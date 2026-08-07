@@ -10,7 +10,19 @@ from tankpit_bot.bot.tick_loop_command_errors import _emit_command_rejected_outc
 from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.ledger.outcome.teleport import TeleportDispatchContract
 from tankpit_bot.ledger.ring import outcome_counts
+from tankpit_bot.ledger.service import LedgerService
+from tankpit_bot.sniffer.world_state import get_world_service
 from tests.conftest import FakeEnv
+
+
+@pytest.fixture()
+def ledger() -> LedgerService:
+    """Return a ledger this test alone owns.
+
+    Returns:
+        A fresh, empty ledger.
+    """
+    return LedgerService()
 
 
 def test_command_rejected_dispatcher_routes_every_kind(fake_env: FakeEnv) -> None:
@@ -30,8 +42,8 @@ def test_command_rejected_dispatcher_routes_every_kind(fake_env: FakeEnv) -> Non
     _emit_command_rejected_outcome(bot, "scan", 1, 2, 100, 0)
     _emit_command_rejected_outcome(bot, "map_open", 1, 2, 100, 0)
     for kind in ("move", "teleport", "scan", "map_open"):
-        assert outcome_counts(kind) == {"command_rejected": 1}
-    assert outcome_counts("collect") == {
+        assert outcome_counts(get_world_service().ledger, kind) == {"command_rejected": 1}
+    assert outcome_counts(get_world_service().ledger, "collect") == {
         "command_rejected": 1,
         "pickup_empty": 1,
         "clamped_transfer": 1,
@@ -48,7 +60,7 @@ def test_stall_dispatcher_routes_every_kind(fake_env: FakeEnv) -> None:
     _emit_stall_outcome(bot, "scan", 1, 2, 10000, 10000)
     _emit_stall_outcome(bot, "map_open", 1, 2, 10000, 10000)
     for kind in ("move", "collect", "teleport", "scan", "map_open"):
-        assert outcome_counts(kind) == {"stall_timeout": 1}
+        assert outcome_counts(get_world_service().ledger, kind) == {"stall_timeout": 1}
 
 
 def test_dispatchers_ignore_shoot_kind(fake_env: FakeEnv) -> None:
@@ -61,16 +73,18 @@ def test_dispatchers_ignore_shoot_kind(fake_env: FakeEnv) -> None:
     bot = Bot("https://test.tankpit.com/", headless=True)
     _emit_command_rejected_outcome(bot, "shoot", 1, 2, 100, 0)
     _emit_stall_outcome(bot, "none", 1, 2, 100, 100)
-    assert outcome_counts("shoot") == {}
+    assert outcome_counts(get_world_service().ledger, "shoot") == {}
 
 
-def test_teleport_dispatch_contract_names_itself_and_rejects_bad_input() -> None:
+def test_teleport_dispatch_contract_names_itself_and_rejects_bad_input(
+    ledger: LedgerService,
+) -> None:
     """The dispatch contract exposes its name and raises on violations."""
     contract = TeleportDispatchContract()
     assert contract.name == "teleport_dispatch"
     with pytest.raises(LedgerInvariantError) as exc:
-        contract.check(target_x=300, target_y=20, message_index=0, sent_window="w")
+        contract.check(ledger, target_x=300, target_y=20, message_index=0, sent_window="w")
     assert exc.value.details == {"target_x": "300", "target_y": "20"}
     with pytest.raises(LedgerInvariantError) as exc:
-        contract.check(target_x=10, target_y=20, message_index=-1, sent_window="w")
+        contract.check(ledger, target_x=10, target_y=20, message_index=-1, sent_window="w")
     assert exc.value.details == {"message_index": "-1", "sent_window": "w"}

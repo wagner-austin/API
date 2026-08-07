@@ -216,14 +216,16 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     Centralising the reset here (top-level autouse) means every test
     inherits the same clean baseline regardless of which directory it
     lives in -- no duplicated per-file fixtures, no missed resets.
+
+    Down to TWO calls. The six ledger resets that used to run here
+    (event ids, outcome rings, decision records, mode transitions,
+    outcome-pairing trackers, teleport dispatch) are gone: that state
+    now lives on ``WorldService.ledger``, so resetting the world
+    resets the ledger with it ([[session-state-deglobalisation]] step
+    6). ``reset_world_state`` is the last session reset standing, and
+    step 8 removes it.
     """
     from tankpit_bot.capture.xor import reset_static_key_cache
-    from tankpit_bot.ledger.decision import reset_decision_records
-    from tankpit_bot.ledger.events import reset_event_ids
-    from tankpit_bot.ledger.mode_transition import reset_mode_transitions
-    from tankpit_bot.ledger.outcome._emit import reset_action_outcome_tracking
-    from tankpit_bot.ledger.outcome.teleport import reset_teleport_dispatch_tracking
-    from tankpit_bot.ledger.ring import reset_outcome_rings
     from tankpit_bot.sniffer.world_state import reset_world_state
 
     reset_world_state()
@@ -232,21 +234,9 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     # remains is the process-wide static-KEY cache, which a test with a
     # faked filesystem can poison for later tests.
     reset_static_key_cache()
-    reset_event_ids()
-    reset_action_outcome_tracking()
-    reset_outcome_rings()
-    reset_teleport_dispatch_tracking()
-    reset_decision_records()
-    reset_mode_transitions()
     yield
     reset_world_state()
     reset_static_key_cache()
-    reset_event_ids()
-    reset_action_outcome_tracking()
-    reset_outcome_rings()
-    reset_teleport_dispatch_tracking()
-    reset_decision_records()
-    reset_mode_transitions()
 
 
 class FakeEnv:

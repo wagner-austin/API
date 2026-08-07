@@ -19,30 +19,19 @@ one outcome -- the still-pending set at session end is exposed via
 
 from __future__ import annotations
 
-from tankpit_bot.ledger.events import ACTION_KINDS, ActionKind, next_event_id
+from tankpit_bot.ledger.events import ActionKind
 from tankpit_bot.ledger.outcomes import ActionOutcome
-from tankpit_bot.ledger.ring import ActionOutcomeRecordDict, append_outcome_record
+from tankpit_bot.ledger.records import ActionOutcomeRecordDict
+from tankpit_bot.ledger.ring import append_outcome_record
+from tankpit_bot.ledger.service import LedgerService
 from tankpit_bot.runtime_logging import emit_diagnostic
 
-_attempt_counters: dict[ActionKind, int] = dict.fromkeys(ACTION_KINDS, 0)
-_pending_decisions: dict[ActionKind, int] = {}
-_resolved_decision_ids: set[int] = set()
 
-
-def _next_attempt_id(action_kind: ActionKind) -> int:
-    """Return the next attempt id for a kind (strictly monotonic).
-
-    Args:
-        action_kind: Kind whose counter advances.
-
-    Returns:
-        Strictly increasing integer per kind, starting at 1.
-    """
-    _attempt_counters[action_kind] += 1
-    return _attempt_counters[action_kind]
-
-
-def register_pending_decision(action_kind: ActionKind, event_id: int) -> None:
+def register_pending_decision(
+    ledger: LedgerService,
+    action_kind: ActionKind,
+    event_id: int,
+) -> None:
     """Register a decision as the causal parent of the kind's next outcome.
 
     A prior unresolved decision of the same kind is closed with a
@@ -50,21 +39,27 @@ def register_pending_decision(action_kind: ActionKind, event_id: int) -> None:
     replaced its own plan before the wire resolved it).
 
     Args:
+        ledger: Session ledger holding the pairing state.
         action_kind: Kind the decision's command maps to.
         event_id: The recorded decision's event id.
     """
-    prior = _pending_decisions.get(action_kind)
+    prior = ledger.pending_decisions.get(action_kind)
     if prior is not None:
         emit_action_outcome(
+            ledger,
             action_kind=action_kind,
             outcome="superseded",
             duration_ms=0,
             superseded_by=event_id,
         )
-    _pending_decisions[action_kind] = event_id
+    ledger.pending_decisions[action_kind] = event_id
 
 
-def transfer_pending_decision(from_kind: ActionKind, to_kind: ActionKind) -> None:
+def transfer_pending_decision(
+    ledger: LedgerService,
+    from_kind: ActionKind,
+    to_kind: ActionKind,
+) -> None:
     """Move a pending decision to the kind its tick actually produced.
 
     Used when a dispatch path substitutes a different wire action for
@@ -79,17 +74,21 @@ def transfer_pending_decision(from_kind: ActionKind, to_kind: ActionKind) -> Non
     normal registration path.
 
     Args:
+        ledger: Session ledger holding the pairing state.
         from_kind: Kind the decision was recorded under.
         to_kind: Kind whose next outcome will resolve the decision.
     """
-    moved = _pending_decisions.pop(from_kind, None)
+    moved = ledger.pending_decisions.pop(from_kind, None)
     if moved is None:
         return
-    register_pending_decision(to_kind, moved)
+    register_pending_decision(ledger, to_kind, moved)
 
 
-def pending_decision_ids() -> dict[ActionKind, int]:
+def pending_decision_ids(ledger: LedgerService) -> dict[ActionKind, int]:
     """Return the still-unresolved decision id per action kind.
+
+    Args:
+        ledger: Session ledger holding the pairing state.
 
     Returns:
         Mapping of action kind to its pending decision event id. Empty
@@ -98,27 +97,23 @@ def pending_decision_ids() -> dict[ActionKind, int]:
         legitimately allowed to lack an outcome (the wire never
         answered before shutdown).
     """
-    return dict(_pending_decisions)
+    return dict(ledger.pending_decisions)
 
 
-def resolved_decision_ids() -> set[int]:
+def resolved_decision_ids(ledger: LedgerService) -> set[int]:
     """Return every decision id an outcome has resolved this session.
+
+    Args:
+        ledger: Session ledger holding the pairing state.
 
     Returns:
         Set of decision event ids consumed into ``caused_by``.
     """
-    return set(_resolved_decision_ids)
-
-
-def reset_action_outcome_tracking() -> None:
-    """Reset attempt counters + pairing state. Test-isolation hook."""
-    for kind in ACTION_KINDS:
-        _attempt_counters[kind] = 0
-    _pending_decisions.clear()
-    _resolved_decision_ids.clear()
+    return set(ledger.resolved_decision_ids)
 
 
 def emit_action_outcome(
+    ledger: LedgerService,
     *,
     action_kind: ActionKind,
     outcome: ActionOutcome,
@@ -131,6 +126,7 @@ def emit_action_outcome(
     -- the outcome resolves that decision.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         action_kind: Kind of action that resolved.
         outcome: Outcome label from the kind's outcome union.
         duration_ms: Wall-clock ms from dispatch to resolution; ``-1``
@@ -141,19 +137,19 @@ def emit_action_outcome(
     Returns:
         The recorded outcome, as appended to the kind's ring.
     """
-    caused_by = _pending_decisions.pop(action_kind, 0)
+    caused_by = ledger.pending_decisions.pop(action_kind, 0)
     if caused_by != 0:
-        _resolved_decision_ids.add(caused_by)
+        ledger.resolved_decision_ids.add(caused_by)
     record = ActionOutcomeRecordDict(
-        event_id=next_event_id(),
-        attempt_id=_next_attempt_id(action_kind),
+        event_id=ledger.next_event_id(),
+        attempt_id=ledger.next_attempt_id(action_kind),
         action_kind=action_kind,
         outcome=outcome,
         duration_ms=duration_ms,
         caused_by=caused_by,
         detail=dict(detail),
     )
-    append_outcome_record(record)
+    append_outcome_record(ledger, record)
     emit_diagnostic(
         diagnostic_kind="action_outcome",
         action_kind=action_kind,
@@ -171,7 +167,6 @@ __all__ = [
     "emit_action_outcome",
     "pending_decision_ids",
     "register_pending_decision",
-    "reset_action_outcome_tracking",
     "resolved_decision_ids",
     "transfer_pending_decision",
 ]

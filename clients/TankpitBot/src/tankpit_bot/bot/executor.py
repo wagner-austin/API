@@ -313,7 +313,7 @@ def _dispatch_teleport_command(
         )
         # This tick's product is the map open, not the teleport: the
         # recorded teleport decision resolves via the map_open outcome.
-        transfer_pending_decision("teleport", "map_open")
+        transfer_pending_decision(get_world_service().ledger, "teleport", "map_open")
         return bot.open_map()
     emit_diagnostic(
         diagnostic_kind="map_open_skipped_already_open",
@@ -338,6 +338,7 @@ def _dispatch_teleport_command(
     if dispatched:
         _record_teleport_fuel_entry(command["target_x"], command["target_y"])
         record_teleport_dispatch(
+            get_world_service().ledger,
             target_x=command["target_x"],
             target_y=command["target_y"],
             message_index=message_index,
@@ -424,6 +425,7 @@ def execute(
     ledger_kind = _LEDGER_KIND_BY_CMD_TYPE.get(command["cmd_type"])
     if ledger_kind is not None:
         record_decision(
+            get_world_service().ledger,
             action_kind=ledger_kind,
             cmd_type=command["cmd_type"],
             mode=behavior["mode"],

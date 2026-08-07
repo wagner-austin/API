@@ -251,9 +251,51 @@ rather than the refactor.[^3]
    `reset_client_structure_survey` was in the ten-call conftest list,
    so that list is now NINE calls (eight session resets plus the
    process-wide `reset_static_key_cache`).
-6. **Ledger cluster** — events counter, teleport `_pending`, `_rings`,
-   `_emit` trackers, `_decisions`, `_transitions`. These form one
-   bookkeeping layer and move together.
+6. ~~**Ledger cluster**~~ **SHIPPED 2026-08-07.** All six globals —
+   `_event_counter`, `_rings`, `_decisions`, `_transitions`, the three
+   `_emit` pairing trackers, and the teleport `_pending` — are now
+   instance attributes on the new `ledger/service.py::LedgerService`.
+   The package holds **zero** module-level mutable globals, zero
+   `global` statements, and zero `reset_*` functions.
+
+   **The blocker dissolved instead of being worked around.** This page
+   previously recorded step 6 as blocked on one function:
+   `pending_teleport_target`, read by
+   `sniffer/world_state_dispatch_containers.py`, whose only session
+   handle is the `WorldService` singleton. The recorded options were
+   "run step 8 first" or "leave teleport-dispatch tracking behind",
+   and putting the ledger on `WorldService` was dismissed as *fake
+   progress — the state would still be reached through a module
+   global*.
+
+   That dismissal was wrong, and the reason matters. `WorldService`
+   already owns three ledger books (`fuel_book`, `damage_book`,
+   `ammo_book`), so ledger state on the session service was settled
+   precedent, not a new conflation. More importantly the objection
+   confused two different things: six globals that **cannot** be
+   duplicated per session, versus one lookup that is already scheduled
+   for deletion. Moving them to `ws.ledger` means two sessions in one
+   process now keep two independent ledgers — which the module globals
+   made impossible. The remaining `get_world_service()` at the call
+   sites is step 8's single global, not six.
+
+   The displacement receipt is exactly why the ledger belongs beside
+   the books: the executor records a teleport dispatch and the 0x5A
+   dispatch handler reads it back to spot server displacement. The
+   service is the only handle both the command layer and the wire
+   layer hold.
+
+   Structural note: `ledger/records.py` is new and holds the four
+   record `TypedDict`s. `LedgerService` must type its attributes, and
+   the modules defining those attributes take the service as a
+   parameter — the shapes had to live somewhere neither imports, or
+   the cluster closes an import cycle.
+
+   **This is the third step to move the completion criterion, and the
+   largest.** Six of the eight conftest resets are gone. The list is
+   now **TWO** calls: `reset_world_state` and the process-wide
+   `reset_static_key_cache`. Step 8 removes the first; the second is
+   not session state.
 7. ~~**`bot/ai/collect_common.py`**~~ **SHIPPED 2026-08-07 — by
    DELETION.** The container blacklist was never de-globalised because
    it was never alive: `blacklist_container` has **no caller in

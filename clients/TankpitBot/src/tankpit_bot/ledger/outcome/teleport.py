@@ -15,13 +15,15 @@ resource target, invalid resource-target source).
 
 from __future__ import annotations
 
-from typing_extensions import TypedDict
-
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.contracts.enforcement import enforce_contract, require
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
-from tankpit_bot.ledger.ring import ActionOutcomeRecordDict
+from tankpit_bot.ledger.records import (
+    ActionOutcomeRecordDict,
+    PendingTeleportDispatchDict,
+)
+from tankpit_bot.ledger.service import LedgerService
 from tankpit_bot.types.message import CapturedMessage
 
 _WINDOW_MESSAGE_LIMIT = 12
@@ -30,45 +32,21 @@ _WINDOW_PAYLOAD_HEAD = 24
 _NO_WINDOW = "(none)"
 
 
-class _PendingTeleportDispatchDict(TypedDict):
-    """Dispatch context held until a completion gate resolves the attempt.
-
-    Attributes:
-        target_x: Requested landing X coordinate.
-        target_y: Requested landing Y coordinate.
-        started_ms: Wall-clock dispatch time.
-        message_index: Length of the captured-message list at dispatch;
-            everything after this index is the attempt's wire window.
-        sent_window: Compact live-client context at dispatch time.
-    """
-
-    target_x: int
-    target_y: int
-    started_ms: int
-    message_index: int
-    sent_window: str
-
-
-_pending: _PendingTeleportDispatchDict | None = None
-
-
-def reset_teleport_dispatch_tracking() -> None:
-    """Clear the pending dispatch. Called from test-isolation fixtures."""
-    global _pending
-    _pending = None
-
-
-def pending_teleport_target() -> tuple[int, int] | None:
+def pending_teleport_target(ledger: LedgerService) -> tuple[int, int] | None:
     """Return the requested landing tile of the in-flight teleport.
+
+    Args:
+        ledger: Session ledger holding the dispatch context.
 
     Returns:
         ``(target_x, target_y)`` from the dispatch context the executor
         recorded when it sent the wire teleport, or ``None`` when no
         teleport is in flight.
     """
-    if _pending is None:
+    pending = ledger.pending_teleport
+    if pending is None:
         return None
-    return (_pending["target_x"], _pending["target_y"])
+    return (pending["target_x"], pending["target_y"])
 
 
 class TeleportDispatchContract:
@@ -81,6 +59,7 @@ class TeleportDispatchContract:
 
     def check(
         self,
+        ledger: LedgerService,
         *,
         target_x: int,
         target_y: int,
@@ -89,7 +68,13 @@ class TeleportDispatchContract:
     ) -> None:
         """Validate a dispatch context before it enters the ledger.
 
+        The contract's signature mirrors the guarded function's, which
+        is what makes enforcement type-preserving -- so ``ledger`` is
+        declared and unread: the invariants are over the dispatch
+        context, not over which ledger receives it.
+
         Args:
+            ledger: Session ledger the context is bound for; unread.
             target_x: Requested landing X coordinate.
             target_y: Requested landing Y coordinate.
             message_index: Captured-message count at dispatch time.
@@ -99,6 +84,7 @@ class TeleportDispatchContract:
             LedgerInvariantError: If the coordinates are off-map or
                 the message index is negative.
         """
+        _ = ledger
         require(
             0 <= target_x <= 255 and 0 <= target_y <= 255,
             LedgerInvariantError,
@@ -115,6 +101,7 @@ class TeleportDispatchContract:
 
 @enforce_contract(TeleportDispatchContract())
 def record_teleport_dispatch(
+    ledger: LedgerService,
     *,
     target_x: int,
     target_y: int,
@@ -124,14 +111,14 @@ def record_teleport_dispatch(
     """Record the dispatch context for the teleport just sent.
 
     Args:
+        ledger: Session ledger receiving the dispatch context.
         target_x: Requested landing X coordinate.
         target_y: Requested landing Y coordinate.
         message_index: Captured-message count at dispatch time.
         sent_window: Compact live-client context at dispatch time
             (formatted by the executor from this tick's snapshot).
     """
-    global _pending
-    _pending = _PendingTeleportDispatchDict(
+    ledger.pending_teleport = PendingTeleportDispatchDict(
         target_x=target_x,
         target_y=target_y,
         started_ms=get_current_time_ms(),
@@ -159,10 +146,14 @@ def _format_message_window(messages: list[CapturedMessage]) -> str:
     return " | ".join(parts)
 
 
-def _consume_pending_windows(messages: list[CapturedMessage]) -> tuple[str, str]:
+def _consume_pending_windows(
+    ledger: LedgerService,
+    messages: list[CapturedMessage],
+) -> tuple[str, str]:
     """Resolve and clear the pending dispatch's wire windows.
 
     Args:
+        ledger: Session ledger holding the dispatch context.
         messages: The bot's full captured-message list.
 
     Returns:
@@ -170,11 +161,10 @@ def _consume_pending_windows(messages: list[CapturedMessage]) -> tuple[str, str]
         gate fired without a recorded dispatch (e.g. tracking reset
         between dispatch and completion).
     """
-    global _pending
-    if _pending is None:
+    pending = ledger.pending_teleport
+    if pending is None:
         return (_NO_WINDOW, _NO_WINDOW)
-    pending = _pending
-    _pending = None
+    ledger.pending_teleport = None
     return (
         pending["sent_window"],
         _format_message_window(messages[pending["message_index"] :]),
@@ -182,6 +172,7 @@ def _consume_pending_windows(messages: list[CapturedMessage]) -> tuple[str, str]
 
 
 def emit_teleport_landed(
+    ledger: LedgerService,
     *,
     duration_ms: int,
     target_x: int,
@@ -193,6 +184,7 @@ def emit_teleport_landed(
     """Record a confirmed teleport landing (exact or displaced).
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-landing wall-clock ms.
         target_x: Requested landing X.
         target_y: Requested landing Y.
@@ -203,9 +195,10 @@ def emit_teleport_landed(
     Returns:
         The recorded outcome (``landed_exact`` or ``landed_inexact``).
     """
-    sent_window, received_window = _consume_pending_windows(messages)
+    sent_window, received_window = _consume_pending_windows(ledger, messages)
     exact = landed_x == target_x and landed_y == target_y
     return emit_action_outcome(
+        ledger,
         action_kind="teleport",
         outcome="landed_exact" if exact else "landed_inexact",
         duration_ms=duration_ms,
@@ -219,6 +212,7 @@ def emit_teleport_landed(
 
 
 def emit_teleport_stall_timeout(
+    ledger: LedgerService,
     *,
     duration_ms: int,
     target_x: int,
@@ -229,6 +223,7 @@ def emit_teleport_stall_timeout(
     """Record a teleport that stalled past its timeout.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-stall wall-clock ms.
         target_x: Requested landing X.
         target_y: Requested landing Y.
@@ -238,8 +233,9 @@ def emit_teleport_stall_timeout(
     Returns:
         The recorded outcome.
     """
-    sent_window, received_window = _consume_pending_windows(messages)
+    sent_window, received_window = _consume_pending_windows(ledger, messages)
     return emit_action_outcome(
+        ledger,
         action_kind="teleport",
         outcome="stall_timeout",
         duration_ms=duration_ms,
@@ -252,6 +248,7 @@ def emit_teleport_stall_timeout(
 
 
 def emit_teleport_command_rejected(
+    ledger: LedgerService,
     *,
     duration_ms: int,
     target_x: int,
@@ -262,6 +259,7 @@ def emit_teleport_command_rejected(
     """Record a teleport the server refused with a 0x52 Supervisor error.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-rejection wall-clock ms.
         target_x: Requested landing X.
         target_y: Requested landing Y.
@@ -271,8 +269,9 @@ def emit_teleport_command_rejected(
     Returns:
         The recorded outcome.
     """
-    sent_window, received_window = _consume_pending_windows(messages)
+    sent_window, received_window = _consume_pending_windows(ledger, messages)
     return emit_action_outcome(
+        ledger,
         action_kind="teleport",
         outcome="command_rejected",
         duration_ms=duration_ms,
@@ -291,5 +290,4 @@ __all__ = [
     "emit_teleport_stall_timeout",
     "pending_teleport_target",
     "record_teleport_dispatch",
-    "reset_teleport_dispatch_tracking",
 ]

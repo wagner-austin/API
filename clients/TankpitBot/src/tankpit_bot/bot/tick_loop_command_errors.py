@@ -384,7 +384,11 @@ def _emit_command_rejected_outcome(
     """
     if kind == "move":
         emit_move_command_rejected(
-            duration_ms=elapsed_ms, target_x=tx, target_y=ty, error_code=error_code
+            get_world_service().ledger,
+            duration_ms=elapsed_ms,
+            target_x=tx,
+            target_y=ty,
+            error_code=error_code,
         )
     elif kind == "collect":
         # Codes 4/5/7 are resolutions, not refusals (2026-07-19): the
@@ -394,17 +398,28 @@ def _emit_command_rejected_outcome(
         # genuine refusals (code 0 geometry, code 1 can't-go) stay
         # ``command_rejected``.
         if error_code == SUPERVISOR_ERROR_EMPTY_CONTAINER:
-            emit_collect_pickup_empty(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
+            emit_collect_pickup_empty(
+                get_world_service().ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
+            )
         elif error_code == SUPERVISOR_ERROR_TANK_FULL:
-            emit_collect_clamped_transfer(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
+            emit_collect_clamped_transfer(
+                get_world_service().ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
+            )
         elif error_code == SUPERVISOR_ERROR_INVENTORY_FULL:
-            emit_collect_inventory_full(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
+            emit_collect_inventory_full(
+                get_world_service().ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
+            )
         else:
             emit_collect_command_rejected(
-                duration_ms=elapsed_ms, target_x=tx, target_y=ty, error_code=error_code
+                get_world_service().ledger,
+                duration_ms=elapsed_ms,
+                target_x=tx,
+                target_y=ty,
+                error_code=error_code,
             )
     elif kind == "teleport":
         emit_teleport_command_rejected(
+            get_world_service().ledger,
             duration_ms=elapsed_ms,
             target_x=tx,
             target_y=ty,
@@ -413,10 +428,16 @@ def _emit_command_rejected_outcome(
         )
     elif kind == "scan":
         emit_scan_command_rejected(
-            duration_ms=elapsed_ms, target_x=tx, target_y=ty, error_code=error_code
+            get_world_service().ledger,
+            duration_ms=elapsed_ms,
+            target_x=tx,
+            target_y=ty,
+            error_code=error_code,
         )
     elif kind == "map_open":
-        emit_map_open_command_rejected(duration_ms=elapsed_ms, error_code=error_code)
+        emit_map_open_command_rejected(
+            get_world_service().ledger, duration_ms=elapsed_ms, error_code=error_code
+        )
 
 
 __all__ = [

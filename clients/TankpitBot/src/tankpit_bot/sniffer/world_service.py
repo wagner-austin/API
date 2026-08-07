@@ -26,6 +26,7 @@ from tankpit_bot.inventory import (
 from tankpit_bot.ledger.ammo_book import AmmoBookDict, make_ammo_book
 from tankpit_bot.ledger.damage_book import DamageBookDict, make_damage_book
 from tankpit_bot.ledger.fuel_book import FuelBookDict, make_fuel_book
+from tankpit_bot.ledger.service import LedgerService
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service_movement import WorldServiceMovementMixin
 from tankpit_bot.sniffer.world_service_radar import WorldServiceRadarMixin
@@ -90,6 +91,12 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin):
         self.fuel_book: FuelBookDict = make_fuel_book()
         self.ammo_book: AmmoBookDict = make_ammo_book()
         self.damage_book: DamageBookDict = make_damage_book()
+        # The ledger sits here beside the three books because the wire
+        # layer and the command layer must share ONE of it: the executor
+        # records a teleport dispatch and the 0x5A dispatch handler reads
+        # it back to spot server displacement. The service is the only
+        # handle both layers hold ([[session-state-deglobalisation]]).
+        self.ledger: LedgerService = LedgerService()
         self.terrain_map: _test_hooks.TerrainMapProtocol | None = None
         self.room_images: dict[str, str] = {}
         self.selected_room: str | None = None

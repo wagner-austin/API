@@ -3432,3 +3432,93 @@ header the `tail` had cut off. The guard was actually exiting 2 on a
 the second time in two sessions that a guard summary read clean while
 the guard failed. Redirect to a file and echo `$?` from the unpiped
 command.
+
+## 2026-08-07 — Step 6: the ledger cluster, and a blocker that was never real
+
+All six ledger globals are gone. `src/tankpit_bot/ledger/` now holds
+zero module-level mutable state, zero `global` statements, and zero
+`reset_*` functions. `make check` exit 0: 6191 passed, 100.00% coverage
+with 0 missed statements and 0 partial branches, mypy clean on 1102
+files, ruff clean, guard clean.
+
+### I had recorded this step as blocked. The block was my own reasoning.
+
+The previous entry said step 6 was blocked on exactly one function —
+`pending_teleport_target`, read by the wire-dispatch layer whose only
+session handle is the `WorldService` singleton — and dismissed the
+obvious fix: "putting the ledger on `WorldService` would make it work
+today and be fake progress; the state would still be reached through a
+module global."
+
+Two things were wrong with that.
+
+First, the precedent already existed and I had not checked it.
+`WorldService` has owned `fuel_book`, `damage_book` and `ammo_book`
+since they landed — three ledger types, on the session service. Ledger
+state living there was settled, not novel.
+
+Second, and more important, the objection conflated two different
+problems. Six module globals **cannot** be duplicated per session: two
+sessions in one process share one decision store, one event counter,
+one set of rings, and there is no way to ask for a second. Moving them
+onto `ws.ledger` makes that possible immediately. That the call sites
+still find their service via `get_world_service()` is *one* global that
+step 8 already exists to delete. Trading six impossible-to-duplicate
+globals for one scheduled-for-deletion lookup is not fake progress; it
+is the actual progress, and I talked myself out of it.
+
+The displacement receipt is the clearest argument for the placement:
+the executor records a teleport dispatch and the 0x5A dispatch handler
+reads it back to detect server displacement. The command layer and the
+wire layer must share ONE ledger, and the service is the only handle
+both hold.
+
+### Shape
+
+`ledger/service.py::LedgerService` owns the event counter, per-kind
+outcome rings, decision store, mode-transition log, the three pairing
+trackers and the pending teleport dispatch. Fifty functions across ten
+modules take it as their first parameter.
+
+`ledger/records.py` is new and holds the four record `TypedDict`s.
+It exists for one reason: `LedgerService` must type its attributes, and
+the modules that define those attributes now import `LedgerService` —
+so the shapes had to move somewhere neither side imports, or the
+cluster closes an import cycle.
+
+### Three things fell out that were not the target
+
+The `@enforce_contract` decorator is `ParamSpec`-generic, so a
+contract's `check()` must carry the *same* signature as the function it
+guards. Adding a first parameter to `record_decision` and
+`record_teleport_dispatch` therefore required adding it to both
+contracts, where it is declared and deliberately unread — the
+invariants are over the record, not over which ledger receives it. That
+is the price of type-preserving enforcement, and it is stated in the
+docstrings rather than left to puzzle over.
+
+Both `ledger/__init__.py` files were pure re-export blocks with **zero
+importers** — nothing in `src/`, `tests/` or `scripts/` imported from
+the package level. They now declare `__all__ = ()` and export nothing.
+The claim block had been dutifully binding nine addresses (seven
+outcome aliases plus two functions) that no code used.
+
+The wiki claim count fell 77 → 65. Every deletion is a symbol that
+stopped existing: six reset functions, `next_event_id` (now a service
+method), and those nine dead re-exports. Four record types moved
+address rather than dying. The prose stating the old count and
+describing the re-exports was rewritten, not left stale — the physics
+claim binder catches the addresses, not the sentences around them.
+
+### Payoff
+
+`tests/conftest.py::_isolate_protocol_singletons` is down from eight
+calls to **TWO**: `reset_world_state` and the process-wide
+`reset_static_key_cache`. Step 8 removes the first. The second is not
+session state and never was.
+
+The ledger tests migrated the same way the world-state tests did last
+entry: a `ledger` fixture returning `LedgerService()` replaces four
+reset calls per test. Tests that drive the real fabric through `Bot`
+read `get_world_service().ledger` instead — they must observe the
+ledger the bot actually wrote to, not a fresh one.

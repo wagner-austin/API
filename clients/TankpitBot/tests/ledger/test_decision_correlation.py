@@ -22,18 +22,31 @@ from tankpit_bot.ledger.outcome.shoot import (
     emit_shoot_miss,
 )
 from tankpit_bot.ledger.ring import recent_outcomes
+from tankpit_bot.ledger.service import LedgerService
 
 
-def _record_move_decision(score: int = 800) -> int:
+@pytest.fixture()
+def ledger() -> LedgerService:
+    """Return a ledger this test alone owns.
+
+    Returns:
+        A fresh, empty ledger.
+    """
+    return LedgerService()
+
+
+def _record_move_decision(ledger: LedgerService, score: int = 800) -> int:
     """Record a canonical move decision for pairing tests.
 
     Args:
+        ledger: Session ledger receiving the decision.
         score: Behavior score to stamp.
 
     Returns:
         The recorded decision's event id.
     """
     return record_decision(
+        ledger,
         action_kind="move",
         cmd_type="move",
         mode="COLLECT",
@@ -46,16 +59,16 @@ def _record_move_decision(score: int = 800) -> int:
     )
 
 
-def test_outcome_consumes_pending_decision_into_caused_by() -> None:
+def test_outcome_consumes_pending_decision_into_caused_by(ledger: LedgerService) -> None:
     """The next outcome of a kind resolves the recorded decision."""
-    decision_id = _record_move_decision()
-    assert pending_decision_ids() == {"move": decision_id}
+    decision_id = _record_move_decision(ledger)
+    assert pending_decision_ids(ledger) == {"move": decision_id}
     outcome = emit_move_position_reached(
-        duration_ms=500, target_x=10, target_y=20, landed_x=10, landed_y=20
+        ledger, duration_ms=500, target_x=10, target_y=20, landed_x=10, landed_y=20
     )
     assert outcome["caused_by"] == decision_id
-    assert pending_decision_ids() == {}
-    stored = decision_record(decision_id)
+    assert pending_decision_ids(ledger) == {}
+    stored = decision_record(ledger, decision_id)
     assert stored == {
         "event_id": decision_id,
         "action_kind": "move",
@@ -70,53 +83,54 @@ def test_outcome_consumes_pending_decision_into_caused_by() -> None:
     }
 
 
-def test_superseding_decision_closes_the_prior_one() -> None:
+def test_superseding_decision_closes_the_prior_one(ledger: LedgerService) -> None:
     """A re-dispatch closes the unresolved prior decision explicitly."""
-    first_id = _record_move_decision()
-    second_id = _record_move_decision(score=900)
-    records = recent_outcomes("move", 5)
+    first_id = _record_move_decision(ledger)
+    second_id = _record_move_decision(ledger, score=900)
+    records = recent_outcomes(ledger, "move", 5)
     assert len(records) == 1
     assert records[0]["outcome"] == "superseded"
     assert records[0]["caused_by"] == first_id
     assert records[0]["detail"] == {"superseded_by": second_id}
-    assert pending_decision_ids() == {"move": second_id}
+    assert pending_decision_ids(ledger) == {"move": second_id}
 
 
-def test_outcome_without_recorded_decision_is_unattributed() -> None:
+def test_outcome_without_recorded_decision_is_unattributed(ledger: LedgerService) -> None:
     """Emitters fired with no pending decision record caused_by=0."""
-    outcome = emit_shoot_miss(duration_ms=100, target_id=5, target_name="x")
+    outcome = emit_shoot_miss(ledger, duration_ms=100, target_id=5, target_name="x")
     assert outcome["caused_by"] == 0
 
 
-def test_verify_outcome_invariant_passes_with_pending_and_resolved() -> None:
+def test_verify_outcome_invariant_passes_with_pending_and_resolved(ledger: LedgerService) -> None:
     """The sweep accepts resolved decisions plus the pending tail."""
-    first = _record_move_decision()
-    emit_move_position_reached(duration_ms=1, target_x=10, target_y=20, landed_x=10, landed_y=20)
-    tail = _record_move_decision()
-    unresolved = verify_outcome_invariant()
+    first = _record_move_decision(ledger)
+    emit_move_position_reached(
+        ledger, duration_ms=1, target_x=10, target_y=20, landed_x=10, landed_y=20
+    )
+    tail = _record_move_decision(ledger)
+    unresolved = verify_outcome_invariant(ledger)
     assert unresolved == {"move": tail}
     assert first != tail
 
 
-def test_verify_outcome_invariant_raises_on_bypassed_fabric() -> None:
+def test_verify_outcome_invariant_raises_on_bypassed_fabric(ledger: LedgerService) -> None:
     """A decision resolved outside the fabric is a hard violation."""
-    from tankpit_bot.ledger.outcome import _emit
-
-    decision_id = _record_move_decision()
+    decision_id = _record_move_decision(ledger)
     # Simulate a bypass: something cleared the pending pairing without
     # emitting an outcome for it.
-    _emit._pending_decisions.clear()
+    ledger.pending_decisions.clear()
     with pytest.raises(LedgerInvariantError) as exc:
-        verify_outcome_invariant()
+        verify_outcome_invariant(ledger)
     assert exc.value.details == {"orphan_decision_ids": str(decision_id)}
 
 
-def test_decision_record_contract_rejects_bad_score_and_empty_reason() -> None:
+def test_decision_record_contract_rejects_bad_score_and_empty_reason(ledger: LedgerService) -> None:
     """The record contract enforces score bounds and a present reason."""
     contract = DecisionRecordContract()
     assert contract.name == "decision_record"
     with pytest.raises(LedgerInvariantError):
         record_decision(
+            ledger,
             action_kind="move",
             cmd_type="move",
             mode="COLLECT",
@@ -129,6 +143,7 @@ def test_decision_record_contract_rejects_bad_score_and_empty_reason() -> None:
         )
     with pytest.raises(LedgerInvariantError):
         record_decision(
+            ledger,
             action_kind="move",
             cmd_type="move",
             mode="COLLECT",
@@ -141,17 +156,18 @@ def test_decision_record_contract_rejects_bad_score_and_empty_reason() -> None:
         )
 
 
-def test_latest_decision_event_id_tracks_recording() -> None:
+def test_latest_decision_event_id_tracks_recording(ledger: LedgerService) -> None:
     """The latest id is 0 before any record and advances after."""
-    assert latest_decision_event_id() == 0
-    first = _record_move_decision()
-    assert latest_decision_event_id() == first
+    assert latest_decision_event_id(ledger) == 0
+    first = _record_move_decision(ledger)
+    assert latest_decision_event_id(ledger) == first
 
 
-def test_mode_transitions_are_first_class_events() -> None:
+def test_mode_transitions_are_first_class_events(ledger: LedgerService) -> None:
     """Mode flips record event id, reason, and causal decision."""
-    decision_id = _record_move_decision()
+    decision_id = _record_move_decision(ledger)
     record = emit_mode_transition(
+        ledger,
         from_mode="HUNT",
         to_mode="COLLECT",
         reason_kind="fuel_collect",
@@ -161,4 +177,4 @@ def test_mode_transitions_are_first_class_events() -> None:
     assert record["to_mode"] == "COLLECT"
     assert record["caused_by"] == decision_id
     assert record["event_id"] > decision_id
-    assert mode_transitions() == [record]
+    assert mode_transitions(ledger) == [record]

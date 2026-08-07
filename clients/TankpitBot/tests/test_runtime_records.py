@@ -291,6 +291,7 @@ class TestRuntimeContext:
         """
         from tankpit_bot.ledger.outcome.shoot import emit_shoot_miss
         from tankpit_bot.runtime_context import set_runtime_context
+        from tankpit_bot.sniffer.world_state import get_world_service
 
         artifacts = configure_bot_runtime_logging("20260620-150138")
         set_runtime_context(
@@ -298,7 +299,9 @@ class TestRuntimeContext:
             bot_state="HUNT/engaging",
             in_flight_action_kind="shoot",
         )
-        emit_shoot_miss(duration_ms=80, target_id=530, target_name="orange-3")
+        emit_shoot_miss(
+            get_world_service().ledger, duration_ms=80, target_id=530, target_name="orange-3"
+        )
 
         event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
         decoded = narrow_json_to_dict(load_json_str(event_line))

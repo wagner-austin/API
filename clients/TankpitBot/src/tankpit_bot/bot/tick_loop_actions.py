@@ -159,9 +159,13 @@ def _clear_rejected_movement(
     elapsed_ms = now - started_ms if started_ms > 0 else -1
     emit_sync("%s to (%d,%d) rejected by server, replanning", kind, tx, ty)
     if kind == "move":
-        emit_move_movement_rejected(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
+        emit_move_movement_rejected(
+            get_world_service().ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
+        )
     else:
-        emit_collect_movement_rejected(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
+        emit_collect_movement_rejected(
+            get_world_service().ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
+        )
     if kind == "collect":
         increment_container_failed_pickups(get_world_service(), tx, ty)
         emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
@@ -231,14 +235,23 @@ def _emit_stall_outcome(
     """
     if kind == "move":
         emit_move_stall_timeout(
-            duration_ms=elapsed_ms, target_x=tx, target_y=ty, timeout_ms=timeout_ms
+            get_world_service().ledger,
+            duration_ms=elapsed_ms,
+            target_x=tx,
+            target_y=ty,
+            timeout_ms=timeout_ms,
         )
     elif kind == "collect":
         emit_collect_stall_timeout(
-            duration_ms=elapsed_ms, target_x=tx, target_y=ty, timeout_ms=timeout_ms
+            get_world_service().ledger,
+            duration_ms=elapsed_ms,
+            target_x=tx,
+            target_y=ty,
+            timeout_ms=timeout_ms,
         )
     elif kind == "teleport":
         emit_teleport_stall_timeout(
+            get_world_service().ledger,
             duration_ms=elapsed_ms,
             target_x=tx,
             target_y=ty,
@@ -247,10 +260,16 @@ def _emit_stall_outcome(
         )
     elif kind == "scan":
         emit_scan_stall_timeout(
-            duration_ms=elapsed_ms, target_x=tx, target_y=ty, timeout_ms=timeout_ms
+            get_world_service().ledger,
+            duration_ms=elapsed_ms,
+            target_x=tx,
+            target_y=ty,
+            timeout_ms=timeout_ms,
         )
     elif kind == "map_open":
-        emit_map_open_stall_timeout(duration_ms=elapsed_ms, timeout_ms=timeout_ms)
+        emit_map_open_stall_timeout(
+            get_world_service().ledger, duration_ms=elapsed_ms, timeout_ms=timeout_ms
+        )
 
 
 def _mark_current_viewport_scan_failed(bot: Bot, timestamp_ms: int) -> None:
@@ -286,7 +305,7 @@ def _clear_completed_map_open(
         return False
     started_ms = action["started_ms"]
     duration_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
-    emit_map_open_data_processed(duration_ms=duration_ms)
+    emit_map_open_data_processed(get_world_service().ledger, duration_ms=duration_ms)
     bot._state_data = transition_to(
         bot._state_data,
         bot.get_state(),

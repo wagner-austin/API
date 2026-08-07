@@ -174,7 +174,7 @@ class TestClearCommandError:
         assert inv["extra_radars"]["count"] >= cap
         from tankpit_bot.ledger.ring import outcome_counts
 
-        assert outcome_counts("collect") == {"inventory_full": 1}
+        assert outcome_counts(get_world_service().ledger, "collect") == {"inventory_full": 1}
 
     def test_command_error_tank_full_does_not_mark_failed_pickup(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``Tank full`` (code 5) clears the action WITHOUT blacklisting.
@@ -240,7 +240,7 @@ class TestClearCommandError:
         assert container["failed_pickups"] == 0
         from tankpit_bot.ledger.ring import outcome_counts
 
-        assert outcome_counts("collect") == {"clamped_transfer": 1}
+        assert outcome_counts(get_world_service().ledger, "collect") == {"clamped_transfer": 1}
 
     def test_command_error_empty_container_removes_belief(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``Empty container`` (code 4) deletes the container belief.
@@ -302,7 +302,7 @@ class TestClearCommandError:
         assert ws.container_desync_ms > 0
         from tankpit_bot.ledger.ring import outcome_counts
 
-        assert outcome_counts("collect") == {"pickup_empty": 1}
+        assert outcome_counts(get_world_service().ledger, "collect") == {"pickup_empty": 1}
 
     def test_command_error_clears_teleport_action(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``You can't go there!`` aborts a pending teleport in < 1 s."""

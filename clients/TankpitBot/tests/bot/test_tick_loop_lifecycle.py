@@ -13,6 +13,7 @@ import pytest
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot import tick_body as tick_body_module
 from tankpit_bot.bot.base import Bot
+from tankpit_bot.sniffer.world_state import get_world_service
 from tests.bot._tick_loop_fakes import (
     _BrowserClosedPage,
     _fail_tick_once_with_browser_closed,
@@ -247,6 +248,7 @@ class TestAppendIndexRowEndToEnd:
         # One resolved decision (outcome-counts line) plus one still
         # pending at shutdown (unresolved-decisions line).
         record_decision(
+            get_world_service().ledger,
             action_kind="map_open",
             cmd_type="map_open",
             mode="HUNT",
@@ -257,8 +259,9 @@ class TestAppendIndexRowEndToEnd:
             target_y=0,
             target_id=0,
         )
-        emit_map_open_data_processed(duration_ms=500)
+        emit_map_open_data_processed(get_world_service().ledger, duration_ms=500)
         record_decision(
+            get_world_service().ledger,
             action_kind="scan",
             cmd_type="radar",
             mode="HUNT",

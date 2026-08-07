@@ -11,15 +11,23 @@ audit instance #3).
 from __future__ import annotations
 
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
-from tankpit_bot.ledger.ring import ActionOutcomeRecordDict
+from tankpit_bot.ledger.records import ActionOutcomeRecordDict
+from tankpit_bot.ledger.service import LedgerService
 
 
 def emit_collect_position_reached(
-    *, duration_ms: int, target_x: int, target_y: int, landed_x: int, landed_y: int
+    ledger: LedgerService,
+    *,
+    duration_ms: int,
+    target_x: int,
+    target_y: int,
+    landed_x: int,
+    landed_y: int,
 ) -> ActionOutcomeRecordDict:
     """Record a collection that reached the container's tile.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-arrival wall-clock ms.
         target_x: Container X.
         target_y: Container Y.
@@ -30,6 +38,7 @@ def emit_collect_position_reached(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="collect",
         outcome="position_reached",
         duration_ms=duration_ms,
@@ -41,7 +50,13 @@ def emit_collect_position_reached(
 
 
 def emit_collect_container_consumed(
-    *, duration_ms: int, target_x: int, target_y: int, landed_x: int, landed_y: int
+    ledger: LedgerService,
+    *,
+    duration_ms: int,
+    target_x: int,
+    target_y: int,
+    landed_x: int,
+    landed_y: int,
 ) -> ActionOutcomeRecordDict:
     """Record a collection resolved by the container vanishing.
 
@@ -50,6 +65,7 @@ def emit_collect_container_consumed(
     matched the target.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-consumption wall-clock ms.
         target_x: Container X.
         target_y: Container Y.
@@ -60,6 +76,7 @@ def emit_collect_container_consumed(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="collect",
         outcome="container_consumed",
         duration_ms=duration_ms,
@@ -71,11 +88,12 @@ def emit_collect_container_consumed(
 
 
 def emit_collect_movement_rejected(
-    *, duration_ms: int, target_x: int, target_y: int
+    ledger: LedgerService, *, duration_ms: int, target_x: int, target_y: int
 ) -> ActionOutcomeRecordDict:
     """Record a collection walk the server rejected.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-rejection wall-clock ms.
         target_x: Container X.
         target_y: Container Y.
@@ -84,6 +102,7 @@ def emit_collect_movement_rejected(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="collect",
         outcome="movement_rejected",
         duration_ms=duration_ms,
@@ -93,7 +112,7 @@ def emit_collect_movement_rejected(
 
 
 def emit_collect_command_rejected(
-    *, duration_ms: int, target_x: int, target_y: int, error_code: int
+    ledger: LedgerService, *, duration_ms: int, target_x: int, target_y: int, error_code: int
 ) -> ActionOutcomeRecordDict:
     """Record a collection the server genuinely refused with a 0x52 error.
 
@@ -103,6 +122,7 @@ def emit_collect_command_rejected(
     ``inventory_full``).
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-rejection wall-clock ms.
         target_x: Container X.
         target_y: Container Y.
@@ -112,6 +132,7 @@ def emit_collect_command_rejected(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="collect",
         outcome="command_rejected",
         duration_ms=duration_ms,
@@ -122,7 +143,7 @@ def emit_collect_command_rejected(
 
 
 def emit_collect_pickup_empty(
-    *, duration_ms: int, target_x: int, target_y: int
+    ledger: LedgerService, *, duration_ms: int, target_x: int, target_y: int
 ) -> ActionOutcomeRecordDict:
     """Record a pickup that found the container drained (0x52 code 4).
 
@@ -131,6 +152,7 @@ def emit_collect_pickup_empty(
     by the same handler that emits this.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-resolution wall-clock ms.
         target_x: Container X.
         target_y: Container Y.
@@ -139,6 +161,7 @@ def emit_collect_pickup_empty(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="collect",
         outcome="pickup_empty",
         duration_ms=duration_ms,
@@ -148,7 +171,7 @@ def emit_collect_pickup_empty(
 
 
 def emit_collect_clamped_transfer(
-    *, duration_ms: int, target_x: int, target_y: int
+    ledger: LedgerService, *, duration_ms: int, target_x: int, target_y: int
 ) -> ActionOutcomeRecordDict:
     """Record a fuel pickup clamped at the cap (0x52 code 5) -- a success.
 
@@ -159,6 +182,7 @@ def emit_collect_clamped_transfer(
     transfer, not a refusal.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-resolution wall-clock ms.
         target_x: Container X.
         target_y: Container Y.
@@ -167,6 +191,7 @@ def emit_collect_clamped_transfer(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="collect",
         outcome="clamped_transfer",
         duration_ms=duration_ms,
@@ -176,7 +201,7 @@ def emit_collect_clamped_transfer(
 
 
 def emit_collect_inventory_full(
-    *, duration_ms: int, target_x: int, target_y: int
+    ledger: LedgerService, *, duration_ms: int, target_x: int, target_y: int
 ) -> ActionOutcomeRecordDict:
     """Record an equipment pickup refused because ALL slots are full (code 7).
 
@@ -185,6 +210,7 @@ def emit_collect_inventory_full(
     the container (fill-what's-empty mechanic, user 2026-07-18).
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-resolution wall-clock ms.
         target_x: Container X.
         target_y: Container Y.
@@ -193,6 +219,7 @@ def emit_collect_inventory_full(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="collect",
         outcome="inventory_full",
         duration_ms=duration_ms,
@@ -202,11 +229,12 @@ def emit_collect_inventory_full(
 
 
 def emit_collect_stall_timeout(
-    *, duration_ms: int, target_x: int, target_y: int, timeout_ms: int
+    ledger: LedgerService, *, duration_ms: int, target_x: int, target_y: int, timeout_ms: int
 ) -> ActionOutcomeRecordDict:
     """Record a collection that stalled past its timeout.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-stall wall-clock ms.
         target_x: Container X.
         target_y: Container Y.
@@ -216,6 +244,7 @@ def emit_collect_stall_timeout(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="collect",
         outcome="stall_timeout",
         duration_ms=duration_ms,

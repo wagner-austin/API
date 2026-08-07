@@ -265,7 +265,7 @@ def _emit_teleport_displacement(ws: WorldService) -> None:
     Args:
         ws: World service instance.
     """
-    pending = pending_teleport_target()
+    pending = pending_teleport_target(ws.ledger)
     self_state = ws.world_state["self_state"]
     if pending is None or self_state is None:
         return

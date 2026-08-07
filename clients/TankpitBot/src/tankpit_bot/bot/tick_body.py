@@ -181,11 +181,14 @@ def _tick_once(bot: Bot) -> None:
         bot._ai_state = decision["updated_ai_state"]
         if bot._ai_state["mode"] != previous_mode:
             emit_mode_transition(
+                get_world_service().ledger,
                 from_mode=previous_mode,
                 to_mode=bot._ai_state["mode"],
                 reason_kind=decision["behavior"]["reason_kind"],
                 caused_by=(
-                    0 if decision["command"]["cmd_type"] == "hold" else latest_decision_event_id()
+                    0
+                    if decision["command"]["cmd_type"] == "hold"
+                    else latest_decision_event_id(get_world_service().ledger)
                 ),
             )
 

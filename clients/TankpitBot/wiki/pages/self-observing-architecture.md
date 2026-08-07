@@ -250,9 +250,9 @@ claim fails the build.[^guard]
 
 **Read the claim kinds, not the count.** This binding is deliberately
 weaker than the protocol ones, and the split is worth stating plainly:
-of 76 symbols, 7 are constants verified by value and 2 are tables
-verified member-by-member, 13 are record types whose FIELD SETS are
-verified, and 54 are functions and Literal aliases carrying `law`
+of 65 symbols, 7 are constants verified by value and 2 are tables
+verified member-by-member, 14 are record types whose FIELD SETS are
+verified, and 42 are functions and Literal aliases carrying `law`
 claims — prose plus an existence check. A `law` claim does not verify
 behaviour; it catches deletion and rename, nothing more. The
 behavioural guarantees for this package come from
@@ -260,45 +260,29 @@ behavioural guarantees for this package come from
 every public `record_*`/`apply_*`/`mutate_*` here) and from the run
 auditor, not from this block.[^guard]
 
-One structural note the binding surfaced: `ledger.outcome` re-exports
-all seven outcome Literal aliases from `ledger.outcomes`, so both
-addresses are public and both must be claimed. The seven claims on the
-`outcome` package say so rather than restating the definition, which
-lives on `outcomes`.[^guard]
+**The count fell 77 → 65 in step 6, and every deletion is a symbol that
+stopped existing.** Six were the reset functions the module globals
+needed (`reset_event_ids`, `reset_outcome_rings`,
+`reset_decision_records`, `reset_mode_transitions`,
+`reset_action_outcome_tracking`, `reset_teleport_dispatch_tracking`) —
+state that now lives on `LedgerService` is reset by constructing one.
+`next_event_id` became a method on that service. The other nine were
+re-exports through `ledger.outcome`'s `__init__`, which had **no
+importers at all**: the binding had been dutifully claiming an address
+nobody used. Both `ledger` package `__init__` files now declare
+`__all__ = ()` and export nothing; the definitions are claimed where
+they live.[^guard]
+
+Four record types moved rather than died: `ActionOutcomeRecordDict`,
+`DecisionRecordDict`, `ModeTransitionRecordDict` and the newly public
+`PendingTeleportDispatchDict` now sit on `ledger.records`. That module
+exists to break a cycle — `LedgerService` must type its attributes, and
+the modules defining those attributes take the service as a parameter,
+so the shapes had to live somewhere neither imports.[^guard]
 
 ```json claims
 {
   "claims": [
-    {
-      "id": "ammo-book-slot-armor",
-      "code": "tankpit_bot.ledger.ammo_book:SLOT_ARMOR",
-      "value": 0,
-      "means": "equipment slot index for armor/shield"
-    },
-    {
-      "id": "ammo-book-slot-dual",
-      "code": "tankpit_bot.ledger.ammo_book:SLOT_DUAL",
-      "value": 1,
-      "means": "equipment slot index for the dual shot"
-    },
-    {
-      "id": "ammo-book-slot-homing",
-      "code": "tankpit_bot.ledger.ammo_book:SLOT_HOMING",
-      "value": 3,
-      "means": "equipment slot index for the homing shot"
-    },
-    {
-      "id": "ammo-book-slot-missile",
-      "code": "tankpit_bot.ledger.ammo_book:SLOT_MISSILE",
-      "value": 2,
-      "means": "equipment slot index for the missile shot"
-    },
-    {
-      "id": "ammo-book-slot-radar",
-      "code": "tankpit_bot.ledger.ammo_book:SLOT_RADAR",
-      "value": 4,
-      "means": "equipment slot index for the extra radar"
-    },
     {
       "id": "ammo-book-ammoactivitycontract",
       "code": "tankpit_bot.ledger.ammo_book:AmmoActivityContract",
@@ -335,6 +319,36 @@ lives on `outcomes`.[^guard]
         "detail"
       ],
       "means": "Reconciliation result for one snapshot-to-snapshot interval."
+    },
+    {
+      "id": "ammo-book-slot-armor",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_ARMOR",
+      "value": 0,
+      "means": "equipment slot index for armor/shield"
+    },
+    {
+      "id": "ammo-book-slot-dual",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_DUAL",
+      "value": 1,
+      "means": "equipment slot index for the dual shot"
+    },
+    {
+      "id": "ammo-book-slot-homing",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_HOMING",
+      "value": 3,
+      "means": "equipment slot index for the homing shot"
+    },
+    {
+      "id": "ammo-book-slot-missile",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_MISSILE",
+      "value": 2,
+      "means": "equipment slot index for the missile shot"
+    },
+    {
+      "id": "ammo-book-slot-radar",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_RADAR",
+      "value": 4,
+      "means": "equipment slot index for the extra radar"
     },
     {
       "id": "ammo-book-make-ammo-book",
@@ -468,23 +482,6 @@ lives on `outcomes`.[^guard]
       "law": "Structural invariants on a recorded decision."
     },
     {
-      "id": "decision-decisionrecorddict",
-      "code": "tankpit_bot.ledger.decision:DecisionRecordDict",
-      "keys": [
-        "action_kind",
-        "cmd_type",
-        "event_id",
-        "mode",
-        "reason_context",
-        "reason_kind",
-        "score",
-        "target_id",
-        "target_x",
-        "target_y"
-      ],
-      "means": "One recorded planner decision."
-    },
-    {
       "id": "decision-decision-record",
       "code": "tankpit_bot.ledger.decision:decision_record",
       "law": "Return the recorded decision for an event id, if any."
@@ -498,11 +495,6 @@ lives on `outcomes`.[^guard]
       "id": "decision-record-decision",
       "code": "tankpit_bot.ledger.decision:record_decision",
       "law": "Record a dispatchable planner decision; return its event id."
-    },
-    {
-      "id": "decision-reset-decision-records",
-      "code": "tankpit_bot.ledger.decision:reset_decision_records",
-      "law": "Clear the decision store. Called from test-isolation fixtures."
     },
     {
       "id": "decision-verify-outcome-invariant",
@@ -526,16 +518,6 @@ lives on `outcomes`.[^guard]
       "id": "events-actionkind",
       "code": "tankpit_bot.ledger.events:ActionKind",
       "law": "ActionKind."
-    },
-    {
-      "id": "events-next-event-id",
-      "code": "tankpit_bot.ledger.events:next_event_id",
-      "law": "Return the next process-wide monotonic event id."
-    },
-    {
-      "id": "events-reset-event-ids",
-      "code": "tankpit_bot.ledger.events:reset_event_ids",
-      "law": "Reset the event counter. Called from test-isolation fixtures."
     },
     {
       "id": "fuel-book-block-reading-cap",
@@ -630,18 +612,6 @@ lives on `outcomes`.[^guard]
       "law": "Fold one absolute wire fuel reading into the open block."
     },
     {
-      "id": "mode-transition-modetransitionrecorddict",
-      "code": "tankpit_bot.ledger.mode_transition:ModeTransitionRecordDict",
-      "keys": [
-        "caused_by",
-        "event_id",
-        "from_mode",
-        "reason_kind",
-        "to_mode"
-      ],
-      "means": "One recorded mode transition."
-    },
-    {
       "id": "mode-transition-emit-mode-transition",
       "code": "tankpit_bot.ledger.mode_transition:emit_mode_transition",
       "law": "Record one AI mode flip as a first-class event."
@@ -650,56 +620,6 @@ lives on `outcomes`.[^guard]
       "id": "mode-transition-mode-transitions",
       "code": "tankpit_bot.ledger.mode_transition:mode_transitions",
       "law": "Return every mode transition recorded this session, in order."
-    },
-    {
-      "id": "mode-transition-reset-mode-transitions",
-      "code": "tankpit_bot.ledger.mode_transition:reset_mode_transitions",
-      "law": "Clear the transition log. Called from test-isolation fixtures."
-    },
-    {
-      "id": "outcome-actionoutcome",
-      "code": "tankpit_bot.ledger.outcome:ActionOutcome",
-      "law": "Re-export of `tankpit_bot.ledger.outcomes:ActionOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
-    },
-    {
-      "id": "outcome-collectoutcome",
-      "code": "tankpit_bot.ledger.outcome:CollectOutcome",
-      "law": "Re-export of `tankpit_bot.ledger.outcomes:CollectOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
-    },
-    {
-      "id": "outcome-mapopenoutcome",
-      "code": "tankpit_bot.ledger.outcome:MapOpenOutcome",
-      "law": "Re-export of `tankpit_bot.ledger.outcomes:MapOpenOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
-    },
-    {
-      "id": "outcome-moveoutcome",
-      "code": "tankpit_bot.ledger.outcome:MoveOutcome",
-      "law": "Re-export of `tankpit_bot.ledger.outcomes:MoveOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
-    },
-    {
-      "id": "outcome-scanoutcome",
-      "code": "tankpit_bot.ledger.outcome:ScanOutcome",
-      "law": "Re-export of `tankpit_bot.ledger.outcomes:ScanOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
-    },
-    {
-      "id": "outcome-shootoutcome",
-      "code": "tankpit_bot.ledger.outcome:ShootOutcome",
-      "law": "Re-export of `tankpit_bot.ledger.outcomes:ShootOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
-    },
-    {
-      "id": "outcome-teleportoutcome",
-      "code": "tankpit_bot.ledger.outcome:TeleportOutcome",
-      "law": "Re-export of `tankpit_bot.ledger.outcomes:TeleportOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
-    },
-    {
-      "id": "outcome-emit-action-outcome",
-      "code": "tankpit_bot.ledger.outcome:emit_action_outcome",
-      "law": "Record one resolved action attempt: diagnostic event + ring entry."
-    },
-    {
-      "id": "outcome-reset-action-outcome-tracking",
-      "code": "tankpit_bot.ledger.outcome:reset_action_outcome_tracking",
-      "law": "Reset attempt counters + pairing state. Test-isolation hook."
     },
     {
       "id": "outcomes-actionoutcome",
@@ -737,14 +657,8 @@ lives on `outcomes`.[^guard]
       "law": "TeleportOutcome."
     },
     {
-      "id": "ring-ring-capacity",
-      "code": "tankpit_bot.ledger.ring:RING_CAPACITY",
-      "value": 128,
-      "means": "per-kind outcome ring size; the oldest record is evicted at capacity"
-    },
-    {
-      "id": "ring-actionoutcomerecorddict",
-      "code": "tankpit_bot.ledger.ring:ActionOutcomeRecordDict",
+      "id": "records-actionoutcomerecorddict",
+      "code": "tankpit_bot.ledger.records:ActionOutcomeRecordDict",
       "keys": [
         "action_kind",
         "attempt_id",
@@ -755,6 +669,53 @@ lives on `outcomes`.[^guard]
         "outcome"
       ],
       "means": "One recorded action outcome."
+    },
+    {
+      "id": "records-decisionrecorddict",
+      "code": "tankpit_bot.ledger.records:DecisionRecordDict",
+      "keys": [
+        "action_kind",
+        "cmd_type",
+        "event_id",
+        "mode",
+        "reason_context",
+        "reason_kind",
+        "score",
+        "target_id",
+        "target_x",
+        "target_y"
+      ],
+      "means": "One recorded planner decision."
+    },
+    {
+      "id": "records-modetransitionrecorddict",
+      "code": "tankpit_bot.ledger.records:ModeTransitionRecordDict",
+      "keys": [
+        "caused_by",
+        "event_id",
+        "from_mode",
+        "reason_kind",
+        "to_mode"
+      ],
+      "means": "One recorded mode transition."
+    },
+    {
+      "id": "records-pendingteleportdispatchdict",
+      "code": "tankpit_bot.ledger.records:PendingTeleportDispatchDict",
+      "keys": [
+        "message_index",
+        "sent_window",
+        "started_ms",
+        "target_x",
+        "target_y"
+      ],
+      "means": "Dispatch context held until a completion gate resolves the attempt."
+    },
+    {
+      "id": "records-ring-capacity",
+      "code": "tankpit_bot.ledger.records:RING_CAPACITY",
+      "value": 128,
+      "means": "per-kind outcome ring size; the oldest record is evicted at capacity"
     },
     {
       "id": "ring-append-outcome-record",
@@ -772,9 +733,9 @@ lives on `outcomes`.[^guard]
       "law": "Return the most recent outcome records for a kind, oldest first."
     },
     {
-      "id": "ring-reset-outcome-rings",
-      "code": "tankpit_bot.ledger.ring:reset_outcome_rings",
-      "law": "Clear every ring. Called from test-isolation fixtures."
+      "id": "service-ledgerservice",
+      "code": "tankpit_bot.ledger.service:LedgerService",
+      "law": "Per-session ledger state: event counter, outcome rings, decision store, mode transitions, outcome pairing, pending teleport dispatch."
     }
   ]
 }

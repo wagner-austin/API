@@ -198,6 +198,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         # homing seeker landed on a closer enemy than commanded).
         on_intended = victim_id == target_id
         emit_shoot_hit(
+            get_world_service().ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,
@@ -210,6 +211,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         return "hit"
     if str(target_id) in bot._ai_state["killed_tank_ids"]:
         emit_shoot_hit(
+            get_world_service().ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,
@@ -240,6 +242,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         # snapshot. A debit is a landed shot regardless of which wire
         # channel reported it.
         emit_shoot_hit(
+            get_world_service().ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,
@@ -254,6 +257,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         # No tile-occupied hit, no ammo debit, and a wire response did
         # arrive -- the shot genuinely missed.
         emit_shoot_miss(
+            get_world_service().ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,
@@ -263,6 +267,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
     if peek_command_error(get_world_service()) in _SHOT_REJECTING_COMMAND_ERRORS:
         error_code = check_and_clear_command_error(get_world_service())
         emit_shoot_command_rejected(
+            get_world_service().ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,

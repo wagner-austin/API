@@ -19,13 +19,15 @@ from __future__ import annotations
 from typing import Literal
 
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
-from tankpit_bot.ledger.ring import ActionOutcomeRecordDict
+from tankpit_bot.ledger.records import ActionOutcomeRecordDict
+from tankpit_bot.ledger.service import LedgerService
 
 HitSignal = Literal["tile_occupied", "kill_confirmed", "ammo_delta"]
 """Which wire channel proved the hit."""
 
 
 def emit_shoot_hit(
+    ledger: LedgerService,
     *,
     duration_ms: int,
     target_id: int,
@@ -37,6 +39,7 @@ def emit_shoot_hit(
     """Record a landed shot (ammo was debited or the kill confirmed).
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-resolution wall-clock ms.
         target_id: Commanded target's tank id.
         target_name: Commanded target's name.
@@ -50,6 +53,7 @@ def emit_shoot_hit(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="shoot",
         outcome="hit",
         duration_ms=duration_ms,
@@ -62,11 +66,12 @@ def emit_shoot_hit(
 
 
 def emit_shoot_miss(
-    *, duration_ms: int, target_id: int, target_name: str
+    ledger: LedgerService, *, duration_ms: int, target_id: int, target_name: str
 ) -> ActionOutcomeRecordDict:
     """Record a genuine miss (response arrived, nothing was debited).
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-resolution wall-clock ms.
         target_id: Commanded target's tank id.
         target_name: Commanded target's name.
@@ -75,6 +80,7 @@ def emit_shoot_miss(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="shoot",
         outcome="miss",
         duration_ms=duration_ms,
@@ -84,11 +90,12 @@ def emit_shoot_miss(
 
 
 def emit_shoot_command_rejected(
-    *, duration_ms: int, target_id: int, target_name: str, error_code: int
+    ledger: LedgerService, *, duration_ms: int, target_id: int, target_name: str, error_code: int
 ) -> ActionOutcomeRecordDict:
     """Record a shot the server refused with a 0x52 error.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-rejection wall-clock ms.
         target_id: Commanded target's tank id.
         target_name: Commanded target's name.
@@ -98,6 +105,7 @@ def emit_shoot_command_rejected(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="shoot",
         outcome="command_rejected",
         duration_ms=duration_ms,

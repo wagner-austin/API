@@ -185,6 +185,7 @@ class CompletionsMixin(SessionBase):
         if not check_and_clear_radar_scan_complete():
             return False
         emit_scan_radar_complete(
+            get_world_service().ledger,
             duration_ms=self._action_duration_ms(action),
             target_x=action["target_x"],
             target_y=action["target_y"],
@@ -207,6 +208,7 @@ class CompletionsMixin(SessionBase):
         tx, ty = action["target_x"], action["target_y"]
         if self_state["x"] == tx and self_state["y"] == ty:
             emit_move_position_reached(
+                get_world_service().ledger,
                 duration_ms=self._action_duration_ms(action),
                 target_x=tx,
                 target_y=ty,
@@ -255,6 +257,7 @@ class CompletionsMixin(SessionBase):
                     now = get_current_time_ms()
                     mark_move_target_failed(tx, ty, now)
             emit_teleport_landed(
+                get_world_service().ledger,
                 duration_ms=self._action_duration_ms(action),
                 target_x=tx,
                 target_y=ty,
@@ -301,6 +304,7 @@ class CompletionsMixin(SessionBase):
         if position_reached or target_key not in world["containers"]:
             if position_reached:
                 emit_collect_position_reached(
+                    get_world_service().ledger,
                     duration_ms=self._action_duration_ms(action),
                     target_x=tx,
                     target_y=ty,
@@ -309,6 +313,7 @@ class CompletionsMixin(SessionBase):
                 )
             else:
                 emit_collect_container_consumed(
+                    get_world_service().ledger,
                     duration_ms=self._action_duration_ms(action),
                     target_x=tx,
                     target_y=ty,

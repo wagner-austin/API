@@ -279,9 +279,9 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
     blocked = len(ai["blocked_combat_targets"])
     mode = ai["mode"]
     mode_state = ai["mode_state"]
-    unresolved = verify_outcome_invariant()
+    unresolved = verify_outcome_invariant(get_world_service().ledger)
     for kind in ACTION_KINDS:
-        counts = outcome_counts(kind)
+        counts = outcome_counts(get_world_service().ledger, kind)
         if counts:
             emit_diagnostic(
                 diagnostic_kind="session_outcome_counts",

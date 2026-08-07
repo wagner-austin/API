@@ -130,7 +130,7 @@ class TestExecute:
             desired_equipment=[],
         )
         assert execute(bot, decision, _make_snapshot()) is True
-        assert latest_decision_event_id() == 0
+        assert latest_decision_event_id(get_world_service().ledger) == 0
 
     def test_execute_records_decision_for_dispatchable_command(self, fake_env: FakeEnv) -> None:
         """A dispatchable decision is recorded before validation."""
@@ -144,8 +144,8 @@ class TestExecute:
             desired_equipment=[],
         )
         execute(bot, decision, _make_snapshot())
-        recorded_id = latest_decision_event_id()
-        assert decision_record(recorded_id) == {
+        recorded_id = latest_decision_event_id(get_world_service().ledger)
+        assert decision_record(get_world_service().ledger, recorded_id) == {
             "event_id": recorded_id,
             "action_kind": "move",
             "cmd_type": "move",

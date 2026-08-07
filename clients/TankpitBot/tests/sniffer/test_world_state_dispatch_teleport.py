@@ -5,10 +5,7 @@ from __future__ import annotations
 import logging
 
 from tankpit_bot.container import TeleportLandedDict
-from tankpit_bot.ledger.outcome.teleport import (
-    record_teleport_dispatch,
-    reset_teleport_dispatch_tracking,
-)
+from tankpit_bot.ledger.outcome.teleport import record_teleport_dispatch
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state import make_self_state
@@ -67,11 +64,9 @@ class TestTeleportDisplacementReceipt:
 
     def setup_method(self) -> None:
         """Reset world state and dispatch tracking before each test."""
-        reset_teleport_dispatch_tracking()
 
     def teardown_method(self) -> None:
         """Reset world state and dispatch tracking after each test."""
-        reset_teleport_dispatch_tracking()
 
     def test_displaced_landing_emits_the_receipt(self) -> None:
         """Landing off the requested tile emits teleport_displacement.
@@ -84,7 +79,13 @@ class TestTeleportDisplacementReceipt:
         (aim at the enemy's own tile, land adjacent) apart from
         minefield ejections.
         """
-        record_teleport_dispatch(target_x=235, target_y=5, message_index=0, sent_window="(none)")
+        record_teleport_dispatch(
+            get_world_service().ledger,
+            target_x=235,
+            target_y=5,
+            message_index=0,
+            sent_window="(none)",
+        )
         _seed_self_at(230, 10)
 
         records = _dispatch_landed_and_capture()
@@ -111,7 +112,13 @@ class TestTeleportDisplacementReceipt:
 
     def test_exact_landing_stays_silent(self) -> None:
         """A landing on the requested tile emits no displacement receipt."""
-        record_teleport_dispatch(target_x=230, target_y=10, message_index=0, sent_window="(none)")
+        record_teleport_dispatch(
+            get_world_service().ledger,
+            target_x=230,
+            target_y=10,
+            message_index=0,
+            sent_window="(none)",
+        )
         _seed_self_at(230, 10)
 
         records = _dispatch_landed_and_capture()
@@ -128,7 +135,13 @@ class TestTeleportDisplacementReceipt:
 
     def test_missing_self_state_stays_silent(self) -> None:
         """A landed confirm before any self sync emits no receipt."""
-        record_teleport_dispatch(target_x=235, target_y=5, message_index=0, sent_window="(none)")
+        record_teleport_dispatch(
+            get_world_service().ledger,
+            target_x=235,
+            target_y=5,
+            message_index=0,
+            sent_window="(none)",
+        )
 
         records = _dispatch_landed_and_capture()
 
@@ -161,7 +174,9 @@ class TestFerryBeliefDisproof:
         ws.world_state["terrain"]["111,104"] = make_terrain_tile(
             111, 104, TERRAIN_FERRY, observed_ms=100000
         )
-        record_teleport_dispatch(target_x=111, target_y=104, message_index=0, sent_window="")
+        record_teleport_dispatch(
+            get_world_service().ledger, target_x=111, target_y=104, message_index=0, sent_window=""
+        )
 
         landed = TeleportLandedDict(msg_type="teleport_landed", subtype=0x0C)
         dispatch_world_state_update(ws, landed)
@@ -184,7 +199,9 @@ class TestFerryBeliefDisproof:
         ws.world_state["terrain"]["111,104"] = make_terrain_tile(
             111, 104, TERRAIN_FERRY, observed_ms=100000
         )
-        record_teleport_dispatch(target_x=111, target_y=104, message_index=0, sent_window="")
+        record_teleport_dispatch(
+            get_world_service().ledger, target_x=111, target_y=104, message_index=0, sent_window=""
+        )
 
         landed = TeleportLandedDict(msg_type="teleport_landed", subtype=0x0C)
         dispatch_world_state_update(ws, landed)
@@ -204,7 +221,9 @@ class TestFerryBeliefDisproof:
         update_world_state_from_position(118, 108)
         ws = get_world_service()
         ws.world_state["terrain"]["111,104"] = make_terrain_tile(111, 104, 0, observed_ms=100000)
-        record_teleport_dispatch(target_x=111, target_y=104, message_index=0, sent_window="")
+        record_teleport_dispatch(
+            get_world_service().ledger, target_x=111, target_y=104, message_index=0, sent_window=""
+        )
 
         landed = TeleportLandedDict(msg_type="teleport_landed", subtype=0x0C)
         dispatch_world_state_update(ws, landed)

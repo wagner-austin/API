@@ -9,15 +9,23 @@ line (rejection-loop audit instance #1's move-path sibling).
 from __future__ import annotations
 
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
-from tankpit_bot.ledger.ring import ActionOutcomeRecordDict
+from tankpit_bot.ledger.records import ActionOutcomeRecordDict
+from tankpit_bot.ledger.service import LedgerService
 
 
 def emit_move_position_reached(
-    *, duration_ms: int, target_x: int, target_y: int, landed_x: int, landed_y: int
+    ledger: LedgerService,
+    *,
+    duration_ms: int,
+    target_x: int,
+    target_y: int,
+    landed_x: int,
+    landed_y: int,
 ) -> ActionOutcomeRecordDict:
     """Record a walk that reached its exact target tile.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-arrival wall-clock ms.
         target_x: Requested X.
         target_y: Requested Y.
@@ -28,6 +36,7 @@ def emit_move_position_reached(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="move",
         outcome="position_reached",
         duration_ms=duration_ms,
@@ -39,11 +48,12 @@ def emit_move_position_reached(
 
 
 def emit_move_movement_rejected(
-    *, duration_ms: int, target_x: int, target_y: int
+    ledger: LedgerService, *, duration_ms: int, target_x: int, target_y: int
 ) -> ActionOutcomeRecordDict:
     """Record a walk the server rejected via the movement-failed path.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-rejection wall-clock ms.
         target_x: Requested X.
         target_y: Requested Y.
@@ -52,6 +62,7 @@ def emit_move_movement_rejected(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="move",
         outcome="movement_rejected",
         duration_ms=duration_ms,
@@ -61,11 +72,12 @@ def emit_move_movement_rejected(
 
 
 def emit_move_command_rejected(
-    *, duration_ms: int, target_x: int, target_y: int, error_code: int
+    ledger: LedgerService, *, duration_ms: int, target_x: int, target_y: int, error_code: int
 ) -> ActionOutcomeRecordDict:
     """Record a walk the server refused with a 0x52 Supervisor error.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-rejection wall-clock ms.
         target_x: Requested X.
         target_y: Requested Y.
@@ -75,6 +87,7 @@ def emit_move_command_rejected(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="move",
         outcome="command_rejected",
         duration_ms=duration_ms,
@@ -85,11 +98,12 @@ def emit_move_command_rejected(
 
 
 def emit_move_stall_timeout(
-    *, duration_ms: int, target_x: int, target_y: int, timeout_ms: int
+    ledger: LedgerService, *, duration_ms: int, target_x: int, target_y: int, timeout_ms: int
 ) -> ActionOutcomeRecordDict:
     """Record a walk that stalled past its timeout.
 
     Args:
+        ledger: Session ledger receiving the outcome.
         duration_ms: Dispatch-to-stall wall-clock ms.
         target_x: Requested X.
         target_y: Requested Y.
@@ -99,6 +113,7 @@ def emit_move_stall_timeout(
         The recorded outcome.
     """
     return emit_action_outcome(
+        ledger,
         action_kind="move",
         outcome="stall_timeout",
         duration_ms=duration_ms,

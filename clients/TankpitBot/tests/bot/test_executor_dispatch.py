@@ -201,7 +201,13 @@ class TestDispatchCommand:
 
         assert result is False
         landed = emit_teleport_landed(
-            duration_ms=0, target_x=200, target_y=200, landed_x=200, landed_y=200, messages=[]
+            get_world_service().ledger,
+            duration_ms=0,
+            target_x=200,
+            target_y=200,
+            landed_x=200,
+            landed_y=200,
+            messages=[],
         )
         assert landed["detail"]["sent_window"] == "(none)"
 
