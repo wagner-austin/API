@@ -15,6 +15,7 @@ import pytest
 from scripts.check_undecoded_fields import (
     DEFAULT_TARGETS,
     Violation,
+    expand_targets,
     find_violations,
     find_violations_in_source,
     run,
@@ -22,7 +23,11 @@ from scripts.check_undecoded_fields import (
 
 from scripts import check_undecoded_fields as guard
 from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks import PathExistsProtocol, ReadTextProtocol
+from tankpit_bot._test_hooks import (
+    GlobPathsProtocol,
+    PathExistsProtocol,
+    ReadTextProtocol,
+)
 
 
 class _FakeFileSystem:
@@ -207,6 +212,57 @@ class TestFindViolations:
         """A missing path raises ``FileNotFoundError``."""
         with pytest.raises(FileNotFoundError):
             find_violations((Path("missing.py"),))
+
+
+class TestExpandTargets:
+    """Tests for package-directory expansion of guard targets."""
+
+    def setup_method(self) -> None:
+        """Install the fake filesystem and a fake directory lister."""
+        (
+            self._fake,
+            self._original_path_exists,
+            self._original_read_text,
+        ) = _install_fake_filesystem()
+        self._original_glob_paths: GlobPathsProtocol = _test_hooks.glob_paths
+        self._members: list[Path] = []
+        _test_hooks.glob_paths = self._glob_paths
+
+    def teardown_method(self) -> None:
+        """Restore the real ``_test_hooks`` bindings."""
+        _test_hooks.path_exists = self._original_path_exists
+        _test_hooks.read_text = self._original_read_text
+        _test_hooks.glob_paths = self._original_glob_paths
+
+    def _glob_paths(self, directory: Path, pattern: str) -> list[Path]:
+        """Return the registered members for any directory."""
+        assert pattern == "*.py"
+        return [directory / name for name in self._members]
+
+    def test_package_target_expands_to_every_module(self) -> None:
+        """A non-``.py`` target lists the package's modules in order."""
+        self._members = [Path("combat.py"), Path("radar.py")]
+        assert expand_targets((Path("pkg/types"),)) == [
+            Path("pkg/types/combat.py"),
+            Path("pkg/types/radar.py"),
+        ]
+
+    def test_empty_package_raises_filenotfound(self) -> None:
+        """A package target holding no module is an error, not a skip.
+
+        Silently scanning nothing would let the guard report "clean"
+        after a directory rename, which is the exact drift it exists to
+        catch.
+        """
+        self._members = []
+        with pytest.raises(FileNotFoundError):
+            expand_targets((Path("pkg/types"),))
+
+    def test_module_target_is_scanned_as_itself(self) -> None:
+        """A ``.py`` target is returned unexpanded."""
+        module = Path("pkg/types.py")
+        self._fake.write(module, "")
+        assert expand_targets((module,)) == [module]
 
 
 class TestViolationFormat:

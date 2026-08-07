@@ -186,18 +186,18 @@ def _restore_runtime_logging_state() -> Generator[None, None, None]:
     """Reset runtime logging globals and artifact handlers for each test."""
     from platform_core.logging import stdlib_logging
 
-    from tankpit_bot import runtime_logging
+    from tankpit_bot import runtime_context, runtime_logging
 
     runtime_logging._BOT_ARTIFACTS = None
     runtime_logging._SNIFF_ARTIFACTS = None
-    runtime_logging.clear_runtime_context()
+    runtime_context.clear_runtime_context()
     runtime_logging._remove_artifact_handlers(stdlib_logging.getLogger())
 
     yield
 
     runtime_logging._BOT_ARTIFACTS = None
     runtime_logging._SNIFF_ARTIFACTS = None
-    runtime_logging.clear_runtime_context()
+    runtime_context.clear_runtime_context()
     runtime_logging._remove_artifact_handlers(stdlib_logging.getLogger())
 
 
