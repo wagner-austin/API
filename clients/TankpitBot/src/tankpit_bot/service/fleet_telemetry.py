@@ -24,7 +24,7 @@ from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.diagnostics.run_digest import build_run_digest
 from tankpit_bot.runtime_artifacts import bot_run_dir
-from tankpit_bot.runtime_logging import RuntimeEventRecordDict
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 TELEMETRY_CACHE_TTL_MS = 2000
 """Maximum age of a cached summary before the events file is re-read."""
@@ -161,6 +161,7 @@ class FleetTelemetry:
             return self._store("stats", instance, {"available": False})
         timeline_kills: list[JSONValue] = [row["kills"] for row in digest["timeline"]]
         inventory_last: list[JSONValue] = list(digest["inventory_last"])
+        inventory_first: list[JSONValue] = list(digest["inventory_first"])
         return self._store(
             "stats",
             instance,
@@ -169,6 +170,11 @@ class FleetTelemetry:
                 "kills": digest["kills"],
                 "deaths": digest["deaths"],
                 "shots": digest["shots"],
+                "hits": digest["hits"],
+                "misses": digest["misses"],
+                "zero_yield_radars": digest["zero_yield_radars"],
+                "damage_dealt": digest["damage_dealt"],
+                "damage_taken": digest["damage_taken"],
                 "teleports": digest["teleports"],
                 "pickups": digest["pickups"],
                 "displacements": digest["displacements"],
@@ -179,6 +185,7 @@ class FleetTelemetry:
                 "rank_number": digest["rank_number"],
                 "promotion_points": digest["promotion_points"],
                 "started_at": digest["started_at"],
+                "inventory_first": inventory_first,
                 "inventory_last": inventory_last,
                 "timeline_kills": timeline_kills,
             },

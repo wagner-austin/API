@@ -334,3 +334,98 @@ def test_cli_writes_digest_json(tmp_path: Path) -> None:
     assert persisted["kills"] == 1
     assert persisted["exit_reason"] == "session_complete"
     assert persisted["displacement_top"] == [{"requested_x": 59, "requested_y": 95, "count": 2}]
+
+
+def test_combat_and_radar_yield_counters(tmp_path: Path) -> None:
+    """Hits, misses, zero-yield radars, and damage totals all count.
+
+    Two radar dispatches with no pickup between them make the first
+    zero-yield; the second is still open at session end and counts
+    too, while the pickup-closed third stays productive. Damage
+    totals come from the teardown ledger emission's numeric fields
+    (2026-08-06 extension).
+    """
+    lines = [
+        _event(
+            "2026-08-06T21:00:00",
+            "DIAGNOSTIC",
+            "diagnostic_kind=radar_dispatch",
+            diagnostic_kind="radar_dispatch",
+        ),
+        _event(
+            "2026-08-06T21:00:02",
+            "DIAGNOSTIC",
+            "diagnostic_kind=radar_dispatch",
+            diagnostic_kind="radar_dispatch",
+        ),
+        _event(
+            "2026-08-06T21:00:04",
+            "DIAGNOSTIC",
+            "diagnostic_kind=container_pickup_dispatched",
+            diagnostic_kind="container_pickup_dispatched",
+        ),
+        _event(
+            "2026-08-06T21:00:06",
+            "DIAGNOSTIC",
+            "diagnostic_kind=radar_dispatch",
+            diagnostic_kind="radar_dispatch",
+        ),
+        _event(
+            "2026-08-06T21:00:08",
+            "DIAGNOSTIC",
+            "diagnostic_kind=action_outcome",
+            diagnostic_kind="action_outcome",
+            action_kind="shoot",
+            outcome="hit",
+        ),
+        _event(
+            "2026-08-06T21:00:10",
+            "DIAGNOSTIC",
+            "diagnostic_kind=action_outcome",
+            diagnostic_kind="action_outcome",
+            action_kind="shoot",
+            outcome="miss",
+        ),
+        _event(
+            "2026-08-06T21:00:12",
+            "DIAGNOSTIC",
+            "diagnostic_kind=damage_ledger",
+            diagnostic_kind="damage_ledger",
+            dealt="orange-5: dual x3 135",
+            taken="orange-1: single x2 50",
+            dealt_fuel=135,
+            taken_fuel=50,
+        ),
+    ]
+    path = tmp_path / "events.jsonl"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    digest = build_run_digest(path)
+
+    assert digest["hits"] == 1
+    assert digest["misses"] == 1
+    # First radar superseded unproductive, third still open at end.
+    assert digest["zero_yield_radars"] == 2
+    assert digest["damage_dealt"] == 135
+    assert digest["damage_taken"] == 50
+
+
+def test_pre_extension_damage_ledger_reads_zero(tmp_path: Path) -> None:
+    """Archives without the numeric ledger fields stay at zero."""
+    lines = [
+        _event(
+            "2026-08-06T21:00:00",
+            "DIAGNOSTIC",
+            "diagnostic_kind=damage_ledger",
+            diagnostic_kind="damage_ledger",
+            dealt="none",
+            taken="none",
+        ),
+    ]
+    path = tmp_path / "events.jsonl"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    digest = build_run_digest(path)
+
+    assert digest["damage_dealt"] == 0
+    assert digest["damage_taken"] == 0

@@ -119,9 +119,11 @@ __CARD_CSS__
 <table>
   <thead><tr>
     <th>name</th><th>account</th><th>status</th><th>limits</th>
-    <th>kills</th><th>deaths</th><th>rank</th><th>time</th><th>actions</th>
+    <th>kills</th><th>deaths</th><th>hit/miss</th><th>dmg +/-</th>
+    <th>tp</th><th>0-radar</th><th>inv start&rarr;now</th>
+    <th>rank</th><th>time</th><th>actions</th>
   </tr></thead>
-  <tbody id="rows"><tr><td colspan="9" class="empty">loading…</td></tr></tbody>
+  <tbody id="rows"><tr><td colspan="14" class="empty">loading…</td></tr></tbody>
 </table>
 </div>
 <form id="spawn">
@@ -231,6 +233,13 @@ function row(bot) {
     "<td>" + status + "</td><td>" + limits + "</td>" +
     "<td>" + (s.available ? s.kills : "") + "</td>" +
     "<td>" + (s.available ? s.deaths : "") + "</td>" +
+    "<td>" + (s.available ? s.hits + "/" + s.misses : "") + "</td>" +
+    "<td>" + (s.available ? s.damage_dealt + " / " + s.damage_taken : "") + "</td>" +
+    "<td>" + (s.available ? s.teleports : "") + "</td>" +
+    "<td>" + (s.available ? s.zero_yield_radars : "") + "</td>" +
+    "<td>" + (s.available && s.inventory_first.length === 5
+      ? s.inventory_first.join("·") + " → " + s.inventory_last.join("·")
+      : "") + "</td>" +
     '<td><span class="rank">' +
     (s.available && s.rank_number >= 0 ? s.rank_number : "") + "</span></td>" +
     "<td>" + fmtDuration(up) + "</td>";
@@ -277,7 +286,7 @@ async function poll() {
   tbody.replaceChildren();
   if (!names.length) {
     tbody.innerHTML =
-      '<tr><td colspan="9" class="empty">no bots yet — launch one below</td></tr>';
+      '<tr><td colspan="14" class="empty">no bots yet — launch one below</td></tr>';
   }
   for (const name of names) tbody.appendChild(row(registry[name]));
   const running = names.filter((n) => registry[n].alive).length;

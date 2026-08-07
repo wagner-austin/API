@@ -458,6 +458,11 @@ lives on `outcomes`.
       "law": "Render one ledger direction as a compact human-readable line."
     },
     {
+      "id": "damage-book-total-fuel",
+      "code": "tankpit_bot.ledger.damage_book:total_fuel",
+      "law": "Sum one ledger direction's fuel-confirmed damage across enemies."
+    },
+    {
       "id": "decision-decisionrecordcontract",
       "code": "tankpit_bot.ledger.decision:DecisionRecordContract",
       "law": "Structural invariants on a recorded decision."

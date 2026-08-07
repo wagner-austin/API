@@ -46,9 +46,13 @@ hubs: [game-mechanics]
   live run left 20-fuel partials in viewport while burning ~200 fuel
   per hop to find a fresh one.[^2]
 - At the cap end the only pickup gate is the per-tile rate rule
-  (2026-07-19): refuse when the clamped transfer
-  `min(volume, headroom)` is under 25 fuel per Manhattan walk tile —
-  adjacent pickups always taken, distant cap-slivers refused. The
+  (2026-07-19; re-priced 2026-08-06): refuse when the clamped
+  transfer `min(volume, headroom)` is under 3 fuel per Manhattan walk
+  tile — the constant is derived from MEASURED walking speed (15
+  tiles in 3.30 s, ~0.22 s/tile; diagonals two Manhattan steps) at
+  the same ~12.5 fuel/s opportunity value the earlier 25 implied
+  under its falsified one-tick-per-tile premise. Adjacent pickups
+  always taken, only true dregs refused. The
   server clamps the transfer and answers code=5, which is handled
   cleanly (container kept, no blacklist). This replaced the
   2026-07-06 binary overfill gate, which refused ANY clamped pickup

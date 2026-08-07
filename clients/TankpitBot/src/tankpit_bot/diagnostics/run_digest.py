@@ -27,7 +27,7 @@ from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
 from tankpit_bot.diagnostics.event_stream import load_event_records, run_analyzer_cli
-from tankpit_bot.runtime_logging import RuntimeEventRecordDict
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 log = get_logger(__name__)
 
@@ -103,6 +103,13 @@ class RunDigestDict(TypedDict):
         kills: Kill-registered count.
         deaths: Own deactivations observed.
         shots: Shoot dispatches.
+        hits: Server-confirmed shot hits (``action_outcome`` hit).
+        misses: Server-confirmed shot misses.
+        zero_yield_radars: Radar dispatches followed by no container
+            pickup before the next radar (or session end) — scans
+            that bought nothing collectible.
+        damage_dealt: Fuel-confirmed damage dealt (``damage_ledger``).
+        damage_taken: Fuel-confirmed damage taken.
         teleports: Teleport dispatches.
         pickups: Pickup dispatches.
         displacements: Total displaced teleports.
@@ -128,6 +135,11 @@ class RunDigestDict(TypedDict):
     kills: int
     deaths: int
     shots: int
+    hits: int
+    misses: int
+    zero_yield_radars: int
+    damage_dealt: int
+    damage_taken: int
     teleports: int
     pickups: int
     displacements: int
@@ -216,6 +228,60 @@ def _bucket(rows: list[TimelineRowDict], start_s: float, t_s: float) -> Timeline
     return rows[index]
 
 
+def _track_radar_yield(kind: str, digest: RunDigestDict, radar_pending: bool) -> bool:
+    """Advance the zero-yield radar window across one event.
+
+    A radar dispatch opens a window; a container pickup before the
+    next radar closes it as productive; a new radar while a window is
+    open counts the superseded scan as zero-yield.
+
+    Args:
+        kind: The event's diagnostic kind (``"None"`` for none).
+        digest: Digest under construction.
+        radar_pending: Whether a radar window is currently open.
+
+    Returns:
+        The new window state.
+    """
+    if kind == "radar_dispatch":
+        if radar_pending:
+            digest["zero_yield_radars"] += 1
+        return True
+    if kind == "container_pickup_dispatched":
+        return False
+    return radar_pending
+
+
+def _apply_combat_diagnostic(
+    record: RuntimeEventRecordDict,
+    digest: RunDigestDict,
+    kind: str,
+) -> None:
+    """Fold one combat-accounting DIAGNOSTIC event into the digest.
+
+    Args:
+        record: The event record.
+        digest: Digest under construction.
+        kind: ``"action_outcome"`` or ``"damage_ledger"``.
+    """
+    if kind == "action_outcome":
+        outcome = str(record["fields"].get("outcome", ""))
+        if outcome == "hit":
+            digest["hits"] += 1
+        elif outcome == "miss":
+            digest["misses"] += 1
+        return
+    # Teardown damage-ledger emission with fuel-confirmed totals
+    # (2026-08-06); pre-extension archives lack the numeric fields
+    # and stay at zero.
+    dealt_value = record["fields"].get("dealt_fuel")
+    taken_value = record["fields"].get("taken_fuel")
+    if isinstance(dealt_value, int):
+        digest["damage_dealt"] = dealt_value
+    if isinstance(taken_value, int):
+        digest["damage_taken"] = taken_value
+
+
 def _apply_diagnostic(
     record: RuntimeEventRecordDict,
     digest: RunDigestDict,
@@ -255,6 +321,8 @@ def _apply_diagnostic(
         if not digest["inventory_first"]:
             digest["inventory_first"] = inventory
         digest["inventory_last"] = inventory
+    elif kind in ("action_outcome", "damage_ledger"):
+        _apply_combat_diagnostic(record, digest, str(kind))
     elif kind == "session_scorecard":
         digest["clean_exit"] = True
         digest["exit_reason"] = str(record["fields"].get("exit_reason", ""))
@@ -320,6 +388,11 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
         kills=0,
         deaths=0,
         shots=0,
+        hits=0,
+        misses=0,
+        zero_yield_radars=0,
+        damage_dealt=0,
+        damage_taken=0,
         teleports=0,
         pickups=0,
         displacements=0,
@@ -336,11 +409,18 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
     displacement_counts: Counter[tuple[int, int]] = Counter()
     release_counts: Counter[str] = Counter()
     pending_clearance: list[tuple[float, ClearanceShotRowDict]] = []
+    # Zero-yield radar tracking: a radar dispatch opens a window; a
+    # container pickup dispatched before the next radar closes it as
+    # productive. A window still open when the next radar fires (or
+    # the session ends) was a scan that bought nothing collectible.
+    radar_pending = False
 
     for record in records:
         t_s = _ts_seconds(record["timestamp"])
         message = record["message"]
-        if record["fields"].get("diagnostic_kind") is not None:
+        kind_field = record["fields"].get("diagnostic_kind")
+        radar_pending = _track_radar_yield(str(kind_field), digest, radar_pending)
+        if kind_field is not None:
             _apply_diagnostic(record, digest, displacement_counts, release_counts)
         elif record["fields"].get("behavior_reason") == "mine_clearance_shot":
             shot_row = ClearanceShotRowDict(
@@ -361,6 +441,8 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
             if deactivated and int(deactivated.group(1)) == digest["self_tank_id"]:
                 digest["deaths"] += 1
 
+    if radar_pending:
+        digest["zero_yield_radars"] += 1
     digest["displacement_top"] = [
         DisplacementRowDict(requested_x=x, requested_y=y, count=count)
         for (x, y), count in displacement_counts.most_common(5)

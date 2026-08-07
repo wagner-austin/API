@@ -403,6 +403,18 @@ def incoming_damage_window(
     return hits, fuel
 
 
+def total_fuel(ledger: dict[str, EnemyDamageSideDict]) -> int:
+    """Sum one ledger direction's fuel-confirmed damage across enemies.
+
+    Args:
+        ledger: The ``dealt`` or ``taken`` map.
+
+    Returns:
+        Total damage in fuel.
+    """
+    return sum(side["fuel"] for side in ledger.values())
+
+
 def summarize_side(ledger: dict[str, EnemyDamageSideDict]) -> str:
     """Render one ledger direction as a compact human-readable line.
 
@@ -443,4 +455,5 @@ __all__ = [
     "record_own_shot_echo",
     "resolve_dealt",
     "summarize_side",
+    "total_fuel",
 ]

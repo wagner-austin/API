@@ -44,7 +44,7 @@ from tankpit_bot.diagnostics.runs_index import (
     make_index_row,
 )
 from tankpit_bot.diagnostics.self_alignment import maybe_emit_self_alignment_sample
-from tankpit_bot.ledger.damage_book import resolve_dealt, summarize_side
+from tankpit_bot.ledger.damage_book import resolve_dealt, summarize_side, total_fuel
 from tankpit_bot.ledger.decision import latest_decision_event_id, verify_outcome_invariant
 from tankpit_bot.ledger.events import ACTION_KINDS
 from tankpit_bot.ledger.mode_transition import emit_mode_transition
@@ -62,12 +62,12 @@ from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
 )
 from tankpit_bot.runtime_artifacts import bot_run_dir, resolve_bot_instance
+from tankpit_bot.runtime_context import set_runtime_context
 from tankpit_bot.runtime_logging import (
     emit_ai,
     emit_diagnostic,
     emit_sync,
     get_bot_runtime_artifacts,
-    set_runtime_context,
 )
 from tankpit_bot.service.types import (
     SessionStatusDict,
@@ -322,6 +322,8 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
         diagnostic_kind="damage_ledger",
         dealt=summarize_side(damage_book["dealt"]),
         taken=summarize_side(damage_book["taken"]),
+        dealt_fuel=total_fuel(damage_book["dealt"]),
+        taken_fuel=total_fuel(damage_book["taken"]),
         **{f"{kind}_count": total["count"] for kind, total in sorted(fuel_totals.items())},
         **{f"{kind}_fuel_lo": total["lo_sum"] for kind, total in sorted(fuel_totals.items())},
         **{f"{kind}_fuel_hi": total["hi_sum"] for kind, total in sorted(fuel_totals.items())},

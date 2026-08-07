@@ -2977,3 +2977,13 @@ Both flagged behaviors fixed and the full suite green (5,972):
 - **User-confirmed law**: extra radar ALWAYS scans the current viewport, wherever the scope parked it — "the viewport is the radar." Strategy implication, user-derived: shift-east-scan then shift-west-scan from one standing position sweeps ~31 columns with a single-column overlap at the tank — a stationary double-wide sweep for two extras and zero walking. Candidate forage upgrade, not yet implemented.
 
 **Addendum — the QUAD SWEEP (user-derived, same conversation).** With autoscroll OFF, from one standing position: shift NW -> radar, NE -> radar, SE -> radar, SW -> radar. The four windows tile around the stationary tank as quadrant corners: ~31x31 = 961 tiles (~3.75 viewports) for four extras, zero movement, zero fuel, ~6% overlap (the shared row/column strips). Moving between scans slides the next quadrant's frame and ruins the tiling — the sweep is maximal exactly when the tank stays planted at the shared corner. Per-extra tile yield matches hopping (~240/extra); the win is no teleport fuel, no displacement risk, no travel time, and one contiguous intel block. Candidate forage/recon upgrade, not yet implemented.
+
+---
+## [2026-08-06] lift | The stats the user asked for: hits/misses, damage dealt/taken, zero-yield radars, inventory start->now
+
+Digest grew five counters, all flowing to `make digest`, the fleet stats endpoint, and the fleet table (six new columns: hit/miss, dmg +/-, tp, 0-radar, inv start->now):
+- **hits / misses** from `action_outcome` records — live mid-run, matching the scorecard (trial run: 58/0 verified).
+- **zero_yield_radars**: a radar dispatch followed by no container pickup before the next radar (or session end) — the user's "radars where there was no pickup", counted by a window state machine.
+- **damage_dealt / damage_taken**: the damage book's fuel-confirmed per-enemy totals, now summed (`damage_book.total_fuel`, wiki-claimed) and emitted numerically on the teardown `damage_ledger` diagnostic; pre-extension archives read 0 by design.
+- **inventory_first** joins inventory_last in the stats payload (armor·dual·missile·homing·radar, start -> now).
+Physics-claim gate did its job twice: forced the wiki claim for the new public symbol AND caught fuel-system.md still claiming the falsified 25/tile rate — re-written to the measured 3/tile derivation. Full suite 5,974 green.
