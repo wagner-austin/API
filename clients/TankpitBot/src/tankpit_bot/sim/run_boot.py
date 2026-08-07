@@ -40,6 +40,7 @@ from tankpit_bot.sim.spawn import find_open_tile_near
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
 from tankpit_bot.sim.world_seed import (
     MINE_DENSITY,
+    seed_ferries,
     seed_field_population,
     seed_minefield,
     seed_practice_client,
@@ -250,6 +251,11 @@ def _boot(
     # session that has one ([[session-state-deglobalisation]]).
     laid = seed_minefield(world, terrain)
     log.info("minefield: %d mines at density %.2f", laid, MINE_DENSITY)
+    # Ferries too: the sim floated exactly one, at a hardcoded tile, in
+    # one scenario, so every other room had none and the 205 archived
+    # 0x4A drift frames had nothing to answer them. A scenario that
+    # placed its own keeps them ([[ferry-mechanics]]).
+    log.info("ferries: %d afloat", seed_ferries(world, terrain))
     _require_seeds_passable(world, terrain)
     server = SimServer(world, terrain, client_id=SIM_CLIENT_ID, roster_ids=roster_ids)
     bot = Bot("https://sim.tankpit.local/", headless=True)

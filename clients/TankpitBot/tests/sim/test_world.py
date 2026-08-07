@@ -101,6 +101,24 @@ def test_decode_world_rejects_malformed_sections() -> None:
             decode_sim_world(broken)
 
 
+def test_decode_rejects_two_mines_on_one_tile() -> None:
+    """Mines are keyed by tile, so a duplicate tile is a corrupt world.
+
+    ``mines`` is a dict keyed by ``"x,y"``, and the decoder builds it
+    from a list -- silently letting the second record win would drop a
+    mine the encoder had written and make the round trip lossy.
+    """
+    world = make_sim_world("field01_r.gif")
+    place_mine(world, 10, 11, 0)
+    encoded = encode_sim_world(world)
+    mines = encoded["mines"]
+    assert isinstance(mines, list)
+    encoded["mines"] = [*mines, {"x": 10, "y": 11, "team": 2}]
+
+    with pytest.raises(ValueError, match="two mines on tile 10,11"):
+        decode_sim_world(encoded)
+
+
 def test_revealed_mine_keys_round_trip_per_team() -> None:
     """Team-scoped reveal knowledge survives encode/decode intact."""
     world = make_sim_world("field01_r.gif")

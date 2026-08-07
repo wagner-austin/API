@@ -132,3 +132,77 @@ def test_a_heading_off_the_map_edge_is_not_a_move() -> None:
         drift_ferries(world, edge, messages)
         assert 0 <= world["ferries"][0]["x"] < MAP_SPAN
         assert 0 <= world["ferries"][0]["y"] < MAP_SPAN
+
+
+def test_the_room_floats_ferries_on_its_water() -> None:
+    """Every scenario gets ferries, not just the one that named a tile.
+
+    The sim floated exactly one, at a hardcoded tile, in one scenario
+    — so every practice, atlas and ghost room had none and the 205
+    archived 0x4A drift frames had nothing to answer them
+    ([[session-state-deglobalisation]]).
+    """
+    from pathlib import Path
+
+    from tankpit_bot import _test_hooks
+    from tankpit_bot.sim.world_seed import seed_ferries
+
+    terrain = _test_hooks.load_terrain_map(Path("field01_r.gif"))
+    world = make_sim_world("field01_r.gif")
+
+    afloat = seed_ferries(world, terrain)
+
+    assert afloat == len(world["ferries"])
+    assert afloat > 0
+    for ferry in world["ferries"]:
+        assert terrain.get_terrain(ferry["x"], ferry["y"]) == terrain.WATER
+
+
+def test_seeded_ferries_never_stack() -> None:
+    """One ferry per tile, so a drift step always has somewhere to go."""
+    from pathlib import Path
+
+    from tankpit_bot import _test_hooks
+    from tankpit_bot.sim.world_seed import seed_ferries
+
+    world = make_sim_world("field01_r.gif")
+    seed_ferries(world, _test_hooks.load_terrain_map(Path("field01_r.gif")))
+
+    tiles = [(ferry["x"], ferry["y"]) for ferry in world["ferries"]]
+    assert len(set(tiles)) == len(tiles)
+
+
+def test_a_scenarios_own_ferry_survives_the_seeding() -> None:
+    """A world that placed its own keeps it — the ferry scenario does."""
+    from pathlib import Path
+
+    from tankpit_bot import _test_hooks
+    from tankpit_bot.sim.world_seed import seed_ferries
+
+    world = make_sim_world("field01_r.gif")
+    world["ferries"].append(SimFerryDict(x=118, y=112))
+
+    seed_ferries(world, _test_hooks.load_terrain_map(Path("field01_r.gif")))
+
+    assert (118, 112) in [(ferry["x"], ferry["y"]) for ferry in world["ferries"]]
+
+
+def test_a_seeded_room_drifts_its_ferries_on_the_tick() -> None:
+    """Seeding and drift compose: the room's ferries move and say so."""
+    from pathlib import Path
+
+    from tankpit_bot import _test_hooks
+    from tankpit_bot.sim.world_seed import seed_ferries
+
+    terrain = _test_hooks.load_terrain_map(Path("field01_r.gif"))
+    world = make_sim_world("field01_r.gif")
+    seed_ferries(world, terrain)
+    messages: list[BinaryMessage] = []
+
+    drift_ferries(world, terrain, messages)
+
+    moves = _terrain_updates(messages)
+    assert moves != []
+    for update in moves:
+        (_, _, cleared), (_, _, occupied) = update
+        assert (cleared, occupied) == (WIRE_TERRAIN_CLEARED, WIRE_TERRAIN_FERRY)
