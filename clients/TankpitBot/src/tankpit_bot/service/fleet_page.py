@@ -221,9 +221,9 @@ function row(bot) {
     : (s.available && s.clean_exit
        ? '<span class="done">' + (s.exit_reason || "finished") + "</span>"
        : '<span class="crash">exit ' + bot.returncode + "</span>");
-  const limits = ((bot.kills ? bot.kills + "k" : "") +
+  const limits = ((bot.kills ? bot.kills + " kills" : "") +
     (bot.kills && bot.seconds ? " / " : "") +
-    (bot.seconds ? bot.seconds + "s" : "")) || "none";
+    (bot.seconds ? bot.seconds + " s" : "")) || "none";
   const up = bot.alive ? Math.floor((Date.now() - bot.started_ms) / 1000)
                        : (s.available ? s.duration_s : -1);
   tr.innerHTML =

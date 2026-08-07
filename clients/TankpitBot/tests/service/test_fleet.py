@@ -90,6 +90,22 @@ def _restore_account_hooks(originals: tuple[PathExistsProtocol, ReadTextProtocol
     top_hooks.path_exists, top_hooks.read_text = originals
 
 
+def _without_accounts() -> PathExistsProtocol:
+    """Make accounts.json absent so tests never read the real file.
+
+    Returns:
+        The original ``path_exists`` hook to restore.
+    """
+
+    def fake_missing(path: Path) -> bool:
+        _ = path
+        return False
+
+    original = top_hooks.path_exists
+    top_hooks.path_exists = fake_missing
+    return original
+
+
 def test_spawn_builds_the_instance_environment(spawner: _FakeSpawner) -> None:
     """The child receives instance, bounds, and account via env."""
     originals = _with_configured_accounts()
@@ -186,25 +202,32 @@ def test_spawn_refuses_a_live_duplicate_but_replaces_a_dead_one(
     spawner: _FakeSpawner,
 ) -> None:
     """One live process per instance; a finished one may be respawned."""
-    manager = FleetManager()
-    manager.spawn(instance="alpha", account="", kills=0, seconds=0)
-
-    with pytest.raises(FleetError, match="already running"):
+    original = _without_accounts()
+    try:
+        manager = FleetManager()
         manager.spawn(instance="alpha", account="", kills=0, seconds=0)
 
-    spawner.processes[0].returncode = 0
-    row = manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+        with pytest.raises(FleetError, match="already running"):
+            manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+
+        spawner.processes[0].returncode = 0
+        row = manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+    finally:
+        top_hooks.path_exists = original
     assert row["pid"] == 1002
 
 
 def test_report_sorts_and_reflects_liveness(spawner: _FakeSpawner) -> None:
     """The report row set is sorted and tracks process exit."""
-    manager = FleetManager()
-    manager.spawn(instance="bravo", account="", kills=0, seconds=0)
-    manager.spawn(instance="alpha", account="", kills=0, seconds=0)
-    spawner.processes[0].returncode = 7
-
-    rows = manager.report()
+    original = _without_accounts()
+    try:
+        manager = FleetManager()
+        manager.spawn(instance="bravo", account="", kills=0, seconds=0)
+        manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+        spawner.processes[0].returncode = 7
+        rows = manager.report()
+    finally:
+        top_hooks.path_exists = original
 
     assert [row["instance"] for row in rows] == ["alpha", "bravo"]
     assert rows[1]["alive"] is False
@@ -292,6 +315,7 @@ def test_stats_summarizes_the_instance_events(spawner: _FakeSpawner) -> None:
         reads.append(Path(path))
         return events
 
+    original_exists = _without_accounts()
     original_read = top_hooks.read_text
     top_hooks.read_text = fake_read
     try:
@@ -300,6 +324,7 @@ def test_stats_summarizes_the_instance_events(spawner: _FakeSpawner) -> None:
         summary = manager.stats("alpha")
     finally:
         top_hooks.read_text = original_read
+        top_hooks.path_exists = original_exists
 
     assert reads == [Path("runs/bot/alpha/latest.events.jsonl")]
     assert summary["available"] is True
@@ -317,6 +342,7 @@ def test_stats_without_events_is_unavailable_not_an_error(
     def fake_read(path: Path) -> str:
         raise OSError(f"no such file {path}")
 
+    original_exists = _without_accounts()
     original_read = top_hooks.read_text
     top_hooks.read_text = fake_read
     try:
@@ -327,6 +353,7 @@ def test_stats_without_events_is_unavailable_not_an_error(
             manager.stats("ghost")
     finally:
         top_hooks.read_text = original_read
+        top_hooks.path_exists = original_exists
 
     assert summary == {"available": False}
 

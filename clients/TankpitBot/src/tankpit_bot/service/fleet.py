@@ -250,6 +250,20 @@ class FleetManager:
                     f"account {account!r} is not in accounts.json (accounts are "
                     f"config, not free text; configured: {known})"
                 )
+        configured = self.accounts()
+        resolved_account = account or (configured[0] if configured else "")
+        for other in self._bots.values():
+            other_account = other.account or (configured[0] if configured else "")
+            if (
+                resolved_account
+                and other_account == resolved_account
+                and other.process.poll() is None
+            ):
+                raise FleetError(
+                    f"account {resolved_account or 'default'!r} already has a live bot "
+                    f"({other.instance!r}, pid {other.process.pid}) - the game refuses "
+                    "a second login on the same account"
+                )
         existing = self._bots.get(instance)
         if existing is not None and existing.process.poll() is None:
             raise FleetError(

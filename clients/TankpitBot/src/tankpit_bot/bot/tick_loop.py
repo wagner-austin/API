@@ -35,7 +35,7 @@ from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.states import make_initial_state_data
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.browser.overlay import OverlayStateDict, encode_overlay_state
+from tankpit_bot.browser.overlay import OverlayStateDict, render_overlay_payload
 from tankpit_bot.browser.overlay_hud import update_bot_overlay
 from tankpit_bot.diagnostics.entity_alignment import maybe_emit_entity_alignment_sample
 from tankpit_bot.diagnostics.runs_index import (
@@ -907,7 +907,7 @@ def _tick_once(bot: Bot) -> None:
     # tick so the fleet page can show the identical card per instance.
     _test_hooks.write_text(
         bot_run_dir(resolve_bot_instance()) / "hud.json",
-        dump_json_str(encode_overlay_state(overlay)),
+        dump_json_str(render_overlay_payload(overlay)),
     )
 
 
