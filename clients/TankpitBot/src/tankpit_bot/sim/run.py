@@ -32,7 +32,7 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.session_exit import SessionExitError
-from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.naming import is_practice_bot_name

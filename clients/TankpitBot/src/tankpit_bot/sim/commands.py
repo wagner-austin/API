@@ -24,7 +24,7 @@ from tankpit_bot.protocol.commands import (
     CMD_SHOOT,
     CMD_TOGGLE_EQUIPMENT,
 )
-from tankpit_bot.protocol.helpers import require_min_length, x16
+from tankpit_bot.wire.helpers import require_min_length, x16
 
 ClientCommandKind = Literal[
     "move",

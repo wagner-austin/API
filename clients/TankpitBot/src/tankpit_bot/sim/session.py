@@ -37,11 +37,11 @@ from tankpit_bot.action_lab.page_client_snapshot import (
     encode_page_client_snapshot,
 )
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
-from tankpit_bot.protocol.helpers import EncodeError
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.transport import decode_client_payload, encode_tick_payload
 from tankpit_bot.types import CapturedMessage, CaptureSession
+from tankpit_bot.wire.helpers import EncodeError
 
 _WS_OPEN = 1
 _SIM_WS_URL = "wss://sim.tankpit.local/ws"
