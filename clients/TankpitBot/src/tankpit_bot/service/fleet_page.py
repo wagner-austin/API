@@ -83,20 +83,28 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   button:hover { background:#242c38; }
   button:disabled { color:#555e6b; border-color:#2a313c; cursor:default; }
   button.primary { background:#67b0e8; color:#0d141b; border-color:#67b0e8;
-                   font-weight:600; padding:.45rem 1.2rem; }
-  form { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-         gap:.9rem 1.1rem; align-items:end; padding:1rem 1.2rem;
-         background:rgba(24,34,80,.28); border-radius:10px;
-         border:2px solid; backdrop-filter:blur(6px) saturate(1.1);
+                   font-weight:600; height:34px; padding:0 1.4rem;
+                   box-sizing:border-box; }
+  form { display:flex; flex-wrap:nowrap; gap:1.1rem;
+         align-items:flex-start; overflow-x:auto;
+         padding:1rem 1.2rem; background:rgba(24,34,80,.28);
+         border-radius:10px; border:2px solid;
+         backdrop-filter:blur(6px) saturate(1.1);
          border-color:rgba(255,255,255,.22) rgba(0,0,0,.8)
            rgba(0,0,0,.8) rgba(255,255,255,.14);
          box-shadow:0 8px 24px rgba(0,0,0,.6); }
-  label { display:block; font-size:.75rem; color:#8a93a3; margin-bottom:.3rem;
-          text-transform:uppercase; letter-spacing:.05em; }
-  .hint { font-size:.73rem; color:#8a93a3; margin-top:.3rem; }
-  input, select { width:100%; background:#0f1319; color:#d6dae2;
+  form .field { display:flex; flex-direction:column; flex:0 0 auto; }
+  form .field.wide { width:210px; }
+  form .field.num { width:145px; }
+  label { display:block; height:1.1rem; font-size:.75rem; color:#8a93a3;
+          margin-bottom:.3rem; text-transform:uppercase;
+          letter-spacing:.05em; white-space:nowrap; }
+  .hint { height:2.4em; overflow:hidden; font-size:.73rem;
+          color:#8a93a3; margin-top:.3rem; }
+  input, select { width:100%; height:34px; box-sizing:border-box;
+                  background:#0f1319; color:#d6dae2;
                   border:1px solid #39424f; border-radius:6px;
-                  padding:.45rem .6rem; font-size:.88rem; }
+                  padding:0 .6rem; font-size:.88rem; }
   #error { color:#e0656a; min-height:1.1rem; font-size:.85rem; }
   .empty { color:#8a93a3; }
 __CARD_CSS__
@@ -117,22 +125,24 @@ __CARD_CSS__
 </table>
 </div>
 <form id="spawn">
-  <div><label for="instance">Name</label>
+  <div class="field wide"><label for="instance">Name</label>
     <input id="instance" placeholder="e.g. alpha" required
            pattern="[a-z0-9][a-z0-9_-]{0,31}">
     <div class="hint">logs land in runs/bot/&lt;name&gt;/</div></div>
-  <div><label for="account">Account</label>
+  <div class="field wide"><label for="account">Account</label>
     <select id="account"><option value="">default</option></select>
-    <div class="hint">from accounts.json — config, not free text</div></div>
-  <div><label for="kills">Stop after kills</label>
+    <div class="hint">from accounts.json</div></div>
+  <div class="field num"><label for="kills">Stop after kills</label>
     <input id="kills" type="number" min="0" value="20">
     <div class="hint">0 = play until stopped</div></div>
-  <div><label for="seconds">Stop after seconds</label>
+  <div class="field num"><label for="seconds">Stop after seconds</label>
     <input id="seconds" type="number" min="0" value="0">
     <div class="hint">0 = no time limit</div></div>
-  <div><button type="submit" class="primary">Launch</button>
-    <div id="error"></div></div>
+  <div class="field"><label>&nbsp;</label>
+    <button type="submit" class="primary">Launch</button>
+    <div class="hint"></div></div>
 </form>
+<div id="error"></div>
 </main>
 <script>
 "use strict";
