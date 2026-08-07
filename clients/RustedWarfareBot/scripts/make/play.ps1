@@ -24,6 +24,8 @@ param(
     [int]$Difficulty = 0,
     [string]$Tree = "",
     [int]$PinDelta = 0,
+    [int]$FastForward = 0,
+    [int]$RngTap = 0,
     [Parameter(Mandatory = $true)][string]$Module,
     [Parameter(Mandatory = $true)][string]$Catalogue,
     [Parameter(Mandatory = $true)][string]$TypeDump,
@@ -76,10 +78,24 @@ try {
         $agentArgs += ";pinDeltaMs=$PinDelta"
         Write-Host "[play] frame delta pinned to ${PinDelta}ms" -ForegroundColor DarkGray
     }
+    if ($FastForward -ne 0) {
+        # The gym knob: N identical pinned steps per loop pass instead of
+        # one -- same simulation, N times the wall speed, CPU permitting
+        # (task #35). Zero leaves the engine at the wall clock.
+        $agentArgs += ";fastForward=$FastForward"
+        Write-Host "[play] fast-forward: ${FastForward}x" -ForegroundColor DarkGray
+    }
+    if ($RngTap -ne 0) {
+        # Diagnostic: per-caller draw counts on the engine generator, one
+        # line per sample window in the agent log (task #36).
+        $agentArgs += ";rngTap=true"
+        Write-Host "[play] rng draw tap armed" -ForegroundColor DarkGray
+    }
 
     $gameArgs = @(
         "-Xmx1000M",
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED",
         "-Djava.library.path=.",
         "-javaagent:$root\$agentJar=$agentArgs",
         "-cp", "game-lib.jar;libs/*",

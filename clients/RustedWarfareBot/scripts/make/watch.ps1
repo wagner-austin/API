@@ -45,6 +45,7 @@ try {
     $gameArgs = @(
         "-Xmx1000M",
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED",
         "-Djava.library.path=.",
         "-javaagent:$root\$agentJar=$agentArgs",
         "-cp", "game-lib.jar;libs/*",
