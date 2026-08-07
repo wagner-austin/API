@@ -9,9 +9,7 @@ from tests.action_lab._fuel_probe_harness import (
     _snapshot,
 )
 
-from tankpit_bot.action_lab.fuel_probe import (
-    format_fuel_probe_summary,
-)
+from tankpit_bot.action_lab.fuel_probe_diagnostics import format_fuel_probe_summary
 from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
     FuelProbeSessionDict,

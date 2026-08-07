@@ -7,16 +7,9 @@ from typing import Literal
 
 from platform_core.logging import get_logger
 
-from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.probe_base import ProbeError
-from tankpit_bot.action_lab.teleport_acquisition import (
-    start_teleport_page_snapshots as _shared_start_teleport_page_snapshots,
-)
-from tankpit_bot.action_lab.teleport_acquisition import (
-    teleport_strategy_requires_map_sync as _shared_teleport_strategy_requires_map_sync,
-)
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
@@ -32,28 +25,6 @@ _TELEPORT_POLL_INTERVAL_MS = 100.0
 
 class TeleportProbeError(ProbeError):
     """Raised when the teleport probe cannot proceed."""
-
-
-def _start_teleport_page_snapshots(
-    *,
-    cdp: CDPSessionProtocol | None,
-    capture_before_map_open: bool,
-    unavailable_error: type[Exception],
-    unavailable_message: str,
-) -> tuple[
-    list[TeleportPageSnapshotDict],
-    Callable[
-        [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
-        TeleportPageSnapshotDict,
-    ],
-]:
-    """Build shared page-snapshot state for a teleport attempt."""
-    return _shared_start_teleport_page_snapshots(
-        cdp=cdp,
-        capture_before_map_open=capture_before_map_open,
-        unavailable_error=unavailable_error,
-        unavailable_message=unavailable_message,
-    )
 
 
 def _format_attempt_window_entries(
@@ -198,13 +169,6 @@ def _emit_teleport_attempt_diagnostic(
         page_snapshots=_format_page_snapshots(page_snapshots),
         page_snapshot_count=len(page_snapshots),
     )
-
-
-def _teleport_strategy_requires_map_sync(
-    teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
-) -> bool:
-    """Return whether a teleport strategy waits for fresh world sync."""
-    return _shared_teleport_strategy_requires_map_sync(teleport_strategy)
 
 
 def _clamp_tile(value: int) -> int:

@@ -29,12 +29,14 @@ from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.teleport import (
     DEFAULT_TELEPORT_STRATEGY,
 )
+from tankpit_bot.action_lab.teleport_acquisition import (
+    teleport_strategy_requires_map_sync,
+)
 from tankpit_bot.action_lab.teleport_attempt import (
     run_tracked_teleport_attempt as _shared_run_tracked_teleport_attempt,
 )
 from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
-    _teleport_strategy_requires_map_sync,
     _wait_for_teleport_outcome,
 )
 from tankpit_bot.action_lab.types import (
@@ -65,10 +67,6 @@ def _make_reposition_target(target_x: int, target_y: int) -> TeleportTargetDict:
         x=target_x,
         y=target_y,
     )
-
-
-def _clear_stale_radar_completion() -> None:
-    """Drain any leaked radar-complete signals before starting a new scan."""
 
 
 class EquipmentProbe(ProbeBase):
@@ -425,7 +423,7 @@ class EquipmentProbe(ProbeBase):
             ),
             run_pickup_attempt=self._run_pickup_attempt,
             make_reposition_target=_make_reposition_target,
-            teleport_strategy_requires_map_sync=_teleport_strategy_requires_map_sync,
+            teleport_strategy_requires_map_sync=teleport_strategy_requires_map_sync,
             dispatch_failure_error=EquipmentProbeError,
             unavailable_error=EquipmentProbeError,
             unexpected_result_error=TeleportProbeError,

@@ -16,12 +16,12 @@ from tests.action_lab._teleport_harness import (
     _SequencedProvider,
 )
 
+from tankpit_bot.action_lab.teleport_acquisition import start_teleport_page_snapshots
 from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
     _find_map_data_message_index,
     _format_attempt_window_entries,
     _format_page_snapshots,
-    _start_teleport_page_snapshots,
     format_teleport_probe_summary,
 )
 from tankpit_bot.action_lab.types import (
@@ -220,7 +220,7 @@ def test_find_map_data_message_index_skips_non_map_data_received_messages() -> N
 
 def test_start_teleport_page_snapshots_rejects_missing_cdp() -> None:
     with pytest.raises(TeleportProbeError, match="cdp session is unavailable"):
-        _start_teleport_page_snapshots(
+        start_teleport_page_snapshots(
             cdp=None,
             capture_before_map_open=True,
             unavailable_error=TeleportProbeError,
@@ -229,7 +229,7 @@ def test_start_teleport_page_snapshots_rejects_missing_cdp() -> None:
 
 
 def test_start_teleport_page_snapshots_can_skip_initial_capture() -> None:
-    snapshots, capture_page_snapshot = _start_teleport_page_snapshots(
+    snapshots, capture_page_snapshot = start_teleport_page_snapshots(
         cdp=StubSnapshotCDPSession(),
         capture_before_map_open=False,
         unavailable_error=TeleportProbeError,

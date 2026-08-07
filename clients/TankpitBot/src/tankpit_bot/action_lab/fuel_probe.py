@@ -1,8 +1,13 @@
 """The fuel probe: teleport to fuel, pick it up, record the attempt.
 
 Holds the :class:`FuelProbe` session class and its entry points. The
-target-selection and outcome helpers it composes are
-:mod:`tankpit_bot.action_lab.fuel_probe`.
+pieces it composes each have their own module: target selection in
+:mod:`tankpit_bot.action_lab.fuel_targeting` and
+:mod:`tankpit_bot.action_lab.fuel_target_phase`, the per-attempt
+orchestration in :mod:`tankpit_bot.action_lab.fuel_probe_attempt` and
+:mod:`tankpit_bot.action_lab.fuel_probe_operations`, and the summary
+and target logging in
+:mod:`tankpit_bot.action_lab.fuel_probe_diagnostics`.
 """
 
 from __future__ import annotations
@@ -19,9 +24,7 @@ from tankpit_bot.action_lab.fuel_collection_phase import (
 from tankpit_bot.action_lab.fuel_probe_attempt import (
     run_single_fuel_target_attempt as _shared_run_single_fuel_target_attempt,
 )
-from tankpit_bot.action_lab.fuel_probe_diagnostics import (
-    format_fuel_probe_summary as _shared_format_fuel_probe_summary,
-)
+from tankpit_bot.action_lab.fuel_probe_diagnostics import format_fuel_probe_summary
 from tankpit_bot.action_lab.fuel_probe_diagnostics import (
     format_visible_fuel_entries as _shared_format_visible_fuel_entries,
 )
@@ -47,9 +50,10 @@ from tankpit_bot.action_lab.fuel_targeting import (
     visible_fuel_requires_reposition,
 )
 from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.action_lab.pickup_phase import PickupPhaseError, run_tracked_pickup_phase
 from tankpit_bot.action_lab.pickup_phase import (
-    effective_pickup_timeout_ms as _shared_effective_pickup_timeout_ms,
+    PickupPhaseError,
+    effective_pickup_timeout_ms,
+    run_tracked_pickup_phase,
 )
 from tankpit_bot.action_lab.pickup_phase import (
     get_completed_pickup_outcome as _shared_get_completed_pickup_outcome,
@@ -58,18 +62,17 @@ from tankpit_bot.action_lab.pickup_phase import (
     wait_for_pickup_outcome as _shared_wait_for_pickup_outcome,
 )
 from tankpit_bot.action_lab.probe_base import ProbeBase
-from tankpit_bot.action_lab.radar_phase import (
-    clear_stale_radar_completion as _shared_clear_stale_radar_completion,
-)
 from tankpit_bot.action_lab.teleport import (
     DEFAULT_TELEPORT_STRATEGY,
+)
+from tankpit_bot.action_lab.teleport_acquisition import (
+    teleport_strategy_requires_map_sync,
 )
 from tankpit_bot.action_lab.teleport_attempt import (
     run_tracked_teleport_attempt,
 )
 from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
-    _teleport_strategy_requires_map_sync,
     _wait_for_teleport_outcome,
 )
 from tankpit_bot.action_lab.types import (
@@ -197,40 +200,6 @@ def _wait_for_pickup_outcome(
         raise FuelProbeError(str(exc)) from exc
 
 
-def _clear_stale_radar_completion() -> None:
-    """Drain any leaked radar-complete signals before starting a new scan."""
-    _shared_clear_stale_radar_completion()
-
-
-def _effective_pickup_timeout_ms(
-    *,
-    current_x: int,
-    current_y: int,
-    target_x: int,
-    target_y: int,
-    base_timeout_ms: int,
-) -> int:
-    """Return a pickup timeout sized for the current travel distance.
-
-    Args:
-        current_x: Current self X tile.
-        current_y: Current self Y tile.
-        target_x: Pickup target X tile.
-        target_y: Pickup target Y tile.
-        base_timeout_ms: Configured minimum pickup timeout.
-
-    Returns:
-        Timeout in milliseconds large enough for the move plus pickup settle.
-    """
-    return _shared_effective_pickup_timeout_ms(
-        current_x=current_x,
-        current_y=current_y,
-        target_x=target_x,
-        target_y=target_y,
-        base_timeout_ms=base_timeout_ms,
-    )
-
-
 def _get_completed_pickup_outcome(
     probe: action_session.WorldStateProviderProtocol,
     *,
@@ -248,11 +217,6 @@ def _get_completed_pickup_outcome(
         )
     except PickupPhaseError as exc:
         raise FuelProbeError(str(exc)) from exc
-
-
-def format_fuel_probe_summary(session: FuelProbeSessionDict) -> str:
-    """Format a compact summary for a fuel probe session."""
-    return _shared_format_fuel_probe_summary(session)
 
 
 _FUEL_PROBE_TARGET_STEP = 16
@@ -612,7 +576,7 @@ class FuelProbe(ProbeBase):
                 run_tracked_pickup_phase=run_tracked_pickup_phase,
                 get_completed_outcome=_get_completed_pickup_outcome,
                 wait_for_outcome=_wait_for_pickup_outcome,
-                compute_timeout=_effective_pickup_timeout_ms,
+                compute_timeout=effective_pickup_timeout_ms,
             )
         except PickupPhaseError as exc:
             raise FuelProbeError(str(exc)) from exc
@@ -663,7 +627,7 @@ class FuelProbe(ProbeBase):
             build_reposition_teleport_timeout_result=self._build_reposition_teleport_timeout_result,
             run_pickup_attempt=self._run_pickup_attempt,
             make_reposition_target=_make_reposition_target,
-            teleport_strategy_requires_map_sync=_teleport_strategy_requires_map_sync,
+            teleport_strategy_requires_map_sync=teleport_strategy_requires_map_sync,
             dispatch_failure_error=FuelProbeError,
             unavailable_error=FuelProbeError,
             unexpected_result_error=TeleportProbeError,
@@ -777,6 +741,7 @@ def run_fuel_probe(
 
 __all__ = [
     "FuelProbe",
+    "FuelProbeError",
     "run_fuel_probe",
     "run_tracked_fuel_collection_phase",
     "run_tracked_teleport_attempt",

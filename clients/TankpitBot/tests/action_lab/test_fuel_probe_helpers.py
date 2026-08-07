@@ -32,8 +32,6 @@ from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
 from tankpit_bot.action_lab.fuel_probe import (
     FuelProbe,
     FuelProbeError,
-    _clear_stale_radar_completion,
-    _effective_pickup_timeout_ms,
     _find_visible_fuel_target,
     _format_visible_fuel_entries,
     _get_completed_pickup_outcome,
@@ -44,6 +42,7 @@ from tankpit_bot.action_lab.pickup_phase import (
     PickupOutcomeWaiterProtocol,
     PickupPhaseError,
     PickupTimeoutSizerProtocol,
+    effective_pickup_timeout_ms,
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
@@ -56,24 +55,10 @@ from tankpit_bot.state import (
 )
 
 
-def test_clear_stale_radar_completion_drains_all_pending_flags() -> None:
-    """Radar completion drain clears all leaked flags before a new scan."""
-    completions = [True, True, False]
-
-    def _check_radar_complete() -> bool:
-        return completions.pop(0)
-
-    action_hooks.check_and_clear_radar_scan_complete = _check_radar_complete
-
-    _clear_stale_radar_completion()
-
-    assert completions == []
-
-
 def test_effective_pickup_timeout_scales_with_distance() -> None:
     """Pickup timeout grows with travel distance and never shrinks below base."""
     assert (
-        _effective_pickup_timeout_ms(
+        effective_pickup_timeout_ms(
             current_x=100,
             current_y=100,
             target_x=101,
@@ -83,7 +68,7 @@ def test_effective_pickup_timeout_scales_with_distance() -> None:
         == 3000
     )
     assert (
-        _effective_pickup_timeout_ms(
+        effective_pickup_timeout_ms(
             current_x=162,
             current_y=94,
             target_x=160,

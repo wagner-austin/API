@@ -39,9 +39,9 @@ from tankpit_bot.action_lab.fuel_locations import build_distinct_ground_targets
 from tankpit_bot.action_lab.fuel_probe import (
     FuelProbe,
     FuelProbeError,
-    format_fuel_probe_summary,
     run_fuel_probe,
 )
+from tankpit_bot.action_lab.fuel_probe_diagnostics import format_fuel_probe_summary
 from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
     FuelProbeSessionDict,

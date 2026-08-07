@@ -37,8 +37,8 @@ from tankpit_bot.action_lab.fuel_probe import (
     FuelProbeError,
     _find_visible_fuel_landing_tile,
     _visible_fuel_requires_reposition,
-    format_fuel_probe_summary,
 )
+from tankpit_bot.action_lab.fuel_probe_diagnostics import format_fuel_probe_summary
 from tankpit_bot.action_lab.fuel_target_phase import (
     BuildNoFuelVisibleResultProtocol,
     BuildRepositionMapSyncTimeoutResultProtocol,

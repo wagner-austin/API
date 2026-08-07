@@ -16,6 +16,9 @@ from tankpit_bot.action_lab.probe_runtime import (
     execute_live_probe_bootstrap,
 )
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
+from tankpit_bot.action_lab.teleport_acquisition import (
+    teleport_strategy_requires_map_sync,
+)
 from tankpit_bot.action_lab.teleport_attempt import (
     run_tracked_teleport_attempt as _shared_run_tracked_teleport_attempt,
 )
@@ -23,7 +26,6 @@ from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
     _limit_targets,
     _log_teleport_attempt_diagnostic,
-    _teleport_strategy_requires_map_sync,
     _wait_for_teleport_outcome,
     build_box_targets,
     format_teleport_probe_summary,
@@ -87,7 +89,7 @@ class TeleportProbe(ProbeBase):
             send_acquisition_command=self.open_map,
             acquisition_command_name="map_open",
             capture_before_map_open=True,
-            wait_for_acquisition_sync=_teleport_strategy_requires_map_sync(teleport_strategy),
+            wait_for_acquisition_sync=teleport_strategy_requires_map_sync(teleport_strategy),
             acquisition_timeout_ms=map_sync_timeout_ms,
             teleport_timeout_ms=teleport_timeout_ms,
             wait_for_outcome=_wait_for_teleport_outcome,
@@ -104,10 +106,7 @@ class TeleportProbe(ProbeBase):
         map_open_started_ms = attempt.acquisition_started_ms
         map_sync_timestamp_ms = attempt.acquisition_sync_timestamp_ms
         page_snapshots = attempt.page_snapshots
-        if (
-            _teleport_strategy_requires_map_sync(teleport_strategy)
-            and map_sync_timestamp_ms is None
-        ):
+        if teleport_strategy_requires_map_sync(teleport_strategy) and map_sync_timestamp_ms is None:
             completion_timestamp_ms = action_hooks.get_current_time_ms()
             self._reset_probe_state_to_idle()
             self_state_after = self._require_self_state()
@@ -361,11 +360,11 @@ __all__ = [
     "BuildTeleportProbeProtocol",
     "TeleportProbe",
     "TeleportProbeError",
-    "_teleport_strategy_requires_map_sync",
     "_wait_for_teleport_outcome",
     "build_box_targets",
     "build_teleport_probe",
     "format_teleport_probe_summary",
     "parse_targets_arg",
     "run_teleport_probe",
+    "teleport_strategy_requires_map_sync",
 ]

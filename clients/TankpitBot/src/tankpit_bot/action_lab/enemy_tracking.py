@@ -138,9 +138,6 @@ def _build_tracked_records(
             tracked_key = ""
             tracked_value = ""
         else:
-            from tankpit_bot.bot.ai.world_types import make_enemy_threat as _unused
-
-            del _unused
             tracked_key, tracked_value = _resolve_identity(js_entry, threat["tank_id"])
         records.append(
             TrackedEnemyDict(
