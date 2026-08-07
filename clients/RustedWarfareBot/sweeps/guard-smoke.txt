@@ -1,0 +1,2 @@
+smoke1|424242|doctrines/flame-nocover.doctrine|400
+smoke2|515151|doctrines/flame-nocover.doctrine|400
