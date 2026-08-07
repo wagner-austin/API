@@ -7,12 +7,11 @@ into human-readable strings for logging and analysis.
 from __future__ import annotations
 
 import base64
-from pathlib import Path
 
 from platform_core.logging import get_logger
 
-from tankpit_bot import _test_hooks, protocol
-from tankpit_bot.capture.xor import decode_base64_safe, xor_decode_body
+from tankpit_bot import protocol
+from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe, xor_decode_body
 from tankpit_bot.parser import is_room_info_text
 from tankpit_bot.protocol.constants import MSG_PROMOTION, RANK_NAMES
 from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
@@ -389,7 +388,7 @@ def decode_text_message(text: str, body_len: int, tag: str, body: bytes | None =
     return f"[{tag}] ???: {preview}..."
 
 
-def decode_message(payload: str, direction: str, magic: str | None = None) -> str:
+def decode_message(payload: str, direction: str, magic: str | None) -> str:
     """Decode a WebSocket message payload for display.
 
     Args:
@@ -471,7 +470,7 @@ def decode_join_confirm(text: str, tag: str) -> str:
     return f"[{tag}] JOIN_CONFIRM: room={room_id} tank={tank_name} {rank_str}"
 
 
-def decode_command(body: bytes, tag: str, magic: str | None = None) -> str:
+def decode_command(body: bytes, tag: str, magic: str | None) -> str:
     """Decode a '!' prefixed command message.
 
     Args:
@@ -485,42 +484,35 @@ def decode_command(body: bytes, tag: str, magic: str | None = None) -> str:
     if len(body) < 3:
         return f"[{tag}] CMD: ! (too short: {body.hex()})"
 
-    # XOR decrypt if magic is available
+    # XOR decrypt if magic is available. This block used to inline the
+    # WHOLE cipher — its own copy of the key path, its own file read,
+    # its own table build, and its own offset-1 XOR loop — and fall
+    # silently through to the hex dump when the key was missing. It was
+    # invisible to a by-name sweep for the shared helpers precisely
+    # because it named none of them ([[session-state-deglobalisation]]).
     if magic:
-        # Load static key (assuming same directory as this file)
-        static_key_path = Path(__file__).parent.parent.parent.parent / "xor_static_key.txt"
-        if _test_hooks.path_exists(static_key_path):
-            static_key = _test_hooks.read_text(static_key_path).strip()
-            # Build table
-            table = bytearray(len(static_key))
-            for i in range(len(static_key)):
-                table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
+        decrypted = bytearray(body)
+        decrypted[1:] = xor_decode_body(body, build_session_xor_table(magic), offset=1)
 
-            # Decrypt
-            decrypted = bytearray(len(body))
-            decrypted[0] = body[0]  # '!'
-            for i in range(1, len(body)):
-                decrypted[i] = body[i] ^ table[i - 1]
+        cmd_type = decrypted[1]
+        cmd_id = decrypted[2]
 
-            cmd_type = decrypted[1]
-            cmd_id = decrypted[2]
+        # Decode movement commands (type=4) with coordinates
+        if cmd_type == 4 and len(decrypted) >= 5:
+            x = decrypted[3]
+            y = decrypted[4]
+            cmd_name = {112: "MOVE", 106: "PICKUP", 116: "TELEPORT"}.get(cmd_id, "?")
+            return f"[{tag}] {cmd_name}: ({x}, {y})"
 
-            # Decode movement commands (type=4) with coordinates
-            if cmd_type == 4 and len(decrypted) >= 5:
-                x = decrypted[3]
-                y = decrypted[4]
-                cmd_name = {112: "MOVE", 106: "PICKUP", 116: "TELEPORT"}.get(cmd_id, "?")
-                return f"[{tag}] {cmd_name}: ({x}, {y})"
+        # Decode shoot commands (type=6) with target
+        if cmd_type == 6 and len(decrypted) >= 5:
+            x = decrypted[3]
+            y = decrypted[4]
+            return f"[{tag}] SHOOT: ({x}, {y})"
 
-            # Decode shoot commands (type=6) with target
-            if cmd_type == 6 and len(decrypted) >= 5:
-                x = decrypted[3]
-                y = decrypted[4]
-                return f"[{tag}] SHOOT: ({x}, {y})"
+        return f"[{tag}] CMD: ! type={cmd_type} id={cmd_id}"
 
-            return f"[{tag}] CMD: ! type={cmd_type} id={cmd_id}"
-
-    # Fallback to hex if no magic or decrypt failed
+    # Fallback to hex when the session has no magic at all.
     return f"[{tag}] CMD: ! {body.hex()}"
 
 

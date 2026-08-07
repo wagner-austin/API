@@ -62,28 +62,13 @@ def build_session_xor_table(magic: str) -> bytes:
     """
     global _static_key_cache
     if _static_key_cache is None:
-        _static_key_cache = _read_static_key()
+        if not _test_hooks.path_exists(DEFAULT_STATIC_KEY_PATH):
+            raise XorStaticKeyUnavailableError(
+                "static XOR key unavailable (xor_static_key.txt missing); "
+                "cannot build a session XOR table"
+            )
+        _static_key_cache = load_static_key(DEFAULT_STATIC_KEY_PATH)
     return build_xor_table(_static_key_cache, magic)
-
-
-def _read_static_key() -> str:
-    """Read the static key, translating absence into the typed error.
-
-    Returns:
-        The static key.
-
-    Raises:
-        XorStaticKeyUnavailableError: If the key file is absent or
-            empty. ``load_static_key`` reports those as
-            ``FileNotFoundError`` / ``InvalidKeyError``; callers here
-            only ever need "no cipher is available".
-    """
-    if not _test_hooks.path_exists(DEFAULT_STATIC_KEY_PATH):
-        raise XorStaticKeyUnavailableError(
-            "static XOR key unavailable (xor_static_key.txt missing); "
-            "cannot build a session XOR table"
-        )
-    return load_static_key(DEFAULT_STATIC_KEY_PATH)
 
 
 def reset_static_key_cache() -> None:

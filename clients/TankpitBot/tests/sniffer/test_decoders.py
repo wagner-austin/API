@@ -8,6 +8,7 @@ import logging
 import pytest
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, reset_static_key_cache
 from tankpit_bot.sniffer.decoders import (
     decode_8byte_state,
     decode_command,
@@ -29,28 +30,28 @@ from tests.sniffer.conftest import make_binary_payload, make_payload, sniffer_xo
 
 def test_decode_message_invalid_base64() -> None:
     """Test decode_message handles invalid base64."""
-    result = decode_message("not valid base64!!!", "sent")
+    result = decode_message("not valid base64!!!", "sent", None)
     assert result == "[SENT] (invalid base64)"
 
 
 def test_decode_message_too_short() -> None:
     """Test decode_message handles messages shorter than 2 bytes."""
     payload = base64.b64encode(b"x").decode()
-    result = decode_message(payload, "received")
+    result = decode_message(payload, "received", None)
     assert "[RECEIVED] (too short:" in result
 
 
 def test_decode_message_auth() -> None:
     """Test decode_message decodes AUTH messages."""
     payload = make_payload(b"%AUTH !be 12345|token|auth extra")
-    result = decode_message(payload, "sent")
+    result = decode_message(payload, "sent", None)
     assert result == "[SENT] AUTH: %AUTH !be 12345|token|auth extra..."
 
 
 def test_decode_message_select() -> None:
     """Test decode_message decodes SELECT messages."""
     payload = make_payload(b"*4")
-    result = decode_message(payload, "sent")
+    result = decode_message(payload, "sent", None)
     assert result == "[SENT] SELECT: room=4"
 
 
@@ -61,7 +62,7 @@ def test_decode_message_select_does_not_mutate_selected_room() -> None:
     reset_world_state()
 
     payload = make_payload(b"*4")
-    result = decode_message(payload, "sent")
+    result = decode_message(payload, "sent", None)
 
     assert result == "[SENT] SELECT: room=4"
     assert get_world_service().selected_room is None
@@ -70,7 +71,7 @@ def test_decode_message_select_does_not_mutate_selected_room() -> None:
 def test_decode_message_response() -> None:
     """Test decode_message decodes RESPONSE messages."""
     payload = make_payload(b"$4|0")
-    result = decode_message(payload, "received")
+    result = decode_message(payload, "received", None)
     assert result == "[RECEIVED] RESPONSE: $4|0"
 
 
@@ -79,7 +80,7 @@ def test_decode_message_state() -> None:
     # Create a 14-byte state message (subtype 0x03, not fuel-related)
     state_body = bytes.fromhex("2e033c020300005c190000ca0300")
     payload = make_payload(state_body)
-    result = decode_message(payload, "received")
+    result = decode_message(payload, "received", None)
     # 14-byte STATE message with subtype shown
     assert "[RECEIVED] STATE: sub=0x03 len=14" in result
     assert "hex=" in result
@@ -90,7 +91,7 @@ def test_decode_message_state_short() -> None:
     # Short state message (4-11 bytes) - shows as POS
     short_state = bytes([0x2E, 0x01, 0x02, 0x03])  # 4 bytes
     payload = make_payload(short_state)
-    result = decode_message(payload, "received")
+    result = decode_message(payload, "received", None)
     assert "[RECEIVED] POS: len=4 hex=2e010203" in result
 
 
@@ -147,14 +148,14 @@ def test_decode_state_message_update() -> None:
 def test_decode_message_unknown() -> None:
     """Test decode_message handles unknown message types."""
     payload = make_payload(b"some unknown message format")
-    result = decode_message(payload, "received")
+    result = decode_message(payload, "received", None)
     assert "[RECEIVED] ???:" in result
 
 
 def test_decode_message_quit() -> None:
     """Test decode_message decodes QUIT messages (dash character)."""
     payload = make_payload(b"-")
-    result = decode_message(payload, "sent")
+    result = decode_message(payload, "sent", None)
     assert result == "[SENT] QUIT: -"
 
 
@@ -264,7 +265,7 @@ def test_decode_command_with_rest() -> None:
     """Test decode_command decodes commands with additional data (no magic)."""
     # Use actual binary bytes, not ASCII string
     body = bytes([0x21, 0x31, 0x2D, 0x43, 0xFE])  # !1-C<0xFE>
-    result = decode_command(body, "SENT")
+    result = decode_command(body, "SENT", None)
     assert result == "[SENT] CMD: ! 21312d43fe"
 
 
@@ -298,14 +299,14 @@ def test_decode_command_with_magic_xor_decryption() -> None:
 
 def test_decode_command_short() -> None:
     """Test decode_command handles short command messages."""
-    result = decode_command(b"!", "SENT")
+    result = decode_command(b"!", "SENT", None)
     assert result == "[SENT] CMD: ! (too short: 21)"
 
 
 def test_decode_command_non_ascii() -> None:
     """Test decode_command handles non-ASCII command bytes (no magic)."""
     body = bytes([0x21, 0x90, 0xAB, 0xCD])  # !<0x90><0xAB><0xCD>
-    result = decode_command(body, "SENT")
+    result = decode_command(body, "SENT", None)
     assert result == "[SENT] CMD: ! 2190abcd"
 
 
@@ -317,41 +318,42 @@ def test_decode_command_non_ascii() -> None:
 def test_decode_message_calls_decode_plus_for_room_list() -> None:
     """Test decode_message routes to decode_plus_message for ROOM_LIST."""
     payload = make_payload(b"+3|Practice|1|0,0,0,0,0,0,0|1|p|field01.gif|2025")
-    result = decode_message(payload, "received")
+    result = decode_message(payload, "received", None)
     assert result == "[RECEIVED] ROOM_LIST: room=3 name=Practice"
 
 
 def test_decode_message_calls_decode_join_confirm() -> None:
     """Test decode_message routes to decode_join_confirm."""
     payload = make_payload(b"=4|Sep. 25, 2012|Yuppler|4|9|10|10|9")
-    result = decode_message(payload, "received")
+    result = decode_message(payload, "received", None)
     assert result == "[RECEIVED] JOIN_CONFIRM: room=4 tank=Yuppler lieutenant"
 
 
 def test_decode_message_calls_decode_command() -> None:
     """Test decode_message routes to decode_command."""
     payload = make_payload(b"!7b")
-    result = decode_message(payload, "sent")
+    result = decode_message(payload, "sent", None)
     # Without magic key, just shows raw hex
     assert result == "[SENT] CMD: ! 213762"
 
 
 def test_decode_message_command_with_magic_but_no_static_key() -> None:
-    """Test decode_message falls back to hex when static key file doesn't exist.
+    """A session with magic but no static key is fatal, not a hex dump.
 
-    This covers the branch where magic is provided but static key file is missing.
+    This asserted a fallback: ``decode_command`` inlined its own copy of
+    the key path, read, table build and XOR loop, and when the key file
+    was absent it fell through to printing raw hex — a display that
+    looks like a decode failure but reads like data
+    ([[session-state-deglobalisation]]).
     """
-    # Create a fake filesystem that has NO static key file
     fs = FakeFileSystem()
     _test_hooks.read_text = fs.read_text
     _test_hooks.path_exists = fs.path_exists
+    reset_static_key_cache()
 
     payload = make_payload(b"!7b")
-    # Provide magic key, but static key file doesn't exist
-    result = decode_message(payload, "sent", magic="test_magic")
-
-    # Should fall back to hex output since static key file is missing
-    assert result == "[SENT] CMD: ! 213762"
+    with pytest.raises(XorStaticKeyUnavailableError, match="static XOR key unavailable"):
+        decode_message(payload, "sent", magic="test_magic")
 
 
 # =============================================================================
