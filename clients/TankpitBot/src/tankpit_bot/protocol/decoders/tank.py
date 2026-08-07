@@ -6,7 +6,11 @@ tank info, entry, exit, status, and status sync.
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import require_min_length, x16
+from tankpit_bot.container.decoders import (
+    decode_container_message,
+    is_container_pickup_structure,
+)
+from tankpit_bot.container.decoders.events import decode_container_pickup
 from tankpit_bot.protocol.types import (
     BinaryMessage,
     TankEntryDict,
@@ -16,6 +20,7 @@ from tankpit_bot.protocol.types import (
     TankStatusDict,
     TankStatusSyncDict,
 )
+from tankpit_bot.wire.helpers import require_min_length, x16
 
 
 def decode_tank_info(data: bytes) -> TankInfoDict:
@@ -401,12 +406,6 @@ def decode_0x2e_message(data: bytes) -> BinaryMessage:
         Decoded `BinaryMessage`. `BinaryMessage` includes `ContainerMessage`
         so callers see one unified union.
     """
-    from tankpit_bot.container.decoders import (
-        decode_container_message,
-        is_container_pickup_structure,
-    )
-    from tankpit_bot.container.decoders.events import decode_container_pickup
-
     if len(data) < 1:
         return decode_container_message(data)
     subtype = data[0]

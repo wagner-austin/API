@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.protocol.helpers import (
-    require_min_length,
-    x16,
-)
 from tankpit_bot.protocol.types import (
     DeactivationDict,
     ShootEventDict,
+)
+from tankpit_bot.wire.helpers import (
+    require_min_length,
+    x16,
 )
 
 log = get_logger(__name__)

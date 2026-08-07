@@ -12,16 +12,16 @@ from tankpit_bot.protocol.constants import (
     MSG_PROMOTION,
     MSG_TANK_POS,
 )
-from tankpit_bot.protocol.helpers import (
-    DecodeError,
-    require_parts,
-    require_prefix,
-)
 from tankpit_bot.protocol.types import (
     AutoscrollAckDict,
     ChatAckDict,
     JoinConfirmDict,
     WorldInfoDict,
+)
+from tankpit_bot.wire.helpers import (
+    DecodeError,
+    require_parts,
+    require_prefix,
 )
 
 _ACK_FLAG_DISABLED = ord("0")

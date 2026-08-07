@@ -17,7 +17,6 @@ than a catch-all dumping ground.
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import DecodeError, require_min_length, x16
 from tankpit_bot.protocol.types import (
     ActionDoneDict,
     ActiveForcesDict,
@@ -33,6 +32,7 @@ from tankpit_bot.protocol.types import (
     Top10Dict,
     Top10EntryDict,
 )
+from tankpit_bot.wire.helpers import DecodeError, require_min_length, x16
 
 
 def decode_action_done(data: bytes) -> ActionDoneDict:

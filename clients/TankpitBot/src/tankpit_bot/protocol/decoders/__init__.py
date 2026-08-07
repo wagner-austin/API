@@ -84,12 +84,12 @@ from tankpit_bot.protocol.decoders.world import (
     viewport_entity_has_fuel_cache,
     viewport_entity_has_no_cache,
 )
-from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.protocol.types import (
     BinaryMessage,
     DecodedMessage,
     TextMessage,
 )
+from tankpit_bot.wire.helpers import DecodeError
 
 
 def decode_message(msg_type: int, data: bytes) -> BinaryMessage:

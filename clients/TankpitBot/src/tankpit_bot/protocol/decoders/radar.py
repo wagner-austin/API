@@ -11,7 +11,6 @@ from typing import TypeVar
 
 from platform_core.json_utils import JSONObject
 
-from tankpit_bot.protocol.helpers import DecodeError, require_min_length, x16
 from tankpit_bot.protocol.types import (
     EnemyDetectionDict,
     RadarContainerDict,
@@ -20,6 +19,7 @@ from tankpit_bot.protocol.types import (
     RadarResultDict,
     RadarScanResultDict,
 )
+from tankpit_bot.wire.helpers import DecodeError, require_min_length, x16
 
 # JS ch handler (tpclient.pretty.js:4811-4813) writes the overlay byte
 # into tile.m raw; the dh detonation handler uses 255 as the canonical

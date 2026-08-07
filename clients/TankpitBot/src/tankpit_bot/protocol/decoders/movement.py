@@ -6,8 +6,8 @@ movement paths and movement responses.
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import require_min_length, x16, x24
 from tankpit_bot.protocol.types import MovementDict, MovementResponseDict
+from tankpit_bot.wire.helpers import require_min_length, x16, x24
 
 
 def decode_movement(data: bytes) -> MovementDict:

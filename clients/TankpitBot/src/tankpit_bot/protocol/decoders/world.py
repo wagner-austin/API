@@ -10,7 +10,6 @@ from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_GO,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
 )
-from tankpit_bot.protocol.helpers import DecodeError, require_min_length, x16
 from tankpit_bot.protocol.types import (
     CacheUpdateDict,
     OverlayUpdateDict,
@@ -22,6 +21,7 @@ from tankpit_bot.protocol.types import (
     ViewportUpdateDict,
 )
 from tankpit_bot.state.viewport_geometry import VIEWPORT_PATCH_WIDTH
+from tankpit_bot.wire.helpers import DecodeError, require_min_length, x16
 
 
 def decode_sync(data: bytes) -> SyncDict:

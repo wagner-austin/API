@@ -18,8 +18,8 @@ Trace-verified from ``tpclient.js`` Ig.h. Layout details live on
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import DecodeError, require_min_length, x16
 from tankpit_bot.protocol.types import MapDataDict, MapTankEntry
+from tankpit_bot.wire.helpers import DecodeError, require_min_length, x16
 
 # Each tank slot is 5 bytes: x, y, tank_id (LE u16), packed byte.
 _TANK_ENTRY_BYTES = 5

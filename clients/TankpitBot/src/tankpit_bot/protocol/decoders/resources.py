@@ -6,7 +6,6 @@ fuel gain/deposit, inventory, equipment gain/toggle.
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import require_min_length, x16
 from tankpit_bot.protocol.types import (
     EquipmentGainDict,
     EquipmentToggleDict,
@@ -14,6 +13,7 @@ from tankpit_bot.protocol.types import (
     FuelGainDict,
     InventoryDict,
 )
+from tankpit_bot.wire.helpers import require_min_length, x16
 
 
 def decode_fuel_gain(data: bytes) -> FuelGainDict:
