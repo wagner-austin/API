@@ -1,49 +1,45 @@
-"""Combat route primitives for the durable HUNT owner.
+"""Combat fire decision: aim, pickup-of-opportunity, and engage.
 
-This module owns typed helper functions for target acquisition, teleport
-landing, shoot/miss cycles, and blocked-target replanning. Top-level owner
-selection now lives in ``ai_strategy`` and ``hunt_mode``.
+The chokepoint every shoot path reaches. Reads
+:mod:`tankpit_bot.bot.ai.combat_prep` for the refuel/refresh stages it
+falls back to, and :mod:`tankpit_bot.bot.ai.combat_target` for the
+lock. The approach stages that call INTO this module live in
+:mod:`tankpit_bot.bot.ai.combat_close`.
 """
 
 from __future__ import annotations
 
-from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.combat_landing import (
     SHOT_RANGE_TILES,
-    choose_combat_landing_tile,
 )
-from tankpit_bot.bot.ai.combat_landing import (
-    combat_landing_candidates as shared_combat_landing_candidates,
+from tankpit_bot.bot.ai.combat_prep import (
+    _has_damaging_weapon_available,
+    open_map_for_target,
+    refuel_for_hunt,
+)
+from tankpit_bot.bot.ai.combat_target import (
+    _set_combat_target,
+    block_combat_target_and_replan,
 )
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
-    can_afford_teleport,
     make_decision,
-    teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.hunt_relay import relay_toward
-from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
-from tankpit_bot.bot.ai.threats import analyze_threats
-from tankpit_bot.bot.ai.types import (
-    AIStateDict,
-    EnemyThreatDict,
-)
+from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,
-    make_map_open_command,
-    make_move_command,
     make_pickup_equipment_command,
     make_pickup_fuel_command,
     make_shoot_command,
-    make_teleport_command,
 )
 from tankpit_bot.inventory import inventory_counts
-from tankpit_bot.physics.capacity import fuel_capacity
-from tankpit_bot.physics.line_of_sight import is_shot_line_clear
 from tankpit_bot.physics.supervisor import equipment_pickup_refusal, fuel_pickup_refusal
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
-from tankpit_bot.sniffer.world_state import is_move_target_failed
+from tankpit_bot.runtime_logging import (
+    emit_ai,
+    emit_diagnostic,
+)
 from tankpit_bot.state.types import SelfStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -86,735 +82,39 @@ def _clamp_aim_into_viewport(ctx: DecideCtx, aim_x: int, aim_y: int) -> tuple[in
     return (max(left, min(right, aim_x)), max(top, min(bottom, aim_y)))
 
 
-def has_clear_shot_line(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
-    """Return True when the straight line to the target has no occluder.
-
-    The user's firing law has always carried a clearance clause ("as
-    long as theyre on the viewport and its a CLEAR dual shot") --
-    enforced since flag s3-16 through the lifted
-    :func:`tankpit_bot.physics.line_of_sight.is_shot_line_clear` test:
-    rock and movable land blocks occlude, water and mines never do,
-    and cardinal adjacency is trivially clear (no intermediate
-    tiles). An in-view target behind terrain is NOT shot from here --
-    spending an over-terrain homing where a re-close buys point-blank
-    duals is the F11 weapon-economy hole ([[flag-triage-20260729]]).
+def has_combat_shot(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
+    """Return True when the target is within the server's shot range.
 
     Args:
-        ctx: Decision context.
-        target: Enemy threat under aim.
+        ctx: Decision context (unused fields reserved; kept so every
+            engagement predicate shares one signature).
+        target: Enemy threat with its current-tick distance.
 
     Returns:
-        True when a dual fired from the current tile flies clean.
+        True if the target's Manhattan distance is within
+        ``SHOT_RANGE_TILES``.
     """
-    return is_shot_line_clear(
-        ctx.self_state["x"],
-        ctx.self_state["y"],
-        target["x"],
-        target["y"],
-        ctx.terrain,
-        ctx.world["terrain"],
-    )
+    del ctx
+    return target["distance"] <= SHOT_RANGE_TILES
 
 
-def is_already_engaged(ctx: DecideCtx) -> bool:
-    """Return True when the bot has already dispatched a shot at the locked target.
-
-    The discriminator is ``last_shot_target_id`` -- set only when
-    :func:`_combat_shoot` actually dispatches a ``shoot`` command for
-    the current ``combat_target_id``. A match proves the bot is in a
-    mid-fight stay-put scenario rather than a fresh acquisition: the
-    initial teleport has happened, at least one shot has resolved, and
-    the target is now somewhere other than point-blank. In that case
-    the right move is to keep firing (the server picks ``homing`` when
-    not adjacent, and homing tracks) instead of teleporting to chase
-    a moving enemy.
-
-    A mismatch means the lock is pre-engagement -- either a fresh
-    acquisition that has not yet teleported, or a re-acquire after
-    a kill -- and the planner should produce the initial close
-    teleport rather than fire from afar.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True if ``last_shot_target_id`` equals ``combat_target_id``.
-    """
-    return ctx.ai_state["last_shot_target_id"] == ctx.ai_state["combat_target_id"]
-
-
-def clear_combat_target(ai_state: AIStateDict) -> AIStateDict:
-    """Return AI state with combat-target ownership cleared.
-
-    Args:
-        ai_state: Current AI state.
-
-    Returns:
-        AI state with combat target fields reset.
-    """
-    return AIStateDict(
-        **{
-            **ai_state,
-            "combat_target_id": -1,
-            "combat_target_x": 0,
-            "combat_target_y": 0,
-        }
-    )
-
-
-def _set_combat_target(
-    ai_state: AIStateDict,
+def has_cardinal_combat_shot(
+    self_state: SelfStateDict,
     target: EnemyThreatDict,
-) -> AIStateDict:
-    """Return AI state with a locked combat target.
-
-    Args:
-        ai_state: Current AI state.
-        target: Combat target to lock.
-
-    Returns:
-        AI state with combat target coordinates updated.
-    """
-    return AIStateDict(
-        **{
-            **ai_state,
-            "combat_target_id": target["tank_id"],
-            "combat_target_x": target["x"],
-            "combat_target_y": target["y"],
-        }
-    )
-
-
-def has_standoff_landing(
-    x: int,
-    y: int,
-    terrain: TerrainMapProtocol | None,
 ) -> bool:
-    """Return True when a passable landing exists within shot range.
+    """Return True when self is cardinally adjacent to the target.
 
-    The engageability question is stand-off, not adjacency: the close
-    teleports onto the target's own tile and the server displaces the
-    bot to the nearest open ground, and duals fire from any in-view
-    tile within ``SHOT_RANGE_TILES`` ([[weapon-selection]]). A target
-    is therefore viable as long as SOME passable tile lies within the
-    shot-range diamond. The stricter passable-adjacent form of this
-    gate made mine-ringed players invisible to acquisition (live
-    2026-07-29: Yuppler ringed himself with mines and every pass
-    rejected him with no_passable_adjacent -- the mine-composed
-    passability view marks the whole ring impassable -- so the human
-    preempt never even saw him while the bot farmed practice bots).
-    """
-    if terrain is None:
-        return True
-    for dx in range(-SHOT_RANGE_TILES, SHOT_RANGE_TILES + 1):
-        remaining = SHOT_RANGE_TILES - abs(dx)
-        for dy in range(-remaining, remaining + 1):
-            nx, ny = x + dx, y + dy
-            if 0 <= nx <= 255 and 0 <= ny <= 255 and terrain.is_passable(nx, ny):
-                return True
-    return False
-
-
-def select_new_combat_target(
-    ctx: DecideCtx,
-    threats: list[EnemyThreatDict],
-) -> EnemyThreatDict | None:
-    """Return the next viable new combat target.
-
-    Picks the closest viable enemy that is not blocked or on kill
-    cooldown and has reachable adjacent ground.
+    Cardinal adjacency (Manhattan distance exactly 1) is the geometry
+    required for a guaranteed hit at point-blank range.
 
     Args:
-        ctx: Decision context.
-        threats: Visible threats in priority order.
+        self_state: Player's own state.
+        target: Enemy threat.
 
     Returns:
-        The next viable enemy target, or ``None`` when combat should not start.
+        True if Manhattan distance is exactly 1.
     """
-    viable = [
-        threat
-        for threat in threats
-        if str(threat["tank_id"]) not in ctx.blocked_targets
-        and str(threat["tank_id"]) not in ctx.killed
-        and has_standoff_landing(threat["x"], threat["y"], ctx.terrain)
-    ]
-    if not viable:
-        return None
-    return viable[0]
-
-
-def get_locked_target(
-    ctx: DecideCtx,
-    threats: list[EnemyThreatDict],
-) -> EnemyThreatDict | None:
-    """Return the lock target IFF the threat list still includes it.
-
-    The threat list is the single source of truth for "this tank is
-    viewport-confirmed right now". The pre-2026-06-21 implementation
-    also fell back to the world-state tanks registry to synthesise
-    a fake threat for tanks that had moved off-viewport, but the
-    enemy-tracking probe proved that fallback was the second source
-    of the "fires one shot then hops" loop: it kept the lock alive
-    on tanks the JS client itself no longer listed in
-    ``activeGame.P.j``, which sent the bot teleporting after
-    phantoms. Now: no fallback. If the locked tank leaves the
-    viewport, ``_decide_hunt_engage`` enters confirm_kill and the
-    bot re-acquires from fresh intel.
-
-    Args:
-        ctx: Decision context.
-        threats: Current threat list.
-
-    Returns:
-        The matching threat from ``threats``, or ``None``.
-    """
-    target_id = ctx.ai_state["combat_target_id"]
-    if target_id == -1:
-        return None
-    for t in threats:
-        if t["tank_id"] == target_id:
-            return t
-    return None
-
-
-def combat_landing_tile(ctx: DecideCtx, target: EnemyThreatDict) -> tuple[int, int]:
-    """Choose the tile to teleport to for combat.
-
-    Combat teleports should land adjacent to the enemy rather than on the
-    enemy's exact coordinates.
-
-    Args:
-        ctx: Decision context.
-        target: Enemy threat currently being engaged.
-
-    Returns:
-        Tuple of landing coordinates, or (-1, -1) if no landing possible.
-    """
-    return choose_combat_landing_tile(
-        ctx.filtered,
-        ctx.self_state,
-        target,
-        ctx.terrain,
-        ctx.timestamp_ms,
-    )
-
-
-def block_combat_target_and_replan(
-    ctx: DecideCtx,
-    target: EnemyThreatDict,
-) -> TickDecisionDict:
-    """Block a combat target and choose the next viable threat.
-
-    Adds the target to blocked_combat_targets so it won't be reacquired until
-    the TTL expires. If another viable threat exists, engages that one.
-    Otherwise falls back to generic enemy search.
-
-    Args:
-        ctx: Decision context.
-        target: The unreachable combat target.
-
-    Returns:
-        Tick decision for the next viable target, or fallback enemy search.
-    """
-    blocked = dict(ctx.blocked_targets)
-    blocked[str(target["tank_id"])] = ctx.timestamp_ms
-    base_with_block = AIStateDict(
-        **{
-            **clear_combat_target(ctx.base),
-            "blocked_combat_targets": blocked,
-        }
-    )
-
-    threats = analyze_threats(
-        ctx.filtered,
-        ctx.self_state,
-        ctx.timestamp_ms,
-        human_min_rank=ctx.config["human_target_min_rank"],
-        human_max_rank=ctx.config["human_target_max_rank"],
-    )
-    skip = {*blocked, *ctx.killed}
-    viable = [t for t in threats if str(t["tank_id"]) not in skip]
-    if viable:
-        next_target = viable[0]
-        emit_ai(
-            "blocked %s, switching to %s (id=%d)",
-            target["name"],
-            next_target["name"],
-            next_target["tank_id"],
-        )
-        return make_decision(
-            make_map_open_command(),
-            "HUNT",
-            800,
-            0,
-            0,
-            "find_target",
-            AIStateDict(
-                **{
-                    **_set_combat_target(base_with_block, next_target),
-                    "last_map_open_ms": ctx.timestamp_ms,
-                }
-            ),
-            ctx.equip,
-            reason_context={"target_name": next_target["name"]},
-        )
-
-    emit_ai("blocked %s, no viable threats remaining", target["name"])
-    return make_decision(
-        make_map_open_command(),
-        "HUNT",
-        0,
-        0,
-        0,
-        "find_enemies",
-        AIStateDict(**{**base_with_block, "last_map_open_ms": ctx.timestamp_ms}),
-        ctx.equip,
-    )
-
-
-# =============================================================================
-# Internal helpers
-# =============================================================================
-
-
-def _has_damaging_weapon_available(ctx: DecideCtx) -> bool:
-    """Return True when at least one damaging weapon slot can fire this tick.
-
-    A "damaging" slot is a dual or homing that is both enabled and
-    stocked. Radars, missiles, and shields don't damage tanks; single
-    (weapon=0) is what the server picks as the fallback when neither
-    dual nor homing is available. The predicate distinguishes the two
-    causes of a ``weapon=0`` miss:
-
-    * ``afterimage_confirmed`` -- dual OR homing was available and the
-      server still picked single, so the target is not at the aim tile.
-    * ``ammo_exhaustion_miss`` -- neither dual nor homing was
-      available, so the server routed to single by default. The miss
-      says nothing about the target's presence.
-
-    Used by the stationary-miss classifier in :func:`_combat_shoot`
-    (Bug 0.6): only the ``afterimage_confirmed`` case warrants
-    blacklisting the target.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True when ``dual_shots`` or ``homing_shots`` has both
-        ``enabled=True`` and ``count > 0``.
-    """
-    duals = ctx.inventory["dual_shots"]
-    homings = ctx.inventory["homing_shots"]
-    return (duals["enabled"] and duals["count"] > 0) or (
-        homings["enabled"] and homings["count"] > 0
-    )
-
-
-def refuel_for_hunt(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Delegate the tick to the fuel planner when hunting is fuel-starved.
-
-    Threats sort nearest-first and teleport cost is monotone in
-    distance, so an unaffordable nearest target means EVERY target is
-    unaffordable. Blocking and replanning instead cascaded through the
-    whole roster and ended in a map-reopen spin: run 20260611-025636
-    spawned at fuel 620 -- above the fuel-low entry rule (500) but
-    below every engagement's cost-plus-reserve -- and spent its entire
-    240s on 115 map reopens without a single shot. Collecting fuel is
-    the only decision that changes the blocked condition.
-
-    Refuel-then-RESUME (user ruling 2026-07-27, closing the last
-    voluntary live-target drop): the lock is KEPT through the fuel
-    detour, so the 2026-07-25 resume machinery returns to this exact
-    target once the tank can fund the trip -- run 183703's red-1 was
-    deferred at fuel 239 under the old clear-and-reacquire and never
-    hunted again (the guest won the fresh distance race). The old
-    anti-spin property survives because each deferred tick delegates
-    to a real collect decision (fuel strictly grows), not a map
-    reopen.
-
-    When the collect cascade itself declines (fuel healthy but nothing
-    collectible in reach), the fuel situation is not going to improve
-    this tick, so the unaffordable target is blocked and replanned
-    instead of exiting the session -- the terminator that also bounds
-    the pathological corner where cost + reserve exceeds the tank's
-    own fuel capacity.
-
-    Args:
-        ctx: Decision context.
-        target: The unaffordable combat target being deferred.
-
-    Returns:
-        Fuel recovery decision with combat target cleared, or a
-        blocked-target replanning decision when collection declines.
-    """
-    # Lazy import: collect_mode imports clear_combat_target from
-    # this module at import time.
-    from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
-
-    locked_ctx = DecideCtx(
-        ctx.world,
-        ctx.self_state,
-        _set_combat_target(ctx.base, target),
-        ctx.inventory,
-        ctx.timestamp_ms,
-        ctx.terrain,
-        ctx.combat_feedback,
-        ctx.map_fuel_dots,
-    )
-    decision = decide_collect_mode(locked_ctx)
-    if decision is None:
-        emit_ai(
-            "refuel-for-hunt found nothing collectible at fuel %d, blocking %s",
-            ctx.fuel,
-            target["name"],
-        )
-        return block_combat_target_and_replan(ctx, target)
-    return decision
-
-
-def _combat_open_map(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Phase 0: Open map to get fresh enemy positions."""
-    emit_ai("open map to find %s", target["name"])
-    return make_decision(
-        make_map_open_command(),
-        "HUNT",
-        800,
-        0,
-        0,
-        "find_target",
-        AIStateDict(
-            **{
-                **_set_combat_target(ctx.base, target),
-                "last_map_open_ms": ctx.timestamp_ms,
-            }
-        ),
-        ctx.equip,
-        reason_context={"target_name": target["name"]},
-    )
-
-
-def open_map_for_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Open the map to refresh or acquire the given target.
-
-    Args:
-        ctx: Decision context.
-        target: Combat target to refresh.
-
-    Returns:
-        Map-open decision that locks the target.
-    """
-    return _combat_open_map(ctx, target)
-
-
-# Walk-vs-teleport break-even for a combat close (user timing law,
-# 2026-07-30: a walk tile costs ~2 s and no fuel; a teleport ~4 s plus
-# fuel plus a map-open tick mid-fight). At three tiles the walk ties on
-# time and wins on fuel; beyond it the teleport wins on time.
-WALK_CLOSE_TILES = 3
-
-
-def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Phase 1: Teleport to enemy."""
-    # In view means no teleport is needed at all (user law 2026-07-29:
-    # "as long as theyre on the viewport and its a clear dual shot then
-    # id just hit them from my new location"; flag s2-13 tightened it:
-    # purple-9 at Manhattan 9 -- in view, beyond the old 8-tile bound --
-    # still got a paid teleport). The server fires at stationary
-    # in-view targets from any range ([[weapon-selection]]): water
-    # never blocks, rock clips to a billed single that resolves as a
-    # miss through the stationary-miss block. This also IS the
-    # mine-ring/ferry counterplay -- a ringed or shore-locked target in
-    # view is shot regardless of landing state -- and it covers every
-    # acquire path (fresh viewport, map-known, locked resume) because
-    # they all funnel through here and _combat_shoot latches the lock
-    # itself.
-    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-    if left <= target["x"] <= right and top <= target["y"] <= bottom:
-        if has_clear_shot_line(ctx, target):
-            emit_ai(
-                "%s already in view at (%d,%d) - engaging without teleport",
-                target["name"],
-                target["x"],
-                target["y"],
-            )
-            return _combat_shoot(ctx, target)
-        # In view but the dual line is occluded (flag s3-16: "we're
-        # shooting over terrain when we should have teleported back
-        # adjacent") -- fall through to the close teleport; adjacency
-        # has no intermediate tiles, so the landing buys a clear shot.
-        emit_ai(
-            "%s in view at (%d,%d) but the shot line is blocked - closing for a clear shot",
-            target["name"],
-            target["x"],
-            target["y"],
-        )
-    close_distance = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
-    if close_distance <= WALK_CLOSE_TILES:
-        # Short closes WALK (user timing law + flag 1 of run
-        # bot-20260730-011x: "i think it should ahve waked back
-        # instead of teleporting"): a walk costs ~2 s per tile and no
-        # fuel, while a mid-fight teleport costs ~4 s plus fuel plus
-        # the map-open precondition tick the last shot closed. Three
-        # walk tiles break even on time and win on everything else.
-        walk_candidates = _combat_landing_candidates(ctx, target)
-        if walk_candidates:
-            walk_x, walk_y = walk_candidates[0]
-            corridor_mine = find_corridor_clearance_shot(
-                ctx.filtered,
-                ctx.self_state,
-                ctx.terrain,
-                walk_x,
-                walk_y,
-            )
-            if corridor_mine is not None:
-                # Flags s6-8/9: six 45-fuel walk-ins against KNOWN
-                # mines because no walk ever consulted the mine layer.
-                # Mine shots are free singles ([[mine-mechanics]]), so
-                # the corridor is drained before the first step.
-                mine_x, mine_y = corridor_mine
-                emit_ai(
-                    "walk corridor to (%d,%d) is mined - clearing (%d,%d) first",
-                    walk_x,
-                    walk_y,
-                    mine_x,
-                    mine_y,
-                )
-                return make_decision(
-                    make_shoot_command(mine_x, mine_y),
-                    "HUNT",
-                    800,
-                    mine_x,
-                    mine_y,
-                    "mine_clearance_shot",
-                    _set_combat_target(ctx.base, target),
-                    ctx.equip,
-                    reason_context={"target_name": target["name"]},
-                )
-            emit_ai(
-                "walking %d tiles to close on %s at (%d,%d)",
-                close_distance,
-                target["name"],
-                target["x"],
-                target["y"],
-            )
-            return make_decision(
-                make_move_command(walk_x, walk_y),
-                "HUNT",
-                800,
-                walk_x,
-                walk_y,
-                "walk_to_target",
-                _set_combat_target(ctx.base, target),
-                ctx.equip,
-                reason_context={"target_name": target["name"]},
-            )
-    landing_x, landing_y = combat_landing_tile(ctx, target)
-    if is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
-        # The target is off-view here (in-view targets shot above), so
-        # with no legal landing and no legal shot, blocking and
-        # replanning is all that is left.
-        emit_ai(
-            "combat landing (%d,%d) for %s already failed, blocking target",
-            landing_x,
-            landing_y,
-            target["name"],
-        )
-        return block_combat_target_and_replan(ctx, target)
-    # Engaging must leave fuel to FIGHT, not merely to exist: the
-    # reserve is fuel_low_threshold (the line where COLLECT outranks
-    # HUNT) plus the full engagement_fuel_budget -- the same
-    # end-to-end funding the acquisition gate demands, so a chase
-    # re-teleport can never slip through cheaper than the fight it
-    # funds. Two priced incidents behind the sum: run 20260611-004505
-    # (a teleport gated only on hunt_min_fuel landed at 224, the fuel
-    # mode hijacked the next tick, and the ~190 spent reaching
-    # purple-8 bought a forbidden fight) and run 20260729-105325 (the
-    # fuel_low_threshold-only reserve passed a 158-cost chase at 372
-    # by 14 fuel, landed at 214, LOW_FUEL hijacked one shot later,
-    # session min 140 -- user ruling 2026-07-29: "we cant kill anyone
-    # if we die... we should fuel before chasing"). Refuel-for-hunt
-    # keeps the lock and prefers in-viewport walk pickups, then the
-    # larder, so the detour is usually one container away.
-    engagement_reserve = ctx.config["fuel_low_threshold"] + ctx.config["engagement_fuel_budget"]
-    if not can_afford_teleport(
-        ctx,
-        landing_x,
-        landing_y,
-        reserve_fuel=engagement_reserve,
-    ):
-        cost = teleport_fuel_cost_to(ctx, landing_x, landing_y)
-        max_affordable = fuel_capacity(ctx.self_state["rank"]) - engagement_reserve
-        if cost > max_affordable:
-            # Beyond refuel reach (flag s10-2, 2026-07-30): a 504-cost
-            # chase at fuel 1097/1100 hit this branch and "refueled"
-            # a 3-point deficit with a 121-fuel dot teleport -- no
-            # amount of fuel makes a cost above cap-minus-reserve
-            # affordable. Distance problems take the RELAY lane
-            # (hunt_relay.relay_toward): the strict-progress dot
-            # selector, monotone by construction. The first cut here
-            # reached for the COLLECT dot-ranker instead, whose /cost
-            # denominator makes the dot under the tank's feet beat any
-            # dot toward the prey -- live 2026-08-04 23:24-23:29: a
-            # locked target 98 tiles out produced a two-tile teleport
-            # ping-pong ((206,254)<->(207,254), then
-            # (225,253)<->(225,254)) at one hop per 2 ticks, forever.
-            emit_ai(
-                "chase to %s costs %d > max affordable %d - relaying via dots "
-                "(fuel=%d, refuel cannot fix distance)",
-                target["name"],
-                cost,
-                max_affordable,
-                ctx.fuel,
-            )
-            relay = relay_toward(
-                ctx,
-                _set_combat_target(ctx.base, target),
-                target,
-            )
-            if relay is not None:
-                return relay
-            # No strict-progress dot and no below-cap refuel: the
-            # target is unreachable by relay from here. Blocking it
-            # beats treadmilling -- the next acquisition pass finds
-            # closer prey or exits honestly.
-            emit_ai(
-                "no relay progress toward %s - blocking unreachable target",
-                target["name"],
-            )
-            return block_combat_target_and_replan(ctx, target)
-        emit_ai(
-            "cannot afford combat teleport for %s to (%d,%d) (fuel=%d cost=%d reserve=%d)"
-            " - refueling before hunt",
-            target["name"],
-            landing_x,
-            landing_y,
-            ctx.fuel,
-            cost,
-            engagement_reserve,
-        )
-        return refuel_for_hunt(ctx, target)
-    emit_ai(
-        "teleport near %s to (%d,%d) (target at %d,%d)",
-        target["name"],
-        landing_x,
-        landing_y,
-        target["x"],
-        target["y"],
-    )
-    return make_decision(
-        make_teleport_command(landing_x, landing_y),
-        "HUNT",
-        800,
-        landing_x,
-        landing_y,
-        "teleport_target",
-        _set_combat_target(ctx.base, target),
-        ctx.equip,
-        reason_context={"target_name": target["name"]},
-    )
-
-
-def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Teleport toward the given combat target when legal.
-
-    Args:
-        ctx: Decision context.
-        target: Combat target to close on.
-
-    Returns:
-        Teleport decision, or a blocked-target replanning decision when the
-        landing tile is unusable or the teleport is unaffordable.
-    """
-    return _combat_teleport(ctx, target)
-
-
-def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Phase closing: shoot when in range or already engaged; teleport on first close.
-
-    User-contract gameplay loop (2026-06-26): open map, teleport
-    cardinally adjacent to the target, dual until the target teleports
-    away, then stay in place and fire homing until the target is
-    deactivated. Enemies don't move *within* the viewport -- when they
-    leave cardinal adjacency, they teleported -- so chasing them with
-    another teleport burns fuel without changing the firing geometry.
-
-    Three branches:
-
-    1. **Cardinally adjacent** -- shoot (server picks ``dual`` for the
-       guaranteed point-blank hit).
-    2. **Already engaged** (:func:`is_already_engaged`) -- shoot from
-       the current tile. The server picks ``homing`` when the target
-       is not adjacent and homing tracks, so a stay-put fire continues
-       to land hits without spending fuel on another teleport.
-    3. **Fresh acquire, not adjacent** -- teleport directly to the
-       target. This is the one-time close the engagement contract
-       allows; subsequent ticks fall through branch (2).
-    """
-    if has_cardinal_combat_shot(ctx.self_state, target) or (
-        has_combat_shot(ctx, target) and has_clear_shot_line(ctx, target)
-    ):
-        # In-view, in range, and the dual line is clean: fire from the
-        # current tile (user ruling 2026-07-29). The purple-8 receipt
-        # this closes: after a break-driven pickup the bot stood at
-        # dist 2 and paid a teleport to regain cardinal adjacency
-        # instead of shooting. Cardinal adjacency is trivially clear
-        # (no intermediate tiles); a ranged shot must pass the lifted
-        # LOS test or the server serves a half-damage over-terrain
-        # homing (flag s3-16 / Artax death: the losing trade).
-        return _combat_shoot(ctx, target)
-    dist = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
-    if is_already_engaged(ctx):
-        if not has_clear_shot_line(ctx, target):
-            # Flag s3-16 ("we're shooting over terrain when we should
-            # have teleported back adjacent"): a stay-put shot here is
-            # a half-damage homing arcing over the occluder while the
-            # enemy duals back for 90 -- the trade that killed Artax.
-            # Re-close instead; the landing is adjacent, and adjacency
-            # always has a clear line.
-            emit_ai(
-                "engaged %s at (%d,%d) is behind terrain from (%d,%d) - "
-                "re-closing for a clear shot",
-                target["name"],
-                target["x"],
-                target["y"],
-                ctx.self_state["x"],
-                ctx.self_state["y"],
-            )
-            return _combat_teleport(ctx, target)
-        emit_ai(
-            "engaged %s moved off cardinal from (%d,%d) target=(%d,%d) dist=%d; staying put",
-            target["name"],
-            ctx.self_state["x"],
-            ctx.self_state["y"],
-            target["x"],
-            target["y"],
-            dist,
-        )
-        return _combat_shoot(ctx, target)
-    emit_ai(
-        "fresh acquire of %s from (%d,%d) target=(%d,%d) dist=%d; teleporting to close",
-        target["name"],
-        ctx.self_state["x"],
-        ctx.self_state["y"],
-        target["x"],
-        target["y"],
-        dist,
-    )
-    return _combat_teleport(ctx, target)
-
-
-def close_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Close distance on the given combat target.
-
-    Args:
-        ctx: Decision context.
-        target: Combat target to approach.
-
-    Returns:
-        Close-range combat decision: a shot when already in cardinal position,
-        a teleport when affordable, or a blocked-target replanning decision.
-    """
-    return _combat_close(ctx, target)
+    return abs(self_state["x"] - target["x"]) + abs(self_state["y"] - target["y"]) == 1
 
 
 def _find_combat_pickup(ctx: DecideCtx) -> BotCommand | None:
@@ -865,7 +165,7 @@ def _find_combat_pickup(ctx: DecideCtx) -> BotCommand | None:
     return None
 
 
-def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
+def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase engaging: shoot; a miss on a STATIONARY target blocks it.
 
     This is the single chokepoint every shoot path reaches (direct
@@ -894,6 +194,14 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     is the one ambiguous case -- a live enemy may simply have stepped
     off the tile as the shot resolved -- so a mover is re-aimed at its
     fresh registry position instead of being abandoned.
+
+
+    Args:
+        ctx: Decision context.
+        target: Combat target to shoot at.
+
+    Returns:
+        Combat engage decision, including miss-driven refresh behavior.
     """
     if ctx.combat_feedback == "rejected":
         # The server refused the previous dispatch outright (0x52
@@ -1029,82 +337,8 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     )
 
 
-def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Engage the given combat target.
-
-    Args:
-        ctx: Decision context.
-        target: Combat target to shoot at.
-
-    Returns:
-        Combat engage decision, including miss-driven refresh behavior.
-    """
-    return _combat_shoot(ctx, target)
-
-
-def _combat_landing_candidates(
-    ctx: DecideCtx,
-    target: EnemyThreatDict,
-) -> list[tuple[int, int]]:
-    """Return usable adjacent landing tiles ordered by distance to self."""
-    return shared_combat_landing_candidates(
-        ctx.filtered,
-        ctx.self_state,
-        target,
-        ctx.terrain,
-        ctx.timestamp_ms,
-    )
-
-
-def has_combat_shot(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
-    """Return True when the target is within the server's shot range.
-
-    Args:
-        ctx: Decision context (unused fields reserved; kept so every
-            engagement predicate shares one signature).
-        target: Enemy threat with its current-tick distance.
-
-    Returns:
-        True if the target's Manhattan distance is within
-        ``SHOT_RANGE_TILES``.
-    """
-    del ctx
-    return target["distance"] <= SHOT_RANGE_TILES
-
-
-def has_cardinal_combat_shot(
-    self_state: SelfStateDict,
-    target: EnemyThreatDict,
-) -> bool:
-    """Return True when self is cardinally adjacent to the target.
-
-    Cardinal adjacency (Manhattan distance exactly 1) is the geometry
-    required for a guaranteed hit at point-blank range.
-
-    Args:
-        self_state: Player's own state.
-        target: Enemy threat.
-
-    Returns:
-        True if Manhattan distance is exactly 1.
-    """
-    return abs(self_state["x"] - target["x"]) + abs(self_state["y"] - target["y"]) == 1
-
-
 __all__ = [
-    "SHOT_RANGE_TILES",
-    "block_combat_target_and_replan",
-    "clear_combat_target",
-    "close_target",
-    "combat_landing_tile",
     "engage_target",
-    "get_locked_target",
     "has_cardinal_combat_shot",
-    "has_clear_shot_line",
     "has_combat_shot",
-    "has_standoff_landing",
-    "is_already_engaged",
-    "open_map_for_target",
-    "select_new_combat_target",
-    "teleport_to_target",
 ]
