@@ -1,15 +1,17 @@
-"""Tests for the Phase 1b/1c entity fact retrofits and projections."""
+"""Tests for :mod:`tankpit_bot.state.projections.container` and
+:mod:`tankpit_bot.state.projections.tank` -- the Phase 1b/1c entity
+fact retrofits and their Fact[T] projections.
+"""
 
 from __future__ import annotations
 
 import pytest
 from platform_core.json_utils import JSONObject
 
-from tankpit_bot.facts.container_facts import container_fact
 from tankpit_bot.facts.provenance import make_provenance, make_source_ref
-from tankpit_bot.facts.tank_facts import tank_fact
-from tankpit_bot.state.mutations import apply_tank_observation
-from tankpit_bot.state.types.constants import ContainerRefreshKind, EntitySource
+from tankpit_bot.state.projections.container import container_fact
+from tankpit_bot.state.projections.tank import tank_fact
+from tankpit_bot.state.tank_mutations import apply_tank_observation
 from tankpit_bot.state.types.container import (
     container_fact_source,
     decode_container_state,
@@ -28,6 +30,7 @@ from tankpit_bot.state.types.tank_observation import (
     make_tank_observation,
 )
 from tankpit_bot.state.types.world import make_empty_world_state
+from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 
 
 @pytest.mark.parametrize(

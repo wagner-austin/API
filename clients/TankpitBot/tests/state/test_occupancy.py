@@ -9,7 +9,7 @@ from tankpit_bot.state.types import (
     make_empty_world_state,
     make_tank_state,
 )
-from tankpit_bot.state.types.constants import TankLiveness
+from tankpit_bot.types.constants import TankLiveness
 
 _NOW_MS = 1_000_000
 

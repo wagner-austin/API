@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from tankpit_bot.physics.line_of_sight import is_shot_line_clear, shot_line_tiles
+from tankpit_bot.state.line_of_sight import is_shot_line_clear, shot_line_tiles
 from tankpit_bot.state.types import TerrainTileDict, make_terrain_tile
-from tankpit_bot.state.types.constants import (
+from tankpit_bot.types.constants import (
     TERRAIN_BLOCK_BRIDGE,
     TERRAIN_BLOCK_LAND,
     TERRAIN_BLOCK_STACKED,

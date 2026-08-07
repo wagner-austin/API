@@ -1,4 +1,6 @@
-"""Tests for the Phase 1d retrofits: self, mine, terrain, viewport."""
+"""Tests for :mod:`tankpit_bot.state.projections.world` -- the Phase 1d
+retrofits: self, mine, terrain, viewport.
+"""
 
 from __future__ import annotations
 
@@ -6,15 +8,18 @@ import pytest
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot.facts.provenance import make_provenance
-from tankpit_bot.facts.world_facts import (
+from tankpit_bot.state.container_mutations import add_mine
+from tankpit_bot.state.projections.world import (
     mine_fact,
     self_fact,
     terrain_tile_fact,
     viewport_fact,
 )
-from tankpit_bot.state.container_mutations import add_mine
-from tankpit_bot.state.mutations import set_self_fuel, set_self_rank, update_self_position
-from tankpit_bot.state.types.constants import EntitySource
+from tankpit_bot.state.self_mutations import (
+    set_self_fuel,
+    set_self_rank,
+    update_self_position,
+)
 from tankpit_bot.state.types.mine import (
     decode_mine_state,
     encode_mine_state,
@@ -37,6 +42,7 @@ from tankpit_bot.state.types.viewport import (
     make_viewport_state,
 )
 from tankpit_bot.state.types.world import make_empty_world_state
+from tankpit_bot.types.constants import EntitySource
 from tests.world_state.helpers import get_self_state
 
 
