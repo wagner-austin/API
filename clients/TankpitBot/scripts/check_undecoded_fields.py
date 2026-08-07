@@ -7,9 +7,10 @@ ongoing Phase 5 work; this guard prevents drift by rejecting new
 violations at lint time.
 
 The guard scans every ``TypedDict`` subclass in the wire-format type
-modules (``src/tankpit_bot/protocol/types.py`` and
-``src/tankpit_bot/container/types.py``) and flags any annotation whose
-field name matches one of the banned patterns.
+modules -- the ``src/tankpit_bot/protocol/types/`` package (every
+payload family inside it) and ``src/tankpit_bot/container/types.py`` --
+and flags any annotation whose field name matches one of the banned
+patterns.
 
 Exit status:
   0 -- no violations.
@@ -28,11 +29,14 @@ from pathlib import Path
 
 from tankpit_bot import _test_hooks
 
-#: Wire-format type modules scanned by the guard. Other modules
-#: (diagnostics, capture stats) intentionally use ``unknown_*`` names
-#: to track unknowns and are out of scope.
+#: Wire-format type locations scanned by the guard. A directory is
+#: expanded to every ``*.py`` inside it, so a new payload family added
+#: under ``protocol/types/`` is covered the day it lands rather than the
+#: day someone remembers to list it. Other modules (diagnostics, capture
+#: stats) intentionally use ``unknown_*`` names to track unknowns and
+#: are out of scope.
 DEFAULT_TARGETS: tuple[Path, ...] = (
-    Path("src/tankpit_bot/protocol/types.py"),
+    Path("src/tankpit_bot/protocol/types"),
     Path("src/tankpit_bot/container/types.py"),
 )
 
@@ -159,26 +163,63 @@ def find_violations_in_source(path: Path, source: str) -> list[Violation]:
     return violations
 
 
-def find_violations(paths: tuple[Path, ...]) -> list[Violation]:
-    """Scan each path and aggregate every violation across all files.
+def expand_targets(paths: tuple[Path, ...]) -> list[Path]:
+    """Resolve each target to the concrete source files to scan.
 
-    File reads route through :mod:`tankpit_bot._test_hooks` so tests
-    inject fakes without touching disk.
+    A ``.py`` target is one module and is scanned as-is. Any other
+    target is a package directory and expands to every ``*.py`` it
+    holds, so a payload family added under ``protocol/types/`` is
+    covered without editing this module.
+
+    Directory listing and existence both route through
+    :mod:`tankpit_bot._test_hooks` so tests inject fakes without
+    touching disk.
 
     Args:
-        paths: Source paths to scan.
+        paths: Configured targets, each a ``.py`` module or a package
+            directory.
+
+    Returns:
+        Concrete file paths, in target order.
+
+    Raises:
+        FileNotFoundError: When a module target does not exist, or a
+            package target holds no ``*.py``.
+    """
+    out: list[Path] = []
+    for path in paths:
+        if path.suffix == ".py":
+            if not _test_hooks.path_exists(path):
+                raise FileNotFoundError(path)
+            out.append(path)
+            continue
+        members = _test_hooks.glob_paths(path, "*.py")
+        if not members:
+            raise FileNotFoundError(path)
+        out.extend(members)
+    return out
+
+
+def find_violations(paths: tuple[Path, ...]) -> list[Violation]:
+    """Scan each target and aggregate every violation across all files.
+
+    Targets are expanded by :func:`expand_targets`, so a package
+    directory contributes each of its modules. File reads route through
+    :mod:`tankpit_bot._test_hooks` so tests inject fakes without
+    touching disk.
+
+    Args:
+        paths: Source targets to scan.
 
     Returns:
         All :class:`Violation` instances, in scan order.
 
     Raises:
-        FileNotFoundError: When a path does not exist on the
+        FileNotFoundError: When a target does not exist on the
             (real or fake) filesystem.
     """
     out: list[Violation] = []
-    for path in paths:
-        if not _test_hooks.path_exists(path):
-            raise FileNotFoundError(path)
+    for path in expand_targets(paths):
         source = _test_hooks.read_text(path)
         out.extend(find_violations_in_source(path, source))
     return out
@@ -188,15 +229,16 @@ def run(targets: tuple[Path, ...] = DEFAULT_TARGETS) -> int:
     """Run the guard and return the CLI exit code.
 
     Args:
-        targets: Source paths to scan. Defaults to
-            :data:`DEFAULT_TARGETS`.
+        targets: Source targets to scan, each a file or a package
+            directory. Defaults to :data:`DEFAULT_TARGETS`.
 
     Returns:
         ``0`` when no violations were found; ``1`` otherwise.
     """
+    scanned = len(expand_targets(targets))
     violations = find_violations(targets)
     if not violations:
-        sys.stdout.write(f"check_undecoded_fields: clean ({len(targets)} files scanned)\n")
+        sys.stdout.write(f"check_undecoded_fields: clean ({scanned} files scanned)\n")
         return 0
     sys.stderr.write(f"check_undecoded_fields: {len(violations)} violation(s):\n")
     for violation in violations:
