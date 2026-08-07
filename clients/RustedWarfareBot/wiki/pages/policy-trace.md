@@ -29,7 +29,7 @@ The same shape of error produced a claim that stood in this wiki for a day: that
 
 ## Two tables, because they answer different questions
 
-**Per sample** — frame, army, credits, enemies, extractors, losses since the last observation, producers, idle producers, orders issued, claims refused, total worth, and the strongest rival's worth. This answers *when*.
+**Per sample** — frame, army, credits, enemies, extractors, losses since the last observation, producers, idle producers, orders issued, claims refused, total worth, the strongest rival's worth, our income and that same rival's income (the engine's own per-second figures, read off the scoreboard rows that ride every sample — the race law in one column pair, [[policy-economy]]), and the world digest ([[policy-determinism]]). The income pair landed 2026-08-05 between `rival` and `world` so that every column an existing reader indexes by position kept its place. This answers *when*.
 
 **Per loss** — the unit, its type, and where it was standing when last seen. This answers *where*, which is what separates "dying on the walk home" from "dying at the enemy front".
 

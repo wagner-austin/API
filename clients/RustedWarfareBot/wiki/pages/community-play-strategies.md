@@ -279,3 +279,34 @@ dip 2,450). Every arm still loses; what moved and what did not:[^8]
 [^2]: https://steamcommunity.com/sharedfiles/filedetails/?id=1449760671 — "RTS Defence", Steam guide.
 [^3]: https://www.chaptercheats.com/cheat/pc/388370/rusted-warfare/hint/136775 — "Text Walk Through".
 [^4]: https://steamcommunity.com/sharedfiles/filedetails/?id=3124371498 — "How to win in Rusted Warfare", Steam guide (author notes untested above Medium).
+
+## The nuke, measured: every mechanical claim true, every timing claim conditional
+
+The community names the nuke as the Impossible finisher. Six measurements
+in (2026-08-05), the split verdict:
+
+**Mechanically confirmed, to the crater.** The launcher places by the
+ordinary builder (45,000, no tech gate), `buildNuke` stockpiles an 11,000
+warhead, `launchNuke` fires the wire's targeted ability, and the strike
+lands where the planner points -- an owned extractor erased at (2370, 510)
+on the fourth probe (`runs/nuke-probe4.out`). Two engine traps are now
+law: the launch action reads *available at zero ammo* (the flag does not
+carry the ammo price), and an early launch is dropped silently -- so every
+launch is refired until the world answers.
+
+**"Nuke your way out of Impossible" is refuted for any bot that cannot
+first solve the Impossible economy.** Funding 45,000 by withhold from tick
+one starved all three hosts before a wall stood (`runs/sweeps/imp-nuke`);
+gating on 50/s income moved the same three deaths one layer later
+(`imp-nuke2`). Cross-checked against every Impossible sweep on disk:
+exactly one survivor exists, holding 18/s with 214 credits banked. There
+is no measured Impossible state carrying the launcher's price -- the
+community accounts presuppose a compounding fortress economy no arm here
+has yet achieved. The finisher is blocked on that, not on the machinery.
+
+**At Very Hard the channel funds only from a decided game.** Mid-contest
+withholding cost baseline wins even income-gated (`vh-nuke`, 90210); the
+funding gate is now the closer's sustained-dominance commitment, the one
+measured state where surplus is real. Targeting aims at the richest
+250-radius circle of hostile structures, not the priciest single one --
+an area weapon pointed at one building pays back less than it costs.

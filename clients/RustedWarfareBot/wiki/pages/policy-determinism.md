@@ -57,6 +57,28 @@ Two reasons, and both matter for anything else attempted here:
 
 The seeding stays, because it removes a real uncontrolled source and costs nothing. It is not a solution.
 
+## The fork anatomy: one draw-count leak, measured to the frame
+
+The 2026-08-06 fork matrix (ten seed-9 traces compared pairwise on the world-digest column) reduced "runs do not replicate" to one shape. Every same-config pair — realtime and 10x fast alike — agrees bit-for-bit for thousands of frames and then forks at a discrete event where the opponent AI resolves one choice differently; eight runs split into exactly two families at frame 7200 on a single build pick (+600 vs +700 rival worth). Divergence is not drift; it is a rare consequential draw landing one unit over.
+
+Three bytecode facts explain it (javap against the pinned jar). The engine's own per-match randomness reset (`f.a()`) seeds generator `b` — which **nothing draws from**; all five draw helpers read generator `a` — which the engine **never seeds**. The agent compensates (`EngineRandom`: engine generator + `Math.random()` + since 2026-08-06 `Collections.shuffle`'s generator, all seeded at premain and reseeded at match start). And the per-sample RNG ledger (`RandomLedger`, `rng frame=` lines in the agent log) showed the remaining leak precisely: in a pinned identical pair the **engine stream's states desync at frame 150** — third sample — while the world stays bit-identical until frame 7875 (fast) / 9525 (realtime). Something draws from the engine generator at a run-varying rate whose values usually touch nothing; every consequential consumer downstream inherits the shifted stream and eventually one choice lands differently.
+
+Consequences: the fast-forward accelerator is exonerated (fast-vs-realtime matched 293/400 — exactly as well as realtime matched itself), and the leak is universal, not load- or speed-specific. The named instrument for the leak is the draw tap (`RandomTap`, `PLAY_RNGTAP=1`): it replaces the generator with a per-caller counting one, and two tapped runs' `rngtap frame=` tallies name the call site whose count varies.
+
+## Solved: bit-exact replication at both speeds (2026-08-06)
+
+The tap named three wall-paced leaks and one structural race, and the fixes compose into full determinism — **400/400 identical world digests realtime-vs-realtime, fast-vs-fast at 10x, and fast-vs-REALTIME, with all three generator states identical at every sample, measured under concurrent panel load** (`runs/cert7-*`, `runs/certf-*`).
+
+The stack, in dependency order:
+
+1. **Three seeded streams** — the engine's own generator (whose shipped per-match reset seeds the WRONG field, bytecode-verified), `Math.random()`, and `Collections.shuffle`'s generator — seeded at premain and reseeded at match start (`EngineRandom`).
+2. **The probe-race latch** (`CommandChannel`): until a planner has acked once, a departure re-enters the wait on the same frame; a readiness probe can no longer release the world for one tick.
+3. **The ambient silencer** (`MatchSetup`): the effects manager's spawner accumulates the MEASURED delta and spends two sim-stream draws per ~10 wall-units; its accumulator is parked at -1e30 on seeded matches.
+4. **The tick-split generator** (`SplitRandom`): every draw walks its stack — through the tick entries (`game.i.a(F)V` / `a(FI)V` / `b(FI)V`, matched by descriptor because `i.a(m.l,float)` is the world DRAW pass) means the seeded sim stream; reaching the render loop first means a salted side stream. Kills the unit-sway redraws and every other render-paced drawer at once, with no bytecode.
+5. **The pre-tick watcher** (`Orders.onEngineTick` → `game.i.k`): the match watcher rides the engine's pre-update runnable queue, so pins, reseed, frame-zero, AI-timer reset and the hold all land BEFORE the new world's first update. Zero free ticks; the opponents' think-timer floats never see a wall-valued delta.
+
+What this retires: the noise floor above no longer binds seeded solo runs — same seed now means same match. Chaos remains real across seeds (that is the game), so paired-seed comparison stays the standard; what changed is that a seed is now a controlled experiment at either speed, and fast panels are bit-exact replays of realtime panels at a third of the wall clock.
+
 ## The standing rules
 
 **Score on survival time, or on worth share.** The endpoint figures the scorecard reports are the worst available: final worth has a standard deviation larger than its own mean. Computed from the per-sample trace instead, the mean share of worth held against the strongest rival has a coefficient of variation of **0.066**, and survival time **0.098** — the endpoint figure beside them is **0.67**.
@@ -70,3 +92,30 @@ The seeding stays, because it removes a real uncontrolled source and costs nothi
 [^1]: `runs/sweeps/noise/` and `runs/sweeps/noise-seeded/`, twelve results each from `sweeps/noise.txt` — one job line repeated twelve times under distinct labels, since results are filed by label.
 [^2]: `.decompiled/com/corrodinggames/rts/game/a/a.java:1713,1737,1761`; `game/a/o.java:96-97,166-167` — `o.w()` returns a random point on a disc and `a.java:1575` hands it to a worker as a destination; `game/units/y.java:4811-4837`.
 [^3]: `.decompiled/com/corrodinggames/rts/java/u.java:210-212` stores the delta, `:637` scales it, `:710` passes it to the simulation, `:714` resets it. See [[harness-parallel-matches]] for why the frame cap is not the lever it looks like.
+
+## The seating is part of the specification, and it silently was not
+
+The match setup queues the engine's own GUI script, and the loader reads
+`numberOfAIs` off the OPEN document with a Java fallback of **four**, capped
+by the map's spawn count -- not by the count its name advertises.[^4] Every
+"(2p)"-named skirmish map in the shipped roster except duel_lake carries
+four spawns, so the entire first cross-map arc silently played 1v3 while
+its notes said 1v1: the scorecard's `players 4 -> ...` line was the only
+witness (log 2026-08-05).
+
+The fix writes the requested count onto the live document between the open
+and the load, through `setValueById` -- the engine's own script-callable
+setter for exactly the attribute the loader reads. Editing the `.rml` file
+on disk was tried in the original match-setup work and does nothing, and
+the decompile now explains why rather than merely recording it: the file
+carries no `value` attribute for the element; only the live document does.
+Verified live: lake_2p, opponents=1, `players 2 -> 2`
+(`runs/seat-probe.out`).
+
+**The rule this buys:** the `players N -> ...` line is part of every
+scorecard read, always. A verdict whose seating was never checked is a
+verdict about an unknown experiment.
+
+[^4]: `.decompiled/com/corrodinggames/librocket/scripts/Root.java:626-645`
+    (`loadConfigCommon`: the element reads and the fallback), `:204-211`
+    (`setValueById`).

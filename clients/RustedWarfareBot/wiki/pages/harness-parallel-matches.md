@@ -3,6 +3,7 @@ title: "Playing Matches in Parallel: What Actually Had to Be Separated"
 tags: [harness, experiments, determinism, verification]
 related:
   - "[[harness-nodisplay]]"
+  - "[[harness-run-lifecycle]]"
   - "[[policy-determinism]]"
   - "[[policy-loop]]"
   - "[[runtime-split-java-agent-python-brain]]"
