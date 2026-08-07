@@ -6,12 +6,14 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.facts.provenance import make_provenance
 from tankpit_bot.state.types import (
-    ContainerRefreshKind,
-    EntitySource,
     WorldStateDict,
     coord_key,
     make_container_state,
     make_mine_state,
+)
+from tankpit_bot.types.constants import (
+    ContainerRefreshKind,
+    EntitySource,
 )
 
 log = get_logger(__name__)

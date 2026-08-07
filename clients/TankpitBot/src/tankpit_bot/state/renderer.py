@@ -8,6 +8,11 @@ from __future__ import annotations
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.state.types import (
+    TankStateDict,
+    WorldStateDict,
+    coord_key,
+)
+from tankpit_bot.types.constants import (
     ASCII_ALLY,
     ASCII_BRIDGE,
     ASCII_ENEMY,
@@ -25,9 +30,6 @@ from tankpit_bot.state.types import (
     TERRAIN_FERRY,
     TERRAIN_FERRY_ROCK,
     TERRAIN_GROUND,
-    TankStateDict,
-    WorldStateDict,
-    coord_key,
 )
 
 # =============================================================================
