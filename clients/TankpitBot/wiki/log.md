@@ -2918,3 +2918,24 @@ Bot assessment on the way in: nothing to fix — 100/0 century, trap class dead,
 RustedWarfare gets the same fleet+UI shape next (user ruling, including its fast-forward option as a spawn parameter) — its tree is receiving the user's catch-up commit first.
 
 Gate note: committed scoped (fleet.py, fleet_page.py, test_fleet.py only) with the full 19-test fleet suite green and targeted ruff/mypy clean on the scope; the tree-wide `make check` was red at commit time from a PARALLEL session's in-flight protocol->wire refactor (their edits, their gate) — the fleet files do not overlap it.
+
+---
+## [2026-08-06] refactor | Step 1 of de-globalisation: the XOR table becomes a value
+
+`7481cdca`. First step of [[session-state-deglobalisation]] shipped: `sniffer/xor.py` deleted outright — no shim, no deprecation — and its four module globals with it. Every decode path now takes the table its frames were encoded under as a parameter; `capture/xor.py::build_session_xor_table(magic) -> bytes` is the one place a table is built, and `SessionBase` stores it and hands the SAME table to `CommandService` instead of building it twice from identical inputs.
+
+**Three silent failures became loud** — the real payoff, not the concurrency:
+
+- A missing `xor_static_key.txt` now raises `XorStaticKeyUnavailableError`. `build_global_xor_table` returned early leaving the table `None`, and `xor_decode` then returned `body[1:]` **undeciphered** — garbage that decoded into plausible world state rather than an error.
+- `drain_messages` returns 0 and keeps the buffer while a session has no table, instead of dispatching pre-magic frames through that same identity decode.
+- `WebSocketSniffer` overrode `_on_magic_captured` WITHOUT `super()`, so live decode silently depended on the global that `init_trackers_with_magic` built as a side effect. The override is gone.
+
+**Two tests had been asserting the silent behaviour.** `test_binary_promotion_takes_binary_route` carried the comment "XOR table is None in tests so `body[1:]` passes through verbatim" and asserted a rank read straight out of plaintext; it now ciphers its body under the same table the decoder is handed. `tests/replay/test_script.py`'s fake filesystem had no key file at all. Both are stronger tests than the ones they replace. Five per-file `_isolate` fixtures in `tests/action_lab/` were deleted as pure duplicates of conftest — one of them documented the exact leak this step removed.
+
+**Sizing correction, recorded on the plan page:** the call-site table predicted 8 sites in 6 files. The commit touched **79 files — 21 `src/`, 57 `tests/`**. The estimate was right about `xor_decode` and wrong about what a signature change costs: threading one parameter rippled into `_test_hooks` protocol members, every fake satisfying them, and every fixture that built a table. Read the `get_world_service` row (73 sites / 20 files) as a `src` floor for step 8, not its size.
+
+**Found while shipping: the cipher is forked four ways**, and they disagree at the edges. `protocol/codec.py::xor_bytes` raises a named `ValueError` past the table end; `capture/xor.py::xor_decode_body` `IndexError`s there incidentally; `diagnostics/capture_audit.py` and `sim/transport.py` each carry an `else` branch passing the byte through in the clear. Argument order flips between them — `(body, table)` in two, `(table, data)` in the other two — so a wrong-order call type-checks and silently produces garbage. Both `codec` and `capture` also compute the static-key path with the byte-identical `__file__`-relative expression. `codec` is the survivor (lower layer, only validated one); folding is its own step because the pass-through arm is a real semantic difference. The 279,771-payload measurement that found the tail dead covers only the received-decode path — it does not license deleting the arm from the sim encoder or the audit reader.
+
+Conftest reset list: `reset_xor_state` out, `reset_static_key_cache` in. Ten calls either way, but the new one guards a process-wide KEY cache (one key builds every session's table), not session state — so the honest count of session-state resets is nine, and step 11's target shrank by one.
+
+Gate note: `make lint` clean — 0 violations across all 28 guard rules; `pytest -n auto` 5939 passed, 0 failures attributable to this work. Three failures remain in `tests/test_check_undecoded_fields.py` from the same PARALLEL session's in-flight split of `protocol/types.py` into a package: `scripts/check_undecoded_fields.py:34` `DEFAULT_TARGETS` still names the deleted file. That script is untouched by either session and enumerating their ten new modules would be guessing at their intent — their split, their gate.
