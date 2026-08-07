@@ -1,0 +1,4 @@
+# Cross-map rerun on the guarded, bracketed stack: the champion, two seeds per map.
+# label | seed | doctrine | samples
+flame-nocover|12345|doctrines/flame-nocover.doctrine|10000
+flame-nocover|777|doctrines/flame-nocover.doctrine|10000

@@ -74,3 +74,20 @@ arms climb from. The named path (log 2026-08-06, erosion analysis):
 winners reach 6 extractors by s1500 and close early; losers reach the same
 peak late and erode. Expansion speed and the closer threshold are the
 levers; erosion is what forecloses them.
+
+## Across maps (xmap3, 2026-08-07): the erosion law travels
+
+The rerun family -- flame-nocover, two seeds per map at VH -- reads
+3W/3S/2L, and the law that covers all eight cards is the one the duel_lake
+erosion analysis already named, read from PEAKS rather than endpoints:
+every match's economy ran (peaks 6-10 extractors everywhere, all plans
+compiled), and the verdict tracks whether it was HELD. Winners and
+survivors end at their peak (big_island 9-10 held, 2W; two_cold_sides 7
+and 4 of peaks 7-8, 2 survived at cap without closing); losers erode to
+nothing while the rival compounds (lake_2p peaks 6-7 ground to 0 with
+rival income reaching 187-202/s, defeated and wiped; hills_2p s12345 peak
+7 to final 1). The endpoint `extractors 0 -> 0` on the lake cards is
+[[policy-trace]]'s canonical trap performing on schedule -- the first
+reading of this family fell into it and stands corrected in the log.
+Expansion speed and the closer threshold remain THE levers, now with
+cross-map evidence; no map-conditional opening is indicated.
