@@ -31,10 +31,14 @@ import re
 import sys
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
 from tankpit_bot.sniffer.decoders import _is_text_route
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner) - the private load/XOR/frame-walk pipeline is
+# deleted; results reproduce exactly. Pre-cipher discriminators (ack,
+# text route) read frame["raw"], as the production receive path does.
 
 WINDOW_BEFORE_MS = 6_000
 WINDOW_AFTER_MS = 1_500
@@ -47,40 +51,24 @@ _REJECT_LINE = re.compile(
 )
 
 
-def _iter_frames(data: bytes) -> list[bytes]:
-    frames: list[bytes] = []
-    offset = 0
-    while offset + 2 < len(data):
-        length = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if length == 0 or offset + length > len(data):
-            return frames
-        frames.append(data[offset : offset + length])
-        offset += length
-    return frames
-
-
-def _decode_all(session: dict) -> list[tuple[int, dict]]:
-    """Decode every received message with its capture timestamp."""
-    reset_xor_state()
-    build_global_xor_table(session["magic"])
+def _decode_all(path: Path) -> list[tuple[int, dict]]:
+    """Decode every received frame with its capture timestamp."""
+    result = scan_session(path)
+    if "reason" in result:
+        return []
     out: list[tuple[int, dict]] = []
-    for message in sorted(session["messages"], key=lambda m: m["timestamp_ms"]):
-        if message.get("direction") == "sent":
+    for frame in sorted(result["frames"], key=lambda f: f["timestamp_ms"]):
+        if frame["direction"] != "received":
             continue
-        data = decode_base64_safe(message.get("payload", ""))
-        if not data:
+        if try_decode_plaintext_ack(frame["raw"]) is not None:
             continue
-        for body in _iter_frames(data):
-            if not body or try_decode_plaintext_ack(body) is not None:
-                continue
-            if _is_text_route(body[0], body):
-                continue
-            try:
-                decoded = dict(decode_message(body[0], xor_decode(body)))
-            except Exception:
-                continue
-            out.append((message["timestamp_ms"], decoded))
+        if _is_text_route(frame["msg_type"], frame["raw"]):
+            continue
+        try:
+            decoded = dict(decode_message(frame["msg_type"], frame["body"]))
+        except Exception:
+            continue
+        out.append((frame["timestamp_ms"], decoded))
     return out
 
 
@@ -112,10 +100,7 @@ def _log_rejections(events_path: Path) -> list[tuple[int, str, int, int]]:
 
 
 def mine(stem: Path) -> None:
-    session = json.loads(
-        (stem.parent / f"{stem.name}.capture_session.json").read_text(encoding="utf-8")
-    )
-    decoded = _decode_all(session)
+    decoded = _decode_all(stem.parent / f"{stem.name}.capture_session.json")
     self_id = _self_id(decoded)
     rejections = _log_rejections(stem.parent / f"{stem.name}.events.jsonl")
 

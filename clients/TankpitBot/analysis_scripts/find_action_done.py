@@ -3,73 +3,59 @@
 The current decoder throws away all bytes. Let's see what's actually there.
 Also check for failed command patterns — what does the server send back
 when a pickup fails, a move is blocked, etc.?
+
+Migrated 2026-08-06 onto ``tankpit_bot.analysis.scan`` (the typed
+capture-scan owner). The original never split frames — it stripped
+one length prefix (``data[2:]``) and treated the remainder of the
+payload as a single frame, which mis-reads any multi-frame payload.
+The per-frame walk is the correction — and measured on runs/bot
+2026-08-06 it reproduced the old output EXACTLY (9,523 hits both
+ways): every 0x54-leading frame in the corpus rides alone in its
+payload, so the prefix-strip shortcut never actually bit here.
 """
 
 from collections import defaultdict
 from pathlib import Path
 
-from tankpit_bot import _test_hooks
-from tankpit_bot.capture.xor import decode_base64_safe
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
-from tankpit_bot.types import decode_capture_session
+from tankpit_bot.analysis.scan import scan_session as scan_capture_session
 
 
 def scan_session(session_path: Path) -> list[dict[str, object]]:
     """Scan for ActionDone and other response messages."""
-    session_text = _test_hooks.read_text(session_path)
-    from platform_core.json_utils import load_json_str, narrow_json_to_dict
-
-    session_json = narrow_json_to_dict(load_json_str(session_text))
-    session = decode_capture_session(session_json)
-
-    magic = session["magic"]
-    if magic is None:
+    result = scan_capture_session(session_path)
+    if "reason" in result:
         return []
 
-    reset_xor_state()
-    build_global_xor_table(magic)
-
     results: list[dict[str, object]] = []
-
-    for msg in session["messages"]:
-        if msg["direction"] != "received":
+    for frame in result["frames"]:
+        if frame["direction"] != "received":
             continue
-        data = decode_base64_safe(msg["payload"])
-        if data is None or len(data) < 3:
-            continue
-        body = data[2:]
-        msg_type = body[0]
-
-        # Binary messages — XOR decode
-        if msg_type == 0x2E:
-            decoded = xor_decode(body)
+        decoded = frame["body"]
+        if frame["msg_type"] == 0x2E:
             if len(decoded) < 1:
                 continue
-
             # Check for tunneled ActionDone (0x54)
             if decoded[0] == 0x54:
                 results.append(
                     {
                         "type": "action_done_tunneled",
-                        "timestamp_ms": msg["timestamp_ms"],
+                        "timestamp_ms": frame["timestamp_ms"],
                         "decoded_hex": decoded.hex(),
                         "decoded_bytes": list(decoded),
                         "length": len(decoded),
                     }
                 )
-        else:
-            decoded = xor_decode(body)
+        elif len(decoded) >= 1 and decoded[0] == 0x54:
             # Standalone ActionDone
-            if len(decoded) >= 1 and decoded[0] == 0x54:
-                results.append(
-                    {
-                        "type": "action_done_standalone",
-                        "timestamp_ms": msg["timestamp_ms"],
-                        "decoded_hex": decoded.hex(),
-                        "decoded_bytes": list(decoded),
-                        "length": len(decoded),
-                    }
-                )
+            results.append(
+                {
+                    "type": "action_done_standalone",
+                    "timestamp_ms": frame["timestamp_ms"],
+                    "decoded_hex": decoded.hex(),
+                    "decoded_bytes": list(decoded),
+                    "length": len(decoded),
+                }
+            )
 
     return results
 

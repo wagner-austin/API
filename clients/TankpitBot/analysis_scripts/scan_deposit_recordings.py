@@ -17,63 +17,50 @@ import json
 import sys
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
+from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sniffer.decoders import _is_text_route
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner, direction-tagged frames) - the private
+# load/XOR/frame-walk pipeline is deleted; results reproduce exactly.
+# The sent line re-frames the frame with the production encoder and
+# takes the first byte, byte-identical to the original payload[:1]
+# because command payloads carry exactly one frame each.
 
 CAPTURE_DIRS = ("runs/sniff", "runs/bot", "runs/probe")
 
 
-def _iter_frames(data: bytes):
-    frames = []
-    offset = 0
-    while offset + 2 < len(data):
-        length = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if length == 0 or offset + length > len(data):
-            return frames
-        frames.append(data[offset : offset + length])
-        offset += length
-    return frames
-
-
 def scan_capture(path: Path, show_context: bool) -> int:
-    session = json.loads(path.read_text(encoding="utf-8"))
-    magic = session.get("magic")
-    if not magic:
+    result = scan_session(path)
+    if "reason" in result:
         return 0
-    reset_xor_state()
-    build_global_xor_table(magic)
     timeline: list[tuple[int, str, str]] = []
     deposit_indexes: list[int] = []
-    for message in sorted(session.get("messages", []), key=lambda m: m["timestamp_ms"]):
-        direction = message.get("direction", "received")
-        data = decode_base64_safe(message.get("payload", ""))
-        if not data:
+    for frame in sorted(result["frames"], key=lambda f: f["timestamp_ms"]):
+        t = frame["timestamp_ms"]
+        if frame["direction"] == "sent":
+            timeline.append((t, "sent", encode_frame(frame["raw"])[:1].hex()))
             continue
-        t = message["timestamp_ms"]
-        if direction == "sent":
-            timeline.append((t, "sent", data[:1].hex()))
+        raw = frame["raw"]
+        if try_decode_plaintext_ack(raw) is not None:
             continue
-        for body in _iter_frames(data):
-            if not body or try_decode_plaintext_ack(body) is not None:
-                continue
-            if _is_text_route(body[0], body):
-                continue
-            try:
-                decoded = decode_message(body[0], xor_decode(body))
-            except (DecodeError, ContainerDecodeError):
-                timeline.append((t, "recv", f"undecodable:{body[0]:#04x}"))
-                continue
-            msg_type = decoded.get("msg_type")
-            label = f"{msg_type:#04x}" if isinstance(msg_type, int) else str(msg_type)
-            if msg_type == 0x64:
-                deposit_indexes.append(len(timeline))
-                label = f"0x64 DEPOSIT {dict(decoded)}"
-            timeline.append((t, "recv", label))
+        if _is_text_route(frame["msg_type"], raw):
+            continue
+        try:
+            decoded = decode_message(frame["msg_type"], frame["body"])
+        except (DecodeError, ContainerDecodeError):
+            timeline.append((t, "recv", f"undecodable:{frame['msg_type']:#04x}"))
+            continue
+        msg_type = decoded.get("msg_type")
+        label = f"{msg_type:#04x}" if isinstance(msg_type, int) else str(msg_type)
+        if msg_type == 0x64:
+            deposit_indexes.append(len(timeline))
+            label = f"0x64 DEPOSIT {dict(decoded)}"
+        timeline.append((t, "recv", label))
     if deposit_indexes:
         print(f"\n=== {path} — {len(deposit_indexes)} deposit frame(s) ===")
         for index in deposit_indexes:

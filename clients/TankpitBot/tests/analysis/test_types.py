@@ -68,27 +68,37 @@ def test_decoded_frame_round_trips_including_body_bytes() -> None:
         timestamp_ms=1_700_000_000_123,
         direction="received",
         msg_type=0x53,
+        raw=bytes([0x53, 0x00, 0x01, 0x7F, 0x80, 0xFF]),
         body=bytes([0x00, 0x01, 0x7F, 0x80, 0xFF]),
     )
     assert decode_decoded_frame(encode_decoded_frame(original)) == original
 
 
-def test_decoded_frame_encodes_body_as_hex() -> None:
-    """The encoded body is lowercase hex of the raw bytes."""
+def test_decoded_frame_encodes_raw_and_body_as_hex() -> None:
+    """The encoded byte fields are lowercase hex of the frame bytes."""
     encoded = encode_decoded_frame(
-        DecodedFrameDict(timestamp_ms=7, direction="sent", msg_type=0x41, body=bytes([0xDE, 0xAD]))
+        DecodedFrameDict(
+            timestamp_ms=7,
+            direction="sent",
+            msg_type=0x41,
+            raw=bytes([0x41, 0xBE, 0xEF]),
+            body=bytes([0xDE, 0xAD]),
+        )
     )
     assert encoded == {
         "timestamp_ms": 7,
         "direction": "sent",
         "msg_type": 0x41,
+        "raw": "41beef",
         "body": "dead",
     }
 
 
 def test_decoded_frame_round_trips_an_empty_body() -> None:
     """A zero-length body encodes to an empty string and back."""
-    original = DecodedFrameDict(timestamp_ms=1, direction="received", msg_type=2, body=b"")
+    original = DecodedFrameDict(
+        timestamp_ms=1, direction="received", msg_type=2, raw=bytes([2]), body=b""
+    )
     assert decode_decoded_frame(encode_decoded_frame(original)) == original
 
 
@@ -117,7 +127,7 @@ def test_decode_decoded_frame_rejects_bad_body_hex() -> None:
     """A malformed body fails the record, not just the field."""
     with pytest.raises(JSONTypeError):
         decode_decoded_frame(
-            {"timestamp_ms": 1, "direction": "received", "msg_type": 2, "body": "xy"}
+            {"timestamp_ms": 1, "direction": "received", "msg_type": 2, "raw": "02", "body": "xy"}
         )
 
 

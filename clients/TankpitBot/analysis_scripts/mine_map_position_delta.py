@@ -52,9 +52,9 @@ def mine(path: Path, agg: dict) -> None:
             continue
         t = frame["timestamp_ms"]
         body = frame["body"]
-        if not body or try_decode_plaintext_ack(body) is not None:
+        if not body or try_decode_plaintext_ack(frame["raw"]) is not None:
             continue
-        if _is_text_route(frame["msg_type"], body):
+        if _is_text_route(frame["msg_type"], frame["raw"]):
             continue
         try:
             decoded = dict(decode_message(frame["msg_type"], body))

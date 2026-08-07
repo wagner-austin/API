@@ -141,6 +141,7 @@ def test_decode_session_frames_decodes_body_with_the_real_cipher(tmp_path: Path)
             "timestamp_ms": 4242,
             "direction": "received",
             "msg_type": 0x53,
+            "raw": body,
             "body": xor_decode(body),
         }
     ]
@@ -185,8 +186,33 @@ def test_decode_session_frames_tags_sent_frames(tmp_path: Path) -> None:
     reset_xor_state()
     build_global_xor_table(MAGIC)
     assert frames == [
-        {"timestamp_ms": 1, "direction": "sent", "msg_type": 0x70, "body": xor_decode(body)}
+        {
+            "timestamp_ms": 1,
+            "direction": "sent",
+            "msg_type": 0x70,
+            "raw": body,
+            "body": xor_decode(body),
+        }
     ]
+
+
+def test_decode_session_frames_keeps_the_raw_frame_untouched(tmp_path: Path) -> None:
+    """``raw`` is the wire frame byte-for-byte, never ciphered.
+
+    The production receive path discriminates plaintext acks and text
+    routes on the RAW frame before ``xor_decode`` runs — a consumer
+    that applies those discriminators to ``body`` reads garbage. The
+    ``raw`` field exists so miners can run the same pre-cipher checks
+    the sniffer does (found live: the viewport-probe migration lost
+    every autoscroll ack until it switched to ``raw``).
+    """
+    ack = b"A1"
+    path = _write(
+        tmp_path, "r.capture_session.json", _session_json(messages=[_received(_payload(ack))])
+    )
+    frames = decode_session_frames(load_capture_session(path))
+    assert [f["raw"] for f in frames] == [ack]
+    assert frames[0]["body"] != ack[1:]
 
 
 def test_decode_session_frames_ignores_empty_payload(tmp_path: Path) -> None:
@@ -252,6 +278,7 @@ def test_scan_session_returns_frames_for_a_decodable_capture(tmp_path: Path) -> 
                 "timestamp_ms": 99,
                 "direction": "received",
                 "msg_type": 0x4C,
+                "raw": body,
                 "body": xor_decode(body),
             }
         ],

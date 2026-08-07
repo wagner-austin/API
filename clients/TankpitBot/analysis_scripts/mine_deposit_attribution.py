@@ -21,10 +21,14 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
 from tankpit_bot.sniffer.decoders import _is_text_route
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner) - the private load/XOR/frame-walk pipeline is
+# deleted; results reproduce exactly. Pre-cipher discriminators (ack,
+# text route) read frame["raw"], as the production receive path does.
 
 REFILLS = Path("runs/analysis/container_refills.json")
 RUN_DIRS = ("runs/bot", "runs/sniff", "runs/probe")
@@ -39,55 +43,40 @@ def _capture_path(stamp: str) -> Path | None:
     return None
 
 
-def _iter_frames(data: bytes):
-    offset = 0
-    while offset + 2 < len(data):
-        length = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if length == 0 or offset + length > len(data):
-            return
-        yield data[offset : offset + length]
-        offset += length
-
-
 def _positions_and_deposits(path: Path):
     """Extract (t, tank_id, x, y) sightings and 0x64 deposit events."""
-    session = json.loads(path.read_text(encoding="utf-8"))
-    reset_xor_state()
-    build_global_xor_table(session["magic"])
+    result = scan_session(path)
     self_id = None
     sightings: list[tuple[int, int, int, int]] = []
     deposits: list[tuple[int, dict]] = []
-    for message in sorted(session["messages"], key=lambda m: m["timestamp_ms"]):
-        if message.get("direction") == "sent":
+    if "reason" in result:
+        return self_id, sightings, deposits
+    for frame in sorted(result["frames"], key=lambda f: f["timestamp_ms"]):
+        if frame["direction"] != "received":
             continue
-        data = decode_base64_safe(message.get("payload", ""))
-        if not data:
+        t = frame["timestamp_ms"]
+        if try_decode_plaintext_ack(frame["raw"]) is not None:
             continue
-        t = message["timestamp_ms"]
-        for body in _iter_frames(data):
-            if not body or try_decode_plaintext_ack(body) is not None:
-                continue
-            if _is_text_route(body[0], body):
-                continue
-            try:
-                decoded = decode_message(body[0], xor_decode(body))
-            except Exception:
-                continue
-            msg_type = decoded.get("msg_type")
-            if msg_type == 0x21 and self_id is None:
-                self_id = decoded.get("tank_id")
-            elif msg_type == 0x3D:
-                sightings.append((t, decoded["tank_id"], decoded["x"], decoded["y"]))
-            elif msg_type == 0x47:
-                x, y = decoded["start_x"], decoded["start_y"]
+        if _is_text_route(frame["msg_type"], frame["raw"]):
+            continue
+        try:
+            decoded = decode_message(frame["msg_type"], frame["body"])
+        except Exception:
+            continue
+        msg_type = decoded.get("msg_type")
+        if msg_type == 0x21 and self_id is None:
+            self_id = decoded.get("tank_id")
+        elif msg_type == 0x3D:
+            sightings.append((t, decoded["tank_id"], decoded["x"], decoded["y"]))
+        elif msg_type == 0x47:
+            x, y = decoded["start_x"], decoded["start_y"]
+            sightings.append((t, decoded["tank_id"], x, y))
+            for step in decoded.get("path", ""):
+                dx, dy = _STEP[step]
+                x, y = x + dx, y + dy
                 sightings.append((t, decoded["tank_id"], x, y))
-                for step in decoded.get("path", ""):
-                    dx, dy = _STEP[step]
-                    x, y = x + dx, y + dy
-                    sightings.append((t, decoded["tank_id"], x, y))
-            elif msg_type == 0x64:
-                deposits.append((t, dict(decoded)))
+        elif msg_type == 0x64:
+            deposits.append((t, dict(decoded)))
     return self_id, sightings, deposits
 
 

@@ -3,65 +3,60 @@
 Supervisor messages come through the text/protocol path, not through
 0x2E containers. Our wire_byte_analysis only looked at containers.
 This script scans the raw messages for 0x52.
+
+Migrated 2026-08-06 onto ``tankpit_bot.analysis.scan`` (the typed
+capture-scan owner). The original never split frames — it stripped
+one length prefix (``data[2:]``) and treated the remainder of the
+payload as a single frame, which mis-reads any multi-frame payload.
+The per-frame walk is the correction — and measured on runs/bot
+2026-08-06 it reproduced the old output EXACTLY (3,342 supervisors
+both ways): every 0x52-leading frame in the corpus rides alone in
+its payload, so the prefix-strip shortcut never actually bit here.
 """
 
 from pathlib import Path
 
-from tankpit_bot import _test_hooks
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session as scan_capture_session
 from tankpit_bot.sniffer.constants import TEXT_MESSAGE_TYPES
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
-from tankpit_bot.types import decode_capture_session
 
 
 def scan_session(session_path: Path) -> list[dict[str, object]]:
     """Scan a capture for Supervisor and Statistics messages."""
-    session_text = _test_hooks.read_text(session_path)
-    from platform_core.json_utils import load_json_str, narrow_json_to_dict
-
-    session_json = narrow_json_to_dict(load_json_str(session_text))
-    session = decode_capture_session(session_json)
-
-    magic = session["magic"]
-    if magic is None:
+    result = scan_capture_session(session_path)
+    if "reason" in result:
         return []
 
-    reset_xor_state()
-    build_global_xor_table(magic)
-
     results: list[dict[str, object]] = []
-    for msg in session["messages"]:
-        if msg["direction"] != "received":
+    for frame in result["frames"]:
+        if frame["direction"] != "received":
             continue
-        data = decode_base64_safe(msg["payload"])
-        if data is None or len(data) < 3:
-            continue
-        body = data[2:]
-        msg_type = body[0]
+        raw = frame["raw"]
+        msg_type = frame["msg_type"]
 
-        # Text messages (including Supervisor 0x52='R')
+        # Text messages (including Supervisor 0x52='R') — never ciphered,
+        # so they read from the raw wire frame.
         if msg_type in TEXT_MESSAGE_TYPES:
-            text = body.decode("utf-8", errors="replace")
+            text = raw.decode("utf-8", errors="replace")
             if msg_type == 0x52:  # Supervisor
                 results.append(
                     {
                         "type": "supervisor",
-                        "timestamp_ms": msg["timestamp_ms"],
-                        "raw_hex": body.hex(),
+                        "timestamp_ms": frame["timestamp_ms"],
+                        "raw_hex": raw.hex(),
                         "text": text,
-                        "length": len(body),
+                        "length": len(raw),
                     }
                 )
             continue
 
-        # Binary messages - XOR decode and check for 0x52 after decode
-        decoded = xor_decode(body)
+        # Binary messages - the deciphered body, checked for 0x52 leads
+        decoded = frame["body"]
         if len(decoded) >= 1 and decoded[0] == 0x52:
             results.append(
                 {
                     "type": "supervisor_binary",
-                    "timestamp_ms": msg["timestamp_ms"],
-                    "raw_hex": body.hex(),
+                    "timestamp_ms": frame["timestamp_ms"],
+                    "raw_hex": raw.hex(),
                     "decoded_hex": decoded.hex(),
                     "decoded_bytes": list(decoded),
                     "length": len(decoded),
@@ -76,7 +71,7 @@ def scan_session(session_path: Path) -> list[dict[str, object]]:
             results.append(
                 {
                     "type": "statistics",
-                    "timestamp_ms": msg["timestamp_ms"],
+                    "timestamp_ms": frame["timestamp_ms"],
                     "destroyed": destroyed,
                     "deactivated": deactivated,
                     "score": score,

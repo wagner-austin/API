@@ -74,15 +74,22 @@ class DecodedFrameDict(TypedDict):
             (:data:`FRAME_DIRECTIONS`). Sent frames are our own
             commands; received frames are the server stream.
         msg_type: First byte of the frame, before XOR decoding.
-        body: The whole frame passed through the session cipher,
-            including the type-byte position — exactly the shape
-            ``protocol.decode_message`` and ``sim.commands.
-            decode_client_command`` take as their data argument.
+        raw: The frame exactly as captured on the wire, type byte
+            included, untouched by the cipher. This is what the
+            production receive path hands to its PRE-cipher
+            discriminators — ``protocol.try_decode_plaintext_ack``
+            and the text-route check — which run before ``xor_decode``
+            because plaintext frames are never ciphered.
+        body: The frame after the session cipher: type byte stripped,
+            remainder XOR-decoded — exactly the data argument
+            ``protocol.decode_message(msg_type, body)`` and
+            ``sim.commands.decode_client_command(body)`` take.
     """
 
     timestamp_ms: int
     direction: FrameDirection
     msg_type: int
+    raw: bytes
     body: bytes
 
 
@@ -154,20 +161,21 @@ def require_session_skip_reason(value: str) -> SessionSkipReason:
 def encode_decoded_frame(frame: DecodedFrameDict) -> JSONObject:
     """Encode a :class:`DecodedFrameDict` to a JSON object.
 
-    The body is rendered as lowercase hex because JSON has no bytes
-    literal and hex round-trips exactly at any byte value.
+    Byte fields are rendered as lowercase hex because JSON has no
+    bytes literal and hex round-trips exactly at any byte value.
 
     Args:
         frame: The decoded frame to encode.
 
     Returns:
-        JSON-serializable object with ``timestamp_ms``, ``msg_type``
-        and hex ``body``.
+        JSON-serializable object with ``timestamp_ms``, ``direction``,
+        ``msg_type`` and hex ``raw`` / ``body``.
     """
     return {
         "timestamp_ms": frame["timestamp_ms"],
         "direction": frame["direction"],
         "msg_type": frame["msg_type"],
+        "raw": frame["raw"].hex(),
         "body": frame["body"].hex(),
     }
 
@@ -183,12 +191,13 @@ def decode_decoded_frame(data: JSONObject) -> DecodedFrameDict:
 
     Raises:
         JSONTypeError: If a field is missing, of the wrong type, or if
-            ``body`` is not valid hex.
+            ``raw`` or ``body`` is not valid hex.
     """
     return DecodedFrameDict(
         timestamp_ms=require_int(data, "timestamp_ms"),
         direction=require_frame_direction(require_str(data, "direction")),
         msg_type=require_int(data, "msg_type"),
+        raw=require_hex_bytes(require_str(data, "raw")),
         body=require_hex_bytes(require_str(data, "body")),
     )
 

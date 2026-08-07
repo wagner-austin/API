@@ -72,9 +72,9 @@ def _decode_all(path: Path) -> list[tuple[int, str, dict]] | None:
                 continue
             out.append((t, "cmd", cmd))
             continue
-        if try_decode_plaintext_ack(body) is not None:
+        if try_decode_plaintext_ack(frame["raw"]) is not None:
             continue
-        if _is_text_route(frame["msg_type"], body):
+        if _is_text_route(frame["msg_type"], frame["raw"]):
             continue
         try:
             decoded = dict(decode_message(frame["msg_type"], body))

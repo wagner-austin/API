@@ -1,12 +1,15 @@
-"""Archive sweep: fuel-container spawn/despawn dynamics from 0x4C fuel-dot atlas diffs."""
+"""Archive sweep: fuel-container spawn/despawn dynamics from 0x4C fuel-dot atlas diffs.
 
-import json
+Migrated 2026-08-06 onto ``tankpit_bot.analysis.scan`` (the typed
+capture-scan owner) - the private load/XOR/frame-walk pipeline is
+deleted; results reproduce exactly.
+"""
+
 from collections import Counter
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.protocol import decode_message
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 
 agg = Counter()
 gap_appear_rate = Counter()  # appearances bucketed by inter-snapshot gap
@@ -17,63 +20,44 @@ disappear_events = 0
 observed_map_minutes = 0.0
 back_to_back_diffs = Counter()
 
-
-def split_frames(payload):
-    data = decode_base64_safe(payload)
-    if not data:
-        return
-    off = 0
-    while off + 2 < len(data):
-        ln = data[off] | (data[off + 1] << 8)
-        off += 2
-        if ln == 0 or off + ln > len(data):
-            break
-        yield data[off : off + ln]
-        off += ln
-
-
 for path in sorted(Path("runs").glob("*/*.capture_session.json")):
     try:
-        s = json.loads(path.read_text(encoding="utf-8"))
+        result = scan_session(path)
     except Exception:
         continue
-    if not s.get("magic"):
+    if "reason" in result:
         continue
-    reset_xor_state()
-    build_global_xor_table(s["magic"])
-    msgs = sorted(s["messages"], key=lambda m: m["timestamp_ms"])
     prev_dots = None
     prev_ts = None
-    for m in msgs:
-        if m["direction"] != "received":
+    for frame in sorted(result["frames"], key=lambda f: f["timestamp_ms"]):
+        if frame["direction"] != "received":
             continue
-        ts = m["timestamp_ms"]
-        for body in split_frames(m["payload"]):
-            try:
-                dm = decode_message(body[0], xor_decode(body))
-            except Exception:
-                continue
-            if dm["msg_type"] != 0x4C:
-                continue
-            dots = frozenset(tuple(d) for d in dm["fuel_dots"])
-            agg["snapshots"] += 1
-            dot_counts.append(len(dots))
-            if prev_dots is not None:
-                gap_s = (ts - prev_ts) / 1000
-                appeared = dots - prev_dots
-                disappeared = prev_dots - dots
-                if gap_s <= 5:
-                    back_to_back_diffs[min(len(appeared) + len(disappeared), 10)] += 1
-                else:
-                    appear_events += len(appeared)
-                    disappear_events += len(disappeared)
-                    observed_map_minutes += gap_s / 60
-                    bucket = min(int(gap_s // 30), 10)
-                    gap_appear_rate[bucket * 30] += len(appeared)
-                    for x, y in appeared:
-                        quadrant_appear[(x // 64, y // 64)] += 1
-            prev_dots = dots
-            prev_ts = ts
+        ts = frame["timestamp_ms"]
+        try:
+            dm = decode_message(frame["msg_type"], frame["body"])
+        except Exception:
+            continue
+        if dm["msg_type"] != 0x4C:
+            continue
+        dots = frozenset(tuple(d) for d in dm["fuel_dots"])
+        agg["snapshots"] += 1
+        dot_counts.append(len(dots))
+        if prev_dots is not None:
+            gap_s = (ts - prev_ts) / 1000
+            appeared = dots - prev_dots
+            disappeared = prev_dots - dots
+            if gap_s <= 5:
+                back_to_back_diffs[min(len(appeared) + len(disappeared), 10)] += 1
+            else:
+                appear_events += len(appeared)
+                disappear_events += len(disappeared)
+                observed_map_minutes += gap_s / 60
+                bucket = min(int(gap_s // 30), 10)
+                gap_appear_rate[bucket * 30] += len(appeared)
+                for x, y in appeared:
+                    quadrant_appear[(x // 64, y // 64)] += 1
+        prev_dots = dots
+        prev_ts = ts
 
 dot_counts.sort()
 n = len(dot_counts)

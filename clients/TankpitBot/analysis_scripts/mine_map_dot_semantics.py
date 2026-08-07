@@ -19,9 +19,14 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import decode_session_frames, load_capture_session
 from tankpit_bot.protocol import decode_message
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner) - the private load/XOR/frame-walk pipeline is
+# deleted; results reproduce exactly. load_capture_session is used
+# directly (rather than scan_session) because the sim-capture filter
+# needs the magic's content, which the scan result does not carry.
 
 BANDS = ((1, 499), (500, 509), (510, 549), (550, 599), (600, 799), (800, 1099), (1100, 32767))
 
@@ -47,32 +52,19 @@ for path in sorted(Path("runs").glob("*/*.capture_session.json")):
         continue
     if not session.get("magic") or "simmagic" in str(session.get("magic")):
         continue
-    reset_xor_state()
-    build_global_xor_table(session["magic"])
     events: list[tuple[int, str, object]] = []
-    for m in sorted(session["messages"], key=lambda x: x["timestamp_ms"]):
-        if m["direction"] != "received":
+    for frame in sorted(decode_session_frames(load_capture_session(path)), key=lambda f: f["timestamp_ms"]):
+        if frame["direction"] != "received":
             continue
-        data = decode_base64_safe(m["payload"])
-        if not data:
+        try:
+            dm = decode_message(frame["msg_type"], frame["body"])
+        except Exception:
             continue
-        off = 0
-        while off + 2 < len(data):
-            ln = data[off] | (data[off + 1] << 8)
-            off += 2
-            if ln == 0 or off + ln > len(data):
-                break
-            body = data[off : off + ln]
-            off += ln
-            try:
-                dm = decode_message(body[0], xor_decode(body))
-            except Exception:
-                continue
-            if dm["msg_type"] == 0x4C:
-                events.append((m["timestamp_ms"], "map", set(map(tuple, dm["fuel_dots"]))))
-            elif dm["msg_type"] == 0x4F:
-                for c in dm["containers"]:
-                    events.append((m["timestamp_ms"], "reveal", (c["x"], c["y"], c["volume"])))
+        if dm["msg_type"] == 0x4C:
+            events.append((frame["timestamp_ms"], "map", set(map(tuple, dm["fuel_dots"]))))
+        elif dm["msg_type"] == 0x4F:
+            for c in dm["containers"]:
+                events.append((frame["timestamp_ms"], "reveal", (c["x"], c["y"], c["volume"])))
 
     atlases = [(ts, dots) for ts, kind, dots in events if kind == "map"]
     if not atlases:

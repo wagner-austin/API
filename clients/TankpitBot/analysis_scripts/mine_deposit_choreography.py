@@ -12,32 +12,25 @@ Usage: ``python analysis_scripts/mine_deposit_choreography.py [capture ...]``
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
+from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sniffer.decoders import _is_text_route
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner, direction-tagged frames) - the private
+# load/XOR/frame-walk pipeline is deleted; results reproduce exactly.
+# The SENT hex lines re-frame each sent frame with the production
+# encoder, which is byte-identical to the original whole-payload dump
+# because command payloads carry exactly one frame each.
 
 DEFAULT_CAPTURES = ("runs/sniff/sniff-20260620-190228.capture_session.json",)
 WINDOW_MS = 12_000
-
-
-def _iter_frames(data: bytes):
-    frames = []
-    offset = 0
-    while offset + 2 < len(data):
-        length = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if length == 0 or offset + length > len(data):
-            return frames
-        frames.append(data[offset : offset + length])
-        offset += length
-    return frames
 
 
 def _label(decoded: dict) -> str:
@@ -54,36 +47,30 @@ def _label(decoded: dict) -> str:
 
 
 def mine(path: Path) -> None:
-    session = json.loads(path.read_text(encoding="utf-8"))
-    magic = session.get("magic")
-    if magic is None:
-        print(f"SKIP {path.name}: session has no XOR magic")
+    result = scan_session(path)
+    if "reason" in result:
+        print(f"SKIP {path.name}: {result['reason']}")
         return
-    reset_xor_state()
-    build_global_xor_table(magic)
     events: list[tuple[int, str]] = []
     deposit_times: list[int] = []
-    for message in sorted(session["messages"], key=lambda m: m["timestamp_ms"]):
-        t = message["timestamp_ms"]
-        data = decode_base64_safe(message.get("payload", ""))
-        if not data:
+    for frame in sorted(result["frames"], key=lambda f: f["timestamp_ms"]):
+        t = frame["timestamp_ms"]
+        if frame["direction"] == "sent":
+            events.append((t, f"SENT {encode_frame(frame['raw']).hex()}"))
             continue
-        if message.get("direction") == "sent":
-            events.append((t, f"SENT {data.hex()}"))
+        raw = frame["raw"]
+        if try_decode_plaintext_ack(raw) is not None:
             continue
-        for body in _iter_frames(data):
-            if not body or try_decode_plaintext_ack(body) is not None:
-                continue
-            if _is_text_route(body[0], body):
-                continue
-            try:
-                decoded = decode_message(body[0], xor_decode(body))
-            except (DecodeError, ContainerDecodeError):
-                events.append((t, f"RECV undecodable {body[:2].hex()}"))
-                continue
-            events.append((t, "RECV " + _label(dict(decoded))))
-            if decoded.get("msg_type") == 0x64:
-                deposit_times.append(t)
+        if _is_text_route(frame["msg_type"], raw):
+            continue
+        try:
+            decoded = decode_message(frame["msg_type"], frame["body"])
+        except (DecodeError, ContainerDecodeError):
+            events.append((t, f"RECV undecodable {raw[:2].hex()}"))
+            continue
+        events.append((t, "RECV " + _label(dict(decoded))))
+        if decoded.get("msg_type") == 0x64:
+            deposit_times.append(t)
     print(f"\n===== {path} — {len(deposit_times)} deposits =====")
     for deposit_t in deposit_times:
         print(f"\n--- window around deposit @ {deposit_t} ---")

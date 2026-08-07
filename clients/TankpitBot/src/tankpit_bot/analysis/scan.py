@@ -114,6 +114,7 @@ def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
                     timestamp_ms=message["timestamp_ms"],
                     direction=message["direction"],
                     msg_type=body[0],
+                    raw=body,
                     body=xor_decode(body),
                 )
             )

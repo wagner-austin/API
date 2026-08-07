@@ -24,51 +24,38 @@ Usage: ``python analysis_scripts/mine_corpse_blocking.py <capture ...>``
 from __future__ import annotations
 
 import datetime
-import json
 import sys
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
 from tankpit_bot.sniffer.decoders import _is_text_route
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner) - the private load/XOR/frame-walk pipeline is
+# deleted; results reproduce exactly. Pre-cipher discriminators (ack,
+# text route) read frame["raw"], as the production receive path does.
 
 _STEP_DELTAS = {"n": (0, -1), "s": (0, 1), "e": (1, 0), "w": (-1, 0)}
 
 
-def _iter_frames(data: bytes) -> list[bytes]:
-    frames: list[bytes] = []
-    offset = 0
-    while offset + 2 < len(data):
-        length = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if length == 0 or offset + length > len(data):
-            return frames
-        frames.append(data[offset : offset + length])
-        offset += length
-    return frames
-
-
-def _decode_all(session: dict) -> list[tuple[int, dict]]:
-    reset_xor_state()
-    build_global_xor_table(session["magic"])
+def _decode_all(path: Path) -> list[tuple[int, dict]]:
+    result = scan_session(path)
+    if "reason" in result:
+        return []
     out: list[tuple[int, dict]] = []
-    for message in sorted(session["messages"], key=lambda m: m["timestamp_ms"]):
-        if message.get("direction") == "sent":
+    for frame in sorted(result["frames"], key=lambda f: f["timestamp_ms"]):
+        if frame["direction"] != "received":
             continue
-        data = decode_base64_safe(message.get("payload", ""))
-        if not data:
+        if try_decode_plaintext_ack(frame["raw"]) is not None:
             continue
-        for body in _iter_frames(data):
-            if not body or try_decode_plaintext_ack(body) is not None:
-                continue
-            if _is_text_route(body[0], body):
-                continue
-            try:
-                decoded = dict(decode_message(body[0], xor_decode(body)))
-            except Exception:
-                continue
-            out.append((message["timestamp_ms"], decoded))
+        if _is_text_route(frame["msg_type"], frame["raw"]):
+            continue
+        try:
+            decoded = dict(decode_message(frame["msg_type"], frame["body"]))
+        except Exception:
+            continue
+        out.append((frame["timestamp_ms"], decoded))
     return out
 
 
@@ -88,8 +75,7 @@ def _hms(t: int) -> str:
 
 
 def mine(path: Path) -> tuple[int, int, int]:
-    session = json.loads(path.read_text(encoding="utf-8"))
-    decoded = _decode_all(session)
+    decoded = _decode_all(path)
     self_id = next(
         m["tank_id"]
         for _, m in decoded

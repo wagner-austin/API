@@ -1,12 +1,15 @@
-"""Archive sweep: within-round 0x53 resolution order vs ascending tank id."""
+"""Archive sweep: within-round 0x53 resolution order vs ascending tank id.
 
-import json
+Migrated 2026-08-06 onto ``tankpit_bot.analysis.scan`` (the typed
+capture-scan owner) - the private load/XOR/frame-walk pipeline is
+deleted; results reproduce exactly.
+"""
+
 from collections import Counter
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.protocol import decode_message
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 
 BURST_GAP_MS = 100
 agg = Counter()
@@ -14,34 +17,21 @@ violations = []
 
 for path in sorted(Path("runs").glob("*/*.capture_session.json")):
     try:
-        s = json.loads(path.read_text(encoding="utf-8"))
+        result = scan_session(path)
     except Exception:
         continue
-    if not s.get("magic"):
+    if "reason" in result:
         continue
-    reset_xor_state()
-    build_global_xor_table(s["magic"])
     shots = []
-    for m in sorted(s["messages"], key=lambda x: x["timestamp_ms"]):
-        if m["direction"] != "received":
+    for frame in sorted(result["frames"], key=lambda f: f["timestamp_ms"]):
+        if frame["direction"] != "received":
             continue
-        data = decode_base64_safe(m["payload"])
-        if not data:
+        try:
+            dm = decode_message(frame["msg_type"], frame["body"])
+        except Exception:
             continue
-        off = 0
-        while off + 2 < len(data):
-            ln = data[off] | (data[off + 1] << 8)
-            off += 2
-            if ln == 0 or off + ln > len(data):
-                break
-            body = data[off : off + ln]
-            off += ln
-            try:
-                dm = decode_message(body[0], xor_decode(body))
-            except Exception:
-                continue
-            if dm["msg_type"] == 0x53:
-                shots.append((m["timestamp_ms"], dm["shooter_id"]))
+        if dm["msg_type"] == 0x53:
+            shots.append((frame["timestamp_ms"], dm["shooter_id"]))
     burst = []
     for ts, shooter in shots:
         if burst and ts - burst[-1][0] > BURST_GAP_MS:
