@@ -6,13 +6,12 @@ import base64
 
 import pytest
 
+from tankpit_bot.bot.ai.scoring_types import make_behavior_score
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
-    make_behavior_score,
     make_initial_ai_state,
 )
 from tankpit_bot.bot.tick_loop_types import make_tick_decision
-from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.bot.types import (
     make_hold_command,
     make_map_open_command,
@@ -20,6 +19,7 @@ from tankpit_bot.bot.types import (
     make_radar_command,
     make_teleport_command,
 )
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.replay.engine import (
     _build_trace,
     _extract_command_target,

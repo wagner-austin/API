@@ -5,7 +5,10 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONTypeError
 
-from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
+from tankpit_bot.bot.ai.world_types import (
+    EnemyThreatDict,
+    make_enemy_threat,
+)
 from tankpit_bot.replay.types import (
     ReplaySessionResultDict,
     ReplayTickTraceDict,

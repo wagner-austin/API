@@ -5,10 +5,8 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.tick_loop_actions import (
-    _emit_command_rejected_outcome,
-    _emit_stall_outcome,
-)
+from tankpit_bot.bot.tick_loop_actions import _emit_stall_outcome
+from tankpit_bot.bot.tick_loop_command_errors import _emit_command_rejected_outcome
 from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.ledger.outcome.teleport import TeleportDispatchContract
 from tankpit_bot.ledger.ring import outcome_counts

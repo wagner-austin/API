@@ -12,7 +12,10 @@ from tankpit_bot.browser.lifecycle import (
 )
 from tankpit_bot.browser.types import GameNotJoinedError
 from tankpit_bot.types import CapturedMessage
-from tests.action_lab._replay_core import ClockAdvancingPage, ReplayClock
+from tests.action_lab._replay_page import (
+    ClockAdvancingPage,
+    ReplayClock,
+)
 from tests.fakes import FakeBrowser, FakeCDPSession
 
 

@@ -22,12 +22,12 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.combat_strategy import engage_target
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.threats import (
+from tankpit_bot.bot.ai.threat_primitives import (
     POSITION_FRESHNESS_TTL_MS,
     WIRE_PRESENCE_TTL_MS,
-    analyze_threats,
 )
-from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.threats import analyze_threats
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.protocol import MovementResponseDict, TankInfoDict
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
@@ -137,7 +137,7 @@ class TestCombatGates:
     def test_combat_fires_when_wire_presence_stale(self) -> None:
         """Wire stale beyond TTL -> still shoot (no block).
 
-        Pre-2026-06-23 the wire-presence gate in ``_combat_shoot``
+        Pre-2026-06-23 the wire-presence gate in ``engage_target``
         blocked any target whose ``last_wire_seen_ms`` exceeded
         ``WIRE_PRESENCE_TTL_MS`` (7000ms). That gate killed pursuit
         shots when a locked target teleported off the bot's viewport:
