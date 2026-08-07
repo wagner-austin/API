@@ -17,7 +17,7 @@ import pytest
 from platform_core.json_utils import dump_json_str
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.protocol.commands import build_move_command
 from tankpit_bot.sim.session import SimCDPSession, build_capture_session, deliver_batch
 from tankpit_bot.types import encode_capture_session

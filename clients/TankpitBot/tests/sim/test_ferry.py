@@ -9,7 +9,7 @@ the move on the transition tile.
 
 from __future__ import annotations
 
-from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.movement import (
     _execute_walk,

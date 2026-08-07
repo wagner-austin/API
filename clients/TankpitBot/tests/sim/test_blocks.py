@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.sim.blocks import (
     BLOCK_BRIDGE,
     BLOCK_LAND,

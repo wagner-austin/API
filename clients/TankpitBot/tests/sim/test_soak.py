@@ -20,7 +20,7 @@ from collections.abc import Callable
 from platform_core.json_utils import JSONObject, load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.physics.capacity import damage_tier
 from tankpit_bot.protocol.types import TankStatusSyncDict
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging

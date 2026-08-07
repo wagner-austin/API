@@ -12,7 +12,7 @@ with the measured midpoint stacks (7 weapons / 3 radar).
 
 from __future__ import annotations
 
-from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.physics.capacity import inventory_capacity
 from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_INVENTORY_FULL
 from tankpit_bot.sim.combat import SLOT_DUAL, SLOT_HOMING, SLOT_RADAR

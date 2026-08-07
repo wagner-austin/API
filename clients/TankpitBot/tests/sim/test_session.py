@@ -15,7 +15,7 @@ from platform_core.json_utils import JSONObject, require_dict
 
 from tankpit_bot.action_lab.page_client_snapshot import decode_page_client_snapshot
 from tankpit_bot.bot.session_exit import SessionExitError
-from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.protocol.commands import CMD_MAP_OPEN, build_query_command
 from tankpit_bot.protocol.types import DeactivationDict
 from tankpit_bot.sim.session import deliver_batch
