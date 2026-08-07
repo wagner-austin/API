@@ -5,29 +5,11 @@ from __future__ import annotations
 import base64
 
 from tankpit_bot.capture.trackers import DeactivationTracker
+from tankpit_bot.capture.xor import xor_decode_body
+from tankpit_bot.protocol.codec import build_xor_table
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import (
-    assert_set_magic_requires_static_key,
-    build_test_xor_table,
-    make_payload,
-)
-
-
-def _xor_encode_bytes(data: bytes, xor_table: bytes) -> bytes:
-    """XOR encode bytes with table."""
-    result = bytearray(len(data))
-    for i in range(len(data)):
-        if i < len(xor_table):
-            result[i] = data[i] ^ xor_table[i]
-        else:
-            result[i] = data[i]
-    return bytes(result)
-
-
-def _make_tracker_payload(body: bytes) -> str:
-    """Wrap body in length header and base64 encode."""
-    header = len(body).to_bytes(2, "little")
-    return base64.b64encode(header + body).decode()
+from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key
+from tests.wire_builders import frame_payload
 
 
 class TestDeactivationTracker:
@@ -60,7 +42,7 @@ class TestDeactivationTracker:
     def test_process_message_returns_none_without_magic(self) -> None:
         """Test process_message returns None when XOR table not set."""
         tracker = DeactivationTracker()
-        payload = make_payload(b"\x2e\x00\x00\x00\x00\x00\x00\x00")
+        payload = frame_payload(b"\x2e\x00\x00\x00\x00\x00\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -83,7 +65,7 @@ class TestDeactivationTracker:
         """Test process_message returns None for non-0x2E messages."""
         tracker = DeactivationTracker()
         tracker.set_magic("kp8ffxx7muk63a0ywtqh")
-        payload = make_payload(b"\x30\x00\x00\x00\x00\x00\x00\x00")
+        payload = frame_payload(b"\x30\x00\x00\x00\x00\x00\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -92,7 +74,7 @@ class TestDeactivationTracker:
         tracker = DeactivationTracker()
         tracker.set_magic("kp8ffxx7muk63a0ywtqh")
         # 7 bytes instead of 8
-        payload = make_payload(b"\x2e\x00\x00\x00\x00\x00\x00")
+        payload = frame_payload(b"\x2e\x00\x00\x00\x00\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -123,16 +105,16 @@ class TestDeactivationTrackerProcessMessage:
         tracker.set_magic(magic)
 
         # Build XOR table
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Deactivation format: body = [0x2E, XOR(0x41, victim_lo, victim_hi,
         #                                        killer_lo, killer_hi, extra, extra)]
         # Body must be 8 bytes. Victim ID = 100 (0x0064), Killer ID = 200 (0x00C8)
         decoded_data = bytes([0x41, 0x64, 0x00, 0xC8, 0x00, 0x00, 0x00])
-        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        encoded_data = xor_decode_body(decoded_data, xor_table)
         body = bytes([0x2E]) + encoded_data  # 8 bytes total
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result, "Expected non-None result from process_message"
         assert "KILL" in result
@@ -150,14 +132,14 @@ class TestDeactivationTrackerProcessMessage:
         tracker.set_magic(magic)
         tracker.set_my_tank_id(100)  # Set our tank ID
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Victim = 100 (our tank), Killer = 200
         decoded_data = bytes([0x41, 0x64, 0x00, 0xC8, 0x00, 0x00, 0x00])
-        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        encoded_data = xor_decode_body(decoded_data, xor_table)
         body = bytes([0x2E]) + encoded_data
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result, "Expected non-None result from process_message"
         assert "DEATH" in result
@@ -175,14 +157,14 @@ class TestDeactivationTrackerProcessMessage:
         tracker = DeactivationTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Use wrong signature 0x99 instead of 0x41
         decoded_data = bytes([0x99, 0x64, 0x00, 0xC8, 0x00, 0x00, 0x00])
-        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        encoded_data = xor_decode_body(decoded_data, xor_table)
         body = bytes([0x2E]) + encoded_data
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result is None
 

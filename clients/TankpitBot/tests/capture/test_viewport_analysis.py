@@ -25,27 +25,10 @@ from tankpit_bot.capture.viewport_analysis import (
 from tankpit_bot.capture.viewport_analysis_types import (
     ViewportAnalysisStateDict,
 )
-from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol.codec import build_xor_table
 from tankpit_bot.types.message import CapturedMessage
 from tankpit_bot.types.session import CaptureSession
-
-
-def _encode_received_frame(msg_type: int, decoded_data: bytes, xor_table: bytes) -> str:
-    """Encode a single received message frame.
-
-    Args:
-        msg_type: Protocol message type byte.
-        decoded_data: XOR-decoded message data without the type byte.
-        xor_table: Session XOR table.
-
-    Returns:
-        Base64-encoded frame payload.
-    """
-    encoded_body = bytes([msg_type]) + xor_decode_body(decoded_data, xor_table)
-    length = len(encoded_body)
-    frame = bytes([length & 0xFF, length >> 8]) + encoded_body
-    return base64.b64encode(frame).decode("ascii")
+from tests.wire_builders import encode_wire_frame
 
 
 def _make_movement_response_payload(
@@ -81,7 +64,7 @@ def _make_movement_response_payload(
             0,  # carrying byte (a[11]) per JS Mg.h
         ]
     )
-    return _encode_received_frame(0x3D, decoded_data, xor_table)
+    return encode_wire_frame(0x3D, decoded_data, xor_table)
 
 
 def _make_viewport_update_payload(
@@ -100,7 +83,7 @@ def _make_viewport_update_payload(
         Base64-encoded received frame payload.
     """
     decoded_data = bytes([viewport_left, viewport_top])
-    return _encode_received_frame(0x5A, decoded_data, xor_table)
+    return encode_wire_frame(0x5A, decoded_data, xor_table)
 
 
 def _make_sync_payload(xor_table: bytes) -> str:
@@ -112,7 +95,7 @@ def _make_sync_payload(xor_table: bytes) -> str:
     Returns:
         Base64-encoded received frame payload.
     """
-    return _encode_received_frame(0x3F, b"", xor_table)
+    return encode_wire_frame(0x3F, b"", xor_table)
 
 
 def _make_unknown_payload(xor_table: bytes) -> str:
@@ -124,7 +107,7 @@ def _make_unknown_payload(xor_table: bytes) -> str:
     Returns:
         Base64-encoded received frame payload.
     """
-    return _encode_received_frame(0xAB, b"\x00\x01\x02", xor_table)
+    return encode_wire_frame(0xAB, b"\x00\x01\x02", xor_table)
 
 
 def _make_session(messages: list[CapturedMessage], magic: str) -> CaptureSession:
@@ -464,11 +447,11 @@ class TestViewportAnalysisHelpers:
         static_key = "E" * 64
         xor_table = build_xor_table(static_key, magic)
 
-        frame_one = _encode_received_frame(0x2E, bytes.fromhex("2402" + "00" * 11), xor_table)
-        frame_two = _encode_received_frame(0x2E, bytes.fromhex("2402" + "11" * 11), xor_table)
-        frame_three = _encode_received_frame(0x2E, bytes.fromhex("3d01" + "22" * 11), xor_table)
-        short_frame = _encode_received_frame(0x2E, b"\x24\x02", xor_table)
-        non_container = _encode_received_frame(0x3F, b"", xor_table)
+        frame_one = encode_wire_frame(0x2E, bytes.fromhex("2402" + "00" * 11), xor_table)
+        frame_two = encode_wire_frame(0x2E, bytes.fromhex("2402" + "11" * 11), xor_table)
+        frame_three = encode_wire_frame(0x2E, bytes.fromhex("3d01" + "22" * 11), xor_table)
+        short_frame = encode_wire_frame(0x2E, b"\x24\x02", xor_table)
+        non_container = encode_wire_frame(0x3F, b"", xor_table)
 
         messages = [
             CapturedMessage(

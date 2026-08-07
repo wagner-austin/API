@@ -26,7 +26,8 @@ from tankpit_bot.sniffer.decoders import (
     set_protocol_frame_logging,
 )
 from tests.conftest import FakeFileSystem
-from tests.sniffer.conftest import make_binary_payload, make_payload, sniffer_xor_table
+from tests.sniffer.conftest import sniffer_xor_table
+from tests.wire_builders import encode_wire_frame, frame_payload
 
 # =============================================================================
 # Basic Decode Message Tests
@@ -48,14 +49,14 @@ def test_decode_message_too_short() -> None:
 
 def test_decode_message_auth() -> None:
     """Test decode_message decodes AUTH messages."""
-    payload = make_payload(b"%AUTH !be 12345|token|auth extra")
+    payload = frame_payload(b"%AUTH !be 12345|token|auth extra")
     result = decode_message(payload, "sent", None)
     assert result == "[SENT] AUTH: %AUTH !be 12345|token|auth extra..."
 
 
 def test_decode_message_select() -> None:
     """Test decode_message decodes SELECT messages."""
-    payload = make_payload(b"*4")
+    payload = frame_payload(b"*4")
     result = decode_message(payload, "sent", None)
     assert result == "[SENT] SELECT: room=4"
 
@@ -66,7 +67,7 @@ def test_decode_message_select_does_not_mutate_selected_room() -> None:
 
     reset_world_state()
 
-    payload = make_payload(b"*4")
+    payload = frame_payload(b"*4")
     result = decode_message(payload, "sent", None)
 
     assert result == "[SENT] SELECT: room=4"
@@ -75,7 +76,7 @@ def test_decode_message_select_does_not_mutate_selected_room() -> None:
 
 def test_decode_message_response() -> None:
     """Test decode_message decodes RESPONSE messages."""
-    payload = make_payload(b"$4|0")
+    payload = frame_payload(b"$4|0")
     result = decode_message(payload, "received", None)
     assert result == "[RECEIVED] RESPONSE: $4|0"
 
@@ -84,7 +85,7 @@ def test_decode_message_state() -> None:
     """Test decode_message decodes STATE messages (binary with '.' prefix)."""
     # Create a 14-byte state message (subtype 0x03, not fuel-related)
     state_body = bytes.fromhex("2e033c020300005c190000ca0300")
-    payload = make_payload(state_body)
+    payload = frame_payload(state_body)
     result = decode_message(payload, "received", None)
     # 14-byte STATE message with subtype shown
     assert "[RECEIVED] STATE: sub=0x03 len=14" in result
@@ -95,7 +96,7 @@ def test_decode_message_state_short() -> None:
     """Test decode_message decodes short position messages."""
     # Short state message (4-11 bytes) - shows as POS
     short_state = bytes([0x2E, 0x01, 0x02, 0x03])  # 4 bytes
-    payload = make_payload(short_state)
+    payload = frame_payload(short_state)
     result = decode_message(payload, "received", None)
     assert "[RECEIVED] POS: len=4 hex=2e010203" in result
 
@@ -152,14 +153,14 @@ def test_decode_state_message_update() -> None:
 
 def test_decode_message_unknown() -> None:
     """Test decode_message handles unknown message types."""
-    payload = make_payload(b"some unknown message format")
+    payload = frame_payload(b"some unknown message format")
     result = decode_message(payload, "received", None)
     assert "[RECEIVED] ???:" in result
 
 
 def test_decode_message_quit() -> None:
     """Test decode_message decodes QUIT messages (dash character)."""
-    payload = make_payload(b"-")
+    payload = frame_payload(b"-")
     result = decode_message(payload, "sent", None)
     assert result == "[SENT] QUIT: -"
 
@@ -168,7 +169,7 @@ def test_process_received_message_respects_protocol_frame_logging(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Protocol frame logging can be disabled for concise bot terminal output."""
-    payload = make_payload(b"$1|0")
+    payload = frame_payload(b"$1|0")
     table = sniffer_xor_table()
 
     set_protocol_frame_logging(False)
@@ -186,7 +187,7 @@ def test_process_received_message_logs_plaintext_chat_ack(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The raw "C0" body is logged as the plaintext chat ack, not XOR-routed."""
-    payload = make_payload(b"C0")
+    payload = frame_payload(b"C0")
 
     set_protocol_frame_logging(True)
     with caplog.at_level(logging.INFO):
@@ -314,21 +315,21 @@ def test_decode_command_non_ascii() -> None:
 
 def test_decode_message_calls_decode_plus_for_room_list() -> None:
     """Test decode_message routes to decode_plus_message for ROOM_LIST."""
-    payload = make_payload(b"+3|Practice|1|0,0,0,0,0,0,0|1|p|field01.gif|2025")
+    payload = frame_payload(b"+3|Practice|1|0,0,0,0,0,0,0|1|p|field01.gif|2025")
     result = decode_message(payload, "received", None)
     assert result == "[RECEIVED] ROOM_LIST: room=3 name=Practice"
 
 
 def test_decode_message_calls_decode_join_confirm() -> None:
     """Test decode_message routes to decode_join_confirm."""
-    payload = make_payload(b"=4|Sep. 25, 2012|Yuppler|4|9|10|10|9")
+    payload = frame_payload(b"=4|Sep. 25, 2012|Yuppler|4|9|10|10|9")
     result = decode_message(payload, "received", None)
     assert result == "[RECEIVED] JOIN_CONFIRM: room=4 tank=Yuppler lieutenant"
 
 
 def test_decode_message_calls_decode_command() -> None:
     """Test decode_message routes to decode_command."""
-    payload = make_payload(b"!7b")
+    payload = frame_payload(b"!7b")
     result = decode_message(payload, "sent", None)
     # Without magic key, just shows raw hex
     assert result == "[SENT] CMD: ! 213762"
@@ -348,7 +349,7 @@ def test_decode_message_command_with_magic_but_no_static_key() -> None:
     _test_hooks.path_exists = fs.path_exists
     reset_static_key_cache()
 
-    payload = make_payload(b"!7b")
+    payload = frame_payload(b"!7b")
     with pytest.raises(XorStaticKeyUnavailableError, match="static XOR key unavailable"):
         decode_message(payload, "sent", magic="test_magic")
 
@@ -775,7 +776,7 @@ class TestProcessReceivedMessage:
         # the table used to be a module global left at None here, which
         # let the plaintext pass through verbatim
         # ([[session-state-deglobalisation]]).
-        payload = make_binary_payload(0x2B, bytes([5, 1]))
+        payload = encode_wire_frame(0x2B, bytes([5, 1]), sniffer_xor_table())
         process_received_message(payload, sniffer_xor_table())
 
         self_state = get_world_service().world_state["self_state"]
@@ -791,7 +792,7 @@ class TestProcessReceivedMessage:
 
         reset_world_state()
         # Long ROOM_LIST / WorldInfo body; well above the 3-byte Rf threshold.
-        payload = make_payload(b"+1|RoomName|24|1,1,1|0|n|field24.gif|2026")
+        payload = frame_payload(b"+1|RoomName|24|1,1,1|0|n|field24.gif|2026")
         process_received_message(payload, sniffer_xor_table())
 
         # No self_state should have been created since this is not binary Rf.

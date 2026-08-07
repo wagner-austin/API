@@ -5,20 +5,10 @@ from __future__ import annotations
 import base64
 
 from tankpit_bot.capture.trackers import EquipmentGainTracker, EquipmentToggleTracker
+from tankpit_bot.protocol.codec import build_xor_table
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import (
-    assert_set_magic_requires_static_key,
-    build_test_xor_table,
-    make_payload,
-)
-
-
-def _make_xor_payload(decoded_data: bytes, xor_table: bytes) -> str:
-    """Create XOR-encoded base64 payload for testing."""
-    encoded = bytes(decoded_data[i] ^ xor_table[i] for i in range(len(decoded_data)))
-    body = bytes([0x2E]) + encoded
-    header = len(body).to_bytes(2, "little")
-    return base64.b64encode(header + body).decode()
+from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key
+from tests.wire_builders import encode_wire_frame, frame_payload
 
 
 class TestEquipmentToggleTracker:
@@ -78,7 +68,7 @@ class TestEquipmentToggleTracker:
     def test_process_message_returns_none_without_magic(self) -> None:
         """Test process_message returns None when XOR table not set."""
         tracker = EquipmentToggleTracker()
-        payload = make_payload(b"\x2e\x00\x00\x00\x00\x00\x00")
+        payload = frame_payload(b"\x2e\x00\x00\x00\x00\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -104,12 +94,12 @@ class TestEquipmentToggleTrackerParseMethods:
         tracker = EquipmentToggleTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Toggle format decoded: 0x74 armor dual missile homing radar
         # armor=ON, dual=OFF, missile=ON, homing=OFF, radar=ON
         decoded_data = bytes([0x74, 0x01, 0x00, 0x01, 0x00, 0x01])
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
 
         result = tracker.process_message(payload)
         assert result, "Expected non-None result from process_message"
@@ -126,10 +116,10 @@ class TestEquipmentToggleTrackerParseMethods:
         tracker = EquipmentToggleTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         decoded_data = bytes([0x74, 0x01, 0x00, 0x01, 0x00, 0x01])
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
         tracker.process_message(payload)
 
         state = tracker.state
@@ -158,14 +148,14 @@ class TestEquipmentToggleTrackerParseMethods:
         tracker = EquipmentToggleTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # First message: all OFF (sets baseline for next comparison)
-        payload1 = _make_xor_payload(bytes([0x74, 0x00, 0x00, 0x00, 0x00, 0x00]), xor_table)
+        payload1 = encode_wire_frame(0x2E, bytes([0x74, 0x00, 0x00, 0x00, 0x00, 0x00]), xor_table)
         tracker.process_message(payload1)
 
         # Second message: dual ON (compared to initial all-OFF state)
-        payload2 = _make_xor_payload(bytes([0x74, 0x00, 0x01, 0x00, 0x00, 0x00]), xor_table)
+        payload2 = encode_wire_frame(0x2E, bytes([0x74, 0x00, 0x01, 0x00, 0x00, 0x00]), xor_table)
         result = tracker.process_message(payload2)
 
         assert result, "Expected non-None result from process_message"
@@ -194,7 +184,7 @@ class TestEquipmentGainTracker:
     def test_process_message_returns_none_without_magic(self) -> None:
         """Test process_message returns None when XOR table not set."""
         tracker = EquipmentGainTracker()
-        payload = make_payload(b"\x2e\x00\x00\x00\x00\x00\x00\x00")
+        payload = frame_payload(b"\x2e\x00\x00\x00\x00\x00\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -220,12 +210,12 @@ class TestEquipmentGainTrackerProcessMessage:
         tracker = EquipmentGainTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Decoded layout (client JS handler V.g):
         # 0x67 [show_message] [armor] [dual] [missile] [homing] [radar]
         decoded_data = bytes([0x67, 0x01, 0x00, 0x02, 0x00, 0x01, 0x03])
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
 
         result = tracker.process_message(payload)
         assert result == "[EQUIP:GAIN] 2 dual, 1 homing, 3 radar (show)"
@@ -264,7 +254,7 @@ class TestEquipmentToggleTrackerEdgeCases:
         tracker.set_magic("testmagic123")
 
         # Body length 6 (should be 7)
-        payload = make_payload(b"\x2e\x01\x02\x03\x04\x05")
+        payload = frame_payload(b"\x2e\x01\x02\x03\x04\x05")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -279,7 +269,7 @@ class TestEquipmentToggleTrackerEdgeCases:
         tracker.set_magic("testmagic123")
 
         # Body starts with 0x30 instead of 0x2E
-        payload = make_payload(b"\x30\x01\x02\x03\x04\x05\x06")
+        payload = frame_payload(b"\x30\x01\x02\x03\x04\x05\x06")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -293,11 +283,11 @@ class TestEquipmentToggleTrackerEdgeCases:
         tracker = EquipmentToggleTracker()
         tracker.set_magic("testmagic123")
 
-        xor_table = build_test_xor_table(static_key, "testmagic123")
+        xor_table = build_xor_table(static_key, "testmagic123")
 
         # Use 0x99 instead of 0x74
         decoded_data = bytes([0x99, 0x01, 0x00, 0x01, 0x00, 0x01])
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
         result = tracker.process_message(payload)
         assert result is None
 
@@ -335,7 +325,7 @@ class TestEquipmentGainTrackerEdgeCases:
         tracker.set_magic("testmagic123")
 
         # Body length 7 (should be 8)
-        payload = make_payload(b"\x2e\x01\x02\x03\x04\x05\x06")
+        payload = frame_payload(b"\x2e\x01\x02\x03\x04\x05\x06")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -350,7 +340,7 @@ class TestEquipmentGainTrackerEdgeCases:
         tracker.set_magic("testmagic123")
 
         # Body starts with 0x30 instead of 0x2E
-        payload = make_payload(b"\x30\x01\x02\x03\x04\x05\x06\x07")
+        payload = frame_payload(b"\x30\x01\x02\x03\x04\x05\x06\x07")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -364,11 +354,11 @@ class TestEquipmentGainTrackerEdgeCases:
         tracker = EquipmentGainTracker()
         tracker.set_magic("testmagic123")
 
-        xor_table = build_test_xor_table(static_key, "testmagic123")
+        xor_table = build_xor_table(static_key, "testmagic123")
 
         # Use 0x99 instead of 0x67
         decoded_data = bytes([0x99, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00])
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
         result = tracker.process_message(payload)
         assert result is None
 
@@ -382,11 +372,11 @@ class TestEquipmentGainTrackerEdgeCases:
         tracker = EquipmentGainTracker()
         tracker.set_magic("testmagic123")
 
-        xor_table = build_test_xor_table(static_key, "testmagic123")
+        xor_table = build_xor_table(static_key, "testmagic123")
 
         # Equipment gain with all five counts at zero and show_message off
         decoded_data = bytes([0x67, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
         result = tracker.process_message(payload)
 
         assert result == "[EQUIP:GAIN] none"

@@ -7,7 +7,6 @@ MovementResponse + ViewportUpdate + 13-byte shape census.
 
 from __future__ import annotations
 
-import base64
 import runpy
 import sys
 from collections.abc import Generator
@@ -19,26 +18,9 @@ from scripts.analyze_viewport import main
 
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
 from tests.conftest import FakeFileSystem
-
-
-def _encode_received_frame(msg_type: int, decoded_data: bytes, xor_table: bytes) -> str:
-    """Encode one received message frame for a capture session.
-
-    Args:
-        msg_type: Protocol message type byte.
-        decoded_data: XOR-decoded message bytes without the type byte.
-        xor_table: Session XOR table.
-
-    Returns:
-        Base64-encoded frame payload.
-    """
-    encoded_body = bytes([msg_type]) + xor_decode_body(decoded_data, xor_table)
-    length = len(encoded_body)
-    frame = bytes([length & 0xFF, length >> 8]) + encoded_body
-    return base64.b64encode(frame).decode("ascii")
+from tests.wire_builders import encode_wire_frame
 
 
 def _make_movement_response_payload(
@@ -49,7 +31,7 @@ def _make_movement_response_payload(
 ) -> str:
     """Create a MovementResponse payload (12-byte body inc. carrying byte)."""
     decoded_data = bytes([1, tank_id & 0xFF, tank_id >> 8, x, y, 0, 0, 1, 0, 0, 5, 0])
-    return _encode_received_frame(0x3D, decoded_data, xor_table)
+    return encode_wire_frame(0x3D, decoded_data, xor_table)
 
 
 def _make_viewport_update_payload(
@@ -59,7 +41,7 @@ def _make_viewport_update_payload(
 ) -> str:
     """Create a ViewportUpdate payload."""
     decoded_data = bytes([viewport_left, viewport_top])
-    return _encode_received_frame(0x5A, decoded_data, xor_table)
+    return encode_wire_frame(0x5A, decoded_data, xor_table)
 
 
 @pytest.fixture()

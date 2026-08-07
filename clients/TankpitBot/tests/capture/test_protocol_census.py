@@ -17,27 +17,11 @@ from tankpit_bot.capture.protocol_census import (
     encode_protocol_census,
     format_protocol_census,
 )
-from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
 from tankpit_bot.types.message import CapturedMessage
 from tankpit_bot.types.session import CaptureSession
 from tests.conftest import FakeFileSystem
-
-
-def _encode_received_frame(msg_type: int, decoded_data: bytes, xor_table: bytes) -> str:
-    """Encode a single received frame.
-
-    Args:
-        msg_type: Protocol type byte.
-        decoded_data: XOR-decoded body bytes without the type byte.
-        xor_table: XOR table for the session.
-
-    Returns:
-        Base64-encoded frame payload.
-    """
-    encoded_body = bytes([msg_type]) + xor_decode_body(decoded_data, xor_table)
-    frame = bytes([len(encoded_body) & 0xFF, len(encoded_body) >> 8]) + encoded_body
-    return base64.b64encode(frame).decode("ascii")
+from tests.wire_builders import encode_wire_frame
 
 
 def _make_session(messages: list[CapturedMessage], magic: str) -> CaptureSession:
@@ -87,7 +71,7 @@ class TestAnalyzeProtocolCensus:
             CapturedMessage(
                 timestamp_ms=1000,
                 direction="received",
-                payload=_encode_received_frame(
+                payload=encode_wire_frame(
                     0x2E,
                     bytes([0x0C]),  # 1-byte teleport_landed
                     xor_table,
@@ -97,13 +81,13 @@ class TestAnalyzeProtocolCensus:
             CapturedMessage(
                 timestamp_ms=1100,
                 direction="received",
-                payload=_encode_received_frame(0x21, bytes([0x01, 0x02]), xor_table),
+                payload=encode_wire_frame(0x21, bytes([0x01, 0x02]), xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
                 timestamp_ms=1200,
                 direction="received",
-                payload=_encode_received_frame(0x7B, bytes([0x11, 0x22, 0x33]), xor_table),
+                payload=encode_wire_frame(0x7B, bytes([0x11, 0x22, 0x33]), xor_table),
                 ws_url="wss://test/ws",
             ),
             CapturedMessage(
@@ -133,7 +117,7 @@ class TestAnalyzeProtocolCensus:
         static_key_path = DEFAULT_STATIC_KEY_PATH
         _fake_fs._files[str(static_key_path)] = static_key
         decoded_data = bytes([0x99, 0x88])
-        payload = _encode_received_frame(0x21, decoded_data, xor_table)
+        payload = encode_wire_frame(0x21, decoded_data, xor_table)
 
         result = analyze_protocol_census(
             _make_session(

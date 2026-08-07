@@ -5,12 +5,11 @@ from __future__ import annotations
 import base64
 
 from tankpit_bot.capture.trackers import RadarTracker
+from tankpit_bot.capture.xor import xor_decode_body
+from tankpit_bot.protocol.codec import build_xor_table
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import (
-    assert_set_magic_requires_static_key,
-    build_test_xor_table,
-    make_payload,
-)
+from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key
+from tests.wire_builders import frame_payload
 
 
 class TestRadarTracker:
@@ -55,7 +54,7 @@ class TestRadarTracker:
     def test_process_message_returns_none_without_magic(self) -> None:
         """Test process_message returns None when XOR table not set."""
         tracker = RadarTracker()
-        payload = make_payload(b"\x2e\x70\x00\x00\x00")
+        payload = frame_payload(b"\x2e\x70\x00\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -92,23 +91,6 @@ class TestRadarTrackerProcessMessage:
         assert category == "equip"
 
 
-def _xor_encode_bytes(data: bytes, xor_table: bytes) -> bytes:
-    """XOR encode bytes with table."""
-    result = bytearray(len(data))
-    for i in range(len(data)):
-        if i < len(xor_table):
-            result[i] = data[i] ^ xor_table[i]
-        else:
-            result[i] = data[i]
-    return bytes(result)
-
-
-def _make_tracker_payload(body: bytes) -> str:
-    """Wrap body in length header and base64 encode."""
-    header = len(body).to_bytes(2, "little")
-    return base64.b64encode(header + body).decode()
-
-
 class TestRadarTrackerEdgeCases:
     """Tests for RadarTracker edge cases and uncovered branches."""
 
@@ -141,7 +123,7 @@ class TestRadarTrackerEdgeCases:
         tracker.set_magic("testmagic")
 
         body = b"\x2e\x00\x00\x00\x00"
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker._decode_radar(payload)
         assert result is None
 
@@ -159,14 +141,14 @@ class TestRadarTrackerEdgeCases:
         tracker = RadarTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Build radar body: 0x2E + 0x70 + XOR-encoded(count, padding, entities...)
         rest_decoded = bytes([0x00, 0x00])  # count=0, padding
-        rest_encoded = _xor_encode_bytes(rest_decoded, xor_table[1:])
+        rest_encoded = xor_decode_body(rest_decoded, xor_table[1:])
         body = bytes([0x2E, 0x70]) + rest_encoded
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result == "[RADAR] No entities found"
 
@@ -181,16 +163,16 @@ class TestRadarTrackerEdgeCases:
         tracker = RadarTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Radar with 2 entities:
         # Entity 1: x=10, y=20, value=100 (fuel)
         # Entity 2: x=30, y=40, value=0xFFFF (tank)
         rest_decoded = bytes([0x02, 0x00, 10, 20, 0x64, 0x00, 30, 40, 0xFF, 0xFF])
-        rest_encoded = _xor_encode_bytes(rest_decoded, xor_table[1:])
+        rest_encoded = xor_decode_body(rest_decoded, xor_table[1:])
         body = bytes([0x2E, 0x70]) + rest_encoded
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result, "Expected non-None result"
         assert "RADAR" in result
@@ -228,6 +210,6 @@ class TestRadarTrackerEdgeCases:
         rest = bytes([0x00, 0x00, 0x00])  # some padding
         body = bytes([0x2E, 0x70]) + rest
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker._decode_radar(payload)
         assert result is None

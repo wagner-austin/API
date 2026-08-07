@@ -24,27 +24,11 @@ from tankpit_bot.capture.viewport_entities import (
 from tankpit_bot.capture.xor import (
     XorStaticKeyUnavailableError,
     reset_static_key_cache,
-    xor_decode_body,
 )
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tests.conftest import FakeFileSystem
-
-
-def _encode_received_frame(msg_type: int, decoded_data: bytes, xor_table: bytes) -> str:
-    """Encode one received frame for a capture session.
-
-    Args:
-        msg_type: Protocol type byte.
-        decoded_data: XOR-decoded body bytes without the type byte.
-        xor_table: Session XOR table.
-
-    Returns:
-        Base64-encoded frame payload.
-    """
-    encoded_body = bytes([msg_type]) + xor_decode_body(decoded_data, xor_table)
-    frame = bytes([len(encoded_body) & 0xFF, len(encoded_body) >> 8]) + encoded_body
-    return base64.b64encode(frame).decode("ascii")
+from tests.wire_builders import encode_wire_frame
 
 
 def _encode_entity_data(entity_id: int, value: int, terrain_type: int) -> bytes:
@@ -81,7 +65,7 @@ def _make_viewport_payload(xor_table: bytes) -> str:
         + bytes([3])
         + _encode_entity_data(0, 2, 0)
     )
-    return _encode_received_frame(0x5A, decoded_data, xor_table)
+    return encode_wire_frame(0x5A, decoded_data, xor_table)
 
 
 def _make_session(messages: list[CapturedMessage], magic: str | None) -> CaptureSession:
@@ -204,13 +188,13 @@ class TestAnalyzeViewportEntities:
                         CapturedMessage(
                             timestamp_ms=1004,
                             direction="received",
-                            payload=_encode_received_frame(0x24, b"\x0e\x22\x12", xor_table),
+                            payload=encode_wire_frame(0x24, b"\x0e\x22\x12", xor_table),
                             ws_url="wss://test/ws",
                         ),
                         CapturedMessage(
                             timestamp_ms=1005,
                             direction="received",
-                            payload=_encode_received_frame(
+                            payload=encode_wire_frame(
                                 0x3D,
                                 bytes([1, 1, 0, 5, 6, 0, 0, 1, 0, 0, 0, 0]),
                                 xor_table,

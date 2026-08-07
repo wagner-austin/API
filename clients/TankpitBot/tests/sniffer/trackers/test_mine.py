@@ -5,12 +5,11 @@ from __future__ import annotations
 import base64
 
 from tankpit_bot.capture.trackers import MineTracker
+from tankpit_bot.capture.xor import xor_decode_body
+from tankpit_bot.protocol.codec import build_xor_table
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import (
-    assert_set_magic_requires_static_key,
-    build_test_xor_table,
-    make_payload,
-)
+from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key
+from tests.wire_builders import frame_payload
 
 
 class TestMineTracker:
@@ -46,7 +45,7 @@ class TestMineTracker:
     def test_process_message_returns_none_without_magic(self) -> None:
         """Test process_message returns None when XOR table not set."""
         tracker = MineTracker()
-        payload = make_payload(b"\x2e\x00\x00")
+        payload = frame_payload(b"\x2e\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -99,23 +98,6 @@ class TestMineTrackerParseMethods:
         assert tracker.mines_detonated == 2
 
 
-def _xor_encode_bytes(data: bytes, xor_table: bytes) -> bytes:
-    """XOR encode bytes with table."""
-    result = bytearray(len(data))
-    for i in range(len(data)):
-        if i < len(xor_table):
-            result[i] = data[i] ^ xor_table[i]
-        else:
-            result[i] = data[i]
-    return bytes(result)
-
-
-def _make_tracker_payload(body: bytes) -> str:
-    """Wrap body in length header and base64 encode."""
-    header = len(body).to_bytes(2, "little")
-    return base64.b64encode(header + body).decode()
-
-
 class TestMineTrackerEdgeCases:
     """Tests for MineTracker edge cases and uncovered branches."""
 
@@ -134,7 +116,7 @@ class TestMineTrackerEdgeCases:
         tracker = MineTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Mine drop: ! type=4 id=98 x=50 y=60
         decrypted = bytes([0x21, 4, 98, 50, 60])
@@ -145,7 +127,7 @@ class TestMineTrackerEdgeCases:
             encrypted[i] = decrypted[i] ^ xor_table[i - 1]
 
         body = bytes(encrypted)
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload, direction="sent")
         assert result, "Expected non-None result"
         assert "MINE:DROP" in result
@@ -161,14 +143,14 @@ class TestMineTrackerEdgeCases:
         tracker = MineTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Mine placed: top-level 0x4B, decoded body is mine_type owner_id(2) count x y
         decoded_data = bytes([0x00, 0x64, 0x00, 1, 50, 60])
-        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        encoded_data = xor_decode_body(decoded_data, xor_table)
         body = bytes([0x4B]) + encoded_data
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result, "Expected non-None result"
         assert "MINE:PLACED" in result
@@ -185,14 +167,14 @@ class TestMineTrackerEdgeCases:
         tracker = MineTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Mine detonation: top-level 0x45 with positions...
         decoded_data = bytes([10, 20, 30, 40])  # 2 mines at (10,20), (30,40)
-        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        encoded_data = xor_decode_body(decoded_data, xor_table)
         body = bytes([0x45]) + encoded_data
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result, "Expected non-None result"
         assert "MINE:EXPLODE" in result
@@ -244,7 +226,7 @@ class TestMineTrackerEdgeCases:
 
         # Body not starting with a mine type and not a command
         body = b"\x99" + bytes(10)
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result is None
 
@@ -259,14 +241,14 @@ class TestMineTrackerEdgeCases:
         tracker = MineTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Build body with unsupported top-level type
         decoded_data = bytes([0x01, 0x02, 0x03])
-        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        encoded_data = xor_decode_body(decoded_data, xor_table)
         body = bytes([0x99]) + encoded_data
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result is None
 
@@ -281,7 +263,7 @@ class TestMineTrackerEdgeCases:
         tracker = MineTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Command with type=5 instead of type=4
         decrypted = bytes([0x21, 5, 98, 50, 60])  # type=5
@@ -291,7 +273,7 @@ class TestMineTrackerEdgeCases:
             encrypted[i] = decrypted[i] ^ xor_table[i - 1]
 
         body = bytes(encrypted)
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload, direction="sent")
         assert result is None
 
@@ -306,14 +288,14 @@ class TestMineTrackerEdgeCases:
         tracker = MineTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Mine detonation with odd position data length: one complete pair and one dangling byte
         decoded_data = bytes([10, 20, 30])
-        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        encoded_data = xor_decode_body(decoded_data, xor_table)
         body = bytes([0x45]) + encoded_data
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
 
         if result is None:
@@ -334,12 +316,12 @@ class TestMineTrackerEdgeCases:
         tracker = MineTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         decoded_data = bytes([0x45, 0x37, 0xDC])
-        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        encoded_data = xor_decode_body(decoded_data, xor_table)
         body = bytes([0x2E]) + encoded_data
 
-        payload = _make_tracker_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result is None

@@ -6,7 +6,8 @@ import base64
 
 from tankpit_bot.capture.trackers import PositionTracker
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key, make_payload
+from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key
+from tests.wire_builders import frame_payload
 
 
 def test_position_tracker_set_magic_builds_xor_table() -> None:
@@ -249,7 +250,7 @@ class TestPositionTrackerEdgeCases:
         tracker.set_magic("testmagic")
 
         # Not starting with 0x2E
-        payload = make_payload(b"\x30\x75\x01\x02\x03\x04")
+        payload = frame_payload(b"\x30\x75\x01\x02\x03\x04")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -272,7 +273,7 @@ class TestPositionTrackerEdgeCases:
         encoded_sig = 0x41 ^ xor_table[0]
         body = bytes([0x2E, encoded_sig, 0x00, 0x00, 0x10, 0x20])
 
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result is None
 
@@ -363,7 +364,7 @@ class TestPositionTrackerMoveSubtype:
         # because xor_table has < 5 bytes
         body = bytes([0x2E, 0x75, 0x00, 0x00, 0x10, 0x20]) + bytes(11)
 
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         # decode_position returns None due to len(xor_table) < 5
         assert result is None

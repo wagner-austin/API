@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from tankpit_bot.capture.trackers import TankTracker
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key, make_payload
+from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key
+from tests.wire_builders import frame_payload
 
 
 class TestTankTracker:
@@ -77,7 +78,7 @@ class TestTankTracker:
     def test_process_message_returns_none_without_magic(self) -> None:
         """Test process_message returns None when XOR table not set."""
         tracker = TankTracker()
-        payload = make_payload(b"\x2e\x00\x00\x00")
+        payload = frame_payload(b"\x2e\x00\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -263,7 +264,7 @@ class TestTankTrackerEdgeCases:
         tracker.set_magic("testmagic")
 
         body = b"\x2e"
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker._decode_payload(payload)
         assert result is None
 
@@ -279,7 +280,7 @@ class TestTankTrackerEdgeCases:
         tracker.set_magic(magic)
 
         body = b"\x99" + bytes(10)
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result is None
 
@@ -600,7 +601,7 @@ class TestTankTrackerEdgeCases:
         tracker.set_magic(magic)
 
         body = b"\x2e\x01\x02\x03"
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result is None
 
@@ -618,7 +619,7 @@ class TestTankTrackerEdgeCases:
 
         # Body: 0x2E + 9 bytes (decoded will be 8+ bytes)
         body = b"\x2e\x50\x64\x00\x01\x02\x03\x04\x05"
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
 
         # Should call _parse_status_sync and return a result
@@ -640,7 +641,7 @@ class TestTankTrackerEdgeCases:
         # Message type 0x28 (tank join) requires min_len=4
         # Body: 0x28 + only 2 bytes (decoded will be < 4)
         body = b"\x28\x01\x02"
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
         assert result is None
 
@@ -686,7 +687,7 @@ class TestTankTrackerEdgeCases:
         # Message type 0x28 (tank join) with min_len=4
         # Body: 0x28 + 5 bytes (decoded will be 4+ bytes, meeting min_len)
         body = b"\x28\x00\x64\x00\xab"  # tank_id=100
-        payload = make_payload(body)
+        payload = frame_payload(body)
         result = tracker.process_message(payload)
 
         # Should call _parse_tank_join handler and return result

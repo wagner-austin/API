@@ -981,7 +981,7 @@ class TestSelfIdentityRecording:
     def test_self_tank_info_records_identity(self) -> None:
         """A 0x21 matching the self tank id lands in self_account."""
         from tankpit_bot.protocol import TankInfoDict
-        from tankpit_bot.state.mutations import update_self_position
+        from tankpit_bot.state.self_mutations import update_self_position
 
         ws = get_world_service()
         ws.world_state = update_self_position(ws.world_state, 100, 100, 1000)

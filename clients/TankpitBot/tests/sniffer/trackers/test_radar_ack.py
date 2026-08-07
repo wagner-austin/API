@@ -5,20 +5,10 @@ from __future__ import annotations
 import base64
 
 from tankpit_bot.capture.trackers import RadarAckTracker
+from tankpit_bot.protocol.codec import build_xor_table
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import (
-    assert_set_magic_requires_static_key,
-    build_test_xor_table,
-    make_payload,
-)
-
-
-def _make_xor_payload(decoded_data: bytes, xor_table: bytes) -> str:
-    """Create XOR-encoded base64 payload for testing."""
-    encoded = bytes(decoded_data[i] ^ xor_table[i] for i in range(len(decoded_data)))
-    body = bytes([0x2E]) + encoded
-    header = len(body).to_bytes(2, "little")
-    return base64.b64encode(header + body).decode()
+from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key
+from tests.wire_builders import encode_wire_frame, frame_payload
 
 
 class TestRadarAckTracker:
@@ -50,7 +40,7 @@ class TestRadarAckTracker:
     def test_process_message_returns_none_without_magic(self) -> None:
         """Test process_message returns None when XOR table not set."""
         tracker = RadarAckTracker()
-        payload = make_payload(b"\x2e\x00\x00\x00")
+        payload = frame_payload(b"\x2e\x00\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -76,11 +66,11 @@ class TestRadarAckTrackerProcessMessage:
         tracker = RadarAckTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Radar ack decoded: 0x46 byte1 byte2
         decoded_data = bytes([0x46, 0x01, 0x00])
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
 
         result = tracker.process_message(payload)
         assert result, "Expected non-None result from process_message"
@@ -97,9 +87,9 @@ class TestRadarAckTrackerProcessMessage:
         tracker = RadarAckTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
-        payload = _make_xor_payload(bytes([0x46, 0x01, 0x00]), xor_table)
+        payload = encode_wire_frame(0x2E, bytes([0x46, 0x01, 0x00]), xor_table)
         tracker.process_message(payload)
         tracker.process_message(payload)
 
@@ -139,7 +129,7 @@ class TestRadarAckTrackerEdgeCases:
         tracker.set_magic("testmagic123")
 
         # Body length 5 (should be 4)
-        payload = make_payload(b"\x2e\x01\x02\x03\x04")
+        payload = frame_payload(b"\x2e\x01\x02\x03\x04")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -154,7 +144,7 @@ class TestRadarAckTrackerEdgeCases:
         tracker.set_magic("testmagic123")
 
         # Body starts with 0x30 instead of 0x2E
-        payload = make_payload(b"\x30\x01\x02\x03")
+        payload = frame_payload(b"\x30\x01\x02\x03")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -168,10 +158,10 @@ class TestRadarAckTrackerEdgeCases:
         tracker = RadarAckTracker()
         tracker.set_magic("testmagic123")
 
-        xor_table = build_test_xor_table(static_key, "testmagic123")
+        xor_table = build_xor_table(static_key, "testmagic123")
 
         # Use 0x99 instead of 0x46
         decoded_data = bytes([0x99, 0x01, 0x00])
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
         result = tracker.process_message(payload)
         assert result is None

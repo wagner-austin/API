@@ -21,19 +21,19 @@ from tankpit_bot.decoder import (
     load_and_decode_session,
 )
 from tankpit_bot.protocol.codec import ProtocolCodec
-from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tests.conftest import FakeEnv, FakeFileSystem
+from tests.wire_builders import frame_payload
 
 # =============================================================================
 # Test Helpers
 # =============================================================================
 
 
-def make_payload(body: bytes) -> str:
-    """Create base64 payload with frame header."""
-    framed = encode_frame(body)
-    return base64.b64encode(framed).decode("ascii")
+# ``make_payload`` lived here and was the only one of eleven copies
+# that used the production framer. It is now
+# ``tests.wire_builders.frame_payload``, and the other ten were
+# rewritten to match it ([[session-state-deglobalisation]]).
 
 
 # =============================================================================
@@ -171,7 +171,7 @@ def test_session_decoder_decodes_command() -> None:
 
     # Command body: ! + type + cmd
     body = bytes([ord("!"), 0x30, 0x42])
-    payload = make_payload(body)
+    payload = frame_payload(body)
 
     session = CaptureSession(
         session_id="test",
@@ -206,7 +206,7 @@ def test_session_decoder_decodes_lobby_message() -> None:
 
     # Lobby message: +4|Room
     body = b"+4|Room"
-    payload = make_payload(body)
+    payload = frame_payload(body)
 
     session = CaptureSession(
         session_id="test",
@@ -240,7 +240,7 @@ def test_session_decoder_skips_state_messages() -> None:
 
     # State message starts with '.'
     body = b"." + bytes([0x01, 0x02, 0x03])
-    payload = make_payload(body)
+    payload = frame_payload(body)
 
     session = CaptureSession(
         session_id="test",
@@ -366,7 +366,7 @@ def test_session_decoder_skips_short_command() -> None:
 
     # Command with only 2 bytes (need at least 3: ! + type + cmd)
     body = bytes([ord("!"), 0x30])
-    payload = make_payload(body)
+    payload = frame_payload(body)
 
     session = CaptureSession(
         session_id="test",
@@ -398,7 +398,7 @@ def test_session_decoder_decodes_command_with_data() -> None:
 
     # Command with data: ! + type + cmd + data
     body = bytes([ord("!"), 0x30, 0x42, 0xAB, 0xCD])
-    payload = make_payload(body)
+    payload = frame_payload(body)
 
     session = CaptureSession(
         session_id="test",
@@ -434,7 +434,7 @@ def test_session_decoder_handles_all_lobby_prefixes() -> None:
 
     for i, prefix in enumerate(prefixes):
         body = (prefix + "test").encode("utf-8")
-        payload = make_payload(body)
+        payload = frame_payload(body)
         messages.append(
             CapturedMessage(
                 timestamp_ms=i * 100,
@@ -475,7 +475,7 @@ def test_load_and_decode_session_success(fake_fs: FakeFileSystem) -> None:
 
     # Create session JSON
     body = bytes([ord("!"), 0x30, 0x42])
-    payload = make_payload(body)
+    payload = frame_payload(body)
 
     session_json = f"""{{
         "session_id": "test",
@@ -538,7 +538,7 @@ def test_session_decoder_skips_unknown_prefix() -> None:
 
     # Unknown prefix '@' - not '!', '.', or lobby prefixes
     body = b"@unknown"
-    payload = make_payload(body)
+    payload = frame_payload(body)
 
     session = CaptureSession(
         session_id="test",
@@ -575,7 +575,7 @@ def test_load_and_decode_session_default_static_key(fake_fs: FakeFileSystem) -> 
 
     # Create session JSON
     body = bytes([ord("!"), 0x30, 0x42])
-    payload = make_payload(body)
+    payload = frame_payload(body)
 
     session_json = f"""{{
         "session_id": "test",
@@ -618,7 +618,7 @@ def test_main_with_commands(
 
     # Create session with commands
     body = bytes([ord("!"), 0x30, 0x42, 0xAB])
-    payload = make_payload(body)
+    payload = frame_payload(body)
 
     session_json = f"""{{
         "session_id": "test",
@@ -725,9 +725,9 @@ def test_main_multiple_command_types(
     body1 = bytes([ord("!"), 0x30, 0x42, 0xAB])
     body2 = bytes([ord("!"), 0x30, 0x43, 0xCD])  # Same type, different cmd
     body3 = bytes([ord("!"), 0x31, 0x42, 0xEF])  # Different type
-    payload1 = make_payload(body1)
-    payload2 = make_payload(body2)
-    payload3 = make_payload(body3)
+    payload1 = frame_payload(body1)
+    payload2 = frame_payload(body2)
+    payload3 = frame_payload(body3)
 
     session_json = f"""{{
         "session_id": "test",

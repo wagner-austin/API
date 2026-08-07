@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import runpy
 import sys
 from collections.abc import Generator
@@ -14,25 +13,9 @@ from scripts.analyze_protocol import main
 
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
 from tests.conftest import FakeFileSystem
-
-
-def _encode_received_frame(msg_type: int, decoded_data: bytes, xor_table: bytes) -> str:
-    """Encode one received frame for a capture session.
-
-    Args:
-        msg_type: Protocol type byte.
-        decoded_data: XOR-decoded data without the type byte.
-        xor_table: Session XOR table.
-
-    Returns:
-        Base64-encoded frame payload.
-    """
-    encoded_body = bytes([msg_type]) + xor_decode_body(decoded_data, xor_table)
-    frame = bytes([len(encoded_body) & 0xFF, len(encoded_body) >> 8]) + encoded_body
-    return base64.b64encode(frame).decode("ascii")
+from tests.wire_builders import encode_wire_frame
 
 
 @pytest.fixture()
@@ -83,7 +66,7 @@ class TestAnalyzeProtocolScript:
                 {
                     "timestamp_ms": 1000,
                     "direction": "received",
-                    "payload": _encode_received_frame(
+                    "payload": encode_wire_frame(
                         0x2E,
                         bytes([0x0C]),  # 1-byte teleport_landed
                         xor_table,
@@ -93,13 +76,13 @@ class TestAnalyzeProtocolScript:
                 {
                     "timestamp_ms": 1100,
                     "direction": "received",
-                    "payload": _encode_received_frame(0x21, bytes([0x01, 0x02]), xor_table),
+                    "payload": encode_wire_frame(0x21, bytes([0x01, 0x02]), xor_table),
                     "ws_url": "wss://test/ws",
                 },
                 {
                     "timestamp_ms": 1200,
                     "direction": "received",
-                    "payload": _encode_received_frame(0x7B, bytes([0x11, 0x22, 0x33]), xor_table),
+                    "payload": encode_wire_frame(0x7B, bytes([0x11, 0x22, 0x33]), xor_table),
                     "ws_url": "wss://test/ws",
                 },
             ],
@@ -200,7 +183,7 @@ class TestAnalyzeProtocolScript:
                 {
                     "timestamp_ms": 1000,
                     "direction": "received",
-                    "payload": _encode_received_frame(
+                    "payload": encode_wire_frame(
                         0x2E,
                         bytes([0x24, 0x02, 0x7D, 0x04, 140, 137, 8, 3, 0, 0, 0, 0, 0]),
                         xor_table,

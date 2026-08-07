@@ -5,20 +5,10 @@ from __future__ import annotations
 import base64
 
 from tankpit_bot.capture.trackers import ContainerTracker
+from tankpit_bot.protocol.codec import build_xor_table
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import (
-    assert_set_magic_requires_static_key,
-    build_test_xor_table,
-    make_payload,
-)
-
-
-def _make_xor_payload(decoded_data: bytes, xor_table: bytes) -> str:
-    """Create XOR-encoded base64 payload for testing."""
-    encoded = bytes(decoded_data[i] ^ xor_table[i] for i in range(len(decoded_data)))
-    body = bytes([0x2E]) + encoded
-    header = len(body).to_bytes(2, "little")
-    return base64.b64encode(header + body).decode()
+from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key
+from tests.wire_builders import encode_wire_frame, frame_payload
 
 
 class TestContainerTracker:
@@ -53,7 +43,7 @@ class TestContainerTracker:
     def test_process_message_returns_none_without_magic(self) -> None:
         """Test process_message returns None when XOR table not set."""
         tracker = ContainerTracker()
-        payload = make_payload(b"\x2e\x00\x00\x00\x00\x00")
+        payload = frame_payload(b"\x2e\x00\x00\x00\x00\x00")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -87,11 +77,11 @@ class TestContainerTrackerProcessMessage:
         tracker = ContainerTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # Container format decoded: 0x43 container_id_lo container_id_hi fuel_lo fuel_hi
         decoded_data = bytes([0x43, 0x64, 0x00, 0xE8, 0x03])  # id=100, fuel=1000
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
 
         result = tracker.process_message(payload)
         assert result, "Expected non-None result from process_message"
@@ -110,14 +100,14 @@ class TestContainerTrackerProcessMessage:
         tracker = ContainerTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
         # First: container has fuel
-        payload1 = _make_xor_payload(bytes([0x43, 0x64, 0x00, 0xE8, 0x03]), xor_table)
+        payload1 = encode_wire_frame(0x2E, bytes([0x43, 0x64, 0x00, 0xE8, 0x03]), xor_table)
         tracker.process_message(payload1)
 
         # Second: container depleted
-        payload2 = _make_xor_payload(bytes([0x43, 0x64, 0x00, 0x00, 0x00]), xor_table)
+        payload2 = encode_wire_frame(0x2E, bytes([0x43, 0x64, 0x00, 0x00, 0x00]), xor_table)
         result = tracker.process_message(payload2)
 
         assert result, "Expected non-None result from process_message"
@@ -134,9 +124,9 @@ class TestContainerTrackerProcessMessage:
         tracker = ContainerTracker()
         tracker.set_magic(magic)
 
-        xor_table = build_test_xor_table(static_key, magic)
+        xor_table = build_xor_table(static_key, magic)
 
-        payload = _make_xor_payload(bytes([0x43, 0x64, 0x00, 0xE8, 0x03]), xor_table)
+        payload = encode_wire_frame(0x2E, bytes([0x43, 0x64, 0x00, 0xE8, 0x03]), xor_table)
         tracker.process_message(payload)
 
         containers = tracker.containers
@@ -161,7 +151,7 @@ class TestContainerTrackerEdgeCases:
         tracker.set_magic("testmagic123")
 
         # Body length is 5 (should be 6)
-        payload = make_payload(b"\x2e\x01\x02\x03\x04")
+        payload = frame_payload(b"\x2e\x01\x02\x03\x04")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -176,7 +166,7 @@ class TestContainerTrackerEdgeCases:
         tracker.set_magic("testmagic123")
 
         # Body starts with 0x30 instead of 0x2E
-        payload = make_payload(b"\x30\x01\x02\x03\x04\x05")
+        payload = frame_payload(b"\x30\x01\x02\x03\x04\x05")
         result = tracker.process_message(payload)
         assert result is None
 
@@ -190,11 +180,11 @@ class TestContainerTrackerEdgeCases:
         tracker = ContainerTracker()
         tracker.set_magic("testmagic123")
 
-        xor_table = build_test_xor_table(static_key, "testmagic123")
+        xor_table = build_xor_table(static_key, "testmagic123")
 
         # Use 0x99 instead of 0x43
         decoded_data = bytes([0x99, 0x64, 0x00, 0xE8, 0x03])
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
         result = tracker.process_message(payload)
         assert result is None
 
@@ -208,14 +198,14 @@ class TestContainerTrackerEdgeCases:
         tracker = ContainerTracker()
         tracker.set_magic("testmagic123")
 
-        xor_table = build_test_xor_table(static_key, "testmagic123")
+        xor_table = build_xor_table(static_key, "testmagic123")
 
         # First: container 100 has 1000 fuel
-        payload1 = _make_xor_payload(bytes([0x43, 0x64, 0x00, 0xE8, 0x03]), xor_table)
+        payload1 = encode_wire_frame(0x2E, bytes([0x43, 0x64, 0x00, 0xE8, 0x03]), xor_table)
         tracker.process_message(payload1)
 
         # Second: container 100 now has 500 fuel (change)
-        payload2 = _make_xor_payload(bytes([0x43, 0x64, 0x00, 0xF4, 0x01]), xor_table)
+        payload2 = encode_wire_frame(0x2E, bytes([0x43, 0x64, 0x00, 0xF4, 0x01]), xor_table)
         result = tracker.process_message(payload2)
 
         if result is None:
@@ -234,11 +224,11 @@ class TestContainerTrackerEdgeCases:
         tracker = ContainerTracker()
         tracker.set_magic("testmagic123")
 
-        xor_table = build_test_xor_table(static_key, "testmagic123")
+        xor_table = build_xor_table(static_key, "testmagic123")
 
         # New container (never seen before) with fuel=0
         decoded_data = bytes([0x43, 0xC8, 0x00, 0x00, 0x00])  # id=200, fuel=0
-        payload = _make_xor_payload(decoded_data, xor_table)
+        payload = encode_wire_frame(0x2E, decoded_data, xor_table)
         result = tracker.process_message(payload)
 
         if result is None:

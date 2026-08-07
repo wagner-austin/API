@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import runpy
 import sys
 from collections.abc import Generator
@@ -14,24 +13,10 @@ from scripts.analyze_shot_viewport import main
 
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
 from tankpit_bot.protocol.commands import CMD_SHOOT, TYPE_COMBAT
 from tests.conftest import FakeFileSystem
-
-
-def _encode_received_frame(msg_type: int, decoded_data: bytes, xor_table: bytes) -> str:
-    """Encode one received frame for a capture session."""
-    encoded_body = bytes([msg_type]) + xor_decode_body(decoded_data, xor_table)
-    frame = bytes([len(encoded_body) & 0xFF, len(encoded_body) >> 8]) + encoded_body
-    return base64.b64encode(frame).decode("ascii")
-
-
-def _encode_sent_frame(decoded_body: bytes, xor_table: bytes) -> str:
-    """Encode one XOR-protected sent frame for a capture session."""
-    encoded_body = decoded_body[:1] + xor_decode_body(decoded_body[1:], xor_table)
-    frame = bytes([len(encoded_body) & 0xFF, len(encoded_body) >> 8]) + encoded_body
-    return base64.b64encode(frame).decode("ascii")
+from tests.wire_builders import encode_wire_frame
 
 
 def _encode_entity_data(entity_id: int, value: int, terrain_type: int) -> bytes:
@@ -45,23 +30,25 @@ def _encode_entity_data(entity_id: int, value: int, terrain_type: int) -> bytes:
 def _make_viewport_payload(xor_table: bytes) -> str:
     """Create one viewport update payload for the script tests."""
     decoded_data = bytes([50, 60, 0]) + _encode_entity_data(514, 255, 0)
-    return _encode_received_frame(0x5A, decoded_data, xor_table)
+    return encode_wire_frame(0x5A, decoded_data, xor_table)
 
 
 def _make_shoot_payload(target_x: int, target_y: int, target_id: int, xor_table: bytes) -> str:
     """Create one sent shoot command payload."""
-    decoded_body = bytes(
-        [
-            ord("!"),
-            TYPE_COMBAT,
-            CMD_SHOOT,
-            target_x & 0xFF,
-            target_y & 0xFF,
-            target_id & 0xFF,
-            (target_id >> 8) & 0xFF,
-        ]
+    return encode_wire_frame(
+        ord("!"),
+        bytes(
+            [
+                TYPE_COMBAT,
+                CMD_SHOOT,
+                target_x & 0xFF,
+                target_y & 0xFF,
+                target_id & 0xFF,
+                (target_id >> 8) & 0xFF,
+            ]
+        ),
+        xor_table,
     )
-    return _encode_sent_frame(decoded_body, xor_table)
 
 
 @pytest.fixture()
