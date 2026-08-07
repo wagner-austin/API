@@ -37,7 +37,8 @@ from tankpit_bot.bot.ai.context import (
     radar_spend_worthwhile,
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
-from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode
+from tankpit_bot.bot.ai.scoring_types import BehaviorMode
+from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_radar_command
 from tankpit_bot.runtime_logging import emit_ai
@@ -154,6 +155,16 @@ def plan_forage_search(
         # a stocked forage radar bought a sliver of tiles and the
         # tank hopped away the next tick).
         radar_productive = radar_spend_worthwhile(ctx)
+        if not radar_productive:
+            # With extras stocked, the game spends an extra on ANY
+            # radar fire and an extra scans the whole viewport from
+            # anywhere -- walking can never improve the scan, and the
+            # free radar can never fire. Foraging here is FINISHED:
+            # returning a decision anyway starved the collect hop one
+            # rung below and produced a one-tile-per-tick edge crawl
+            # (artax flags 1-3, 2026-08-06). Say so by yielding
+            # nothing.
+            return None
     elif not tank_in_viewport:
         radar_productive = True
     else:

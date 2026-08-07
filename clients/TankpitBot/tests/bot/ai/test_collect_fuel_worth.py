@@ -20,12 +20,14 @@ from tests.bot.ai._support import (
 def test_pickup_refused_when_clamped_gain_not_worth_the_walk() -> None:
     """A distant cap-clamped sliver is refused: the 2026-07-06 waste class.
 
-    Private (rank 1, cap 1100) at fuel 1054: headroom 46, so a
-    386-volume container transfers only 46. At a 2-tile walk the
-    threshold is ``25 * 2 = 50 > 46`` -- not worth it, refuse.
+    Private (rank 1, cap 1100) at fuel 1096: headroom 4, so a
+    386-volume container transfers only 4. At a 2-tile walk the
+    threshold is ``3 * 2 = 6 > 4`` -- not worth it, refuse. (The
+    per-tile price is the MEASURED-walking-speed derivation of
+    2026-08-06, not the falsified one-tick-per-tile premise.)
     """
 
-    base_world, base_self = make_world(fuel=1054)
+    base_world, base_self = make_world(fuel=1096)
     self_state = SelfStateDict(**{**base_self, "rank": 1})
     world = base_world
     world["self_state"] = self_state
@@ -174,10 +176,11 @@ def test_critical_fuel_takes_any_reachable_sliver() -> None:
 def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> None:
     """``select_and_pickup_fuel`` returns None on a not-worth-it sliver.
 
-    Wire the 2026-07-06 waste class end-to-end: private at fuel 1054
-    (headroom 46) with a single visible 386-volume fuel container 3
-    tiles east -- effective gain 46 against a ``25 * 3 = 75``
-    threshold. The at-cap gate passes (fuel below cap), the fuel
+    Wire the 2026-07-06 waste class end-to-end: private at fuel 1092
+    (headroom 8) with a single visible 386-volume fuel container 3
+    tiles east -- effective gain 8 against a ``3 * 3 = 9``
+    threshold (measured-speed pricing, 2026-08-06). The at-cap gate
+    passes (fuel below cap), the fuel
     target is selected successfully, but ``_pickup_not_worth_walk``
     fires and the planner returns None instead of dispatching. The
     container is left untouched -- not blacklisted -- so a later
@@ -186,7 +189,7 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
     """
 
     base_world, base_self = make_world(
-        fuel=1054,
+        fuel=1092,
         scanned=True,
         containers={
             "103,100": make_container_state(

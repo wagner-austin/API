@@ -158,10 +158,15 @@ def test_viewport_enemy_shoot_rejection_loop_replays_as_a_restock() -> None:
     assert result["total_ticks"] == 9
     assert result["total_messages"] == 59
     assert behavior_counts == Counter({"COLLECT": 9})
-    assert command_counts == Counter({"radar": 9})
+    # Re-pinned 2026-08-06: the measured-speed walk pricing
+    # (_FUEL_GAIN_PER_WALK_TILE 25 -> 3) takes the fuel pickups the
+    # falsified one-tick-per-tile premise refused - the same session
+    # now forages by picking up instead of re-radaring.
+    assert command_counts == Counter({"pickup_fuel": 8, "radar": 1})
     assert traces[0]["behavior_reason"] == "scan_on_landing"
     assert all(trace["ai_mode"] == "COLLECT" for trace in traces)
-    assert all(trace["ai_mode_state"] == "SENSE" for trace in traces)
+    # PICKUP joins SENSE: the re-priced walks turn forage into pickups.
+    assert {trace["ai_mode_state"] for trace in traces} <= {"SENSE", "PICKUP"}
     assert all(trace["combat_target_id"] == -1 for trace in traces)
 
 

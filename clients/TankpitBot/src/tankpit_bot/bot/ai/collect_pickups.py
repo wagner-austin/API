@@ -169,14 +169,19 @@ def mine_clearance_decision(
     )
 
 
-_FUEL_GAIN_PER_WALK_TILE = 25
+_FUEL_GAIN_PER_WALK_TILE = 3
 """Minimum effective fuel gained per tile of walking for a pickup to pay.
 
-Each walk tile costs roughly one 2-second tick the bot could spend on
-a dot hop, which refuels while traveling. 25/tile keeps adjacent
-pickups always worth taking (walk 0-1 clears at any meaningful gain)
-while refusing long walks for cap-clamped slivers -- the 2026-07-06
-waste class (26 s across four near-cap pickups for ~50 fuel each).
+Priced from MEASURED walking speed, not the tick: the user timed
+15 cardinal tiles in 3.30 s (2026-08-06) -- ~0.22 s per tile, with
+diagonals costing two Manhattan steps. The previous constant (25)
+justified itself with "each walk tile costs roughly one 2-second
+tick", off by ~10x; at the artax flag scene it refused an 80-fuel
+pickup four tiles (under one second) away. Keeping the same
+opportunity value of time the old constant implied (~12.5 fuel/s),
+a tile now prices at ~0.22 s x 12.5 = ~3 fuel. The rule still
+refuses true dregs (a 5-fuel sliver ten tiles off) while taking any
+meaningfully stocked container within honest walking range.
 """
 
 
