@@ -79,4 +79,4 @@ if __name__ == "__main__":
     raise SystemExit(main())
 
 
-__all__ = ["main"]
+__all__ = ["main", "run_enemy_tracking_probe"]
