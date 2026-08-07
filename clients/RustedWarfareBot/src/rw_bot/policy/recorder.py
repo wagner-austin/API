@@ -60,6 +60,7 @@ class Recorder:
         worth: int,
         rival: int,
         plan: str,
+        workers: int,
     ) -> None:
         """Record one observation.
 
@@ -75,6 +76,7 @@ class Recorder:
             worth: Everything the player holds.
             rival: The strongest hostile player's total.
             plan: The opening plan's outcome this observation.
+            workers: Builders owned, as the workforce counts them.
         """
         if self._path is None:
             return
@@ -106,6 +108,7 @@ class Recorder:
                 rival_income=rival_income(sample),
                 world=world_digest(sample),
                 plan=plan,
+                workers=workers,
             )
         )
 

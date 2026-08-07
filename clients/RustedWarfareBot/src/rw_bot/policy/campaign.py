@@ -423,6 +423,7 @@ def play(
                 scores.worth_end,
                 scores.rival_worth_end,
                 build_outcome,
+                workforce.size(sample),
             )
 
             # The engine's verdict is the only thing that ends a match early.

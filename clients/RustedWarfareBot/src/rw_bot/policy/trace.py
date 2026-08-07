@@ -101,6 +101,11 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
             collapse (log 2026-08-06): every ledger counted totals, and the
             question that decided the diagnosis -- WHEN did the plan die, and
             did it ever come back -- had no record anywhere.
+        workers: Builders owned, as the workforce counts them. The other
+            column that diagnosis kept needing and inferring from death
+            ledgers: every economy failure this project has recorded runs
+            through the worker count, and "when did the workforce die" should
+            be a column read, not an inference ([[policy-economy]]).
         world: A deterministic digest of every visible entity's identity,
             position and health -- CRC32 over a canonical rendering, never
             Python's randomised ``hash``. The divergence detector: two
@@ -126,6 +131,7 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
     rival_income: int
     world: int
     plan: str
+    workers: int
 
 
 def owned_by_id(sample: Sample) -> Mapping[int, Entity]:
@@ -201,14 +207,14 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{'frame':>8}{'army':>6}{'credits':>9}{'enemies':>9}{'extractors':>12}"
         f"{'lost':>6}{'producers':>11}{'idle':>6}{'orders':>8}{'refused':>9}"
         f"{'worth':>9}{'rival':>9}{'income':>8}{'rival_income':>14}{'world':>12}"
-        f"{'plan':>10}"
+        f"{'plan':>10}{'workers':>9}"
     ]
     lines.extend(
         f"{t['frame']:>8}{t['army']:>6}{t['credits']:>9}"
         f"{t['enemies']:>9}{t['extractors']:>12}{t['lost']:>6}"
         f"{t['producers']:>11}{t['idle']:>6}{t['orders']:>8}{t['refused']:>9}"
         f"{t['worth']:>9}{t['rival']:>9}{t['income']:>8}{t['rival_income']:>14}"
-        f"{t['world']:>12}{t['plan']:>10}"
+        f"{t['world']:>12}{t['plan']:>10}{t['workers']:>9}"
         for t in ticks
     )
     lines.append("")
