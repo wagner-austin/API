@@ -57,7 +57,7 @@ from tankpit_bot.action_lab.probe_runtime import (
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.protocol import try_decode_plaintext_ack
 from tankpit_bot.sniffer.world_state import get_terrain_map
 
@@ -182,17 +182,7 @@ class ViewportProbe(ProbeBase):
         for captured in self.messages[start_index:]:
             if captured["direction"] != "received":
                 continue
-            data = decode_base64_safe(captured["payload"])
-            if not data:
-                continue
-            offset = 0
-            while offset + 2 < len(data):
-                length = data[offset] | (data[offset + 1] << 8)
-                offset += 2
-                if length == 0 or offset + length > len(data):
-                    break
-                body = data[offset : offset + length]
-                offset += length
+            for body in split_payload_frames(captured["payload"]):
                 ack = try_decode_plaintext_ack(body)
                 if ack is not None and ack["msg_type"] == "autoscroll_ack":
                     return ack["enabled"]

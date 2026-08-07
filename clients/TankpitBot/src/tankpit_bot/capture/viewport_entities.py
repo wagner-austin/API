@@ -13,13 +13,13 @@ from typing import TypedDict
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, require_int, require_list
 from platform_core.logging import get_logger
 
+from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.capture.xor import (
     build_session_xor_table,
-    decode_base64_safe,
     xor_decode_body,
 )
 from tankpit_bot.protocol import try_decode_binary_message
-from tankpit_bot.protocol.framing import FramingError, split_frames
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.types import CaptureSession
 
 log = get_logger(__name__)
@@ -327,11 +327,8 @@ def _split_received_frames(payload: str) -> list[bytes]:
     Returns:
         Logical frame bodies or an empty list when the payload is invalid.
     """
-    raw_bytes = decode_base64_safe(payload)
-    if raw_bytes is None:
-        return []
     try:
-        return split_frames(raw_bytes)
+        return split_payload_frames(payload)
     except FramingError as exc:
         log.warning("Skipping malformed capture payload during viewport entity dump: %s", exc)
         return []

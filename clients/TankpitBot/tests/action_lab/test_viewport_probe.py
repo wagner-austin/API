@@ -31,6 +31,7 @@ from tankpit_bot.action_lab.viewport_probe import (
     format_viewport_probe_summary,
     run_viewport_probe,
 )
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state
 from tankpit_bot.state.types import make_self_state, make_viewport_state
 from tankpit_bot.types import CapturedMessage
@@ -75,8 +76,28 @@ def _ack_message(enabled: bool) -> CapturedMessage:
     )
 
 
+def _truncated_message() -> CapturedMessage:
+    """A frame whose length prefix claims 255 bytes and carries one.
+
+    Kept out of :func:`_noise_messages` deliberately. It is corruption,
+    not noise, and the reader now says so instead of skipping it
+    ([[session-state-deglobalisation]]).
+    """
+    return CapturedMessage(
+        timestamp_ms=1000,
+        direction="received",
+        payload=base64.b64encode(bytes([0xFF, 0x00, 0x41])).decode("ascii"),
+        ws_url="wss://test",
+    )
+
+
 def _noise_messages() -> list[CapturedMessage]:
-    """Frames the ack reader must skip: sent, empty, non-0x41, truncated."""
+    """Frames the ack reader must skip: sent, empty, non-0x41.
+
+    Every entry is well-formed; each is simply not an autoscroll ack.
+    A torn frame used to sit in this list too — see
+    :func:`_truncated_message`.
+    """
     return [
         CapturedMessage(
             timestamp_ms=1000,
@@ -94,12 +115,6 @@ def _noise_messages() -> list[CapturedMessage]:
             timestamp_ms=1000,
             direction="received",
             payload=base64.b64encode(bytes([0x03, 0x00, 0x2E, 0x01, 0x02])).decode("ascii"),
-            ws_url="wss://test",
-        ),
-        CapturedMessage(
-            timestamp_ms=1000,
-            direction="received",
-            payload=base64.b64encode(bytes([0xFF, 0x00, 0x41])).decode("ascii"),
             ws_url="wss://test",
         ),
         CapturedMessage(
@@ -251,6 +266,20 @@ def test_read_autoscroll_ack_raises_when_absent() -> None:
     probe = _ViewportHarness()
     probe.message_log.extend(_noise_messages())
     with pytest.raises(ProbeError, match="no autoscroll ack"):
+        probe._read_autoscroll_ack(0)
+
+
+def test_read_autoscroll_ack_refuses_a_truncated_frame() -> None:
+    """Corruption is reported, not skipped on the way to the ack.
+
+    The inline frame walk dropped a torn tail and read on, so a probe
+    could report an unverified toggle as verified
+    ([[session-state-deglobalisation]]).
+    """
+    probe = _ViewportHarness()
+    probe.message_log.append(_truncated_message())
+    probe.message_log.append(_ack_message(True))
+    with pytest.raises(FramingError, match="Incomplete frame"):
         probe._read_autoscroll_ack(0)
 
 

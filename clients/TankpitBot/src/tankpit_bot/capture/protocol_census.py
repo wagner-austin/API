@@ -22,9 +22,10 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 
 from tankpit_bot.browser.types import TEXT_MESSAGE_TYPES
-from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe
+from tankpit_bot.capture.frames import split_payload_frames
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.protocol import try_decode_binary_message
-from tankpit_bot.protocol.framing import FramingError, split_frames
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.types import CaptureSession
 from tankpit_bot.wire.helpers import DecodeError
 
@@ -397,11 +398,8 @@ def _accumulate_message(
         xor_table: Session XOR table.
         acc: Mutable census accumulator.
     """
-    raw_bytes = decode_base64_safe(payload)
-    if raw_bytes is None:
-        return
     try:
-        frames = split_frames(raw_bytes)
+        frames = split_payload_frames(payload)
     except FramingError as exc:
         acc["framing_error_count"] += 1
         log.warning("Skipping malformed capture payload during protocol census: %s", exc)

@@ -15,6 +15,9 @@ from __future__ import annotations
 
 from collections import Counter
 
+from platform_core.logging import get_logger
+
+from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.capture.viewport_analysis_types import (
     DecodedBinaryRecordDict,
     ThirteenByteShapeDict,
@@ -31,30 +34,34 @@ from tankpit_bot.capture.viewport_analysis_types import (
     encode_viewport_inference,
     encode_viewport_shift,
 )
-from tankpit_bot.capture.xor import decode_base64_safe, xor_decode_body
+from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol import try_decode_binary_message
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.types.session import CaptureSession
 
+log = get_logger(__name__)
 
-def _split_frame_messages(frame: bytes) -> list[bytes]:
-    """Split a captured WebSocket frame into message bodies.
+
+def _split_frame_messages(payload: str) -> list[bytes]:
+    """Split a captured WebSocket payload into message bodies.
+
+    An analysis pass reports what it cannot read rather than quietly
+    reading less; the private walk this replaces returned everything
+    before a torn tail and dropped the rest in silence
+    ([[session-state-deglobalisation]]).
 
     Args:
-        frame: Raw frame bytes including 2-byte length prefixes.
+        payload: Base64-encoded frame payload.
 
     Returns:
-        List of message bodies without the frame-level length prefixes.
+        Message bodies without the frame-level length prefixes; empty
+        when the payload cannot be parsed.
     """
-    bodies: list[bytes] = []
-    offset = 0
-    while offset + 2 <= len(frame):
-        msg_len = frame[offset] | (frame[offset + 1] << 8)
-        offset += 2
-        if msg_len == 0 or offset + msg_len > len(frame):
-            return bodies
-        bodies.append(frame[offset : offset + msg_len])
-        offset += msg_len
-    return bodies
+    try:
+        return split_payload_frames(payload)
+    except FramingError as error:
+        log.warning("viewport analysis: skipping unparseable payload: %s", error)
+        return []
 
 
 def _decode_received_binary_records(
@@ -75,11 +82,7 @@ def _decode_received_binary_records(
         if message["direction"] != "received":
             continue
 
-        frame = decode_base64_safe(message["payload"])
-        if frame is None:
-            continue
-
-        for body in _split_frame_messages(frame):
+        for body in _split_frame_messages(message["payload"]):
             msg_type = body[0]
             decoded_data = xor_decode_body(body, xor_table, offset=1)
             decoded = try_decode_binary_message(msg_type, decoded_data)
@@ -113,10 +116,7 @@ def _collect_thirteen_byte_shapes(
     for message in session["messages"]:
         if message["direction"] != "received":
             continue
-        frame = decode_base64_safe(message["payload"])
-        if frame is None:
-            continue
-        for body in _split_frame_messages(frame):
+        for body in _split_frame_messages(message["payload"]):
             if len(body) < 1 or body[0] != 0x2E:
                 continue
             decoded_data = xor_decode_body(body, xor_table, offset=1)

@@ -18,11 +18,17 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe, xor_decode_body
+from platform_core.logging import get_logger
+
+from tankpit_bot.capture.frames import split_payload_frames
+from tankpit_bot.capture.xor import build_session_xor_table, xor_decode_body
 from tankpit_bot.protocol import decode_message
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.types import CapturedMessage, CaptureSession
+
+log = get_logger(__name__)
 
 _TRACKED_TYPES = frozenset({0x21, 0x28, 0x29, 0x2E, 0x3D, 0x41, 0x47, 0x49, 0x53, 0x58, 0x67})
 """Top-level frame types the extraction decodes. The 0x2E envelope
@@ -135,26 +141,22 @@ def _message_timestamp(msg: CapturedMessage) -> int:
 def _split_frame_bodies(payload: str) -> list[bytes]:
     """Split one base64 WebSocket payload into logical message bodies.
 
+    Same policy as the wire timeline: report an unparseable payload and
+    skip it, rather than silently truncating a torn tail
+    ([[session-state-deglobalisation]]).
+
     Args:
         payload: Base64-encoded frame payload.
 
     Returns:
         Message bodies (without length prefixes); empty when the
-        payload is unparseable or too short.
+        payload cannot be parsed.
     """
-    data = decode_base64_safe(payload)
-    if data is None or len(data) < 3:
+    try:
+        return split_payload_frames(payload)
+    except FramingError as error:
+        log.warning("shadow timeline: skipping unparseable payload: %s", error)
         return []
-    bodies: list[bytes] = []
-    offset = 0
-    while offset + 2 < len(data):
-        msg_len = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if msg_len == 0 or offset + msg_len > len(data):
-            break
-        bodies.append(data[offset : offset + msg_len])
-        offset += msg_len
-    return bodies
 
 
 def _ingest_tank_events(

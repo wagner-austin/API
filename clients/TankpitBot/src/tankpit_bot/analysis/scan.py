@@ -41,12 +41,12 @@ from tankpit_bot.analysis.types import (
     ScannedSessionDict,
     SkippedSessionDict,
 )
+from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.capture.xor import (
     build_session_xor_table,
-    decode_base64_safe,
     xor_decode_body,
 )
-from tankpit_bot.protocol.framing import FramingError, split_frames
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.types import CaptureSession, decode_capture_session
 
 log = get_logger(__name__)
@@ -105,10 +105,7 @@ def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
     xor_table = build_session_xor_table(magic)
     frames: list[DecodedFrameDict] = []
     for message in session["messages"]:
-        payload = decode_base64_safe(message["payload"])
-        if not payload:
-            continue
-        for body in split_frames(payload):
+        for body in split_payload_frames(message["payload"]):
             if not body:
                 continue
             frames.append(

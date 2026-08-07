@@ -9,6 +9,7 @@ import pytest
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, reset_static_key_cache
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.sniffer.decoders import (
     decode_8byte_state,
     decode_command,
@@ -692,23 +693,47 @@ class TestProcessReceivedMessage:
         payload = base64.b64encode(frame).decode()
         process_received_message(payload, sniffer_xor_table())  # decode, log, dispatch
 
-    def test_malformed_frame_length_breaks_early(self) -> None:
-        """process_received_message breaks on zero-length or oversized sub-message."""
+    def test_zero_length_frame_carries_no_message(self) -> None:
+        """A zero-length frame is legal framing and dispatches nothing.
+
+        The inline walk read this as a torn frame and stopped, which
+        also happened to keep the empty body away from the router. The
+        splitter drops the empty body instead, so the router keeps its
+        "body[0] is safe" guarantee AND any later frame in the same
+        payload still gets processed ([[session-state-deglobalisation]]).
+        """
         from tankpit_bot.sniffer.decoders import process_received_message
 
-        # Frame with msg_len=0 → triggers break at line 127
-        frame = b"\x00\x00"
-        payload = base64.b64encode(frame).decode()
-        process_received_message(payload, sniffer_xor_table())  # should not raise
+        payload = base64.b64encode(b"\x00\x00").decode()
+        process_received_message(payload, sniffer_xor_table())
 
-    def test_oversized_submessage_breaks_early(self) -> None:
-        """process_received_message breaks when sub-message extends beyond frame."""
+    def test_zero_length_frame_does_not_hide_the_frame_after_it(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The frame following a zero-length one is still dispatched.
+
+        The inline walk lost it: ``msg_len == 0`` broke the loop before
+        the 0x4D that follows was ever read.
+        """
         from tankpit_bot.sniffer.decoders import process_received_message
 
-        # Frame claims 100 bytes but only has 2 → offset + msg_len > len(data)
-        frame = b"\x64\x00\x01\x02"
+        body = bytes([0x4D, 0x01, 0x02, 0x03])
+        frame = b"\x00\x00" + len(body).to_bytes(2, "little") + body
         payload = base64.b64encode(frame).decode()
-        process_received_message(payload, sniffer_xor_table())  # should not raise
+
+        set_protocol_frame_logging(True)
+        with caplog.at_level(logging.INFO):
+            process_received_message(payload, sniffer_xor_table())
+        assert any("[RECEIVED]" in record.message for record in caplog.records)
+
+    def test_oversized_submessage_raises(self) -> None:
+        """A sub-message that overruns its payload is fatal, not truncated."""
+        from tankpit_bot.sniffer.decoders import process_received_message
+
+        # Frame claims 100 bytes but only has 2.
+        payload = base64.b64encode(b"\x64\x00\x01\x02").decode()
+        with pytest.raises(FramingError, match="Incomplete frame"):
+            process_received_message(payload, sniffer_xor_table())
 
     def test_chat_message_decodes_and_dispatches(self) -> None:
         """process_received_message decodes 0x4D ChatMessage through full path.

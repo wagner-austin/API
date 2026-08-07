@@ -31,7 +31,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks import AutoscrollPageProtocol
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.protocol.decoders.text import try_decode_plaintext_ack
 from tankpit_bot.types.message import CapturedMessage
 
@@ -85,21 +85,16 @@ def _read_autoscroll_ack(messages: list[CapturedMessage], start_index: int) -> b
 
     Returns:
         The acked enabled flag, or ``None`` when no ack has arrived.
+
+    Raises:
+        FramingError: If a live payload is corrupt. This used to
+            re-derive the frame walk inline and drop a torn tail with a
+            silent ``break`` ([[session-state-deglobalisation]]).
     """
     for captured in messages[start_index:]:
         if captured["direction"] != "received":
             continue
-        data = decode_base64_safe(captured["payload"])
-        if not data:
-            continue
-        offset = 0
-        while offset + 2 < len(data):
-            length = data[offset] | (data[offset + 1] << 8)
-            offset += 2
-            if length == 0 or offset + length > len(data):
-                break
-            body = data[offset : offset + length]
-            offset += length
+        for body in split_payload_frames(captured["payload"]):
             ack = try_decode_plaintext_ack(body)
             if ack is not None and ack["msg_type"] == "autoscroll_ack":
                 return ack["enabled"]

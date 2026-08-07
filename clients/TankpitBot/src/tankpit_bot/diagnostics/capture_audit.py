@@ -27,14 +27,12 @@ from typing import Literal
 from platform_core.logging import get_logger
 
 from tankpit_bot import protocol
-from tankpit_bot.capture.xor import (
-    XorStaticKeyUnavailableError,
-    build_session_xor_table,
-    decode_base64_safe,
-)
+from tankpit_bot.capture.frames import split_payload_frames
+from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, build_session_xor_table
 from tankpit_bot.diagnostics.event_stream import scan_diagnostic_records
 from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
 from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.runtime_logging import RuntimeEventRecordDict
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.types import CaptureSession
@@ -77,30 +75,6 @@ def _xor_with_table(body: bytes, table: bytes) -> bytes:
     return bytes(decoded)
 
 
-def _iter_frames(payload: str) -> list[bytes]:
-    """Split one received WebSocket payload into logical message bodies.
-
-    Args:
-        payload: Base64-encoded frame payload.
-
-    Returns:
-        Message bodies (each starting with its type byte), in order.
-    """
-    data = decode_base64_safe(payload)
-    if data is None or len(data) < 3:
-        return []
-    bodies: list[bytes] = []
-    offset = 0
-    while offset + 2 < len(data):
-        msg_len = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if msg_len == 0 or offset + msg_len > len(data):
-            break
-        bodies.append(data[offset : offset + msg_len])
-        offset += msg_len
-    return bodies
-
-
 def _replay_frame_bodies(capture: CaptureSession) -> list[bytes]:
     """Collect the received frame bodies the XOR replay should decode.
 
@@ -118,7 +92,15 @@ def _replay_frame_bodies(capture: CaptureSession) -> list[bytes]:
     for message in capture["messages"]:
         if message["direction"] != "received":
             continue
-        for body in _iter_frames(message["payload"]):
+        # An audit reports what it cannot read rather than quietly
+        # reading less — the private walk this replaced dropped a torn
+        # tail without a word ([[session-state-deglobalisation]]).
+        try:
+            frames = split_payload_frames(message["payload"])
+        except FramingError as error:
+            log.warning("replay audit: skipping unparseable payload: %s", error)
+            continue
+        for body in frames:
             if try_decode_plaintext_ack(body) is None:
                 bodies.append(body)
     return bodies

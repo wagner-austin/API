@@ -120,7 +120,7 @@ class TestFormatTraceLine:
         """_format_trace_line includes all trace fields."""
         from scripts.replay_bot import _format_trace_line
 
-        from tankpit_bot.bot.ai.types import make_enemy_threat
+        from tankpit_bot.bot.ai.world_types import make_enemy_threat
 
         trace = ReplayTickTraceDict(
             tick_index=3,
@@ -395,7 +395,14 @@ class TestMainCLI:
         msg = CapturedMessage(
             timestamp_ms=1000,
             direction="received",
-            payload="BQBUZXN0",  # base64 for a 5-byte text frame
+            # A well-formed 4-byte text frame. This read "BQBUZXN0"
+            # until 2026-08-06 — a length prefix claiming FIVE bytes
+            # over a four-byte body, i.e. a torn frame the old inline
+            # walk silently truncated to nothing. The comment beside it
+            # said "5-byte text frame", so the fixture had been wrong
+            # since it was written and nothing could say so
+            # ([[session-state-deglobalisation]]).
+            payload="BABUZXN0",
             ws_url="wss://tankpit.com/ws",
         )
         session = CaptureSession(

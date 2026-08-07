@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import base64
 
+from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.protocol.encoders import encode_envelope_body
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.commands import ClientCommandDict, decode_client_command
 from tankpit_bot.wire.helpers import DecodeError, pack16
@@ -80,22 +82,14 @@ def decode_client_payload(payload: str, table: bytes) -> list[ClientCommandDict]
         DecodeError: If the payload is not valid base64, a frame is
             torn, or a frame does not carry the ``!`` command prefix.
     """
+    # The split is shared; only the translation into this module's
+    # DecodeError is local ([[session-state-deglobalisation]]).
     try:
-        data = base64.b64decode(payload, validate=True)
-    except ValueError as error:
-        raise DecodeError(f"client payload is not valid base64: {error}") from error
+        frames = split_payload_frames(payload)
+    except FramingError as error:
+        raise DecodeError(f"undecodable client payload: {error}") from error
     commands: list[ClientCommandDict] = []
-    offset = 0
-    while offset + 2 < len(data):
-        frame_len = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if frame_len == 0 or offset + frame_len > len(data):
-            raise DecodeError(
-                f"torn client frame: length {frame_len} at offset {offset - 2} "
-                f"in a {len(data)}-byte payload"
-            )
-        body = data[offset : offset + frame_len]
-        offset += frame_len
+    for body in frames:
         if body[0] != COMMAND_PREFIX:
             raise DecodeError(f"client frame missing '!' prefix: 0x{body[0]:02X}")
         commands.append(decode_client_command(_xor_with_table(table, body[1:])))

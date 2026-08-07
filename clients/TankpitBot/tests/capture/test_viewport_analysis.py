@@ -393,9 +393,27 @@ class TestViewportAnalysisEncoding:
 class TestViewportAnalysisHelpers:
     """Tests for internal helper branches in viewport analysis."""
 
-    def test_split_frame_messages_stops_on_zero_length_frame(self) -> None:
-        """Stops splitting when a zero-length frame prefix appears."""
-        assert va._split_frame_messages(b"\x00\x00") == []
+    def test_split_frame_messages_drops_a_zero_length_frame(self) -> None:
+        """A zero-length frame carries no message and yields nothing."""
+        assert va._split_frame_messages(base64.b64encode(b"\x00\x00").decode()) == []
+
+    def test_split_frame_messages_keeps_the_frame_after_a_zero_length_one(self) -> None:
+        """A zero-length frame no longer hides the frames behind it.
+
+        The private walk returned everything before it and dropped the
+        rest; the shared splitter skips only the empty body
+        ([[session-state-deglobalisation]]).
+        """
+        body = bytes([0x2E, 0x01, 0x02])
+        payload = base64.b64encode(b"\x00\x00" + len(body).to_bytes(2, "little") + body).decode()
+
+        assert va._split_frame_messages(payload) == [body]
+
+    def test_split_frame_messages_reports_a_torn_payload(self) -> None:
+        """A torn payload is logged and skipped, never silently shortened."""
+        payload = base64.b64encode(b"\xff\x00\x41").decode()
+
+        assert va._split_frame_messages(payload) == []
 
     def test_decode_received_binary_records_skips_sent_invalid_and_sync(self) -> None:
         """Skips sent and invalid frames while decoding unmatched sync messages."""

@@ -46,9 +46,11 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
-from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe, xor_decode_body
+from tankpit_bot.capture.frames import split_payload_frames
+from tankpit_bot.capture.xor import build_session_xor_table, xor_decode_body
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
 from tankpit_bot.protocol.commands import TICK_RATE_MS
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sim.world import SimContainerDict, SimEquipmentDict
@@ -147,24 +149,6 @@ class _Walk:
         if self.t0 is None:
             self.t0 = t
         return max(0, (t - self.t0) // _TICK_MS)
-
-
-def _split_frames(data: bytes) -> list[bytes]:
-    """Split one wire payload into its length-prefixed message bodies.
-
-    A zero or overrunning length is a torn frame: everything before
-    it is returned, the tail is dropped.
-    """
-    frames: list[bytes] = []
-    offset = 0
-    while offset + 2 < len(data):
-        length = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if length == 0 or offset + length > len(data):
-            return frames
-        frames.append(data[offset : offset + length])
-        offset += length
-    return frames
 
 
 def _note_position(walk: _Walk, tank_id: int, t: int, x: int, y: int) -> None:
@@ -441,11 +425,16 @@ def compile_ghost_spec(capture_text: str) -> GhostSpecDict:
     for message in messages:
         if message.get("direction") == "sent":
             continue
-        data = decode_base64_safe(narrow_json_to_str(message.get("payload") or ""))
-        if not data:
-            continue
         t = narrow_json_to_int(message["timestamp_ms"])
-        for body in _split_frames(data):
+        # The ghost compiler reads a recording to replay it; a payload
+        # it cannot parse is reported and skipped, not silently
+        # truncated ([[session-state-deglobalisation]]).
+        try:
+            frames = split_payload_frames(narrow_json_to_str(message.get("payload") or ""))
+        except FramingError as error:
+            log.warning("ghost compile: skipping unparseable payload: %s", error)
+            continue
+        for body in frames:
             if not body or try_decode_plaintext_ack(body) is not None:
                 continue
             if _is_text_route(body[0], body):

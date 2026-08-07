@@ -16,6 +16,7 @@ from tankpit_bot.browser.autoscroll import (
     _read_autoscroll_ack,
     ensure_autoscroll_off,
 )
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.sniffer.world_state import get_world_state, reset_world_state
 from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types.message import CapturedMessage
@@ -105,15 +106,39 @@ class TestReadAutoscrollAck:
 
         assert _read_autoscroll_ack(messages, 0) is None
 
-    def test_tolerates_undecodable_and_truncated_frames(self) -> None:
-        """Garbage payloads and truncated length prefixes are skipped."""
-        bad_b64 = _received("!!!not-base64!!!")
-        # Length prefix claims 200 bytes but the frame carries 2.
-        truncated = _received(base64.b64encode(b"\xc8\x00AB").decode())
-        zero_length = _received(base64.b64encode(b"\x00\x00A0").decode())
-        messages = [bad_b64, truncated, zero_length, _received(_frame(b"A0"))]
+    def test_refuses_an_undecodable_payload(self) -> None:
+        """A payload that is not valid base64 is fatal, not skipped."""
+        messages = [_received("!!!not-base64!!!"), _received(_frame(b"A0"))]
 
-        assert _read_autoscroll_ack(messages, 0) is False
+        with pytest.raises(FramingError, match="not valid base64"):
+            _read_autoscroll_ack(messages, 0)
+
+    def test_refuses_a_truncated_frame(self) -> None:
+        """A length prefix that overruns its payload is fatal.
+
+        This asserted tolerance: the inline walk skipped a torn tail and
+        read on. Measured over the whole archive, no received payload is
+        ever undecodable or torn (230,323 of them across 407 sessions),
+        so the tolerance only ever hid corruption
+        ([[session-state-deglobalisation]]).
+        """
+        # Length prefix claims 200 bytes but the frame carries 2.
+        messages = [_received(base64.b64encode(b"\xc8\x00AB").decode())]
+
+        with pytest.raises(FramingError, match="Incomplete frame"):
+            _read_autoscroll_ack(messages, 0)
+
+    def test_reads_the_ack_past_a_zero_length_frame(self) -> None:
+        """A zero-length frame is legal framing; the scan reads past it.
+
+        The inline walk treated ``length == 0`` as a torn frame and
+        stopped, losing every later frame in the same payload. The
+        shared splitter yields the empty body and carries on
+        ([[session-state-deglobalisation]]).
+        """
+        payload = base64.b64encode(b"\x00\x00" + b"\x02\x00A0").decode()
+
+        assert _read_autoscroll_ack([_received(payload)], 0) is False
 
 
 class TestEnsureAutoscrollOff:

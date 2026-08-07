@@ -19,6 +19,7 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 
+from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.capture.viewport_entities import (
     ViewportEntityRowDict,
     ViewportEntityUpdateDict,
@@ -28,11 +29,10 @@ from tankpit_bot.capture.viewport_entities import (
 )
 from tankpit_bot.capture.xor import (
     build_session_xor_table,
-    decode_base64_safe,
     xor_decode_body,
 )
 from tankpit_bot.protocol.commands import CMD_SHOOT, deserialize_command
-from tankpit_bot.protocol.framing import FramingError, split_frames
+from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.types import CaptureSession
 
 log = get_logger(__name__)
@@ -238,11 +238,8 @@ def _split_sent_frames(payload: str) -> list[bytes]:
     Returns:
         Logical frame bodies or an empty list when the payload is invalid.
     """
-    raw_bytes = decode_base64_safe(payload)
-    if raw_bytes is None:
-        return []
     try:
-        return split_frames(raw_bytes)
+        return split_payload_frames(payload)
     except FramingError as exc:
         log.warning("Skipping malformed sent payload during shot correlation: %s", exc)
         return []
