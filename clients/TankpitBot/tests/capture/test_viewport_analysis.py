@@ -1,9 +1,7 @@
-"""Tests for capture viewport analysis.
+"""Tests for viewport capture analysis and encoding.
 
-The PositionUpdate (13-byte 0x24) container path was deleted 2026-06-20
-after corpus proof of zero production fires. The position_evidence path
-of the analyzer is gone; only the MovementResponse + ViewportUpdate +
-13-byte shape census remain.
+``test_viewport_analysis.py`` was 622 lines; the helper detail is now a
+sibling.
 """
 
 from __future__ import annotations
@@ -22,114 +20,150 @@ from tankpit_bot.capture.viewport_analysis import (
     encode_viewport_analysis,
     format_viewport_analysis,
 )
-from tankpit_bot.capture.viewport_analysis_types import (
-    ViewportAnalysisStateDict,
-)
 from tankpit_bot.protocol.codec import build_xor_table
 from tankpit_bot.types.message import CapturedMessage
-from tankpit_bot.types.session import CaptureSession
+from tests.capture._viewport_analysis_fixtures import (
+    _make_session,
+    _make_sync_payload,
+)
 from tests.wire_builders import encode_wire_frame
 
 
-def _make_movement_response_payload(
-    tank_id: int,
-    x: int,
-    y: int,
-    xor_table: bytes,
-) -> str:
-    """Create a MovementResponse payload.
+class TestViewportAnalysisHelpers:
+    """Tests for internal helper branches in viewport analysis."""
 
-    Args:
-        tank_id: Tank identifier.
-        x: Absolute x position.
-        y: Absolute y position.
-        xor_table: Session XOR table.
+    def test_split_frame_messages_drops_a_zero_length_frame(self) -> None:
+        """A zero-length frame carries no message and yields nothing."""
+        assert va._split_frame_messages(base64.b64encode(b"\x00\x00").decode()) == []
 
-    Returns:
-        Base64-encoded received frame payload.
-    """
-    decoded_data = bytes(
-        [
-            1,
-            tank_id & 0xFF,
-            tank_id >> 8,
-            x,
-            y,
-            0,
-            0,
-            1,
-            0,
-            0,
-            5,
-            0,  # carrying byte (a[11]) per JS Mg.h
+    def test_split_frame_messages_keeps_the_frame_after_a_zero_length_one(self) -> None:
+        """A zero-length frame no longer hides the frames behind it.
+
+        The private walk returned everything before it and dropped the
+        rest; the shared splitter skips only the empty body
+        ([[session-state-deglobalisation]]).
+        """
+        body = bytes([0x2E, 0x01, 0x02])
+        payload = base64.b64encode(b"\x00\x00" + len(body).to_bytes(2, "little") + body).decode()
+
+        assert va._split_frame_messages(payload) == [body]
+
+    def test_split_frame_messages_reports_a_torn_payload(self) -> None:
+        """A torn payload is logged and skipped, never silently shortened."""
+        payload = base64.b64encode(b"\xff\x00\x41").decode()
+
+        assert va._split_frame_messages(payload) == []
+
+    def test_decode_received_binary_records_skips_sent_invalid_and_sync(self) -> None:
+        """Skips sent and invalid frames while decoding unmatched sync messages."""
+        magic = "decode-magic"
+        static_key = "C" * 64
+        xor_table = build_xor_table(static_key, magic)
+        messages = [
+            CapturedMessage(
+                timestamp_ms=1000,
+                direction="sent",
+                payload=_make_sync_payload(xor_table),
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1100,
+                direction="received",
+                payload="not-base64!",
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1200,
+                direction="received",
+                payload=base64.b64encode(b"\x00\x00").decode("ascii"),
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1250,
+                direction="received",
+                payload=_make_unknown_payload(xor_table),
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1300,
+                direction="received",
+                payload=_make_sync_payload(xor_table),
+                ws_url="wss://test/ws",
+            ),
         ]
-    )
-    return encode_wire_frame(0x3D, decoded_data, xor_table)
 
+        records = va._decode_received_binary_records(_make_session(messages, magic), xor_table)
 
-def _make_viewport_update_payload(
-    viewport_left: int,
-    viewport_top: int,
-    xor_table: bytes,
-) -> str:
-    """Create a ViewportUpdate payload with explicit viewport origin.
+        assert len(records) == 1
+        assert records[0]["decoded"]["msg_type"] == 0x3F
 
-    Args:
-        viewport_left: Absolute viewport left coordinate.
-        viewport_top: Absolute viewport top coordinate.
-        xor_table: Session XOR table.
+    def test_collect_thirteen_byte_shapes_filters_and_sorts(self) -> None:
+        """Collects only received 13-byte 0x2E bodies and sorts shape counts."""
+        magic = "shape-magic"
+        static_key = "E" * 64
+        xor_table = build_xor_table(static_key, magic)
 
-    Returns:
-        Base64-encoded received frame payload.
-    """
-    decoded_data = bytes([viewport_left, viewport_top])
-    return encode_wire_frame(0x5A, decoded_data, xor_table)
+        frame_one = encode_wire_frame(0x2E, bytes.fromhex("2402" + "00" * 11), xor_table)
+        frame_two = encode_wire_frame(0x2E, bytes.fromhex("2402" + "11" * 11), xor_table)
+        frame_three = encode_wire_frame(0x2E, bytes.fromhex("3d01" + "22" * 11), xor_table)
+        short_frame = encode_wire_frame(0x2E, b"\x24\x02", xor_table)
+        non_container = encode_wire_frame(0x3F, b"", xor_table)
 
+        messages = [
+            CapturedMessage(
+                timestamp_ms=1000,
+                direction="sent",
+                payload=frame_one,
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1100,
+                direction="received",
+                payload="not-base64!",
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1200,
+                direction="received",
+                payload=frame_one,
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1300,
+                direction="received",
+                payload=frame_two,
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1400,
+                direction="received",
+                payload=frame_three,
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1500,
+                direction="received",
+                payload=short_frame,
+                ws_url="wss://test/ws",
+            ),
+            CapturedMessage(
+                timestamp_ms=1600,
+                direction="received",
+                payload=non_container,
+                ws_url="wss://test/ws",
+            ),
+        ]
 
-def _make_sync_payload(xor_table: bytes) -> str:
-    """Create a Sync payload.
+        total_count, shapes = va._collect_thirteen_byte_shapes(
+            _make_session(messages, magic),
+            xor_table,
+        )
 
-    Args:
-        xor_table: Session XOR table.
-
-    Returns:
-        Base64-encoded received frame payload.
-    """
-    return encode_wire_frame(0x3F, b"", xor_table)
-
-
-def _make_unknown_payload(xor_table: bytes) -> str:
-    """Create an unsupported binary payload.
-
-    Args:
-        xor_table: Session XOR table.
-
-    Returns:
-        Base64-encoded received frame payload.
-    """
-    return encode_wire_frame(0xAB, b"\x00\x01\x02", xor_table)
-
-
-def _make_session(messages: list[CapturedMessage], magic: str) -> CaptureSession:
-    """Create a typed capture session for tests.
-
-    Args:
-        messages: Captured messages.
-        magic: Session magic string.
-
-    Returns:
-        CaptureSession containing the provided messages.
-    """
-    return CaptureSession(
-        session_id="viewport-analysis-test",
-        start_timestamp_ms=1000,
-        end_timestamp_ms=2000,
-        base_url="https://tankpit.com/play",
-        messages=messages,
-        magic=magic,
-        game_log=[],
-        tank_names={},
-    )
+        assert total_count == 3
+        assert shapes == [
+            {"first_byte": 0x24, "second_byte": 0x02, "count": 2},
+            {"first_byte": 0x3D, "second_byte": 0x01, "count": 1},
+        ]
 
 
 class TestAnalyzeCaptureSession:
@@ -373,250 +407,68 @@ class TestViewportAnalysisEncoding:
             )
 
 
-class TestViewportAnalysisHelpers:
-    """Tests for internal helper branches in viewport analysis."""
+def _make_movement_response_payload(
+    tank_id: int,
+    x: int,
+    y: int,
+    xor_table: bytes,
+) -> str:
+    """Create a MovementResponse payload.
 
-    def test_split_frame_messages_drops_a_zero_length_frame(self) -> None:
-        """A zero-length frame carries no message and yields nothing."""
-        assert va._split_frame_messages(base64.b64encode(b"\x00\x00").decode()) == []
+    Args:
+        tank_id: Tank identifier.
+        x: Absolute x position.
+        y: Absolute y position.
+        xor_table: Session XOR table.
 
-    def test_split_frame_messages_keeps_the_frame_after_a_zero_length_one(self) -> None:
-        """A zero-length frame no longer hides the frames behind it.
-
-        The private walk returned everything before it and dropped the
-        rest; the shared splitter skips only the empty body
-        ([[session-state-deglobalisation]]).
-        """
-        body = bytes([0x2E, 0x01, 0x02])
-        payload = base64.b64encode(b"\x00\x00" + len(body).to_bytes(2, "little") + body).decode()
-
-        assert va._split_frame_messages(payload) == [body]
-
-    def test_split_frame_messages_reports_a_torn_payload(self) -> None:
-        """A torn payload is logged and skipped, never silently shortened."""
-        payload = base64.b64encode(b"\xff\x00\x41").decode()
-
-        assert va._split_frame_messages(payload) == []
-
-    def test_decode_received_binary_records_skips_sent_invalid_and_sync(self) -> None:
-        """Skips sent and invalid frames while decoding unmatched sync messages."""
-        magic = "decode-magic"
-        static_key = "C" * 64
-        xor_table = build_xor_table(static_key, magic)
-        messages = [
-            CapturedMessage(
-                timestamp_ms=1000,
-                direction="sent",
-                payload=_make_sync_payload(xor_table),
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1100,
-                direction="received",
-                payload="not-base64!",
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1200,
-                direction="received",
-                payload=base64.b64encode(b"\x00\x00").decode("ascii"),
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1250,
-                direction="received",
-                payload=_make_unknown_payload(xor_table),
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1300,
-                direction="received",
-                payload=_make_sync_payload(xor_table),
-                ws_url="wss://test/ws",
-            ),
+    Returns:
+        Base64-encoded received frame payload.
+    """
+    decoded_data = bytes(
+        [
+            1,
+            tank_id & 0xFF,
+            tank_id >> 8,
+            x,
+            y,
+            0,
+            0,
+            1,
+            0,
+            0,
+            5,
+            0,  # carrying byte (a[11]) per JS Mg.h
         ]
+    )
+    return encode_wire_frame(0x3D, decoded_data, xor_table)
 
-        records = va._decode_received_binary_records(_make_session(messages, magic), xor_table)
 
-        assert len(records) == 1
-        assert records[0]["decoded"]["msg_type"] == 0x3F
+def _make_viewport_update_payload(
+    viewport_left: int,
+    viewport_top: int,
+    xor_table: bytes,
+) -> str:
+    """Create a ViewportUpdate payload with explicit viewport origin.
 
-    def test_collect_thirteen_byte_shapes_filters_and_sorts(self) -> None:
-        """Collects only received 13-byte 0x2E bodies and sorts shape counts."""
-        magic = "shape-magic"
-        static_key = "E" * 64
-        xor_table = build_xor_table(static_key, magic)
+    Args:
+        viewport_left: Absolute viewport left coordinate.
+        viewport_top: Absolute viewport top coordinate.
+        xor_table: Session XOR table.
 
-        frame_one = encode_wire_frame(0x2E, bytes.fromhex("2402" + "00" * 11), xor_table)
-        frame_two = encode_wire_frame(0x2E, bytes.fromhex("2402" + "11" * 11), xor_table)
-        frame_three = encode_wire_frame(0x2E, bytes.fromhex("3d01" + "22" * 11), xor_table)
-        short_frame = encode_wire_frame(0x2E, b"\x24\x02", xor_table)
-        non_container = encode_wire_frame(0x3F, b"", xor_table)
+    Returns:
+        Base64-encoded received frame payload.
+    """
+    decoded_data = bytes([viewport_left, viewport_top])
+    return encode_wire_frame(0x5A, decoded_data, xor_table)
 
-        messages = [
-            CapturedMessage(
-                timestamp_ms=1000,
-                direction="sent",
-                payload=frame_one,
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1100,
-                direction="received",
-                payload="not-base64!",
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1200,
-                direction="received",
-                payload=frame_one,
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1300,
-                direction="received",
-                payload=frame_two,
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1400,
-                direction="received",
-                payload=frame_three,
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1500,
-                direction="received",
-                payload=short_frame,
-                ws_url="wss://test/ws",
-            ),
-            CapturedMessage(
-                timestamp_ms=1600,
-                direction="received",
-                payload=non_container,
-                ws_url="wss://test/ws",
-            ),
-        ]
 
-        total_count, shapes = va._collect_thirteen_byte_shapes(
-            _make_session(messages, magic),
-            xor_table,
-        )
+def _make_unknown_payload(xor_table: bytes) -> str:
+    """Create an unsupported binary payload.
 
-        assert total_count == 3
-        assert shapes == [
-            {"first_byte": 0x24, "second_byte": 0x02, "count": 2},
-            {"first_byte": 0x3D, "second_byte": 0x01, "count": 1},
-        ]
+    Args:
+        xor_table: Session XOR table.
 
-    def test_format_capture_status_covers_remaining_outcomes(self) -> None:
-        """Reports the exact missing evidence stage for each outcome."""
-        missing_viewport: ViewportAnalysisDict = {
-            "self_tank_id": 638,
-            "viewport_inferences": [],
-            "viewport_shifts": [],
-            "movement_response_count": 1,
-            "viewport_update_count": 0,
-            "thirteen_byte_0x2e_count": 0,
-            "thirteen_byte_shapes": [],
-        }
-        inferred: ViewportAnalysisDict = {
-            "self_tank_id": 638,
-            "viewport_inferences": [
-                {
-                    "message_index": 1,
-                    "timestamp_ms": 1100,
-                    "viewport_left": 136,
-                    "viewport_top": 134,
-                }
-            ],
-            "viewport_shifts": [],
-            "movement_response_count": 1,
-            "viewport_update_count": 1,
-            "thirteen_byte_0x2e_count": 0,
-            "thirteen_byte_shapes": [],
-        }
-
-        assert (
-            va._format_capture_status(missing_viewport) == "capture_status=missing_viewport_update"
-        )
-        assert va._format_capture_status(inferred) == "capture_status=viewport_inferred"
-
-    def test_handle_movement_response_ignores_other_tanks(self) -> None:
-        """Leaves viewport state unchanged when self id is already learned."""
-        state = ViewportAnalysisStateDict(
-            self_tank_id=638,
-            current_viewport_left=136,
-            current_viewport_top=134,
-        )
-        updated = va._handle_movement_response(state, 999)
-
-        assert updated == state
-
-    def test_handle_movement_response_keeps_same_viewport_without_shift(self) -> None:
-        """Learns self tank id without mutating known viewport origin."""
-        state = ViewportAnalysisStateDict(
-            self_tank_id=None,
-            current_viewport_left=136,
-            current_viewport_top=134,
-        )
-        updated = va._handle_movement_response(state, 638)
-
-        assert updated["current_viewport_left"] == 136
-        assert updated["current_viewport_top"] == 134
-        assert updated["self_tank_id"] == 638
-
-    def test_handle_viewport_update_records_inference_and_shift(self) -> None:
-        """Records direct viewport origins and shift transitions."""
-        state = ViewportAnalysisStateDict(
-            self_tank_id=638,
-            current_viewport_left=136,
-            current_viewport_top=134,
-        )
-        viewport_inferences: list[va.ViewportInferenceDict] = []
-        viewport_shifts: list[va.ViewportShiftDict] = []
-        updated = va._handle_viewport_update(
-            state,
-            2,
-            1100,
-            137,
-            134,
-            viewport_inferences,
-            viewport_shifts,
-        )
-        assert updated["current_viewport_left"] == 137
-        assert viewport_inferences == [
-            {"message_index": 2, "timestamp_ms": 1100, "viewport_left": 137, "viewport_top": 134}
-        ]
-        assert viewport_shifts == [
-            {
-                "message_index": 2,
-                "timestamp_ms": 1100,
-                "old_left": 136,
-                "old_top": 134,
-                "new_left": 137,
-                "new_top": 134,
-            }
-        ]
-
-    def test_analyze_capture_session_ignores_unmatched_sync_messages(self) -> None:
-        """Ignores decoded messages that are outside the viewport-analysis cases."""
-        magic = "analyze-other"
-        static_key = "D" * 64
-        xor_table = build_xor_table(static_key, magic)
-        messages = [
-            CapturedMessage(
-                timestamp_ms=1000,
-                direction="received",
-                payload=_make_sync_payload(xor_table),
-                ws_url="wss://test/ws",
-            )
-        ]
-
-        result = analyze_capture_session(_make_session(messages, magic), xor_table)
-
-        assert result["self_tank_id"] is None
-        assert result["movement_response_count"] == 0
-        assert result["viewport_update_count"] == 0
-        assert result["thirteen_byte_0x2e_count"] == 0
-        assert result["thirteen_byte_shapes"] == []
+    Returns:
+        Base64-encoded received frame payload.
+    """
+    return encode_wire_frame(0xAB, b"\x00\x01\x02", xor_table)
