@@ -60,7 +60,6 @@ from tankpit_bot.browser.session import BrowserSession
 from tankpit_bot.browser.types import (
     KNOWN_PROTOCOL_SIGNATURES,
     STATIC_KEY_LENGTH,
-    STATIC_KEY_PATH,
     TEXT_MESSAGE_TYPES,
     BrowserError,
     GameNotJoinedError,
@@ -70,7 +69,6 @@ from tankpit_bot.browser.types import (
 __all__ = [
     "KNOWN_PROTOCOL_SIGNATURES",
     "STATIC_KEY_LENGTH",
-    "STATIC_KEY_PATH",
     "TEXT_MESSAGE_TYPES",
     "Account",
     "AccountLoginResult",

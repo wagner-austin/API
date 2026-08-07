@@ -15,7 +15,7 @@ from scripts.analyze_shot_viewport import main
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.capture.xor import xor_decode_body
-from tankpit_bot.protocol.codec import build_xor_table
+from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
 from tankpit_bot.protocol.commands import CMD_SHOOT, TYPE_COMBAT
 from tests.conftest import FakeFileSystem
 
@@ -126,9 +126,7 @@ class TestAnalyzeShotViewportScript:
             "tank_names": {},
         }
         _fake_fs._files[str(Path("capture_session.json"))] = dump_json_str(session)
-        _fake_fs._files[str(Path(__file__).resolve().parent.parent / "xor_static_key.txt")] = (
-            static_key
-        )
+        _fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
 
         old_argv = sys.argv
         sys.argv = ["analyze_shot_viewport"]
@@ -221,9 +219,7 @@ class TestAnalyzeShotViewportScript:
             "tank_names": {},
         }
         _fake_fs._files[str(Path("capture_session.json"))] = dump_json_str(session)
-        _fake_fs._files[str(Path(__file__).resolve().parent.parent / "xor_static_key.txt")] = (
-            static_key
-        )
+        _fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
 
         old_argv = sys.argv
         sys.argv = ["analyze_shot_viewport"]

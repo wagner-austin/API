@@ -8,7 +8,11 @@ import logging
 import pytest
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, reset_static_key_cache
+from tankpit_bot.capture.xor import (
+    XorStaticKeyUnavailableError,
+    build_session_xor_table,
+    reset_static_key_cache,
+)
 from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.sniffer.decoders import (
     decode_8byte_state,
@@ -271,28 +275,20 @@ def test_decode_command_with_rest() -> None:
 
 
 def test_decode_command_with_magic_xor_decryption() -> None:
-    """Test decode_command decodes commands with XOR decryption when magic provided."""
-    from pathlib import Path
+    """decode_command decrypts a command against the session cipher.
 
-    # Check if static key exists (required for XOR decryption)
-    static_key_path = Path(__file__).parent.parent.parent / "xor_static_key.txt"
-    if not static_key_path.exists():
-        pytest.skip("xor_static_key.txt not found")
+    This used to read the key through its own copy of the path
+    expression, skip itself when the file was absent, and build the
+    table with its own copy of the math. The repo's key is present —
+    every other cipher test depends on it — so the skip was a branch
+    that could only ever hide a broken checkout
+    ([[session-state-deglobalisation]]).
+    """
+    magic = "test_magic_key_20char"
+    table = build_session_xor_table(magic)
 
-    # Read the static key
-    static_key = static_key_path.read_text().strip()
-    magic = "test_magic_key_20char"  # 20 char magic key
-
-    # Build the XOR table manually to know what encoded bytes to send
-    table = bytearray(len(static_key))
-    for i in range(len(static_key)):
-        table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
-
-    # We want to decode type=2, id=63 (enter game command)
-    # Encoded bytes: type_encoded = 2 ^ table[0], id_encoded = 63 ^ table[1]
-    type_encoded = 2 ^ table[0]
-    id_encoded = 63 ^ table[1]
-    body = bytes([0x21, type_encoded, id_encoded])
+    # Decode target: type=2, id=63 (enter game command).
+    body = bytes([0x21, 2 ^ table[0], 63 ^ table[1]])
 
     result = decode_command(body, "SENT", magic)
     assert result == "[SENT] CMD: ! type=2 id=63"

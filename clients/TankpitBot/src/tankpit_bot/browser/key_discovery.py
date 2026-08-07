@@ -12,9 +12,9 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.browser.types import (
     KNOWN_PROTOCOL_SIGNATURES,
     STATIC_KEY_LENGTH,
-    STATIC_KEY_PATH,
     TEXT_MESSAGE_TYPES,
 )
+from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 from tankpit_bot.types import CapturedMessage
 
 
@@ -93,7 +93,7 @@ def load_static_key() -> str:
         FileNotFoundError: If key file does not exist.
         ValueError: If key is not exactly 1000 characters.
     """
-    content = _test_hooks.read_text(STATIC_KEY_PATH)
+    content = _test_hooks.read_text(DEFAULT_STATIC_KEY_PATH)
     key = content.strip()
     if len(key) != STATIC_KEY_LENGTH:
         raise ValueError(f"Static key has {len(key)} chars, expected {STATIC_KEY_LENGTH}")
@@ -111,7 +111,7 @@ def save_static_key(key: str) -> None:
     """
     if len(key) != STATIC_KEY_LENGTH:
         raise ValueError(f"Static key has {len(key)} chars, expected {STATIC_KEY_LENGTH}")
-    _test_hooks.write_text(STATIC_KEY_PATH, key + "\n")
+    _test_hooks.write_text(DEFAULT_STATIC_KEY_PATH, key + "\n")
 
 
 __all__ = [

@@ -6,8 +6,6 @@ browser module.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 # Known binary message signatures from TankPit protocol.
 # These are the first decoded byte of binary messages after XOR decoding.
 KNOWN_PROTOCOL_SIGNATURES: frozenset[int] = frozenset(
@@ -47,8 +45,11 @@ KNOWN_PROTOCOL_SIGNATURES: frozenset[int] = frozenset(
 # Text message type bytes that should be skipped during XOR analysis.
 TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x2B, 0x2D, 0x3D, 0x25, 0x2A, 0x7E})
 
-# Path to the static XOR key file.
-STATIC_KEY_PATH: Path = Path(__file__).parent.parent.parent.parent / "xor_static_key.txt"
+# The static-key path is NOT redeclared here. It was a private copy of
+# the same __file__-relative expression that protocol/codec.py owns, so
+# a move of either file silently pointed the two at different places.
+# Consumers import DEFAULT_STATIC_KEY_PATH from its owner directly —
+# no alias in between ([[session-state-deglobalisation]]).
 
 # Expected length of the static XOR key.
 STATIC_KEY_LENGTH: int = 1000
@@ -69,7 +70,6 @@ class GameNotJoinedError(BrowserError):
 __all__ = [
     "KNOWN_PROTOCOL_SIGNATURES",
     "STATIC_KEY_LENGTH",
-    "STATIC_KEY_PATH",
     "TEXT_MESSAGE_TYPES",
     "BrowserError",
     "GameNotJoinedError",

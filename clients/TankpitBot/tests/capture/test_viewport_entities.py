@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONTypeError
@@ -27,7 +26,7 @@ from tankpit_bot.capture.xor import (
     reset_static_key_cache,
     xor_decode_body,
 )
-from tankpit_bot.protocol.codec import build_xor_table
+from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tests.conftest import FakeFileSystem
 
@@ -171,7 +170,7 @@ class TestAnalyzeViewportEntities:
         old_exists = core_hooks.path_exists
         old_read = core_hooks.read_text
         fake_fs = FakeFileSystem()
-        fake_fs._files[str(Path(__file__).resolve().parents[2] / "xor_static_key.txt")] = static_key
+        fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
         core_hooks.path_exists = fake_fs.path_exists
         core_hooks.read_text = fake_fs.read_text
         try:
@@ -237,7 +236,7 @@ class TestAnalyzeViewportEntities:
         old_exists = core_hooks.path_exists
         old_read = core_hooks.read_text
         fake_fs = FakeFileSystem()
-        fake_fs._files[str(Path(__file__).resolve().parents[2] / "xor_static_key.txt")] = static_key
+        fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
         core_hooks.path_exists = fake_fs.path_exists
         core_hooks.read_text = fake_fs.read_text
         try:
