@@ -141,7 +141,11 @@ clients/TankpitBot/raw_capture.json
 clients/TankpitBot/messages_dump.txt
 clients/TankpitBot/session_summary.json
 clients/TankpitBot/mine_place.json
-clients/TankpitBot/.pytest_tmp/
+# pytest basetemp: .pytest_tmp is the configured one (pyproject addopts);
+# the glob also covers per-session overrides like --basetemp .pytest_tmp_mine,
+# which exist because pytest wipes basetemp at startup and two concurrent
+# `make check` runs would corrupt each other through the shared default.
+clients/TankpitBot/.pytest_tmp*/
 # TankpitBot credentials (real passwords, never commit)
 clients/TankpitBot/accounts.json
 # Rust
