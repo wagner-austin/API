@@ -478,5 +478,59 @@ final class EngineNames {
      */
     static final String AMBIENT_CLOCK = "x";
 
+    /**
+     * The engine base class, {@code gameFramework.l} -- what
+     * {@link EngineHandle} reaches the singleton through. Named here as well
+     * so the drift guard can resolve the two wrong-world names below against
+     * it with no game running.
+     */
+    static final String ENGINE_CLASS = "com.corrodinggames.rts.gameFramework.l";
+
+    /**
+     * The current map path on the engine ({@code l.dl}), e.g.
+     * {@code maps/skirmish/[p2]Lake (2p).tmx}.
+     *
+     * <p>Every load path writes it before loading: the match starter stores
+     * the exact string it was handed, the menu-background loader stores its
+     * menu map, the battleroom stores the broadcast selection. So whatever
+     * world is live, this field names its map -- which is what lets match
+     * liveness verify the world is the one that was requested rather than
+     * whatever a failed load drifted into (wiki: policy-determinism, the
+     * seating anomaly).
+     */
+    static final String MAP_PATH = "dl";
+
+    /**
+     * The engine's own automated-testing switch ({@code l.aT}, public
+     * static, false unless a debug socket bootstrap sets it).
+     *
+     * <p>Its one gameplay reader is the map-load catch: with the flag set, a
+     * map that fails to load throws -- the engine logs "Crashing on allowed
+     * map error because automated testing is active" -- instead of raising
+     * an alert nothing headless reads and returning, which is the silent
+     * fallback that seated six stale clones in the boot sandbox and voided
+     * the cross-map batch family. Its only other reader appends a debug
+     * marker to the multiplayer handshake, which is why the host path never
+     * sets it. Cleared only by the class's own static initializer, so a
+     * write sticks for the process.
+     */
+    static final String TESTING_FLAG = "aT";
+
+    /**
+     * The match's synced-draw seed ({@code l.bJ}, public int).
+     *
+     * <p>The engine names it itself: the load logs {@code "global Seed: "}
+     * plus exactly this field. Every synced draw ({@code f.a(min,max,salt)})
+     * hashes it with the frame counter and the drawing entity's identity, so
+     * it is the half of the match's randomness the generator reseed does not
+     * reach. The load assigns it FROM a generator draw taken while the
+     * outgoing world is still consuming draws -- measured forking
+     * same-seed invocations at the first AI decision (s94 on duel_lake)
+     * while parallel replicas agreed, batch by batch, on the value the log
+     * line prints (wiki: policy-determinism). Pinned from the requested
+     * seed at match liveness for exactly that reason.
+     */
+    static final String SYNC_SEED = "bJ";
+
     static final String PIN = " -- pinned build is 1.15 (code 176, build #28)";
 }

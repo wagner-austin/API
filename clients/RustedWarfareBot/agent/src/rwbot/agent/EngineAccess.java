@@ -205,6 +205,29 @@ final class EngineAccess {
     }
 
     /**
+     * Writes a static {@code boolean} field through the same pinned-name
+     * machinery.
+     *
+     * <p>Exists for exactly one caller so far: the match setup arming the
+     * engine's own automated-testing switch, so a map that fails to load
+     * crashes at the failure instead of silently dropping the run into
+     * whatever world was live (see MatchSetup).
+     *
+     * @param owner Class declaring the field.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @param value The value to store.
+     * @throws IllegalStateException When the field is absent or not a boolean.
+     */
+    static void writeStaticBooleanField(Class<?> owner, String name, boolean value) {
+        try {
+            pinnedField(owner, name).setBoolean(null, value);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot write static boolean " + name + EngineNames.PIN, e);
+        }
+    }
+
+    /**
      * Reads a {@code long} field through the same pinned-name machinery.
      *
      * @param target Object to read from.

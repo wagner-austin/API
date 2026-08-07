@@ -190,6 +190,21 @@ final class BindingCheck {
             problems.add("not an enum: " + EngineNames.MOVEMENT_CLASS);
         }
 
+        Class<?> engine = checkClass(EngineNames.ENGINE_CLASS, problems);
+        if (engine != null) {
+            // The wrong-world guard. Losing either name fails quietly in the
+            // worst direction: a match whose map a game dir lacks would fall
+            // back to the boot sandbox and produce a plausible scorecard from
+            // a world nobody asked for (wiki: policy-determinism).
+            checkField(engine, EngineNames.MAP_PATH, problems);
+            checkField(engine, EngineNames.TESTING_FLAG, problems);
+            // The synced-draw seed. Losing it quietly would not break a
+            // build: same-seed runs would simply stop reproducing across
+            // invocations, forking at the first AI decision -- the exact
+            // defect it was pinned to close.
+            checkField(engine, EngineNames.SYNC_SEED, problems);
+        }
+
         Class<?> ai = checkClass(EngineNames.AI_CLASS, problems);
         checkClass(EngineNames.ZONE_CLASS, problems);
         if (ai != null) {

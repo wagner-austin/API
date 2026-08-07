@@ -82,9 +82,18 @@ final class FastForward {
             return frame;
         }
         int budget = Math.min(extraPerPass, boundary - frame - 1);
-        for (int i = 0; i < budget; i++) {
-            EngineAccess.invoke(
-                    tick, engine, Float.valueOf(stepScaled), Integer.valueOf(stepMsHeld));
+        // Bracketed explicitly: these invocations run inside the script
+        // drain, where this pass's tick-bracket EXIT may already have
+        // lowered the sim-phase flag, and every draw the extra ticks make
+        // belongs to the simulation (see TickBracket).
+        TickBracket.enterExtra();
+        try {
+            for (int i = 0; i < budget; i++) {
+                EngineAccess.invoke(
+                        tick, engine, Float.valueOf(stepScaled), Integer.valueOf(stepMsHeld));
+            }
+        } finally {
+            TickBracket.exitExtra();
         }
         int advanced =
                 budget <= 0 ? frame : EngineAccess.readIntField(engine, StateStream.FRAME_FIELD);

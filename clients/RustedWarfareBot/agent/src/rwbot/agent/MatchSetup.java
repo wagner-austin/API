@@ -33,6 +33,14 @@ import java.lang.reflect.Method;
  * Easy, 0 Medium, 1 Hard, 2 Very Hard, 3 Impossible, and it is an <b>income
  * multiplier on the AI alone</b> — 0.4x, 0.7x, 1.0x, 1.4x, 1.8x and 3.7x. At
  * Medium an opponent earns exactly what the bot does.
+ *
+ * <p><b>A requested match that cannot happen kills the run</b> — the load
+ * crash is armed before the start, the watcher refuses to latch on any world
+ * but the requested map, and a match that never goes live dies at a deadline
+ * naming what was live instead. All three pieces are {@link WrongWorldGuard}.
+ *
+ * <p>The hosted sparring path is {@link HostSetup} — none of the machinery
+ * here runs against a human peer, the guard included.
  */
 final class MatchSetup {
 
@@ -150,10 +158,7 @@ final class MatchSetup {
         // so it has to arrive after. Wall clock is tolerable here and only
         // here: everything before the match starts happens to a game object
         // that starting the match throws away.
-        try {
-            Thread.sleep(SETTLE_SECONDS * 1000L);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        if (!settle()) {
             Log.error("match setup interrupted while settling");
             return;
         }
@@ -173,6 +178,7 @@ final class MatchSetup {
         // begins the moment its result exists (wiki: policy-determinism).
         Orders.onGameThread(
                 () -> {
+                    WrongWorldGuard.armMapLoadCrash();
                     if (seed != 0) {
                         EngineRandom.seed(seed);
                     }
@@ -193,8 +199,14 @@ final class MatchSetup {
                             EngineHandle.current(),
                             () ->
                                     watchForMatch(
-                                            difficulty, seed, channel, pinDeltaMs, fastForwardFps));
+                                            map,
+                                            difficulty,
+                                            seed,
+                                            channel,
+                                            pinDeltaMs,
+                                            fastForwardFps));
                 });
+        WrongWorldGuard.awaitDeadline(map);
     }
 
     /**
@@ -224,24 +236,48 @@ final class MatchSetup {
      * match".
      */
     private static void watchForMatch(
+            String map,
             int difficulty,
             long seed,
             CommandChannel channel,
             int pinDeltaMs,
             int fastForwardFps) {
+        // The map term is the wrong-world guard's gate: the menu demo can
+        // pass the player-and-units half whenever its script phase says so,
+        // and the start script runs a full frame after the runnable that
+        // queued it, so an ungated watcher latching on the menu world is a
+        // coin flip -- measured both ways (see WrongWorldGuard).
         Object engine = EngineHandle.current();
         boolean live =
                 engine != null
+                        && WrongWorldGuard.isRequestedWorld(map, engine)
                         && EngineAccess.readField(engine, EngineNames.LOCAL_TEAM) != null
                         && !Perception.ownedUnits(engine).isEmpty();
         if (!live) {
-            // Re-posted to the PRE-tick queue: liveness flips on the loader
-            // thread mid-pass, and this check must run before the next
-            // tick's world update, not after it -- the whole reason the
-            // watcher rides this queue (see awaitEngineSwap).
-            Orders.onEngineTick(
-                    engine,
-                    () -> watchForMatch(difficulty, seed, channel, pinDeltaMs, fastForwardFps));
+            // Re-posted through the SCRIPT queue, then back onto the PRE-tick
+            // queue. Both hops matter. The pre-tick queue is drained with
+            // `while (peek != null) poll().run()`, so a check that reposts
+            // straight back is picked up by the drain it is running in and
+            // spins the game thread forever -- measured as a run whose log
+            // simply stops at "match starting", because the tick never
+            // completes, the script drain never runs, and the requested
+            // world can never arrive. The script queue cannot spin -- its
+            // drain snapshots before running, so anything a running action
+            // queues waits a full frame -- and the hop back onto the
+            // pre-tick queue keeps the latch where it must be: before the
+            // new world's first update, not after it.
+            Orders.onGameThread(
+                    () ->
+                            Orders.onEngineTick(
+                                    EngineHandle.current(),
+                                    () ->
+                                            watchForMatch(
+                                                    map,
+                                                    difficulty,
+                                                    seed,
+                                                    channel,
+                                                    pinDeltaMs,
+                                                    fastForwardFps)));
             return;
         }
         // The generator swap happens before the reseed reads the field, so
@@ -255,8 +291,28 @@ final class MatchSetup {
         } else if (seed != 0) {
             SplitRandom.install(seed);
         }
+        // The split routes by phase, and the bracket is what publishes the
+        // phase: without it every draw reads as render-side and the
+        // simulation would consume the unpinned side stream.
+        if (RandomTap.requested() || seed != 0) {
+            TickBracket.start(engine);
+        }
         if (seed != 0) {
             EngineRandom.seed(seed);
+            // **The synced-draw seed is pinned too, because the reseed
+            // cannot reach it.** The load assigns `bJ = ay.q` from a
+            // generator draw taken while the outgoing world is still
+            // consuming draws, so its value depends on how many frames the
+            // menu ran before the load -- measured: parallel replicas of
+            // one seed agreed on it and stayed bit-exact for 400 samples,
+            // while three separate invocations drew three values and forked
+            // at the first AI decision, s94 on duel_lake, the exact place
+            // the synced hash first matters (wiki: policy-determinism).
+            // Long.hashCode's fold, computed inline so the pin is one write
+            // with no dependency: same seed, same synced draws, always.
+            int syncSeed = (int) (seed ^ (seed >>> 32));
+            EngineAccess.writeIntField(engine, EngineNames.SYNC_SEED, syncSeed);
+            Log.info("synced-draw seed pinned to " + syncSeed + " from the match seed");
         }
         applyDifficulty(difficulty);
         pinLogicInterval(fastForwardFps);
@@ -315,115 +371,8 @@ final class MatchSetup {
         // takes, and those are exactly the frames this design exists to
         // remove.
         channel.holdNow();
+        WrongWorldGuard.markLive();
         Log.info("match live; frame zeroed, channel open, world held for the planner");
-    }
-
-    /**
-     * Schedules a hosted network game a human can join, on a daemon thread.
-     *
-     * <p>The sparring path (wiki: multiplayer-portability-invariants). The
-     * whole chain lives in the engine's unobfuscated script surface — the
-     * same one that provided {@code -sandbox}: {@code hostStart(false)}
-     * boots a private LAN server on the configured port and opens the
-     * battleroom; {@code mp.setMapFromPopup(path)} broadcasts the map; and
-     * the battleroom's own Start button reduces to {@code
-     * mp.multiplayerStart()}, whose server branch has no readiness gate.
-     * The lobby is polled through the same player roster the state stream
-     * already reads, so "a human joined" is "a second non-absent slot".
-     *
-     * <p><b>None of the reproducibility machinery runs here, by design.</b>
-     * No hold — a human cannot be world-held; no reseed, no frame zeroing,
-     * no fixed logic step — the peers simulate in lockstep and rewriting
-     * either side's clock is a desync. The planner must be free-running
-     * ({@code lockstepFrames=0}); this is invariant four of the portability
-     * page, selected rather than assumed.
-     *
-     * @param map Map path as the engine names it, e.g.
-     *     {@code maps/skirmish/[p2]Lake (2p).tmx}.
-     * @param channel The command channel to open once the match is live.
-     */
-    static void scheduleHost(String map, CommandChannel channel) {
-        Thread thread = new Thread(() -> runHost(map, channel), "rw-agent-host");
-        thread.setDaemon(true);
-        thread.start();
-        Log.info("hosting requested on " + map + "; a human may join");
-    }
-
-    /** Boots the lobby, waits for a human, starts the game. Daemon thread. */
-    private static void runHost(String map, CommandChannel channel) {
-        if (!awaitGameThread()) {
-            Log.error(
-                    "hosting abandoned: the game thread never became ready within "
-                            + READY_TIMEOUT_SECONDS
-                            + "s");
-            return;
-        }
-        try {
-            Thread.sleep(SETTLE_SECONDS * 1000L);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            Log.error("hosting interrupted while settling");
-            return;
-        }
-        // hostStart(false) is "Host Private" — the battleroom's own popup
-        // wires exactly this call. The map is broadcast separately because
-        // hostStart resets the selection to the engine's eight-player
-        // default whenever none is set.
-        queueScript("hostStart(false);");
-        queueScript("mp.setMapFromPopup('" + map + "');");
-        Log.info("lobby open; waiting for a player to join before starting");
-        int waited = 0;
-        while (Scoreboard.rosterCount() < 2) {
-            try {
-                Thread.sleep(1000L);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                Log.error("hosting interrupted while waiting for a player");
-                return;
-            }
-            waited++;
-            if (waited % 15 == 0) {
-                Log.info("still waiting for a player to join (" + waited + "s)");
-            }
-        }
-        Log.info("player joined; starting the game");
-        queueScript("mp.multiplayerStart();");
-        Orders.onGameThread(() -> watchForHostedMatch(channel));
-    }
-
-    /**
-     * Runs each tick until the hosted match is live, then opens the channel.
-     *
-     * <p>The same liveness predicate the skirmish watcher trusts — the local
-     * player exists and owns its starting units — and nothing else: the
-     * world is not held, reseeded, re-clocked or re-paced, because every one
-     * of those is a desync against the human's client.
-     */
-    private static void watchForHostedMatch(CommandChannel channel) {
-        Object engine = EngineHandle.current();
-        boolean live =
-                engine != null
-                        && EngineAccess.readField(engine, EngineNames.LOCAL_TEAM) != null
-                        && !Perception.ownedUnits(engine).isEmpty();
-        if (!live) {
-            Orders.onGameThread(() -> watchForHostedMatch(channel));
-            return;
-        }
-        channel.start();
-        Log.info("hosted match live; channel open, world running free for the human");
-    }
-
-    /** Queues one script string on the engine's own script engine. */
-    private static void queueScript(String script) {
-        Orders.onGameThread(
-                () -> {
-                    Class<?> scripts = EngineAccess.pinnedClass(EngineNames.SCRIPTS_CLASS);
-                    Object instance = EngineAccess.invokeStatic(scripts, "getInstance");
-                    Method queue =
-                            EngineAccess.pinnedMethod(
-                                    scripts, EngineNames.SCRIPT_QUEUE_METHOD, String.class);
-                    EngineAccess.invoke(queue, instance, script);
-                });
     }
 
     /**
@@ -515,11 +464,29 @@ final class MatchSetup {
     }
 
     /**
+     * Sleeps out the settle window. Shared with {@link HostSetup}.
+     *
+     * @return False when interrupted.
+     */
+    static boolean settle() {
+        try {
+            Thread.sleep(SETTLE_SECONDS * 1000L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Polls until work can be queued on the game thread.
+     *
+     * <p>Shared with {@link HostSetup}, which waits on the same readiness
+     * before opening its lobby.
      *
      * @return True when the game thread answered, false on timeout.
      */
-    private static boolean awaitGameThread() {
+    static boolean awaitGameThread() {
         long deadline = System.nanoTime() + READY_TIMEOUT_SECONDS * 1_000_000_000L;
         while (System.nanoTime() < deadline) {
             if (Orders.gameThreadReady()) {

@@ -1,37 +1,36 @@
 package rwbot.agent;
 
-import java.util.Optional;
 import java.util.Random;
 
 /**
  * Splits the engine's one random stream in two: the simulation's, and
  * everyone else's.
  *
- * <p>The draw tap ran the last divergence to ground in stages. First it
- * proved every draw -- the opponent AI, unit simulation, particle spawns,
- * cosmetic sway -- happens on ONE thread, so a thread split routes nothing.
- * Then it named the wall-paced drawers: the ambient spawner
- * ({@code d.c.a}, silenced separately) and the unit sway redraws
- * ({@code units/e/b.a:260,265}), whose per-window counts wobbled 9-vs-6
- * between identical pinned runs. Their common shape: RENDER-path code fed
- * the measured wall-clock delta, drawing from the same generator the AI's
+ * <p>The draw tap ran the wall-paced divergence to ground in stages. First
+ * it proved every draw -- the opponent AI, unit simulation, particle
+ * spawns, cosmetic sway -- happens on ONE thread, so a thread split routes
+ * nothing. Then it named the wall-paced drawers: RENDER-path code fed the
+ * measured wall-clock delta, drawing from the same generator the AI's
  * decisions use, at moments only the scheduler chooses
  * (wiki: policy-determinism).
  *
- * <p>The invariant that separates them is not the thread but the CALL PATH:
- * everything the simulation does runs under the engine's own tick --
- * {@code game.i.a(float)}, the method that increments the frame counter
- * ([[engine-tick-and-clock]]) -- and everything cosmetic reaches the
- * generator from the render loop ({@code java.u}) without passing through
- * it. So every draw walks its stack: through the tick means the seeded
- * stream this object inherits, otherwise the side stream. The simulation's
- * sequence becomes a pure function of the seed whatever the wall clock
- * does, and the cosmetics lose nothing, since their draws were never
+ * <p>The invariant that separates them is the PHASE: everything the
+ * simulation does runs under the engine's own tick, and everything
+ * cosmetic runs outside it. The first build classified each draw by
+ * walking its stack for the tick entries -- and that walk was itself the
+ * next divergence: a per-draw classification that consults the JIT-shaped
+ * frame stream is process-varying in a way no seed can reach, and
+ * same-seed runs from separate invocations forked at the first
+ * consequential roll while parallel replicas agreed for whole panels
+ * (wiki: policy-determinism, the cross-invocation arc). Routing now asks
+ * {@link TickBracket#simPhase()} -- a flag raised and lowered by queue
+ * rides whose ordering the engine itself guarantees -- so the simulation's
+ * sequence is a pure function of the seed whatever the JIT, the scheduler
+ * or the wall clock do. The cosmetics lose nothing: their draws were never
  * reproducible to begin with.
  *
- * <p>The walk costs microseconds and the engine draws about once per tick,
- * so the price is noise. {@code setSeed} re-pins both streams, so the
- * match-start reseed keeps its meaning without knowing the split exists.
+ * <p>{@code setSeed} re-pins both streams, so the match-start reseed keeps
+ * its meaning without knowing the split exists.
  */
 class SplitRandom extends Random {
 
@@ -39,30 +38,6 @@ class SplitRandom extends Random {
 
     /** Offsets the side stream's seed so the two streams never correlate. */
     private static final long SIDE_SALT = 0x51DE57E4A5EEDL;
-
-    /** The tick owner: the class whose update increments the frame counter. */
-    private static final String TICK_CLASS = "com.corrodinggames.rts.game.i";
-
-    /**
-     * The tick entries on {@link #TICK_CLASS}, by name and descriptor: the
-     * engine's own pass calls {@code a(float, int)}, which locks and runs
-     * {@code b(float, int)}, which runs {@code a(float)} -- the
-     * {@code updateAllGame1} body that increments the frame counter
-     * ([[engine-tick-and-clock]]). Descriptors matter: the same class also
-     * carries {@code a(m.l, float)}, the world DRAW pass, and a name-only
-     * match would hand every cosmetic draw the simulation's stream back.
-     */
-    private static final String[] TICK_NAMES = {"a", "b", "a"};
-
-    /** Descriptors matching {@link #TICK_NAMES} position by position. */
-    private static final String[] TICK_DESCRIPTORS = {"(FI)V", "(FI)V", "(F)V"};
-
-    /** The render loop; reaching it before the tick means a cosmetic draw. */
-    private static final String RENDER_CLASS = "com.corrodinggames.rts.java.u";
-
-    /** One walker for every draw; descriptors need the class-reference option. */
-    private static final StackWalker WALKER =
-            StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
     /** The stream every non-simulation draw is served from. */
     private final Side side;
@@ -98,7 +73,7 @@ class SplitRandom extends Random {
         if (side == null) {
             return super.next(bits);
         }
-        if (underTick()) {
+        if (TickBracket.simPhase()) {
             onSimDraw();
             return super.next(bits);
         }
@@ -123,43 +98,6 @@ class SplitRandom extends Random {
         if (side != null) {
             side.setSeed(seed ^ SIDE_SALT);
         }
-    }
-
-    /**
-     * Whether the current draw is being made by the simulation.
-     *
-     * <p>Walks the caller's stack top-down: hitting the tick first means the
-     * simulation (however it was invoked -- the engine's own pass or the
-     * fast-forward's extra ticks); hitting the render loop first means a
-     * cosmetic draw made outside any tick. A stack containing neither --
-     * loading screens, menu threads -- is not the simulation.
-     */
-    private boolean underTick() {
-        Optional<Boolean> verdict =
-                WALKER.walk(
-                        frames ->
-                                frames.map(SplitRandom::classify)
-                                        .filter(java.util.Objects::nonNull)
-                                        .findFirst());
-        return verdict.orElse(Boolean.FALSE).booleanValue();
-    }
-
-    /** One frame's vote: tick, render loop, or no opinion. */
-    private static Boolean classify(StackWalker.StackFrame frame) {
-        String owner = frame.getClassName();
-        if (TICK_CLASS.equals(owner)) {
-            for (int i = 0; i < TICK_NAMES.length; i++) {
-                if (TICK_NAMES[i].equals(frame.getMethodName())
-                        && TICK_DESCRIPTORS[i].equals(frame.getDescriptor())) {
-                    return Boolean.TRUE;
-                }
-            }
-            return null;
-        }
-        if (RENDER_CLASS.equals(owner)) {
-            return Boolean.FALSE;
-        }
-        return null;
     }
 
     /** The other stream, with the protected draw exposed to the split. */

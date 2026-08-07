@@ -100,7 +100,7 @@ public final class Premain {
                 // Sparring: the bot hosts, a human joins, nothing is held or
                 // reseeded — the reproducibility machinery is a desync against
                 // a real peer (wiki: multiplayer-portability-invariants).
-                MatchSetup.scheduleHost(options.hostMap(), channel);
+                HostSetup.schedule(options.hostMap(), channel);
             } else if (options.matchRequested()) {
                 MatchSetup.schedule(
                         options.matchMap(),
