@@ -2887,3 +2887,18 @@ User rulings: "so we can run two bots at once? also can you finish the other ai 
 - New seams `service_hooks.spawn_bot_process` + `run_web_app`, both with real-implementation tests (the spawn test kills the child inside interpreter startup, long before the entry point could open a browser).
 
 Gate: **5,938 tests at 100.00%**, guard 0 violations, `make shadow` all laws PASS.
+
+---
+## [2026-08-06] lift | Forty private pipelines to zero — every analysis script now rides the typed capture-scan owner
+
+Continuation of the archive-owner arc (cb49da1f built the package, the direction/raw extensions finished it): all 26 remaining capture-walking scripts under `analysis_scripts/` migrated off their private load/XOR/frame-walk pipelines onto `scan_session` / `decode_session_frames`. Discipline per script: baseline run on real archive data BEFORE the edit, migrate, rerun, byte-diff — **24 of 26 reproduce exactly**; `analyze_wire_bytes` differs only in a reworded skip-warning line, and nothing else differs anywhere. `grep` proof: zero references to `build_global_xor_table` / `_iter_frames` / `_split_frames` / `decode_base64_safe` remain in `analysis_scripts/`.
+
+Found and fixed along the way:
+
+- **The `raw` lift** (committed 4376fd77 mid-arc): the viewport-probe migration lost every autoscroll ack — production discriminates plaintext acks and text routes on the RAW frame BEFORE the cipher, and the package only carried the post-cipher body. `DecodedFrameDict` gained `raw`; every migrated ack/text/room-select consumer reads it. The displacement verdicts re-verified exact after the fix (1,227 enemy / 2 friendly, 20 friendly-exact, 88 stale-clears).
+- **The prefix-strip class**: 5 scripts (`find_action_done`, `find_supervisor`, `analyze_wire_bytes`, `verify_js_claims`, `verify_everything`) never split frames at all — `data[2:]` treated a whole payload as one frame. The per-frame walk is a semantic CORRECTION, yet every one reproduced its old output exactly: measured law, 0x2E/0x54/0x52-leading frames always ride alone in their payloads on this corpus.
+- **Sent payloads carry exactly one frame each**: the re-framed `SENT` hex lines (`encode_frame(frame["raw"])`) reproduce the original whole-payload dumps byte-for-byte in both deposit scripts.
+- **Two broken fossils repaired**: `crack_tank_update` could not even import (`protocol.decoders.misc` is long gone — decoders moved to `session_events`); `analyze_wire_bytes` runs but finds nothing on a combat-full archive (its container-type keys predate the current decoders) — preserved-but-dormant, noted in its docstring.
+- **Artifact-writing miners diffed on their artifacts too**: `mine_container_atlas` reproduced `container_atlas.json` and `container_observations.jsonl` byte-for-byte; `mine_bot_policy` its output JSON.
+
+The 12 scripts not touched read pre-extracted artifacts (correlate_unknowns, crack_all_blobs, solve_*, find_kill_byte, mine_inventory_persistence, mine_radar_floor, verify_tank511, analyze_container_atlas) — no capture pipeline to migrate. Net across the whole arc: every byte of capture decoding in this repo now has exactly one owner. Gate green (guard 0, 100.00% coverage).

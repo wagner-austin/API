@@ -25,33 +25,26 @@ Usage: ``python diff_server_laws.py [--live-only|--sim-only]``.
 
 from __future__ import annotations
 
-import json
 import math
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
 from tankpit_bot.sim.commands import decode_client_command
 from tankpit_bot.sniffer.decoders import _is_text_route
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner, direction-tagged frames) - the private
+# load/XOR/frame-walk pipeline is deleted; results reproduce exactly.
+# Pre-cipher discriminators (ack, text route, the '!' command prefix)
+# read frame["raw"] / frame["msg_type"], as production does.
 
 LIVE_DIRS = ("runs/bot", "runs/sniff", "runs/probe")
 SIM_DIRS = ("runs/sim",)
 WINDOW_MS = 3000
 VIEWPORT_SPAN = 16
-
-
-def _iter_frames(data: bytes):
-    offset = 0
-    while offset + 2 < len(data):
-        length = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if length == 0 or offset + length > len(data):
-            return
-        yield data[offset : offset + length]
-        offset += length
 
 
 def _shape_token(decoded, self_id):
@@ -98,15 +91,11 @@ def _shape_token(decoded, self_id):
 def mine_capture(path: Path, agg: dict, law: dict) -> None:
     """Diff one capture's command/response pairs into the aggregates."""
     try:
-        session = json.loads(path.read_text(encoding="utf-8"))
+        result = scan_session(path)
     except (OSError, ValueError):
         return
-    magic = session.get("magic")
-    messages = session.get("messages")
-    if not magic or not messages:
+    if "reason" in result or not result["frames"]:
         return
-    reset_xor_state()
-    build_global_xor_table(magic)
     self_id = None
     self_pos = None
     fuel_reads: list[tuple[int, int]] = []
@@ -115,31 +104,25 @@ def mine_capture(path: Path, agg: dict, law: dict) -> None:
     sent: list[tuple[int, str, dict]] = []
     events: list[tuple[int, str, object]] = []  # (t, "cmd"|"msg", payload)
 
-    for message in sorted(messages, key=lambda m: m["timestamp_ms"]):
-        data = decode_base64_safe(message.get("payload", ""))
-        if not data:
-            continue
-        t = message["timestamp_ms"]
-        is_sent = message.get("direction") == "sent"
-        for body in _iter_frames(data):
-            if not body:
-                continue
-            if is_sent:
-                if body[0] != 0x21:  # '!' command prefix; text sends skipped
-                    continue
-                try:
-                    cmd = decode_client_command(xor_decode(body))
-                except Exception:
-                    continue
-                events.append((t, "cmd", cmd))
-                continue
-            if try_decode_plaintext_ack(body) is not None or _is_text_route(body[0], body):
+    for frame in sorted(result["frames"], key=lambda f: f["timestamp_ms"]):
+        t = frame["timestamp_ms"]
+        if frame["direction"] == "sent":
+            if frame["msg_type"] != 0x21:  # '!' command prefix; text sends skipped
                 continue
             try:
-                decoded = decode_message(body[0], xor_decode(body))
+                cmd = decode_client_command(frame["body"])
             except Exception:
                 continue
-            events.append((t, "msg", decoded))
+            events.append((t, "cmd", cmd))
+            continue
+        raw = frame["raw"]
+        if try_decode_plaintext_ack(raw) is not None or _is_text_route(frame["msg_type"], raw):
+            continue
+        try:
+            decoded = decode_message(frame["msg_type"], frame["body"])
+        except Exception:
+            continue
+        events.append((t, "msg", decoded))
 
     # walk in order, tracking state and pairing windows. A window ends
     # at the NEXT sent command (or the wall cap): sim sessions compress

@@ -34,26 +34,19 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
 from tankpit_bot.sniffer.decoders import _is_text_route
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.state.viewport_geometry import viewport_patch_world_coords
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner, direction-tagged frames) - the private
+# load/XOR/frame-walk pipeline is deleted; results reproduce exactly.
+# Sent-frame room SELECTs and text ROOM_LIST rows read frame["raw"]
+# (never ciphered), as the production receive path does.
 
 RUN_DIRS = ("runs/bot", "runs/sniff", "runs/probe")
 OUT_DIR = Path("runs/analysis")
-
-
-def _iter_frames(data: bytes):
-    """Yield each length-prefixed message body in a wire payload."""
-    offset = 0
-    while offset + 2 < len(data):
-        length = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if length == 0 or offset + length > len(data):
-            return
-        yield data[offset : offset + length]
-        offset += length
 
 
 def _pickup_records(pickups):
@@ -68,17 +61,13 @@ def _pickup_records(pickups):
 def mine_capture(path: Path, events: list, errors: dict) -> dict:
     """Extract every container observation from one capture."""
     try:
-        session = json.loads(path.read_text(encoding="utf-8"))
+        result = scan_session(path)
     except (OSError, ValueError):
         errors["unreadable"] += 1
         return {}
-    magic = session.get("magic")
-    messages = session.get("messages")
-    if not magic or not messages:
+    if "reason" in result or not result["frames"]:
         errors["no_magic_or_messages"] += 1
         return {}
-    reset_xor_state()
-    build_global_xor_table(magic)
     stamp = path.name.split(".")[0]
     room = "?"
     room_images: dict[str, str] = {}
@@ -96,50 +85,44 @@ def mine_capture(path: Path, events: list, errors: dict) -> dict:
         events.append((t, seq, room, room_images.get(room, "?"), x, y, v, src, stamp))
         counts[src] += 1
 
-    for message in sorted(messages, key=lambda m: m["timestamp_ms"]):
-        data = decode_base64_safe(message.get("payload", ""))
-        if not data:
+    for frame in sorted(result["frames"], key=lambda f: f["timestamp_ms"]):
+        t = frame["timestamp_ms"]
+        raw = frame["raw"]
+        if frame["direction"] == "sent":
+            if frame["msg_type"] == 0x2A:  # '*' room SELECT
+                try:
+                    room = raw[1:].decode("ascii")
+                except UnicodeDecodeError:
+                    pass
             continue
-        t = message["timestamp_ms"]
-        sent = message.get("direction") == "sent"
-        for body in _iter_frames(data):
-            if not body:
-                continue
-            if sent:
-                if body[0] == 0x2A:  # '*' room SELECT
-                    try:
-                        room = body[1:].decode("ascii")
-                    except UnicodeDecodeError:
-                        pass
-                continue
-            if try_decode_plaintext_ack(body) is not None:
-                continue
-            if _is_text_route(body[0], body):
-                if body[0] == 0x2B:  # '+' ROOM_LIST rows carry room->field
-                    parts = body.decode("utf-8", errors="replace")[1:].split("|")
-                    if len(parts) >= 7 and parts[6].startswith("field"):
-                        room_images[parts[0]] = parts[6]
-                continue
-            try:
-                decoded = decode_message(body[0], xor_decode(body))
-            except Exception:
-                errors["decode"] += 1
-                continue
-            msg_type = decoded.get("msg_type")
-            if msg_type == 0x4F:
-                for c in decoded["containers"]:
-                    emit(t, c["x"], c["y"], c["volume"], "r")
-            elif msg_type == 0x43:
-                for x, y, v in decoded["updates"]:
-                    emit(t, x, y, v, "c")
-            elif msg_type == 0x5A:
-                left, top = decoded["viewport_left"], decoded["viewport_top"]
-                for e in decoded["entities"]:
-                    x, y = viewport_patch_world_coords(left, top, e["col"], e["row"])
-                    emit(t, x, y, e["cache_value"], "v")
-            elif msg_type == "container_pickup":
-                for x, y, remaining in _pickup_records(decoded["pickups"]):
-                    emit(t, x, y, remaining, "p")
+        if try_decode_plaintext_ack(raw) is not None:
+            continue
+        if _is_text_route(frame["msg_type"], raw):
+            if frame["msg_type"] == 0x2B:  # '+' ROOM_LIST rows carry room->field
+                parts = raw.decode("utf-8", errors="replace")[1:].split("|")
+                if len(parts) >= 7 and parts[6].startswith("field"):
+                    room_images[parts[0]] = parts[6]
+            continue
+        try:
+            decoded = decode_message(frame["msg_type"], frame["body"])
+        except Exception:
+            errors["decode"] += 1
+            continue
+        msg_type = decoded.get("msg_type")
+        if msg_type == 0x4F:
+            for c in decoded["containers"]:
+                emit(t, c["x"], c["y"], c["volume"], "r")
+        elif msg_type == 0x43:
+            for x, y, v in decoded["updates"]:
+                emit(t, x, y, v, "c")
+        elif msg_type == 0x5A:
+            left, top = decoded["viewport_left"], decoded["viewport_top"]
+            for e in decoded["entities"]:
+                x, y = viewport_patch_world_coords(left, top, e["col"], e["row"])
+                emit(t, x, y, e["cache_value"], "v")
+        elif msg_type == "container_pickup":
+            for x, y, remaining in _pickup_records(decoded["pickups"]):
+                emit(t, x, y, remaining, "p")
     return {"stamp": stamp, "room": room, "field": room_images.get(room, "?"), **counts}
 
 

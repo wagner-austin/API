@@ -17,34 +17,27 @@ from pathlib import Path
 
 from statistics import median
 
-from platform_core.json_utils import load_json_str
+from tankpit_bot.analysis.scan import scan_session as scan_capture_session
 from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message
 from tankpit_bot.protocol.commands import CMD_RADAR, COMMAND_PREFIX
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
-from tankpit_bot.types import decode_capture_session
-from tankpit_bot.validate.wire_timeline import _split_frame_bodies
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner, direction-tagged frames) - the private
+# load/XOR/frame-walk pipeline is deleted; results reproduce exactly.
 
 BOT_NAME = re.compile(r"^(red|purple|blue|orange)-\d+$")
 TRACKED = {0x21, 0x28, 0x2E, 0x3D, 0x41, 0x47, 0x4C, 0x4F, 0x53, 0x58, 0x5A, 0x67}
 
 
-def narrow(obj: object) -> dict:
-    if not isinstance(obj, dict):
-        raise ValueError("not a dict")
-    return obj
-
-
 def scan_session(path: Path, agg: dict) -> None:
-    session = decode_capture_session(narrow(load_json_str(path.read_text(encoding="utf-8"))))
-    magic = session["magic"]
-    if magic is None:
+    result = scan_capture_session(path)
+    if "reason" in result:
         agg["skipped_no_magic"] += 1
         return
-    reset_xor_state()
-    build_global_xor_table(magic)
+    session_id = result["session_id"]
 
     names: dict[int, str] = {}
     self_id: int | None = None
@@ -90,7 +83,7 @@ def scan_session(path: Path, agg: dict) -> None:
             agg["respawn_displacement"][min(dist // 8, 12)] += 1
             agg["respawn_pairs"].append(
                 {
-                    "session": session["session_id"],
+                    "session": session_id,
                     "bot": names.get(tid, ""),
                     "corpse": [watch[1], watch[2]],
                     "next_seen": [x, y],
@@ -141,7 +134,7 @@ def scan_session(path: Path, agg: dict) -> None:
                         agg["tier_up_unexplained_in_viewport"] += 1
                         agg["in_viewport_cases"].append(
                             {
-                                "session": session["session_id"],
+                                "session": session_id,
                                 "bot": names.get(tid, ""),
                                 "ts": ts,
                                 "tier": f"{prev[1]}->{tier}",
@@ -175,126 +168,124 @@ def scan_session(path: Path, agg: dict) -> None:
                 agg["bot_pos_stationary_syncs"] += 1
         last_pos[tid] = (ts, x, y)
 
-    ordered = sorted(session["messages"], key=lambda m: m["timestamp_ms"])
-    t0 = ordered[0]["timestamp_ms"] if ordered else 0
-    t1 = ordered[-1]["timestamp_ms"] if ordered else 0
-    for msg in ordered:
-        ts = msg["timestamp_ms"]
-        if msg["direction"] == "sent":
-            for body in _split_frame_bodies(msg["payload"]):
-                if body and body[0] == COMMAND_PREFIX:
-                    decoded = xor_decode(body)
-                    if len(decoded) >= 2:
-                        sent_cmds.append((ts, decoded[1]))
+    frames = sorted(result["frames"], key=lambda f: f["timestamp_ms"])
+    t0 = frames[0]["timestamp_ms"] if frames else 0
+    t1 = frames[-1]["timestamp_ms"] if frames else 0
+    for frame in frames:
+        ts = frame["timestamp_ms"]
+        if frame["direction"] == "sent":
+            if frame["msg_type"] == COMMAND_PREFIX:
+                decoded = frame["body"]
+                if len(decoded) >= 2:
+                    sent_cmds.append((ts, decoded[1]))
             continue
-        for body in _split_frame_bodies(msg["payload"]):
-            mt = body[0]
-            if mt not in TRACKED:
-                continue
-            data = xor_decode(body)
-            if len(data) < MSG_MIN_LENGTHS.get(mt, 3):
-                continue
-            try:
-                m = decode_message(mt, data)
-            except (DecodeError, ContainerDecodeError):
-                agg["decode_errors"] += 1
-                continue
-            k = m["msg_type"]
-            if k == 0x21:
-                names[m["tank_id"]] = m["name"]
-                if self_id is None:
-                    self_id = m["tank_id"]
-            elif k == 0x28:
-                note_rank(m["tank_id"], m["rank"])
-                note_tier(m["tank_id"], ts, m["damage_state"])
-                note_pos(m["tank_id"], ts, m["x"], m["y"], via_walk=False)
-            elif k == 0x2E:
-                note_rank(m["tank_id"], m["rank"])
-                note_tier(m["tank_id"], ts, m["damage_state"])
-                if self_id is not None and m["tank_id"] == self_id:
-                    self_sync_ts.append(ts)
-                    if m["fuel"] is not None:
-                        self_fuel.append((ts, m["fuel"]))
-            elif k == 0x44 or k == 0x64:
-                self_fuel.append((ts, m["fuel_total"]))
-                contaminations.append(ts)
-            elif k == "container_pickup" or k == 0x45:
-                contaminations.append(ts)
-            elif k == 0x3D:
-                note_rank(m["tank_id"], m["rank"])
-                note_tier(m["tank_id"], ts, m["damage_state"])
-                note_pos(m["tank_id"], ts, m["x"], m["y"], via_walk=False)
-            elif k == 0x47:
-                tid = m["tank_id"]
-                note_rank(tid, m["rank"])
-                note_tier(tid, ts, m["damage_state"])
-                last_move_ts[tid] = ts
-                if is_bot(tid):
-                    agg["bot_moves"] += 1
-                    agg["bot_path_tiles"][min(m["path_tiles"], 30)] += 1
-                end = m["waypoints"][-1] if m["waypoints"] else (m["start_x"], m["start_y"])
-                note_pos(tid, ts, end[0], end[1], via_walk=True)
-            elif k == 0x53:
-                contaminations.append(ts)
-                sid = m["shooter_id"]
-                # register the hit on whoever stands at the impact tile
-                for tid, (_pts, px, py) in list(last_pos.items()):
-                    if px == m["target_x"] and py == m["target_y"] and tid != sid:
-                        last_hit_ts[tid] = ts
-                        last_attacker[tid] = sid
-                        hits_since_jump[tid] = hits_since_jump.get(tid, 0) + 1
-                if is_bot(sid):
-                    session_bot_shots += 1
-                    agg["bot_shot_weapons"][m["weapon"]] += 1
-                    rng = max(
-                        abs(m["target_x"] - m["source_x"]), abs(m["target_y"] - m["source_y"])
-                    )
-                    agg["bot_shot_range"][min(rng, 20)] += 1
-                    atk = last_attacker.get(sid)
-                    if atk is not None and atk in last_pos:
-                        ax, ay = last_pos[atk][1], last_pos[atk][2]
-                        at_attacker = m["target_x"] == ax and m["target_y"] == ay
-                        agg["bot_shot_at_attacker"] += 1 if at_attacker else 0
-                        agg["bot_shot_with_known_attacker"] += 1
-                    since = ts - last_hit_ts[sid] if sid in last_hit_ts else None
-                    if since is None:
-                        agg["bot_shot_unprovoked_never_hit"] += 1
+        mt = frame["msg_type"]
+        if mt not in TRACKED:
+            continue
+        data = frame["body"]
+        if len(data) < MSG_MIN_LENGTHS.get(mt, 3):
+            continue
+        try:
+            m = decode_message(mt, data)
+        except (DecodeError, ContainerDecodeError):
+            agg["decode_errors"] += 1
+            continue
+        k = m["msg_type"]
+        if k == 0x21:
+            names[m["tank_id"]] = m["name"]
+            if self_id is None:
+                self_id = m["tank_id"]
+        elif k == 0x28:
+            note_rank(m["tank_id"], m["rank"])
+            note_tier(m["tank_id"], ts, m["damage_state"])
+            note_pos(m["tank_id"], ts, m["x"], m["y"], via_walk=False)
+        elif k == 0x2E:
+            note_rank(m["tank_id"], m["rank"])
+            note_tier(m["tank_id"], ts, m["damage_state"])
+            if self_id is not None and m["tank_id"] == self_id:
+                self_sync_ts.append(ts)
+                if m["fuel"] is not None:
+                    self_fuel.append((ts, m["fuel"]))
+        elif k == 0x44 or k == 0x64:
+            self_fuel.append((ts, m["fuel_total"]))
+            contaminations.append(ts)
+        elif k == "container_pickup" or k == 0x45:
+            contaminations.append(ts)
+        elif k == 0x3D:
+            note_rank(m["tank_id"], m["rank"])
+            note_tier(m["tank_id"], ts, m["damage_state"])
+            note_pos(m["tank_id"], ts, m["x"], m["y"], via_walk=False)
+        elif k == 0x47:
+            tid = m["tank_id"]
+            note_rank(tid, m["rank"])
+            note_tier(tid, ts, m["damage_state"])
+            last_move_ts[tid] = ts
+            if is_bot(tid):
+                agg["bot_moves"] += 1
+                agg["bot_path_tiles"][min(m["path_tiles"], 30)] += 1
+            end = m["waypoints"][-1] if m["waypoints"] else (m["start_x"], m["start_y"])
+            note_pos(tid, ts, end[0], end[1], via_walk=True)
+        elif k == 0x53:
+            contaminations.append(ts)
+            sid = m["shooter_id"]
+            # register the hit on whoever stands at the impact tile
+            for tid, (_pts, px, py) in list(last_pos.items()):
+                if px == m["target_x"] and py == m["target_y"] and tid != sid:
+                    last_hit_ts[tid] = ts
+                    last_attacker[tid] = sid
+                    hits_since_jump[tid] = hits_since_jump.get(tid, 0) + 1
+            if is_bot(sid):
+                session_bot_shots += 1
+                agg["bot_shot_weapons"][m["weapon"]] += 1
+                rng = max(
+                    abs(m["target_x"] - m["source_x"]), abs(m["target_y"] - m["source_y"])
+                )
+                agg["bot_shot_range"][min(rng, 20)] += 1
+                atk = last_attacker.get(sid)
+                if atk is not None and atk in last_pos:
+                    ax, ay = last_pos[atk][1], last_pos[atk][2]
+                    at_attacker = m["target_x"] == ax and m["target_y"] == ay
+                    agg["bot_shot_at_attacker"] += 1 if at_attacker else 0
+                    agg["bot_shot_with_known_attacker"] += 1
+                since = ts - last_hit_ts[sid] if sid in last_hit_ts else None
+                if since is None:
+                    agg["bot_shot_unprovoked_never_hit"] += 1
+                else:
+                    agg["bot_reaction_ms"][min(since // 500, 20)] += 1
+                    if since <= 3000:
+                        agg["bot_shot_within_3s_of_hit"] += 1
+                    elif since <= 10000:
+                        agg["bot_shot_3_to_10s"] += 1
                     else:
-                        agg["bot_reaction_ms"][min(since // 500, 20)] += 1
-                        if since <= 3000:
-                            agg["bot_shot_within_3s_of_hit"] += 1
-                        elif since <= 10000:
-                            agg["bot_shot_3_to_10s"] += 1
-                        else:
-                            agg["bot_shot_over_10s"] += 1
-            elif k == 0x41:
-                last_killed_ts[m["victim_id"]] = ts
-                if is_bot(m["victim_id"]):
-                    agg["bot_deaths"] += 1
-                    corpse = last_pos.get(m["victim_id"])
-                    if corpse is not None and ts - corpse[0] <= 10000:
-                        death_watch[m["victim_id"]] = (ts, corpse[1], corpse[2])
-                if not m["is_mine_kill"] and is_bot(m["killer_id"]):
-                    agg["bot_kills"] += 1
-            elif k == 0x4B:
-                if is_bot(m["tank_id"]):
-                    agg["bot_mine_placements"] += 1
-            elif k == 0x5A:
-                viewport[0] = m["viewport_left"]
-                viewport[1] = m["viewport_top"]
-                for ent in m["entities"]:
-                    ex = m["viewport_left"] + ent["col"] - 1
-                    ey = m["viewport_top"] + ent["row"] - 1
-                    if 0 <= ex < 256 and 0 <= ey < 256:
-                        note_tile(ts, ex, ey, ent["cache_value"])
-            elif k == 0x4C:
-                for entry in m["tanks"]:
-                    note_any_pos(entry["tank_id"], ts, entry["x"], entry["y"])
-            elif k == 0x4F:
-                for cont in m["containers"]:
-                    note_tile(ts, cont["x"], cont["y"], cont["volume"])
-            elif k == 0x67:
-                gain_ts.append(ts)
+                        agg["bot_shot_over_10s"] += 1
+        elif k == 0x41:
+            last_killed_ts[m["victim_id"]] = ts
+            if is_bot(m["victim_id"]):
+                agg["bot_deaths"] += 1
+                corpse = last_pos.get(m["victim_id"])
+                if corpse is not None and ts - corpse[0] <= 10000:
+                    death_watch[m["victim_id"]] = (ts, corpse[1], corpse[2])
+            if not m["is_mine_kill"] and is_bot(m["killer_id"]):
+                agg["bot_kills"] += 1
+        elif k == 0x4B:
+            if is_bot(m["tank_id"]):
+                agg["bot_mine_placements"] += 1
+        elif k == 0x5A:
+            viewport[0] = m["viewport_left"]
+            viewport[1] = m["viewport_top"]
+            for ent in m["entities"]:
+                ex = m["viewport_left"] + ent["col"] - 1
+                ey = m["viewport_top"] + ent["row"] - 1
+                if 0 <= ex < 256 and 0 <= ey < 256:
+                    note_tile(ts, ex, ey, ent["cache_value"])
+        elif k == 0x4C:
+            for entry in m["tanks"]:
+                note_any_pos(entry["tank_id"], ts, entry["x"], entry["y"])
+        elif k == 0x4F:
+            for cont in m["containers"]:
+                note_tile(ts, cont["x"], cont["y"], cont["volume"])
+        elif k == 0x67:
+            gain_ts.append(ts)
 
     # radar-cost isolation: fuel windows containing exactly one sent
     # radar, no other sent commands, and no contamination (3 s guard
@@ -314,7 +305,7 @@ def scan_session(path: Path, agg: dict) -> None:
         stamp = re.search(r"(\d{8})-", path.name)
         agg["self_cadence_rows"].append(
             {
-                "session": session["session_id"],
+                "session": session_id,
                 "kind": kind,
                 "date": stamp.group(1) if stamp else "",
                 "median_gap_ms": int(med),

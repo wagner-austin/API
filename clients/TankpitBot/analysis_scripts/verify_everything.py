@@ -11,41 +11,31 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from tankpit_bot import _test_hooks
-from tankpit_bot.capture.xor import decode_base64_safe
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
-from tankpit_bot.types import decode_capture_session
+from tankpit_bot.analysis.scan import scan_session
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner). The original stripped one length prefix
+# (data[2:]) and treated the remainder of the payload as a single
+# frame; the per-frame walk is the correction, and the corpus
+# reproduces the old output exactly.
 
 
 def process_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
     """Process ALL message types from a session."""
-    session_text = _test_hooks.read_text(session_path)
-    from platform_core.json_utils import load_json_str, narrow_json_to_dict
-
-    session_json = narrow_json_to_dict(load_json_str(session_text))
-    session = decode_capture_session(session_json)
-
-    magic = session["magic"]
-    if magic is None:
+    result = scan_session(session_path)
+    if "reason" in result:
         return {}
-
-    reset_xor_state()
-    build_global_xor_table(magic)
 
     results: dict[str, list[dict[str, object]]] = defaultdict(list)
 
-    for msg in session["messages"]:
-        if msg["direction"] != "received":
+    for frame in result["frames"]:
+        if frame["direction"] != "received":
             continue
-        data = decode_base64_safe(msg["payload"])
-        if data is None or len(data) < 3:
-            continue
-        body = data[2:]
-        msg_type = body[0]
-        ts = msg["timestamp_ms"]
+        msg_type = frame["msg_type"]
+        ts = frame["timestamp_ms"]
 
         if msg_type == 0x2E:
-            decoded = xor_decode(body)
+            decoded = frame["body"]
             if len(decoded) < 1:
                 continue
 
@@ -123,7 +113,7 @@ def process_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
                 continue
 
         else:
-            decoded = xor_decode(body)
+            decoded = frame["body"]
             # FuelGain standalone (0x44)
             if len(decoded) >= 3 and decoded[0] == 0x44:
                 fuel_total = decoded[1] | (decoded[2] << 8)

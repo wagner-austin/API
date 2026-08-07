@@ -23,19 +23,20 @@ from pathlib import Path
 
 from platform_core.logging import get_logger, setup_rich_logging
 
-from tankpit_bot import _test_hooks
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.container.decoders import decode_container_message
 from tankpit_bot.container.identification import identify_container_type
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
-from tankpit_bot.types import decode_capture_session
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner) - the private load/XOR/frame-walk pipeline is
+# deleted. The original stripped one length prefix (data[2:]) and only
+# looked at payloads whose FIRST frame was 0x2E; the per-frame walk is
+# the correction. NOTE (measured 2026-08-06): the default runs/bot
+# sweep prints "No data found" both before and after migration - the
+# script's container-type keys predate the current container decoders,
+# so it is preserved-but-dormant archaeology.
 
 log = get_logger(__name__)
-
-
-def _decode_0x2e_body(body: bytes) -> bytes:
-    """XOR-decode a 0x2E container body (strip type byte, XOR rest)."""
-    return xor_decode(body)
 
 
 def _format_bytes(data: bytes) -> str:
@@ -51,38 +52,20 @@ def _analyze_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
     Returns a dict keyed by container message type name, each value a list
     of dicts with timestamp, tank_id, all raw bytes, and decoded fields.
     """
-    session_text = _test_hooks.read_text(session_path)
-    from platform_core.json_utils import load_json_str, narrow_json_to_dict
-
-    session_json = narrow_json_to_dict(load_json_str(session_text))
-    session = decode_capture_session(session_json)
-
-    magic = session["magic"]
-    if magic is None:
-        log.warning("No magic key in %s — skipping", session_path.name)
+    result = scan_session(session_path)
+    if "reason" in result:
+        log.warning("Skipping %s: %s", session_path.name, result["reason"])
         return {}
 
-    reset_xor_state()
-    build_global_xor_table(magic)
-
     results: dict[str, list[dict[str, object]]] = defaultdict(list)
-    messages = session["messages"]
 
-    for msg in messages:
-        if msg["direction"] != "received":
+    for frame in result["frames"]:
+        if frame["direction"] != "received":
+            continue
+        if frame["msg_type"] != 0x2E:
             continue
 
-        data = decode_base64_safe(msg["payload"])
-        if data is None or len(data) < 3:
-            continue
-
-        body = data[2:]
-        msg_type_byte = body[0]
-
-        if msg_type_byte != 0x2E:
-            continue
-
-        decoded_bytes = _decode_0x2e_body(body)
+        decoded_bytes = frame["body"]
         if len(decoded_bytes) < 1:
             continue
 
@@ -94,7 +77,7 @@ def _analyze_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
         except Exception as e:
             results["DECODE_ERROR"].append(
                 {
-                    "timestamp_ms": msg["timestamp_ms"],
+                    "timestamp_ms": frame["timestamp_ms"],
                     "error": str(e),
                     "raw_hex": decoded_bytes.hex(),
                     "length": len(decoded_bytes),
@@ -103,7 +86,7 @@ def _analyze_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
             continue
 
         entry: dict[str, object] = {
-            "timestamp_ms": msg["timestamp_ms"],
+            "timestamp_ms": frame["timestamp_ms"],
             "type": type_name,
             "length": len(decoded_bytes),
             "raw_hex": decoded_bytes.hex(),

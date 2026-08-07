@@ -28,20 +28,24 @@ With no arguments, scans runs/bot/*.capture_session.json.
 
 from __future__ import annotations
 
-import base64
-import json
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from tankpit_bot.capture.xor import build_xor_table, load_xor_static_key
-from tankpit_bot.protocol.decoders.misc import decode_build_pickup, decode_statistics
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.protocol.decoders.movement import decode_movement_response
+from tankpit_bot.protocol.decoders.session_events import decode_build_pickup, decode_statistics
 from tankpit_bot.protocol.decoders.tank import (
     decode_0x2e_message,
     decode_tank_entry,
 )
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner) - the private base64/XOR-table/frame-walk
+# pipeline is deleted; results reproduce exactly. Same day: the
+# imports were repaired (protocol.decoders.misc no longer exists -
+# decode_statistics / decode_build_pickup live in session_events).
 
 
 @dataclass(frozen=True)
@@ -69,38 +73,6 @@ class MovementResponseSample:
     rank: int
     lb_score: int
     carrying: int
-
-
-def _build_table(magic: str) -> bytes:
-    """Build the per-session XOR table the way the runtime does."""
-    static_key, _ = load_xor_static_key(None)
-    if static_key is None:
-        raise RuntimeError("Static XOR key not found on disk")
-    return build_xor_table(static_key, magic)
-
-
-def _xor_decode(body: bytes, table: bytes) -> bytes:
-    """XOR-decode a wire body. First byte (msg_type) is not encoded."""
-    if len(body) < 2:
-        return body[1:] if len(body) == 1 else b""
-    out = bytearray(len(body) - 1)
-    for i in range(len(out)):
-        out[i] = body[i + 1] ^ table[i] if i < len(table) else body[i + 1]
-    return bytes(out)
-
-
-def _split_frames(data: bytes) -> list[bytes]:
-    """Split a base64-decoded payload into individual message bodies."""
-    out: list[bytes] = []
-    offset = 0
-    while offset + 2 < len(data):
-        msg_len = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if msg_len == 0 or offset + msg_len > len(data):
-            break
-        out.append(data[offset : offset + msg_len])
-        offset += msg_len
-    return out
 
 
 def _parse_movement_response(decoded: bytes) -> MovementResponseSample | None:
@@ -147,9 +119,7 @@ def _parse_tank_update(decoded: bytes) -> TankUpdateSample | None:
     )
 
 
-def _count_normal_tank_entries(
-    session: dict[str, object],
-) -> int:
+def _count_normal_tank_entries(path: Path) -> int:
     """Count 0x2E bodies that currently route to TankEntry (subtype 0x28, inner >= 10).
 
     This is the comparison baseline for the 10-byte / 0x28 hypothesis:
@@ -159,109 +129,77 @@ def _count_normal_tank_entries(
     name field). If the regular count is also near zero, the 10-byte
     case may be a pattern entirely unrelated to TankEntry.
     """
-    magic = session.get("magic")
-    if not isinstance(magic, str):
-        return 0
-    table = _build_table(magic)
-    messages = session.get("messages")
-    if not isinstance(messages, list):
+    result = scan_session(path)
+    if "reason" in result:
         return 0
     count = 0
-    for msg in messages:
-        if not isinstance(msg, dict) or msg.get("direction") != "received":
+    for frame in result["frames"]:
+        if frame["direction"] != "received" or frame["msg_type"] != 0x2E:
             continue
-        payload = msg.get("payload")
-        if not isinstance(payload, str):
-            continue
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
-            continue
-        for body in _split_frames(data):
-            if len(body) < 2 or body[0] != 0x2E:
-                continue
-            decoded = _xor_decode(body, table)
-            if len(decoded) >= 11 and decoded[0] == 0x28:
-                # Already qualifies for the tunneled TankEntry path
-                count += 1
+        decoded = frame["body"]
+        if len(decoded) >= 11 and decoded[0] == 0x28:
+            # Already qualifies for the tunneled TankEntry path
+            count += 1
     return count
 
 
 def _collect_samples(
-    session: dict[str, object],
+    path: Path,
 ) -> tuple[list[TankUpdateSample], list[MovementResponseSample]]:
     """Walk one capture session and bucket every 0x2E TankUpdate and 0x3D."""
-    magic = session.get("magic")
-    if not isinstance(magic, str):
+    result = scan_session(path)
+    if "reason" in result:
         return [], []
-    table = _build_table(magic)
 
     tank_updates: list[TankUpdateSample] = []
     movement_responses: list[MovementResponseSample] = []
-    messages = session.get("messages")
-    if not isinstance(messages, list):
-        return [], []
 
-    for msg in messages:
-        if not isinstance(msg, dict):
+    for frame in result["frames"]:
+        if frame["direction"] != "received" or frame["msg_type"] != 0x2E:
             continue
-        if msg.get("direction") != "received":
+        decoded = frame["body"]
+        if len(decoded) < 1:
             continue
-        payload = msg.get("payload")
-        if not isinstance(payload, str):
-            continue
-        timestamp = msg.get("timestamp_ms")
-        if not isinstance(timestamp, int):
-            continue
+        timestamp = frame["timestamp_ms"]
+        # Use the production subtype-first dispatcher so we route
+        # tunneled subtypes (Movement at 0x47, ViewportUpdate at
+        # 0x5A, MovementResponse at 0x3D, ...) the same way the
+        # runtime does. Only bodies that fall through to the
+        # length-based container path arrive as TankUpdate*.
         try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+            routed = decode_0x2e_message(decoded)
+        except Exception:
             continue
-        for body in _split_frames(data):
-            if len(body) < 2 or body[0] != 0x2E:
-                continue
-            decoded = _xor_decode(body, table)
-            if len(decoded) < 1:
-                continue
-            # Use the production subtype-first dispatcher so we route
-            # tunneled subtypes (Movement at 0x47, ViewportUpdate at
-            # 0x5A, MovementResponse at 0x3D, ...) the same way the
-            # runtime does. Only bodies that fall through to the
-            # length-based container path arrive as TankUpdate*.
-            try:
-                routed = decode_0x2e_message(decoded)
-            except Exception:
-                continue
-            msg_type = routed.get("msg_type")
-            if msg_type == 0x3D:
-                movement_responses.append(
-                    MovementResponseSample(
-                        timestamp_ms=timestamp,
-                        tank_id=routed["tank_id"],
-                        team=routed["team"],
-                        x=routed["x"],
-                        y=routed["y"],
-                        direction=routed["direction"],
-                        damage=routed["damage_state"],
-                        rank=routed["rank"],
-                        lb_score=routed["lb_score"],
-                        carrying=routed["carrying"],
-                    )
+        msg_type = routed.get("msg_type")
+        if msg_type == 0x3D:
+            movement_responses.append(
+                MovementResponseSample(
+                    timestamp_ms=timestamp,
+                    tank_id=routed["tank_id"],
+                    team=routed["team"],
+                    x=routed["x"],
+                    y=routed["y"],
+                    direction=routed["direction"],
+                    damage=routed["damage_state"],
+                    rank=routed["rank"],
+                    lb_score=routed["lb_score"],
+                    carrying=routed["carrying"],
                 )
-            elif msg_type in (
-                "tank_update_compact",
-                "tank_update_extended",
-                "tank_update_full",
-            ):
-                tank_updates.append(
-                    TankUpdateSample(
-                        timestamp_ms=timestamp,
-                        body_len=len(decoded),
-                        tank_id=routed["tank_id"],
-                        status_data=routed["status_data"],
-                        full_body=decoded,
-                    )
+            )
+        elif msg_type in (
+            "tank_update_compact",
+            "tank_update_extended",
+            "tank_update_full",
+        ):
+            tank_updates.append(
+                TankUpdateSample(
+                    timestamp_ms=timestamp,
+                    body_len=len(decoded),
+                    tank_id=routed["tank_id"],
+                    status_data=routed["status_data"],
+                    full_body=decoded,
                 )
+            )
     return tank_updates, movement_responses
 
 
@@ -361,14 +299,6 @@ def _print_report(
                 print(f"    {field:13s} {count:5d}/{total} ({pct:5.1f}%){marker}")
 
 
-def _load_sessions(paths: list[Path]) -> list[dict[str, object]]:
-    sessions: list[dict[str, object]] = []
-    for path in paths:
-        with path.open(encoding="utf-8") as f:
-            sessions.append(json.load(f))
-    return sessions
-
-
 def main(argv: list[str]) -> int:
     if argv:
         paths = [Path(a) for a in argv]
@@ -384,11 +314,11 @@ def main(argv: list[str]) -> int:
     all_updates: list[TankUpdateSample] = []
     all_movements: list[MovementResponseSample] = []
     normal_tank_entries = 0
-    for session in _load_sessions(paths):
-        updates, movements = _collect_samples(session)
+    for path in paths:
+        updates, movements = _collect_samples(path)
         all_updates.extend(updates)
         all_movements.extend(movements)
-        normal_tank_entries += _count_normal_tank_entries(session)
+        normal_tank_entries += _count_normal_tank_entries(path)
 
     print(f"Processed {len(paths)} session(s)")
     print(

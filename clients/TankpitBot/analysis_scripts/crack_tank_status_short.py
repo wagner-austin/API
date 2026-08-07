@@ -18,15 +18,17 @@ Usage::
 
 from __future__ import annotations
 
-import base64
-import json
 import sys
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-from tankpit_bot.capture.xor import build_xor_table, load_xor_static_key
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.protocol.decoders.tank import decode_0x2e_message
+
+# Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
+# capture-scan owner) - the private base64/XOR-table/frame-walk
+# pipeline is deleted; results reproduce exactly.
 
 
 @dataclass(frozen=True)
@@ -57,100 +59,55 @@ class MRSample:
     carrying: int
 
 
-def _xor_decode(body: bytes, table: bytes) -> bytes:
-    if len(body) < 2:
-        return body[1:] if len(body) == 1 else b""
-    out = bytearray(len(body) - 1)
-    for i in range(len(out)):
-        out[i] = body[i + 1] ^ table[i] if i < len(table) else body[i + 1]
-    return bytes(out)
-
-
-def _split_frames(data: bytes) -> list[bytes]:
-    out: list[bytes] = []
-    offset = 0
-    while offset + 2 < len(data):
-        msg_len = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if msg_len == 0 or offset + msg_len > len(data):
-            break
-        out.append(data[offset : offset + msg_len])
-        offset += msg_len
-    return out
-
-
-def _build_table(magic: str) -> bytes:
-    static_key, _ = load_xor_static_key(None)
-    if static_key is None:
-        raise RuntimeError("Static XOR key not found on disk")
-    return build_xor_table(static_key, magic)
-
-
-def _collect(
-    session: dict[str, object],
-) -> tuple[list[TSSample], list[MRSample]]:
+def _collect(path: Path) -> tuple[list[TSSample], list[MRSample]]:
     """Walk one session and return (TankStatusShort, MovementResponse) lists."""
-    magic = session.get("magic")
-    if not isinstance(magic, str):
-        return [], []
-    table = _build_table(magic)
-    messages = session.get("messages")
-    if not isinstance(messages, list):
+    result = scan_session(path)
+    if "reason" in result:
         return [], []
 
     tss: list[TSSample] = []
     mrs: list[MRSample] = []
 
-    for msg in messages:
-        if not isinstance(msg, dict) or msg.get("direction") != "received":
+    for frame in result["frames"]:
+        if frame["direction"] != "received" or frame["msg_type"] != 0x2E:
             continue
-        payload = msg.get("payload")
-        timestamp = msg.get("timestamp_ms")
-        if not isinstance(payload, str) or not isinstance(timestamp, int):
+        decoded = frame["body"]
+        if len(decoded) < 1:
             continue
+        timestamp = frame["timestamp_ms"]
         try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+            routed = decode_0x2e_message(decoded)
+        except Exception:
             continue
-        for body in _split_frames(data):
-            if len(body) < 2 or body[0] != 0x2E:
-                continue
-            decoded = _xor_decode(body, table)
-            if len(decoded) < 1:
-                continue
-            try:
-                routed = decode_0x2e_message(decoded)
-            except Exception:
-                continue
-            mt = routed.get("msg_type")
-            if mt == "tank_status_short":
-                # Pull byte 8 raw from the original decoded body
-                if len(decoded) >= 9:
-                    tss.append(
-                        TSSample(
-                            timestamp_ms=timestamp,
-                            tank_id=routed["tank_id"],
-                            damage_state=routed["damage_state"],
-                            rank=routed["rank"],
-                            lb_pos=routed["leaderboard_position"],
-                            byte_8=decoded[8],
-                        )
-                    )
-            elif mt == 0x3D:
-                mrs.append(
-                    MRSample(
+        mt = routed.get("msg_type")
+        if mt == "tank_status_short":
+            # Pull byte 8 raw from the original decoded body
+            if len(decoded) >= 9:
+                tss.append(
+                    TSSample(
                         timestamp_ms=timestamp,
                         tank_id=routed["tank_id"],
-                        team=routed["team"],
-                        x=routed["x"],
-                        y=routed["y"],
-                        direction=routed["direction"],
                         damage_state=routed["damage_state"],
                         rank=routed["rank"],
-                        lb_score=routed["lb_score"],
-                        carrying=routed["carrying"],
+                        lb_pos=routed["leaderboard_position"],
+                        byte_8=decoded[8],
                     )
                 )
+        elif mt == 0x3D:
+            mrs.append(
+                MRSample(
+                    timestamp_ms=timestamp,
+                    tank_id=routed["tank_id"],
+                    team=routed["team"],
+                    x=routed["x"],
+                    y=routed["y"],
+                    direction=routed["direction"],
+                    damage_state=routed["damage_state"],
+                    rank=routed["rank"],
+                    lb_score=routed["lb_score"],
+                    carrying=routed["carrying"],
+                )
+            )
     return tss, mrs
 
 
@@ -195,9 +152,7 @@ def main(argv: list[str]) -> int:
     all_tss: list[TSSample] = []
     all_mrs: list[MRSample] = []
     for path in paths:
-        with path.open(encoding="utf-8") as f:
-            session = json.load(f)
-        tss, mrs = _collect(session)
+        tss, mrs = _collect(path)
         all_tss.extend(tss)
         all_mrs.extend(mrs)
 
@@ -262,60 +217,44 @@ def main(argv: list[str]) -> int:
     sane_container = 0
     samples_dumped = 0
     for path in paths:
-        with path.open(encoding="utf-8") as f:
-            session = json.load(f)
-        magic = session.get("magic")
-        if not isinstance(magic, str):
+        result = scan_session(path)
+        if "reason" in result:
             continue
-        table = _build_table(magic)
-        messages = session.get("messages")
-        if not isinstance(messages, list):
-            continue
-        for msg in messages:
-            if not isinstance(msg, dict) or msg.get("direction") != "received":
+        for frame in result["frames"]:
+            if frame["direction"] != "received" or frame["msg_type"] != 0x2E:
                 continue
-            payload = msg.get("payload")
-            if not isinstance(payload, str):
+            decoded = frame["body"]
+            if len(decoded) != 9:
                 continue
             try:
-                data = base64.b64decode(payload)
-            except (ValueError, TypeError):
+                routed = decode_0x2e_message(decoded)
+            except Exception:
                 continue
-            for body in _split_frames(data):
-                if len(body) < 2 or body[0] != 0x2E:
-                    continue
-                decoded = _xor_decode(body, table)
-                if len(decoded) != 9:
-                    continue
-                try:
-                    routed = decode_0x2e_message(decoded)
-                except Exception:
-                    continue
-                if routed.get("msg_type") != "tank_status_short":
-                    continue
-                # Og.h interpretation
-                og_tid = decoded[1] | (decoded[2] << 8)
-                og_dmg = decoded[3]
-                og_rank = decoded[4]
-                og_promo = decoded[8]
-                og_ok = og_dmg <= 3 and og_rank <= 8 and og_promo <= 11
-                if og_ok:
-                    sane_og += 1
-                # Container TankStatusShort interpretation
-                ct_tid = decoded[2] | (decoded[3] << 8)
-                ct_rank = decoded[5]
-                ct_ok = ct_rank <= 8
-                if ct_ok:
-                    sane_container += 1
-                if samples_dumped < 15:
-                    og_team = decoded[0] & 0x03
-                    og_lb = (decoded[5] << 16) | (decoded[6] << 8) | decoded[7]
-                    print(
-                        f"  {decoded.hex():24s}  "
-                        f"{og_team}    {og_tid:5d}  {og_dmg}    {og_rank}     "
-                        f"{og_lb:8d} {og_promo}        {ct_tid:5d}  {ct_rank}"
-                    )
-                    samples_dumped += 1
+            if routed.get("msg_type") != "tank_status_short":
+                continue
+            # Og.h interpretation
+            og_tid = decoded[1] | (decoded[2] << 8)
+            og_dmg = decoded[3]
+            og_rank = decoded[4]
+            og_promo = decoded[8]
+            og_ok = og_dmg <= 3 and og_rank <= 8 and og_promo <= 11
+            if og_ok:
+                sane_og += 1
+            # Container TankStatusShort interpretation
+            ct_tid = decoded[2] | (decoded[3] << 8)
+            ct_rank = decoded[5]
+            ct_ok = ct_rank <= 8
+            if ct_ok:
+                sane_container += 1
+            if samples_dumped < 15:
+                og_team = decoded[0] & 0x03
+                og_lb = (decoded[5] << 16) | (decoded[6] << 8) | decoded[7]
+                print(
+                    f"  {decoded.hex():24s}  "
+                    f"{og_team}    {og_tid:5d}  {og_dmg}    {og_rank}     "
+                    f"{og_lb:8d} {og_promo}        {ct_tid:5d}  {ct_rank}"
+                )
+                samples_dumped += 1
     print(f"\nOg.h sanity (dmg<=3 AND rank<=8 AND promo<=11): {sane_og}/{len(all_tss)}")
     print(f"Container sanity (rank<=8): {sane_container}/{len(all_tss)}")
 
