@@ -1,0 +1,12 @@
+imp-fortress|12345|doctrines/fortress.doctrine|10000
+imp-fortress|1337|doctrines/fortress.doctrine|10000
+imp-fortress|141421|doctrines/fortress.doctrine|10000
+imp-fortress|16180|doctrines/fortress.doctrine|10000
+imp-fortress|173205|doctrines/fortress.doctrine|10000
+imp-fortress|223606|doctrines/fortress.doctrine|10000
+imp-fortress|244948|doctrines/fortress.doctrine|10000
+imp-fortress|24601|doctrines/fortress.doctrine|10000
+imp-fortress|264575|doctrines/fortress.doctrine|10000
+imp-fortress|2718|doctrines/fortress.doctrine|10000
+imp-fortress|271828|doctrines/fortress.doctrine|10000
+imp-fortress|282842|doctrines/fortress.doctrine|10000

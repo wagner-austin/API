@@ -76,3 +76,16 @@ def test_a_unit_seen_again_after_expiry_is_news_again() -> None:
     intel.observe(sample(frame=300))
     intel.observe(sample(enemy(9, "heli"), frame=350))
     assert intel.sightings_taken == 2
+
+
+def test_a_sighting_remembers_the_layer_it_was_seen_on() -> None:
+    """A remembered fleet must read as one to the naval tilt.
+
+    The counter's naval clause keys on the movement layer, and a sighting
+    that dropped it would make every scouted warship read as a land threat
+    the moment it left view ([[policy-exact-timing]], the naval wall).
+    """
+    intel = Intel(window_frames=100)
+    intel.observe(sample(entity(7, "warship", mine=False, hostile=True, movement="WATER"), frame=0))
+    (sighting,) = intel.remembered()
+    assert sighting["movement"] == "WATER"

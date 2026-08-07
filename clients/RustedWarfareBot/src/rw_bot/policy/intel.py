@@ -45,6 +45,10 @@ class Sighting(TypedDict):
         unit_id: Engine identity of the hostile.
         type_name: Its type, for the profile lookup.
         flying: Whether it was airborne when last seen.
+        movement: The engine's movement layer for the type, e.g. ``"LAND"``
+            or ``"WATER"`` -- carried so a remembered fleet reads as one to
+            the counter tilt's naval clause, exactly as a visible fleet does
+            ([[policy-exact-timing]], the naval wall).
         x: World x when last seen.
         y: World y when last seen.
         frame: When it was last seen.
@@ -53,6 +57,7 @@ class Sighting(TypedDict):
     unit_id: int
     type_name: str
     flying: bool
+    movement: str
     x: float
     y: float
     frame: int
@@ -99,6 +104,7 @@ class Intel:
                 unit_id=entity["unit_id"],
                 type_name=entity["type_name"],
                 flying=entity["flying"],
+                movement=entity["movement"],
                 x=entity["x"],
                 y=entity["y"],
                 frame=sample["frame"],

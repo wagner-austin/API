@@ -93,3 +93,65 @@ def test_two_anti_air_types_are_repeated_in_their_stated_ratio() -> None:
     aa = sum(1 for name in added if name == "c_aa")
     missile = sum(1 for name in added if name == "c_missile")
     assert abs(aa - missile) <= 1
+
+
+def _ship(unit_id: int) -> Entity:
+    """A surface warship: WATER layer, guns that reach 240 world units."""
+    return entity(unit_id, "warship", mine=False, hostile=True, movement="WATER")
+
+
+_NAVAL_PROFILES: dict[str, CombatProfile] = {
+    **_PROFILES,
+    "warship": profile("warship", 240.0),
+    # Outranges the warship from the shore, which is the naval answer the
+    # profiles hand over mechanically ([[policy-exact-timing]]).
+    "c_artillery": profile("c_artillery", 290.0),
+}
+
+
+def test_a_fleet_repeats_the_type_that_outranges_it() -> None:
+    """Half the visible threat floats, so half the mix must outgun the fleet."""
+    tilted = counter_composition(
+        ("c_tank", "c_tank", "c_tank", "c_artillery"),
+        (_ship(1), _ship(2), _ground(3), _ground(4)),
+        _NAVAL_PROFILES,
+    )
+    assert tilted[:4] == ("c_tank", "c_tank", "c_tank", "c_artillery")
+    outgunning = sum(1 for name in tilted if name == "c_artillery")
+    assert outgunning / len(tilted) >= 0.5
+
+
+def test_a_mix_nothing_in_which_outranges_the_fleet_is_left_alone() -> None:
+    """Which unit outranges a fleet is the doctrine's question, not this one's."""
+    mix = ("c_tank", "c_tank", "c_aa")
+    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES) == mix
+
+
+def test_an_all_naval_picture_drops_the_outgunned() -> None:
+    """Producing a unit that fights inside the fleet's guns is producing a loss.
+
+    The builder stays: it is in the mix for the economy, not the fight.
+    """
+    tilted = counter_composition(
+        ("builder", "c_tank", "c_artillery"),
+        (_ship(1), _ship(2)),
+        _NAVAL_PROFILES,
+    )
+    assert tilted == ("builder", "c_artillery")
+
+
+def test_a_mix_already_outgunning_the_naval_share_is_left_alone() -> None:
+    mix = ("c_artillery", "c_artillery", "c_tank")
+    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES) == mix
+
+
+def test_the_air_and_naval_tilts_compose_on_one_picture() -> None:
+    """A helicopter and a warship in sight each pull their own answer."""
+    tilted = counter_composition(
+        ("c_tank", "c_tank", "c_aa", "c_artillery"),
+        (_heli(1), _ship(2), _ground(3), _ground(4)),
+        _NAVAL_PROFILES,
+    )
+    assert tilted[:4] == ("c_tank", "c_tank", "c_aa", "c_artillery")
+    assert sum(1 for name in tilted if name == "c_aa") >= 1
+    assert sum(1 for name in tilted if name == "c_artillery") >= 1

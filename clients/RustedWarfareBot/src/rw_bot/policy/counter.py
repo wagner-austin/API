@@ -15,14 +15,24 @@ that is airborne. No unit is invented -- only types the caller already asked
 for are repeated, so a doctrine with no anti-air in it is left alone and the
 gap stays visible where it already shows, in the report's ``engageable`` count.
 
+The same arithmetic answers the water since 2026-08-07: the VH wall turned
+out to be the opponents' naval branch, whose surface ships cannot be engaged
+profitably by anything that stands inside their guns -- and seven one-knob
+composition arms measured that permanently reshaping the mix for that case
+costs the land game more than it pays ([[policy-exact-timing]], the naval
+wall; log 2026-08-07, the arm ladder). So the answer is conditional, here:
+when the seen threat includes WATER-layer movers, the tilt repeats the
+doctrine's own types whose surface fire starts beyond the fleet's longest
+reach. A mix with no such type is left alone, exactly like the airless case.
+
 Pure, like the rest of the policy layer: entities in, a composition out.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from math import ceil
-from typing import TypedDict
+from typing import Final, TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile, profile_of
@@ -41,10 +51,19 @@ class Threat(TypedDict):
     Attributes:
         type_name: Engine type name, for the profile lookup.
         flying: Whether it is (or was last seen) airborne.
+        movement: The engine's movement layer for the type, e.g. ``"LAND"``
+            or ``"WATER"`` -- the field a live entity already carries on the
+            wire, and the one fact that tells a ship from everything else
+            ([[policy-exact-timing]], the naval wall).
     """
 
     type_name: str
     flying: bool
+    movement: str
+
+
+#: The engine's movement-layer name for surface ships, as the wire spells it.
+_NAVAL_LAYER: Final = "WATER"
 
 
 def _hits_air(profiles: Mapping[str, CombatProfile], type_name: str) -> bool:
@@ -64,34 +83,52 @@ def _hits_air(profiles: Mapping[str, CombatProfile], type_name: str) -> bool:
     return profile_of(profiles, type_name)["hits_air"]
 
 
-def counter_composition(
-    composition: Sequence[str],
-    targets: Sequence[Threat],
-    profiles: Mapping[str, CombatProfile],
-) -> tuple[str, ...]:
-    """Return the mix, tilted until its anti-air share covers the air threat.
+def _outguns(profiles: Mapping[str, CombatProfile], type_name: str, reach: float) -> bool:
+    """Report whether a type engages a surface fleet from beyond its guns.
 
-    The tilt only ever repeats types already in the mix, in their stated
-    order, because repeats are how a composition says "more of this"
-    ([[policy-production]]). Three cases fall out of that rule rather than
-    being decided here:
-
-    * **Nothing visible flies**: the mix is returned unchanged. Fog is not
-      evidence of absence, but neither is it evidence -- the tilt follows what
-      is seen, exactly as targeting does.
-    * **The mix has no anti-air type**: it is returned unchanged. Adding a
-      type the caller never asked for would be a choice of unit made here,
-      and which unit answers air is the doctrine's question, not this
-      function's.
-    * **Everything visible flies**: the armed ground-only types are dropped
-      for as long as that holds, because producing them is producing units
-      that cannot fight anything in sight. Unarmed types stay -- a builder is
-      in the mix for the economy, not the fight.
+    The naval answer the profiles hand over mechanically: a weapon that hits
+    the surface from further than the longest naval reach in sight fights
+    the fleet without standing in its fire -- measured on the VH wall, where
+    the 290-range artillery outranges every surface ship the opponents field
+    ([[policy-exact-timing]], the naval wall).
 
     Args:
-        composition: The army mix to hold, repeats meaningful as a ratio.
-        targets: The hostile entities currently visible.
-        profiles: Combat profiles by type name, for which types reach the air.
+        profiles: Combat profiles by type name.
+        type_name: The type to test.
+        reach: The longest attack range among the naval threats in sight.
+
+    Returns:
+        True when its surface fire starts beyond that reach.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe
+            the type.
+    """
+    record = profile_of(profiles, type_name)
+    return record["hits_land"] and record["attack_range"] > reach
+
+
+def _tilted(
+    mix: tuple[str, ...],
+    matched: int,
+    total: int,
+    answers: Callable[[str], bool],
+    profiles: Mapping[str, CombatProfile],
+) -> tuple[str, ...]:
+    """Return the mix with enough answering entries to cover a threat share.
+
+    The share arithmetic both tilts run on, extracted so the air and naval
+    clauses cannot drift apart. The tilt only ever repeats types already in
+    the mix, in their stated order, because repeats are how a composition
+    says "more of this" ([[policy-production]]).
+
+    Args:
+        mix: The army mix to hold, repeats meaningful as a ratio.
+        matched: How many visible threats this tilt answers.
+        total: How many threats are visible in all.
+        answers: Whether one mix type answers this tilt's threat.
+        profiles: Combat profiles by type name, for the unarmed test in the
+            everything-matches branch.
 
     Returns:
         The mix to produce against, repeats meaningful as a ratio.
@@ -100,33 +137,91 @@ def counter_composition(
         CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe
             a type in the mix.
     """
-    mix = tuple(composition)
-    if not mix or not targets:
+    if matched == 0:
         return mix
-    flying = sum(1 for target in targets if target["flying"])
-    if flying == 0:
-        return mix
-    capable = tuple(name for name in dict.fromkeys(mix, True) if _hits_air(profiles, name))
+    capable = tuple(name for name in dict.fromkeys(mix, True) if answers(name))
     if not capable:
         return mix
-    if flying == len(targets):
+    if matched == total:
         return tuple(
             name
             for name in mix
-            if _hits_air(profiles, name) or profile_of(profiles, name)["attack_range"] == 0.0
+            if answers(name) or profile_of(profiles, name)["attack_range"] == 0.0
         )
-
-    share = flying / len(targets)
-    held = sum(1 for name in mix if _hits_air(profiles, name))
-    # Append k anti-air entries so that (held + k) / (len(mix) + k) >= share.
+    share = matched / total
+    held = sum(1 for name in mix if answers(name))
+    # Append k answering entries so that (held + k) / (len(mix) + k) >= share.
     # Solved for k rather than looped, and the repeats cycle through every
-    # capable type so a doctrine with two answers to air keeps its own ratio
-    # between them.
+    # capable type so a doctrine with two answers keeps its own ratio between
+    # them.
     lack = share * len(mix) - held
     if lack <= 0:
         return mix
     wanted = ceil(lack / (1.0 - share))
     return (*mix, *(capable[i % len(capable)] for i in range(wanted)))
+
+
+def counter_composition(
+    composition: Sequence[str],
+    targets: Sequence[Threat],
+    profiles: Mapping[str, CombatProfile],
+) -> tuple[str, ...]:
+    """Return the mix, tilted until it answers the air and naval shares.
+
+    Two passes of one arithmetic (:func:`_tilted`), air then naval, each
+    following the same rule: only types already in the mix are repeated.
+    Three cases fall out of that rule rather than being decided here:
+
+    * **Nothing visible flies or floats**: the mix is returned unchanged.
+      Fog is not evidence of absence, but neither is it evidence -- the tilt
+      follows what is seen, exactly as targeting does.
+    * **The mix has no answering type**: it is returned unchanged. Adding a
+      type the caller never asked for would be a choice of unit made here,
+      and which unit answers air -- or outranges a fleet -- is the
+      doctrine's question, not this function's.
+    * **Everything visible flies (or floats)**: the armed types that cannot
+      answer are dropped for as long as that holds, because producing them
+      is producing units that cannot fight anything in sight. Unarmed types
+      stay -- a builder is in the mix for the economy, not the fight.
+
+    The naval answer is range dominance: a type whose surface fire starts
+    beyond the longest naval reach in sight fights the fleet without
+    standing in its fire. Seven composition arms measured that FORCING a
+    naval answer into the mix costs the land game more than it pays
+    anywhere; this tilt spends nothing until a fleet is actually seen, and
+    amplifies only what the doctrine already holds
+    (log 2026-08-07, the arm ladder).
+
+    Args:
+        composition: The army mix to hold, repeats meaningful as a ratio.
+        targets: The hostile entities currently visible.
+        profiles: Combat profiles by type name, for reach and layers.
+
+    Returns:
+        The mix to produce against, repeats meaningful as a ratio.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe
+            a type in the mix or a naval threat.
+    """
+    mix = tuple(composition)
+    if not mix or not targets:
+        return mix
+    flying = sum(1 for target in targets if target["flying"])
+
+    def hits_air(name: str) -> bool:
+        return _hits_air(profiles, name)
+
+    mix = _tilted(mix, flying, len(targets), hits_air, profiles)
+    naval = tuple(t for t in targets if t["movement"] == _NAVAL_LAYER)
+    if not naval:
+        return mix
+    reach = max(profile_of(profiles, t["type_name"])["attack_range"] for t in naval)
+
+    def outguns(name: str) -> bool:
+        return _outguns(profiles, name, reach)
+
+    return _tilted(mix, len(naval), len(targets), outguns, profiles)
 
 
 def mobile_threats(intel: Intel, catalogue: Mapping[str, UnitStats]) -> tuple[Threat, ...]:
