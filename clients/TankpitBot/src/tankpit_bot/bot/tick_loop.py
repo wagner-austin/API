@@ -1,72 +1,41 @@
-"""Tick loop orchestrator for the bot.
+"""The bot session loop: run ticks until a bound or a signal ends it.
 
-Runs the sync-decide-execute cycle on each server tick. The game uses
-a command queue — move/pickup commands are queued and the tank walks
-there automatically. No need to wait for arrival.
-
-Cycle: SYNC → DECIDE → EXECUTE → WAIT
+Owns the loop itself, the exit boundary, the interrupt flag, the
+per-tick context and status publication, and the end-of-session
+scorecard and runs-index row. One tick's work is
+:mod:`tankpit_bot.bot.tick_body`.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 from playwright._impl._errors import TargetClosedError
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import PageProtocol
-from tankpit_bot.action_lab.client_structure import maybe_emit_client_structure_survey
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-    capture_page_client_snapshot,
-)
-from tankpit_bot.bot import ai_strategy, executor, world_sync
-from tankpit_bot.bot.ai.combat_target import clear_combat_target
-from tankpit_bot.bot.ai.scoring_types import render_reason
+from tankpit_bot.bot import tick_body
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
-    make_respawn_ai_state,
 )
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
-from tankpit_bot.bot.states import make_initial_state_data
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.browser.overlay import OverlayStateDict, render_overlay_payload
-from tankpit_bot.browser.overlay_hud import update_bot_overlay
-from tankpit_bot.diagnostics.entity_alignment import maybe_emit_entity_alignment_sample
 from tankpit_bot.diagnostics.runs_index import (
     append_index_row,
     count_stall_timeouts,
     make_index_row,
 )
-from tankpit_bot.diagnostics.self_alignment import maybe_emit_self_alignment_sample
-from tankpit_bot.ledger.damage_book import resolve_dealt, summarize_side, total_fuel
-from tankpit_bot.ledger.decision import latest_decision_event_id, verify_outcome_invariant
+from tankpit_bot.ledger.damage_book import summarize_side, total_fuel
+from tankpit_bot.ledger.decision import verify_outcome_invariant
 from tankpit_bot.ledger.events import ACTION_KINDS
-from tankpit_bot.ledger.mode_transition import emit_mode_transition
-from tankpit_bot.ledger.outcome.shoot import (
-    emit_shoot_command_rejected,
-    emit_shoot_hit,
-    emit_shoot_miss,
-)
 from tankpit_bot.ledger.ring import outcome_counts
-from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.protocol.commands import TICK_RATE_MS
-from tankpit_bot.protocol.constants import (
-    SUPERVISOR_ERROR_CANT_DO,
-    SUPERVISOR_ERROR_FRIENDLY_FIRE,
-    SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
-)
-from tankpit_bot.runtime_artifacts import bot_run_dir, resolve_bot_instance
 from tankpit_bot.runtime_context import set_runtime_context
 from tankpit_bot.runtime_logging import (
-    emit_ai,
     emit_diagnostic,
-    emit_sync,
     get_bot_runtime_artifacts,
 )
 from tankpit_bot.service.types import (
@@ -77,38 +46,36 @@ from tankpit_bot.service.types import (
     wire_mode_to_manual,
 )
 from tankpit_bot.sniffer.world_state import (
-    get_terrain_map,
     get_world_service,
 )
-from tankpit_bot.sniffer.world_state_combat import (
-    check_and_clear_ammo_delta_hit,
-    check_and_clear_combat_hit,
-    check_and_clear_command_error,
-    check_and_clear_last_shot_victim_id,
-    check_and_clear_our_shot_response,
-    drain_killed_tank_ids,
-    peek_combat_hit,
-    peek_command_error,
-    peek_our_shot_response,
-)
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
-from tankpit_bot.state import SelfStateDict
-
-# 0x52 Supervisor codes a shoot dispatch can draw. Any of these while a
-# shot is pending is the server's authoritative refusal of THAT shot --
-# no 0x53 ShootEvent and no ammo delta will ever arrive for it (live
-# run 2026-07-03 20:34: five code-0 rejections at an off-viewport aim
-# produced zero wire feedback and each burned the full 4 s feedback
-# window before an identical redispatch).
-_SHOT_REJECTING_COMMAND_ERRORS = frozenset(
-    {
-        SUPERVISOR_ERROR_CANT_DO,  # aim outside the viewport
-        SUPERVISOR_ERROR_FRIENDLY_FIRE,
-        SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
-    }
-)
 
 log = get_logger(__name__)
+
+# Early-wake slice width. The server processes commands in fixed 2 s
+# windows (TICK_RATE_MS, fire-spam verified), and a completion message
+# that lands just after the loop goes to sleep used to wait out the
+# whole window before the next decision -- a phase drift that cost one
+# full server tick whenever the wakeup missed a window boundary by
+# milliseconds (user observation 2026-07-30: "it seems like we are
+# losing a tick after each equipment pickup sometimes"; measured: 294
+# of 302 completion->dispatch pairs were same-second, so the pipeline
+# is clean and ONLY the sleep is blind). Waking on fresh wire traffic
+# while an action is in flight puts the next decision within one slice
+# of the completion, like a player clicking the moment the tank
+# arrives.
+_WAKE_SLICE_MS = 250
+
+#: True when an OS signal (SIGINT / SIGTERM) has requested a graceful
+#: shutdown. The tick loop checks this once per iteration so the bot
+#: exits at a clean tick boundary, writing the session scorecard +
+#: index row before the process dies. Reset to ``False`` by
+#: :func:`reset_interrupt_flag` so consecutive sessions start clean.
+# Final-stretch length of a bounded session spent disengaging and
+# topping off for the clean ``session_complete`` exit.
+_WIND_DOWN_SECONDS = 60
+
+_INTERRUPT_REQUESTED: bool = False
 
 
 def run_tick_loop(
@@ -220,19 +187,45 @@ def run_tick_loop(
             return
 
 
-# Early-wake slice width. The server processes commands in fixed 2 s
-# windows (TICK_RATE_MS, fire-spam verified), and a completion message
-# that lands just after the loop goes to sleep used to wait out the
-# whole window before the next decision -- a phase drift that cost one
-# full server tick whenever the wakeup missed a window boundary by
-# milliseconds (user observation 2026-07-30: "it seems like we are
-# losing a tick after each equipment pickup sometimes"; measured: 294
-# of 302 completion->dispatch pairs were same-second, so the pipeline
-# is clean and ONLY the sleep is blind). Waking on fresh wire traffic
-# while an action is in flight puts the next decision within one slice
-# of the completion, like a player clicking the moment the tank
-# arrives.
-_WAKE_SLICE_MS = 250
+def _tick_with_exit_boundary(bot: Bot, ticks_done: int) -> str | None:
+    """Run one guarded tick and translate its endings into exit reasons.
+
+    The session's single exception boundary ([[bot-behavior-contract]]
+    §1.2/§1.3): a closed browser and a self-directed
+    :class:`SessionExitError` become graceful exit reasons the caller
+    finalizes; any OTHER unhandled exception finalizes the artifacts
+    HERE — scorecard, ``latest.summary.txt``, and the ``_index.tsv``
+    row as ``exit_reason="crashed"`` — and then RE-RAISES so the
+    process still fails loudly. Before 2026-07-31 the contract
+    promised "crashed" with no writer anywhere: a crashed session
+    simply vanished from the runs index, which is exactly the "which
+    runs died?" blindness the index exists to prevent.
+
+    Args:
+        bot: Bot instance.
+        ticks_done: Completed tick count (for the crash scorecard).
+
+    Returns:
+        A graceful exit reason for the caller to finalize, or ``None``
+        to continue the loop.
+    """
+    try:
+        tick_body._tick_once(bot)
+        tick_body._sync_live_view_demand(bot)
+    except TargetClosedError:
+        log.info("Browser closed during tick, ending run gracefully")
+        return "browser_closed"
+    except SessionExitError as exit_request:
+        log.info("Session exit: %s -- %s", exit_request.reason, exit_request.detail)
+        return exit_request.reason
+    except Exception:
+        log.exception(
+            "Unhandled exception in tick %d - finalizing artifacts as crashed",
+            ticks_done + 1,
+        )
+        _emit_session_scorecard(bot, ticks_done, exit_reason="crashed")
+        raise
+    return None
 
 
 def _wait_between_ticks(bot: Bot, page: PageProtocol) -> int:
@@ -407,20 +400,6 @@ def _extract_stamp_from_archive_path(archive_events_path: str) -> str:
     return name[len("bot-") : -len(".events.jsonl")]
 
 
-_WS_READY_STATE_OPEN = 1
-
-#: True when an OS signal (SIGINT / SIGTERM) has requested a graceful
-#: shutdown. The tick loop checks this once per iteration so the bot
-#: exits at a clean tick boundary, writing the session scorecard +
-#: index row before the process dies. Reset to ``False`` by
-#: :func:`reset_interrupt_flag` so consecutive sessions start clean.
-# Final-stretch length of a bounded session spent disengaging and
-# topping off for the clean ``session_complete`` exit.
-_WIND_DOWN_SECONDS = 60
-
-_INTERRUPT_REQUESTED: bool = False
-
-
 def request_interrupt() -> None:
     """Signal the tick loop to exit at the next tick boundary.
 
@@ -528,694 +507,10 @@ def _publish_session_status(bot: Bot) -> None:
     bot._status_bus.publish(status)
 
 
-def _tick_with_exit_boundary(bot: Bot, ticks_done: int) -> str | None:
-    """Run one guarded tick and translate its endings into exit reasons.
-
-    The session's single exception boundary ([[bot-behavior-contract]]
-    §1.2/§1.3): a closed browser and a self-directed
-    :class:`SessionExitError` become graceful exit reasons the caller
-    finalizes; any OTHER unhandled exception finalizes the artifacts
-    HERE — scorecard, ``latest.summary.txt``, and the ``_index.tsv``
-    row as ``exit_reason="crashed"`` — and then RE-RAISES so the
-    process still fails loudly. Before 2026-07-31 the contract
-    promised "crashed" with no writer anywhere: a crashed session
-    simply vanished from the runs index, which is exactly the "which
-    runs died?" blindness the index exists to prevent.
-
-    Args:
-        bot: Bot instance.
-        ticks_done: Completed tick count (for the crash scorecard).
-
-    Returns:
-        A graceful exit reason for the caller to finalize, or ``None``
-        to continue the loop.
-    """
-    try:
-        _tick_once(bot)
-        _sync_live_view_demand(bot)
-    except TargetClosedError:
-        log.info("Browser closed during tick, ending run gracefully")
-        return "browser_closed"
-    except SessionExitError as exit_request:
-        log.info("Session exit: %s -- %s", exit_request.reason, exit_request.detail)
-        return exit_request.reason
-    except Exception:
-        log.exception(
-            "Unhandled exception in tick %d - finalizing artifacts as crashed",
-            ticks_done + 1,
-        )
-        _emit_session_scorecard(bot, ticks_done, exit_reason="crashed")
-        raise
-    return None
-
-
-def _sync_live_view_demand(bot: Bot) -> None:
-    """Keep the in-page caster matched to viewer demand.
-
-    Runs once per tick, directly after ``_tick_once`` inside the same
-    ``TargetClosedError`` guard (a closed browser during the toggle
-    ends the run as ``browser_closed``). Demand is the frame bus's
-    subscriber count: a ``/video`` (or ``/frame``) connection on the
-    service creates it; the last disconnect removes it. While demand
-    holds, :meth:`LiveViewService.ensure` re-evaluates the idempotent
-    caster snippet EVERY tick — that repetition is the self-heal for
-    page navigations, which wipe injected JS. Sessions nobody watches
-    never run the caster, and ``make run`` / replay sessions (inert
-    default bus, zero subscribers) never start it at all.
-
-    Skipped silently before the CDP session is attached — the tick
-    loop's readiness gates run this only in ticks where the browser is
-    already up, but the very first iterations of a session can land
-    here pre-attach.
-
-    Args:
-        bot: Bot instance whose ``_live_view`` and ``_frame_bus``
-            drive the decision.
-    """
-    cdp = bot._cdp
-    if cdp is None:
-        return
-    if bot._frame_bus.subscriber_count() > 0:
-        bot._live_view.ensure(cdp)
-    elif bot._live_view.active:
-        bot._live_view.stop(cdp)
-
-
-def _enforce_autoscroll_once(bot: Bot) -> None:
-    """Run the autoscroll-off dance on the FIRST spawned tick only.
-
-    The toggle only acks in-game (user ruling 2026-07-29: "you cant
-    enable or disable autoscroll til the bot is in the game"), and the
-    caller invokes this after confirming ``self_state`` -- fed by THIS
-    tick's drain -- which is the proof of being in-game. Wiring it
-    before the tick loop was the 23:08/23:16 double failure: the world
-    service is pull-fed, so a pre-loop wait starved forever on a state
-    nothing was draining yet.
-
-    Args:
-        bot: Bot instance carrying the one-shot latch and live page.
-    """
-    if bot._autoscroll_enforced or bot._page is None:
-        return
-    _test_hooks.ensure_autoscroll_off(bot._page, bot._messages)
-    bot._autoscroll_enforced = True
-
-
-# How long a dead tank waits for its respawn sync before the session
-# exits ``deactivated`` anyway. The real server respawns promptly; a
-# world that never respawns (the sim has no respawn law) must not
-# wait forever on a sync that cannot come.
-_RESPAWN_WAIT_MS = 60_000
-
-
-def _handle_own_deactivation(bot: Bot, self_state: SelfStateDict) -> None:
-    """Reset the corpse's beliefs and start the respawn wait.
-
-    User contract 2026-07-30: "if the tank dies, it should just wait
-    for respawn and then go into collecting mode." Every tactical
-    belief the dead tank carried — combat lock, escape latch,
-    resource locks, in-flight action — describes a tank that no
-    longer exists, so the AI state rebuilds from initial values with
-    only the session-scoped facts carried over (kill count, wind-down
-    flag, greeting latch, config). The dead self record is dropped
-    outright (the post-mortem fuel field reads garbage, e.g. 65482 in
-    run bot-20260730-004144), which turns the loop's self-None early
-    exit into the wait itself.
-
-    Args:
-        bot: Bot instance.
-        self_state: The corpse's final self record, for the receipt.
-    """
-    service = get_world_service()
-    service.self_deactivated = False
-    emit_diagnostic(
-        diagnostic_kind="self_respawn_wait",
-        died_x=self_state["x"],
-        died_y=self_state["y"],
-        session_kills=bot._ai_state["session_kill_count"],
-    )
-    log.info(
-        "Deactivated at (%d,%d) - waiting for respawn, then collecting",
-        self_state["x"],
-        self_state["y"],
-    )
-    bot._ai_state = make_respawn_ai_state(bot._ai_state)
-    bot._state_data = make_initial_state_data()
-    service.world_state["self_state"] = None
-    bot._respawn_deadline_ms = get_current_time_ms() + _RESPAWN_WAIT_MS
-
-
-def _note_respawn(bot: Bot, self_state: SelfStateDict) -> None:
-    """Clear the respawn wait once fresh self state proves the respawn.
-
-    The tank is back on the field with empty stocks, so the normal
-    arbitration hands the next tick to COLLECT exactly as the
-    contract asks.
-
-    Args:
-        bot: Bot instance.
-        self_state: The freshly synced self record.
-    """
-    if bot._respawn_deadline_ms <= 0:
-        return
-    log.info(
-        "Respawned at (%d,%d) fuel=%d - resuming with collection",
-        self_state["x"],
-        self_state["y"],
-        self_state["fuel"],
-    )
-    bot._respawn_deadline_ms = 0
-
-
-def _check_respawn_deadline(bot: Bot) -> None:
-    """Fail the respawn wait loudly once the deadline passes.
-
-    Args:
-        bot: Bot instance.
-
-    Raises:
-        SessionExitError: When the tank died and no respawn sync
-            arrived within :data:`_RESPAWN_WAIT_MS`.
-    """
-    if bot._respawn_deadline_ms > 0 and get_current_time_ms() >= bot._respawn_deadline_ms:
-        raise SessionExitError(
-            "deactivated",
-            f"no respawn sync within {_RESPAWN_WAIT_MS // 1000}s of the own 0x41",
-        )
-
-
-# Wire-silence limit for the connection-lost watchdog. Live game
-# traffic is near-continuous (fuel ticks, tank movement, viewport
-# churn arrive many times a minute), and the longest sanctioned quiet
-# stretch is the 60 s respawn wait (_RESPAWN_WAIT_MS) -- during which
-# the corpse's viewport still streams other tanks. 90 s sits safely
-# above both while turning session 3's 43-minute zombie into a
-# 90-second clean exit.
-_WIRE_SILENCE_LIMIT_MS = 90_000
-
-
-def _check_wire_silence(bot: Bot) -> None:
-    """End the session when the game wire has gone silent.
-
-    The ws-ready page-health gate cannot catch this failure: session 3
-    of run 20260730 lost its game socket mid-move at 11:58:32, the
-    page auto-reconnected to the LOBBY -- a perfectly OPEN socket the
-    server no longer associates with an in-game tank -- and every
-    injected map_open vanished for 43 minutes (243 consecutive stalls,
-    zero inbound world messages). Inbound game traffic is the only
-    truthful liveness signal, so its absence past the limit is
-    terminal. A zero stamp means no game message has EVER arrived
-    (boot, lobby) and the watchdog stays disarmed.
-
-    Args:
-        bot: Bot instance (unused state anchor; the stamp lives on the
-            world service singleton the sniffer writes).
-
-    Raises:
-        SessionExitError: When the last dispatched game message is
-            older than :data:`_WIRE_SILENCE_LIMIT_MS`.
-    """
-    last_ms = get_world_service().last_game_message_ms
-    if last_ms <= 0:
-        return
-    silence_ms = get_current_time_ms() - last_ms
-    if silence_ms < _WIRE_SILENCE_LIMIT_MS:
-        return
-    raise SessionExitError(
-        "connection_lost",
-        f"no game wire message for {silence_ms // 1000}s "
-        f"(limit {_WIRE_SILENCE_LIMIT_MS // 1000}s) - game session is dead",
-    )
-
-
-def _tick_once(bot: Bot) -> None:
-    """Execute one sync-decide-execute cycle.
-
-    Args:
-        bot: Bot instance.
-    """
-    # 1. SYNC — drain CDP message buffer
-    world_sync.drain_messages(bot)
-    _check_wire_silence(bot)
-
-    # 1b. Record the in-game text log as a capture witness. The DOM log
-    # is the client's rendering of wire messages the bot already decodes
-    # (0x41 Deactivation for kills, 0x52 error codes for rejections --
-    # capture replay 2026-07-19 falsified the June claim that the wire
-    # was silent on own kills and failed pickups: the messages were
-    # 0x2E-tunneled and the June decoder could not unwrap them). The
-    # entries act on nothing; they land in the capture artifact so the
-    # analyzer can diff the client's rendering against the wire.
-    bot._record_game_log_witness(bot._poll_game_log())
-
-    # 2. Read state
-    world = bot.get_world_state()
-    self_state = world["self_state"]
-    if self_state is None:
-        _check_respawn_deadline(bot)
-        return
-
-    _note_respawn(bot, self_state)
-    _enforce_autoscroll_once(bot)
-
-    # 2a. The wire announced OUR OWN death (0x41, victim == self).
-    # User contract 2026-07-30 ("if the tank dies, it should just
-    # wait for respawn and then go into collecting mode"): instead of
-    # ending the session, reset every tactical belief the corpse
-    # carried and wait for the respawn sync. The Artax death receipt
-    # (run bot-20260730-004144, fuel read 65482 post-mortem) shows
-    # the dead self_state is garbage, so it is dropped outright and
-    # the loop's self-None early exit becomes the wait.
-    if get_world_service().self_deactivated:
-        _handle_own_deactivation(bot, self_state)
-        return
-
-    bot._update_state_from_world()
-    if not _is_ready_for_decision(bot):
-        return
-    if has_in_flight_action(bot):
-        return
-
-    # Re-read state after sync/action resolution. In-flight handlers may
-    # mutate world state (for example marking failed pickups) before
-    # allowing replanning in the same tick.
-    world = bot.get_world_state()
-    self_state = world["self_state"]
-    if self_state is None:
-        return
-
-    # 3. Merge kills from protocol
-    bot._ai_state = _merge_protocol_kills(bot._ai_state)
-    now = get_current_time_ms()
-    if _has_pending_shot_feedback(bot, now):
-        return
-
-    # 4. Authoritative live-client read, shared by the registry truth
-    # ingest, the decision, and the dispatch boundary gates (map already
-    # open, WS down, JS hung). Done after every early-exit gate so a
-    # tick that decides nothing pays no CDP cost.
-    snapshot = capture_page_client_snapshot(bot._require_cdp())
-    if not _is_page_client_healthy(snapshot):
-        return
-
-    world = bot.get_world_state()
-
-    # 5. Combat feedback (counters incremented inside _get_combat_feedback)
-    combat_feedback = _get_combat_feedback(bot)
-
-    # 6. DECIDE
-    inventory = get_inventory_state(get_world_service())
-    terrain = get_terrain_map()
-
-    decision = ai_strategy.decide(
-        world,
-        self_state,
-        bot._ai_state,
-        inventory,
-        now,
-        terrain,
-        combat_feedback,
-        get_world_service().map_fuel_dots,
-    )
-
-    maybe_emit_self_alignment_sample(self_state, snapshot)
-    maybe_emit_entity_alignment_sample(
-        world,
-        snapshot,
-        in_combat=bot._ai_state["mode"] == "HUNT",
-    )
-    maybe_emit_client_structure_survey(bot._require_cdp())
-    # Account-wide ground truth (lifetime kills, play time, promotion
-    # points) baselined on the first healthy tick; the loading screen
-    # ignores the C hotkey at bootstrap.
-    bot.maybe_capture_account_stats_once()
-
-    # 7. EXECUTE — game queues commands
-    command_sent = executor.execute(bot, decision, snapshot)
-
-    # 8. Persist AI state only after the command actually dispatches.
-    # This prevents speculative shot feedback state from leaking across
-    # executor-side validation failures.
-    if command_sent:
-        previous_mode = bot._ai_state["mode"]
-        bot._ai_state = decision["updated_ai_state"]
-        if bot._ai_state["mode"] != previous_mode:
-            emit_mode_transition(
-                from_mode=previous_mode,
-                to_mode=bot._ai_state["mode"],
-                reason_kind=decision["behavior"]["reason_kind"],
-                caused_by=(
-                    0 if decision["command"]["cmd_type"] == "hold" else latest_decision_event_id()
-                ),
-            )
-
-    # 9. Update the in-page HUD so a human watching the browser sees what
-    # the bot decided this tick without tailing artifacts, keep the flag
-    # binding armed, and ring-buffer the payload so a flag click can
-    # snapshot the ticks that led up to it.
-    overlay = OverlayStateDict(
-        hfsm_state=bot.get_state(),
-        ai_mode=bot._ai_state["mode"],
-        ai_mode_state=bot._ai_state["mode_state"],
-        behavior_mode=decision["behavior"]["mode"],
-        behavior_reason=render_reason(decision["behavior"]),
-        command_type=decision["command"]["cmd_type"],
-        target_x=decision["behavior"]["target_x"],
-        target_y=decision["behavior"]["target_y"],
-        command_sent=command_sent,
-        in_flight_kind=bot._state_data["in_flight_action"]["kind"],
-        fuel=self_state["fuel"],
-        fuel_cap=fuel_capacity(self_state["rank"]),
-        self_x=self_state["x"],
-        self_y=self_state["y"],
-        armor=inventory["armor_shields"]["count"],
-        duals=inventory["dual_shots"]["count"],
-        missiles=inventory["missile_shots"]["count"],
-        homings=inventory["homing_shots"]["count"],
-        radars=inventory["extra_radars"]["count"],
-        inv_cap=inventory_capacity(self_state["rank"]),
-        kills=bot._ai_state["session_kill_count"],
-        hits=bot._ai_state["session_hit_count"],
-        misses=bot._ai_state["session_miss_count"],
-        rejects=bot._ai_state["session_reject_count"],
-        target_id=bot._ai_state["combat_target_id"],
-        target_name=bot._ai_state["last_shot_target_name"],
-    )
-    hud_cdp = bot._require_cdp()
-    bot._flag_capture.ensure(hud_cdp)
-    bot._flag_capture.record_tick(overlay)
-    update_bot_overlay(hud_cdp, overlay)
-    # The same payload the in-page HUD renders, mirrored to disk each
-    # tick so the fleet page can show the identical card per instance.
-    _test_hooks.write_text(
-        bot_run_dir(resolve_bot_instance()) / "hud.json",
-        dump_json_str(render_overlay_payload(overlay)),
-    )
-
-
-def _is_page_client_healthy(snapshot: PageClientSnapshotDict) -> bool:
-    """Return True when the live JS client is ready to receive commands.
-
-    Reads the authoritative live signals from the captured snapshot rather
-    than guessing from local send-side state. Two failure modes block
-    the tick:
-
-    1. ``client_present`` is False -- the inject script hasn't captured
-       ``window.__tankpitActiveGame`` yet, so the game isn't initialized.
-    2. ``ws_ready_state`` is anything other than ``OPEN`` (1) -- sends
-       would land in a dead socket. ``None`` means the socket has not
-       been captured yet; the tick waits rather than dispatching
-       against unknown state.
-
-    ``heartbeat_age_ms`` (``activeGame.va.j``) is deliberately NOT a
-    health signal: live-run measurement (run 20260609-233736) showed it
-    refreshes only about every 30 seconds while the wire is demonstrably
-    alive, so gating on it froze the bot ~25 of every 30 seconds. The
-    browser WebSocket ``readyState`` is the authoritative liveness
-    signal.
-    """
-    if not snapshot["client_present"]:
-        emit_sync("page client not present; skipping tick")
-        return False
-    ws_state = snapshot["ws_ready_state"]
-    if ws_state != _WS_READY_STATE_OPEN:
-        emit_sync("page websocket not OPEN (ws_ready_state=%s); skipping tick", str(ws_state))
-        return False
-    return True
-
-
-def _is_ready_for_decision(bot: Bot) -> bool:
-    """Return True when the bot state machine is ready to execute AI plans.
-
-    The planner may only dispatch commands from executable states. During
-    startup and disconnect handling, world state may already exist while the
-    bot state machine is still converging to ``IDLE``. Replanning in those
-    transitional states can produce invalid command transitions.
-
-    Args:
-        bot: Bot instance.
-
-    Returns:
-        True if the bot can safely plan and execute a command this tick.
-    """
-    state = bot.get_state()
-    if state in ("INITIALIZING", "WAITING_FOR_POSITION", "DISCONNECTED"):
-        emit_sync("deferring decisions while state=%s", state)
-        return False
-    return True
-
-
-def _merge_protocol_kills(ai_state: AIStateDict) -> AIStateDict:
-    """Merge Deactivation kills from protocol into AI killed_tank_ids.
-
-    Args:
-        ai_state: Current AI state.
-
-    Returns:
-        Updated AI state with new kills merged.
-    """
-    new_kills = drain_killed_tank_ids(get_world_service())
-    if not new_kills:
-        return ai_state
-    now = get_current_time_ms()
-    merged = dict(ai_state["killed_tank_ids"])
-    for tank_id in new_kills:
-        merged[str(tank_id)] = now
-        emit_ai("kill registered (tank_id=%d)", tank_id)
-    # The shot-target fields are NOT cleared here: when the killed tank
-    # is the pending shot's target, ``_get_combat_feedback`` must still
-    # see the target id to resolve the shot as ``kill_confirmed`` (a
-    # kill produces no damage-change feedback, so this is the kill
-    # shot's only resolution path). The classifier clears the fields
-    # itself after emitting the outcome.
-    target_was_killed = ai_state["combat_target_id"] in new_kills
-    return AIStateDict(
-        **{
-            **ai_state,
-            "killed_tank_ids": merged,
-            "session_kill_count": ai_state["session_kill_count"] + len(new_kills),
-            "combat_target_id": -1 if target_was_killed else ai_state["combat_target_id"],
-            "combat_target_x": 0 if target_was_killed else ai_state["combat_target_x"],
-            "combat_target_y": 0 if target_was_killed else ai_state["combat_target_y"],
-        }
-    )
-
-
-def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:
-    """Return True while a fired shot is still inside its feedback window.
-
-    Args:
-        bot: Bot instance.
-        timestamp_ms: Current timestamp in milliseconds.
-
-    Returns:
-        True if a shot outcome is still pending and the tick should wait.
-    """
-    target_id = bot._ai_state["last_shot_target_id"]
-    if target_id == -1:
-        return False
-    if peek_combat_hit(get_world_service()):
-        return False
-    if peek_our_shot_response(get_world_service()):
-        return False
-    if peek_command_error(get_world_service()) in _SHOT_REJECTING_COMMAND_ERRORS:
-        # The server refused the shot outright -- no ShootEvent or
-        # ammo delta will ever arrive, so waiting out the feedback
-        # window is pure dead time. The classifier consumes the error.
-        return False
-    if str(target_id) in bot._ai_state["killed_tank_ids"]:
-        return False
-    elapsed_ms = timestamp_ms - bot._ai_state["last_shoot_ms"]
-    if elapsed_ms >= bot._ai_state["config"]["shot_feedback_timeout_ms"]:
-        return False
-    emit_sync(
-        "waiting for shot feedback for %s (id=%d)",
-        bot._ai_state["last_shot_target_name"],
-        target_id,
-    )
-    return True
-
-
-def _get_combat_feedback(bot: Bot) -> CombatFeedback:
-    """Get combat feedback from the per-shot ammo consumption ledger.
-
-    **Consumption = hit** (user contract 2026-07-02): the server only
-    spends dual / missile / homing ammo on a shot that lands, and the
-    0x53 ShootEvent ``weapon`` field records the spend per shot --
-    the same per-shot inventory delta the page client renders.
-    ``weapon=0`` (free single, resolved against empty ground) spends
-    nothing and is a genuine miss. The earlier tile-occupancy signal
-    (``victim_id``) classified off-viewport pursuit hits as misses
-    because the impact tile is outside the local registry's view (run
-    2026-07-02 01:21: five ``weapon=3`` debits killed orange-3 while
-    ``victim_id`` was -1 on every shot).
-
-    Outcomes:
-      - ammo debited (weapon > 0)   -> "hit"
-      - target already in killed    -> "hit" (kill confirmed)
-      - 0x49 sync shows a debit the shot event missed -> "hit"
-      - shot response, no debit     -> "miss"
-      - 0x52 shot-rejecting error   -> "rejected" (server refused the
-        dispatch; neither hit nor miss -- no ammo moved)
-      - no response yet             -> ""  (keep waiting)
-
-    Ammo count is decremented in ``mark_combat_hit`` per the weapon
-    byte. Combat feedback never rewrites inventory counts -- wire
-    messages 0x49, 0x67, 0x74 remain the absolute authority the
-    shadow count reconciles against.
-
-    Args:
-        bot: Bot instance.
-
-    Returns:
-        "hit", "miss", or "" when feedback is indeterminate.
-    """
-    target_id = bot._ai_state["last_shot_target_id"]
-    target_name = bot._ai_state["last_shot_target_name"]
-    if target_id == -1:
-        return ""
-    got_hit = check_and_clear_combat_hit(get_world_service())
-    victim_id = check_and_clear_last_shot_victim_id(get_world_service())
-    got_response = check_and_clear_our_shot_response(get_world_service())
-    ammo_hit = check_and_clear_ammo_delta_hit(get_world_service())
-
-    def _inc_hit() -> None:
-        bot._ai_state = AIStateDict(
-            **{**bot._ai_state, "session_hit_count": bot._ai_state["session_hit_count"] + 1}
-        )
-
-    def _inc_miss() -> None:
-        bot._ai_state = AIStateDict(
-            **{**bot._ai_state, "session_miss_count": bot._ai_state["session_miss_count"] + 1}
-        )
-
-    duration_ms = get_current_time_ms() - bot._ai_state["last_shoot_ms"]
-    if got_hit:
-        # Distinguish intended-target hit from incidental hit (e.g.
-        # homing seeker landed on a closer enemy than commanded).
-        on_intended = victim_id == target_id
-        emit_shoot_hit(
-            duration_ms=duration_ms,
-            target_id=target_id,
-            target_name=target_name,
-            victim_id=victim_id,
-            on_intended_target=on_intended,
-            hit_signal="tile_occupied",
-        )
-        resolve_dealt(get_world_service().damage_book, victim_id, target_name, target_id)
-        _inc_hit()
-        return "hit"
-    if str(target_id) in bot._ai_state["killed_tank_ids"]:
-        emit_shoot_hit(
-            duration_ms=duration_ms,
-            target_id=target_id,
-            target_name=target_name,
-            victim_id=target_id,
-            on_intended_target=True,
-            hit_signal="kill_confirmed",
-        )
-        resolve_dealt(get_world_service().damage_book, target_id, target_name, target_id)
-        _inc_hit()
-        # Clear the shot-target fields directly: the trigger is
-        # ``killed_tank_ids`` membership, which is not a consumable
-        # wire flag -- without the clear, a tick that dispatches no
-        # command (so ``updated_ai_state`` never persists) would
-        # re-emit this outcome every tick until one does.
-        bot._ai_state = AIStateDict(
-            **{
-                **bot._ai_state,
-                "last_shot_target_id": -1,
-                "last_shot_target_name": "",
-            }
-        )
-        return "hit"
-    if ammo_hit:
-        # Reconciliation channel: the per-shot ``weapon`` byte is the
-        # primary consumption signal (handled above via got_hit), but
-        # if the 0x53 echo is lost, the server's 0x49 absolute
-        # inventory sync still reveals the debit against the pre-shot
-        # snapshot. A debit is a landed shot regardless of which wire
-        # channel reported it.
-        emit_shoot_hit(
-            duration_ms=duration_ms,
-            target_id=target_id,
-            target_name=target_name,
-            victim_id=victim_id,
-            on_intended_target=True,
-            hit_signal="ammo_delta",
-        )
-        resolve_dealt(get_world_service().damage_book, victim_id, target_name, target_id)
-        _inc_hit()
-        return "hit"
-    if got_response:
-        # No tile-occupied hit, no ammo debit, and a wire response did
-        # arrive -- the shot genuinely missed.
-        emit_shoot_miss(
-            duration_ms=duration_ms,
-            target_id=target_id,
-            target_name=target_name,
-        )
-        _inc_miss()
-        return "miss"
-    if peek_command_error(get_world_service()) in _SHOT_REJECTING_COMMAND_ERRORS:
-        error_code = check_and_clear_command_error(get_world_service())
-        emit_shoot_command_rejected(
-            duration_ms=duration_ms,
-            target_id=target_id,
-            target_name=target_name,
-            error_code=error_code,
-        )
-        bot._ai_state = AIStateDict(
-            **{
-                **bot._ai_state,
-                "session_reject_count": bot._ai_state["session_reject_count"] + 1,
-            }
-        )
-        if error_code == SUPERVISOR_ERROR_FRIENDLY_FIRE:
-            _disprove_target_by_friendly_fire(bot, target_id, target_name)
-        return "rejected"
-    return ""
-
-
-def _disprove_target_by_friendly_fire(bot: Bot, target_id: int, target_name: str) -> None:
-    """Consume a friendly-fire rejection as proof the target is not engageable.
-
-    The server's err=3 on an id-targeted shot is the only unfakeable
-    receipt that the id no longer resolves to an enemy. Session 4 of
-    run 20260730 (20:36): Yuppler left the game, the 0x58 grace kept
-    his registry entry (by design -- it powers the pursuit volley),
-    and every subsequent map open re-stamped the ghost's map
-    freshness, so acquisition re-selected him and the bot fired 43
-    consecutive rejected shots ("Friendly fire!" client spam). One
-    rejection now blocklists the id for the block TTL and releases the
-    combat lock, so the next tick re-acquires from live truth. The
-    registry entry itself is deliberately NOT deleted -- 0x58
-    semantics (tracking churn, reroute grace) stay intact.
-
-    Args:
-        bot: Bot instance.
-        target_id: The shot's intended target id.
-        target_name: The shot's intended target name (log receipt).
-    """
-    blocked = dict(bot._ai_state["blocked_combat_targets"])
-    blocked[str(target_id)] = get_current_time_ms()
-    updated = AIStateDict(**{**bot._ai_state, "blocked_combat_targets": blocked})
-    if updated["combat_target_id"] == target_id:
-        updated = clear_combat_target(updated)
-    bot._ai_state = updated
-    log.info(
-        "AI: shot at %s (id=%d) rejected as friendly fire - "
-        "target disproved, blocked and lock released",
-        target_name,
-        target_id,
-    )
-    emit_diagnostic(
-        diagnostic_kind="target_disproved_by_friendly_fire",
-        target_id=target_id,
-        target_name=target_name,
-    )
-
-
 __all__ = [
+    "is_interrupt_requested",
+    "log",
+    "request_interrupt",
+    "reset_interrupt_flag",
     "run_tick_loop",
 ]

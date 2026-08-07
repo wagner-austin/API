@@ -63,7 +63,10 @@ def main() -> None:
     """Entry point for tankpit-bot command."""
     from tankpit_bot.bot.base import Bot
     from tankpit_bot.bot.config import resolve_prefer_account, resolve_target_url
-    from tankpit_bot.bot.tick_loop import request_interrupt, reset_interrupt_flag
+    from tankpit_bot.bot.tick_loop import (
+        request_interrupt,
+        reset_interrupt_flag,
+    )
     from tankpit_bot.service import _test_hooks as service_hooks
     from tankpit_bot.sniffer.decoders import set_protocol_frame_logging
 
