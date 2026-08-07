@@ -12,8 +12,8 @@ side can split by match. Fifteen hundred rows of one match agree with each
 other far more than they agree with anything else; split by row, the test set
 is the training set wearing a different frame number.
 
-Only the 15-column trace shape exports: the income pair is the point of the
-dataset -- the race law in one column per sample ([[policy-economy]]) -- and a
+Only traces carrying the income pair (15 columns or more) export: it is the
+point of the dataset -- the race law in one column per sample ([[policy-economy]]) -- and a
 13-column archive trace has no honest value to put there. Skips are counted
 and printed, never silent.
 
@@ -22,6 +22,7 @@ Run as ``python -m scripts.export_matches <batch-name> [<batch-name> ...]``.
 
 from __future__ import annotations
 
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -45,6 +46,10 @@ EXIT_BAD_USAGE = 2
 #: the tick's own ``lost`` column; ``killed_cum`` counts only the ledger
 #: entries that name a killer -- the distinction the trace records on purpose,
 #: a blank killer being a unit that left the roster some other way.
+#: ``difficulty`` is the card's own statement of what was played (runner
+#: files a ``match`` line since 2026-08-06), blank for cards that predate
+#: it -- metadata for slicing, excluded from the model's features exactly
+#: like arm and seed.
 HEADER = (
     "match",
     "arm",
@@ -67,10 +72,12 @@ HEADER = (
     "rival",
     "income",
     "rival_income",
+    "difficulty",
 )
 
-#: Columns a tick row must split into to export -- the shape with the income
-#: pair at 12-13. The 13-column archive shape is counted, reported and
+#: Fewest columns a tick row must split into to export -- the shape with
+#: the income pair at 12-13. Later columns (plan at 15, workers at 16) are
+#: read when present. The 13-column archive shape is counted, reported and
 #: skipped rather than padded: an invented zero income is not a measurement.
 _TICK_COLUMNS = 15
 
@@ -129,7 +136,7 @@ def parse_trace(text: str) -> ParsedTrace:
 
 
 def match_rows(
-    match: str, arm: str, seed: str, verdict: str, parsed: ParsedTrace
+    match: str, arm: str, seed: str, verdict: str, difficulty: str, parsed: ParsedTrace
 ) -> tuple[str, ...]:
     """Join one match's ticks with its loss ledger and verdict.
 
@@ -138,6 +145,8 @@ def match_rows(
         arm: The sweep arm the match ran under.
         seed: The match's seed.
         verdict: The scorecard's grade, first word.
+        difficulty: The card's stated difficulty, empty when the card
+            predates the ``match`` line.
         parsed: The match's parsed trace.
 
     Returns:
@@ -165,6 +174,7 @@ def match_rows(
                     str(lost_cum),
                     str(killed),
                     *(str(value) for value in tick[6:14]),
+                    difficulty,
                 )
             )
         )
@@ -197,8 +207,10 @@ def export(batches: Sequence[str], sweeps: Path, traces: Path) -> tuple[list[str
                 continue
             fields = scorecard_fields(card.read_text(encoding="utf-8"))
             verdict = fields.get("verdict", "?").split(" ")[0]
+            found = re.search(r"difficulty (-?\d+)", fields.get("match", ""))
+            difficulty = found.group(1) if found else ""
             arm, _, seed = path.stem.rpartition("-s")
-            rows.extend(match_rows(f"{batch}/{path.stem}", arm, seed, verdict, parsed))
+            rows.extend(match_rows(f"{batch}/{path.stem}", arm, seed, verdict, difficulty, parsed))
     return rows, skipped
 
 

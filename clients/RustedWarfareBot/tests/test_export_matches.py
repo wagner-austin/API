@@ -157,6 +157,33 @@ def test_a_missing_verdict_field_exports_as_a_question_mark(
     capsys.readouterr()
 
 
+def test_the_difficulty_rides_every_row_when_the_card_states_its_match(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Cards file their setup since 2026-08-06; older cards leave the column
+    blank rather than inventing a difficulty."""
+    sweeps, traces = _write_match(
+        tmp_path, "night", "flame-close-s777", _TICK_HEADER + _tick(0), "won"
+    )
+    card = sweeps / "night" / "flame-close-s777.txt"
+    stated = "\n".join(
+        (
+            "### flame-close-s777",
+            f"{'match':<15}1 opponent(s) at difficulty 2 (1.8x AI income) on maps/x.tmx",
+            f"{'verdict':<15}won (won)",
+            "",
+        )
+    )
+    card.write_text(stated, encoding="utf-8")
+    dest = tmp_path / "dataset"
+    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest) == EXIT_OK
+    lines = (dest / "data.csv").read_text(encoding="utf-8").splitlines()
+    by_column = dict(zip(HEADER, lines[1].split(","), strict=True))
+    assert by_column["difficulty"] == "2"
+    assert by_column["won"] == "1"
+    capsys.readouterr()
+
+
 def test_no_arguments_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
     assert main([]) == EXIT_BAD_USAGE
     assert capsys.readouterr().out == "usage: export_matches <batch-name> [<batch-name> ...]\n"
