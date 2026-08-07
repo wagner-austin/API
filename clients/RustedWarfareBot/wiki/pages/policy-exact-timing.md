@@ -70,10 +70,16 @@ Two traps this regime opened, both paid for and fixed the same day:
 
 None of these is a closed rung: the standard is winning a rung outright,
 not leading a coin flip, and 12/24 at Very Hard is the baseline the next
-arms climb from. The named path (log 2026-08-06, erosion analysis):
-winners reach 6 extractors by s1500 and close early; losers reach the same
-peak late and erode. Expansion speed and the closer threshold are the
-levers; erosion is what forecloses them.
+arms climb from. The erosion analysis (log 2026-08-06) read the winning
+trajectory as: reach 6 extractors by s1500, close early. Both naive
+operationalizations of that sentence are now measured NEGATIVE (log
+2026-08-07): latching the closer at 2x instead of 3x went 1W/23L (net
+-16, the premature-all-in mode at panel scale), and 10 workers instead
+of 8 went 8W/12L (net -5, early credits taken from the army as the first
+waves land). The trajectory is a description, not a knob: the
+discriminator lives upstream, in the early skirmishes that decide whether
+expansion is affordable and dominance is real. The instrument for the
+next step is the baseline panel's own 12-vs-12 split, not another arm.
 
 ## Across maps (xmap3, 2026-08-07): the erosion law travels
 
