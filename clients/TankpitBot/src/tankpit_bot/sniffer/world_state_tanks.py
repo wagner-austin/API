@@ -18,7 +18,7 @@ from tankpit_bot.facts.source import FactSource
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import remove_tank
-from tankpit_bot.state.mutations import apply_tank_observation
+from tankpit_bot.state.tank_mutations import apply_tank_observation
 from tankpit_bot.state.types import WorldStateDict, make_self_state, make_tank_observation
 
 log = get_logger(__name__)

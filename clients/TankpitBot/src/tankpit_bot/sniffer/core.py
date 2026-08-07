@@ -27,9 +27,7 @@ from tankpit_bot.browser.lifecycle import (
 from tankpit_bot.capture.summary import build_session_summary
 from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.runtime_artifacts import SniffRunArtifactsDict
-from tankpit_bot.runtime_logging import (
-    configure_sniff_runtime_logging,
-)
+from tankpit_bot.runtime_logging import configure_sniff_runtime_logging
 from tankpit_bot.sniffer.constants import (
     DEFAULT_CAPTURE_DURATION_MS,
     DEFAULT_TARGET_URL,

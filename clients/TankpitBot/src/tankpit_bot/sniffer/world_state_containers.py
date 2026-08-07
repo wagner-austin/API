@@ -13,7 +13,10 @@ from tankpit_bot.facts.source import FactSource
 from tankpit_bot.ledger.damage_book import confirm_incoming_damage
 from tankpit_bot.ledger.fuel_book import record_fuel_entry, record_fuel_reading
 from tankpit_bot.physics.capacity import fuel_capacity
-from tankpit_bot.runtime_logging import emit_diagnostic, emit_world
+from tankpit_bot.runtime_logging import (
+    emit_diagnostic,
+    emit_world,
+)
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     pickup_container,
