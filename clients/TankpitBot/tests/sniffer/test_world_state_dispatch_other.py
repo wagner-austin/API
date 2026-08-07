@@ -90,6 +90,7 @@ class TestDispatchOther:
             rank=4,
             lb_score=8,
             promo_state=0,
+            promo_bar_lit=True,
             fuel=1400,
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -115,6 +116,7 @@ class TestDispatchOther:
             rank=4,
             lb_score=0,
             promo_state=None,
+            promo_bar_lit=None,
             fuel=None,
         )
         dispatch_world_state_update(get_world_service(), msg)

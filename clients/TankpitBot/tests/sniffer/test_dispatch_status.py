@@ -187,6 +187,7 @@ class TestDispatchSelfStatus:
             rank=1,
             lb_score=151,
             promo_state=0,
+            promo_bar_lit=True,
             fuel=1100,
         )
         dispatch_world_state_update(ws, msg)
@@ -220,6 +221,7 @@ class TestDispatchSelfStatus:
             rank=1,
             lb_score=151,
             promo_state=7,
+            promo_bar_lit=None,
             fuel=None,
         )
         # The dispatch path emits a diagnostic event; we just need to
@@ -253,6 +255,7 @@ class TestDispatchSelfStatus:
             rank=1,
             lb_score=151,
             promo_state=0,
+            promo_bar_lit=True,
             fuel=1100,
         )
         dispatch_world_state_update(ws, msg)
@@ -280,6 +283,7 @@ class TestDispatchSelfStatus:
             rank=5,
             lb_score=0,
             promo_state=0,
+            promo_bar_lit=None,
             fuel=None,
         )
         dispatch_world_state_update(ws, msg)

@@ -110,6 +110,22 @@ def test_tank_status_sync_all_three_length_variants() -> None:
         assert encode_message_payload(message) == payload
     full = decode_tank_status_sync(with_fuel)
     assert full["fuel"] == 1100
+    assert full["promo_bar_lit"] is True
+
+
+def test_tank_status_sync_re_encodes_a_dark_promo_bar() -> None:
+    """Byte 9 comes back from the message, not from a constant.
+
+    Hardcoding it to 1 cost 219 archived bodies their byte identity —
+    the whole 0x2E family failed ``make roundtrip`` once the archive
+    walk stopped crashing before it could report
+    ([[session-state-deglobalisation]]).
+    """
+    payload = bytes([0, 7, 0, 1, 4, 0, 0, 55, 2, 0, 0x4C, 0x04])
+    message = decode_tank_status_sync(payload)
+    assert message["promo_bar_lit"] is False
+    assert message["fuel"] == 1100
+    assert encode_message_payload(message) == payload
 
 
 def test_tank_status_roundtrip_preserves_info_byte_bits() -> None:

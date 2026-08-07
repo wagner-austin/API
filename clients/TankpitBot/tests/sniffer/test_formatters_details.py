@@ -136,6 +136,7 @@ class TestFormatFunctions:
             rank=3,
             lb_score=5,
             promo_state=0,
+            promo_bar_lit=None,
             fuel=None,
         )
         result = format_tank_details(msg)

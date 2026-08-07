@@ -180,6 +180,7 @@ def test_detector_fires_on_corrupted_fuel_sync(fake_fs: FakeFileSystem) -> None:
             rank=truth["rank"],
             lb_score=0,
             promo_state=0,
+            promo_bar_lit=True,
             fuel=truth["fuel"] + 700,
         )
         deliver_batch(bot._cdp_message_buffer, [corrupted, corrupted], link)

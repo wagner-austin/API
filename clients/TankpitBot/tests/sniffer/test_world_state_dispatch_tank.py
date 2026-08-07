@@ -185,6 +185,7 @@ class TestDispatchTankMessages:
             rank=4,
             lb_score=1234,
             promo_state=0,
+            promo_bar_lit=None,
             fuel=None,
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -221,6 +222,7 @@ class TestDispatchTankMessages:
                 rank=4,
                 lb_score=1234,
                 promo_state=0,
+                promo_bar_lit=None,
                 fuel=None,
             )
             dispatch_world_state_update(get_world_service(), msg)
@@ -259,6 +261,7 @@ class TestDispatchTankMessages:
             rank=4,
             lb_score=1234,
             promo_state=0,
+            promo_bar_lit=None,
             fuel=None,
         )
         dispatch_world_state_update(get_world_service(), msg)

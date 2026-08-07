@@ -67,8 +67,11 @@ def encode_tank_status_sync(message: TankStatusSyncDict) -> bytes:
     """Encode a 0x2E TankStatusSync body (inverse of ``decode_tank_status_sync``).
 
     Length variant follows the optional fields: 8 bytes bare, 9 with
-    ``promo_state``, 12 with ``fuel`` (the has-fuel-bar byte before the
-    fuel u16 is always 1 on the wire — 21,278/21,278 corpus bodies).
+    ``promo_state``, 12 with ``promo_bar_lit`` and ``fuel``. That byte
+    used to be hardcoded to 1 here on a corpus claim that has since
+    been falsified — 219 archived long-form bodies carry 0 — so it is
+    now carried through from the decode
+    ([[session-state-deglobalisation]]).
 
     Args:
         message: Decoded status sync.
@@ -85,7 +88,7 @@ def encode_tank_status_sync(message: TankStatusSyncDict) -> bytes:
     if message["promo_state"] is not None:
         out += bytes([message["promo_state"]])
         if message["fuel"] is not None:
-            out += bytes([1]) + pack16(message["fuel"])
+            out += bytes([1 if message["promo_bar_lit"] else 0]) + pack16(message["fuel"])
     return out
 
 

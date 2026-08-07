@@ -361,6 +361,7 @@ def self_status_sync(
     damage_state: int = 0,
     lb_score: int = 0,
     promo_state: int = 0,
+    promo_bar_lit: bool = True,
 ) -> TankStatusSyncDict:
     """Build a fuel-bearing 0x2E ``TankStatusSync`` for the self tank.
 
@@ -378,6 +379,9 @@ def self_status_sync(
         damage_state: Damage tier (0-3).
         lb_score: Leaderboard score.
         promo_state: Promotion-progress counter.
+        promo_bar_lit: The promotion bar's colour byte — lit on
+            70,313 of 70,532 archived long-form bodies, so lit is the
+            default and the dark form is the one a test opts into.
 
     Returns:
         A :class:`TankStatusSyncDict` ready for ingestion.
@@ -390,6 +394,7 @@ def self_status_sync(
         rank=rank,
         lb_score=lb_score,
         promo_state=promo_state,
+        promo_bar_lit=promo_bar_lit,
         fuel=fuel,
     )
 

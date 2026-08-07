@@ -338,6 +338,7 @@ class TestCombatHitAdvancesDamageState:
                 rank=1,
                 lb_score=107,
                 promo_state=0,
+                promo_bar_lit=None,
                 fuel=None,
             ),
         )

@@ -161,6 +161,7 @@ class TestDecodeTankStatusSync:
         assert result["damage_state"] == 2
         assert result["rank"] == 4
         assert result["promo_state"] is None
+        assert result["promo_bar_lit"] is None
         assert result["fuel"] is None
 
     def test_decodes_9byte_form_with_promo_state(self) -> None:
@@ -172,6 +173,7 @@ class TestDecodeTankStatusSync:
         data = bytes([1, 0x02, 0x01, 2, 4, 0, 0x10, 0x00, 3])
         result = decode_tank_status_sync(data)
         assert result["promo_state"] == 3
+        assert result["promo_bar_lit"] is None
         assert result["fuel"] is None
 
     def test_decodes_long_format(self) -> None:
@@ -180,6 +182,21 @@ class TestDecodeTankStatusSync:
         result = decode_tank_status_sync(data)
         assert result["subtype"] == 3
         assert result["promo_state"] == 7
+        assert result["promo_bar_lit"] is True
+        assert result["fuel"] == 1000
+
+    def test_dark_promo_bar_survives_the_decode(self) -> None:
+        """Byte 9 clear is a real wire state, not a constant.
+
+        The encoder used to hardcode this byte to 1 on a corpus claim
+        of 21,278/21,278; the 2026-08-06 sweep found 219 long-form
+        bodies carrying 0, so the decoder now keeps it and fuel is
+        read either way — the JS applies fuel unconditionally
+        ([[session-state-deglobalisation]]).
+        """
+        data = bytes([3, 0x02, 0x01, 0, 5, 0, 0x10, 0x00, 7, 0, 0xE8, 0x03])
+        result = decode_tank_status_sync(data)
+        assert result["promo_bar_lit"] is False
         assert result["fuel"] == 1000
 
     def test_raises_on_short_data(self) -> None:

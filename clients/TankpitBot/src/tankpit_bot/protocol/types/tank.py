@@ -101,13 +101,32 @@ class TankStatusSyncDict(TypedDict):
       a[4]    = rank (b.l)
       a[5:8]  = lb_score (24-bit BE)
       a[8]    = promo_state -- present when the body is at least 9 bytes
-      a[9]    = has_fuel_bar (if long form)
+      a[9]    = promo_bar_lit (if long form)
       a[10:12] = fuel (LE u16, if long form)
 
     The 9-byte short form carries ``promo_state``; the 13-byte long
     form carries ``fuel`` as well. Production corpus
     (analysis_scripts/crack_tank_status_short.py) confirms 74/74
     9-byte 0x2E bodies have promo_state in ``[0, 5]``.
+
+    ``a[9]`` was documented as ``has_fuel_bar`` and then DROPPED by the
+    decoder, leaving the encoder to hardcode it to 1 ("21,278/21,278
+    corpus bodies"). Both halves were wrong. The JS reads fuel
+    unconditionally at long form (``Cc(a.v, this.o)`` runs whatever
+    ``a[9]`` says), so the byte gates nothing about fuel; it rides with
+    ``promo_state`` into ``Dc``, which stores it as the promotion
+    bar's colour — ``Fc`` fills the bar to ``2 * promo_state`` pixels
+    and paints it green when the flag is set, dark red when it is
+    clear. Its meaning beyond that colour is unproven. A 2026-08-06
+    archive sweep found 219 of 70,532 long-form bodies carrying 0, all
+    on the client's own tank across four sessions and every fuel
+    level, so the hardcoded 1 was a genuine round-trip defect that the
+    archive walk had been crashing before it could report
+    ([[session-state-deglobalisation]]).
+
+    ``promo_bar_lit`` and ``fuel`` are present together or not at all:
+    the only observed body lengths are 8, 9, and 12, and byte 9 exists
+    only in the 12-byte form.
     """
 
     msg_type: Literal[0x2E]
@@ -117,6 +136,7 @@ class TankStatusSyncDict(TypedDict):
     rank: int
     lb_score: int
     promo_state: int | None
+    promo_bar_lit: bool | None
     fuel: int | None
 
 

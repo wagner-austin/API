@@ -87,6 +87,11 @@ def status_sync(tank_id: int, world: SimWorldDict, include_fuel: bool) -> TankSt
         rank=tank["rank"],
         lb_score=0,
         promo_state=0,
+        # The promotion bar rides with the fuel field or not at all.
+        # Lit is the overwhelming wire majority (70,313 of 70,532
+        # long-form bodies); the sim never darkens it because nothing
+        # is known about what darkens it on the real server.
+        promo_bar_lit=True if include_fuel else None,
         fuel=tank["fuel"] if include_fuel else None,
     )
 
