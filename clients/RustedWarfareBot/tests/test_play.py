@@ -26,80 +26,22 @@ from scripts.play import (
 
 from rw_bot.policy.doctrine import Doctrine, DoctrineError
 from rw_bot.policy.doctrine_file import format_doctrine
-from tests.wire_fixtures import ScriptedPeer, StubbedConnect
-
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_CATALOGUE_PATH = _PROJECT_ROOT / "wiki" / "sources" / "m0-probe" / "printunits.log"
-_PLACEMENT_PATH = _PROJECT_ROOT / "wiki" / "sources" / "m11-pools" / "type-flags.ndjson"
-
-
-def _entity_line(frame: int, index: int, unit_id: int, type_name: str) -> str:
-    return (
-        f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
-        f'"type":"{type_name}","class":"units.x","x":100.0,"y":200.0,'
-        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0,"damaged_by":""}}'
-    )
-
-
-def _pool_line(frame: int, index: int, tile_x: int, tile_y: int) -> str:
-    return (
-        f'{{"kind":"pool","frame":{frame},"index":{index},'
-        f'"tile_x":{tile_x},"tile_y":{tile_y},'
-        f'"x":{tile_x * 20 + 10}.0,"y":{tile_y * 20 + 10}.0,"group_land":1}}'
-    )
-
-
-#: What the Builder offers by default here -- the plan's own types, which the
-#: live capture confirms unit 214 reports.
-_BUILDER_OFFERS = ("extractorT1", "landFactory", "c_tank")
-
-
-def _option_line(frame: int, index: int, unit_id: int, produces: str) -> str:
-    return (
-        f'{{"kind":"option","frame":{frame},"index":{index},"unit_id":{unit_id},'
-        f'"produces":"{produces}","key":"u_x","placed":true,"available":true,"makes_something":true,"price":100}}'
-    )
-
-
-def _sample_lines(
-    frame: int,
-    credits: int,
-    *entities: tuple[int, str],
-    pools: tuple[tuple[int, int], ...] = (),
-    options: tuple[tuple[int, str], ...] | None = None,
-) -> list[str]:
-    if options is None:
-        options = tuple((214, name) for name in _BUILDER_OFFERS)
-    lines = [
-        f'{{"kind":"frame","frame":{frame},"clock_ms":{frame * 3},'
-        f'"visible":{len(entities)},"pools":{len(pools)},'
-        f'"options":{len(options)},"players":0,'
-        f'"credits":{credits},"defeated":false,"wiped":false,"players_left":6}}'
-    ]
-    for index, (unit_id, type_name) in enumerate(entities):
-        lines.append(_entity_line(frame, index, unit_id, type_name))
-    for index, (tile_x, tile_y) in enumerate(pools):
-        lines.append(_pool_line(frame, index, tile_x, tile_y))
-    for index, (unit_id, produces) in enumerate(options):
-        lines.append(_option_line(frame, index, unit_id, produces))
-    return lines
-
-
-_BUILDER = (214, "builder")
-
-#: What DEFAULT_GOALS expands to against the real tree from the opening roster.
-#: Stated here so a change to either the goals or the tree fails loudly rather
-#: than quietly changing what these tests drive.
-_EXPANDED = (
-    "extractorT1",
-    "extractorT1",
-    "extractorT1",
-    "landFactory",
-    "c_tank",
-    "c_tank",
-    "c_tank",
-    "c_tank",
+from tests.play_fixtures import (
+    BUILDER as _BUILDER,
 )
+from tests.play_fixtures import (
+    CATALOGUE_PATH as _CATALOGUE_PATH,
+)
+from tests.play_fixtures import (
+    EXPANDED as _EXPANDED,
+)
+from tests.play_fixtures import (
+    PLACEMENT_PATH as _PLACEMENT_PATH,
+)
+from tests.play_fixtures import (
+    sample_lines as _sample_lines,
+)
+from tests.wire_fixtures import ScriptedPeer, StubbedConnect
 
 
 def test_the_real_catalogue_prices_every_goal() -> None:
@@ -535,89 +477,3 @@ def test_heavies_are_verified_against_the_real_catalogue() -> None:
         heavy_reinforcements(("landFactory",), catalogue)
     assert structure.value.code == "RW-DOCTRINE-011"
     assert "structure" in structure.value.message
-
-
-def test_the_opening_settles_by_content_not_by_clock(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """A held match world may be sampled before its units spawn.
-
-    The world used to settle on 22 seconds of free-running wall clock, and
-    runs began from worlds that already differed ([[policy-determinism]]).
-    The roster is what plan expansion reads, so the roster is the condition:
-    empty samples are acknowledged and the plan is expanded against the first
-    observation that owns something finished.
-    """
-    built = [(300 + i, name) for i, name in enumerate(_EXPANDED)]
-    empty = _sample_lines(1, 4000)
-    populated = _sample_lines(2, 9000, _BUILDER, *built)
-    # Two empty observations, one populated one the settle consumes, then the
-    # loop's own two samples.
-    peer = ScriptedPeer(empty + empty + populated * 12)
-    with StubbedConnect(peer):
-        assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "2"]) == EXIT_OK
-    printed = capsys.readouterr().out.splitlines()
-    # The plan was expanded against the populated world, not the empty one.
-    assert printed[3] == (
-        "plan:  extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> c_tank"
-    )
-
-
-def test_a_world_that_never_populates_is_a_failed_start_not_a_slow_one() -> None:
-    """The settle is bounded: a match whose units never spawn is broken, and
-    expanding a plan against an empty world says so loudly rather than
-    waiting forever.
-    """
-    from rw_bot.policy.expand import ExpansionError
-
-    empty = _sample_lines(1, 4000)
-    peer = ScriptedPeer(empty * 60)
-    with StubbedConnect(peer), pytest.raises(ExpansionError) as caught:
-        main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"])
-    assert caught.value.code == "RW-EXPAND-001"
-
-
-_SANDBOX = (
-    (100, "commandCenter"),
-    (101, "builder"),
-    (102, "landFactory"),
-    (103, "gunShip"),
-    (104, "airFactory"),
-)
-
-
-def test_the_plan_waits_out_the_boot_sandbox_before_compiling(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """The exact-timing regime can serve the engine's ten-player boot world
-    before the configured match goes live, frame counter already pinned to
-    zero. A plan compiled against that roster inserts no factory -- it
-    believes it owns two -- and is dead at its first combat entry
-    (log 2026-08-06: 0/24 at Very Hard AND at Hard). The swap is a roster
-    sharing no identity with the sandbox's."""
-    sandbox = _sample_lines(1, 4000, *_SANDBOX)
-    duel = _sample_lines(2, 4000, _BUILDER)
-    peer = ScriptedPeer(sandbox + duel * 4)
-    with StubbedConnect(peer):
-        # Incomplete is right: a bare builder cannot finish a nine-entry plan
-        # in two samples. The compile is what is under test.
-        assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "2"]) == EXIT_INCOMPLETE
-    printed = capsys.readouterr().out.splitlines()
-    assert printed[1] == "owned at compile (frame 2): builder"
-    assert printed[3] == "plan:  " + " -> ".join(_EXPANDED)
-
-
-def test_a_rich_world_that_never_swaps_is_the_run_s_real_world(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """The default-map probes play the sandbox itself; for them the rich
-    roster is the truth and compiling against it is correct. The wait is
-    bounded so those runs pay a window, not the match."""
-    sandbox = _sample_lines(1, 4000, *_SANDBOX)
-    peer = ScriptedPeer(sandbox * 12)
-    with StubbedConnect(peer):
-        main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"])
-    printed = capsys.readouterr().out.splitlines()
-    assert printed[1].startswith("owned at compile (frame 1):")
-    # The sandbox owns a factory, so expansion inserts nothing.
-    assert printed[3] == "plan:  " + " -> ".join(DEFAULT_GOALS)
