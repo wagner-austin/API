@@ -106,8 +106,6 @@ def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
     frames: list[DecodedFrameDict] = []
     for message in session["messages"]:
         for body in split_payload_frames(message["payload"]):
-            if not body:
-                continue
             frames.append(
                 DecodedFrameDict(
                     timestamp_ms=message["timestamp_ms"],

@@ -288,8 +288,6 @@ def _decode_viewport_update(
     Returns:
         Decoded viewport update or ``None`` when the frame is not ``0x5A``.
     """
-    if len(body) == 0:
-        return None
     decoded_data = xor_decode_body(body, xor_table, offset=1)
     parsed = try_decode_binary_message(body[0], decoded_data)
     if parsed is None:

@@ -435,7 +435,7 @@ def compile_ghost_spec(capture_text: str) -> GhostSpecDict:
             log.warning("ghost compile: skipping unparseable payload: %s", error)
             continue
         for body in frames:
-            if not body or try_decode_plaintext_ack(body) is not None:
+            if try_decode_plaintext_ack(body) is not None:
                 continue
             if _is_text_route(body[0], body):
                 continue
