@@ -33,23 +33,46 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tankpit fleet</title>
+<title>Tankpit Fleet</title>
 <style>
-  body { background:#0f1115; color:#d6dae2; margin:0;
-         font-family:"Segoe UI",system-ui,sans-serif; }
-  header { padding:1rem 1.6rem; border-bottom:1px solid #262c37;
-           display:flex; align-items:baseline; gap:1rem; }
-  header h1 { margin:0; font-size:1.15rem; letter-spacing:.03em; }
-  header .sub { color:#8a93a3; font-size:.85rem; }
-  main { padding:1.3rem 1.6rem; display:grid; gap:1.3rem; max-width:1200px; }
-  #huds { display:flex; flex-wrap:wrap; gap:1rem; }
-  .hudwrap .hudname { font:600 .8rem "Segoe UI",sans-serif; color:#8a93a3;
-                      margin:0 0 .3rem .2rem; text-transform:uppercase;
-                      letter-spacing:.06em; }
+  body { margin:0; color:#e9e9f0;
+         font-family:"Segoe UI",system-ui,sans-serif;
+         background:#0c0f16 radial-gradient(1100px 700px at 18% -8%,
+           rgba(37,52,120,.55), transparent 62%) no-repeat fixed; }
+  header { padding:1rem 1.6rem; display:flex; align-items:baseline;
+           gap:1rem; border-bottom:1px solid rgba(255,255,255,.09);
+           background:rgba(24,34,80,.22);
+           backdrop-filter:blur(6px) saturate(1.1); }
+  header h1 { margin:0; font-size:1.2rem; letter-spacing:.06em;
+              color:rgb(57,255,20);
+              text-shadow:0 0 8px rgba(57,255,20,.45); }
+  header .sub { color:#9aa3b5; font-size:.85rem; }
+  .dot { display:inline-block; width:.55em; height:.55em;
+         border-radius:50%; margin-right:.4em;
+         background:#5ecb71; box-shadow:0 0 6px #5ecb71; }
+  .dot.off { background:#e0656a; box-shadow:0 0 6px #e0656a; }
+  main { padding:1.3rem 1.6rem; display:grid; gap:1.3rem; max-width:1240px; }
+  #huds { display:grid; gap:1.1rem;
+          grid-template-columns:repeat(auto-fill, 272px);
+          align-items:start; justify-content:start; }
+  .hudwrap { width:272px; }
+  .hudwrap .hudname { font:600 .8rem "Segoe UI",sans-serif; color:#9aa3b5;
+                      margin:0 0 .35rem .2rem; text-transform:uppercase;
+                      letter-spacing:.08em; height:1.1rem;
+                      overflow:hidden; white-space:nowrap; }
+  .panel { background:rgba(24,34,80,.28); border-radius:10px;
+           border:2px solid; padding:.2rem;
+           border-color:rgba(255,255,255,.22) rgba(0,0,0,.8)
+             rgba(0,0,0,.8) rgba(255,255,255,.14);
+           box-shadow:0 8px 24px rgba(0,0,0,.6),
+             0 0 22px rgba(25,50,230,.14);
+           backdrop-filter:blur(6px) saturate(1.1); }
   table { border-collapse:collapse; width:100%; font-size:.9rem; }
-  th, td { border:1px solid #262c37; padding:.45rem .7rem; text-align:left; }
-  th { background:#161a21; color:#8a93a3; font-size:.78rem;
-       text-transform:uppercase; letter-spacing:.05em; }
+  th, td { border-bottom:1px solid rgba(255,255,255,.07);
+           padding:.5rem .8rem; text-align:left; white-space:nowrap; }
+  tr:last-child td { border-bottom:none; }
+  th { color:#9aa3b5; font-size:.76rem; text-transform:uppercase;
+       letter-spacing:.07em; border-bottom:1px solid rgba(255,255,255,.14); }
   tr.dead td { color:#6d7585; }
   .alive { color:#5ecb71; font-weight:600; }
   .done { color:#8a93a3; } .crash { color:#e0656a; }
@@ -62,8 +85,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   button.primary { background:#67b0e8; color:#0d141b; border-color:#67b0e8;
                    font-weight:600; padding:.45rem 1.2rem; }
   form { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-         gap:.9rem 1.1rem; align-items:end; background:#161a21;
-         border:1px solid #262c37; border-radius:10px; padding:1rem 1.2rem; }
+         gap:.9rem 1.1rem; align-items:end; padding:1rem 1.2rem;
+         background:rgba(24,34,80,.28); border-radius:10px;
+         border:2px solid; backdrop-filter:blur(6px) saturate(1.1);
+         border-color:rgba(255,255,255,.22) rgba(0,0,0,.8)
+           rgba(0,0,0,.8) rgba(255,255,255,.14);
+         box-shadow:0 8px 24px rgba(0,0,0,.6); }
   label { display:block; font-size:.75rem; color:#8a93a3; margin-bottom:.3rem;
           text-transform:uppercase; letter-spacing:.05em; }
   .hint { font-size:.73rem; color:#8a93a3; margin-top:.3rem; }
@@ -76,10 +103,11 @@ __CARD_CSS__
 </style>
 </head>
 <body>
-<header><h1>tankpit fleet</h1>
-<span class="sub" id="headline">connecting…</span></header>
+<header><h1>Tankpit Fleet</h1>
+<span class="sub" id="headline"><span class="dot off"></span>connecting…</span></header>
 <main>
 <div id="huds"></div>
+<div class="panel">
 <table>
   <thead><tr>
     <th>name</th><th>account</th><th>status</th><th>limits</th>
@@ -87,6 +115,7 @@ __CARD_CSS__
   </tr></thead>
   <tbody id="rows"><tr><td colspan="9" class="empty">loading…</td></tr></tbody>
 </table>
+</div>
 <form id="spawn">
   <div><label for="instance">Name</label>
     <input id="instance" placeholder="e.g. alpha" required
@@ -221,7 +250,8 @@ async function poll() {
     for (const name of Object.keys(registry)) delete registry[name];
     for (const bot of body.bots) registry[bot.instance] = bot;
   } catch (e) {
-    document.getElementById("headline").textContent = "fleet unreachable";
+    document.getElementById("headline").innerHTML =
+      '<span class="dot off"></span>fleet unreachable';
     return;
   }
   const names = Object.keys(registry).sort();
@@ -245,7 +275,8 @@ async function poll() {
   }
   for (const name of names) tbody.appendChild(row(registry[name]));
   const running = names.filter((n) => registry[n].alive).length;
-  document.getElementById("headline").textContent =
+  document.getElementById("headline").innerHTML =
+    '<span class="dot"></span>fleet online · ' +
     names.length + " bot" + (names.length === 1 ? "" : "s") +
     " · " + running + " running";
 }
@@ -254,14 +285,13 @@ async function loadAccounts() {
   try {
     const body = await (await fetch("/accounts")).json();
     const select = document.getElementById("account");
+    if (!body.accounts.length) return;
+    select.replaceChildren();
     for (const name of body.accounts) {
       const option = document.createElement("option");
       option.value = name;
       option.textContent = name;
       select.appendChild(option);
-    }
-    if (body.accounts.length) {
-      select.options[0].textContent = "default (" + body.accounts[0] + ")";
     }
   } catch (e) { /* dropdown falls back to plain default */ }
 }

@@ -481,7 +481,7 @@ async def test_http_page_stats_and_restart(
     assert page.status == 200
     assert (page.headers["Content-Type"]).startswith("text/html")
     body = await page.text()
-    assert "tankpit fleet" in body and "/bots" in body and "/accounts" in body
+    assert "Tankpit Fleet" in body and "/bots" in body and "/accounts" in body
 
     originals = _with_configured_accounts()
     try:
