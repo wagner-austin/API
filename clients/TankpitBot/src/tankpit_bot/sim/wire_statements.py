@@ -17,10 +17,14 @@ from tankpit_bot.protocol.types import (
     TankStatusDict,
     TankStatusSyncDict,
 )
+from tankpit_bot.sim.awards import DECORATION_SLOTS, pack_decorations
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.movement import MoveOutcomeDict
 from tankpit_bot.sim.progression import STEADY_PROMO_STATE
 from tankpit_bot.sim.world import SimWorldDict
+
+_NO_AWARDS = pack_decorations((0,) * DECORATION_SLOTS)
+"""A tank that has earned nothing — every opponent the sim seeds."""
 
 
 def queued_tank_id(entry: tuple[int, ClientCommandDict]) -> int:
@@ -109,12 +113,19 @@ def status_sync(
     )
 
 
-def identity_statement(world: SimWorldDict, tank_id: int) -> TankInfoDict:
+def identity_statement(
+    world: SimWorldDict, tank_id: int, decoration_state: bytes = _NO_AWARDS
+) -> TankInfoDict:
     """Build the 0x21 identity broadcast for one tank.
 
     Args:
         world: Simulated world.
         tank_id: The announced tank.
+        decoration_state: The tank's packed awards
+            ([[decoration-encoding]]). Defaults to none earned, which
+            is true of every tank the sim seeds but was ALSO what the
+            client itself carried no matter what it had done
+            ([[session-state-deglobalisation]]).
 
     Returns:
         The identity message.
@@ -124,7 +135,7 @@ def identity_statement(world: SimWorldDict, tank_id: int) -> TankInfoDict:
         msg_type=0x21,
         tank_id=tank_id,
         team=tank["team"],
-        decoration_state=bytes(4),
+        decoration_state=decoration_state,
         persistent_tank_id=0,
         # The tank's seeded wire name. The default practice shape
         # (``red-<id>``, set by ``make_sim_tank``) keeps sim opponents
@@ -169,7 +180,9 @@ def statistics_statement(tick: int, destroyed: int, deactivated: int) -> Statist
     )
 
 
-def full_status_statement(world: SimWorldDict, tank_id: int) -> TankStatusDict:
+def full_status_statement(
+    world: SimWorldDict, tank_id: int, decoration_state: bytes = _NO_AWARDS
+) -> TankStatusDict:
     """Build the 0x3E full status the join burst carries for own tank.
 
     Every one of the 285 archived real sessions opens with the same
@@ -187,6 +200,7 @@ def full_status_statement(world: SimWorldDict, tank_id: int) -> TankStatusDict:
     Args:
         world: Simulated world.
         tank_id: The described tank.
+        decoration_state: The tank's packed awards.
 
     Returns:
         The full status message.
@@ -198,7 +212,7 @@ def full_status_statement(world: SimWorldDict, tank_id: int) -> TankStatusDict:
         rank=tank["rank"],
         damage_state=damage_tier(tank["fuel"], tank["rank"]),
         tank_id=tank_id,
-        decoration_state=bytes(4),
+        decoration_state=decoration_state,
         leaderboard_score=0,
         leaderboard_position=0,
         name=tank["name"],

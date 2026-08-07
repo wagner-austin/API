@@ -30,6 +30,7 @@ from tankpit_bot.protocol.types import (
     SyncDict,
 )
 from tankpit_bot.sim.actions import build_map_data
+from tankpit_bot.sim.awards import AwardLedger
 from tankpit_bot.sim.bot_policy import reactivate_practice_bot
 from tankpit_bot.sim.combat_emissions import CORPSE_WINDOW_TICKS, CombatLedger
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
@@ -111,6 +112,7 @@ class SimServer(SimServerMoveMixin):
         self._combat = CombatLedger(world, terrain, client_id)
         self._churn = RoomChurn()
         self._progression = RankProgression(client_id)
+        self._awards = AwardLedger(client_id)
 
     def handshake(self) -> list[BinaryMessage]:
         """Build the session-start burst the client receives on join.
@@ -140,8 +142,8 @@ class SimServer(SimServerMoveMixin):
         """
         client = self.world["tanks"][self.client_id]
         messages: list[BinaryMessage] = [
-            identity_statement(self.world, self.client_id),
-            full_status_statement(self.world, self.client_id),
+            identity_statement(self.world, self.client_id, self._awards.decoration_state),
+            full_status_statement(self.world, self.client_id, self._awards.decoration_state),
             self._viewport.build_update(),
             position_statement(self.world, self.client_id),
             FuelGainDict(msg_type=0x44, fuel_total=client["fuel"], is_free=False, flag=1),
@@ -313,7 +315,7 @@ class SimServer(SimServerMoveMixin):
         """
         kind = command["kind"]
         if kind == "mine":
-            emit_mine_press(self.world, self.terrain, tank_id, messages)
+            emit_mine_press(self.world, self.terrain, self.client_id, tank_id, messages)
             return
         if kind == "toggle_equipment":
             emit_equipment_toggle(self.world, tank_id, command["slot"], messages)
@@ -472,6 +474,20 @@ class SimServer(SimServerMoveMixin):
         # The promotion that ends a recovery window, before the syncs
         # so this tick's bar already reads the restored steady state.
         self._progression.advance(self.world, messages)
+        # Awards are granted from the same counters the 0x56 reports,
+        # against the thresholds the in-client guide names
+        # ([[decoration-encoding]]): 100/200/500 kills, 20/50/100
+        # deaths, Major/Colonel/General, 100/200/500 hours. The archive
+        # caught exactly one grant — Artax's 500th kill stepping the
+        # Tank award to golden on 2026-07-29
+        # ([[session-state-deglobalisation]]).
+        self._awards.advance(
+            self.world["tanks"][self.client_id]["rank"],
+            self._combat.client_destroyed,
+            self._combat.client_deactivated,
+            self.world["tick"] * TICK_RATE_MS // 1000,
+            messages,
+        )
         for tank_id in sorted(self.world["tanks"]):
             if self.world["tanks"][tank_id]["alive"]:
                 messages.append(

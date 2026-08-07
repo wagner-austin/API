@@ -109,12 +109,18 @@ def test_the_toggle_echo_is_a_decodable_ack() -> None:
     assert ack == {"msg_type": "autoscroll_ack", "enabled": True}
 
 
-def test_quit_is_recorded_and_answered_with_silence() -> None:
-    """The client's ``-`` ends the session; the server says nothing."""
+def test_quit_is_recorded_and_echoed_back() -> None:
+    """The server ECHOES the quit, as it echoes the autoscroll toggle.
+
+    67 of the 74 archived sessions carrying a quit show ``--> <--`` at
+    a median 62 ms. The received frame is the acknowledgement of the
+    client's own q-press — it looked like a server-initiated kick until
+    the pairing was measured ([[session-state-deglobalisation]]).
+    """
     lobby = _lobby()
     assert lobby.quit is False
 
-    assert lobby.handle_frame(QUIT_BODY) == []
+    assert lobby.handle_frame(QUIT_BODY) == [QUIT_BODY]
     assert lobby.quit is True
 
 

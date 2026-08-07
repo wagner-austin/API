@@ -30,9 +30,13 @@ Two rooms are advertised in every session and the enter response is
 Practice. Room lists carry eight pipe-delimited fields and so do join
 confirms.
 
-Mid-session the same plaintext channel carries two more exchanges: the
-autoscroll toggle (``A1``/``A0``, echoed back verbatim — 38 and 37 in
-the archive) and quit (``-``, 35).
+Mid-session the same plaintext channel carries two more exchanges, and
+BOTH are echoes: the autoscroll toggle (``A1``/``A0``, echoed back
+verbatim — 38 and 37 in the archive) and quit (``-``, echoed at a
+median 62 ms in 67 of the 74 sessions that carry one). The received
+quit is the server acknowledging the client's own q-press, not a
+server-initiated kick — which is what it looked like until the pairing
+was measured.
 
 The AUTH frame is the PAGE CLIENT's, not the bot's — our code only
 reads it, to lift the session magic (``codec.extract_magic_from_auth``).
@@ -220,8 +224,14 @@ class SimLobby:
             # local re-reading of the two bytes.
             return [body]
         if body == QUIT_BODY:
+            # The server ECHOES the quit, exactly as it echoes the
+            # autoscroll toggle. 67 of the 74 archived sessions that
+            # carry a quit show ``--> <--`` at a median 62 ms; the
+            # received frame is the acknowledgement of the client's own
+            # q-press, not a server-initiated kick
+            # ([[session-state-deglobalisation]]).
             self.quit = True
-            return []
+            return [body]
         text = body.decode("utf-8", errors="replace")
         if text.startswith(AUTH_PREFIX):
             return [_room_list_frame(room) for room in self._rooms]

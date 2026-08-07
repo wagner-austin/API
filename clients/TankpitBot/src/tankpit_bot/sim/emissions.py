@@ -349,21 +349,35 @@ def emit_radar(
 def emit_mine_press(
     world: SimWorldDict,
     terrain: TerrainMapProtocol,
+    client_id: int,
     tank_id: int,
     messages: list[BinaryMessage],
 ) -> None:
     """Process one mine press and emit its wire consequences.
 
+    The 0x4B placement is PER-RECIPIENT — it is the placer's own
+    receipt, the same discipline the 0x52 rejections and the fuel sync
+    follow. Every one of the 23 placements in the whole archive
+    (``runs/bot`` plus ``runs/sniff``) names tank 1301, the capturing
+    client; not one reports another player's press, however heavily
+    they mined. Other players' mines reach the client as overlay and
+    radar reveals instead ([[mine-mechanics]],
+    [[session-state-deglobalisation]]).
+
+    The 0x45 detonation is NOT per-recipient: it broadcasts, which is
+    why the archive carries 296 of them against 23 placements.
+
     Args:
         world: Simulated world.
         terrain: Static terrain.
+        client_id: The connected client's tank id.
         tank_id: The placing tank.
         messages: This tick's outgoing batch (appended).
     """
     outcome = process_mine_press(world, terrain, tank_id)
     tank = world["tanks"][tank_id]
     tank["fuel"] = max(0, tank["fuel"] - MINE_PRESS_FUEL_COST)
-    if outcome["placed"]:
+    if outcome["placed"] and tank_id == client_id:
         messages.append(
             MinePlacementDict(
                 msg_type=0x4B,
