@@ -1,4 +1,9 @@
-"""Live teleport-radar-fuel action probe harness."""
+"""The fuel probe: teleport to fuel, pick it up, record the attempt.
+
+Holds the :class:`FuelProbe` session class and its entry points. The
+target-selection and outcome helpers it composes are
+:mod:`tankpit_bot.action_lab.fuel_probe`.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +14,7 @@ from tankpit_bot.action_lab import fuel_probe_operations as _fuel_probe_operatio
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict, FuelDecisionBasisDict
 from tankpit_bot.action_lab.fuel_collection_phase import (
-    run_tracked_fuel_collection_phase as _shared_run_tracked_fuel_collection_phase,
+    run_tracked_fuel_collection_phase,
 )
 from tankpit_bot.action_lab.fuel_probe_attempt import (
     run_single_fuel_target_attempt as _shared_run_single_fuel_target_attempt,
@@ -36,9 +41,6 @@ from tankpit_bot.action_lab.fuel_probe_types import (
 from tankpit_bot.action_lab.fuel_target_phase import (
     FuelTargetPhaseProbeProtocol,
 )
-from tankpit_bot.action_lab.fuel_target_phase import (
-    resolve_fuel_target_after_radar as _shared_resolve_fuel_target_after_radar,
-)
 from tankpit_bot.action_lab.fuel_targeting import (
     FuelTargetingError,
     find_visible_fuel_landing_tile,
@@ -63,7 +65,7 @@ from tankpit_bot.action_lab.teleport import (
     DEFAULT_TELEPORT_STRATEGY,
 )
 from tankpit_bot.action_lab.teleport_attempt import (
-    run_tracked_teleport_attempt as _shared_run_tracked_teleport_attempt,
+    run_tracked_teleport_attempt,
 )
 from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
@@ -77,15 +79,6 @@ from tankpit_bot.action_lab.types import (
 from tankpit_bot.bot.ai.equipment_search import find_best_fuel
 from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state.types import ContainerStateDict
-
-_FUEL_PROBE_TARGET_STEP = 16
-_FUEL_PROBE_TARGET_MAX_RADIUS = 48
-_FUEL_PROBE_TELEPORT_STRATEGY: Literal["sync_before_teleport", "immediate_after_map_open"] = (
-    DEFAULT_TELEPORT_STRATEGY
-)
-run_tracked_teleport_attempt = _shared_run_tracked_teleport_attempt
-resolve_fuel_target_after_radar_phase = _shared_resolve_fuel_target_after_radar
-run_tracked_fuel_collection_phase = _shared_run_tracked_fuel_collection_phase
 
 
 class FuelProbeError(Exception):
@@ -168,29 +161,6 @@ def _find_visible_fuel_landing_tile(
         return find_visible_fuel_landing_tile(probe, fuel_target)
     except FuelTargetingError as exc:
         raise FuelProbeError(str(exc)) from exc
-
-
-def _find_visible_fuel_target_for_phase(
-    probe: FuelTargetPhaseProbeProtocol,
-) -> ContainerStateDict | None:
-    """Typed bridge for shared fuel-target phase selection."""
-    return _find_visible_fuel_target(probe)
-
-
-def _visible_fuel_requires_reposition_for_phase(
-    probe: FuelTargetPhaseProbeProtocol,
-    fuel_target: ContainerStateDict,
-) -> bool:
-    """Typed bridge for shared blocked-fuel reposition checks."""
-    return _visible_fuel_requires_reposition(probe, fuel_target)
-
-
-def _find_visible_fuel_landing_tile_for_phase(
-    probe: FuelTargetPhaseProbeProtocol,
-    fuel_target: ContainerStateDict,
-) -> tuple[int, int] | None:
-    """Typed bridge for shared blocked-fuel landing selection."""
-    return _find_visible_fuel_landing_tile(probe, fuel_target)
 
 
 def _make_reposition_target(target_x: int, target_y: int) -> TeleportTargetDict:
@@ -283,6 +253,15 @@ def _get_completed_pickup_outcome(
 def format_fuel_probe_summary(session: FuelProbeSessionDict) -> str:
     """Format a compact summary for a fuel probe session."""
     return _shared_format_fuel_probe_summary(session)
+
+
+_FUEL_PROBE_TARGET_STEP = 16
+
+_FUEL_PROBE_TARGET_MAX_RADIUS = 48
+
+_FUEL_PROBE_TELEPORT_STRATEGY: Literal["sync_before_teleport", "immediate_after_map_open"] = (
+    DEFAULT_TELEPORT_STRATEGY
+)
 
 
 class FuelProbe(ProbeBase):
@@ -669,9 +648,9 @@ class FuelProbe(ProbeBase):
             build_teleport_timeout_result=self._build_teleport_timeout_result,
             finalize_attempt_delay=self._finalize_attempt_delay,
             terrain_provider=get_terrain_map,
-            find_visible_target=_find_visible_fuel_target_for_phase,
-            requires_reposition=_visible_fuel_requires_reposition_for_phase,
-            find_landing_tile=_find_visible_fuel_landing_tile_for_phase,
+            find_visible_target=_find_visible_fuel_target,
+            requires_reposition=_visible_fuel_requires_reposition,
+            find_landing_tile=_find_visible_fuel_landing_tile,
             get_phase_overlaps=self._get_attempt_phase_overlaps,
             log_target_diagnostic=lambda radar_cycle_id, fuel_target: _log_fuel_target_diagnostic(
                 self,
@@ -796,4 +775,9 @@ def run_fuel_probe(
     )
 
 
-__all__ = ["FuelProbe", "FuelProbeError", "format_fuel_probe_summary", "run_fuel_probe"]
+__all__ = [
+    "FuelProbe",
+    "run_fuel_probe",
+    "run_tracked_fuel_collection_phase",
+    "run_tracked_teleport_attempt",
+]

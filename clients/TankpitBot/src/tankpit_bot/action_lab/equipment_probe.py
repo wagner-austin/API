@@ -19,9 +19,6 @@ from tankpit_bot.action_lab.equipment_probe_diagnostics import (
 from tankpit_bot.action_lab.equipment_probe_types import (
     EquipmentProbeAttemptResultDict,
 )
-from tankpit_bot.action_lab.equipment_target_phase import (
-    EquipmentTargetPhaseProbeProtocol,
-)
 from tankpit_bot.action_lab.equipment_targeting import (
     EquipmentTargetingError,
     find_visible_equipment_landing_tile,
@@ -59,29 +56,6 @@ run_tracked_equipment_collection_phase = _shared_run_tracked_equipment_collectio
 
 class EquipmentProbeError(Exception):
     """Raised when the equipment probe cannot proceed."""
-
-
-def _find_visible_equipment_target_for_phase(
-    probe: EquipmentTargetPhaseProbeProtocol,
-) -> ContainerStateDict | None:
-    """Typed bridge for shared equipment-target phase selection."""
-    return find_visible_equipment_target(probe)
-
-
-def _visible_equipment_requires_reposition_for_phase(
-    probe: EquipmentTargetPhaseProbeProtocol,
-    equipment_target: ContainerStateDict,
-) -> bool:
-    """Typed bridge for shared blocked-equipment reposition checks."""
-    return visible_equipment_requires_reposition(probe, equipment_target)
-
-
-def _find_visible_equipment_landing_tile_for_phase(
-    probe: EquipmentTargetPhaseProbeProtocol,
-    equipment_target: ContainerStateDict,
-) -> tuple[int, int] | None:
-    """Typed bridge for shared blocked-equipment landing selection."""
-    return find_visible_equipment_landing_tile(probe, equipment_target)
 
 
 def _make_reposition_target(target_x: int, target_y: int) -> TeleportTargetDict:
@@ -437,9 +411,9 @@ class EquipmentProbe(ProbeBase):
             build_teleport_timeout_result=self._build_teleport_timeout_result,
             finalize_attempt_delay=self._finalize_attempt_delay,
             terrain_provider=get_terrain_map,
-            find_visible_target=_find_visible_equipment_target_for_phase,
-            requires_reposition=_visible_equipment_requires_reposition_for_phase,
-            find_landing_tile=_find_visible_equipment_landing_tile_for_phase,
+            find_visible_target=find_visible_equipment_target,
+            requires_reposition=visible_equipment_requires_reposition,
+            find_landing_tile=find_visible_equipment_landing_tile,
             get_phase_overlaps=self._get_attempt_phase_overlaps,
             build_radar_timeout_result=self._build_radar_timeout_result,
             build_no_equipment_visible_result=self._build_no_equipment_visible_result,
