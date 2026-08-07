@@ -41,6 +41,19 @@ class XorStaticKeyUnavailableError(CodecError):
     """
 
 
+class XorBodyTooLongError(CodecError):
+    """Raised when a body's ciphered span outruns the session table.
+
+    The table's length IS the frame bound: the key is 1000 bytes and
+    the largest ciphered span the real server has ever sent is 931
+    (archive sweep over 282,783 received bodies). A longer body did
+    not come from the wire — it is a foreign or corrupt capture — and
+    the cipher used to signal that with a bare :class:`IndexError`
+    thrown from the middle of its inner loop, which said nothing about
+    what had gone wrong ([[session-state-deglobalisation]]).
+    """
+
+
 def build_session_xor_table(magic: str) -> bytes:
     """Build the XOR table belonging to one session.
 
@@ -124,14 +137,25 @@ def xor_decode_body(body: bytes, xor_table: bytes, offset: int = 0) -> bytes:
 
     Returns:
         Decoded bytes.
+
+    Raises:
+        XorBodyTooLongError: If the ciphered span outruns the table.
     """
-    decoded = bytearray(len(body) - offset)
-    for i in range(len(decoded)):
+    span = len(body) - offset
+    if span > len(xor_table):
+        raise XorBodyTooLongError(
+            f"ciphered span is {span} bytes over a {len(xor_table)}-byte table; "
+            "the real server's largest observed body is 931 bytes (282,783 "
+            "sampled), so this frame did not come from the wire"
+        )
+    decoded = bytearray(span)
+    for i in range(span):
         decoded[i] = body[i + offset] ^ xor_table[i]
     return bytes(decoded)
 
 
 __all__ = [
+    "XorBodyTooLongError",
     "XorStaticKeyUnavailableError",
     "build_session_xor_table",
     "decode_base64_safe",

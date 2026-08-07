@@ -157,7 +157,9 @@ def decode_tank_status_sync(data: bytes) -> TankStatusSyncDict:
     #   a[5:8]  = lb_score (24-bit BE)
     #   If len > 8:
     #     a[8]  = promo_state
-    #     a[9]  = has_fuel_bar
+    #     a[9]  = promo_bar_lit (the promotion bar's colour, NOT a
+    #             fuel gate -- the JS applies fuel regardless; see
+    #             TankStatusSyncDict)
     #     a[10:12] = fuel (LE u16)
     # Caveat (2026-06-19): when this decoder is reached via the
     # subtype-first dispatcher for ``subtype == 0x2E`` (i.e. the
@@ -177,8 +179,10 @@ def decode_tank_status_sync(data: bytes) -> TankStatusSyncDict:
 
     promo_state: int | None = data[8] if len(data) >= 9 else None
     if len(data) >= 12:
+        promo_bar_lit: bool | None = data[9] == 1
         fuel: int | None = x16(data[10], data[11])
     else:
+        promo_bar_lit = None
         fuel = None
 
     return TankStatusSyncDict(
@@ -189,6 +193,7 @@ def decode_tank_status_sync(data: bytes) -> TankStatusSyncDict:
         rank=rank,
         lb_score=lb_score,
         promo_state=promo_state,
+        promo_bar_lit=promo_bar_lit,
         fuel=fuel,
     )
 
@@ -255,6 +260,14 @@ def _dispatch_protocol_tank(subtype: int, inner: bytes) -> BinaryMessage | None:
 
     if subtype == 0x21 and len(inner) >= 10:
         return decode_tank_info(inner)
+    if subtype == 0x29 and len(inner) == 5:
+        # Tunneled TankExit (Vf.h). Archive sweep 2026-08-06: 15
+        # bodies, every one exactly 5 inner bytes, and nothing else
+        # in the corpus carries subtype 0x29 — so the clamp is
+        # EXACT rather than a minimum. A longer 0x29 body has never
+        # been seen; sending it to the length-based container path
+        # (where it lands today) beats guessing it is an exit.
+        return decode_tank_exit(inner)
     if subtype == 0x28 and len(inner) >= 9:
         # JS Uf.h reads a[0..8] = 9 bytes. Lowering the threshold from
         # 10 to 9 matches the decoder's require_min_length(9) and the
@@ -361,7 +374,11 @@ def _dispatch_protocol_misc(subtype: int, inner: bytes) -> BinaryMessage | None:
     """Subtypes that tunnel a protocol misc message.
 
     Covers ActionDone (0x54), BuildPickup (0x42), Statistics (0x56),
-    and ChatMessage (0x4D). The first three were ground-truthed
+    ChatMessage (0x4D), Promotion (0x2B), and Decoration (0x4E).
+    The last two are exact-length clamped: the 2026-08-06 archive
+    sweep found one body length each and no competing claimant, and
+    an exact clamp can only send an unseen shape where it already
+    goes. The first three were ground-truthed
     against production captures (analysis_scripts/crack_tank_update.py):
     0x56 fires on 239/239 samples in the corpus, 0x42 on 2/2 own-tank
     build/pickup events, and 0x54 is the ~1-byte ActionDone heartbeat.
@@ -374,9 +391,22 @@ def _dispatch_protocol_misc(subtype: int, inner: bytes) -> BinaryMessage | None:
         decode_action_done,
         decode_build_pickup,
         decode_chat_message,
+        decode_decoration,
+        decode_promotion,
         decode_statistics,
     )
 
+    if subtype == 0x2B and len(inner) == 2:
+        # Tunneled binary Promotion (Rf.h). Same archive sweep: 7
+        # bodies, all 2 inner bytes. Exact clamp for the same reason
+        # as 0x29 — 0x2B is also the TEXT ROOM_LIST byte at top
+        # level, so a loose arm here is the one that would bite.
+        return decode_promotion(inner)
+    if subtype == 0x4E and len(inner) == 4:
+        # Tunneled Decoration / award (Sf.h). One body in the whole
+        # archive (tank 1301, slot 1, level 3) — rare, but it is a
+        # real award event and it was landing in unknown_container.
+        return decode_decoration(inner)
     if subtype == 0x42 and len(inner) >= 9:
         return decode_build_pickup(inner)
     if subtype == 0x4D and len(inner) >= 5:

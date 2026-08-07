@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.capture.xor import (
+    XorBodyTooLongError,
     XorStaticKeyUnavailableError,
     build_session_xor_table,
     decode_base64_safe,
@@ -101,6 +102,29 @@ class TestXorDecodeBody:
         xor_table = bytes([0x10, 0x20])
         result = xor_decode_body(body, xor_table)
         assert result == b""
+
+    def test_body_exactly_filling_the_table_decodes(self) -> None:
+        """The table's length is the bound, and the bound is inclusive."""
+        xor_table = bytes([0x10, 0x20, 0x30])
+        assert xor_decode_body(bytes([0x41, 0x42, 0x43]), xor_table) == bytes([0x51, 0x62, 0x73])
+
+    def test_body_past_the_table_raises(self) -> None:
+        """One byte past the table is a frame the wire cannot carry.
+
+        The key length IS the frame bound: the real server's largest
+        observed ciphered span is 931 bytes under a 1000-byte table.
+        This used to escape as a bare ``IndexError`` thrown from the
+        middle of the cipher loop, which named neither the span nor
+        the table ([[session-state-deglobalisation]]).
+        """
+        with pytest.raises(XorBodyTooLongError, match=r"4 bytes over a 3-byte table"):
+            xor_decode_body(bytes([0x41, 0x42, 0x43, 0x44]), bytes([0x10, 0x20, 0x30]))
+
+    def test_offset_is_counted_against_the_bound(self) -> None:
+        """The bound applies to the CIPHERED span, not the whole body."""
+        body = bytes([0x2E, 0x41, 0x42, 0x43])
+        xor_table = bytes([0x10, 0x20, 0x30])
+        assert xor_decode_body(body, xor_table, offset=1) == bytes([0x51, 0x62, 0x73])
 
     def test_decode_body_shorter_than_table(self) -> None:
         """Test decoding body shorter than XOR table."""

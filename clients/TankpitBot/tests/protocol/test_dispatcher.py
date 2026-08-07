@@ -463,6 +463,52 @@ class TestUnwrap0x2e:
         result = decode_message(MSG_TANK_STATS, data)
         assert result["msg_type"] == 0x28
 
+    def test_unwraps_tank_exit_from_0x2e(self) -> None:
+        """Decodes tunneled 0x29 tank exit from inside 0x2E.
+
+        Fifteen archived bodies were landing in ``unknown_container``
+        for want of this arm ([[session-state-deglobalisation]]).
+        """
+        data = bytes([MSG_TANK_EXIT, 0x02, 0x95, 0x03, 0x00, 0x00])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result == {
+            "msg_type": 0x29,
+            "team": 2,
+            "tank_id": 917,
+            "was_silent": False,
+            "was_eliminated": False,
+        }
+
+    def test_tank_exit_arm_is_exact_length(self) -> None:
+        """A 0x29 body of any other length keeps its container route."""
+        data = bytes([MSG_TANK_EXIT, 0x02, 0x95, 0x03, 0x00, 0x00, 0x00])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == "unknown_container"
+
+    def test_unwraps_promotion_from_0x2e(self) -> None:
+        """Decodes tunneled binary 0x2B promotion from inside 0x2E."""
+        data = bytes([MSG_PROMOTION, 0x01, 0x01])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result == {"msg_type": 0x2B, "new_rank": 1, "was_promoted": True}
+
+    def test_promotion_arm_is_exact_length(self) -> None:
+        """0x2B is also the TEXT room-list byte, so its arm stays tight."""
+        data = bytes([MSG_PROMOTION, 0x01, 0x01, 0x01])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == "unknown_container"
+
+    def test_unwraps_decoration_from_0x2e(self) -> None:
+        """Decodes tunneled 0x4E decoration/award from inside 0x2E."""
+        data = bytes([MSG_DECORATION, 0x15, 0x05, 0x01, 0x03])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result == {"msg_type": 0x4E, "tank_id": 1301, "slot": 1, "level": 3}
+
+    def test_decoration_arm_is_exact_length(self) -> None:
+        """A 0x4E body of any other length keeps its container route."""
+        data = bytes([MSG_DECORATION, 0x15, 0x05, 0x01])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == "unknown_container"
+
     def test_unwraps_tank_status_full_from_0x2e(self) -> None:
         """Decodes tunneled 0x3E tank status from inside 0x2E."""
         header = bytes([MSG_TANK_STATUS_FULL, 0x42, 0x02, 0x01, 0xDE, 0xAD, 0xBE, 0xEF])
