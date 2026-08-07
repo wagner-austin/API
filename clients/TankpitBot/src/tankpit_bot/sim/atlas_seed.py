@@ -13,8 +13,16 @@ Classification per atlas tile (the mined vocabulary):
 
 * ``last_v == -1`` — equipment container.
 * ``last_v > 0`` — fuel container at the last-read volume; ``dotted``
-  when the visible layer ever showed it (a 0x5A/0x43 sighting means
-  the container is EXPOSED on the map).
+  when the visible layer showed it holding
+  :data:`~tankpit_bot.physics.map.MAP_DOT_MIN_VOLUME` or more. A
+  sighting alone is NOT a dot: the dot law (which ``sim/actions.py``
+  applies during play) requires the reveal to find 500+ volume.
+  Seeding ignored that threshold until 2026-08-06 and dotted every
+  tile ever sighted at any volume — 10,132 on field01 against the
+  law's 497, where a real persistent map carries 296-655 (median 608
+  over 239 sessions). The result was a 0x4C frame of 8,592 dots that
+  no server could send and the bot could not decode
+  ([[session-state-deglobalisation]]).
 * ``last_v == 0`` and visible-seen — a drained DOT: part of the real
   map experience (dots that answer pickups with 0x52 code 4), seeded
   only when the drain was read within :data:`DRAINED_DOT_FRESH_MS`
@@ -41,6 +49,7 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.physics.map import MAP_DOT_MIN_VOLUME
 from tankpit_bot.sim.world import SimContainerDict, SimEquipmentDict, SimWorldDict
 
 DEFAULT_ATLAS_PATH = Path("runs") / "analysis" / "container_atlas.json"
@@ -104,17 +113,34 @@ def _exposure(
         newest_ms: The atlas's newest observation timestamp.
 
     Returns:
-        Whether a stocked seed is dotted, and whether a drained tile
-        seeds as a dot at all.
+        Whether the tile seeds DOTTED, and whether a drained tile
+        seeds as a container at all.
     """
     if dotted_tiles is not None:
         dotted = (x, y) in dotted_tiles
         return dotted, dotted
     visible = entry["visible_seen"] is True
-    drained_dot = (
-        visible and newest_ms - narrow_json_to_int(entry["last_ms"]) <= DRAINED_DOT_FRESH_MS
-    )
-    return visible, drained_dot
+    fresh = newest_ms - narrow_json_to_int(entry["last_ms"]) <= DRAINED_DOT_FRESH_MS
+    # THE DOT LAW, the same one sim/actions.py applies during play: a
+    # container joins the 0x4C atlas when it is revealed holding
+    # MAP_DOT_MIN_VOLUME or more. Seeding applied no volume test at
+    # all — every tile the visible layer had ever shown became a dot,
+    # at any volume, which is a far larger set than the game's.
+    #
+    # Measured 2026-08-06 on field01: 10,132 tiles pass `visible_seen`
+    # alone; 497 pass the law. A real map carries 296-655 dots (median
+    # 608 over 239 sessions), so the law lands in range and the old
+    # rule was ~16x the game.
+    #
+    # `last_v`, not `max_fuel`: the atlas is a MONTH-long union and the
+    # real dot set churns — 39 consecutive real maps show ~420 dots
+    # each but 2,023 distinct tiles between them. Every tile that has
+    # EVER been dotted (max_fuel >= 500) is 3,472, five times what any
+    # one map holds. The container's last-known stock is the closest
+    # the atlas gets to one session's snapshot
+    # ([[session-state-deglobalisation]]).
+    dotted = visible and narrow_json_to_int(entry["last_v"]) >= MAP_DOT_MIN_VOLUME
+    return dotted, visible and fresh
 
 
 def seed_atlas_population(
@@ -183,7 +209,15 @@ def seed_atlas_population(
             world["containers"].append(SimContainerDict(x=x, y=y, volume=last_v, dotted=dotted))
             tally["fuel"] += 1
         elif drained_dot:
-            world["containers"].append(SimContainerDict(x=x, y=y, volume=0, dotted=True))
+            # A drained tile still SEEDS — the server answers pickups
+            # on it with 0x52 code 4 "Empty container", and that is
+            # part of the real field. It is not automatically a DOT:
+            # this arm forced ``dotted=True`` regardless of volume and
+            # contributed 5,184 of the sim's 5,681 dots, which is what
+            # pushed the 0x4C frame past anything the wire can carry.
+            # A tile at volume 0 fails the dot law, so it seeds plain
+            # ([[session-state-deglobalisation]]).
+            world["containers"].append(SimContainerDict(x=x, y=y, volume=0, dotted=dotted))
             tally["drained_dots"] += 1
     return tally
 

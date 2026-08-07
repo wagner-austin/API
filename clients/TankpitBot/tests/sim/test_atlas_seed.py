@@ -45,10 +45,11 @@ def test_atlas_tiles_classify_into_the_sim_vocabulary(fake_fs: FakeFileSystem) -
     _write_atlas(
         fake_fs,
         {
-            "10,10": _entry(700, visible=True),  # exposed fuel -> dotted
+            "10,10": _entry(700, visible=True),  # exposed at 500+ -> dotted
+            "15,10": _entry(340, visible=True),  # exposed BELOW 500 -> no dot
             "11,10": _entry(340, visible=False),  # radar-only fuel -> hidden
             "12,10": _entry(-1, visible=True),  # equipment
-            "13,10": _entry(0, visible=True),  # drained dot (answers code 4)
+            "13,10": _entry(0, visible=True),  # drained: seeds, but no dot
             "14,10": _entry(0, visible=False),  # empty hidden tile: nothing
         },
     )
@@ -57,7 +58,7 @@ def test_atlas_tiles_classify_into_the_sim_vocabulary(fake_fs: FakeFileSystem) -
     tally = seed_atlas_population(world, InMemoryTerrainMap(), _ATLAS_PATH)
 
     assert tally == {
-        "fuel": 2,
+        "fuel": 3,
         "drained_dots": 1,
         "equipment": 1,
         "water_tiles": 0,
@@ -65,8 +66,15 @@ def test_atlas_tiles_classify_into_the_sim_vocabulary(fake_fs: FakeFileSystem) -
     }
     by_tile = {(c["x"], c["y"]): c for c in world["containers"]}
     assert by_tile[(10, 10)] == {"x": 10, "y": 10, "volume": 700, "dotted": True}
+    # Seen, but never at dot volume: the dot law needs 500+ at reveal,
+    # and seeding used to ignore that ([[session-state-deglobalisation]]).
+    assert by_tile[(15, 10)] == {"x": 15, "y": 10, "volume": 340, "dotted": False}
     assert by_tile[(11, 10)] == {"x": 11, "y": 10, "volume": 340, "dotted": False}
-    assert by_tile[(13, 10)] == {"x": 13, "y": 10, "volume": 0, "dotted": True}
+    # A drained tile still SEEDS — the server answers pickups on it
+    # with 0x52 code 4 — but volume 0 fails the dot law, so it carries
+    # no dot. This arm forced dotted=True and supplied 5,184 of the
+    # sim's 5,681 map dots.
+    assert by_tile[(13, 10)] == {"x": 13, "y": 10, "volume": 0, "dotted": False}
     assert (14, 10) not in by_tile
     assert [(e["x"], e["y"]) for e in world["equipment"]] == [(12, 10)]
 
