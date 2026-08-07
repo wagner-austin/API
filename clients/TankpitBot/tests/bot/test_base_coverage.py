@@ -44,10 +44,11 @@ class TestMaybeCaptureAccountStatsOnce:
     ) -> None:
         """After max attempts, no further capture is tried.
 
-        This exercises line 1036 -- the early return when
-        ``_account_stats_attempts >= _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS``.
+        Exercises the early return when ``_account_stats_attempts``
+        has reached ``_ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS``.
         """
-        from tankpit_bot.bot.base import _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS, Bot
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.game_log_witness import _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._account_stats_attempts = _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS

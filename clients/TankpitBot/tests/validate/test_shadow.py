@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import dump_json_str
 
-from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, TICK_MS
+from tankpit_bot.protocol.commands import TICK_RATE_MS
+from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS
 from tankpit_bot.types import CaptureSession, encode_capture_session
 from tankpit_bot.validate.shadow import collect_shadow_evidence, main, run_shadow
 from tests.validate.builders import (
@@ -29,7 +30,7 @@ from tests.validate.builders import (
 
 VICTIM_ID = 12
 BOT_ID = 21
-CORPSE_MS = CORPSE_WINDOW_TICKS * TICK_MS
+CORPSE_MS = CORPSE_WINDOW_TICKS * TICK_RATE_MS
 
 
 def _write_capture(path: Path, session: CaptureSession) -> None:
@@ -38,7 +39,9 @@ def _write_capture(path: Path, session: CaptureSession) -> None:
 
 def _lawful_session() -> CaptureSession:
     messages = [identity_message(0, SELF_ID)]
-    messages.extend(sync_message(index * TICK_MS, ENEMY_ID, 3, 400, damage=1) for index in range(8))
+    messages.extend(
+        sync_message(index * TICK_RATE_MS, ENEMY_ID, 3, 400, damage=1) for index in range(8)
+    )
     messages.append(equipment_gain_message(20_000, [0, 7, 0, 0, 0], True))
     messages.append(inventory_message(20_100, [5, 12, 5, 5, 3]))
     messages.append(inventory_message(30_000, [5, 12, 5, 5, 3]))

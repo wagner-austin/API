@@ -158,10 +158,9 @@ def test_block_cap_forces_judgement_in_never_quiet_combat() -> None:
 
 def test_announced_gains_credit_the_live_book() -> None:
     """0x44 gains explain their own delta at the wire mutation point."""
-    from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+    from tankpit_bot.sniffer.world_state import get_world_service
     from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
-    reset_world_state()
     ws = get_world_service()
     update_world_state_from_fuel_total(ws, 1000, "wire_0x44_fuel_gain")
     assert ws.fuel_book["entries"] == []
@@ -171,4 +170,3 @@ def test_announced_gains_credit_the_live_book() -> None:
     update_world_state_from_fuel_total(ws, 1200, "wire_0x2E_tank_status_sync")
     assert ws.fuel_book["windows"] == 1
     assert ws.fuel_book["divergences"] == 0
-    reset_world_state()

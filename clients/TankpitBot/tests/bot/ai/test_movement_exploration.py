@@ -6,9 +6,6 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import (
     walk_or_teleport,
 )
-from tankpit_bot.sniffer.world_state import (
-    reset_world_state,
-)
 from tests.bot.ai._movement_fixtures import _NOW_MS
 from tests.bot.ai._support import (
     make_inventory,
@@ -28,10 +25,6 @@ class TestPickupSurfaceRouting:
     is passable while on a ferry") leaked into a pickup dispatch and
     the server refused it after the disembark stop.
     """
-
-    def setup_method(self) -> None:
-        """Reset world-state test globals before each case."""
-        reset_world_state()
 
     def _channel_terrain(self, columns: tuple[int, ...]) -> InMemoryTerrainMap:
         """Build terrain with full-height water columns sealing a channel.

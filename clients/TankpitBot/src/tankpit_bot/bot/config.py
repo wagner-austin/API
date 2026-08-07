@@ -16,6 +16,7 @@ environment.
 from __future__ import annotations
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.bot.ai.types import AIConfigDict, make_default_ai_config
 
 DEFAULT_TARGET_URL = "https://tankpit.com/"
 """Canonical tankpit URL used when ``TANKPIT_URL`` is unset or empty."""
@@ -74,29 +75,6 @@ def resolve_human_rank_window() -> tuple[int, int]:
     )
 
 
-def resolve_idle_exit_seconds() -> float:
-    """Return the service idle self-exit threshold from the environment.
-
-    ``TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS`` overrides the default
-    idle window (:data:`~tankpit_bot.service.constants.SERVICE_IDLE_EXIT_SECONDS`,
-    1800 s). ``0`` (or any non-positive value) DISABLES the idle
-    self-exit entirely — the always-on deployment mode (2026-07-29):
-    with the SPA's tankpit video served by this service, the phone
-    expects the URL to answer at any hour, so the startup launcher
-    runs the service with the exit disabled.
-
-    Returns:
-        The idle threshold in seconds; non-positive means disabled.
-
-    Raises:
-        ValueError: If the env value is set but not a number.
-    """
-    from tankpit_bot.service.constants import SERVICE_IDLE_EXIT_SECONDS
-
-    raw = _test_hooks.get_env("TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS")
-    return float(raw) if raw is not None else SERVICE_IDLE_EXIT_SECONDS
-
-
 def resolve_video_fps() -> float:
     """Return the live-view capture rate from ``TANKPIT_BOT_VIDEO_FPS``.
 
@@ -146,8 +124,8 @@ def resolve_priority_target() -> str:
 
 __all__ = [
     "DEFAULT_TARGET_URL",
+    "env_ai_config",
     "resolve_human_rank_window",
-    "resolve_idle_exit_seconds",
     "resolve_prefer_account",
     "resolve_priority_target",
     "resolve_target_url",
@@ -183,3 +161,30 @@ def resolve_weapon_resume_slack() -> int:
     if value < 0:
         raise ValueError(f"TANKPIT_BOT_WEAPON_RESUME_SLACK must be >= 0, got {value}")
     return value
+
+
+def env_ai_config() -> AIConfigDict:
+    """Build the session AI config with environment overrides applied.
+
+    Overrides: ``TANKPIT_BOT_PRIORITY_TARGET`` (the priority hunt
+    account) and ``TANKPIT_BOT_HUMAN_MIN_RANK`` /
+    ``TANKPIT_BOT_HUMAN_MAX_RANK`` (the targetable human rank window)
+    -- [[bot-behavior-contract]] §3.2.
+
+    Lives here rather than in ``bot/base.py`` because it is env-resolved
+    launch configuration like every other resolver in this module, and
+    because both ``base`` and ``run_session`` need it — keeping it in
+    ``base`` forced the run loop to import the class that imports it.
+
+    Returns:
+        Default AI config with env-resolved fields filled in.
+    """
+    min_rank, max_rank = resolve_human_rank_window()
+    return AIConfigDict(
+        **{
+            **make_default_ai_config(),
+            "priority_target_name": resolve_priority_target(),
+            "human_target_min_rank": min_rank,
+            "human_target_max_rank": max_rank,
+        }
+    )

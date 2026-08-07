@@ -13,11 +13,6 @@ from platform_core.json_utils import (
     require_str,
 )
 
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-    decode_page_client_snapshot,
-    encode_page_client_snapshot,
-)
 from tankpit_bot.action_lab.types import (
     TeleportStartupTimingDict,
     TeleportTargetDict,
@@ -30,6 +25,11 @@ from tankpit_bot.action_lab.types_codecs import (
 )
 from tankpit_bot.bot.ai.types_codecs import decode_enemy_threat, encode_enemy_threat
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.browser.page_client_snapshot import (
+    PageClientSnapshotDict,
+    decode_page_client_snapshot,
+    encode_page_client_snapshot,
+)
 
 
 class EnemyTeleportAttemptResultDict(TypedDict):

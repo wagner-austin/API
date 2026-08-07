@@ -1,8 +1,17 @@
-"""Shared COLLECT-cascade primitives: score, blacklist, decline telemetry.
+"""Shared COLLECT-cascade primitives: score and decline telemetry.
 
-Session-scoped state and constants every collect submodule shares:
-the cascade's behavior score, the permanent container blacklist
-(cleared on death/respawn), and the structured hop-decline emitter.
+Constants and emitters every collect submodule shares: the cascade's
+behavior score and the structured hop-decline emitter.
+
+**The container blacklist was deleted 2026-08-07.** It had a reader
+consulted at five decision sites, a ``reset`` its docstring said ran
+"on death/respawn", and NO writer — ``blacklist_container`` was never
+called from ``src/`` in any commit in this repository's history. The
+predicate therefore always answered False, so removing it is
+behaviour-identical, and the five guards it fed were decisions made
+against a set that could never fill ([[session-state-deglobalisation]]
+step 7). If per-session container blacklisting is wanted, it needs a
+writer first — a reader without one is a decision nobody makes.
 """
 
 from __future__ import annotations
@@ -11,39 +20,6 @@ from tankpit_bot.runtime_logging import emit_diagnostic
 
 COLLECT_SCORE = 925
 """Behavior score every COLLECT-cascade decision carries."""
-
-_blacklisted_container_keys: set[str] = set()
-
-
-def blacklist_container(x: int, y: int) -> None:
-    """Permanently blacklist a container for this session.
-
-    Args:
-        x: Container X coordinate.
-        y: Container Y coordinate.
-    """
-    key = f"{x},{y}"
-    if key not in _blacklisted_container_keys:
-        emit_diagnostic(diagnostic_kind="container_blacklisted", x=x, y=y)
-    _blacklisted_container_keys.add(key)
-
-
-def is_container_blacklisted(x: int, y: int) -> bool:
-    """Check if a container is permanently blacklisted.
-
-    Args:
-        x: Container X coordinate.
-        y: Container Y coordinate.
-
-    Returns:
-        True if the container has been blacklisted this session.
-    """
-    return f"{x},{y}" in _blacklisted_container_keys
-
-
-def reset_container_blacklist() -> None:
-    """Clear the container blacklist (called on death/respawn)."""
-    _blacklisted_container_keys.clear()
 
 
 def emit_hop_declined(hop_kind: str, **tallies: int) -> None:
@@ -64,8 +40,5 @@ def emit_hop_declined(hop_kind: str, **tallies: int) -> None:
 
 __all__ = [
     "COLLECT_SCORE",
-    "blacklist_container",
     "emit_hop_declined",
-    "is_container_blacklisted",
-    "reset_container_blacklist",
 ]

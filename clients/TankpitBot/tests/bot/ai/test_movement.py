@@ -17,7 +17,6 @@ from tankpit_bot.bot.ai.movement_exploration import (
 )
 from tankpit_bot.sniffer.world_state import (
     mark_move_target_failed,
-    reset_world_state,
 )
 from tankpit_bot.state.types import (
     TankStateDict,
@@ -35,10 +34,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestWalkOrTeleport:
     """Tests for public movement planning behavior."""
-
-    def setup_method(self) -> None:
-        """Reset world-state test globals before each case."""
-        reset_world_state()
 
     def test_uses_final_move_target_when_viewport_path_exists(self) -> None:
         """In-viewport detours still issue the final move target."""
@@ -343,26 +338,21 @@ class TestWalkOrTeleport:
         """
         from tankpit_bot.sniffer.world_state import (
             mark_move_target_failed,
-            reset_world_state,
         )
 
-        reset_world_state()
-        try:
-            world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-            ai_state = make_scanned_ai_state()
-            inventory = make_inventory()
-            ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-            candidates = viewport_exploration_candidates(ctx)
-            if not candidates:
-                raise AssertionError("expected at least one exploration candidate")
-            first_x, first_y = candidates[0]
-            mark_move_target_failed(first_x, first_y, 99000)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        ai_state = make_scanned_ai_state()
+        inventory = make_inventory()
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        candidates = viewport_exploration_candidates(ctx)
+        if not candidates:
+            raise AssertionError("expected at least one exploration candidate")
+        first_x, first_y = candidates[0]
+        mark_move_target_failed(first_x, first_y, 99000)
 
-            result = select_exploration_command(ctx)
+        result = select_exploration_command(ctx)
 
-            if result is None:
-                raise AssertionError("expected fallback to a non-failed candidate")
-            picked_x, picked_y, _command = result
-            assert (picked_x, picked_y) != (first_x, first_y)
-        finally:
-            reset_world_state()
+        if result is None:
+            raise AssertionError("expected fallback to a non-failed candidate")
+        picked_x, picked_y, _command = result
+        assert (picked_x, picked_y) != (first_x, first_y)

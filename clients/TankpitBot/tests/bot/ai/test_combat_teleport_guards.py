@@ -12,7 +12,6 @@ from tankpit_bot.bot.ai.combat_close import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
@@ -27,14 +26,6 @@ from tests.bot.ai._support import (
 
 class TestCombatTeleportGuards:
     """Tests for combat teleport affordability and legality."""
-
-    def setup_method(self) -> None:
-        """Reset shared world-state globals before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        reset_world_state()
 
     def test_teleport_to_target_refuels_when_unaffordable(self) -> None:
         """An unaffordable combat target delegates the tick to fuel recovery.

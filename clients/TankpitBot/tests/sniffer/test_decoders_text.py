@@ -60,9 +60,7 @@ def test_decode_message_select() -> None:
 
 def test_decode_message_select_does_not_mutate_selected_room() -> None:
     """Sent SELECT packets do not mark the room as joined."""
-    from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
-
-    reset_world_state()
+    from tankpit_bot.sniffer.world_state import get_world_service
 
     payload = frame_payload(b"*4")
     result = decode_message(payload, "sent", None)
@@ -185,9 +183,7 @@ def test_decode_plus_message_action_short() -> None:
 
 def test_decode_plus_message_action_does_not_register_room_image() -> None:
     """ACTION messages do not mutate room-image registration."""
-    from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
-
-    reset_world_state()
+    from tankpit_bot.sniffer.world_state import get_world_service
 
     result = decode_plus_message("+1|2|118|101|manual-click", "SENT")
 
@@ -209,9 +205,7 @@ def test_decode_join_confirm_short() -> None:
 
 def test_decode_join_confirm_empty_room_id_does_not_select_room() -> None:
     """Empty room IDs do not mutate selected-room state."""
-    from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
-
-    reset_world_state()
+    from tankpit_bot.sniffer.world_state import get_world_service
 
     result = decode_join_confirm("=|date", "RECV")
 

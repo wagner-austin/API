@@ -19,12 +19,8 @@ class TestBotEquipmentSlots:
         """HUNT with critically damaged enemy enables radar, dual, homing."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         counts = [10, 40, 20, 15, 5]
         update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -38,12 +34,8 @@ class TestBotEquipmentSlots:
         """HUNT with healthy enemy enables radar and dual only."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         counts = [10, 40, 20, 15, 5]
         update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -57,12 +49,8 @@ class TestBotEquipmentSlots:
         """DEFEND mode enables radar (5) and armor (1), disables dual+homing."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         counts = [10, 40, 20, 15, 5]
         update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -76,12 +64,8 @@ class TestBotEquipmentSlots:
         """COLLECT with critical fuel enables radar and shields."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         counts = [10, 40, 20, 15, 5]
         update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -95,12 +79,8 @@ class TestBotEquipmentSlots:
         """COLLECT with low (not critical) fuel: radar only."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         counts = [10, 40, 20, 15, 5]
         update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -114,12 +94,8 @@ class TestBotEquipmentSlots:
         """PATROL mode only enables extra radar (5)."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         counts = [10, 40, 20, 15, 5]
         update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -133,12 +109,8 @@ class TestBotEquipmentSlots:
         """Disables combat equipment when switching from HUNT to PATROL."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         # Simulate: homing+dual+radar enabled, shields disabled
         counts = [10, 40, 20, 15, 5]
         update_inventory_from_protocol(
@@ -155,12 +127,8 @@ class TestBotEquipmentSlots:
         """Does not enable equipment when stock is depleted."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         # All counts zero, all disabled
         update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 0], [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -173,10 +141,8 @@ class TestBotEquipmentSlots:
     def test_is_equipment_enabled_all_slots(self, fake_env: FakeEnv) -> None:
         """is_equipment_enabled returns correct state for all 5 slots."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
-        reset_world_state()
         update_inventory_from_toggle(get_world_service(), [True, False, True, False, True])
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot.is_equipment_enabled(1) is True
@@ -188,9 +154,7 @@ class TestBotEquipmentSlots:
     def test_disable_equipment_invalid_slot(self, fake_env: FakeEnv) -> None:
         """disable_equipment returns False for out-of-range slot."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot.disable_equipment(0) is False
         assert bot.disable_equipment(6) is False
@@ -198,11 +162,7 @@ class TestBotEquipmentSlots:
     def test_has_equipment_stock_missile_slot(self, fake_env: FakeEnv) -> None:
         """_has_equipment_stock returns True for slot 3 (missile) with stock."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
 
-        reset_world_state()
         update_inventory_from_protocol(get_world_service(), [0, 0, 10, 0, 0], [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot._has_equipment_stock(3) is True
@@ -210,8 +170,6 @@ class TestBotEquipmentSlots:
     def test_has_equipment_stock_invalid_slot(self, fake_env: FakeEnv) -> None:
         """_has_equipment_stock returns False for invalid slot number."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot._has_equipment_stock(99) is False

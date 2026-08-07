@@ -374,9 +374,8 @@ def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
     opportunistic fuel pickup, falling through to the no-equipment
     search-hop path.
     """
-    from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+    from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
-    reset_world_state()
     world, self_state = make_world(
         fuel=800,
         scanned=True,
@@ -405,7 +404,6 @@ def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
 
     decision = decide_collect_mode(ctx)
 
-    reset_world_state()
     if decision is None:
         raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason_kind"] != "fuel_collect"

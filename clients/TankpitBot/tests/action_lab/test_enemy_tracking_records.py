@@ -34,7 +34,7 @@ from tankpit_bot.action_lab.enemy_tracking_types import TrackingObservationDict
 from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.state.types import make_tank_state
 
@@ -47,7 +47,6 @@ def _restore_hooks() -> Generator[None, None, None]:
     yield
     action_hooks.get_current_time_ms = original_get_time
     action_hooks.drain_buffered_messages = original_drain
-    reset_world_state()
 
 
 class _DrainProbe(ProbeBase):

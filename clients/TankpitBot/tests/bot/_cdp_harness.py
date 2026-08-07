@@ -7,7 +7,6 @@ result, and the health-gate snapshot variant.
 
 from __future__ import annotations
 
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.bot.states import (
     ActionKind,
     BotStateDataDict,
@@ -15,6 +14,7 @@ from tankpit_bot.bot.states import (
     make_in_flight_action,
 )
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 
 
 def _make_snapshot(*, map_visible: bool = False) -> PageClientSnapshotDict:

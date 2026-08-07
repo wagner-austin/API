@@ -185,7 +185,6 @@ class TestForageSearch:
             ctx.ai_state,
             score=925,
             behavior_mode="COLLECT",
-            radar_affordable=True,
         )
 
         if decision is None:
@@ -203,7 +202,6 @@ class TestForageSearch:
             ctx.ai_state,
             score=900,
             behavior_mode="COLLECT",
-            radar_affordable=True,
         )
 
         if decision is None:
@@ -212,9 +210,18 @@ class TestForageSearch:
         assert decision["behavior"]["reason_kind"] == "forage_radar"
         assert decision["behavior"]["score"] == 900
 
-    def test_walks_to_unscanned_tile_when_radar_unaffordable(self) -> None:
-        """Radar gated False but viewport not fully covered yields a walk."""
-        coverage = {"100,100": 100000}
+    def test_walks_when_the_free_radar_would_reveal_nothing_new(self) -> None:
+        """An already-covered radar footprint yields a walk, not a scan.
+
+        This is the production-reachable version of the walk branch.
+        It used to be forced with ``radar_affordable=False``, a gate no
+        caller could ever set — radar is free at any fuel, so the only
+        thing that makes the radar unproductive is the free 5x5 around
+        the tank already being scanned while the wider viewport is not.
+        """
+        # The free radar covers (tank +/- 2); scan exactly that, so a
+        # scan would reveal nothing, while the viewport stays uncovered.
+        coverage = {f"{x},{y}": 100000 for x in range(98, 103) for y in range(98, 103)}
         ctx = _ctx(radars=0, scanned_tiles=coverage)
 
         decision = plan_forage_search(
@@ -222,7 +229,6 @@ class TestForageSearch:
             ctx.ai_state,
             score=925,
             behavior_mode="COLLECT",
-            radar_affordable=False,
         )
 
         if decision is None:
@@ -239,7 +245,6 @@ class TestForageSearch:
             ctx.ai_state,
             score=925,
             behavior_mode="COLLECT",
-            radar_affordable=False,
         )
 
         assert decision is None
@@ -271,7 +276,6 @@ class TestForageSearch:
             ctx.ai_state,
             score=925,
             behavior_mode="COLLECT",
-            radar_affordable=False,
         )
 
         assert decision is None

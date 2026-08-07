@@ -56,7 +56,6 @@ from tankpit_bot.protocol import (
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
 )
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
@@ -139,7 +138,6 @@ class BotScenario:
             combat_feedback: Initial combat feedback channel.
             config: Optional AI config override.
         """
-        reset_world_state()
         self.timestamp_ms: int = timestamp_ms
         self.combat_feedback: CombatFeedback = combat_feedback
         self.config: AIConfigDict | None = config

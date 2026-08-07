@@ -3,7 +3,7 @@
 A *sample* pairs the bot's wire-derived belief about its own tank
 (:class:`tankpit_bot.state.types.SelfStateDict` fields) with the live
 JS client's minified self-tank field map
-(:attr:`tankpit_bot.action_lab.page_client_snapshot.PageClientSnapshotDict.self_fields`)
+(:attr:`tankpit_bot.browser.page_client_snapshot.PageClientSnapshotDict.self_fields`)
 captured at the same tick. The mapping report aggregates samples to
 discover which minified keys carry tank_id / x / y / fuel.
 """
@@ -21,7 +21,7 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from tankpit_bot.action_lab.page_client_snapshot_codecs import (
+from tankpit_bot.browser.page_client_snapshot_codecs import (
     decode_client_field_map,
     encode_client_field_map,
 )

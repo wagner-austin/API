@@ -2,7 +2,7 @@
 
 The field map and collection blocks, their JSON narrowing helpers, and
 the runtime-value extractor. The snapshot record that composes them is
-:mod:`tankpit_bot.action_lab.page_client_snapshot`.
+:mod:`tankpit_bot.browser.page_client_snapshot`.
 """
 
 from __future__ import annotations

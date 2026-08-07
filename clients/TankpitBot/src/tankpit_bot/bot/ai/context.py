@@ -428,26 +428,6 @@ def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
     return uncovered > 0
 
 
-def can_use_radar(ctx: DecideCtx) -> bool:
-    """Return True -- radar is always available regardless of fuel.
-
-    Radar dispatch can never kill the bot: the server accepts the
-    command even at zero fuel (user-confirmed 2026-06-26). The
-    wire-reported 10-fuel deduction after a radar is just a debit, not
-    a precondition. Keeping radar available at fuel=0 is what lets a
-    stranded bot still see what's around it instead of looping silently.
-
-    Args:
-        ctx: Decision context (unused; kept for signature compatibility
-            with the rest of the ``can_*`` predicate family).
-
-    Returns:
-        Always True.
-    """
-    del ctx
-    return True
-
-
 def teleport_fuel_cost_to(ctx: DecideCtx, target_x: int, target_y: int) -> int:
     """Return the exact fuel cost to teleport from self to a destination.
 
@@ -517,7 +497,6 @@ def require_command(
 __all__ = [
     "DecideCtx",
     "can_afford_teleport",
-    "can_use_radar",
     "clear_resource_target",
     "compute_equipment",
     "expire_kills",

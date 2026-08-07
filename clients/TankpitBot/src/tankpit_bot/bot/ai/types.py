@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing_extensions import TypedDict
 
-from tankpit_bot.bot.ai.modes import (
+from tankpit_bot.types.modes import (
     AIMode,
     AIModeState,
 )
@@ -190,7 +190,7 @@ class AIStateDict(TypedDict):
             ``"HUNT"`` / ``"COLLECT"`` force those modes. ``None``
             restores the built-in auto-arbitration and mirrors the
             historical (pre-service) behaviour of :func:`make bot`.
-            Drained from :mod:`tankpit_bot.service.mode_bridge` at the
+            Drained from :mod:`tankpit_bot.bus.mode_bridge` at the
             top of every tick.
         live_radars_used: Radar-scan commands dispatched by the executor
             this session. Incremented at the radar dispatch call-site

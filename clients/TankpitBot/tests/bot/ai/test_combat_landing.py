@@ -277,16 +277,11 @@ def test_combat_landing_candidates_skip_failed_move_marked_tiles() -> None:
     """
     from tankpit_bot.sniffer.world_state import (
         mark_move_target_failed,
-        reset_world_state,
     )
 
-    reset_world_state()
     world, self_state, target = _world()
     mark_move_target_failed(103, 100, 99000)
 
-    try:
-        result = combat_landing_candidates(world, self_state, target, None, 100000)
-    finally:
-        reset_world_state()
+    result = combat_landing_candidates(world, self_state, target, None, 100000)
 
     assert result == [(105, 100), (104, 101), (104, 99)]

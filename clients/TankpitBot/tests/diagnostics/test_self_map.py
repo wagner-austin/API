@@ -2,7 +2,7 @@
 
 Every test drives the REAL pipeline:
 :func:`tankpit_bot.runtime_logging.configure_bot_runtime_logging` ->
-:func:`tankpit_bot.diagnostics.self_alignment.maybe_emit_self_alignment_sample`
+:meth:`tankpit_bot.diagnostics.self_alignment.SelfAlignmentEmitter.maybe_emit`
 -> real ``_HookEventArtifactHandler`` -> JSONL via
 :class:`tests.conftest.FakeFileSystem` -> real
 :func:`tankpit_bot.diagnostics.self_map.build_self_map_report` ->
@@ -19,8 +19,8 @@ from platform_core.json_utils import JSONTypeError
 from tests.conftest import FakeFileSystem
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.diagnostics.self_alignment import maybe_emit_self_alignment_sample
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.diagnostics.self_alignment import SelfAlignmentEmitter
 from tankpit_bot.diagnostics.self_alignment_types import (
     SelfAlignmentSampleDict,
     SelfFieldCandidateDict,
@@ -75,7 +75,7 @@ def _emit_sample(
         map_fields={},
         world_collections={},
     )
-    assert maybe_emit_self_alignment_sample(self_state, snapshot)
+    assert SelfAlignmentEmitter().maybe_emit(self_state, snapshot)
 
 
 def _emit_two_movement_samples() -> str:

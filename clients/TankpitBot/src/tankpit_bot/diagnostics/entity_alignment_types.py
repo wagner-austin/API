@@ -3,7 +3,7 @@
 An entity alignment *sample* pairs the bot's wire-derived container
 beliefs (``world_state["containers"]``) with the live JS client's
 array-of-objects properties of ``activeGame.h``
-(:attr:`tankpit_bot.action_lab.page_client_snapshot.PageClientSnapshotDict.world_collections`)
+(:attr:`tankpit_bot.browser.page_client_snapshot.PageClientSnapshotDict.world_collections`)
 captured at the same tick. The mapping report aggregates samples to
 discover which minified collection carries the client's container list
 and which item fields carry x/y -- the prerequisite for detecting
@@ -23,7 +23,7 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from tankpit_bot.action_lab.page_client_snapshot_codecs import (
+from tankpit_bot.browser.page_client_snapshot_codecs import (
     decode_client_collections,
     encode_client_collections,
 )

@@ -7,9 +7,9 @@ from tankpit_bot.protocol.types import (
     EquipmentToggleDict,
     InventoryDict,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
 )
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.world_state_inventory import (
@@ -21,14 +21,6 @@ from tankpit_bot.sniffer.world_state_inventory import (
 
 class TestInventoryTrackingDetail:
     """Tests for inventory tracking detail."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_update_from_toggle_changes_enabled(self) -> None:
         """Test 0x74 message updates enabled flags."""
@@ -100,16 +92,17 @@ class TestInventoryTrackingDetail:
         assert changes[0]["old_count"] == 10
         assert changes[0]["new_count"] == 9
 
-    def test_reset_clears_inventory(self) -> None:
-        """Test reset_world_state clears inventory to empty."""
+    def test_a_fresh_service_carries_an_empty_inventory(self) -> None:
+        """Stocked inventory belongs to the service that was stocked."""
+        stocked = WorldService()
         update_inventory_from_protocol(
-            get_world_service(),
+            stocked,
             counts=[40, 30, 20, 10, 5],
             enabled=[False, False, False, False, False],
         )
-        reset_world_state()
+        assert get_inventory_state(stocked)["armor_shields"]["count"] == 40
 
-        inv = get_inventory_state(get_world_service())
+        inv = get_inventory_state(WorldService())
         assert inv["armor_shields"]["count"] == 0
         assert inv["armor_shields"]["enabled"] is False
 

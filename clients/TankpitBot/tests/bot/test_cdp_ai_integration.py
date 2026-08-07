@@ -25,9 +25,7 @@ class TestBotAIIntegration:
         """_tick_once returns early when self_state is None."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         _tick_once(bot)
         # AI state unchanged — no self_state to act on
@@ -186,12 +184,10 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(209, 79)
         _update_fuel_total(get_world_service(), 345)
         update_inventory_from_protocol(
@@ -213,12 +209,10 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(get_world_service(), 1200)
         update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
@@ -241,14 +235,12 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tankpit_bot.state.tank_mutations import apply_tank_observation
         from tankpit_bot.state.types import make_tank_observation, make_tank_state
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(get_world_service(), 1200)
         update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
@@ -299,12 +291,10 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(get_world_service(), 1200)
         update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
@@ -326,12 +316,10 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_move_command
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -347,12 +335,10 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_pickup_fuel_command
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -368,12 +354,10 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_shoot_command
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -389,12 +373,10 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_radar_command
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -411,7 +393,6 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.types import make_teleport_command
         from tankpit_bot.sniffer.world_state import (
             get_world_service,
-            reset_world_state,
             update_world_state_from_position,
         )
         from tankpit_bot.sniffer.world_state_containers import (
@@ -419,7 +400,6 @@ class TestBotAIIntegration:
         )
         from tests.fakes import FakeCDPSession, FakePage
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         # The hop must be affordable or the executor's refusal
         # prediction (physics/supervisor.py) suppresses the send:
@@ -446,12 +426,10 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_teleport_command
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession, FakePage
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()

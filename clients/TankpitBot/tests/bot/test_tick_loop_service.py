@@ -21,9 +21,9 @@ from tankpit_bot.bot.tick_loop import (
     _apply_pending_mode_override,
     _publish_session_status,
 )
-from tankpit_bot.service.frame_bus import FrameBus
-from tankpit_bot.service.mode_bridge import ModeBridge
-from tankpit_bot.service.status_bus import StatusBus
+from tankpit_bot.bus.frame_bus import FrameBus
+from tankpit_bot.bus.mode_bridge import ModeBridge
+from tankpit_bot.bus.status_bus import StatusBus
 
 
 class _RecordingCDP:

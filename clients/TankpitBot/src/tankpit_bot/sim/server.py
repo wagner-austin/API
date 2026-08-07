@@ -512,10 +512,7 @@ class SimServer(SimServerMoveMixin):
         return messages
 
 
-TICK_MS = TICK_RATE_MS
-
 __all__ = [
     "CORPSE_WINDOW_TICKS",
-    "TICK_MS",
     "SimServer",
 ]

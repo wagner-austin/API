@@ -1,4 +1,4 @@
-"""Tests for :class:`tankpit_bot.service.frame_bus.FrameBus`.
+"""Tests for :class:`tankpit_bot.bus.frame_bus.FrameBus`.
 
 Covers the subscribe / unsubscribe / publish contract, the
 cache-on-publish behaviour that gives fresh ``/video`` viewers an
@@ -14,7 +14,7 @@ from __future__ import annotations
 import threading
 import time
 
-from tankpit_bot.service.frame_bus import FrameBus, FrameSubscriber
+from tankpit_bot.bus.frame_bus import FrameBus, FrameSubscriber
 
 # =============================================================================
 # FrameSubscriber

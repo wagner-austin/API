@@ -26,11 +26,9 @@ class TestBotStateUpdateDetail:
         """TELEPORTING completes when the server confirms landing."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -51,11 +49,9 @@ class TestBotStateUpdateDetail:
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             is_move_target_failed,
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -78,11 +74,9 @@ class TestBotStateUpdateDetail:
         """LOW_FUEL does not override an in-flight TELEPORTING state."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -102,11 +96,9 @@ class TestBotStateUpdateDetail:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -128,11 +120,9 @@ class TestBotStateUpdateDetail:
         """LOW_FUEL does not override an in-flight SCANNING state."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -151,11 +141,9 @@ class TestBotStateUpdateDetail:
         """TELEPORTING completes to IDLE even when fuel is below threshold."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()

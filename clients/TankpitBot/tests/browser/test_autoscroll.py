@@ -17,7 +17,7 @@ from tankpit_bot.browser.autoscroll import (
     ensure_autoscroll_off,
 )
 from tankpit_bot.protocol.framing import FramingError
-from tankpit_bot.sniffer.world_state import get_world_state, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types.message import CapturedMessage
 
@@ -146,12 +146,7 @@ class TestEnsureAutoscrollOff:
 
     def setup_method(self) -> None:
         """Seed a spawned tank -- the toggle only works in-game."""
-        reset_world_state()
         _spawn()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        reset_world_state()
 
     def test_setting_was_on_single_press_corrects(self) -> None:
         """Ack ``A0`` after the first press means the toggle is fixed."""
@@ -197,30 +192,18 @@ def test_real_hook_delegates_to_the_module() -> None:
     """The ``_test_hooks`` seam's real implementation runs the dance."""
     from tankpit_bot._test_hooks import _real_ensure_autoscroll_off
 
-    reset_world_state()
     _spawn()
-    try:
-        messages: list[CapturedMessage] = []
-        keyboard = _FakeKeyboard(messages, [b"A0"])
-        page = _FakePage(keyboard)
+    messages: list[CapturedMessage] = []
+    keyboard = _FakeKeyboard(messages, [b"A0"])
+    page = _FakePage(keyboard)
 
-        _real_ensure_autoscroll_off(page, messages)
-    finally:
-        reset_world_state()
+    _real_ensure_autoscroll_off(page, messages)
 
     assert keyboard.presses == ["a"]
 
 
 class TestInGameGate:
     """The spawn gate in front of the first toggle press."""
-
-    def setup_method(self) -> None:
-        """Start each case from an unspawned world."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        reset_world_state()
 
     def test_waits_for_spawn_then_presses(self) -> None:
         """The dance polls until ``self_state`` appears, then toggles.

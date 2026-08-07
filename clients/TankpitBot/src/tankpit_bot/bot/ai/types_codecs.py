@@ -17,13 +17,6 @@ from platform_core.json_utils import (
     require_str,
 )
 
-from tankpit_bot.bot.ai.modes import (
-    AI_MODES,
-    AIMode,
-    is_valid_ai_mode_state,
-    require_ai_mode,
-    require_ai_mode_state,
-)
 from tankpit_bot.bot.ai.scoring_types import (
     BEHAVIOR_MODES,
     REASON_KINDS,
@@ -38,6 +31,13 @@ from tankpit_bot.bot.ai.types import (
 from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
     PathStepDict,
+)
+from tankpit_bot.types.modes import (
+    AI_MODES,
+    AIMode,
+    is_valid_ai_mode_state,
+    require_ai_mode,
+    require_ai_mode_state,
 )
 
 

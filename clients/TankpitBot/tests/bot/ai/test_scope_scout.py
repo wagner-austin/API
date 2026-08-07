@@ -227,10 +227,7 @@ def test_ground_served_container_never_draws_a_pan() -> None:
 
 
 def test_unpannable_and_unqualified_goals_leave_no_scout() -> None:
-    """Out-of-reach water, drained, refused, and blacklisted all decline."""
-    from tankpit_bot.bot.ai.collect_common import blacklist_container
-
-    blacklist_container(100, 121)
+    """Out-of-reach water, drained, and refused all decline."""
     drained = make_container(110, 102, 0, is_fuel=True)
     refused = make_container(110, 98, 500, is_fuel=True)
     refused["failed_pickups"] = 1

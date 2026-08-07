@@ -17,20 +17,12 @@ progress.
 from __future__ import annotations
 
 from tankpit_bot.protocol import MapDataDict
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
 class TestMapOpenClearsOnMapData:
     """Integration test for the map_open clear signal."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_map_data_dispatch_flips_processed_flag(self) -> None:
         """A 0x4C MapData dispatch must flag map_data_processed.

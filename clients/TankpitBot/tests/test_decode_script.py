@@ -70,6 +70,8 @@ def _make_session_json(messages: list[dict[str, str]], magic: str | None = None)
         "start_timestamp_ms": 1000000,
         "end_timestamp_ms": 1001000,
         "base_url": "https://tankpit.com/play",
+        "game_log": [],
+        "tank_names": {},
         "messages": [
             {
                 "timestamp_ms": 1000000 + i * 100,
@@ -127,9 +129,6 @@ class TestDecodeScript:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test decode processes text messages from capture session."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         room_payload = _make_text_payload(
             "+2|World|24|flags|2|n|field24.gif|2026",
@@ -152,7 +151,6 @@ class TestDecodeScript:
             main()
         finally:
             sys.argv = old_argv
-            reset_world_state()
 
         output = capsys.readouterr().out
         assert "ROOM_LIST" in output
@@ -196,9 +194,6 @@ class TestDecodeScript:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test decode accepts custom session path as argument."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         room_payload = _make_text_payload(
             "+1|Practice|1|flags|2|p|field01.gif|2026",
@@ -215,7 +210,6 @@ class TestDecodeScript:
             main()
         finally:
             sys.argv = old_argv
-            reset_world_state()
 
         output = capsys.readouterr().out
         assert "ROOM_LIST" in output
@@ -227,15 +221,13 @@ class TestDecodeScript:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test decode prints game log entries when present."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         session = {
             "session_id": "test-log-session",
             "start_timestamp_ms": 1000000,
             "end_timestamp_ms": 1001000,
             "base_url": "https://tankpit.com/play",
+            "tank_names": {},
             "messages": [],
             "magic": "logmagic",
             "game_log": [
@@ -251,7 +243,6 @@ class TestDecodeScript:
             main()
         finally:
             sys.argv = old_argv
-            reset_world_state()
 
         output = capsys.readouterr().out
         assert "Game Log (2 entries)" in output
@@ -264,9 +255,6 @@ class TestDecodeScript:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test decode warns on short sent/received payloads."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         short = _make_short_payload()
         messages = [
@@ -282,7 +270,6 @@ class TestDecodeScript:
             main()
         finally:
             sys.argv = old_argv
-            reset_world_state()
 
         output = capsys.readouterr().out
         assert "decode failed" in output
@@ -293,9 +280,6 @@ class TestDecodeScript:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test decode handles sent XOR command (0x21 prefix)."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         # 0x21 = '!', followed by enough bytes for XOR decode
         xor_body = bytes([0x21]) + b"\x00" * 10
@@ -311,7 +295,6 @@ class TestDecodeScript:
             main()
         finally:
             sys.argv = old_argv
-            reset_world_state()
 
         output = capsys.readouterr().out
         assert "SENT" in output
@@ -322,9 +305,6 @@ class TestDecodeScript:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test decode handles sent message with unknown type (RAW)."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         # 0x99 is not a text type and not 0x21
         raw_body = bytes([0x99, 0x01, 0x02, 0x03])
@@ -340,7 +320,6 @@ class TestDecodeScript:
             main()
         finally:
             sys.argv = old_argv
-            reset_world_state()
 
         output = capsys.readouterr().out
         assert "RAW" in output
@@ -351,9 +330,6 @@ class TestDecodeScript:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test decode handles received binary (non-text) messages."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         # 0x99 not in TEXT_MESSAGE_TYPES, with enough data for XOR
         binary_body = bytes([0x99]) + b"\x01" * 10
@@ -372,7 +348,6 @@ class TestDecodeScript:
             main()
         finally:
             sys.argv = old_argv
-            reset_world_state()
 
         output = capsys.readouterr().out
         assert "RECEIVED" in output
@@ -383,9 +358,6 @@ class TestDecodeScript:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test decode handles received binary with single-byte body."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         # Single byte body -> xor_decode returns empty
         binary_body = bytes([0x99])
@@ -404,7 +376,6 @@ class TestDecodeScript:
             main()
         finally:
             sys.argv = old_argv
-            reset_world_state()
 
         output = capsys.readouterr().out
         assert "EMPTY" in output
@@ -415,9 +386,6 @@ class TestDecodeScript:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test decode handles sent XOR with short decoded result."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         # 0x21 with only 1 extra byte -> decoded < 2 -> CMD fallback
         xor_body = bytes([0x21, 0x00])
@@ -433,7 +401,6 @@ class TestDecodeScript:
             main()
         finally:
             sys.argv = old_argv
-            reset_world_state()
 
         output = capsys.readouterr().out
         assert "CMD" in output
@@ -450,6 +417,8 @@ def test_decode_entrypoint_runs_as_main(
             "start_timestamp_ms": 1000000,
             "end_timestamp_ms": 1001000,
             "base_url": "https://tankpit.com/play",
+            "game_log": [],
+            "tank_names": {},
             "messages": [],
             "magic": "mainmagic",
         },

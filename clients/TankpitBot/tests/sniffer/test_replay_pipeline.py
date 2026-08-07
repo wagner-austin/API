@@ -15,7 +15,6 @@ world-state mutations a live session would.
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -25,7 +24,7 @@ from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.sniffer.decoders import process_received_message
-from tankpit_bot.sniffer.world_state import get_world_service, get_world_state, reset_world_state
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.types import CaptureSession, decode_capture_session
 
@@ -48,27 +47,38 @@ def _load(path: Path) -> CaptureSession:
     return decode_capture_session(narrow_json_to_dict(load_json_str(text)))
 
 
-def _replay_all_received(session: CaptureSession) -> int:
+def _replay_all_received(session: CaptureSession) -> tuple[WorldService, int]:
+    """Replay every received frame into a service this call owns.
+
+    Returns:
+        The service the frames were decoded into, and how many were
+        replayed. The service is a LOCAL, not the process singleton —
+        isolation comes from never sharing it ([[session-state-deglobalisation]]).
+    """
     magic = session["magic"]
     if magic is None:
         raise RuntimeError("capture has no magic key — cannot replay binary frames")
-    reset_world_state()
+    ws = WorldService()
     xor_table = build_session_xor_table(magic)
     count = 0
     for msg in session["messages"]:
         if msg["direction"] != "received":
             continue
-        process_received_message(msg["payload"], xor_table)
+        process_received_message(ws, msg["payload"], xor_table)
         count += 1
-    return count
+    return ws, count
 
 
-def _replay_through(session: CaptureSession, *, stop_at_index: int) -> int:
-    """Replay received frames up to (not including) the absolute message index."""
+def _replay_through(session: CaptureSession, *, stop_at_index: int) -> tuple[WorldService, int]:
+    """Replay received frames up to (not including) the absolute message index.
+
+    Returns:
+        The service the frames were decoded into, and how many were replayed.
+    """
     magic = session["magic"]
     if magic is None:
         raise RuntimeError("capture has no magic key")
-    reset_world_state()
+    ws = WorldService()
     xor_table = build_session_xor_table(magic)
     received = 0
     for i, msg in enumerate(session["messages"]):
@@ -76,20 +86,11 @@ def _replay_through(session: CaptureSession, *, stop_at_index: int) -> int:
             break
         if msg["direction"] != "received":
             continue
-        process_received_message(msg["payload"], xor_table)
+        process_received_message(ws, msg["payload"], xor_table)
         received += 1
-    return received
+    return ws, received
 
 
-@pytest.fixture()
-def _isolate_world_state() -> Generator[None, None, None]:
-    """Each test gets a clean global world-state and a fresh teardown."""
-    reset_world_state()
-    yield
-    reset_world_state()
-
-
-@pytest.mark.usefixtures("_isolate_world_state")
 def test_fuel_probe_capture_replays_to_observed_terminal_state() -> None:
     """The full fuel_probe capture produces the recorded terminal state.
 
@@ -99,10 +100,10 @@ def test_fuel_probe_capture_replays_to_observed_terminal_state() -> None:
     are mutated will fail this assertion.
     """
     session = _load(REPO_ROOT / "fuel_probe.capture_session.json")
-    received = _replay_all_received(session)
+    ws, received = _replay_all_received(session)
 
-    world = get_world_state()
-    inv = get_inventory_state(get_world_service())
+    world = ws.get_world_state()
+    inv = get_inventory_state(ws)
     self_state = world["self_state"]
 
     assert received == 119
@@ -147,7 +148,6 @@ def test_fuel_probe_capture_replays_to_observed_terminal_state() -> None:
     assert inv["extra_radars"]["count"] == 7
 
 
-@pytest.mark.usefixtures("_isolate_world_state")
 def test_fuel_probe_inventory_zero_until_first_sync_frame() -> None:
     """Real ``_inventory_state`` stays empty until the first 0x49 frame.
 
@@ -157,13 +157,12 @@ def test_fuel_probe_inventory_zero_until_first_sync_frame() -> None:
     populated by the explicit absolute-sync message.
     """
     session = _load(REPO_ROOT / "fuel_probe.capture_session.json")
-    received = _replay_through(session, stop_at_index=51)
+    ws, received = _replay_through(session, stop_at_index=51)
 
     assert received > 0
-    assert total_inventory_count(get_inventory_state(get_world_service())) == 0
+    assert total_inventory_count(get_inventory_state(ws)) == 0
 
 
-@pytest.mark.usefixtures("_isolate_world_state")
 def test_fuel_probe_inventory_jumps_to_112_after_first_sync_frame() -> None:
     """The first 0x49 absolute-inventory frame credits all five slots at once.
 
@@ -171,9 +170,9 @@ def test_fuel_probe_inventory_jumps_to_112_after_first_sync_frame() -> None:
     the real tracker now reports the recorded post-sync totals.
     """
     session = _load(REPO_ROOT / "fuel_probe.capture_session.json")
-    _replay_through(session, stop_at_index=52)
+    ws, _received = _replay_through(session, stop_at_index=52)
 
-    inv = get_inventory_state(get_world_service())
+    inv = get_inventory_state(ws)
     assert total_inventory_count(inv) == 112
     assert inv["armor_shields"]["count"] == 25
     assert inv["dual_shots"]["count"] == 25
@@ -182,7 +181,6 @@ def test_fuel_probe_inventory_jumps_to_112_after_first_sync_frame() -> None:
     assert inv["extra_radars"]["count"] == 12
 
 
-@pytest.mark.usefixtures("_isolate_world_state")
 def test_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
     """The teleport probe capture exercises teleport-landed signals end to end.
 
@@ -193,9 +191,9 @@ def test_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
     old per-tile cache_value path didn't promote anything).
     """
     session = _load(REPO_ROOT / "teleport_probe.capture_session.json")
-    received = _replay_all_received(session)
+    ws, received = _replay_all_received(session)
 
-    world = get_world_state()
+    world = ws.get_world_state()
     self_state = world["self_state"]
 
     assert received == 68
@@ -207,18 +205,17 @@ def test_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
     assert len(world["tanks"]) == 37
     assert len(world["containers"]) == 11
     assert len(world["mines"]) == 6
-    assert total_inventory_count(get_inventory_state(get_world_service())) == 124
+    assert total_inventory_count(get_inventory_state(ws)) == 124
 
 
-@pytest.mark.usefixtures("_isolate_world_state")
 def test_enemy_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
     """The enemy-teleport capture lands on an enemy and decrements radar slots."""
     session = _load(REPO_ROOT / "enemy_teleport_probe.capture_session.json")
-    received = _replay_all_received(session)
+    ws, received = _replay_all_received(session)
 
-    world = get_world_state()
+    world = ws.get_world_state()
     self_state = world["self_state"]
-    inv = get_inventory_state(get_world_service())
+    inv = get_inventory_state(ws)
 
     assert received == 71
     if self_state is None:
@@ -231,7 +228,6 @@ def test_enemy_teleport_probe_capture_replays_to_observed_terminal_state() -> No
     assert inv["extra_radars"]["count"] == 19
 
 
-@pytest.mark.usefixtures("_isolate_world_state")
 def test_movement_probe_capture_replays_to_observed_terminal_state() -> None:
     """The movement probe capture exercises pure walk-to-target sequencing.
 
@@ -243,9 +239,9 @@ def test_movement_probe_capture_replays_to_observed_terminal_state() -> None:
     container-store world).
     """
     session = _load(REPO_ROOT / "movement_probe.capture_session.json")
-    received = _replay_all_received(session)
+    ws, received = _replay_all_received(session)
 
-    world = get_world_state()
+    world = ws.get_world_state()
     self_state = world["self_state"]
 
     assert received == 62
@@ -254,10 +250,9 @@ def test_movement_probe_capture_replays_to_observed_terminal_state() -> None:
     assert (self_state["x"], self_state["y"]) == (131, 118)
     assert self_state["fuel"] == 1076
     assert len(world["containers"]) == 22
-    assert total_inventory_count(get_inventory_state(get_world_service())) == 125
+    assert total_inventory_count(get_inventory_state(ws)) == 125
 
 
-@pytest.mark.usefixtures("_isolate_world_state")
 def test_mixed_activity_sniff_capture_replays_to_observed_terminal_state() -> None:
     """The 2026-06-20 mixed-activity sniff capture exercises many decoder paths.
 
@@ -273,11 +268,11 @@ def test_mixed_activity_sniff_capture_replays_to_observed_terminal_state() -> No
     """
     fixtures_dir = REPO_ROOT / "tests" / "replay" / "fixtures"
     session = _load(fixtures_dir / "mixed_activity_sniff.capture_session.json")
-    received = _replay_all_received(session)
+    ws, received = _replay_all_received(session)
 
-    world = get_world_state()
+    world = ws.get_world_state()
     self_state = world["self_state"]
-    inv = get_inventory_state(get_world_service())
+    inv = get_inventory_state(ws)
 
     assert received == 228
     if self_state is None:
@@ -302,13 +297,16 @@ def test_mixed_activity_sniff_capture_replays_to_observed_terminal_state() -> No
     assert inv["extra_radars"]["count"] == 25
 
 
-@pytest.mark.usefixtures("_isolate_world_state")
 def test_fuel_probe_radar_uses_decrement_extra_radars_individually() -> None:
     """Each radar use processed during replay reduces the radar slot by exactly 1.
 
     Five radar-use frames (indices 67, 80, 97, 114, 130 in the capture)
     incrementally decrement ``extra_radars`` from 12 -> 7 — the only slot that
     changes between the initial sync and end of capture.
+
+    Each prefix replays into its OWN service, so the five runs cannot
+    contaminate one another. The previous global reset made isolation a
+    property of call ordering; a fresh service makes it structural.
     """
     session = _load(REPO_ROOT / "fuel_probe.capture_session.json")
 
@@ -320,15 +318,15 @@ def test_fuel_probe_radar_uses_decrement_extra_radars_individually() -> None:
         pytest.fail("capture session must have a magic key")
 
     for stop_index, expected_radar in zip(radar_use_indices, expected_radar_totals, strict=True):
-        reset_world_state()
+        ws = WorldService()
         xor_table = build_session_xor_table(magic)
         for i, msg in enumerate(session["messages"]):
             if i > stop_index:
                 break
             if msg["direction"] == "received":
-                process_received_message(msg["payload"], xor_table)
+                process_received_message(ws, msg["payload"], xor_table)
 
-        inv = get_inventory_state(get_world_service())
+        inv = get_inventory_state(ws)
         assert inv["extra_radars"]["count"] == expected_radar, (
             f"after frame {stop_index} expected radar={expected_radar} "
             f"got {inv['extra_radars']['count']}"

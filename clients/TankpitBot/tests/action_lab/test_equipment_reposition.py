@@ -25,8 +25,8 @@ from tests.action_lab._equipment_collection_harness import (
     _waiter,
     _yes_repo,
 )
+from tests.action_lab._teleport_seams import equipment_target_phase_module
 
-from tankpit_bot.action_lab import equipment_target_phase as _etp_mod
 from tankpit_bot.action_lab.equipment_target_phase import (
     resolve_equipment_target_after_radar,
 )
@@ -40,8 +40,8 @@ def test_no_landing_tile_raises() -> None:
 
 def test_reposition_map_sync_timeout() -> None:
     """equipment_target_phase.py lines 261-262."""
-    original = _etp_mod.run_equipment_reposition_attempt
-    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+    original = equipment_target_phase_module.run_tracked_teleport_attempt
+    equipment_target_phase_module.run_tracked_teleport_attempt = lambda *_a, **_kw: _make_tracked(
         sync_ts=None, tp_result=None, tp_started=None
     )
     try:
@@ -49,26 +49,26 @@ def test_reposition_map_sync_timeout() -> None:
         if result.terminal_result is None:
             raise AssertionError("expected terminal result")
     finally:
-        _etp_mod.run_equipment_reposition_attempt = original
+        equipment_target_phase_module.run_tracked_teleport_attempt = original
 
 
 def test_reposition_dispatch_failure_raises() -> None:
     """equipment_target_phase.py line 287."""
-    original = _etp_mod.run_equipment_reposition_attempt
-    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+    original = equipment_target_phase_module.run_tracked_teleport_attempt
+    equipment_target_phase_module.run_tracked_teleport_attempt = lambda *_a, **_kw: _make_tracked(
         sync_ts=2100, tp_result=None, tp_started=None
     )
     try:
         with pytest.raises(RuntimeError):
             _common_reposition_call()
     finally:
-        _etp_mod.run_equipment_reposition_attempt = original
+        equipment_target_phase_module.run_tracked_teleport_attempt = original
 
 
 def test_reposition_teleport_timeout() -> None:
     """equipment_target_phase.py line 289."""
-    original = _etp_mod.run_equipment_reposition_attempt
-    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+    original = equipment_target_phase_module.run_tracked_teleport_attempt
+    equipment_target_phase_module.run_tracked_teleport_attempt = lambda *_a, **_kw: _make_tracked(
         sync_ts=2100, tp_result=_TP_TIMEOUT, tp_started=2200
     )
     try:
@@ -76,13 +76,13 @@ def test_reposition_teleport_timeout() -> None:
         if result.terminal_result is None:
             raise AssertionError("expected terminal result")
     finally:
-        _etp_mod.run_equipment_reposition_attempt = original
+        equipment_target_phase_module.run_tracked_teleport_attempt = original
 
 
 def test_reposition_success_propagates_teleport() -> None:
     """equipment_target_phase.py branch 494->496."""
-    original = _etp_mod.run_equipment_reposition_attempt
-    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+    original = equipment_target_phase_module.run_tracked_teleport_attempt
+    equipment_target_phase_module.run_tracked_teleport_attempt = lambda *_a, **_kw: _make_tracked(
         sync_ts=2100, tp_result=_TP_RESULT, tp_started=2200
     )
     try:
@@ -129,13 +129,13 @@ def test_reposition_success_propagates_teleport() -> None:
             raise AssertionError("expected teleport result")
         assert r.teleport_result["status"] == "landed_exact"
     finally:
-        _etp_mod.run_equipment_reposition_attempt = original
+        equipment_target_phase_module.run_tracked_teleport_attempt = original
 
 
 def test_reposition_timeout_preserves_original_teleport() -> None:
     """equipment_target_phase.py branch 494->496 False path."""
-    original = _etp_mod.run_equipment_reposition_attempt
-    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+    original = equipment_target_phase_module.run_tracked_teleport_attempt
+    equipment_target_phase_module.run_tracked_teleport_attempt = lambda *_a, **_kw: _make_tracked(
         sync_ts=2100, tp_result=_TP_TIMEOUT, tp_started=2200
     )
     try:
@@ -182,4 +182,4 @@ def test_reposition_timeout_preserves_original_teleport() -> None:
         if r.terminal_result is None:
             raise AssertionError("expected terminal result from timeout")
     finally:
-        _etp_mod.run_equipment_reposition_attempt = original
+        equipment_target_phase_module.run_tracked_teleport_attempt = original

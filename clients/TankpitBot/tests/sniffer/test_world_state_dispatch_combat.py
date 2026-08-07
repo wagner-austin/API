@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_combat_hit,
     check_and_clear_our_shot_response,
@@ -21,14 +22,6 @@ from tankpit_bot.sniffer.world_state_inventory import (
 
 class TestCombatHitTracking:
     """Tests for mark_combat_hit and check_and_clear_combat_hit."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_check_and_clear_returns_false_by_default(self) -> None:
         """check_and_clear_combat_hit returns False when no hit recorded."""
@@ -135,23 +128,17 @@ class TestCombatHitTracking:
         mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 0
 
-    def test_reset_clears_our_shot_response(self) -> None:
-        """reset_world_state clears the our_shot_response flag."""
-        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
-        reset_world_state()
-        assert peek_our_shot_response(get_world_service()) is False
+    def test_a_fresh_service_has_no_our_shot_response(self) -> None:
+        """The our_shot_response flag belongs to the service that saw the hit."""
+        marked = WorldService()
+        mark_combat_hit(marked, weapon_byte=0, victim_id=-1)
+        assert peek_our_shot_response(marked) is True
+
+        assert peek_our_shot_response(WorldService()) is False
 
 
 class TestTeleportLandedTracking:
     """Tests for mark_teleport_landed and check_and_clear_teleport_landed."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_check_returns_false_by_default(self) -> None:
         """check_and_clear_teleport_landed returns False with no teleport."""
@@ -171,23 +158,17 @@ class TestTeleportLandedTracking:
         dispatch_world_state_update(get_world_service(), msg)
         assert check_and_clear_teleport_landed(get_world_service()) is True
 
-    def test_reset_clears_teleport_flag(self) -> None:
-        """reset_world_state clears the teleport landed flag."""
-        mark_teleport_landed(get_world_service())
-        reset_world_state()
-        assert check_and_clear_teleport_landed(get_world_service()) is False
+    def test_a_fresh_service_has_no_teleport_landed_flag(self) -> None:
+        """The teleport-landed flag belongs to the service that saw the landing."""
+        landed = WorldService()
+        mark_teleport_landed(landed)
+
+        assert check_and_clear_teleport_landed(WorldService()) is False
+        assert check_and_clear_teleport_landed(landed) is True
 
 
 class TestAmmoDeltaHit:
     """Tests for inventory-delta hit confirmation."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_returns_false_when_no_snapshot_pending(self) -> None:
         """No snapshot pending -> ammo delta is not consulted."""

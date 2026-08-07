@@ -27,8 +27,8 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.enemy_teleport import (
-    EnemyTeleportProbe,
+from tankpit_bot.action_lab.enemy_teleport import EnemyTeleportProbe
+from tankpit_bot.action_lab.enemy_teleport_targeting import (
     _enemy_by_id,
     format_enemy_teleport_probe_summary,
 )

@@ -19,27 +19,28 @@ from pathlib import Path
 
 from platform_core.logging import get_logger
 
+from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.bot.config import (
-    resolve_idle_exit_seconds,
     resolve_prefer_account,
     resolve_target_url,
 )
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
+from tankpit_bot.bus.frame_bus import FrameBus, FrameBusProtocol
+from tankpit_bot.bus.mode_bridge import ModeBridge, ModeBridgeProtocol
+from tankpit_bot.bus.session_status import idle_session_status
+from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.runtime_artifacts import resolve_bot_instance
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import SiteRunnerProtocol
+from tankpit_bot.service.config import resolve_idle_exit_seconds
 from tankpit_bot.service.constants import (
     SERVICE_HOST,
     SERVICE_IDLE_EXIT_SECONDS,
     SERVICE_IDLE_POLL_SECONDS,
     resolve_service_port,
 )
-from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.service.http_server import SessionRunnerHTTPProtocol, make_app
-from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.session_runner import SessionRunner
-from tankpit_bot.service.status_bus import StatusBus, StatusBusProtocol
-from tankpit_bot.service.types import idle_session_status
 
 log = get_logger(__name__)
 
@@ -193,7 +194,7 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
 def main() -> None:
     """Console entry point for ``tankpit-bot-service``.
 
-    Loads the ``.env`` file via :data:`service_hooks.load_dotenv`,
+    Loads the ``.env`` file via :data:`core_hooks.load_dotenv`,
     probes for an already-running instance via
     :data:`service_hooks.probe_existing_instance`, and — only if no
     other instance is answering — runs the service under
@@ -209,7 +210,7 @@ def main() -> None:
     A ``KeyboardInterrupt`` unwinds cleanly — the aiohttp
     ``AppRunner``'s cleanup handles socket teardown.
     """
-    service_hooks.load_dotenv()
+    core_hooks.load_dotenv()
     if service_hooks.probe_existing_instance():
         log.info(
             "tankpit-bot-service already responding on %s:%d; exiting idempotently.",

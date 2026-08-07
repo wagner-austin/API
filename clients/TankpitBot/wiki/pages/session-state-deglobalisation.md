@@ -48,7 +48,7 @@ problem all along, and the resets are the workaround.[^2]
 Deleting that reset list is the completion criterion for this work. If
 state is instance-scoped, no reset is possible to forget.[^2]
 
-**Progress: 10 calls → 9.** Step 1 removed `reset_xor_state` and put
+**Progress: 10 calls → 8 (list length), of which 7 are session state.** Step 1 removed `reset_xor_state` and put
 `reset_static_key_cache` in its place, so the count is unchanged at
 first glance — but the two are not the same kind of thing. The old call
 reset a *session's* cipher; the new one resets a *process-wide key
@@ -74,7 +74,7 @@ counted.[^3]
 |---|---|---|
 | ~~`sniffer/xor.py`~~ | ~~`_global_xor_table`, `_global_static_key`~~ | **module deleted, step 1** |
 | `sniffer/world_state.py` | `_service` (a `WorldService`) | rebind |
-| `sniffer/viewport.py` | `_viewport_left`, `_viewport_top` | rebind |
+| ~~`sniffer/viewport.py`~~ | ~~`_viewport_left`, `_viewport_top`~~ | **module deleted, step 2** |
 | `sniffer/trackers.py:41` | `ALL_TRACKERS` (tuple of tracker instances) | in-place |
 | `ledger/events.py` | `_event_counter` | rebind |
 | `ledger/outcome/teleport.py` | `_pending` | rebind |
@@ -82,11 +82,11 @@ counted.[^3]
 | `ledger/ring.py:51` | `_rings` | in-place |
 | `ledger/decision.py:60` | `_decisions` | in-place |
 | `ledger/mode_transition.py:38` | `_transitions` | in-place |
-| `bot/ai/collect_common.py:15` | `_blacklisted_container_keys` | in-place |
-| `diagnostics/self_alignment.py` | `_last_emitted_belief` | rebind |
-| `diagnostics/entity_alignment.py` | `_last_emitted_signature` | rebind |
-| `browser/cdp_utils.py` | `_cdp_time_offset_ms` | rebind |
-| `browser/client_structure.py` | `_survey_emitted` | rebind |
+| ~~`bot/ai/collect_common.py`~~ | ~~`_blacklisted_container_keys`~~ | **deleted, step 7 — never had a writer** |
+| ~~`diagnostics/self_alignment.py`~~ | ~~`_last_emitted_belief`~~ | **instance state, step 3** |
+| ~~`diagnostics/entity_alignment.py`~~ | ~~`_last_emitted_signature`~~ | **instance state, step 3** |
+| ~~`browser/cdp_utils.py`~~ | ~~`_cdp_time_offset_ms`~~ | **instance state, step 4** |
+| ~~`browser/client_structure.py`~~ | ~~`_survey_emitted`~~ | **instance state, step 5** |
 | `runtime_logging.py` | `_BOT_ARTIFACTS`, `_SNIFF_ARTIFACTS`, `_PROBE_ARTIFACTS` | rebind |
 | `runtime_context.py:25` | `_RUNTIME_CONTEXT_TICK_N`, `_..._BOT_STATE`, `_..._IN_FLIGHT_ACTION_KIND` | rebind |
 
@@ -209,21 +209,121 @@ rather than the refactor.[^3]
    (step 11's first entry to fall); `reset_static_key_cache` took its
    place, because the **key** is process-wide — one key builds every
    session's table — while only the **table** was session state.[^12]
-2. **`sniffer/viewport.py`** — `_viewport_left` / `_viewport_top` onto
-   the session's viewport state.
-3. **Diagnostics dedupe memories** — `self_alignment`,
-   `entity_alignment`.
-4. **`browser/cdp_utils.py`** — `_cdp_time_offset_ms` onto the CDP
-   service, which is already per-session.
-5. **`browser/client_structure.py`** — `_survey_emitted`. (Moved out
-   of `action_lab/` 2026-08-07 with the `action_lab` <-> `bot` cycle
-   cut; the global moved with it, unchanged.)
+2. ~~**`sniffer/viewport.py`**~~ **SHIPPED 2026-08-07 — by DELETION,
+   not by threading.** The step was written as "move the two globals
+   onto the session's viewport state". They were already there. The
+   single writer (`sniffer/world_state_tiles.py`) called
+   `update_viewport_origin(left, top)` and then, on the very next
+   statement, wrote the same pair into `ws.world_state["viewport"]`
+   via `make_visible_viewport_state`. Every production consumer reads
+   the world-state copy through `viewport_visible_bounds`;
+   `get_viewport_left()` / `get_viewport_top()` had **zero callers in
+   `src/`, `scripts/` or `analysis_scripts/`** — only tests. The
+   module was write-only in production, and `reset_viewport_tracking()`
+   (called at four session boundaries) reset state nobody consulted.
+   Deleted outright: the module, its single write, its four resets, and
+   the two tests that existed only to cover it. One test
+   (`test_world_state_functions.py`) had been setting BOTH the global
+   and the world-state copy — the assertion depended only on the
+   latter, which is the duplication in miniature.
+
+   **This does not move the completion criterion.** These globals were
+   never in the conftest reset list, so the count stays at nine. Step 2
+   removed a duplicate, not a leak.
+3. ~~**Diagnostics dedupe memories**~~ **SHIPPED 2026-08-07.** Both
+   gates became `SelfAlignmentEmitter` / `EntityAlignmentEmitter`,
+   constructed by `Bot` and called as `bot._self_alignment.maybe_emit(...)`.
+   Both `reset_*_emitter` functions are DELETED, and the two tests that
+   proved "reset clears the gate" now prove the stronger property a
+   reset can never prove: a SECOND emitter emits the same belief. The
+   sibling `tests/diagnostics/conftest.py` fixture lost both calls.
+4. ~~**`browser/cdp_utils.py`**~~ **SHIPPED 2026-08-07.** The offset
+   became `CDPClock`, owned by `CDPService` — which was already
+   per-session, so the state simply moved to where its lifetime already
+   was. The anchor matters per session: CDP timestamps are monotonic
+   seconds from an arbitrary origin, so a second session reading
+   through the first session's offset would misdate every frame.
+   `reset_cdp_time_offset` is deleted along with its four call sites.
+5. ~~**`browser/client_structure.py`**~~ **SHIPPED 2026-08-07.**
+   `_survey_emitted` became `ClientStructureSurveyor`, owned by `Bot`.
+   "Once per session" now means once per SESSION rather than once per
+   process. **This is the first step to move the completion criterion:**
+   `reset_client_structure_survey` was in the ten-call conftest list,
+   so that list is now NINE calls (eight session resets plus the
+   process-wide `reset_static_key_cache`).
 6. **Ledger cluster** — events counter, teleport `_pending`, `_rings`,
    `_emit` trackers, `_decisions`, `_transitions`. These form one
    bookkeeping layer and move together.
-7. **`bot/ai/collect_common.py`** — container blacklist.
+7. ~~**`bot/ai/collect_common.py`**~~ **SHIPPED 2026-08-07 — by
+   DELETION.** The container blacklist was never de-globalised because
+   it was never alive: `blacklist_container` has **no caller in
+   `src/` in any commit in this repository's history**, and
+   `reset_container_blacklist` — whose docstring said it ran "on
+   death/respawn" — had none either. Only tests called both. The
+   reader `is_container_blacklisted` therefore always answered False,
+   so the five decision sites consulting it (two hop selectors, the
+   equipment pickup, the quad sweep, the scope scout) were filtering
+   on a set that could never fill, and the `is_blacklisted` predicate
+   threaded through `larder.select_fuel_larder_hop` carried the same
+   nothing. Removing all of it is behaviour-identical.
+
+   **This is the second step to move the completion criterion:**
+   `reset_container_blacklist` was in the conftest list, so the list
+   is now EIGHT calls. If per-session blacklisting is wanted, it needs
+   a writer first — a reader without one is a decision nobody makes.
 8. **`WorldService`** — delete `_service` and `get_world_service()`;
    thread the instance through the 74 sites. The largest step.
+
+   **Decode boundary cut 2026-08-07.** `process_received_message`,
+   `_process_single_message`, `try_decode_binary` and
+   `try_decode_received` now take the session's service. The replay
+   hook does not: threading it through `_test_hooks` closes an import
+   cycle (`state → … → _test_hooks → sniffer.world_service → state`),
+   so `_real_process_received_message` resolves the service inside the
+   function body with the reason recorded there. That is the last
+   singleton reach on the replay path and it falls with this step's
+   final flip.
+
+   **Test-side migration 2026-08-07: `reset_world_state()` 496 → 3.**
+   The blocker was believed to be 496 call sites needing a hand-built
+   service. It was not. `tests/conftest.py::_isolate_protocol_singletons`
+   is autouse and already resets the singleton before *and* after every
+   test, so **444 of the 496 were dead ritual** — 195 prologue calls,
+   229 whole `setup_method`/`teardown_method` bodies, and 20 epilogues,
+   plus 20 `try/finally` blocks that existed solely to guarantee a reset
+   the fixture already guaranteed. Deleting them removed 202 lifecycle
+   methods, 212 unused imports, and the now-empty `real_inventory` and
+   `_isolate_world_state` fixtures. The test count did not move: 6191
+   before, 6191 after.
+
+   What made the deletion safe to prove rather than guess: **no fixture
+   anywhere populates world state.** All seven `conftest.py` files were
+   checked — the only writers are the root autouse reset and two
+   `action_lab` fixtures that reset-and-yield without populating. Had
+   any fixture seeded state, a test's prologue reset would have been
+   deliberately wiping it, and deleting the reset would have silently
+   changed what the test measured.
+
+   `tests/sniffer/test_replay_pipeline.py` is now fully off the
+   singleton: its helpers return the `WorldService` they decoded into.
+   The five "reset clears X" tests were rewritten to assert the durable
+   invariant — *a freshly constructed service starts clean* — which is
+   the property that outlives `reset_world_state` rather than dying
+   with it.
+
+   **The 3 survivors, and why.** Two are the conftest fixture itself
+   (the seam). The third is
+   `tests/bot/test_executor_dispatch.py:288`, which is genuinely
+   load-bearing: `_make_bot()` seeds position and fuel, and the test
+   needs *no* self-belief, so it wipes the service after construction.
+   It unblocks when `Bot` takes a `WorldService` — src-side work, not
+   test work.
+
+   **The estimate was wrong in the useful direction.** The step-1
+   calibration note above warns that the table *undercounts* by ~10×.
+   Here the opposite held: the test-side figure overcounted by ~150×,
+   because it counted call sites without asking whether they did
+   anything. Count what a call *does*, not that it appears.
 9. **`sniffer/trackers.py`** — `ALL_TRACKERS`.
 10. **`runtime_logging.py` + `runtime_context.py`** — per-session
     artifacts and context. The three tick-context globals moved to

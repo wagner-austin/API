@@ -8,7 +8,6 @@ from tankpit_bot.sniffer.world_state import (
     get_world_service,
     get_world_state,
     mark_scan_viewport_failed,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_radar import (
@@ -30,12 +29,7 @@ class TestUpdateWorldStateFromRadarCache:
 
     def setup_method(self) -> None:
         """Reset state before each test."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset state after each test."""
-        reset_world_state()
 
     def test_refreshes_existing_envelope_containers(self) -> None:
         """Radar cache refresh bumps refresh_kind on in-envelope containers."""
@@ -136,12 +130,7 @@ class TestUpdateWorldStateFromRadarKnownResources:
 
     def setup_method(self) -> None:
         """Reset state before each test."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset state after each test."""
-        reset_world_state()
 
     def test_preserves_existing_containers(self) -> None:
         """Zero-delta radar preserves known containers in viewport."""
@@ -197,12 +186,7 @@ class TestHandleRadarAck:
 
     def setup_method(self) -> None:
         """Reset state before each test."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset state after each test."""
-        reset_world_state()
 
     def test_empty_delta_found_true_preserves(self) -> None:
         """RadarAck(found=True) after empty delta preserves known resources."""
@@ -282,12 +266,7 @@ class TestReconcileRadarViewportResources:
 
     def setup_method(self) -> None:
         """Reset state before each test."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset state after each test."""
-        reset_world_state()
 
     def test_removes_stale_containers_not_in_radar(self) -> None:
         """Containers in radar bounds but absent from new radar are removed."""
@@ -367,14 +346,6 @@ class TestReconcileRadarViewportResources:
 
 class TestScanViewportFailed:
     """Tests for mark_scan_viewport_failed and is_scan_viewport_failed."""
-
-    def setup_method(self) -> None:
-        """Reset state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset state after each test."""
-        reset_world_state()
 
     def test_failed_viewport_prevents_repeat_scan(self) -> None:
         """A recently failed viewport scan is recognized as failed."""

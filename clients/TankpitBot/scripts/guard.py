@@ -12,8 +12,10 @@ from typing import Protocol
 
 from scripts.contract_rules import run_contract_rules
 from scripts.file_size_rules import run_file_size_rules
+from scripts.layer_rules import run_layer_rules
 from scripts.physics_claims import run_physics_claim_rules
 from scripts.protocol_constant_rules import run_protocol_constant_rules
+from scripts.shim_rules import run_shim_rules
 from scripts.state_sentinel_rules import run_mine_layer_rules, run_state_sentinel_rules
 from scripts.wiki_rules import run_wiki_rules
 from tankpit_bot import _hooks_guard
@@ -127,6 +129,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     local_violations = (
         run_contract_rules(target_root)
         + run_file_size_rules(target_root)
+        + run_layer_rules(target_root)
+        + run_shim_rules(target_root)
         + run_physics_claim_rules(target_root)
         + run_protocol_constant_rules(target_root)
         + run_state_sentinel_rules(target_root)

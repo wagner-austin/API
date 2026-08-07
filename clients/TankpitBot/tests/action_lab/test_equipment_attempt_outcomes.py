@@ -43,7 +43,7 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
 )
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
 from tankpit_bot.state.types import ContainerStateDict
 
@@ -52,16 +52,12 @@ class TestEquipmentAttemptOutcomes:
     """Tests for equipment-attempt terminal outcomes."""
 
     def setup_method(self) -> None:
-        reset_world_state()
         get_world_service().world_state = _world()
         update_inventory_from_protocol(
             get_world_service(),
             [0, 0, 0, 0, 0],
             [False] * 5,
         )
-
-    def teardown_method(self) -> None:
-        reset_world_state()
 
     def test_map_sync_timeout(self) -> None:
         """Lines 366-376."""

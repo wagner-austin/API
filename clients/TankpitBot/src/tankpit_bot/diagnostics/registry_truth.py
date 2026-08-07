@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from typing_extensions import TypedDict
 
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_combat import (

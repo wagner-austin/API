@@ -17,15 +17,15 @@ from aiohttp.test_utils import (
     TestServer,
 )
 
-from tankpit_bot.service.frame_bus import (
+from tankpit_bot.bus.frame_bus import (
     FrameBus,
     FrameSubscriberProtocol,
 )
-from tankpit_bot.service.http_server import make_app
-from tankpit_bot.service.mode_bridge import ModeBridge
-from tankpit_bot.service.status_bus import (
+from tankpit_bot.bus.mode_bridge import ModeBridge
+from tankpit_bot.bus.status_bus import (
     StatusBus,
 )
+from tankpit_bot.service.http_server import make_app
 from tests.service._http_fixtures import (
     _noop_shutdown,
     _RecordingRunner,

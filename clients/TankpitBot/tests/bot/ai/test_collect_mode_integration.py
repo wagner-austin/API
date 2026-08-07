@@ -10,7 +10,6 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
 )
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     ContainerStateDict,
 )
@@ -26,10 +25,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestRecoverEquipmentPriority:
     """Tests for top-level recovery priority ordering."""
-
-    def setup_method(self) -> None:
-        """Reset world-state test globals before each case."""
-        reset_world_state()
 
     def test_equipment_before_combat(self) -> None:
         """Critical equipment recovery preempts combat when supplies are depleted."""

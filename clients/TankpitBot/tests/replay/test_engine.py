@@ -27,8 +27,6 @@ from tankpit_bot.replay.engine import (
     replay_session,
 )
 from tankpit_bot.replay.types import ReplayTickTraceDict
-from tankpit_bot.sniffer.viewport import reset_viewport_tracking
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     WorldStateDict,
     make_container_state,
@@ -99,8 +97,6 @@ def _cleanup() -> None:
     The XOR table is no longer among it — each replay builds its own
     from the capture's magic ([[session-state-deglobalisation]]).
     """
-    reset_world_state()
-    reset_viewport_tracking()
 
 
 def _require_trace(
@@ -413,7 +409,7 @@ class TestReplaySessionMultiTick:
 
         def _injecting_hook(payload: str, xor_table: bytes) -> None:
             nonlocal call_count
-            real_prm(payload, xor_table)
+            real_prm(get_world_service(), payload, xor_table)
             call_count += 1
             if call_count == 1:
                 svc = get_world_service()

@@ -20,9 +20,6 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 
-run_acquisition_phase = run_tracked_acquisition_phase
-run_teleport_phase = run_tracked_teleport_command
-
 
 class TeleportAttemptProbeProtocol(TeleportPhaseProbeProtocol, Protocol):
     """Minimal probe interface required for one tracked teleport attempt."""
@@ -123,7 +120,7 @@ def run_tracked_teleport_attempt(
         acquisition_sync_timestamp_ms,
         page_snapshots,
         capture_page_snapshot,
-    ) = run_acquisition_phase(
+    ) = run_tracked_acquisition_phase(
         page,
         probe,
         cdp=cdp,
@@ -148,7 +145,7 @@ def run_tracked_teleport_attempt(
             teleport_result=None,
             teleport_started_ms=None,
         )
-    teleport_result, teleport_started_ms = run_teleport_phase(
+    teleport_result, teleport_started_ms = run_tracked_teleport_command(
         page,
         probe,
         target,
@@ -182,7 +179,5 @@ def run_tracked_teleport_attempt(
 __all__ = [
     "TeleportAttemptProbeProtocol",
     "TrackedTeleportAttempt",
-    "run_acquisition_phase",
-    "run_teleport_phase",
     "run_tracked_teleport_attempt",
 ]

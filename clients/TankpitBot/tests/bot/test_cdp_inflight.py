@@ -32,12 +32,10 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_walk
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import InMemoryTerrainMap
 
-        reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(get_world_service(), 800)
         get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
@@ -59,12 +57,10 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import InMemoryTerrainMap
 
-        reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(get_world_service(), 800)
         get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
@@ -84,9 +80,6 @@ class TestBotInFlightGuards:
         """Blocked-walk helper does nothing when self position is unknown."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_walk
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
@@ -101,12 +94,10 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import InMemoryTerrainMap
 
-        reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(get_world_service(), 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
@@ -135,12 +126,10 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import InMemoryTerrainMap
 
-        reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(get_world_service(), 580)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=12, y=10, volume=-1)]
@@ -166,12 +155,10 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import InMemoryTerrainMap
 
-        reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(get_world_service(), 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
@@ -195,11 +182,9 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(get_world_service(), 800)
 
@@ -222,11 +207,9 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(64, 64)
         _update_fuel_total(get_world_service(), 800)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=72, y=63, volume=-1)]
@@ -251,11 +234,9 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(64, 64)
         _update_fuel_total(get_world_service(), 800)
 
@@ -279,9 +260,7 @@ class TestBotInFlightGuards:
         """Shoot actions are not blocking for replanning."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._state_data = _sba(bot._state_data, "COMBAT", "shoot", 50, 50)
 
@@ -296,12 +275,10 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tankpit_bot.state.types import WorldStateDict
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 800)
 
@@ -331,12 +308,10 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tankpit_bot.state.types import WorldStateDict
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 800)
 
@@ -366,11 +341,9 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 1400)
 
@@ -395,9 +368,7 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.states import InFlightActionDict
         from tankpit_bot.bot.tick_loop_actions import _clear_stalled_action
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         action: InFlightActionDict = make_in_flight_action(
             "move",
@@ -428,11 +399,9 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             is_scan_viewport_failed,
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 1400)
 
@@ -457,11 +426,9 @@ class TestBotInFlightGuards:
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             is_move_target_failed,
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 1400)
 
@@ -485,12 +452,10 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import InMemoryTerrainMap
 
-        reset_world_state()
         update_world_state_from_position(14, 10)
         _update_fuel_total(get_world_service(), 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
@@ -515,9 +480,6 @@ class TestBotInFlightGuards:
         """Blocked-collection helper does nothing when self position is unknown."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 15, 10)
@@ -531,12 +493,10 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(get_world_service(), 300)
         update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 5], [False] * 5)

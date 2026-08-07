@@ -18,11 +18,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 _RANK = 2
 
 
-def _never_blacklisted(x: int, y: int) -> bool:
-    del x, y
-    return False
-
-
 def _ctx(
     *,
     fuel: int,
@@ -53,7 +48,6 @@ def test_big_deficit_prefers_the_rich_far_container() -> None:
     }
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(600), containers=containers),
-        is_blacklisted=_never_blacklisted,
     )
     winner = selection["container"]
     assert winner == containers["120,100"]
@@ -70,13 +64,12 @@ def test_small_deficit_prefers_the_near_container() -> None:
     }
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(150), containers=containers),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["container"] == containers["110,100"]
     assert selection["cost"] == 60
 
 
-def test_skips_equipment_empty_failed_blacklisted_and_adjacent() -> None:
+def test_skips_equipment_empty_failed_and_adjacent() -> None:
     """Only live believed fuel beyond auto-pick reach enters scoring."""
     failed = make_container(130, 100, 400, is_fuel=True)
     failed["failed_pickups"] = 2
@@ -84,17 +77,12 @@ def test_skips_equipment_empty_failed_blacklisted_and_adjacent() -> None:
         "115,100": make_container(115, 100, 0, is_fuel=False),
         "116,100": make_container(116, 100, 0, is_fuel=True),
         "130,100": failed,
-        "125,100": make_container(125, 100, 400, is_fuel=True),
         "101,101": make_container(101, 101, 400, is_fuel=True),
         "120,100": make_container(120, 100, 500, is_fuel=True),
     }
 
-    def _blacklist_125(x: int, y: int) -> bool:
-        return (x, y) == (125, 100)
-
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(600), containers=containers),
-        is_blacklisted=_blacklist_125,
     )
     assert selection["container"] == containers["120,100"]
     assert selection["candidates"] == 2
@@ -115,7 +103,6 @@ def test_water_locked_container_counts_no_landing() -> None:
     containers = {"120,100": make_container(120, 100, 500, is_fuel=True)}
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(600), containers=containers, terrain=terrain),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["container"] is None
     assert selection["no_landing"] == 1
@@ -127,7 +114,6 @@ def test_shore_container_lands_on_the_cardinal_neighbor() -> None:
     containers = {"120,100": make_container(120, 100, 500, is_fuel=True)}
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(600), containers=containers, terrain=terrain),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["container"] == containers["120,100"]
     assert (selection["landing_x"], selection["landing_y"]) == (121, 100)
@@ -144,7 +130,6 @@ def test_reserve_gates_the_transaction_not_the_transit() -> None:
     containers = {"108,100": make_container(108, 100, 355, is_fuel=True)}
     selection = select_fuel_larder_hop(
         _ctx(fuel=216, containers=containers),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["container"] == containers["108,100"]
     assert selection["reserve_blocked"] == 0
@@ -155,7 +140,6 @@ def test_reserve_blocked_hop_is_declined() -> None:
     containers = {"120,100": make_container(120, 100, 105, is_fuel=True)}
     selection = select_fuel_larder_hop(
         _ctx(fuel=210, containers=containers),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["container"] is None
     assert selection["reserve_blocked"] == 1
@@ -166,7 +150,6 @@ def test_gain_below_cost_is_unprofitable() -> None:
     containers = {"120,100": make_container(120, 100, 50, is_fuel=True)}
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(600), containers=containers),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["container"] is None
     assert selection["unprofitable"] == 1
@@ -175,7 +158,6 @@ def test_gain_below_cost_is_unprofitable() -> None:
 def test_empty_registry_returns_no_candidates() -> None:
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(600), containers={}),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["container"] is None
     assert selection["candidates"] == 0
@@ -195,7 +177,6 @@ def test_dreg_below_floor_is_skipped_for_the_real_container() -> None:
     }
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(600), containers=containers),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["container"] == containers["131,100"]
     assert selection["dreg"] == 1
@@ -212,7 +193,6 @@ def test_dreg_gain_completing_the_deficit_is_taken() -> None:
     }
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(80), containers=containers),
-        is_blacklisted=_never_blacklisted,
     )
     winner = selection["container"]
     assert winner == containers["110,100"]
@@ -245,7 +225,7 @@ def test_dreg_waiver_needs_hunt_ready_inventory() -> None:
         "",
     )
 
-    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+    selection = select_fuel_larder_hop(ctx)
 
     assert selection["container"] is None
     assert selection["dreg"] == 1
@@ -264,7 +244,6 @@ def test_desperation_fuel_is_reserve_blocked_not_dreg_gated() -> None:
     }
     selection = select_fuel_larder_hop(
         _ctx(fuel=150, containers=containers),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["container"] is None
     assert selection["reserve_blocked"] == 1
@@ -284,7 +263,6 @@ def test_in_viewport_containers_belong_to_the_walk_step() -> None:
     }
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(600), containers=containers),
-        is_blacklisted=_never_blacklisted,
     )
     assert selection["too_close"] == 2
     assert selection["container"] is None
@@ -304,7 +282,7 @@ def test_walk_dominant_range_excludes_close_offscreen_containers() -> None:
     ctx.world["viewport"]["left"] = 92
     ctx.self_state["x"] = 107
 
-    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+    selection = select_fuel_larder_hop(ctx)
 
     assert selection["too_close"] == 1
     assert selection["container"] == containers["131,100"]
@@ -350,7 +328,7 @@ def test_water_locked_fuel_is_ferry_served() -> None:
 
     ctx.world["terrain"]["124,100"] = make_terrain_tile(124, 100, 0, observed_ms=100000)
 
-    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+    selection = select_fuel_larder_hop(ctx)
 
     assert selection["container"] == containers["125,100"]
     assert (selection["landing_x"], selection["landing_y"]) == (122, 101)
@@ -386,7 +364,7 @@ def test_ferry_on_a_disjoint_pond_stays_no_landing() -> None:
     )
     ctx.world["terrain"]["129,101"] = _ferry_tile(129, 101, observed_ms=100000)
 
-    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+    selection = select_fuel_larder_hop(ctx)
 
     assert selection["container"] is None
     assert selection["no_landing"] == 1
@@ -412,7 +390,7 @@ def test_old_ferry_belief_still_boards() -> None:
     )
     ctx.world["terrain"]["122,101"] = _ferry_tile(122, 101, observed_ms=100000 - 61000)
 
-    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+    selection = select_fuel_larder_hop(ctx)
 
     container = selection["container"]
     if container is None:
@@ -434,7 +412,7 @@ def test_far_ferry_is_not_a_boarding_target() -> None:
     )
     ctx.world["terrain"]["150,130"] = _ferry_tile(150, 130, observed_ms=100000)
 
-    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+    selection = select_fuel_larder_hop(ctx)
 
     assert selection["container"] is None
     assert selection["no_landing"] == 1
@@ -462,7 +440,7 @@ def test_in_viewport_water_container_is_still_larder_business() -> None:
     )
     ctx.world["terrain"]["108,100"] = _ferry_tile(108, 100, observed_ms=100000)
 
-    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+    selection = select_fuel_larder_hop(ctx)
 
     assert selection["too_close"] == 0
     assert selection["container"] == containers["105,100"]

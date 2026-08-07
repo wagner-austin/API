@@ -67,10 +67,9 @@ def main() -> None:
         request_interrupt,
         reset_interrupt_flag,
     )
-    from tankpit_bot.service import _test_hooks as service_hooks
     from tankpit_bot.sniffer.decoders import set_protocol_frame_logging
 
-    service_hooks.load_dotenv()
+    _test_hooks.load_dotenv()
     session_seconds = resolve_session_seconds(
         _test_hooks.get_argv()[1:],
         _test_hooks.get_env("TANKPIT_BOT_SESSION_SECONDS"),

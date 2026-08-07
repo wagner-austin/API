@@ -7,7 +7,6 @@ the substate derivations. The entry/exit predicates it consults are
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
 from tankpit_bot.bot.ai.quad_sweep import anchored_window_origin
 from tankpit_bot.bot.ai.scoring_types import make_behavior_score
 from tankpit_bot.bot.ai.tactics import compute_desired_equipment
@@ -15,6 +14,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand, make_hold_command
 from tankpit_bot.inventory import InventoryState
+from tankpit_bot.types.modes import AIMode, AIModeState, is_valid_ai_mode_state
 
 
 def clear_ai_mode(ai_state: AIStateDict) -> AIStateDict:

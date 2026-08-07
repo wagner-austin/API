@@ -216,39 +216,46 @@ def get_current_time_ms() -> int:
     return _test_hooks.get_current_time_ms()
 
 
-_cdp_time_offset_ms: int | None = None
+class CDPClock:
+    """Anchors one session's CDP monotonic clock to Unix milliseconds.
 
-
-def cdp_timestamp_to_ms(timestamp: float) -> int:
-    """Convert CDP monotonic timestamp to Unix milliseconds.
-
-    Args:
-        timestamp: CDP monotonic timestamp in seconds.
-
-    Returns:
-        Unix timestamp in milliseconds.
+    CDP timestamps are monotonic seconds from an arbitrary origin, so
+    the first frame of a session fixes the offset every later frame is
+    read against. That anchor belongs to ONE browser session — a second
+    session in the same process has a different origin and would read
+    every timestamp through the first session's offset
+    ([[session-state-deglobalisation]] step 4). A fresh instance is
+    unanchored, which is why no reset function exists.
     """
-    global _cdp_time_offset_ms
-    cdp_ms = int(timestamp * 1000)
-    if _cdp_time_offset_ms is None:
-        _cdp_time_offset_ms = get_current_time_ms() - cdp_ms
-    return cdp_ms + _cdp_time_offset_ms
 
+    def __init__(self) -> None:
+        self._offset_ms: int | None = None
 
-def reset_cdp_time_offset() -> None:
-    """Reset CDP time offset for new browser session."""
-    global _cdp_time_offset_ms
-    _cdp_time_offset_ms = None
+    def to_unix_ms(self, timestamp: float) -> int:
+        """Convert a CDP monotonic timestamp to Unix milliseconds.
+
+        The first call anchors the offset from the wall clock; later
+        calls reuse it, so frames stay ordered relative to each other.
+
+        Args:
+            timestamp: CDP monotonic timestamp in seconds.
+
+        Returns:
+            Unix timestamp in milliseconds.
+        """
+        cdp_ms = int(timestamp * 1000)
+        if self._offset_ms is None:
+            self._offset_ms = get_current_time_ms() - cdp_ms
+        return cdp_ms + self._offset_ms
 
 
 __all__ = [
+    "CDPClock",
     "SentFrameMetadata",
     "_extract_runtime_value",
     "_is_valid_base64",
     "_pop_sent_frame_metadata",
-    "cdp_timestamp_to_ms",
     "get_captured_raw_messages",
     "get_current_time_ms",
-    "reset_cdp_time_offset",
     "send_websocket_bytes",
 ]

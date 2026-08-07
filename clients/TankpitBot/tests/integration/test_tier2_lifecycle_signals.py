@@ -26,7 +26,6 @@ from tankpit_bot.protocol import (
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete,
     get_world_service,
-    reset_world_state,
 )
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_teleport_landed,
@@ -38,14 +37,6 @@ from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
 class TestStallTimeoutReplansToIdle:
     """A stall_timeout clears the bot's in-flight action."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_stall_timeout_clears_in_flight_action(self) -> None:
         """The shared stall-timeout helper sets the in-flight action to ``none``.
@@ -91,14 +82,6 @@ class TestStallTimeoutReplansToIdle:
 class TestTeleportLandedClearsAction:
     """A TeleportLanded container message flips the teleport-landed flag."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_teleport_landed_dispatch_flips_flag(self) -> None:
         """A ``teleport_landed`` dispatch flips the WS flag exactly once.
 
@@ -135,14 +118,6 @@ class TestTeleportLandedClearsAction:
 
 class TestRadarScanReturnsToIdle:
     """0x4F RadarScanResult flips the radar-complete flag."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_radar_scan_dispatch_marks_complete_and_applies_tile_writes(self) -> None:
         """A 0x4F dispatch marks scan-complete and applies per-tile writes.
@@ -213,14 +188,6 @@ class TestMinePlacementUpdatesWorld:
     (133, 124) by Artax (tank 1301, blue team).
     """
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_seven_position_placement_adds_every_mine(self) -> None:
         """All 7 positions land in ``world_state["mines"]`` keyed by ``x,y``."""
         ws = get_world_service()
@@ -279,14 +246,6 @@ class TestCombatHitAdvancesDamageState:
     dispatch path lifts the tier from a registry entry's previous
     value to the new value.
     """
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_status_sync_drops_damage_tier(self) -> None:
         """A status-sync with ``damage_state=2`` lowers the tier from 3 to 2.

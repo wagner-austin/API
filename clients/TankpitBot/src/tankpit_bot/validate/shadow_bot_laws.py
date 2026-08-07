@@ -23,13 +23,14 @@ was lawful team aggro, not noise.
 from __future__ import annotations
 
 from tankpit_bot.physics.capacity import damage_tier, fuel_capacity
+from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.protocol.naming import PRACTICE_BOT_NAME_PATTERN
 from tankpit_bot.sim.bot_policy import (
     AGGRO_SIGHT_RADIUS,
     BOT_RETURN_WEAPON,
     BOT_RETURN_WINDOW_MS,
 )
-from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, TICK_MS
+from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS
 from tankpit_bot.validate.shadow_timeline import (
     ShadowTimelineDict,
     ShotEventDict,
@@ -275,8 +276,8 @@ def shadow_bot_reactivation(timelines: list[ShadowTimelineDict]) -> ClaimEvidenc
     Returns:
         Evidence for the ``bot-reactivation`` claim.
     """
-    corpse_ms = CORPSE_WINDOW_TICKS * TICK_MS
-    observed_window_ms = corpse_ms + 2 * TICK_MS
+    corpse_ms = CORPSE_WINDOW_TICKS * TICK_RATE_MS
+    observed_window_ms = corpse_ms + 2 * TICK_RATE_MS
     samples = 0
     exact = 0
     for timeline in timelines:

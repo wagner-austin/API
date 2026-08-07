@@ -7,7 +7,6 @@ equipment slot toggling and command sending.
 from __future__ import annotations
 
 from tankpit_bot._test_hooks import BotProtocol
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.bot.ai.scoring_types import render_reason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
@@ -16,6 +15,7 @@ from tankpit_bot.bot.types import (
     PickupFuelCommandDict,
     TeleportCommandDict,
 )
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.inventory import inventory_counts
 from tankpit_bot.ledger.ammo_book import record_ammo_scan
 from tankpit_bot.ledger.decision import record_decision

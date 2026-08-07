@@ -17,6 +17,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe, xor_decode_body
 from tankpit_bot.sniffer.constants import TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.decoders import decode_text_message, try_decode_binary
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.types import decode_capture_session
 
 log = get_logger(__name__)
@@ -50,7 +51,7 @@ def _decode_sent(payload: str, xor_table: bytes) -> str | None:
         if len(decoded) < 2:
             return f"[SENT] CMD: len={len(body)} hex={body.hex()}"
         msg_type = decoded[0]
-        return "[SENT] " + try_decode_binary(msg_type, decoded, body)
+        return "[SENT] " + try_decode_binary(get_world_service(), msg_type, decoded, body)
 
     return f"[SENT] RAW: len={len(body)} hex={body[:20].hex()}"
 
@@ -82,7 +83,7 @@ def _decode_received(payload: str, xor_table: bytes) -> str | None:
     if len(decoded_data) == 0:
         return f"[RECEIVED] EMPTY: type=0x{msg_type:02X}"
 
-    return "[RECEIVED] " + try_decode_binary(msg_type, decoded_data, body)
+    return "[RECEIVED] " + try_decode_binary(get_world_service(), msg_type, decoded_data, body)
 
 
 def main() -> None:

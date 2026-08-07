@@ -59,55 +59,55 @@ _SURVEY_EXPRESSION = """
 })()
 """
 
-_survey_emitted = False
 
+class ClientStructureSurveyor:
+    """Emits the client structure survey once per session.
 
-def reset_client_structure_survey() -> None:
-    """Reset the once-per-session gate so the next call emits again.
-
-    Called from test isolation fixtures; a fresh bot process starts
-    with the gate already clear.
+    "Once" is one SESSION's once, so the gate is instance state: two
+    sessions in one process each owe their own survey, and a shared
+    gate would silently withhold the second one
+    ([[session-state-deglobalisation]] step 5). A fresh instance has
+    not yet surveyed, which is why no reset function exists.
     """
-    global _survey_emitted
-    _survey_emitted = False
 
+    def __init__(self) -> None:
+        self._emitted = False
 
-def maybe_emit_client_structure_survey(cdp: CDPSessionProtocol) -> bool:
-    """Capture and emit the client structure survey once per session.
+    def maybe_emit(self, cdp: CDPSessionProtocol) -> bool:
+        """Capture and emit the client structure survey once per session.
 
-    Args:
-        cdp: Active CDP session attached to the live tankpit page.
+        Args:
+            cdp: Active CDP session attached to the live tankpit page.
 
-    Returns:
-        True when the survey was captured and emitted; False when it was
-        already emitted this session or the client object is not yet
-        present on the page.
+        Returns:
+            True when the survey was captured and emitted; False when it
+            was already emitted this session or the client object is not
+            yet present on the page.
 
-    Raises:
-        JSONTypeError: When the evaluated survey payload is not a JSON
-            object; malformed captures are surfaced instead of dropped.
-    """
-    global _survey_emitted
-    if _survey_emitted:
-        return False
-    result = cdp.send(
-        "Runtime.evaluate",
-        {"expression": _SURVEY_EXPRESSION, "returnByValue": True},
-    )
-    result_obj = require_dict(result, "result")
-    raw_value = result_obj.get("value")
-    if raw_value is None:
-        return False
-    survey: JSONObject = require_dict({"survey": raw_value}, "survey")
-    _survey_emitted = True
-    emit_diagnostic(
-        diagnostic_kind="client_structure_survey",
-        survey_json=dump_json_str(survey),
-    )
-    return True
+        Raises:
+            JSONTypeError: When the evaluated survey payload is not a
+                JSON object; malformed captures are surfaced instead of
+                dropped.
+        """
+        if self._emitted:
+            return False
+        result = cdp.send(
+            "Runtime.evaluate",
+            {"expression": _SURVEY_EXPRESSION, "returnByValue": True},
+        )
+        result_obj = require_dict(result, "result")
+        raw_value = result_obj.get("value")
+        if raw_value is None:
+            return False
+        survey: JSONObject = require_dict({"survey": raw_value}, "survey")
+        self._emitted = True
+        emit_diagnostic(
+            diagnostic_kind="client_structure_survey",
+            survey_json=dump_json_str(survey),
+        )
+        return True
 
 
 __all__ = [
-    "maybe_emit_client_structure_survey",
-    "reset_client_structure_survey",
+    "ClientStructureSurveyor",
 ]

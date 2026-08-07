@@ -6,9 +6,6 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import (
     walk_or_teleport,
 )
-from tankpit_bot.sniffer.world_state import (
-    reset_world_state,
-)
 from tankpit_bot.state.types import (
     make_tank_state,
     make_viewport_state,
@@ -23,10 +20,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestApproachTarget:
     """Tests for approach-tile selection when the target is off-viewport."""
-
-    def setup_method(self) -> None:
-        """Reset world-state test globals before each case."""
-        reset_world_state()
 
     def test_approach_sidesteps_blocked_clamp_tile(self) -> None:
         """A rock on the projected edge tile no longer kills the approach.

@@ -5,19 +5,19 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from tankpit_bot.service import _test_hooks as service_hooks
-from tankpit_bot.service.frame_bus import (
+from tankpit_bot.bus.frame_bus import (
     FrameBusProtocol,
 )
-from tankpit_bot.service.mode_bridge import (
+from tankpit_bot.bus.mode_bridge import (
     ModeBridgeProtocol,
 )
+from tankpit_bot.bus.status_bus import (
+    StatusBusProtocol,
+)
+from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.session_runner import (
     BotFactoryProtocol,
     RunnableBotProtocol,
-)
-from tankpit_bot.service.status_bus import (
-    StatusBusProtocol,
 )
 
 

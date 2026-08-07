@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.physics.damage import SINGLE_HIT_VICTIM_COST
 from tankpit_bot.sim.actions import process_radar
 from tankpit_bot.sim.combat import SLOT_RADAR
-from tankpit_bot.sim.movement import MINE_WALK_COST, process_move
+from tankpit_bot.sim.movement import process_move
 from tankpit_bot.sim.world import (
     SimBlockDict,
     SimContainerDict,
@@ -90,7 +91,7 @@ def test_walking_into_enemy_mine_detonates_and_bills_45() -> None:
     assert outcome["kind"] == "moved"
     assert outcome["mine_positions"] == [(11, 10)]
     assert world["mines"] == {}
-    assert world["tanks"][9]["fuel"] == 1000 - 1 - MINE_WALK_COST
+    assert world["tanks"][9]["fuel"] == 1000 - 1 - SINGLE_HIT_VICTIM_COST
 
 
 def test_revealed_enemy_mine_forces_detour_own_mine_does_not() -> None:
@@ -126,7 +127,7 @@ def test_hidden_enemy_mine_is_walked_into_and_arrests_the_move() -> None:
     assert outcome["path"] == "s"
     assert outcome["mine_positions"] == [(10, 11)]
     assert (world["tanks"][9]["x"], world["tanks"][9]["y"]) == (10, 11)
-    assert world["tanks"][9]["fuel"] == 1000 - 1 - MINE_WALK_COST
+    assert world["tanks"][9]["fuel"] == 1000 - 1 - SINGLE_HIT_VICTIM_COST
     assert world["mines"] == {}
 
 
@@ -253,4 +254,4 @@ def test_hidden_mine_on_the_severed_fallback_walk_detonates_instead() -> None:
     assert outcome["path"] == "ee"
     assert outcome["mine_positions"] == [(12, 10)]
     assert (world["tanks"][9]["x"], world["tanks"][9]["y"]) == (12, 10)
-    assert world["tanks"][9]["fuel"] == 1000 - 2 - MINE_WALK_COST
+    assert world["tanks"][9]["fuel"] == 1000 - 2 - SINGLE_HIT_VICTIM_COST

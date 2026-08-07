@@ -7,7 +7,7 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+from tankpit_bot.sniffer.world_state import mark_move_target_failed
 from tankpit_bot.state.types import ContainerStateDict, make_mine_state
 from tests.bot.ai._collect_helper_fixtures import _enemy
 from tests.bot.ai._support import (
@@ -21,10 +21,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestCollectModeMoves:
     """Tests for COLLECT-mode move and pickup selection."""
-
-    def setup_method(self) -> None:
-        """Reset world-state test globals before each case."""
-        reset_world_state()
 
     def test_decide_picks_up_visible_edge_equipment(self) -> None:
         """Visible edge equipment is actionable without an approach step."""

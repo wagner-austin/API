@@ -15,7 +15,6 @@ from tankpit_bot.action_lab.movement_probe_types import (
     MovementProbeSessionDict,
     encode_movement_probe_session,
 )
-from tankpit_bot.action_lab.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.probe_entrypoint import (
     run_and_save_standard_probe_session,
@@ -26,6 +25,7 @@ from tankpit_bot.action_lab.probe_runtime import (
 )
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportTargetDict
+from tankpit_bot.browser.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state import SelfStateDict, WorldStateDict

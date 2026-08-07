@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import walk_or_teleport
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -42,14 +42,6 @@ def _stamp_mine_hit(at_ms: int) -> None:
 
 class TestMineFlip:
     """Tests for the reactive walk→teleport flip."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_recent_mine_hit_flips_the_approach_to_teleport(self) -> None:
         """After a walk-over the same destination is approached by air.

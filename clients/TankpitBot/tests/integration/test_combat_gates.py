@@ -29,7 +29,7 @@ from tankpit_bot.bot.ai.threat_primitives import (
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.protocol import MovementResponseDict, TankInfoDict
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state
 
@@ -95,14 +95,6 @@ def _seed_self_and_enemy() -> int:
 
 class TestCombatGates:
     """Integration tests for the kill-gate wire-presence checks."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_combat_fires_when_both_gates_pass(self) -> None:
         """Wire-fresh + position-fresh enemy at shot range -> shoot command."""

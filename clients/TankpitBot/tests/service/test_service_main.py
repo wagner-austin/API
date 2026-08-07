@@ -11,8 +11,21 @@ import asyncio
 import pytest
 from aiohttp import web
 
+from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.bot.base import Bot
+from tankpit_bot.bus.frame_bus import (
+    FrameBus,
+    FrameBusProtocol,
+)
+from tankpit_bot.bus.mode_bridge import (
+    ModeBridge,
+    ModeBridgeProtocol,
+)
+from tankpit_bot.bus.status_bus import (
+    StatusBus,
+    StatusBusProtocol,
+)
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import (
     SiteRunnerProtocol,
@@ -23,22 +36,10 @@ from tankpit_bot.service.constants import (
     SERVICE_HOST,
     SERVICE_PORT,
 )
-from tankpit_bot.service.frame_bus import (
-    FrameBus,
-    FrameBusProtocol,
-)
-from tankpit_bot.service.mode_bridge import (
-    ModeBridge,
-    ModeBridgeProtocol,
-)
 from tankpit_bot.service.service_main import (
     _async_main,
     main,
     run_service_forever,
-)
-from tankpit_bot.service.status_bus import (
-    StatusBus,
-    StatusBusProtocol,
 )
 from tests.conftest import FakeEnv
 from tests.service._service_main_harness import (
@@ -269,7 +270,7 @@ class TestMain:
             nonlocal serve_calls
             serve_calls += 1
 
-        service_hooks.load_dotenv = fake_load_dotenv
+        core_hooks.load_dotenv = fake_load_dotenv
         service_hooks.probe_existing_instance = fake_probe
         service_hooks.serve = fake_serve
 
@@ -301,7 +302,7 @@ class TestMain:
             nonlocal serve_calls
             serve_calls += 1
 
-        service_hooks.load_dotenv = lambda: None
+        core_hooks.load_dotenv = lambda: None
         service_hooks.probe_existing_instance = fake_probe
         service_hooks.serve = fake_serve
 
@@ -322,7 +323,7 @@ class TestMain:
         def fake_serve() -> None:
             raise KeyboardInterrupt
 
-        service_hooks.load_dotenv = fake_load_dotenv
+        core_hooks.load_dotenv = fake_load_dotenv
         service_hooks.probe_existing_instance = lambda: False
         service_hooks.serve = fake_serve
 

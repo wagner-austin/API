@@ -22,8 +22,6 @@ from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 
-run_equipment_reposition_attempt = run_tracked_teleport_attempt
-
 
 class EquipmentTargetPhaseProbeProtocol(TeleportAttemptProbeProtocol, Protocol):
     """Minimal probe interface required for post-radar equipment target resolution."""
@@ -227,7 +225,7 @@ def _run_blocked_equipment_reposition(
         raise no_landing_tile_error(no_landing_tile_message)
     reposition_target = make_reposition_target(landing_tile[0], landing_tile[1])
     self_state_before_reposition = probe._require_self_state()
-    reposition_attempt = run_equipment_reposition_attempt(
+    reposition_attempt = run_tracked_teleport_attempt(
         page,
         probe,
         reposition_target,
@@ -511,5 +509,4 @@ __all__ = [
     "EquipmentTargetPhaseProbeProtocol",
     "EquipmentTargetResolution",
     "resolve_equipment_target_after_radar",
-    "run_equipment_reposition_attempt",
 ]

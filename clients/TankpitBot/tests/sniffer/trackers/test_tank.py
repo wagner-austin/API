@@ -161,7 +161,7 @@ class TestTankTrackerEdgeCases:
         tracker.register_name(100, "SyncTank")
 
         decoded = bytearray([0x50, 100, 0, 0x01, 0x02])
-        result = tracker._parse_status_sync(decoded, b"\x2e\x50\x64\x00")
+        result = tracker._parse_status_sync(decoded)
         assert "STATUS:0x50 'P'" in result
         assert "SyncTank" in result
 
@@ -173,7 +173,7 @@ class TestTankTrackerEdgeCases:
         fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
 
         tracker = TankTracker()
-        result = tracker._parse_status_sync(bytearray(), b"")
+        result = tracker._parse_status_sync(bytearray())
         assert "STATUS:0x00" in result
 
     def test_parse_movement_with_known_tank(self, fake_fs: FakeFileSystem) -> None:

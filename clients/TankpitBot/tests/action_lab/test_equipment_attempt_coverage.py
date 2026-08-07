@@ -10,7 +10,7 @@ from tests.action_lab._equipment_attempt_harness import (
     _world,
 )
 
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
 
 
@@ -18,13 +18,9 @@ class TestEquipmentProbeAttemptCoverage:
     """TestEquipmentProbeAttemptCoverage tests."""
 
     def setup_method(self) -> None:
-        reset_world_state()
         get_world_service().world_state = _world()
         update_inventory_from_protocol(
             get_world_service(),
             [0, 0, 0, 0, 0],
             [False] * 5,
         )
-
-    def teardown_method(self) -> None:
-        reset_world_state()

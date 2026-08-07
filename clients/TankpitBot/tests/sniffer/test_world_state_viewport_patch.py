@@ -2,21 +2,13 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state.types import make_viewport_state
 
 
 class TestDispatchViewportPatchDetail:
     """Tests for viewport-update dispatch detail."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_dispatch_viewport_update_skips_self_and_zeroed_tanks(self) -> None:
         """Dispatch 0x5A skips self tank and already-invalidated (0,0) tanks."""
@@ -67,7 +59,6 @@ class TestDispatchViewportPatchDetail:
     def test_dispatch_viewport_update_initializes_from_packet_origin(self) -> None:
         """Dispatch 0x5A uses packet origin even when prior viewport is default."""
         from tankpit_bot.protocol import TankEntryDict, ViewportUpdateDict
-        from tankpit_bot.sniffer.viewport import get_viewport_left, get_viewport_top
 
         # Default viewport: left=0, top=0, width=18 is still a valid origin.
         entry = TankEntryDict(
@@ -85,8 +76,6 @@ class TestDispatchViewportPatchDetail:
 
         assert get_world_service().world_state["viewport"]["left"] == 0
         assert get_world_service().world_state["viewport"]["top"] == 0
-        assert get_viewport_left() == 0
-        assert get_viewport_top() == 0
         assert get_world_service().world_state["tanks"]["801"]["x"] == 5
         assert get_world_service().world_state["tanks"]["801"]["y"] == 5
 

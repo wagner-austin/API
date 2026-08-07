@@ -55,6 +55,8 @@ from tankpit_bot.state import (
 
 def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_result() -> None:
     """Fuel target resolution rejects a tracked reposition without a teleport result."""
+    from tests.action_lab._teleport_seams import fuel_target_phase_module
+
     from tankpit_bot.action_lab import fuel_target_phase
 
     clock = ReplayClock(1000)
@@ -62,7 +64,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
     page = ClockAdvancingPage(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     fuel_target = make_container_state(101, 100, True, 300)
-    original_attempt_runner = fuel_target_phase.run_reposition_attempt
+    original_attempt_runner = fuel_target_phase_module.run_tracked_teleport_attempt
 
     def _requires_reposition(
         probe: fuel_target_phase.FuelTargetPhaseProbeProtocol,
@@ -204,7 +206,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
             teleport_started_ms=None,
         )
 
-    fuel_target_phase.run_reposition_attempt = _run_attempt
+    fuel_target_phase_module.run_tracked_teleport_attempt = _run_attempt
     try:
         with pytest.raises(FuelProbeError, match="fuel reposition ended before teleport dispatch"):
             fuel_target_phase.resolve_fuel_target_after_radar(
@@ -279,7 +281,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
                 ),
             )
     finally:
-        fuel_target_phase.run_reposition_attempt = original_attempt_runner
+        fuel_target_phase_module.run_tracked_teleport_attempt = original_attempt_runner
 
 
 def test_resolve_fuel_target_builds_reposition_map_sync_timeout_result() -> None:

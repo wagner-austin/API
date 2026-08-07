@@ -11,6 +11,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
 from tankpit_bot.sniffer.decoders import process_received_message
+from tankpit_bot.sniffer.world_state import get_world_service
 
 log = get_logger(__name__)
 
@@ -40,8 +41,9 @@ def drain_messages(bot: BufferedMessageSourceProtocol) -> int:
     msgs = bot._cdp_message_buffer
     bot._cdp_message_buffer = []
 
+    ws = get_world_service()
     for payload in msgs:
-        process_received_message(payload, xor_table)
+        process_received_message(ws, payload, xor_table)
 
     if msgs:
         log.debug("SYNC: %d messages", len(msgs))

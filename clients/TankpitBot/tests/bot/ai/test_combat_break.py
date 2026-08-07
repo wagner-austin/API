@@ -14,7 +14,6 @@ from tankpit_bot.bot.ai.world_types import (
     make_enemy_threat,
 )
 from tankpit_bot.inventory import InventoryState
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import TankStateDict, make_container_state, make_tank_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -199,12 +198,8 @@ def test_engage_blocks_the_unwinnable_two_attacker_fight() -> None:
     capacity), so escaping-and-returning would loop forever -- the
     break blocks the target with the standard TTL and replans.
     """
-    reset_world_state()
     seed_confirmed_incoming(5)
-    try:
-        decision = decide_hunt_mode(_engage_ctx(fuel=800))
-    finally:
-        reset_world_state()
+    decision = decide_hunt_mode(_engage_ctx(fuel=800))
 
     assert decision["updated_ai_state"]["combat_target_id"] == -1
     assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
@@ -219,12 +214,8 @@ def test_engage_breaks_under_moderate_fire_and_keeps_the_lock() -> None:
     remembered 700-fuel larder container with the lock held
     (never-drop) and latches the release level.
     """
-    reset_world_state()
     seed_confirmed_incoming(5, weapon=0, damage=-45)
-    try:
-        decision = decide_hunt_mode(_engage_ctx(fuel=500, damage_state=1))
-    finally:
-        reset_world_state()
+    decision = decide_hunt_mode(_engage_ctx(fuel=500, damage_state=1))
 
     assert decision["behavior"]["reason_kind"] == "fuel_hop"
     assert decision["command"]["cmd_type"] == "teleport"
@@ -235,11 +226,7 @@ def test_engage_breaks_under_moderate_fire_and_keeps_the_lock() -> None:
 
 def test_engage_keeps_fighting_when_no_fire_is_measured() -> None:
     """The identical pursuit with an empty damage book still shoots."""
-    reset_world_state()
-    try:
-        decision = decide_hunt_mode(_engage_ctx(fuel=800))
-    finally:
-        reset_world_state()
+    decision = decide_hunt_mode(_engage_ctx(fuel=800))
 
     assert decision["command"]["cmd_type"] == "shoot"
     assert decision["behavior"]["reason_kind"] == "shoot_target"
@@ -253,12 +240,8 @@ def test_break_sets_the_escape_latch_on_the_delegated_decision() -> None:
     map-fire loop (map_open deferred by the escape hop, closed by the
     next tick's shot, reopened by the next break, 27-36 fuel/tick).
     """
-    reset_world_state()
     seed_confirmed_incoming(5, weapon=0, damage=-45)
-    try:
-        decision = decide_hunt_mode(_engage_ctx(fuel=500, damage_state=1))
-    finally:
-        reset_world_state()
+    decision = decide_hunt_mode(_engage_ctx(fuel=500, damage_state=1))
 
     # Release = fuel_at_break + (floor - projected): the level at which
     # the SAME projection clears. A bare-floor release was a zero-width
@@ -276,22 +259,18 @@ def test_latched_break_escapes_even_when_the_projection_recovers() -> None:
     With the latch (fuel below the stored floor) the tick must stay
     on the escape -- same fuel-hop shape, lock still held.
     """
-    reset_world_state()
-    try:
-        base_ctx = _engage_ctx(fuel=300)
-        latched_ctx = DecideCtx(
-            base_ctx.world,
-            base_ctx.self_state,
-            AIStateDict(**{**base_ctx.ai_state, "break_escape_until_fuel": 372}),
-            base_ctx.inventory,
-            base_ctx.timestamp_ms,
-            base_ctx.terrain,
-            base_ctx.combat_feedback,
-            base_ctx.map_fuel_dots,
-        )
-        decision = decide_hunt_mode(latched_ctx)
-    finally:
-        reset_world_state()
+    base_ctx = _engage_ctx(fuel=300)
+    latched_ctx = DecideCtx(
+        base_ctx.world,
+        base_ctx.self_state,
+        AIStateDict(**{**base_ctx.ai_state, "break_escape_until_fuel": 372}),
+        base_ctx.inventory,
+        base_ctx.timestamp_ms,
+        base_ctx.terrain,
+        base_ctx.combat_feedback,
+        base_ctx.map_fuel_dots,
+    )
+    decision = decide_hunt_mode(latched_ctx)
 
     assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
@@ -309,61 +288,57 @@ def test_latched_close_phase_stays_on_the_escape() -> None:
     so the deferred hop re-dispatches against the opened map on the
     very next tick.
     """
-    reset_world_state()
-    try:
-        visible_target = make_tank_state(
-            tank_id=50,
-            x=150,
-            y=150,
-            team=2,
-            rank=1,
-            name="Runner",
-            is_self=False,
-            is_bot=False,
-            damage_state=3,
-            timestamp_ms=100000,
-            last_wire_seen_ms=100000,
-            last_position_update_ms=100000,
-            last_viewport_observation_ms=100000,
-        )
-        world, self_state = make_world(
-            fuel=300,
-            tanks={"50": visible_target},
-            containers={
-                "140,100": make_container_state(
-                    x=140,
-                    y=100,
-                    is_fuel=True,
-                    volume=700,
-                    timestamp_ms=100000,
-                    failed_pickups=0,
-                )
-            },
-        )
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "mode": "HUNT",
-                "mode_state": "CLOSE",
-                "mode_started_ms": 90000,
-                "combat_target_id": 50,
-                "combat_target_x": 150,
-                "combat_target_y": 150,
-                "break_escape_until_fuel": 372,
-            }
-        )
-        ctx = DecideCtx(
-            world,
-            self_state,
-            ai_state,
-            make_inventory(),
-            100000,
-            InMemoryTerrainMap(),
-            "",
-        )
-        decision = decide_hunt_mode(ctx)
-    finally:
-        reset_world_state()
+    visible_target = make_tank_state(
+        tank_id=50,
+        x=150,
+        y=150,
+        team=2,
+        rank=1,
+        name="Runner",
+        is_self=False,
+        is_bot=False,
+        damage_state=3,
+        timestamp_ms=100000,
+        last_wire_seen_ms=100000,
+        last_position_update_ms=100000,
+        last_viewport_observation_ms=100000,
+    )
+    world, self_state = make_world(
+        fuel=300,
+        tanks={"50": visible_target},
+        containers={
+            "140,100": make_container_state(
+                x=140,
+                y=100,
+                is_fuel=True,
+                volume=700,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            )
+        },
+    )
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "CLOSE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 150,
+            "combat_target_y": 150,
+            "break_escape_until_fuel": 372,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+    )
+    decision = decide_hunt_mode(ctx)
 
     assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["command"]["cmd_type"] != "shoot"
@@ -378,27 +353,23 @@ def test_latch_without_a_lock_does_not_hijack_the_tick() -> None:
     the lock is gone the phases proceed (here: acquisition opens the
     map) and the latch simply waits for its fuel release.
     """
-    reset_world_state()
-    try:
-        world, self_state = make_world(fuel=300)
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "break_escape_until_fuel": 372,
-            }
-        )
-        ctx = DecideCtx(
-            world,
-            self_state,
-            ai_state,
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-        decision = decide_hunt_mode(ctx)
-    finally:
-        reset_world_state()
+    world, self_state = make_world(fuel=300)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "break_escape_until_fuel": 372,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        None,
+        "",
+    )
+    decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
     assert decision["updated_ai_state"]["break_escape_until_fuel"] == 372
@@ -414,23 +385,19 @@ def test_close_phase_fight_under_fire_breaks_at_entry() -> None:
     assessment at HUNT entry, the same fight shape breaks on the
     first sustained-fire window while escape is still cheap.
     """
-    reset_world_state()
     seed_confirmed_incoming(5, weapon=0, damage=-45)
-    try:
-        base_ctx = _engage_ctx(fuel=500, damage_state=1)
-        close_ctx = DecideCtx(
-            base_ctx.world,
-            base_ctx.self_state,
-            AIStateDict(**{**base_ctx.ai_state, "mode_state": "CLOSE"}),
-            base_ctx.inventory,
-            base_ctx.timestamp_ms,
-            base_ctx.terrain,
-            base_ctx.combat_feedback,
-            base_ctx.map_fuel_dots,
-        )
-        decision = decide_hunt_mode(close_ctx)
-    finally:
-        reset_world_state()
+    base_ctx = _engage_ctx(fuel=500, damage_state=1)
+    close_ctx = DecideCtx(
+        base_ctx.world,
+        base_ctx.self_state,
+        AIStateDict(**{**base_ctx.ai_state, "mode_state": "CLOSE"}),
+        base_ctx.inventory,
+        base_ctx.timestamp_ms,
+        base_ctx.terrain,
+        base_ctx.combat_feedback,
+        base_ctx.map_fuel_dots,
+    )
+    decision = decide_hunt_mode(close_ctx)
 
     assert decision["behavior"]["reason_kind"] == "fuel_hop"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
@@ -468,14 +435,10 @@ def test_unwinnable_human_fight_refuels_and_keeps_the_lock() -> None:
     held. Fuel 500 sits below the rank-2 half-capacity band (600), so
     the break is live.
     """
-    reset_world_state()
     seed_confirmed_incoming(5)
-    try:
-        base_ctx = _engage_ctx(fuel=500)
-        base_ctx.world["tanks"]["50"] = _human_pursuit_tank()
-        decision = decide_hunt_mode(base_ctx)
-    finally:
-        reset_world_state()
+    base_ctx = _engage_ctx(fuel=500)
+    base_ctx.world["tanks"]["50"] = _human_pursuit_tank()
+    decision = decide_hunt_mode(base_ctx)
 
     assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
@@ -493,14 +456,10 @@ def test_human_fight_above_half_capacity_keeps_fighting() -> None:
     2026-07-31: "it dont really hunt to kill, it kinda just does
     damage then leaves").
     """
-    reset_world_state()
     seed_confirmed_incoming(5)
-    try:
-        base_ctx = _engage_ctx(fuel=800)
-        base_ctx.world["tanks"]["50"] = _human_pursuit_tank()
-        decision = decide_hunt_mode(base_ctx)
-    finally:
-        reset_world_state()
+    base_ctx = _engage_ctx(fuel=800)
+    base_ctx.world["tanks"]["50"] = _human_pursuit_tank()
+    decision = decide_hunt_mode(base_ctx)
 
     assert decision["behavior"]["mode"] == "HUNT"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
@@ -509,23 +468,19 @@ def test_human_fight_above_half_capacity_keeps_fighting() -> None:
 
 def test_close_phase_unwinnable_fight_blocks_at_entry() -> None:
     """A fight no fuel level can fund is blocked from CLOSE ticks too."""
-    reset_world_state()
     seed_confirmed_incoming(5)
-    try:
-        base_ctx = _engage_ctx(fuel=800)
-        close_ctx = DecideCtx(
-            base_ctx.world,
-            base_ctx.self_state,
-            AIStateDict(**{**base_ctx.ai_state, "mode_state": "CLOSE"}),
-            base_ctx.inventory,
-            base_ctx.timestamp_ms,
-            base_ctx.terrain,
-            base_ctx.combat_feedback,
-            base_ctx.map_fuel_dots,
-        )
-        decision = decide_hunt_mode(close_ctx)
-    finally:
-        reset_world_state()
+    base_ctx = _engage_ctx(fuel=800)
+    close_ctx = DecideCtx(
+        base_ctx.world,
+        base_ctx.self_state,
+        AIStateDict(**{**base_ctx.ai_state, "mode_state": "CLOSE"}),
+        base_ctx.inventory,
+        base_ctx.timestamp_ms,
+        base_ctx.terrain,
+        base_ctx.combat_feedback,
+        base_ctx.map_fuel_dots,
+    )
+    decision = decide_hunt_mode(close_ctx)
 
     assert decision["updated_ai_state"]["combat_target_id"] == -1
     assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
@@ -533,22 +488,18 @@ def test_close_phase_unwinnable_fight_blocks_at_entry() -> None:
 
 def test_break_latch_releases_when_fuel_recovers_to_the_floor() -> None:
     """Fuel at the stored floor clears the latch and the fight resumes."""
-    reset_world_state()
-    try:
-        base_ctx = _engage_ctx(fuel=800)
-        latched_ctx = DecideCtx(
-            base_ctx.world,
-            base_ctx.self_state,
-            AIStateDict(**{**base_ctx.ai_state, "break_escape_until_fuel": 372}),
-            base_ctx.inventory,
-            base_ctx.timestamp_ms,
-            base_ctx.terrain,
-            base_ctx.combat_feedback,
-            base_ctx.map_fuel_dots,
-        )
-        decision = decide_hunt_mode(latched_ctx)
-    finally:
-        reset_world_state()
+    base_ctx = _engage_ctx(fuel=800)
+    latched_ctx = DecideCtx(
+        base_ctx.world,
+        base_ctx.self_state,
+        AIStateDict(**{**base_ctx.ai_state, "break_escape_until_fuel": 372}),
+        base_ctx.inventory,
+        base_ctx.timestamp_ms,
+        base_ctx.terrain,
+        base_ctx.combat_feedback,
+        base_ctx.map_fuel_dots,
+    )
+    decision = decide_hunt_mode(latched_ctx)
 
     assert decision["command"]["cmd_type"] == "shoot"
     assert decision["updated_ai_state"]["break_escape_until_fuel"] == 0

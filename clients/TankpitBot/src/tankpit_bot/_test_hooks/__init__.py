@@ -51,7 +51,13 @@ from tankpit_bot._test_hooks.cdp import (
     PageProtocol,
     ResponseProtocol,
 )
-from tankpit_bot._test_hooks.env import _default_get_env, get_env
+from tankpit_bot._test_hooks.env import (
+    LoadDotenvProtocol,
+    _default_get_env,
+    _real_load_dotenv,
+    get_env,
+    load_dotenv,
+)
 from tankpit_bot._test_hooks.fs import (
     AppendTextProtocol,
     GlobPathsProtocol,
@@ -121,6 +127,7 @@ __all__ = [
     "GlobPathsProtocol",
     "InstallSignalHandlersProtocol",
     "KeyboardProtocol",
+    "LoadDotenvProtocol",
     "LoadTerrainMapProtocol",
     "PageProtocol",
     "PageWaitProtocol",
@@ -145,6 +152,7 @@ __all__ = [
     "_real_get_sync_playwright",
     "_real_glob_paths",
     "_real_install_signal_handlers",
+    "_real_load_dotenv",
     "_real_load_terrain_map",
     "_real_path_exists",
     "_real_process_received_message",
@@ -163,6 +171,7 @@ __all__ = [
     "get_sync_playwright",
     "glob_paths",
     "install_signal_handlers",
+    "load_dotenv",
     "load_terrain_map",
     "path_exists",
     "process_received_message_hook",

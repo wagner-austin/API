@@ -20,14 +20,14 @@ from tankpit_bot._test_hooks.browser import (
     SyncPlaywrightContextManagerProtocol,
     SyncPlaywrightFactoryProtocol,
 )
-from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
-from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
+from tankpit_bot.bus.frame_bus import FrameBus, FrameBusProtocol
+from tankpit_bot.bus.mode_bridge import ModeBridge, ModeBridgeProtocol
+from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.service.session_runner import (
     RunnableBotProtocol,
     SessionAlreadyRunningError,
     SessionRunner,
 )
-from tankpit_bot.service.status_bus import StatusBus, StatusBusProtocol
 from tests.conftest import FakeFileSystem
 
 _STOP_FILE = Path("runs/bot/STOP")

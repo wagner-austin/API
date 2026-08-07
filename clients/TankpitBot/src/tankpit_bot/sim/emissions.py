@@ -18,6 +18,7 @@ from tankpit_bot.container.types import (
     MinePlacementDict,
     TeleportLandedDict,
 )
+from tankpit_bot.physics.costs import MINE_PRESS_COST, RADAR_COST
 from tankpit_bot.physics.supervisor import fuel_pickup_close_code
 from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_GO,
@@ -38,8 +39,6 @@ from tankpit_bot.protocol.types import (
     TerrainUpdateDict,
 )
 from tankpit_bot.sim.actions import (
-    MINE_PRESS_FUEL_COST,
-    RADAR_FUEL_COST,
     process_mine_press,
     process_radar,
     process_teleport,
@@ -319,7 +318,7 @@ def emit_radar(
     """
     outcome = process_radar(world, tank_id, window if tank_id == client_id else None)
     tank = world["tanks"][tank_id]
-    tank["fuel"] = max(0, tank["fuel"] - RADAR_FUEL_COST)
+    tank["fuel"] = max(0, tank["fuel"] - RADAR_COST)
     del ammo_changed
     if outcome["consumed_extra"] and tank_id == client_id:
         # The extra-consumption snapshot LEADS the scan results —
@@ -376,7 +375,7 @@ def emit_mine_press(
     """
     outcome = process_mine_press(world, terrain, tank_id)
     tank = world["tanks"][tank_id]
-    tank["fuel"] = max(0, tank["fuel"] - MINE_PRESS_FUEL_COST)
+    tank["fuel"] = max(0, tank["fuel"] - MINE_PRESS_COST)
     if outcome["placed"] and tank_id == client_id:
         messages.append(
             MinePlacementDict(

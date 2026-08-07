@@ -7,9 +7,9 @@ sibling.
 from __future__ import annotations
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_inventory import (
@@ -23,14 +23,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestInventoryTracking:
     """Tests for binary protocol inventory tracking (0x49, 0x67, 0x74)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_full_signal_without_self_state_is_noop(self) -> None:
         """Code-7 reconciliation is a no-op when rank is unknown."""
@@ -178,24 +170,28 @@ class TestInventoryTracking:
 class TestWorldStateCore:
     """Tests for sniffer world state core operations."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
     def teardown_method(self) -> None:
         """Reset world state and hooks after each test."""
-        reset_world_state()
         _test_hooks.path_exists = _test_hooks._real_path_exists
         _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
 
-    def test_reset_world_state_clears_state(self) -> None:
-        """Test reset_world_state clears world state and terrain map."""
-        update_world_state_from_position(100, 100)
-        reset_world_state()
+    def test_a_fresh_service_carries_no_self_state_or_terrain(self) -> None:
+        """A newly built service starts with no position and no terrain map.
 
-        svc = get_world_service()
-        assert svc.world_state["self_state"] is None
-        assert svc.terrain_map is None
+        The contrast against a populated service is the point: isolation
+        comes from constructing a service, not from resetting a shared
+        one ([[session-state-deglobalisation]]).
+        """
+        populated = WorldService()
+        populated.update_world_state_from_position(100, 100)
+        populated_self = populated.world_state["self_state"]
+        if populated_self is None:
+            raise AssertionError("update_world_state_from_position must seed self_state")
+        assert (populated_self["x"], populated_self["y"]) == (100, 100)
+
+        fresh = WorldService()
+        assert fresh.world_state["self_state"] is None
+        assert fresh.terrain_map is None
 
     def test_load_terrain_map_returns_none_if_no_file(self) -> None:
         """Test returns None when no terrain file exists."""
@@ -295,13 +291,8 @@ class TestWorldStateCore:
 class TestWorldStateRendering:
     """Tests for world state ASCII rendering."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
     def teardown_method(self) -> None:
         """Reset world state and hooks after each test."""
-        reset_world_state()
         _test_hooks.path_exists = _test_hooks._real_path_exists
         _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
 
@@ -340,13 +331,8 @@ class TestWorldStateRendering:
 class TestRoomTracking:
     """Tests for room image tracking and terrain map selection."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
     def teardown_method(self) -> None:
         """Reset world state and hooks after each test."""
-        reset_world_state()
         _test_hooks.path_exists = _test_hooks._real_path_exists
         _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
 
@@ -445,25 +431,21 @@ class TestRoomTracking:
         result = get_world_service()._load_terrain_map_if_needed()
         assert result is None
 
-    def test_reset_clears_room_tracking(self) -> None:
-        """Test reset_world_state clears room tracking state."""
-        from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
+    def test_a_fresh_service_carries_no_room_tracking(self) -> None:
+        """A newly built service knows no room images and no selection."""
+        populated = WorldService()
+        populated.register_room_image("2", "field42.gif")
+        populated.set_selected_room("2")
+        assert populated.room_images == {"2": "field42.gif"}
+        assert populated.selected_room == "2"
 
-        register_room_image("2", "field42.gif")
-        set_selected_room("2")
-
-        reset_world_state()
-
-        assert get_world_service().room_images == {}
-        assert get_world_service().selected_room is None
+        fresh = WorldService()
+        assert fresh.room_images == {}
+        assert fresh.selected_room is None
 
 
 class TestFailedMoveTargets:
     """Tests for failed move target tracking."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
 
     def test_mark_and_check_failed_move(self) -> None:
         """Marking a move target as failed makes it show as failed."""
@@ -517,18 +499,6 @@ class TestFailedMoveTargets:
 
 class TestMovementRejections:
     """Tests for the movement-rejection record."""
-
-    def setup_method(self) -> None:
-        """Reset shared world-state globals before each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
     def test_recorded_rejections_count_inside_the_window(self) -> None:
         """Rejections inside the trailing window are counted."""

@@ -36,7 +36,6 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     EnemyTeleportAttemptResultDict,
     EnemyTeleportProbeSessionDict,
 )
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
@@ -48,6 +47,7 @@ from tankpit_bot.bot.ai.world_types import (
 )
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,

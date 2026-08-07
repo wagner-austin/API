@@ -14,9 +14,6 @@ from tankpit_bot.action_lab.enemy_tracking_types import (
     TrackedEnemyDict,
     TrackingObservationDict,
 )
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-)
 from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.tracking_observation import (
     build_tracking_observation,
@@ -24,6 +21,9 @@ from tankpit_bot.action_lab.tracking_observation import (
     select_js_identity_key,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.browser.page_client_snapshot import (
+    PageClientSnapshotDict,
+)
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
 )

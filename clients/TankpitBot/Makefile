@@ -279,7 +279,7 @@ service: install
 fleet: install
 	@Write-Host ""
 	@Write-Host "==> fleet (AI-operated fleet manager)" -ForegroundColor Cyan
-	@Write-Host "  Listens on 0.0.0.0:27300 (TANKPIT_FLEET_PORT overrides); Ctrl+C to stop." -ForegroundColor DarkGray
+	@Write-Host "  Listens on 127.0.0.1:27300 (TANKPIT_FLEET_PORT overrides); Ctrl+C to stop." -ForegroundColor DarkGray
 	poetry run tankpit-fleet
 
 run: install

@@ -16,7 +16,6 @@ from tankpit_bot.sniffer.world_state import (
     container_desync_pending,
     get_world_service,
     mark_container_desync,
-    reset_world_state,
 )
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tankpit_bot.state.types import make_container_state
@@ -25,14 +24,6 @@ from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_wo
 
 class TestDesyncRescan:
     """Tests for the desync-rescan cascade gate and its latch."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_pending_desync_outranks_remembered_container_pursuit(self) -> None:
         """A pending disproof produces one radar before any pickup."""
@@ -131,14 +122,6 @@ class TestDesyncRescan:
 
 class TestRadarSpendEconomics:
     """The shared radar-spend rule and its consumers."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_covered_viewport_answers_the_desync_without_a_scan(self) -> None:
         """Live coverage clears the latch instead of spending a radar.
@@ -257,14 +240,6 @@ class TestRadarSpendEconomics:
 
 class TestDisplacedLandingScanEconomics:
     """The displaced-harvest radar obeys the spend economics."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_displaced_landing_in_live_coverage_skips_the_radar(self) -> None:
         """Flag s9-2: a displaced harvest landing in fully-scanned

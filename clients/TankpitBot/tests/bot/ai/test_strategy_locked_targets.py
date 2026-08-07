@@ -10,7 +10,6 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.sniffer.world_state import (
-    reset_world_state,
     update_world_state_from_position,
 )
 from tests.bot.ai._strategy_fixtures import (
@@ -26,12 +25,7 @@ class TestLockedEquipmentTarget:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset world state."""
-        reset_world_state()
 
     def test_continues_locked_equipment_target(self) -> None:
         """Locked equipment target is continued when still actionable."""
@@ -185,12 +179,7 @@ class TestLockedFuelTarget:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset world state."""
-        reset_world_state()
 
     def test_continues_locked_fuel_target(self) -> None:
         """Locked fuel target is continued when still actionable."""
@@ -310,12 +299,7 @@ class TestCriticalEquipmentLockedTarget:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset world state."""
-        reset_world_state()
 
     def test_continues_locked_critical_equipment_target(self) -> None:
         """Critical locked equipment target is continued when executable."""

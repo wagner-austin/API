@@ -3139,3 +3139,296 @@ acyclic, unchanged), the over-600 file count (**0**), the type-safety
 zeros (now counting `scripts/` too), the seven `make shadow` laws, the
 `get_world_service` call-site census (73 in 20 files -> **74 in 23**,
 and the old "21 in `tick_loop.py` alone" is gone with the split).
+
+## [2026-08-07] refactor | De-globalisation step 2 lands as a deletion; six re-exports and a back-compat decoder go with it
+
+**Step 2 was mis-scoped in its own plan.** [[session-state-deglobalisation]]
+listed `sniffer/viewport.py`'s two globals as state to move onto the
+session. They were already on the session: the single writer set the
+globals and then wrote the same pair into `world_state["viewport"]` on
+the next statement. `get_viewport_left()` / `get_viewport_top()` had
+zero callers outside tests. The module was write-only in production and
+its four session-boundary resets cleared state nobody read — so the
+step shipped as a deletion, and the completion criterion (the conftest
+reset list) did not move, because these globals were never in it.
+
+**Method note:** the tell was in a test. `test_world_state_functions`
+set the global AND the world-state copy before asserting; only the
+latter mattered. A test that has to write the same fact twice is
+describing duplication in the code under it.
+
+### Shims, wrappers, re-exports: a mechanical pass
+
+The standing rule (no back-compat shims, thin wrappers, fallbacks,
+legacy code, type aliases, re-exports) was re-checked by AST scan
+rather than by reading. Removed:
+
+- `capture/trackers/tank.py` — `TEAM_NAMES = TEAM_NAMES  # Backward-compatible alias`, which announced itself.
+- `sim/actions.py` — `RADAR_FUEL_COST` / `MINE_PRESS_FUEL_COST`, renamed re-exports of `physics.costs`. Their only consumer was `sim/emissions.py`; `actions.py` imported both names **solely** to re-export them, so the import went too.
+- `sim/server.py` — `TICK_MS = TICK_RATE_MS`, re-exported so sim consumers could avoid importing from the protocol layer that owns it. Four consumers repointed.
+- `sim/ghost.py` — `_TICK_MS`, a private rename with one use.
+- `validate/shadow_laws.py` — `PAIRING_WINDOW_MS = TICK_MS`, a rename of a re-export.
+- `sim/movement.py` — `MINE_WALK_COST = SINGLE_HIT_VICTIM_COST`. The domain fact it carried (a mine walk-over costs the same 45 as a single hit) survives as a comment at the use site; the alias does not.
+- `types/session.py` — the two "backwards compatibility for old sessions" branches in `decode_capture_session`, which tolerated a missing or malformed `game_log` / `tank_names` by silently skipping entries.
+
+**The back-compat decoder was provably dead, and the proof matters
+more than the deletion:** the encoder always writes both keys, the
+`CaptureSession` TypedDict declares both REQUIRED, and **0 of 410
+archived captures lack either** (parsed, not grepped — a 4 KB head
+check would have been wrong, since the keys sit after the `messages`
+array). A decoder that contradicts its own type is a shim regardless of
+how defensive it looks. The two tests that pinned the skipping now pin
+the raise.
+
+### What was NOT removed, and why
+
+- **Nine `_test_hooks` / action_lab aliases stay.** They are the DI
+  seams, with 4-10 test patch sites each. Deleting them type-checks
+  clean and silently disables injection — the trap already recorded in
+  the 2026-08-07 layering entry, where only a DID-NOT-RAISE caught it.
+- **`terrain.py`'s `is_landing_legal` / `is_landing_attainable` stay.**
+  They collapse to `is_passable` on the static minimap and DIVERGE in
+  `FerryAwareTerrain`; that is polymorphism, not a wrapper.
+- **`set_self_rank` stays.** The scan flagged it as a pass-through
+  because its first three arguments forward verbatim — it adds the
+  `"wire_0x2B_promotion"` provenance, making it a named specialization.
+- **Four `except` handlers stay.** All are narrow, typed and logged at
+  the archive-parsing boundary (`ValueError`, `FramingError`,
+  `DecodeError`) — the boundary case the coding standard permits, and
+  the archive genuinely contains unparseable payloads.
+
+Mechanically verified after the pass: `TypeAlias` 0, `typing.Any` 0,
+real `cast(` 0 (the six hits are `broadcast(` substrings and a guard
+fixture string), real `type: ignore` 0 (four hits are prose restating
+the ban), `noqa` 0, `TYPE_CHECKING` 0, `.pyi` 0, `pragma` 0, coverage
+`omit` 0, `exclude_lines` 0, `xfail`/`skip` 0.
+
+## [2026-08-07] refactor | De-globalisation steps 3-5; bot/base.py splits by concern; the no-shims rule becomes a guard rule
+
+**Steps 3, 4 and 5 shipped, and all three deleted their reset function
+rather than moving it.** The pattern that replaced them is the same
+each time: a per-session object whose constructor IS the reset.
+
+| Step | Global | Now |
+|---|---|---|
+| 3 | `_last_emitted_belief`, `_last_emitted_signature` | `SelfAlignmentEmitter` / `EntityAlignmentEmitter` on `Bot` |
+| 4 | `_cdp_time_offset_ms` | `CDPClock` on `CDPService`, which was already per-session |
+| 5 | `_survey_emitted` | `ClientStructureSurveyor` on `Bot` |
+
+**Step 5 is the first to move the completion criterion.**
+`reset_client_structure_survey` was in the ten-call conftest reset
+list, so the list is now nine — eight session resets plus the
+process-wide `reset_static_key_cache` that stays by design.
+
+**The test change is the point, not a side effect.** Each step
+replaced a "reset clears the gate" test with "a SECOND instance has
+its own gate". The old test proved a reset function works; the new one
+proves the property the refactor exists for — two sessions in one
+process cannot silence each other. A reset can never prove that.
+
+Step 4 has the sharpest reason: CDP timestamps are monotonic seconds
+from an arbitrary origin, so the first frame of a session fixes the
+offset every later frame is read against. A second session has a
+DIFFERENT origin; sharing one anchor misdates every frame it reads.
+
+### `bot/base.py`: 601 -> 440, split by concern
+
+The new file-size rule caught the 601 immediately — the six lines step
+3 added crossed the ceiling on the commit that crossed it, which is
+what the rule is for.
+
+**A wrong turn worth recording.** The first split moved the run loop
+out as functions over a `Bot`, matching `run_tick_loop(bot, ...)`. That
+was wrong: `Bot.run` satisfies `RunnableBotProtocol`, the seam that
+lets `SessionRunner` accept a fake bot with no Playwright. Removing the
+method would have forced the production factory to return an adapter —
+a wrapper, which is banned. **A method that satisfies a Protocol is not
+a candidate for extraction, however well it separates on paper.**
+
+The seam that actually separates is the read model. `StateAccessMixin`
+(`bot/state_access.py`) holds the seven world-state queries, which
+touch no session state at all — no browser, no CDP, no HFSM.
+`GameLogWitnessMixin` (`bot/game_log_witness.py`) holds the DOM
+game-log poll and the account-stats read, declaring the attributes it
+uses as annotations so `Bot` keeps ownership of the state. Chain is
+now Bot -> GameLogWitnessMixin -> StateAccessMixin -> DispatchMixin ->
+CompletionsMixin -> SessionBase.
+
+### The no-shims rule is now enforced
+
+[[coding-standards]] banned back-compat shims, thin wrappers,
+fallbacks, legacy code, type aliases and re-exports — and was the one
+standard with no enforcing artifact. `scripts/shim_rules.py` now runs
+in the guard at zero violations, failing on legacy vocabulary
+(`back-compat`, `deprecated`, `legacy`, `kept for signature/API
+compatibility`), self-named aliases (`X = X`), and renamed re-exports
+(`NEW = IMPORTED` where `NEW` is exported).
+
+The `_test_hooks` exemption is **structural**: it covers that module
+kind, because binding an imported implementation to a patchable module
+attribute IS the DI mechanism. It cannot grow entry by entry, which an
+allowlist would.
+
+Cleaning to zero removed six re-exports and four legacy markers.
+Two were more than renames:
+
+- **`decode_and_log_binary` had zero production callers.** One test
+  kept it alive. Dead code with a test looks covered, which is exactly
+  how it survives.
+- **`can_use_radar` returned `True` unconditionally**, and the
+  `radar_affordable` parameter it fed was residue of a two-caller
+  design (equipment recovery and fuel recovery each passing their own
+  predicate) whose modes no longer exist. One caller remained, passing
+  a constant. The parameter went with it, and the test that forced the
+  walk branch with `radar_affordable=False` was rewritten to reach that
+  branch the way production can — the free 5x5 already scanned while
+  the wider viewport is not.
+
+Verified: `make check` green, 100.00% coverage with zero misses, guard
+clean across every rule.
+
+## [2026-08-07] refactor | Step 7 deletes a blacklist that never had a writer; step 6 is blocked on step 8
+
+**The container blacklist was dead, not global.** Step 7 was written
+as "de-globalise `_blacklisted_container_keys`". The right move turned
+out to be deleting it: `blacklist_container` has **no caller under
+`src/` in any commit in this repository's history** (checked with
+`git log -S` across the three commits that ever touched the file), and
+neither does `reset_container_blacklist`, whose docstring claimed it
+ran "on death/respawn". Only tests called either.
+
+So the reader always answered False, and five decision sites were
+filtering candidates against a set that could never fill: both hop
+selectors in `collect_hops`, the equipment pickup in
+`collect_pickups`, the quad sweep, and the scope scout — plus an
+`is_blacklisted` predicate threaded as a parameter through
+`larder.select_fuel_larder_hop`. Deleting the mechanism is
+behaviour-identical by construction.
+
+**A reader with no writer is worse than dead code**: it reads as a
+safety feature. Five separate decision sites were written to respect
+it, and one of them threaded it through a public signature. The tests
+made it look alive — three of them called `blacklist_container`
+directly and asserted the reader saw it, which proves the mechanism
+works and says nothing about whether anything uses it.
+
+Second step to move the completion criterion: the conftest reset list
+is now **eight** calls (seven session resets plus the process-wide
+`reset_static_key_cache`), down from ten.
+
+### Step 6 is blocked on step 8, and the block is one function
+
+The ledger cluster measures small — the six globals have only three
+consumer files outside `ledger/` for the counter/ring/decision/
+transition group, and `emit_action_outcome` is called only from within
+the outcome package. Every one of those consumers already takes `bot`.
+
+The exception is `pending_teleport_target`, read by
+`sniffer/world_state_dispatch_containers.py` — the WIRE-DISPATCH
+layer, whose only session handle is the `WorldService` singleton that
+step 8 exists to remove. Its four sibling functions
+(`record_teleport_dispatch`, `emit_teleport_landed`,
+`emit_teleport_stall_timeout`, `emit_teleport_command_rejected`) are
+all bot-side; only the read crosses into dispatch.
+
+Putting the ledger on `WorldService` would make it work today and be
+fake progress — the state would still be reached through a module
+global. The honest options are to run step 8 first, or to accept a
+step 6 that leaves the teleport-dispatch tracking behind. Recorded
+here rather than guessed at.
+
+### Method note: `make check` was slow, and it was self-inflicted
+
+A run took 453 s against a normal ~90 s. Not a hang: three concurrent
+pytest fleets were on the box (628 s, 359 s and 165 s of accumulated
+CPU), because several `make check` runs had been backgrounded during
+the session and `addopts` carries `-n auto` — 16 workers each. The
+harness reported those tasks complete while their xdist workers stayed
+alive. **Background one long gate at a time**; a second one does not
+run in parallel, it runs 3x slower and hides the real timing.
+
+## 2026-08-07 — Step 8's test-side blocker was 150x smaller than counted
+
+`reset_world_state()` in `tests/`: **496 -> 3**. Full gate green after:
+6191 passed (unchanged), 100.00% coverage with 0 missed statements and
+0 partial branches, mypy clean on 1100 files, ruff clean, guard exit 0.
+
+### The count was real; the conclusion drawn from it was not
+
+Last session I reported 496 `reset_world_state()` sites as the blocker
+on step 8 and recommended a session's work migrating each to a
+hand-built `WorldService`. That recommendation was wrong, and the error
+is worth naming: **I counted appearances without asking what any of
+them did.**
+
+`tests/conftest.py::_isolate_protocol_singletons` is autouse at the
+root and already resets the singleton before and after every test. So a
+`reset_world_state()` as the first statement of a test body runs
+microseconds after the fixture did exactly that. Classified by AST
+position:
+
+| kind | count | verdict |
+|---|---|---|
+| prologue (first statement) | 195 | dead |
+| `setup_method` / `teardown_method` body | 229 | dead |
+| epilogue (last statement) | 20 | dead |
+| `try/finally` scaffolding | 20 | dead — the `try` existed only for the reset |
+| shares a `finally` with real cleanup | 9 | line dead, block stays |
+| genuine mid-test | 22 | needs reading |
+| non-body (in a loop) | 1 | needs reading |
+
+444 of 496 were ritual. Of the 23 that needed reading, 20 turned out to
+be redundant once their surroundings were checked (the builders they
+followed — `make_world`, `_sweep_ctx`, `make_inventory` — are pure and
+touch no global).
+
+### What made this safe to prove instead of guess
+
+A prologue reset is only redundant if no fixture the test depends on
+*populated* world state first; otherwise deleting it silently changes
+what the test measures — and in tests asserting `result is None`, a
+state leak makes them pass spuriously rather than fail. So the
+deletion was gated on a specific check across all seven `conftest.py`
+files: **nothing anywhere populates world state in a fixture.** The
+only writers are the root autouse reset and two `action_lab` fixtures
+that reset-and-yield. That check is what turned this from a plausible
+cleanup into a provable one.
+
+### Collateral removed
+
+202 `setup_method`/`teardown_method` bodies that did nothing else, 212
+unused imports, and two fixtures that the strip reduced to a bare
+`yield`: `real_inventory` (40 call-site edits across 4 files) and
+`_isolate_world_state`. A fixture whose body is `yield` is a parameter
+every test carries and nothing reads.
+
+### Tests that outlive the thing they test
+
+Five tests asserted "populate, reset, observe clean" — they test
+`reset_world_state` itself, so they would die with it. Rewritten to
+assert the durable invariant underneath: *a freshly constructed
+`WorldService` starts clean*, contrasted against a populated one. Same
+coverage, no global, and they survive step 8's final flip.
+`tests/sniffer/test_replay_pipeline.py` went further and is now
+entirely off the singleton — its helpers return the service they
+decoded into, and the five-prefix replay test builds one service per
+iteration, making isolation structural rather than a property of call
+ordering.
+
+### The 3 survivors
+
+Two are the conftest fixture (the seam). The third,
+`tests/bot/test_executor_dispatch.py:288`, is load-bearing: `_make_bot`
+seeds position and fuel, and the test needs no self-belief. It unblocks
+when `Bot` takes a `WorldService` — src-side work.
+
+### Method note: read the exit code, not the summary
+
+`poetry run python -m scripts.guard | tail -15` printed fifteen lines
+of `0 violations` and `$?` reported 0. Both were false comfort: `$?`
+after a pipe is `tail`'s status, and the violation line was in the
+header the `tail` had cut off. The guard was actually exiting 2 on a
+`weak-assertion-is-not-none` in a test written this session. This is
+the second time in two sessions that a guard summary read clean while
+the guard failed. Redirect to a file and echo `$?` from the unpiped
+command.

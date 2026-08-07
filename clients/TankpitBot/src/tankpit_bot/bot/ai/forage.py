@@ -87,19 +87,28 @@ def plan_forage_search(
     *,
     score: int,
     behavior_mode: BehaviorMode,
-    radar_affordable: bool,
 ) -> TickDecisionDict | None:
     """Plan the next foraging action inside the current viewport.
 
     The forager is mode-agnostic. Callers supply their own
-    ``behavior_mode``, ``score``, and ``radar_affordable`` predicate;
-    the function itself never branches on caller identity.
+    ``behavior_mode`` and ``score``; the function itself never branches
+    on caller identity.
+
+    Radar affordability is NOT a branch here. Radar dispatch can never
+    kill the bot: the server accepts the command even at zero fuel
+    (user-confirmed 2026-06-26), and the wire-reported 10-fuel
+    deduction is a debit, not a precondition — which is what lets a
+    stranded bot still see what is around it instead of looping
+    silently. The old ``radar_affordable`` parameter carried a
+    caller-supplied predicate back when two recovery modes each had
+    their own; both modes are gone, the surviving caller passed a
+    constant True, and the parameter went with them
+    ([[session-state-deglobalisation]]).
 
     Three branches in order:
 
-    1. If any tile in the current viewport is unscanned AND
-       ``radar_affordable`` is True → dispatch the radar. The wire
-       handler records the revealed tile set into
+    1. If any tile in the current viewport is unscanned → dispatch the
+       radar. The wire handler records the revealed tile set into
        ``world.scanned_tiles`` when the server radar response
        arrives next tick.
     2. Else if an unscanned tile is reachable → walk toward it so the
@@ -116,9 +125,6 @@ def plan_forage_search(
         ai_state: Base AI state to rewrite for the produced command.
         score: Behavior score for the produced decision.
         behavior_mode: Behavior-mode label stamped on the decision.
-        radar_affordable: Caller-evaluated predicate that says the
-            radar's fuel cost is payable under the caller's reserve
-            policy this tick.
 
     Returns:
         Foraging radar or move decision, or ``None`` when no productive
@@ -140,8 +146,8 @@ def plan_forage_search(
     # spot whose footprint is already fully covered would mark zero
     # new tiles -- the tank must walk first so a later free radar
     # reaches new ground. Without this gate the forager loops firing
-    # the same free radar from the same position whenever
-    # ``can_use_radar`` is permissive (radar is fuel-free). The gate
+    # the same free radar from the same position, since radar is
+    # fuel-free and nothing else would stop it. The gate
     # intentionally only applies inside the viewport: if the tank is
     # somehow outside it (test setup, pre-synced wire state), there's
     # no walk that helps, so let radar fire and rely on the next wire
@@ -180,7 +186,7 @@ def plan_forage_search(
             ctx.self_state["rank"],
         )
         radar_productive = next_radar_gain > 0
-    if not viewport_fully_covered and radar_affordable and radar_productive:
+    if not viewport_fully_covered and radar_productive:
         emit_ai(
             "forage radar (mode=%s, extras=%d, viewport=(%d,%d)-(%d,%d))",
             behavior_mode,

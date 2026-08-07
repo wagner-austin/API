@@ -38,7 +38,6 @@ from tankpit_bot.action_lab.fuel_probe_results import (
     build_teleport_timeout_result as _shared_build_teleport_timeout_result,
 )
 from tankpit_bot.action_lab.fuel_probe_types import FuelProbeAttemptResultDict
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.pickup_phase import (
     PickupImmediateOutcomeProtocol,
     PickupOutcomeWaiterProtocol,
@@ -48,6 +47,7 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
 )
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import SelfStateDict
 from tankpit_bot.state.types import ContainerStateDict
 from tankpit_bot.types import CapturedMessage

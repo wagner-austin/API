@@ -27,10 +27,6 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     EnemyTeleportProbeSessionDict,
     encode_enemy_teleport_probe_session,
 )
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-    capture_page_client_snapshot,
-)
 from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.probe_entrypoint import (
     run_and_save_standard_probe_session,
@@ -54,6 +50,10 @@ from tankpit_bot.bot.ai.combat_landing import (
     has_cardinal_enemy_adjacency,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.browser.page_client_snapshot import (
+    PageClientSnapshotDict,
+    capture_page_client_snapshot,
+)
 from tankpit_bot.sniffer.world_state import get_terrain_map
 
 log = get_logger(__name__)

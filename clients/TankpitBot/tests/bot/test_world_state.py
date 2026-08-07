@@ -15,11 +15,9 @@ class TestBotWithWorldState:
         """Test Bot.get_position returns position when tracked."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(100, 150)
         bot = Bot("https://test.tankpit.com/", headless=True)
         pos = bot.get_position()
@@ -29,11 +27,9 @@ class TestBotWithWorldState:
         """Test Bot.get_self_state returns state when tracked."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(50, 75)
         bot = Bot("https://test.tankpit.com/", headless=True)
         self_state = bot.get_self_state()
@@ -47,11 +43,9 @@ class TestBotWithWorldState:
         """Test Bot.get_fuel returns fuel when tracked."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(50, 75)
         update_world_state_from_fuel_total(get_world_service(), 500)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -63,11 +57,7 @@ class TestBotWithWorldState:
         """Test Bot.get_fuel_containers returns fuel containers."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.protocol import RadarContainerDict
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
 
-        reset_world_state()
         containers: list[RadarContainerDict] = [
             RadarContainerDict(x=10, y=20, volume=100),
             RadarContainerDict(x=30, y=40, volume=200),
@@ -82,11 +72,9 @@ class TestBotWithWorldState:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         containers: list[RadarContainerDict] = [
             RadarContainerDict(x=10, y=10, volume=100),  # Distance: 80
@@ -106,11 +94,9 @@ class TestBotWithWorldState:
         """Test Bot.get_nearest_fuel_container returns None when no fuel containers."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         nearest = bot.get_nearest_fuel_container()

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
 )
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state.types import WorldStateDict
@@ -17,14 +16,6 @@ from tests.conftest import FakeFileSystem
 
 class TestDispatchTankMessages:
     """Tank entry, status, removal, terrain, and damage dispatch."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_dispatch_tank_entry(self) -> None:
         """Test dispatch handles TankEntry (0x28) message."""
@@ -276,10 +267,6 @@ class TestDispatchTankMessages:
 
 class TestSelfIdentityRecording:
     """The self 0x21 TankInfo fills the canonical account model."""
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_self_tank_info_records_identity(self) -> None:
         """A 0x21 matching the self tank id lands in self_account."""

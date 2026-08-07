@@ -12,11 +12,6 @@ from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.action_lab.client_structure import maybe_emit_client_structure_survey
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-    capture_page_client_snapshot,
-)
 from tankpit_bot.bot import ai_strategy, executor, world_sync
 from tankpit_bot.bot.ai.scoring_types import render_reason
 from tankpit_bot.bot.ai.types import (
@@ -34,8 +29,10 @@ from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.overlay import OverlayStateDict, render_overlay_payload
 from tankpit_bot.browser.overlay_hud import update_bot_overlay
-from tankpit_bot.diagnostics.entity_alignment import maybe_emit_entity_alignment_sample
-from tankpit_bot.diagnostics.self_alignment import maybe_emit_self_alignment_sample
+from tankpit_bot.browser.page_client_snapshot import (
+    PageClientSnapshotDict,
+    capture_page_client_snapshot,
+)
 from tankpit_bot.ledger.decision import latest_decision_event_id
 from tankpit_bot.ledger.mode_transition import emit_mode_transition
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
@@ -161,13 +158,13 @@ def _tick_once(bot: Bot) -> None:
         get_world_service().map_fuel_dots,
     )
 
-    maybe_emit_self_alignment_sample(self_state, snapshot)
-    maybe_emit_entity_alignment_sample(
+    bot._self_alignment.maybe_emit(self_state, snapshot)
+    bot._entity_alignment.maybe_emit(
         world,
         snapshot,
         in_combat=bot._ai_state["mode"] == "HUNT",
     )
-    maybe_emit_client_structure_survey(bot._require_cdp())
+    bot._client_structure.maybe_emit(bot._require_cdp())
     # Account-wide ground truth (lifetime kills, play time, promotion
     # points) baselined on the first healthy tick; the loading screen
     # ignores the C hotkey at bootstrap.

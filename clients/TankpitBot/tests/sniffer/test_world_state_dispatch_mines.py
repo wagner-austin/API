@@ -8,21 +8,12 @@ from __future__ import annotations
 
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
 )
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
 class TestDispatchTunneledMines:
     """Mine placement, cascade, and detonation dispatch."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_dispatch_tunneled_mine_placement_adds_mines(self) -> None:
         """Test tunneled 0x4B mine placement updates world mine state."""

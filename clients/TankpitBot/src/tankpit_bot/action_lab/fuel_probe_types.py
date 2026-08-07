@@ -22,17 +22,17 @@ from tankpit_bot.action_lab.action_trace_types import (
     encode_action_phase_overlap,
     encode_fuel_decision_basis,
 )
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-    decode_page_client_snapshot,
-    encode_page_client_snapshot,
-)
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict, TeleportTargetDict
 from tankpit_bot.action_lab.types_codecs import (
     decode_teleport_startup_timing,
     decode_teleport_target,
     encode_teleport_startup_timing,
     encode_teleport_target,
+)
+from tankpit_bot.browser.page_client_snapshot import (
+    PageClientSnapshotDict,
+    decode_page_client_snapshot,
+    encode_page_client_snapshot,
 )
 
 

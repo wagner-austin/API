@@ -55,10 +55,10 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 
-from tankpit_bot.service.frame_bus import FrameBusProtocol
-from tankpit_bot.service.mode_bridge import ModeBridgeProtocol
+from tankpit_bot.bus.frame_bus import FrameBusProtocol
+from tankpit_bot.bus.mode_bridge import ModeBridgeProtocol
+from tankpit_bot.bus.status_bus import StatusBusProtocol
 from tankpit_bot.service.session_runner import SessionAlreadyRunningError
-from tankpit_bot.service.status_bus import StatusBusProtocol
 from tankpit_bot.service.types_codecs import (
     decode_mode_command,
     encode_session_status,

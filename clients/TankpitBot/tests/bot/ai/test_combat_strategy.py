@@ -13,7 +13,6 @@ from tankpit_bot.bot.ai.combat_strategy import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     TankStateDict,
     WorldStateDict,
@@ -29,14 +28,6 @@ from tests.bot.ai._support import (
 
 class TestKillShotWireGate:
     """Tests for the wire-presence kill gate at the shoot chokepoint."""
-
-    def setup_method(self) -> None:
-        """Reset shared world-state globals before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        reset_world_state()
 
     def _adjacent_world_and_ctx(
         self,
@@ -137,14 +128,6 @@ class TestKillShotWireGate:
 class TestMissOnMovedTarget:
     """Tests for the miss-on-moved-target re-aim path in engage_target."""
 
-    def setup_method(self) -> None:
-        """Reset shared world-state globals before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        reset_world_state()
-
     def test_miss_on_moved_target_re_aims_instead_of_blocking(self) -> None:
         """A miss against a target that moved since the shot re-aims at the new position.
 
@@ -236,12 +219,6 @@ class TestHasCombatShot:
 
 class TestFindCombatPickup:
     """Tests for _find_combat_pickup mid-combat pickup selection."""
-
-    def setup_method(self) -> None:
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        reset_world_state()
 
     def test_finds_adjacent_fuel_when_low(self) -> None:
         """Returns fuel pickup when fuel is below threshold and fuel is adjacent."""

@@ -21,7 +21,6 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.types import make_move_command
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_mine_state
 from tests.bot.ai._collect_helper_fixtures import _enemy
 from tests.bot.ai._support import (
@@ -35,10 +34,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestRecoveryHelpers:
     """Tests for helper-level recovery planning behavior."""
-
-    def setup_method(self) -> None:
-        """Reset world-state test globals before each case."""
-        reset_world_state()
 
     def test_compute_equipment_collect_fuel(self) -> None:
         """Stocked combat equipment enables the standard equipment list."""

@@ -1,9 +1,10 @@
-"""Bot — assembles SessionBase + CompletionsMixin + DispatchMixin.
+"""Bot — assembles the session mixin chain into the playable bot.
 
 Bot owns CDPService and CommandService via SessionBase composition.
 State machine completions live in ``completions.py``, command dispatch
-in ``bot_dispatch.py``. This module adds init, state access, game log,
-account stats, and the run loop.
+in ``bot_dispatch.py``, world-state queries in ``state_access.py``, and
+the DOM game-log witness in ``game_log_witness.py``. This module keeps
+construction and the session run loop.
 """
 
 from __future__ import annotations
@@ -13,31 +14,28 @@ from pathlib import Path
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks import AutoscrollPageProtocol, CDPSessionProtocol, PageProtocol
-from tankpit_bot.bot.account_stats_capture import capture_account_stats
+from tankpit_bot._test_hooks import (
+    AutoscrollPageProtocol,
+    CDPSessionProtocol,
+    PageProtocol,
+)
 from tankpit_bot.bot.ai.types import (
-    AIConfigDict,
     AIStateDict,
-    make_default_ai_config,
     make_initial_ai_state,
 )
 from tankpit_bot.bot.bot_dispatch import DispatchMixin
 from tankpit_bot.bot.command_service import CommandService
-from tankpit_bot.bot.states import (
-    make_initial_state_data,
-)
+from tankpit_bot.bot.config import env_ai_config
+from tankpit_bot.bot.game_log_witness import GameLogWitnessMixin
+from tankpit_bot.bot.state_access import StateAccessMixin
+from tankpit_bot.bot.states import make_initial_state_data
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
+from tankpit_bot.browser.client_structure import ClientStructureSurveyor
 from tankpit_bot.browser.dom_scraper import (
-    GameLogEntry,
     GameLogScraper,
 )
 from tankpit_bot.browser.flag_capture import FlagCaptureService
-from tankpit_bot.browser.game_log import (
-    make_game_log_scraper,
-    poll_game_log,
-    timestamp_game_log_entries,
-)
 from tankpit_bot.browser.lifecycle import (
     cleanup_browser,
     gather_intel,
@@ -50,49 +48,20 @@ from tankpit_bot.browser.session_storage import (
     load_storage_state,
     save_storage_state,
 )
+from tankpit_bot.bus.frame_bus import FrameBus, FrameBusProtocol
+from tankpit_bot.bus.mode_bridge import ModeBridge, ModeBridgeProtocol
+from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
+from tankpit_bot.diagnostics.entity_alignment import EntityAlignmentEmitter
+from tankpit_bot.diagnostics.self_alignment import SelfAlignmentEmitter
 from tankpit_bot.runtime_logging import emit_state
-from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
-from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
-from tankpit_bot.service.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.sniffer.chrome_launch import (
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
     _maximize_via_cdp,
 )
-from tankpit_bot.sniffer.world_state import get_world_state
-from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage, GameLogEntryWithTimestamp
 
 log = get_logger(__name__)
-
-# The first-tick keypress itself can be swallowed by the client (run
-# 20260611-013801: panel never opened across a full poll budget), so
-# the startup capture retries on later ticks.
-_ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS = 3
-
-
-def _env_ai_config() -> AIConfigDict:
-    """Build the session AI config with environment overrides applied.
-
-    Overrides: ``TANKPIT_BOT_PRIORITY_TARGET`` (the priority hunt
-    account) and ``TANKPIT_BOT_HUMAN_MIN_RANK`` /
-    ``TANKPIT_BOT_HUMAN_MAX_RANK`` (the targetable human rank window)
-    -- [[bot-behavior-contract]] §3.2.
-
-    Returns:
-        Default AI config with env-resolved fields filled in.
-    """
-    from tankpit_bot.bot.config import resolve_human_rank_window, resolve_priority_target
-
-    min_rank, max_rank = resolve_human_rank_window()
-    return AIConfigDict(
-        **{
-            **make_default_ai_config(),
-            "priority_target_name": resolve_priority_target(),
-            "human_target_min_rank": min_rank,
-            "human_target_max_rank": max_rank,
-        }
-    )
 
 
 class BotError(Exception):
@@ -112,13 +81,16 @@ class ProtocolNotDiscoveredError(BotError):
     """
 
 
-class Bot(DispatchMixin):
+class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
     """Bot that sends commands and tracks game state with a state machine.
 
-    Inheritance chain: Bot → DispatchMixin → CompletionsMixin → SessionBase.
-    Each layer adds a focused concern: SessionBase owns CDPService/CommandService,
-    CompletionsMixin adds state transitions, DispatchMixin adds command dispatch.
-    Bot adds init, state access, game log, account stats, and the run loop.
+    Inheritance chain: Bot → GameLogWitnessMixin → StateAccessMixin →
+    DispatchMixin → CompletionsMixin → SessionBase. Each layer adds one
+    focused concern: SessionBase owns CDPService/CommandService,
+    CompletionsMixin adds state transitions, DispatchMixin adds command
+    dispatch, StateAccessMixin answers world-state questions, and
+    GameLogWitnessMixin polls the DOM log and reads account stats. Bot
+    itself is left with construction and the session run loop.
     """
 
     def __init__(
@@ -183,7 +155,7 @@ class Bot(DispatchMixin):
         self._game_log_scraper: GameLogScraper | None = None
         self._game_log_witness: list[GameLogEntryWithTimestamp] = []
         self._shot_screenshot_seq: int = 0
-        self._ai_state: AIStateDict = make_initial_ai_state(_env_ai_config())
+        self._ai_state: AIStateDict = make_initial_ai_state(env_ai_config())
         default_mode_bridge: ModeBridgeProtocol = ModeBridge()
         default_status_bus: StatusBusProtocol = StatusBus()
         self._mode_bridge: ModeBridgeProtocol = (
@@ -205,6 +177,16 @@ class Bot(DispatchMixin):
         # clicks over its own CDP binding; the service turns each into
         # a human_flag diagnostic carrying the recent-tick ring.
         self._flag_capture = FlagCaptureService()
+        # Belief-vs-truth alignment sampling. Each emitter remembers what
+        # it last wrote so identical ticks add no artifact bulk; that
+        # memory is one session's, not the process's
+        # ([[session-state-deglobalisation]] step 3).
+        self._self_alignment = SelfAlignmentEmitter()
+        self._entity_alignment = EntityAlignmentEmitter()
+        # The client-structure survey is written once per SESSION, so
+        # its "already done" gate belongs to the session too
+        # ([[session-state-deglobalisation]] step 5).
+        self._client_structure = ClientStructureSurveyor()
         # Gate for the C-panel account stats capture; fired from the
         # first HEALTHY tick rather than at bootstrap because the game
         # client ignores hotkeys until fully loaded (run 20260611-000x
@@ -238,136 +220,6 @@ class Bot(DispatchMixin):
         return self._cdp
 
     # =========================================================================
-    # State Access
-    # =========================================================================
-
-    def get_world_state(self) -> WorldStateDict:
-        """Get current world state.
-
-        Returns:
-            Current WorldStateDict with all tracked entities.
-        """
-        return get_world_state()
-
-    def get_self_state(self) -> SelfStateDict | None:
-        """Get self tank state (position, fuel, etc.).
-
-        Returns:
-            SelfStateDict if available, None if not yet tracked.
-        """
-        return get_world_state()["self_state"]
-
-    def get_fuel(self) -> int:
-        """Get current fuel (HP).
-
-        Returns:
-            Current fuel amount, or 0 if self_state not yet tracked.
-        """
-        state = self.get_self_state()
-        return state["fuel"] if state is not None else 0
-
-    def get_position(self) -> tuple[int, int] | None:
-        """Get current position.
-
-        Returns:
-            Tuple of (x, y) coordinates, or None if not yet tracked.
-        """
-        state = self.get_self_state()
-        if state is None:
-            return None
-        return (state["x"], state["y"])
-
-    def get_containers(self) -> dict[str, ContainerStateDict]:
-        """Get all known containers.
-
-        Returns:
-            Dict of container key ("x,y") to ContainerStateDict.
-        """
-        return get_world_state()["containers"]
-
-    def get_fuel_containers(self) -> list[ContainerStateDict]:
-        """Get all known fuel containers (not equipment).
-
-        Returns:
-            List of fuel containers with volume > 0.
-        """
-        containers = self.get_containers()
-        return [c for c in containers.values() if c["is_fuel"] and c["volume"] > 0]
-
-    def get_nearest_fuel_container(self) -> ContainerStateDict | None:
-        """Get nearest fuel container to current position.
-
-        Returns:
-            Nearest ContainerStateDict, or None if no containers or no position.
-        """
-        pos = self.get_position()
-        if pos is None:
-            return None
-
-        fuel_containers = self.get_fuel_containers()
-        if not fuel_containers:
-            return None
-
-        # Sort by Manhattan distance
-        my_x, my_y = pos
-        fuel_containers.sort(key=lambda c: abs(c["x"] - my_x) + abs(c["y"] - my_y))
-        return fuel_containers[0]
-
-    # =========================================================================
-    # Game Log
-    # =========================================================================
-    #
-    # The bot inherits ``SessionBase`` -- a parallel hierarchy from the
-    # ``BrowserSession`` used by the standalone sniffer -- so it owns
-    # its own game-log scraper hooks. The DOM log is a WITNESS, not an
-    # actor: every line it renders is the client's presentation of a
-    # wire message the bot already decodes (0x41 Deactivation for
-    # kills, 0x52 error codes for rejections -- capture replay
-    # 2026-07-19, see wiki [[deactivation-format]]). The tick loop
-    # polls it each tick and records the entries into the capture
-    # artifact so the analyzer can diff the client's rendering against
-    # the wire; nothing in the bot acts on them.
-
-    def _init_game_log_scraper(self, cdp: CDPSessionProtocol) -> None:
-        """Create the game log scraper for server feedback visibility.
-
-        Args:
-            cdp: Active CDP session for DOM access.
-        """
-        self._game_log_scraper = make_game_log_scraper(cdp)
-
-    def _poll_game_log(self) -> list[GameLogEntry]:
-        """Poll the game log for new entries since the last scrape.
-
-        Returns:
-            New log entries (kills, hits, empty containers, etc.).
-        """
-        return poll_game_log(self._game_log_scraper)
-
-    def _record_game_log_witness(self, entries: list[GameLogEntry]) -> None:
-        """Timestamp new game-log entries into the capture witness list.
-
-        Args:
-            entries: New log entries from this tick's poll, in order.
-        """
-        self._game_log_witness.extend(timestamp_game_log_entries(entries))
-
-    def maybe_capture_account_stats_once(self) -> None:
-        """Capture account stats on the first healthy tick, with bounded retries.
-
-        The C-panel hotkey can be swallowed by the game client (run
-        20260611-013801), so failed attempts retry on later ticks up to
-        a bounded maximum.
-        """
-        if self._account_stats_captured:
-            return
-        if self._account_stats_attempts >= _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS:
-            return
-        self._account_stats_attempts += 1
-        capture_account_stats(self._cdp, self._page, "startup")
-        self._account_stats_captured = True
-
-    # =========================================================================
     # Run Loop
     # =========================================================================
 
@@ -394,9 +246,7 @@ class Bot(DispatchMixin):
         Raises:
             RuntimeError: If Playwright is not installed.
         """
-        from tankpit_bot.browser.cdp_utils import reset_cdp_time_offset
         from tankpit_bot.browser.types import PlaywrightNotInstalledError
-        from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 
         if _test_hooks.sync_playwright is None:
             raise PlaywrightNotInstalledError("Playwright is not installed.")
@@ -406,7 +256,7 @@ class Bot(DispatchMixin):
         self._ws_urls = {}
         self._magic = None
         self._state_data = make_initial_state_data()
-        self._ai_state = make_initial_ai_state(_env_ai_config())
+        self._ai_state = make_initial_ai_state(env_ai_config())
         self._cdp_message_buffer = []
 
         launch_args = _chrome_stream_display_args()
@@ -428,9 +278,6 @@ class Bot(DispatchMixin):
 
             self._cdp = cdp
             self._page = page
-
-            reset_cdp_time_offset()
-            reset_viewport_tracking()
 
             self._setup_console_listener(cdp)
             self._setup_cdp_handlers(cdp)

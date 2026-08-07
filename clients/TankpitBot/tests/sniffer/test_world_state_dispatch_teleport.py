@@ -9,7 +9,7 @@ from tankpit_bot.ledger.outcome.teleport import (
     record_teleport_dispatch,
     reset_teleport_dispatch_tracking,
 )
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state import make_self_state
 
@@ -67,12 +67,10 @@ class TestTeleportDisplacementReceipt:
 
     def setup_method(self) -> None:
         """Reset world state and dispatch tracking before each test."""
-        reset_world_state()
         reset_teleport_dispatch_tracking()
 
     def teardown_method(self) -> None:
         """Reset world state and dispatch tracking after each test."""
-        reset_world_state()
         reset_teleport_dispatch_tracking()
 
     def test_displaced_landing_emits_the_receipt(self) -> None:
@@ -139,18 +137,6 @@ class TestTeleportDisplacementReceipt:
 
 class TestFerryBeliefDisproof:
     """A displaced boarding landing expires the ferry belief it rode."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
     def test_displaced_landing_deletes_the_ferry_belief(self) -> None:
         """Flags s9-7/8: the loop root -- the stale belief must die.

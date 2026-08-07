@@ -243,9 +243,8 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
 
 def test_select_fuel_target_returns_none_for_unreachable_off_viewport_target() -> None:
     """Out-of-viewport fuel with no walkable approach and no fuel returns None."""
-    from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+    from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
-    reset_world_state()
     world, self_state = make_world(
         self_x=100,
         self_y=100,
@@ -275,7 +274,6 @@ def test_select_fuel_target_returns_none_for_unreachable_off_viewport_target() -
     )
 
     assert _first_walkworthy_fuel(ctx) is None
-    reset_world_state()
 
 
 def test_select_fuel_target_rejects_walk_unreachable_in_viewport() -> None:

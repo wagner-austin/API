@@ -21,7 +21,6 @@ from tankpit_bot.sim.world import (
     make_sim_tank,
     make_sim_world,
 )
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 SEAM_MAGIC = "seammagic5uk3et4epiexu"
@@ -135,7 +134,6 @@ def boot_seam(
         XorStaticKeyUnavailableError: If the repo's XOR static key is
             unavailable.
     """
-    reset_world_state()
     table = build_session_xor_table(SEAM_MAGIC)
     world = make_sim_world("field01_r.gif")
     world["tanks"][SEAM_CLIENT_ID] = make_sim_tank(SEAM_CLIENT_ID, 2, 1, 100, 100, client_fuel)

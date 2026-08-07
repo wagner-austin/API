@@ -120,55 +120,51 @@ def test_trapped_escape_takes_the_near_hop_over_standing_still() -> None:
     from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
     from tankpit_bot.bot.ai.context import DecideCtx
     from tankpit_bot.ledger.damage_book import confirm_incoming_damage, record_incoming_shot
-    from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+    from tankpit_bot.sniffer.world_state import get_world_service
     from tankpit_bot.state.types import make_container_state
     from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-    reset_world_state()
-    try:
-        book = get_world_service().damage_book
-        for i in range(4):
-            ts = 95000 + i * 1000
-            record_incoming_shot(book, 60, "Yuppler", 1, ts)
-            confirm_incoming_damage(book, -90, ts + 100)
-        world, self_state = make_world(
-            fuel=800,
-            containers={
-                "110,100": make_container_state(
-                    x=110,
-                    y=100,
-                    is_fuel=True,
-                    volume=400,
-                    timestamp_ms=100000,
-                    failed_pickups=0,
-                )
-            },
-        )
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "mode": "COLLECT",
-                "mode_state": "SEARCH",
-                "mode_started_ms": 90000,
-                "last_map_open_ms": 99000,
-                "combat_target_id": 50,
-                "combat_target_x": 112,
-                "combat_target_y": 100,
-            }
-        )
-        ctx = DecideCtx(
-            world,
-            self_state,
-            ai_state,
-            make_inventory(),
-            100000,
-            InMemoryTerrainMap(),
-            "",
-        )
-        decision = decide_collect_mode(ctx)
-    finally:
-        reset_world_state()
+    book = get_world_service().damage_book
+    for i in range(4):
+        ts = 95000 + i * 1000
+        record_incoming_shot(book, 60, "Yuppler", 1, ts)
+        confirm_incoming_damage(book, -90, ts + 100)
+    world, self_state = make_world(
+        fuel=800,
+        containers={
+            "110,100": make_container_state(
+                x=110,
+                y=100,
+                is_fuel=True,
+                volume=400,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            )
+        },
+    )
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99000,
+            "combat_target_id": 50,
+            "combat_target_x": 112,
+            "combat_target_y": 100,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+    )
+    decision = decide_collect_mode(ctx)
 
     if decision is None:
         raise AssertionError("expected trapped-escape hop decision")
@@ -178,18 +174,6 @@ def test_trapped_escape_takes_the_near_hop_over_standing_still() -> None:
 
 class TestEscapePlanContinuity:
     """Tests for committed-plan continuity inside the under-fire branch."""
-
-    def setup_method(self) -> None:
-        """Reset shared world-state globals before each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
 
     def test_equipment_plan_on_own_tile_is_finished_not_rederived(self) -> None:
         """Standing on the locked equipment under fire dispatches the pickup.
@@ -378,18 +362,6 @@ class TestEscapePlanContinuity:
 class TestMovementDeadEscape:
     """Tests for the movement-dead walk-rung skip under fire."""
 
-    def setup_method(self) -> None:
-        """Reset shared world-state globals before each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
-
     def test_rejected_movement_skips_the_walk_and_hops_out(self) -> None:
         """Two cant_go refusals in-window kill the walk rung.
 
@@ -529,7 +501,6 @@ def test_under_fire_with_nothing_available_falls_to_the_exhausted_outcome() -> N
     """
     from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
     from tankpit_bot.bot.ai.context import DecideCtx
-    from tankpit_bot.sniffer.world_state import reset_world_state
     from tests.bot.ai._support import (
         make_inventory,
         make_scanned_ai_state,
@@ -537,21 +508,17 @@ def test_under_fire_with_nothing_available_falls_to_the_exhausted_outcome() -> N
         seed_confirmed_incoming,
     )
 
-    reset_world_state()
-    try:
-        seed_confirmed_incoming(3)
-        world, self_state = make_world(fuel=1200)
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(dual_count=30, default_count=30),
-            100000,
-            None,
-            "",
-            map_fuel_dots=((101, 101),),
-        )
+    seed_confirmed_incoming(3)
+    world, self_state = make_world(fuel=1200)
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(dual_count=30, default_count=30),
+        100000,
+        None,
+        "",
+        map_fuel_dots=((101, 101),),
+    )
 
-        assert decide_collect_mode(ctx) is None
-    finally:
-        reset_world_state()
+    assert decide_collect_mode(ctx) is None

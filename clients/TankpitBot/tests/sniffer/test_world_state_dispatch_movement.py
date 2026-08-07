@@ -5,7 +5,6 @@ from __future__ import annotations
 from tankpit_bot import _test_hooks
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_combat import drain_killed_tank_ids
@@ -15,13 +14,8 @@ from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 class TestDispatchMovement:
     """Tests for dispatch_world_state_update with movement messages."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
     def teardown_method(self) -> None:
         """Reset world state and hooks after each test."""
-        reset_world_state()
         _test_hooks.path_exists = _test_hooks._real_path_exists
         _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
 
@@ -108,14 +102,6 @@ class TestDispatchMovement:
 
 class TestDispatchProtocolMovement:
     """Tests for dispatch with protocol Movement (0x47) and Deactivation (0x41)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_dispatch_movement_with_waypoints_updates_enemy(self) -> None:
         """Dispatch 0x47 movement with waypoints updates non-self tank position."""
@@ -337,14 +323,6 @@ class TestDispatchProtocolMovement:
 
 class TestDispatchMoveResponseUpdatesSelf:
     """Tests for 0x3D move response updating existing self position."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_move_response_for_different_tank_id(self) -> None:
         """0x3D for a different tank than self skips self position update."""

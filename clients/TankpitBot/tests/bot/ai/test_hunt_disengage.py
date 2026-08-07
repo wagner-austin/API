@@ -10,7 +10,6 @@ from tankpit_bot.inventory import (
     InventoryItem,
     InventoryState,
 )
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     TankStateDict,
     make_container_state,
@@ -25,10 +24,6 @@ from tests.bot.ai._support import (
 
 class TestHuntDisengage:
     """Tests for hunt disengagement: ammo exhaustion, disabled weapons, and"""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
 
     def test_ammo_exhaustion_mid_fight_disengages_to_collect_keeping_the_lock(self) -> None:
         """An ammo-exhausted tick disengages to COLLECT without blocking.

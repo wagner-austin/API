@@ -29,10 +29,6 @@ from tankpit_bot.sim.pathfind import route
 from tankpit_bot.sim.world import SimFerryDict, SimTankDict, SimWorldDict
 from tankpit_bot.state.scan_coverage import tile_key
 
-# Walking into an enemy mine costs the mine's 45 (wiki [[game-economy]],
-# same magnitude as a single hit).
-MINE_WALK_COST = SINGLE_HIT_VICTIM_COST
-
 _STEP_DELTAS: dict[str, tuple[int, int]] = {
     "n": (0, -1),
     "s": (0, 1),
@@ -241,7 +237,9 @@ def _resolve_arrival(world: SimWorldDict, tank_id: int, outcome: MoveOutcomeDict
     mine = world["mines"].get(key)
     if mine is not None and mine["team"] != tank["team"]:
         del world["mines"][key]
-        tank["fuel"] = max(0, tank["fuel"] - MINE_WALK_COST)
+        # Walking into an enemy mine costs the mine's 45 (wiki
+        # [[game-economy]]) — the same number as a single hit takes.
+        tank["fuel"] = max(0, tank["fuel"] - SINGLE_HIT_VICTIM_COST)
         outcome["mine_positions"].append((x, y))
     resolve_pickup(world, tank_id, outcome["pickups"])
 
@@ -483,7 +481,6 @@ def process_move(
 
 
 __all__ = [
-    "MINE_WALK_COST",
     "MoveOutcomeDict",
     "PickupRecordDict",
     "StopReason",

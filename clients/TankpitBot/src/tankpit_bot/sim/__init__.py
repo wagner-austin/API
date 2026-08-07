@@ -17,7 +17,7 @@ from tankpit_bot.sim.commands import (
 )
 from tankpit_bot.sim.movement import MoveOutcomeDict, PickupRecordDict, process_move
 from tankpit_bot.sim.pathfind import PassableFn, route
-from tankpit_bot.sim.server import TICK_MS, SimServer
+from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import (
     SimContainerDict,
     SimMineDict,
@@ -32,7 +32,6 @@ from tankpit_bot.sim.world import (
 )
 
 __all__ = [
-    "TICK_MS",
     "ClientCommandDict",
     "ClientCommandKind",
     "MoveOutcomeDict",

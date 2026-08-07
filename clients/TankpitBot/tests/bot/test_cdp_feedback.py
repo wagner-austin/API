@@ -24,9 +24,7 @@ class TestBotCombatFeedback:
         """_merge_protocol_kills adds Deactivation kills to AI killed_tank_ids."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _merge_protocol_kills
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         mark_tank_killed(get_world_service(), 50)
         mark_tank_killed(get_world_service(), 60)
@@ -49,9 +47,7 @@ class TestBotCombatFeedback:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _merge_protocol_kills
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "orange-8"
@@ -75,9 +71,7 @@ class TestBotCombatFeedback:
         """_merge_protocol_kills returns unchanged state when no kills."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _merge_protocol_kills
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = _merge_protocol_kills(bot._ai_state)
         assert result is bot._ai_state
@@ -94,11 +88,7 @@ class TestBotCombatFeedback:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
 
-        reset_world_state()
         update_inventory_from_protocol(
             get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
         )
@@ -115,9 +105,7 @@ class TestBotCombatFeedback:
         """_get_combat_feedback returns '' when dual shots depleted."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -131,10 +119,8 @@ class TestBotCombatFeedback:
         """_get_combat_feedback returns 'hit' when a 0x53 ShootEvent was received."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
         from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -155,9 +141,7 @@ class TestBotCombatFeedback:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -176,9 +160,7 @@ class TestBotCombatFeedback:
         """_get_combat_feedback returns '' when no shot was fired."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = _get_combat_feedback(bot)
         assert result == ""
@@ -197,9 +179,7 @@ class TestBotCombatFeedback:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -231,9 +211,7 @@ class TestBotCombatFeedback:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 1229
         bot._ai_state["last_shot_target_name"] = "Yuppler"
@@ -261,9 +239,7 @@ class TestBotCombatFeedback:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -286,9 +262,7 @@ class TestBotCombatFeedback:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -314,10 +288,8 @@ class TestBotCombatFeedback:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "purple-9"
@@ -339,9 +311,7 @@ class TestBotCombatFeedback:
         """_has_pending_shot_feedback waits while a shot is still inside its timeout."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -356,9 +326,7 @@ class TestBotCombatFeedback:
         """_has_pending_shot_feedback stops waiting once the timeout expires."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -373,10 +341,8 @@ class TestBotCombatFeedback:
         """_has_pending_shot_feedback yields to feedback when a hit is already buffered."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
         from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -392,9 +358,7 @@ class TestBotCombatFeedback:
         """_has_pending_shot_feedback stops waiting when the target is already dead."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -410,10 +374,8 @@ class TestBotCombatFeedback:
         """_has_pending_shot_feedback ends when weapon_byte=0 response arrives."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
-        from tankpit_bot.sniffer.world_state import reset_world_state
         from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -429,11 +391,7 @@ class TestBotCombatFeedback:
         """weapon_byte=0 with dual available is a miss (target was empty)."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
 
-        reset_world_state()
         update_inventory_from_protocol(
             get_world_service(),
             [0, 10, 0, 0, 0],
@@ -458,11 +416,7 @@ class TestBotCombatFeedback:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
 
-        reset_world_state()
         update_inventory_from_protocol(
             get_world_service(),
             [0, 0, 0, 0, 0],
@@ -482,11 +436,7 @@ class TestBotCombatFeedback:
         """First hit decrements dual; next shot on empty tile is miss."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-        )
 
-        reset_world_state()
         update_inventory_from_protocol(
             get_world_service(),
             [0, 1, 0, 0, 0],

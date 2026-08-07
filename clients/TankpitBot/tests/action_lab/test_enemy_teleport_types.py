@@ -13,12 +13,12 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     encode_enemy_teleport_attempt_result,
     encode_enemy_teleport_probe_session,
 )
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict, TeleportTargetDict
 from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
     make_enemy_threat,
 )
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 
 
 def _enemy() -> EnemyThreatDict:

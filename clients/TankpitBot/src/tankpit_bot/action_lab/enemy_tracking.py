@@ -22,10 +22,6 @@ from tankpit_bot.action_lab.enemy_tracking_types import (
     TrackedEnemyDict,
     TrackingObservationDict,
 )
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-    capture_page_client_snapshot,
-)
 from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.probe_entrypoint import (
     run_and_save_standard_probe_session,
@@ -45,6 +41,10 @@ from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.bot.ai.combat_landing import choose_combat_landing_tile
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.browser.page_client_snapshot import (
+    PageClientSnapshotDict,
+    capture_page_client_snapshot,
+)
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
 )

@@ -60,6 +60,8 @@ def test_real_load_and_decode_session_loads_session(tmp_path: Path) -> None:
         "start_timestamp_ms": 1000,
         "end_timestamp_ms": 2000,
         "base_url": "https://tankpit.com",
+        "game_log": [],
+        "tank_names": {},
         "messages": [],
         "magic": "testmagic123456789",
     }
@@ -97,6 +99,8 @@ def test_load_and_decode_session_hook_is_callable(tmp_path: Path) -> None:
         "start_timestamp_ms": 1000,
         "end_timestamp_ms": 2000,
         "base_url": "https://tankpit.com",
+        "game_log": [],
+        "tank_names": {},
         "messages": [],
         "magic": "testmagic123456789",
     }

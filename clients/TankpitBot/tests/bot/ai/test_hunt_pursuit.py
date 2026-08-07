@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
-from tankpit_bot.bot.ai.modes import AIModeState
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.state.types import TankStateDict, make_tank_state
+from tankpit_bot.types.modes import AIModeState
 from tests.bot.ai._support import (
     make_inventory,
     make_pursuit_target,

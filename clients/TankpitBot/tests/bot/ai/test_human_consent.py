@@ -19,7 +19,7 @@ from tankpit_bot.bot.ai.threat_primitives import (
 )
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.ledger.damage_book import record_incoming_shot
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state.types import (
     SelfStateDict,
     WorldStateDict,
@@ -61,14 +61,6 @@ def _human_world(name: str = "Yuppler") -> tuple[WorldStateDict, SelfStateDict]:
 class TestHumanCombatConsented:
     """The consent predicate's two signals."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_unknown_human_is_not_consented(self) -> None:
         """No chat and no incoming damage means no consent."""
         assert human_combat_consented(1229) is False
@@ -86,14 +78,6 @@ class TestHumanCombatConsented:
 
 class TestConsentGates:
     """Unconsented humans never enter targeting; consented ones do."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_unconsented_human_excluded_from_threats(self) -> None:
         """The viewport threat list drops an unconsented human."""
@@ -198,14 +182,6 @@ class TestGreetingLandingTile:
 
 class TestConsentEdgeCoverage:
     """Edge branches of the consent stack's scanners and choosers."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_rank_protected_human_never_enters_threats_even_consented(self) -> None:
         """The rank window still outranks consent in the threat list."""

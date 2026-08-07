@@ -1,4 +1,4 @@
-"""Equipment target selection, blacklist, and lock-steal executability."""
+"""Equipment target selection and lock-steal executability."""
 
 from __future__ import annotations
 
@@ -20,9 +20,8 @@ def test_select_equipment_target_returns_none_for_unreachable_off_viewport_targe
     the bot can't walk OR afford a teleport. The selector must
     surface that as "no executable target".
     """
-    from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+    from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
-    reset_world_state()
     world, self_state = make_world(
         self_x=100,
         self_y=100,
@@ -54,7 +53,6 @@ def test_select_equipment_target_returns_none_for_unreachable_off_viewport_targe
     )
 
     assert select_equipment_target(ctx) is None
-    reset_world_state()
 
 
 def test_select_equipment_target_rejects_walk_unreachable_in_viewport() -> None:
@@ -158,76 +156,6 @@ def test_rock_walled_equipment_is_skipped_for_forage() -> None:
     assert decision["command"]["cmd_type"] != "pickup_equipment"
 
 
-def test_blacklisted_container_is_skipped_by_select() -> None:
-    """A blacklisted container is excluded from equipment candidate selection."""
-    from tankpit_bot.bot.ai.collect_common import (
-        blacklist_container,
-        is_container_blacklisted,
-    )
-
-    blacklist_container(105, 105)
-    assert is_container_blacklisted(105, 105) is True
-
-    containers = {
-        "105,105": make_container_state(
-            x=105,
-            y=105,
-            is_fuel=False,
-            volume=0,
-            timestamp_ms=100000,
-            failed_pickups=0,
-        ),
-    }
-    world, self_state = make_world(fuel=800, containers=containers)
-    inventory = make_inventory(dual_count=3, default_count=30)
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
-
-    result = select_equipment_target(ctx)
-
-    assert result is None
-
-
-def test_blacklist_duplicate_does_not_re_emit_diagnostic() -> None:
-    """Blacklisting the same container twice skips the second diagnostic."""
-    from tankpit_bot.bot.ai.collect_common import (
-        blacklist_container,
-        is_container_blacklisted,
-    )
-
-    blacklist_container(91, 65)
-    assert is_container_blacklisted(91, 65) is True
-    blacklist_container(91, 65)
-    assert is_container_blacklisted(91, 65) is True
-
-
-def test_select_skips_previously_blacklisted_container() -> None:
-    """A previously blacklisted container is excluded from candidates."""
-    from tankpit_bot.bot.ai.collect_common import (
-        blacklist_container,
-        is_container_blacklisted,
-    )
-
-    containers = {
-        "102,100": make_container_state(
-            x=102,
-            y=100,
-            is_fuel=False,
-            volume=0,
-            timestamp_ms=100000,
-            failed_pickups=0,
-        ),
-    }
-    blacklist_container(102, 100)
-    assert is_container_blacklisted(102, 100) is True
-
-    world, self_state = make_world(self_x=100, self_y=100, fuel=800, containers=containers)
-    inventory = make_inventory(dual_count=3, default_count=30)
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
-
-    result = select_equipment_target(ctx)
-    assert result is None
-
-
 def test_lock_steal_requires_an_executable_candidate() -> None:
     """Closer-but-unexecutable equipment never steals a viable lock.
 
@@ -239,7 +167,7 @@ def test_lock_steal_requires_an_executable_candidate() -> None:
     demands a command THIS TICK, the same bar execution applies.
     """
     from tankpit_bot.bot.ai.collect_locks import _superior_equipment_candidate
-    from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+    from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
     containers = {
         "130,100": make_container_state(
@@ -260,14 +188,10 @@ def test_lock_steal_requires_an_executable_candidate() -> None:
         ),
     }
     world, self_state = make_world(self_x=100, self_y=100, fuel=900, containers=containers)
-    reset_world_state()
     mark_move_target_failed(103, 100, 99000)
     ctx = DecideCtx(world, self_state, make_scanned_ai_state(), make_inventory(), 100000, None, "")
 
-    try:
-        result = _superior_equipment_candidate(ctx, containers["130,100"])
-    finally:
-        reset_world_state()
+    result = _superior_equipment_candidate(ctx, containers["130,100"])
 
     assert result is None
 

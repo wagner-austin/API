@@ -326,12 +326,11 @@ class TestWebSocketSnifferMethods:
         from tankpit_bot.protocol.encoders.movement import encode_movement
         from tankpit_bot.protocol.framing import encode_frame
         from tankpit_bot.protocol.types import MovementDict
-        from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+        from tankpit_bot.sniffer.world_state import get_world_service
         from tankpit_bot.state.types import make_tank_state
         from tankpit_bot.types import CapturedMessage
 
         fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
-        reset_world_state()
         xor_table = build_session_xor_table("testmagic")
 
         # 0x47 for a non-self tank moves whichever registry tank is

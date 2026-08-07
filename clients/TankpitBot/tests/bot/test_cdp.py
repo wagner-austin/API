@@ -98,12 +98,10 @@ class TestBotWithCDP:
         """Test Bot.move_to succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -118,12 +116,10 @@ class TestBotWithCDP:
         """Test Bot.pickup_fuel_to succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -138,12 +134,10 @@ class TestBotWithCDP:
         """Test Bot.teleport_to succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession, FakePage
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -159,12 +153,10 @@ class TestBotWithCDP:
         """A new teleport drains any stale TeleportLanded ack before sending."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession, FakePage
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         mark_teleport_landed(get_world_service())
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -183,12 +175,10 @@ class TestBotWithCDP:
         """Test Bot.shoot_at succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -203,12 +193,10 @@ class TestBotWithCDP:
         """Test Bot.shoot_at stays in COMBAT if already in COMBAT."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -223,12 +211,10 @@ class TestBotWithCDP:
         """Test Bot.use_radar succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()

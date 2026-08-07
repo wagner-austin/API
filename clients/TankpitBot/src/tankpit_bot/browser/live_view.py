@@ -186,7 +186,7 @@ class LiveViewService:
         Args:
             publish: Threadsafe sink each decoded JPEG frame is pushed
                 into — production wires
-                :meth:`~tankpit_bot.service.frame_bus.FrameBus.publish`.
+                :meth:`~tankpit_bot.bus.frame_bus.FrameBus.publish`.
         """
         self._publish = publish
         self._expression = build_caster_expression(resolve_video_fps(), resolve_video_quality())

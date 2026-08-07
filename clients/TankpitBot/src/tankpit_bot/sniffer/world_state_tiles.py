@@ -19,7 +19,6 @@ from typing import TypeVar
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.facts.provenance import make_provenance
 from tankpit_bot.runtime_logging import emit_world
-from tankpit_bot.sniffer.viewport import update_viewport_origin
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     ContainerStateDict,
@@ -66,8 +65,6 @@ def update_viewport_entities(
         viewport_top: Absolute top edge of the visible 16x16 viewport.
         entities: Viewport entity dicts with col, row, cache_value, overlay_value, terrain_type.
     """
-    update_viewport_origin(viewport_left, viewport_top)
-
     ws.world_state = WorldStateDict(
         self_state=ws.world_state["self_state"],
         tanks=ws.world_state["tanks"],

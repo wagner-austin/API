@@ -6,8 +6,8 @@ from typing import Literal
 
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict, FuelDecisionBasisDict
 from tankpit_bot.action_lab.fuel_probe_types import FuelProbeAttemptResultDict
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import SelfStateDict
 from tankpit_bot.state.types import ContainerStateDict
 

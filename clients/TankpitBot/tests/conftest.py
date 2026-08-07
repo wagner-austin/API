@@ -217,8 +217,6 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     inherits the same clean baseline regardless of which directory it
     lives in -- no duplicated per-file fixtures, no missed resets.
     """
-    from tankpit_bot.action_lab.client_structure import reset_client_structure_survey
-    from tankpit_bot.bot.ai.collect_common import reset_container_blacklist
     from tankpit_bot.capture.xor import reset_static_key_cache
     from tankpit_bot.ledger.decision import reset_decision_records
     from tankpit_bot.ledger.events import reset_event_ids
@@ -240,8 +238,6 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     reset_teleport_dispatch_tracking()
     reset_decision_records()
     reset_mode_transitions()
-    reset_container_blacklist()
-    reset_client_structure_survey()
     yield
     reset_world_state()
     reset_static_key_cache()
@@ -251,8 +247,6 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     reset_teleport_dispatch_tracking()
     reset_decision_records()
     reset_mode_transitions()
-    reset_container_blacklist()
-    reset_client_structure_survey()
 
 
 class FakeEnv:

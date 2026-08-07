@@ -187,18 +187,6 @@ def test_existing_secondary_command_is_never_displaced() -> None:
 class TestGreetingThroughDecide:
     """End-to-end: the arbitrator's HUNT path carries the greeting."""
 
-    def setup_method(self) -> None:
-        """Reset module-level world state before each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset module-level world state after each test."""
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
-
     def test_decide_greets_but_never_locks_an_unconsented_human(self) -> None:
         """The consent contract end-to-end: HELLO yes, lock no.
 

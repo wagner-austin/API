@@ -18,8 +18,6 @@ landing displaces the teleport outside auto-pick reach every time
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from typing_extensions import TypedDict
 
 from tankpit_bot.bot.ai.context import DecideCtx
@@ -102,19 +100,15 @@ class FuelLarderSelectionDict(TypedDict):
     ferry_served: int
 
 
-def _live_fuel_beliefs(
-    ctx: DecideCtx,
-    is_blacklisted: Callable[[int, int], bool],
-) -> list[ContainerStateDict]:
+def _live_fuel_beliefs(ctx: DecideCtx) -> list[ContainerStateDict]:
     """Return believed fuel containers eligible to enter larder scoring.
 
-    Filters to fuel containers with positive volume, no failed
-    pickups, and no session blacklist mark — the pre-candidate
-    universe; every gate after this point is tallied per candidate.
+    Filters to fuel containers with positive volume and no failed
+    pickups — the pre-candidate universe; every gate after this point
+    is tallied per candidate.
 
     Args:
         ctx: Decision context.
-        is_blacklisted: Session blacklist predicate for container tiles.
 
     Returns:
         Containers that count as larder candidates.
@@ -122,10 +116,7 @@ def _live_fuel_beliefs(
     return [
         container
         for container in ctx.world["containers"].values()
-        if container["is_fuel"]
-        and container["volume"] > 0
-        and container["failed_pickups"] == 0
-        and not is_blacklisted(container["x"], container["y"])
+        if container["is_fuel"] and container["volume"] > 0 and container["failed_pickups"] == 0
     ]
 
 
@@ -169,11 +160,7 @@ def _is_walk_territory(
     return abs(container["x"] - sx) + abs(container["y"] - sy) <= _WALK_DOMINANT_RANGE
 
 
-def select_fuel_larder_hop(
-    ctx: DecideCtx,
-    *,
-    is_blacklisted: Callable[[int, int], bool],
-) -> FuelLarderSelectionDict:
+def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     """Score every believed fuel container and return the best harvest hop.
 
     Hard gates: a legal landing tile, the fuel reserve net of the
@@ -188,7 +175,6 @@ def select_fuel_larder_hop(
 
     Args:
         ctx: Decision context. ``ctx.terrain`` must not be ``None``.
-        is_blacklisted: Session blacklist predicate for container tiles.
 
     Returns:
         Selection outcome with the winner (or ``None``) and the
@@ -211,7 +197,7 @@ def select_fuel_larder_hop(
     best_landing_y = 0
     best_cost = 0
     best_score = 0.0
-    for container in _live_fuel_beliefs(ctx, is_blacklisted):
+    for container in _live_fuel_beliefs(ctx):
         candidates += 1
         if _is_walk_territory(ctx, container, sx, sy):
             too_close += 1

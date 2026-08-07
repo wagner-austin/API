@@ -13,7 +13,6 @@ from tankpit_bot.bot.ai.types import (
     make_default_ai_config,
 )
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     ContainerStateDict,
     TankStateDict,
@@ -31,10 +30,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestRecoverEquipmentSearch:
     """Tests for equipment search and related recovery transitions."""
-
-    def setup_method(self) -> None:
-        """Reset world-state test globals before each case."""
-        reset_world_state()
 
     def test_critical_equipment_search_uses_radar_when_ready(self) -> None:
         """Critical equipment depletion scans before relocating when radar is ready."""

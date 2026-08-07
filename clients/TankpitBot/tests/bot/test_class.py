@@ -38,9 +38,7 @@ class TestBotClass:
     def test_bot_get_world_state(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_world_state returns world state from module."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         world = bot.get_world_state()
         assert world["self_state"] is None
@@ -49,9 +47,7 @@ class TestBotClass:
     def test_bot_get_self_state_none(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_self_state returns None when not tracked."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         self_state = bot.get_self_state()
         assert self_state is None
@@ -59,9 +55,7 @@ class TestBotClass:
     def test_bot_get_fuel_when_no_self_state(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_fuel returns 0 when self_state not tracked."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         fuel = bot.get_fuel()
         assert fuel == 0
@@ -69,9 +63,7 @@ class TestBotClass:
     def test_bot_get_position_none(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_position returns None when not tracked."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         pos = bot.get_position()
         assert pos is None
@@ -79,9 +71,7 @@ class TestBotClass:
     def test_bot_get_containers_empty(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_containers returns empty dict when none tracked."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         containers = bot.get_containers()
         assert containers == {}
@@ -89,9 +79,7 @@ class TestBotClass:
     def test_bot_get_fuel_containers_empty(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_fuel_containers returns empty list when none tracked."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         fuel_containers = bot.get_fuel_containers()
         assert fuel_containers == []
@@ -99,9 +87,7 @@ class TestBotClass:
     def test_bot_get_nearest_fuel_container_no_position(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_nearest_fuel_container returns None when no position."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         container = bot.get_nearest_fuel_container()
         assert container is None
@@ -217,9 +203,7 @@ class TestBotEquipmentState:
     def test_is_equipment_enabled_false_by_default(self, fake_env: FakeEnv) -> None:
         """Test Bot.is_equipment_enabled returns False by default (inventory all disabled)."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         # Default inventory starts with enabled=False for all slots
         for slot in range(1, 6):
@@ -236,10 +220,9 @@ class TestBotEquipmentState:
     def test_is_equipment_enabled_reads_from_inventory(self, fake_env: FakeEnv) -> None:
         """Test Bot.is_equipment_enabled reads from server inventory state."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+        from tankpit_bot.sniffer.world_state import get_world_service
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         # Toggle some off via inventory update
         update_inventory_from_toggle(get_world_service(), [False, True, False, True, False])
@@ -252,10 +235,9 @@ class TestBotEquipmentState:
     def test_enable_equipment_already_enabled(self, fake_env: FakeEnv) -> None:
         """Test Bot.enable_equipment returns True if already enabled."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+        from tankpit_bot.sniffer.world_state import get_world_service
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         # Set slot 1 to enabled via protocol
         update_inventory_from_toggle(get_world_service(), [True, False, False, False, False])

@@ -15,7 +15,7 @@ from typing import Literal, TypedDict
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.capacity import damage_tier, free_radar_radius
-from tankpit_bot.physics.costs import MINE_PRESS_COST, RADAR_COST, teleport_cost
+from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.physics.map import MAP_DOT_MIN_VOLUME
 from tankpit_bot.physics.supervisor import teleport_refusal
 from tankpit_bot.protocol.types import MapDataDict, MapTankEntry, RadarContainerDict, RadarMineDict
@@ -346,12 +346,7 @@ def process_mine_press(
     return outcome
 
 
-RADAR_FUEL_COST = RADAR_COST
-MINE_PRESS_FUEL_COST = MINE_PRESS_COST
-
 __all__ = [
-    "MINE_PRESS_FUEL_COST",
-    "RADAR_FUEL_COST",
     "VIEWPORT_RADIUS",
     "MinePressOutcomeDict",
     "RadarOutcomeDict",

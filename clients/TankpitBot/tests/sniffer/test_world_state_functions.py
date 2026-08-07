@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
@@ -17,14 +16,6 @@ from tankpit_bot.state.viewport_geometry import (
 
 class TestTankNameRegistry:
     """Tests for the tank-name registry (PlayerIdMapper was deleted)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_reset_player_id_mapper_clears_names(self) -> None:
         """reset_player_id_mapper clears the tank-name registry."""
@@ -39,14 +30,6 @@ class TestTankNameRegistry:
 
 class TestViewportGeometry:
     """Tests for visible viewport and radar envelope geometry."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_radar_bounds_extend_visible_viewport_by_one_tile(self) -> None:
         """Radar bounds extend one tile beyond the visible viewport."""
@@ -158,14 +141,6 @@ class TestTextDecoding:
 class TestWorldStateGetter:
     """Tests for get_world_state function."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_get_world_state_returns_current_state(self) -> None:
         """Test get_world_state returns the current world state."""
         from tankpit_bot.sniffer.world_state import get_world_state
@@ -194,14 +169,6 @@ class TestWorldStateGetter:
 class TestFuelUpdate:
     """Tests for fuel update functions."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_update_world_state_from_fuel_total(self) -> None:
         """Test fuel total sets self_state fuel to absolute value."""
         from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
@@ -222,7 +189,6 @@ class TestFuelUpdate:
         from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
         # Reset to ensure no self_state
-        reset_world_state()
 
         # Verify self_state is None
         state = get_world_service().world_state
@@ -237,14 +203,6 @@ class TestFuelUpdate:
 
 class TestContainerPickup:
     """Tests for container pickup functions."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_update_world_state_from_container_pickup(self) -> None:
         """Test container pickup removes container and adds fuel."""
@@ -275,20 +233,10 @@ class TestContainerPickup:
 class TestRadarViewportReconciliation:
     """Tests for radar-confirmed viewport resource reconciliation."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_radar_marks_current_viewport_as_scanned(self) -> None:
         """Radar records authoritative coverage for the current viewport origin."""
         from tankpit_bot.protocol import RadarContainerDict
-        from tankpit_bot.sniffer import viewport
 
-        viewport.update_viewport_origin(100, 200)
         ws = get_world_service()
         ws.world_state["viewport"]["left"] = 100
         ws.world_state["viewport"]["top"] = 200

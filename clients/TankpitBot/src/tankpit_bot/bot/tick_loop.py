@@ -23,6 +23,13 @@ from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.bus.session_status import (
+    SessionStatusDict,
+    make_live_stats,
+    make_session_status,
+    manual_to_wire_mode,
+    wire_mode_to_manual,
+)
 from tankpit_bot.diagnostics.runs_index import (
     append_index_row,
     count_stall_timeouts,
@@ -37,13 +44,6 @@ from tankpit_bot.runtime_context import set_runtime_context
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     get_bot_runtime_artifacts,
-)
-from tankpit_bot.service.types import (
-    SessionStatusDict,
-    make_live_stats,
-    make_session_status,
-    manual_to_wire_mode,
-    wire_mode_to_manual,
 )
 from tankpit_bot.sniffer.world_state import (
     get_world_service,

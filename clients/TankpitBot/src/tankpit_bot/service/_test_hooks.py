@@ -12,7 +12,7 @@ directly, never a real function guarded by ``if TESTING``.
 Kept inside the service package (rather than the top-level
 :mod:`tankpit_bot._test_hooks` tree) because the hook Protocols
 reference :mod:`tankpit_bot.service.types`, which transitively pulls
-:mod:`tankpit_bot.bot.ai.modes`. Loading that during the top-level
+:mod:`tankpit_bot.types.modes`. Loading that during the top-level
 ``_test_hooks`` init would cycle through ``bot.ai.combat_landing`` →
 ``_test_hooks.TerrainMapProtocol``. Locating the service hooks inside
 the service tree keeps the import graph acyclic.
@@ -53,14 +53,6 @@ class BotFactoryBuilderProtocol(Protocol):
             A callable that :class:`SessionRunner` invokes once per
             session with a shared bridge + bus.
         """
-        ...
-
-
-class LoadDotenvProtocol(Protocol):
-    """Loads the ``.env`` file (or a fake in tests)."""
-
-    def __call__(self) -> None:
-        """Populate the process env from ``.env``."""
         ...
 
 
@@ -230,18 +222,6 @@ async def _real_build_site(
     )
 
 
-def _real_load_dotenv() -> None:
-    """Production ``.env`` loader — thin wrapper around :mod:`dotenv`.
-
-    The service main invokes this at process boot so shell-provided env
-    vars still take precedence (dotenv leaves already-set values
-    alone).
-    """
-    from dotenv import load_dotenv
-
-    load_dotenv()
-
-
 def _real_serve() -> None:
     """Production entry point — drives ``_async_main`` under :func:`asyncio.run`.
 
@@ -280,10 +260,10 @@ def _real_build_bot_factory(
         :class:`SessionRunner` invokes once per session.
     """
     from tankpit_bot.bot.base import Bot
-    from tankpit_bot.service.frame_bus import FrameBusProtocol
-    from tankpit_bot.service.mode_bridge import ModeBridgeProtocol
+    from tankpit_bot.bus.frame_bus import FrameBusProtocol
+    from tankpit_bot.bus.mode_bridge import ModeBridgeProtocol
+    from tankpit_bot.bus.status_bus import StatusBusProtocol
     from tankpit_bot.service.session_runner import RunnableBotProtocol
-    from tankpit_bot.service.status_bus import StatusBusProtocol
 
     def factory(
         *,
@@ -310,8 +290,6 @@ build_site: SiteFactoryProtocol = _real_build_site
 
 #: ``.env`` loader hook — production reads the real ``.env`` file;
 #: tests replace with a no-op so the process env stays clean.
-load_dotenv: LoadDotenvProtocol = _real_load_dotenv
-
 #: Existence-probe hook — production sends a live HTTP GET to the
 #: expected health endpoint (see :mod:`tankpit_bot.service.probe`);
 #: tests inject a scriptable double that returns True or False to
@@ -419,7 +397,6 @@ __all__ = [
     "_real_spawn_bot_process",
     "build_bot_factory",
     "build_site",
-    "load_dotenv",
     "probe_existing_instance",
     "run_web_app",
     "serve",

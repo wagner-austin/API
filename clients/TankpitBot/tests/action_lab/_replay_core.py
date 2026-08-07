@@ -377,7 +377,6 @@ def prepare_probe_replay(
     if magic is None:
         raise RuntimeError(f"capture {capture_path.name} has no magic key")
 
-    reset_world_state()
     probe.xor_table = build_session_xor_table(magic)
 
     probe._magic = magic

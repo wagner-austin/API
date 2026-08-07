@@ -6,8 +6,8 @@ from typing import Literal, Protocol
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
-from tankpit_bot.action_lab.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
+from tankpit_bot.browser.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 

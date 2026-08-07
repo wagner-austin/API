@@ -7,8 +7,11 @@ and the CDP maximize call. Shared by the sniffer and the bot.
 from __future__ import annotations
 
 from platform_core.json_utils import require_int
+from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
+
+log = get_logger(__name__)
 
 
 def _chrome_stream_display_args() -> list[str]:
@@ -39,6 +42,10 @@ def _chrome_stream_display_args() -> list[str]:
         try:
             values.append(int(raw))
         except ValueError:
+            # A non-numeric override disables the stream geometry rather
+            # than crashing the session; say so, or the operator's typo
+            # looks like the flags were never wired.
+            log.warning("stream display env %s is not an integer: %r", k, raw)
             return []
     x, y, w, h = values
     if w <= 0 or h <= 0:

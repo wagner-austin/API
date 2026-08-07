@@ -10,16 +10,16 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
-from tankpit_bot.service.types import (
+from tankpit_bot.bus.session_status import (
     WIRE_MODES,
     idle_session_status,
     make_live_stats,
-    make_mode_command,
     make_session_status,
     manual_to_wire_mode,
     wire_mode_to_manual,
     zero_live_stats,
 )
+from tankpit_bot.service.types import make_mode_command
 from tankpit_bot.service.types_codecs import (
     decode_live_stats,
     decode_mode_command,

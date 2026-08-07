@@ -10,7 +10,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai.world_types import make_enemy_threat
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+from tankpit_bot.sniffer.world_state import mark_move_target_failed
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_tank_state
 from tests.bot.ai._support import make_container, make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -18,10 +18,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestDecideBlockedCombatTargets:
     """Tests for blocked combat target memory."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
 
     def test_blocked_target_is_skipped_on_reacquire(self) -> None:
         """Blocked targets are not reacquired as new HUNT threats."""

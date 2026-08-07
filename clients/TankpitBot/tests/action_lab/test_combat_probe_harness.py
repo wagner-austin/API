@@ -26,7 +26,7 @@ from tankpit_bot.action_lab.combat_probe_types import (
     CombatEngagementDict,
 )
 from tankpit_bot.bot.ai.world_types import make_enemy_threat
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     make_tank_state,
 )
@@ -39,7 +39,6 @@ def _restore_hooks() -> Generator[None, None, None]:
     yield
     action_hooks.get_current_time_ms = original_get_time
     core_hooks.sync_playwright = original_sync_playwright
-    reset_world_state()
 
 
 def test_find_fresh_enemy_returns_closest_fresh() -> None:

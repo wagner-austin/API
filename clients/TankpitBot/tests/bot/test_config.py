@@ -13,11 +13,11 @@ import pytest
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.config import (
     DEFAULT_TARGET_URL,
-    resolve_idle_exit_seconds,
     resolve_prefer_account,
     resolve_target_url,
     resolve_weapon_resume_slack,
 )
+from tankpit_bot.service.config import resolve_idle_exit_seconds
 from tests.conftest import FakeEnv
 
 

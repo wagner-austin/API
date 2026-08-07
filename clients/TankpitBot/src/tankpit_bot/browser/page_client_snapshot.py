@@ -2,7 +2,7 @@
 
 Holds the record shape, its codec, and the CDP capture call. The
 nested block codecs are
-:mod:`tankpit_bot.action_lab.page_client_snapshot_codecs`.
+:mod:`tankpit_bot.browser.page_client_snapshot_codecs`.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
-from tankpit_bot.action_lab.page_client_snapshot_codecs import (
+from tankpit_bot.browser.page_client_snapshot_codecs import (
     _extract_runtime_value,
     _require_bool_field,
     _require_client_collections,

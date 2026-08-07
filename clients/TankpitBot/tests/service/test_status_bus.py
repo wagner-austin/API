@@ -1,4 +1,4 @@
-"""Tests for :class:`tankpit_bot.service.status_bus.StatusBus`.
+"""Tests for :class:`tankpit_bot.bus.status_bus.StatusBus`.
 
 Covers the subscribe / unsubscribe / publish contract, the
 cache-on-publish behaviour that makes fresh subscribers see the
@@ -13,8 +13,12 @@ from __future__ import annotations
 import threading
 import time
 
-from tankpit_bot.service.status_bus import StatusBus, StatusSubscriber
-from tankpit_bot.service.types import SessionStatusDict, idle_session_status, make_live_stats
+from tankpit_bot.bus.session_status import (
+    SessionStatusDict,
+    idle_session_status,
+    make_live_stats,
+)
+from tankpit_bot.bus.status_bus import StatusBus, StatusSubscriber
 
 
 def _make_status(tick_timestamp_ms: int, kills: int = 0) -> SessionStatusDict:

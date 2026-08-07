@@ -66,7 +66,6 @@ _STEP_DELTAS: dict[str, tuple[int, int]] = {
     "e": (1, 0),
     "w": (-1, 0),
 }
-_TICK_MS = TICK_RATE_MS
 _TRACK_DRIFT_TILES = 4
 """Chebyshev drift beyond which the live bot no longer 'tracks' the
 recorded client — the ghost_summary's divergence threshold."""
@@ -149,7 +148,7 @@ class _Walk:
         """Map an absolute timestamp onto the session tick index."""
         if self.t0 is None:
             self.t0 = t
-        return max(0, (t - self.t0) // _TICK_MS)
+        return max(0, (t - self.t0) // TICK_RATE_MS)
 
 
 def _note_position(walk: _Walk, tank_id: int, t: int, x: int, y: int) -> None:

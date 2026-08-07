@@ -22,6 +22,7 @@ from tankpit_bot.sim.world import (
 from tests.conftest import FakeFileSystem
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 from tests.sim._ghost_fixtures import (
+    _T0,
     _fight_capture,
     _rich_capture,
 )
@@ -193,3 +194,85 @@ def test_dead_ghosts_skip_their_remaining_timeline() -> None:
     batch = server.advance_tick()
     # nothing was queued: the tick carries only the client's sync
     assert [m["msg_type"] for m in batch] == [0x2E]
+
+
+def test_mine_press_records_only_other_tanks() -> None:
+    """A recorded 0x4B is a ghost's press; the client's own is not.
+
+    The 0x4B reports the tiles that took a mine and the FIRST is the
+    placer's own tile, so the press replays from that centre. The
+    client's own presses are excluded because the live bot lays its
+    own mines — replaying them would double the field.
+    """
+    from tankpit_bot.container.types import MinePlacementDict
+    from tankpit_bot.sim.ghost import _consume, _Walk
+
+    walk = _Walk()
+    walk.self_id = 9
+    walk.tick(_T0)
+    _consume(
+        walk,
+        _T0 + 2000,
+        MinePlacementDict(
+            msg_type=0x4B, mine_type=1, tank_id=500, positions=[(133, 124), (134, 124)]
+        ),
+    )
+    _consume(
+        walk,
+        _T0 + 4000,
+        MinePlacementDict(msg_type=0x4B, mine_type=1, tank_id=9, positions=[(50, 50)]),
+    )
+    assert walk.mine_presses == [(1, 500, 133, 124)]
+
+
+def test_mine_presses_lift_only_for_rostered_ghosts() -> None:
+    """A press by a tank that never made the roster is dropped."""
+    from tankpit_bot.sim.ghost import _ghost_actions, _Walk
+
+    walk = _Walk()
+    walk.mine_presses = [(3, 500, 133, 124), (4, 777, 20, 20)]
+    events = _ghost_actions(walk, {500})
+    assert events == [
+        {"tick": 3, "tank_id": 500, "kind": "mine", "x": 133, "y": 124, "message_id": 0}
+    ]
+
+
+def test_replayed_mine_press_relocates_then_lays_by_sim_law() -> None:
+    """The recording supplies the tile; the sim's 3x3 law supplies the frame.
+
+    The event carries the press LOCATION, so the ghost is moved there
+    first and the mine command is then queued with no coordinates of
+    its own — the server's own placement law produces the 0x4B family.
+    """
+    from tankpit_bot.sim.ghost import GhostEventDict, GhostSpecDict
+    from tankpit_bot.sim.run_boot import _queue_ghost_round
+
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
+    world["tanks"][500] = make_sim_tank(500, 1, 1, 20, 20, 600)
+    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    spec = GhostSpecDict(
+        client_team=0,
+        client_rank=1,
+        client_x=10,
+        client_y=10,
+        client_fuel=800,
+        client_counts=[25] * 5,
+        ghosts=[],
+        events=[GhostEventDict(tick=0, tank_id=500, kind="mine", x=40, y=41, message_id=0)],
+        recorded_path={},
+        containers=[],
+        equipment=[],
+        dot_atlas=[],
+        ticks=1,
+        unplaced_tanks=0,
+    )
+
+    acted = _queue_ghost_round(server, spec, 0)
+
+    assert acted == frozenset({500})
+    assert (world["tanks"][500]["x"], world["tanks"][500]["y"]) == (40, 41)
+    server.advance_tick()
+    laid = {(mine["x"], mine["y"]) for mine in world["mines"].values()}
+    assert (40, 41) in laid
+    assert len(laid) == 9

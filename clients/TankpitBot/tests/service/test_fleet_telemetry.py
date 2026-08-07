@@ -7,7 +7,10 @@ from pathlib import Path
 import pytest
 
 from tankpit_bot import _test_hooks as top_hooks
-from tankpit_bot.service.fleet import FleetError, FleetManager
+from tankpit_bot.service.fleet_manager import (
+    FleetError,
+    FleetManager,
+)
 from tankpit_bot.service.fleet_telemetry import (
     TELEMETRY_CACHE_TTL_MS,
     FleetTelemetry,
@@ -154,7 +157,7 @@ def test_manager_activity_requires_a_registered_instance() -> None:
 def test_spawn_derives_the_instance_from_the_account() -> None:
     """No name given: the account (or the default) names the instance."""
     from tankpit_bot.service import _test_hooks as service_hooks
-    from tests.service.test_fleet import (
+    from tests.service._fleet_fixtures import (
         _FakeSpawner,
         _restore_account_hooks,
         _with_configured_accounts,

@@ -25,7 +25,6 @@ from tankpit_bot.action_lab.fuel_probe_operations import (
     finalize_attempt_delay,
     run_pickup_attempt_for_probe,
 )
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.pickup_phase import (
     PickupImmediateOutcomeProtocol,
     PickupOutcomeWaiterProtocol,
@@ -33,6 +32,7 @@ from tankpit_bot.action_lab.pickup_phase import (
     PickupTimeoutSizerProtocol,
 )
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import make_container_state
 
 

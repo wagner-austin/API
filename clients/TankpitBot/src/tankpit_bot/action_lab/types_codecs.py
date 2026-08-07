@@ -16,16 +16,16 @@ from platform_core.json_utils import (
     require_str,
 )
 
-from tankpit_bot.action_lab.page_client_snapshot import (
-    decode_page_client_snapshot,
-    encode_page_client_snapshot,
-)
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
     TeleportProbeSessionDict,
     TeleportStartupTimingDict,
     TeleportTargetDict,
+)
+from tankpit_bot.browser.page_client_snapshot import (
+    decode_page_client_snapshot,
+    encode_page_client_snapshot,
 )
 
 

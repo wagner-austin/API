@@ -42,7 +42,7 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import movement_probe as movement_probe_module
 from tankpit_bot.action_lab import queue_experiments as queue_experiments_module
 from tankpit_bot.capture.xor import build_session_xor_table
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import (
     update_inventory_from_protocol,
 )
@@ -99,13 +99,17 @@ class FailIfWaitedPage:
 
 
 @pytest.fixture()
-def replay_pipeline() -> Generator[ReplayPipeline, None, None]:
-    """Reset world state and build the capture's own XOR table.
+def replay_pipeline() -> ReplayPipeline:
+    """Build the capture's own XOR table alongside its frames.
 
-    Yields the typed captured-message list together with the table
-    those frames were encoded under, so tests can replay specific
-    frames through the real decoder pipeline via
-    ``process_received_message``. Restores world state after.
+    Returns:
+        The typed captured-message list together with the table those
+        frames were encoded under, so tests can replay specific frames
+        through the real decoder pipeline via
+        ``process_received_message``.
+
+    Raises:
+        RuntimeError: If the capture carries no magic key.
     """
     session_text = core_hooks.read_text(FUEL_PROBE_CAPTURE_PATH)
     session = decode_capture_session(narrow_json_to_dict(load_json_str(session_text)))
@@ -114,25 +118,10 @@ def replay_pipeline() -> Generator[ReplayPipeline, None, None]:
         raise RuntimeError(
             f"Capture {FUEL_PROBE_CAPTURE_PATH.name} has no magic key — cannot replay binary frames"
         )
-    reset_world_state()
-    yield ReplayPipeline(
+    return ReplayPipeline(
         messages=session["messages"],
         xor_table=build_session_xor_table(magic),
     )
-    reset_world_state()
-
-
-@pytest.fixture()
-def real_inventory() -> Generator[None, None, None]:
-    """Reset world state before and after the test.
-
-    Tests use ``update_inventory_from_protocol(get_world_service(), [counts], [enabled])`` directly
-    to set a known inventory baseline via the real codepath, so every module
-    binding of ``get_inventory_state`` returns the same real value.
-    """
-    reset_world_state()
-    yield
-    reset_world_state()
 
 
 @pytest.fixture(autouse=True)

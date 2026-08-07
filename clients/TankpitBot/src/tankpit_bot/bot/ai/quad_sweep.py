@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE, is_container_blacklisted
+from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.collect_pickups import pickup_not_worth_walk
 from tankpit_bot.bot.ai.context import (
     RADAR_RESERVE_EXTRAS,
@@ -471,8 +471,6 @@ def _harvest_candidates(ctx: DecideCtx) -> list[ContainerStateDict]:
         if not is_container_pursuable(container, want_fuel=want_fuel):
             continue
         cx, cy = container["x"], container["y"]
-        if is_container_blacklisted(cx, cy):
-            continue
         if left <= cx <= right and top <= cy <= bottom:
             continue
         if max(abs(cx - sx), abs(cy - sy)) > BLOCK_REACH_TILES:

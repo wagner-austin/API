@@ -152,7 +152,10 @@ def _add_telemetry_routes(app: web.Application, manager: FleetManager) -> None:
             return web.Response(status=404, text=str(error))
         try:
             raw = top_hooks.read_text(bot_run_dir(instance) / "hud.json")
-        except OSError:
+        except OSError as error:
+            # A run that has not written a HUD frame yet is the normal
+            # case mid-boot, not a fault: the page polls until it lands.
+            log.info("Fleet: no hud for %r yet: %s", instance, error)
             return _json_response({"available": False})
         return web.Response(text=raw, content_type="application/json")
 

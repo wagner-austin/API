@@ -77,6 +77,8 @@ def test_load_and_decode_session_success(fake_fs: FakeFileSystem) -> None:
         "end_timestamp_ms": 1000,
         "base_url": "https://test.com",
         "magic": "ABCD",
+        "game_log": [],
+        "tank_names": {{}},
         "messages": [{{
             "timestamp_ms": 500,
             "direction": "sent",
@@ -102,6 +104,8 @@ def test_load_and_decode_session_missing_magic_raises(fake_fs: FakeFileSystem) -
         "end_timestamp_ms": 1000,
         "base_url": "https://test.com",
         "magic": null,
+        "game_log": [],
+        "tank_names": {},
         "messages": []
     }"""
 
@@ -172,6 +176,8 @@ def test_load_and_decode_session_default_static_key(fake_fs: FakeFileSystem) -> 
         "end_timestamp_ms": 1000,
         "base_url": "https://test.com",
         "magic": "ABCD",
+        "game_log": [],
+        "tank_names": {{}},
         "messages": [{{
             "timestamp_ms": 500,
             "direction": "sent",
@@ -210,6 +216,8 @@ def test_main_with_commands(
         "end_timestamp_ms": 1000,
         "base_url": "https://test.com",
         "magic": "ABCDE",
+        "game_log": [],
+        "tank_names": {{}},
         "messages": [{{
             "timestamp_ms": 500,
             "direction": "sent",
@@ -248,6 +256,8 @@ def test_main_no_commands(
         "end_timestamp_ms": 1000,
         "base_url": "https://test.com",
         "magic": "ABCD",
+        "game_log": [],
+        "tank_names": {},
         "messages": []
     }"""
 
@@ -281,6 +291,8 @@ def test_main_with_custom_output_path(
         "end_timestamp_ms": 1000,
         "base_url": "https://test.com",
         "magic": "ABCD",
+        "game_log": [],
+        "tank_names": {},
         "messages": []
     }"""
 
@@ -319,6 +331,8 @@ def test_main_multiple_command_types(
         "end_timestamp_ms": 1000,
         "base_url": "https://test.com",
         "magic": "ABCDEFGH",
+        "game_log": [],
+        "tank_names": {{}},
         "messages": [
             {{"timestamp_ms": 100, "direction": "sent", "payload": "{payload1}", "ws_url": "wss://test.com/ws"}},
             {{"timestamp_ms": 200, "direction": "sent", "payload": "{payload2}", "ws_url": "wss://test.com/ws"}},

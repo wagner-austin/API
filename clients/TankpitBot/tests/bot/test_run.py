@@ -457,10 +457,8 @@ class TestBotGameLoopStates:
     ) -> None:
         """Game loop returns early when tick-loop state has no self tank."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
         from tests.fakes import FakeCDPSession, FakePageInterrupting
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -487,13 +485,11 @@ class TestBotGameLoopStates:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             get_world_service,
-            reset_world_state,
             update_world_state_from_position,
         )
         from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
         from tests.fakes import FakeCDPSession, FakePageInterrupting
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         update_world_state_from_fuel_total(get_world_service(), 800)
         bot = Bot("https://test.tankpit.com/", headless=True)

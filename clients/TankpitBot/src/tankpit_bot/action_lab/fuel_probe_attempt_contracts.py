@@ -29,9 +29,6 @@ from tankpit_bot.action_lab.fuel_target_phase import (
     BuildRepositionTeleportTimeoutResultProtocol,
     FuelTargetPhaseProbeProtocol,
 )
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-)
 from tankpit_bot.action_lab.pickup_phase import (
     PickupImmediateOutcomeProtocol,
     PickupOutcomeWaiterProtocol,
@@ -44,6 +41,9 @@ from tankpit_bot.action_lab.teleport_attempt import (
 )
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.browser.page_client_snapshot import (
+    PageClientSnapshotDict,
+)
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 
 

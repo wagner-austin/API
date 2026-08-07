@@ -7,7 +7,6 @@ from tankpit_bot.bot.ai.combat_close import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
@@ -22,14 +21,6 @@ from tests.bot.ai._support import (
 
 class TestCombatCorridorMineGuard:
     """Tests for the walk-close corridor mine clearance."""
-
-    def setup_method(self) -> None:
-        """Reset shared world-state globals before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        reset_world_state()
 
     def test_mined_walk_corridor_draws_the_free_clearance_first(self) -> None:
         """A short close through a known mine shoots it before stepping.

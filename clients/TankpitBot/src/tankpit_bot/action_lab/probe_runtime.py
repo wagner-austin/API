@@ -18,9 +18,8 @@ from tankpit_bot._test_hooks import (
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
-from tankpit_bot.browser import PlaywrightNotInstalledError, reset_cdp_time_offset
+from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.sniffer.trackers import reset_all_trackers
-from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state import SelfStateDict
 from tankpit_bot.types import CapturedMessage
@@ -151,8 +150,6 @@ def prepare_live_probe_runtime(
     probe._page = page
     reset_world_state()
     reset_all_trackers()
-    reset_cdp_time_offset()
-    reset_viewport_tracking()
     probe._setup_console_listener(cdp)
     probe._setup_cdp_handlers(cdp)
     action_hooks.navigate_and_login(

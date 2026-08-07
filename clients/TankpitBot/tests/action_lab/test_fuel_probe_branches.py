@@ -48,13 +48,13 @@ from tankpit_bot.action_lab.fuel_target_phase import (
     FuelTargetResolution,
 )
 from tankpit_bot.action_lab.fuel_targeting import FuelTargetingError
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
     TeleportTargetDict,
 )
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import (
     ContainerStateDict,
     make_container_state,

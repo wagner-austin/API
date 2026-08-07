@@ -7,7 +7,6 @@ from tankpit_bot.bot.ai.context import DecideCtx, filter_killed_tanks
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -15,10 +14,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestDecideTeleportToFarTarget:
     """Tests for HUNT close/teleport integration through decide()."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
 
     def test_in_range_target_is_shot_on_acquire(self) -> None:
         """A visible in-range target is engaged directly, never approached.

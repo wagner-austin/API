@@ -10,10 +10,10 @@ from tankpit_bot.bot.ai.mode_gates import (
     should_enter_hunt,
     should_exit_collect,
 )
-from tankpit_bot.bot.ai.modes import AIMode
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.state.types import TankStateDict
+from tankpit_bot.types.modes import AIMode
 from tests.bot.ai._support import make_enemy_tank, make_scanned_ai_state, make_world
 
 

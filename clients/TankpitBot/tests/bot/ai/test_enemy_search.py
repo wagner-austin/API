@@ -12,7 +12,6 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.session_exit import SessionExitError
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -20,10 +19,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 class TestDecideMapOpen:
     """Tests for top-level enemy search routing."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
 
     def test_map_open_when_no_enemies(self) -> None:
         """decide() triggers map open when no live enemies are visible."""
@@ -96,10 +91,6 @@ class TestDecideMapOpen:
 
 class TestDecideBlockedEdgeSearch:
     """Tests for blocked viewport-edge scouting paths."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
 
     def _blocked_exploration_terrain(
         self,

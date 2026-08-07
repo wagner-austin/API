@@ -7,6 +7,7 @@ import base64
 import pytest
 
 from tankpit_bot.capture.xor import build_session_xor_table, reset_static_key_cache
+from tankpit_bot.sniffer.world_state import get_world_service
 from tests.conftest import FakeFileSystem
 
 # =============================================================================
@@ -16,28 +17,6 @@ from tests.conftest import FakeFileSystem
 
 class TestSnifferCoverageBranches:
     """Tests to cover remaining sniffer.py branches."""
-
-    def test_update_viewport_origin_sets_both_edges(self) -> None:
-        """Test viewport origin storage uses explicit left/top values."""
-        from tankpit_bot.sniffer import viewport
-
-        viewport.reset_viewport_tracking()
-
-        viewport.update_viewport_origin(34, 52)
-
-        assert viewport.get_viewport_left() == 34
-        assert viewport.get_viewport_top() == 52
-
-    def test_reset_viewport_tracking_clears_origin(self) -> None:
-        """Test viewport reset clears stored origin."""
-        from tankpit_bot.sniffer import viewport
-
-        viewport.update_viewport_origin(34, 52)
-
-        viewport.reset_viewport_tracking()
-
-        assert viewport.get_viewport_left() is None
-        assert viewport.get_viewport_top() is None
 
     def test_format_container_simple_container_pickup(self) -> None:
         """Test format_container_simple for container_pickup message.
@@ -257,11 +236,10 @@ class TestSnifferCoverageBranches:
     def test_dispatch_world_state_update_radar_response(self) -> None:
         """Test dispatch_world_state_update processes radar_response."""
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict, RadarScanResultDict
-        from tankpit_bot.sniffer import world_state, world_state_dispatch
+        from tankpit_bot.sniffer import world_state_dispatch
         from tankpit_bot.sniffer.world_state import get_world_service
 
         # Reset world state
-        world_state.reset_world_state()
 
         msg = RadarScanResultDict(
             msg_type=0x4F,
@@ -274,11 +252,10 @@ class TestSnifferCoverageBranches:
     def test_dispatch_world_state_update_movement_response_valid(self) -> None:
         """Test dispatch_world_state_update with valid MovementResponse updates position."""
         from tankpit_bot.protocol import MovementResponseDict
-        from tankpit_bot.sniffer import world_state, world_state_dispatch
+        from tankpit_bot.sniffer import world_state_dispatch
         from tankpit_bot.sniffer.world_state import get_world_service
 
         # Reset world state
-        world_state.reset_world_state()
 
         msg = MovementResponseDict(
             msg_type=0x3D,
@@ -311,7 +288,9 @@ class TestSnifferCoverageBranches:
         payload = base64.b64encode(header + body).decode()
 
         # This should decode and log (we just verify no crash)
-        decoders.process_received_message(payload, build_session_xor_table("testmagic"))
+        decoders.process_received_message(
+            get_world_service(), payload, build_session_xor_table("testmagic")
+        )
 
     def test_process_received_message_binary(self, fake_fs: FakeFileSystem) -> None:
         """Test process_received_message handles binary messages."""
@@ -333,7 +312,7 @@ class TestSnifferCoverageBranches:
         payload = base64.b64encode(header + body).decode()
 
         # This should decode through the binary path
-        decoders.process_received_message(payload, xor_table)
+        decoders.process_received_message(get_world_service(), payload, xor_table)
 
 
 # =============================================================================

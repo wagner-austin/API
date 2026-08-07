@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 
 
 class OurTankBeliefDict(TypedDict):

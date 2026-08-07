@@ -14,14 +14,14 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     EnemyTeleportAttemptResultDict,
     EnemyTeleportProbeSessionDict,
 )
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-)
 from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.bot.ai.threat_primitives import find_closest_threat
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.browser.page_client_snapshot import (
+    PageClientSnapshotDict,
+)
 
 
 def _require_fresh_enemy_threat(

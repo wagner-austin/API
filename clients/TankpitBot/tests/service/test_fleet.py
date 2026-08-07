@@ -11,7 +11,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot import _test_hooks as top_hooks
-from tankpit_bot._test_hooks.fs import PathExistsProtocol, ReadTextProtocol
+from tankpit_bot._test_hooks.fs import PathExistsProtocol
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import _real_run_web_app, _real_spawn_bot_process
 from tankpit_bot.service.fleet import main
@@ -22,37 +22,11 @@ from tankpit_bot.service.fleet_manager import (
     resolve_fleet_port,
 )
 from tests.conftest import FakeEnv
-from tests.service._fleet_fixtures import _FakeSpawner
-
-
-def _with_configured_accounts() -> tuple[PathExistsProtocol, ReadTextProtocol]:
-    """Install fake account config carrying ``artax`` and ``second``.
-
-    Returns:
-        The original ``(path_exists, read_text)`` hooks to restore.
-    """
-
-    def fake_exists(path: Path) -> bool:
-        _ = path
-        return True
-
-    def fake_read(path: Path) -> str:
-        _ = path
-        return '[{"username": "artax", "password": "a"}, {"username": "second", "password": "b"}]'
-
-    originals = (top_hooks.path_exists, top_hooks.read_text)
-    top_hooks.path_exists = fake_exists
-    top_hooks.read_text = fake_read
-    return originals
-
-
-def _restore_account_hooks(originals: tuple[PathExistsProtocol, ReadTextProtocol]) -> None:
-    """Restore the account-config hooks.
-
-    Args:
-        originals: The ``(path_exists, read_text)`` pair to put back.
-    """
-    top_hooks.path_exists, top_hooks.read_text = originals
+from tests.service._fleet_fixtures import (
+    _FakeSpawner,
+    _restore_account_hooks,
+    _with_configured_accounts,
+)
 
 
 def _without_accounts() -> PathExistsProtocol:

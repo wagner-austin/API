@@ -8,21 +8,21 @@ import pytest
 from aiohttp import web
 
 from tankpit_bot import _test_hooks as top_hooks
+from tankpit_bot._test_hooks import _real_load_dotenv
+from tankpit_bot.bus.frame_bus import (
+    FrameBus,
+)
+from tankpit_bot.bus.status_bus import (
+    StatusBus,
+)
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import (
     SiteRunnerProtocol,
     _real_build_site,
-    _real_load_dotenv,
     _real_serve,
-)
-from tankpit_bot.service.frame_bus import (
-    FrameBus,
 )
 from tankpit_bot.service.service_main import (
     exit_when_idle,
-)
-from tankpit_bot.service.status_bus import (
-    StatusBus,
 )
 from tests.conftest import FakeEnv
 from tests.service._service_main_harness import (

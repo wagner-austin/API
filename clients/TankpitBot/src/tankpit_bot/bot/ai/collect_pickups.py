@@ -8,7 +8,7 @@ harvest live in :mod:`collect_hops`; lock continuation in
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE, is_container_blacklisted
+from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision, set_resource_target
 from tankpit_bot.bot.ai.equipment_search import (
     find_equipment_candidates,
@@ -41,15 +41,11 @@ def select_equipment_target(
         ``(container, command)`` for the nearest executable equipment target, or
         ``None`` when no visible equipment target can currently be executed.
     """
-    candidates = [
-        container
-        for container in find_equipment_candidates(
-            ctx.filtered,
-            ctx.self_state,
-            ctx.terrain,
-        )
-        if not is_container_blacklisted(container["x"], container["y"])
-    ]
+    candidates = find_equipment_candidates(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.terrain,
+    )
     if not candidates:
         return None
 

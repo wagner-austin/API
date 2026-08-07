@@ -17,11 +17,12 @@ from tests.action_lab._teleport_attempt_harness import (
     _target,
     _WaitForOutcome,
 )
+from tests.action_lab._teleport_seams import teleport_attempt_module
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab import teleport_attempt
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.teleport_attempt import run_tracked_teleport_attempt
 from tankpit_bot.action_lab.teleport_phase import (
     TeleportOutcomeWaiterProtocol,
     TeleportPhaseProbeProtocol,
@@ -35,8 +36,8 @@ from tankpit_bot.action_lab.types import (
 
 def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
     """Shared helper returns full tracked state for a successful attempt."""
-    original_acquisition = teleport_attempt.run_acquisition_phase
-    original_teleport = teleport_attempt.run_teleport_phase
+    original_acquisition = teleport_attempt_module.run_tracked_acquisition_phase
+    original_teleport = teleport_attempt_module.run_tracked_teleport_command
     expected_page = _Page()
     expected_probe = _Probe()
     expected_target = _target()
@@ -132,10 +133,10 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
         teleport_calls.append(message_start_index)
         return (_result(target), 1800)
 
-    teleport_attempt.run_acquisition_phase = _run_acquisition
-    teleport_attempt.run_teleport_phase = _run_teleport
+    teleport_attempt_module.run_tracked_acquisition_phase = _run_acquisition
+    teleport_attempt_module.run_tracked_teleport_command = _run_teleport
     try:
-        attempt = teleport_attempt.run_tracked_teleport_attempt(
+        attempt = run_tracked_teleport_attempt(
             expected_page,
             expected_probe,
             expected_target,
@@ -159,8 +160,8 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
             unexpected_result_message="impossible",
         )
     finally:
-        teleport_attempt.run_acquisition_phase = original_acquisition
-        teleport_attempt.run_teleport_phase = original_teleport
+        teleport_attempt_module.run_tracked_acquisition_phase = original_acquisition
+        teleport_attempt_module.run_tracked_teleport_command = original_teleport
 
     assert expected_probe.reset_idle_calls == 1
     assert expected_probe.started_cycles == [("teleport", "target")]
@@ -176,8 +177,8 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
 
 def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> None:
     """Shared helper returns without teleport dispatch when acquisition times out."""
-    original_acquisition = teleport_attempt.run_acquisition_phase
-    original_teleport = teleport_attempt.run_teleport_phase
+    original_acquisition = teleport_attempt_module.run_tracked_acquisition_phase
+    original_teleport = teleport_attempt_module.run_tracked_teleport_command
     expected_page = _Page()
     expected_probe = _Probe()
     expected_target = _target()
@@ -269,10 +270,10 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
         )
         raise AssertionError("teleport dispatch should not run after acquisition timeout")
 
-    teleport_attempt.run_acquisition_phase = _run_acquisition
-    teleport_attempt.run_teleport_phase = _run_teleport
+    teleport_attempt_module.run_tracked_acquisition_phase = _run_acquisition
+    teleport_attempt_module.run_tracked_teleport_command = _run_teleport
     try:
-        attempt = teleport_attempt.run_tracked_teleport_attempt(
+        attempt = run_tracked_teleport_attempt(
             expected_page,
             expected_probe,
             expected_target,
@@ -296,8 +297,8 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
             unexpected_result_message="impossible",
         )
     finally:
-        teleport_attempt.run_acquisition_phase = original_acquisition
-        teleport_attempt.run_teleport_phase = original_teleport
+        teleport_attempt_module.run_tracked_acquisition_phase = original_acquisition
+        teleport_attempt_module.run_tracked_teleport_command = original_teleport
 
     assert expected_probe.reset_idle_calls == 1
     assert attempt.message_start_index == 1

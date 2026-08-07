@@ -25,7 +25,6 @@ from tankpit_bot.bot.ai.collect_pickups import (
 )
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
-    can_use_radar,
 )
 from tankpit_bot.bot.ai.equipment_search import describe_container_search
 from tankpit_bot.bot.ai.forage import plan_forage_search
@@ -151,7 +150,6 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
         base_state,
         score=COLLECT_SCORE,
         behavior_mode="COLLECT",
-        radar_affordable=can_use_radar(ctx),
     )
     if forage_decision is not None:
         return forage_decision

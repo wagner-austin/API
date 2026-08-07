@@ -21,10 +21,10 @@ from tankpit_bot.action_lab.fuel_target_phase import (
     FuelTargetResolution,
     resolve_fuel_target_after_radar,
 )
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.radar_phase import run_tracked_radar_phase
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 
 

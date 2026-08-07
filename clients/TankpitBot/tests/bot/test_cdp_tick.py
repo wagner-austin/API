@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_fuel_total as _update_fuel_total,
@@ -26,12 +26,10 @@ class TestBotTickOnce:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(get_world_service(), 300)
         update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 5], [False] * 5)
@@ -52,12 +50,10 @@ class TestBotTickOnce:
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(get_world_service(), 300)
         update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 5], [False] * 5)
@@ -81,12 +77,10 @@ class TestBotTickOnce:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession, InMemoryTerrainMap
 
-        reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(get_world_service(), 800)
         update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
@@ -107,12 +101,10 @@ class TestBotTickOnce:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(196, 85)
         _update_fuel_total(get_world_service(), 582)
         update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
@@ -133,12 +125,10 @@ class TestBotTickOnce:
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession, InMemoryTerrainMap
 
-        reset_world_state()
         update_world_state_from_position(205, 79)
         _update_fuel_total(get_world_service(), 580)
         update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
@@ -163,12 +153,10 @@ class TestBotTickOnce:
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 800)
         update_inventory_from_protocol(
@@ -213,7 +201,6 @@ class TestBotTickOnce:
         from tankpit_bot.bot.types import make_shoot_command
         from tankpit_bot.inventory import InventoryState
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
@@ -223,7 +210,6 @@ class TestBotTickOnce:
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(get_world_service(), 800)
         update_inventory_from_protocol(
@@ -311,7 +297,6 @@ class TestBotTickOnce:
         from tankpit_bot.bot.types import make_shoot_command
         from tankpit_bot.inventory import InventoryState
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
@@ -321,7 +306,6 @@ class TestBotTickOnce:
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(get_world_service(), 800)
         update_inventory_from_protocol(
@@ -408,12 +392,10 @@ class TestBotTickOnce:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 800)
 
@@ -442,14 +424,12 @@ class TestBotTickOnce:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tankpit_bot.state.tank_mutations import apply_tank_observation
         from tankpit_bot.state.types import make_tank_observation, make_tank_state
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(get_world_service(), 800)
         update_inventory_from_protocol(
@@ -518,12 +498,10 @@ class TestBotTickOnce:
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 800)
         update_inventory_from_protocol(

@@ -14,7 +14,6 @@ from tankpit_bot.bot.ai.combat_target import (
     select_new_combat_target,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
@@ -29,14 +28,6 @@ from tests.bot.ai._support import (
 
 class TestCombatTargetSelection:
     """Tests for combat target selection constraints."""
-
-    def setup_method(self) -> None:
-        """Reset shared world-state globals before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        reset_world_state()
 
     def test_select_new_combat_target_allows_non_emergency_reserve_band(self) -> None:
         """Combat still acquires targets above the break threshold."""
@@ -259,12 +250,6 @@ class TestCombatTargetSelection:
 class TestGetLockedTargetWorldStateFallback:
     """Tests for get_locked_target world-state fallback."""
 
-    def setup_method(self) -> None:
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        reset_world_state()
-
     def test_returns_threat_when_in_threat_list(self) -> None:
         """Threat-list match takes priority over world-state fallback."""
         world, self_state = make_world(fuel=800)
@@ -328,14 +313,6 @@ class TestGetLockedTargetWorldStateFallback:
 
 class TestIsAlreadyEngaged:
     """Tests for the engaged-vs-fresh discriminator."""
-
-    def setup_method(self) -> None:
-        """Reset shared world-state globals before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset shared world-state globals after each test."""
-        reset_world_state()
 
     def test_true_when_last_shot_target_matches_combat_target(self) -> None:
         """A dispatched shoot at the current lock proves the bot is engaged."""

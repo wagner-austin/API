@@ -2,7 +2,7 @@
 
 Every test drives the REAL pipeline:
 :func:`tankpit_bot.runtime_logging.configure_bot_runtime_logging` ->
-:func:`tankpit_bot.diagnostics.self_alignment.maybe_emit_self_alignment_sample`
+:meth:`tankpit_bot.diagnostics.self_alignment.SelfAlignmentEmitter.maybe_emit`
 -> real ``_HookEventArtifactHandler`` -> JSONL via
 :class:`tests.conftest.FakeFileSystem` -> real
 :func:`tankpit_bot.diagnostics.event_stream.load_event_records` ->
@@ -17,13 +17,10 @@ from platform_core.json_utils import JSONObject, dump_json_str
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes import FakeCDPSession
 
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.action_lab.page_client_snapshot_codecs import encode_client_field_map
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.browser.page_client_snapshot_codecs import encode_client_field_map
 from tankpit_bot.diagnostics.event_stream import load_event_records
-from tankpit_bot.diagnostics.self_alignment import (
-    maybe_emit_self_alignment_sample,
-    reset_self_alignment_emitter,
-)
+from tankpit_bot.diagnostics.self_alignment import SelfAlignmentEmitter
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.state.types import SelfStateDict, make_self_state
@@ -90,7 +87,7 @@ def test_emit_writes_sample_through_real_pipeline(fake_fs: FakeFileSystem) -> No
     """An emitted sample lands in the JSONL with the exact belief + truth payload."""
     artifacts = configure_bot_runtime_logging("20260609-120000")
 
-    emitted = maybe_emit_self_alignment_sample(_make_self_state(), _make_snapshot(_SELF_FIELDS))
+    emitted = SelfAlignmentEmitter().maybe_emit(_make_self_state(), _make_snapshot(_SELF_FIELDS))
 
     assert emitted is True
     records = _sample_records(artifacts["latest_events_path"])
@@ -108,9 +105,10 @@ def test_emit_writes_sample_through_real_pipeline(fake_fs: FakeFileSystem) -> No
 def test_emit_skips_when_self_fields_empty(fake_fs: FakeFileSystem) -> None:
     """An empty truth map produces no sample -- there is nothing to align."""
     artifacts = configure_bot_runtime_logging("20260609-120000")
-    assert maybe_emit_self_alignment_sample(_make_self_state(), _make_snapshot(_SELF_FIELDS))
+    emitter = SelfAlignmentEmitter()
+    assert emitter.maybe_emit(_make_self_state(), _make_snapshot(_SELF_FIELDS))
 
-    emitted = maybe_emit_self_alignment_sample(
+    emitted = emitter.maybe_emit(
         _make_self_state(x=200),
         _make_snapshot({}),
     )
@@ -122,9 +120,10 @@ def test_emit_skips_when_self_fields_empty(fake_fs: FakeFileSystem) -> None:
 def test_emit_gates_on_unchanged_belief(fake_fs: FakeFileSystem) -> None:
     """A second tick with the same belief tuple emits nothing new."""
     artifacts = configure_bot_runtime_logging("20260609-120000")
-    assert maybe_emit_self_alignment_sample(_make_self_state(), _make_snapshot(_SELF_FIELDS))
+    emitter = SelfAlignmentEmitter()
+    assert emitter.maybe_emit(_make_self_state(), _make_snapshot(_SELF_FIELDS))
 
-    emitted = maybe_emit_self_alignment_sample(_make_self_state(), _make_snapshot(_SELF_FIELDS))
+    emitted = emitter.maybe_emit(_make_self_state(), _make_snapshot(_SELF_FIELDS))
 
     assert emitted is False
     assert len(_sample_records(artifacts["latest_events_path"])) == 1
@@ -133,9 +132,10 @@ def test_emit_gates_on_unchanged_belief(fake_fs: FakeFileSystem) -> None:
 def test_emit_again_when_belief_changes(fake_fs: FakeFileSystem) -> None:
     """A belief change re-opens the gate and emits a second sample."""
     artifacts = configure_bot_runtime_logging("20260609-120000")
-    assert maybe_emit_self_alignment_sample(_make_self_state(), _make_snapshot(_SELF_FIELDS))
+    emitter = SelfAlignmentEmitter()
+    assert emitter.maybe_emit(_make_self_state(), _make_snapshot(_SELF_FIELDS))
 
-    emitted = maybe_emit_self_alignment_sample(
+    emitted = emitter.maybe_emit(
         _make_self_state(x=147, fuel=980),
         _make_snapshot(_SELF_FIELDS),
     )
@@ -146,13 +146,17 @@ def test_emit_again_when_belief_changes(fake_fs: FakeFileSystem) -> None:
     assert [r["fields"]["belief_fuel"] for r in records] == [1100, 980]
 
 
-def test_reset_clears_change_gate(fake_fs: FakeFileSystem) -> None:
-    """``reset_self_alignment_emitter`` lets an identical belief emit again."""
-    artifacts = configure_bot_runtime_logging("20260609-120000")
-    assert maybe_emit_self_alignment_sample(_make_self_state(), _make_snapshot(_SELF_FIELDS))
+def test_each_emitter_carries_its_own_gate(fake_fs: FakeFileSystem) -> None:
+    """A second emitter emits the same belief -- the gate is instance state.
 
-    reset_self_alignment_emitter()
-    emitted = maybe_emit_self_alignment_sample(_make_self_state(), _make_snapshot(_SELF_FIELDS))
+    This is the property that replaced ``reset_self_alignment_emitter``:
+    two sessions in one process must not silence each other's samples
+    ([[session-state-deglobalisation]] step 3).
+    """
+    artifacts = configure_bot_runtime_logging("20260609-120000")
+    assert SelfAlignmentEmitter().maybe_emit(_make_self_state(), _make_snapshot(_SELF_FIELDS))
+
+    emitted = SelfAlignmentEmitter().maybe_emit(_make_self_state(), _make_snapshot(_SELF_FIELDS))
 
     assert emitted is True
     assert len(_sample_records(artifacts["latest_events_path"])) == 2

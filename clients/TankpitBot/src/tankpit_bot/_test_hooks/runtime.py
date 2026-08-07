@@ -89,13 +89,24 @@ class ProcessReceivedMessageProtocol(Protocol):
 def _real_process_received_message(payload: str, xor_table: bytes) -> None:
     """Real implementation - delegates to sniffer decoders.
 
+    The world service is resolved HERE rather than taken as a
+    parameter: ``_test_hooks`` cannot import
+    :mod:`tankpit_bot.sniffer.world_service` at module scope without
+    closing an import cycle through ``state`` (measured 2026-08-07 —
+    the guard's physics-claim importer caught it, a plain
+    ``import _test_hooks.runtime`` did not, because the cycle only
+    shows when ``state`` is imported first). This is the last
+    singleton reach on the replay path and falls with step 8's final
+    flip ([[session-state-deglobalisation]]).
+
     Args:
         payload: Base64-encoded WebSocket frame payload.
         xor_table: The owning session's XOR table.
     """
     from tankpit_bot.sniffer.decoders import process_received_message
+    from tankpit_bot.sniffer.world_state import get_world_service
 
-    process_received_message(payload, xor_table)
+    process_received_message(get_world_service(), payload, xor_table)
 
 
 process_received_message_hook: ProcessReceivedMessageProtocol = _real_process_received_message

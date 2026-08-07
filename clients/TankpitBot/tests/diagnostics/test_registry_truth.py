@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from tests.conftest import FakeFileSystem
 
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.diagnostics.registry_truth import (
     RegistryTankDict,
@@ -353,7 +353,6 @@ def test_register_skips_partial_entries(fake_fs: FakeFileSystem) -> None:
 
 def test_register_skips_when_map_visible(tmp_path: Path) -> None:
     """Registry truth is skipped when the map overlay is open."""
-    world_state.reset_world_state()
     snapshot = _make_snapshot(
         collections={
             "ya": [

@@ -30,8 +30,8 @@ from tankpit_bot.action_lab.movement_probe_types import (
     MovementProbeAttemptResultDict,
     MovementProbeSessionDict,
 )
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,

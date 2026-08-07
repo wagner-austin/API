@@ -37,7 +37,6 @@ from tankpit_bot.bot.types import (
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.replay.types import ReplaySessionResultDict, ReplayTickTraceDict
-from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
     get_world_service,
@@ -88,7 +87,6 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
 
     # Reset the remaining global state for a clean replay
     reset_world_state()
-    reset_viewport_tracking()
     xor_table = build_session_xor_table(magic)
 
     # Filter to received messages only, sorted by timestamp

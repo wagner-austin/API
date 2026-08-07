@@ -28,13 +28,13 @@ from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
     FuelProbeSessionDict,
 )
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
     TeleportStartupTimingDict,
     TeleportTargetDict,
 )
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import (
     ContainerStateDict,
     make_container_state,

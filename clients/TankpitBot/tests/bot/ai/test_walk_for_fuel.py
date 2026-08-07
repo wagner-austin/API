@@ -130,50 +130,6 @@ def test_marooned_exit_ignores_blacklisted_containers() -> None:
         decide_collect_mode(_marooned_ctx(with_blacklisted_sliver=True))
 
 
-def test_marooned_exit_ignores_session_blacklisted_containers() -> None:
-    """A session-blacklisted container never anchors the walk."""
-    from tankpit_bot.bot.ai.collect_common import (
-        blacklist_container,
-        reset_container_blacklist,
-    )
-
-    containers = {
-        "130,100": make_container_state(
-            x=130,
-            y=100,
-            is_fuel=True,
-            volume=400,
-            timestamp_ms=100000,
-        )
-    }
-    world, self_state = make_world(fuel=88, scanned=True, containers=containers)
-    ai_state = AIStateDict(
-        **{
-            **make_scanned_ai_state(),
-            "mode": "COLLECT",
-            "mode_state": "SEARCH",
-            "mode_started_ms": 90000,
-            "last_map_open_ms": 99000,
-        }
-    )
-    ctx = DecideCtx(
-        world,
-        self_state,
-        ai_state,
-        make_inventory(),
-        100000,
-        InMemoryTerrainMap(),
-        "",
-    )
-    reset_container_blacklist()
-    blacklist_container(130, 100)
-    try:
-        with pytest.raises(SessionExitError, match="out_of_fuel"):
-            decide_collect_mode(ctx)
-    finally:
-        reset_container_blacklist()
-
-
 def test_marooned_walk_declines_when_the_leg_is_the_current_tile() -> None:
     """A target clamping onto the tank's own tile produces no walk.
 

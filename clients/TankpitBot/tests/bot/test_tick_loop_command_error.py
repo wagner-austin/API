@@ -15,7 +15,6 @@ from tankpit_bot.bot.states import (
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.state.types import make_self_state
@@ -27,14 +26,6 @@ from tests.conftest import (
 
 class TestClearCommandError:
     """The Supervisor (0x52) error code clears every in-flight action kind."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def _make_pending_action(
         self,

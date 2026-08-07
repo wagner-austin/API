@@ -16,7 +16,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
-from tankpit_bot.action_lab.page_client_snapshot import (
+from tankpit_bot.browser.page_client_snapshot import (
     PageClientSnapshotDict,
     capture_page_client_snapshot,
     decode_page_client_snapshot,

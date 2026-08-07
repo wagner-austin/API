@@ -18,8 +18,8 @@ from tankpit_bot.protocol.constants import MSG_PROMOTION, RANK_NAMES
 from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.formatters import format_decoded_message
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import (
-    get_world_service,
     register_room_image,
     set_selected_room,
 )
@@ -123,12 +123,14 @@ def decode_received_text_message(payload: str) -> None:
         _log_protocol_line(result)
 
 
-def try_decode_received(payload: str, xor_table: bytes) -> str | None:
+def try_decode_received(ws: WorldService, payload: str, xor_table: bytes) -> str | None:
     """Try to decode a received message and return formatted result.
 
     Pure function that returns the decoded message string or None. Does not log.
 
     Args:
+        ws: The SESSION's world service; the binary route dispatches
+            into it ([[session-state-deglobalisation]] step 8).
         payload: Base64-encoded message payload.
         xor_table: The SESSION's XOR table. Passed in rather than read
             from a module global so two sessions cannot decode each
@@ -163,10 +165,10 @@ def try_decode_received(payload: str, xor_table: bytes) -> str | None:
         return f"[RECEIVED] EMPTY: type=0x{msg_type:02X}"
 
     # All messages go through protocol.decode_message (handles 0x2E routing internally)
-    return "[RECEIVED] " + try_decode_binary(msg_type, decoded_data, body)
+    return "[RECEIVED] " + try_decode_binary(ws, msg_type, decoded_data, body)
 
 
-def process_received_message(payload: str, xor_table: bytes) -> None:
+def process_received_message(ws: WorldService, payload: str, xor_table: bytes) -> None:
     """Decode, log, and dispatch received messages to world state.
 
     A single WebSocket frame can contain multiple logical messages, each
@@ -176,13 +178,14 @@ def process_received_message(payload: str, xor_table: bytes) -> None:
     ([[session-state-deglobalisation]]).
 
     Args:
+        ws: The SESSION's world service. Passed in rather than reached
+            through a module singleton so two sessions cannot dispatch
+            into each other's world ([[session-state-deglobalisation]]
+            step 8) — the same reason ``xor_table`` is a parameter.
         payload: Base64-encoded WebSocket frame payload.
         xor_table: The SESSION's XOR table. Passed in rather than read
             from a module global so two sessions cannot decode each
             other's frames ([[session-state-deglobalisation]] step 1).
-            The world service this dispatches into is still reached
-            through its module singleton; that is step 8 of the same
-            plan and is deliberately not bundled here.
 
     Raises:
         FramingError: If the live payload is corrupt. Measured over the
@@ -191,13 +194,14 @@ def process_received_message(payload: str, xor_table: bytes) -> None:
             real fault rather than a routine condition to absorb.
     """
     for body in split_payload_frames(payload):
-        _process_single_message(body, xor_table)
+        _process_single_message(ws, body, xor_table)
 
 
-def _process_single_message(body: bytes, xor_table: bytes) -> None:
+def _process_single_message(ws: WorldService, body: bytes, xor_table: bytes) -> None:
     """Process a single logical message (after frame splitting).
 
     Args:
+        ws: The SESSION's world service to dispatch into.
         body: Non-empty message body bytes (without length prefix).
             The frame parser guarantees msg_len > 0 before calling.
         xor_table: The SESSION's XOR table.
@@ -230,13 +234,13 @@ def _process_single_message(body: bytes, xor_table: bytes) -> None:
     if min_len is not None and len(decoded_data) >= min_len:
         binary_decoded = protocol.decode_message(msg_type, decoded_data)
         _log_protocol_line(f"[RECEIVED] {format_decoded_message(msg_type, binary_decoded)}")
-        dispatch_world_state_update(get_world_service(), binary_decoded)
+        dispatch_world_state_update(ws, binary_decoded)
         return
     msg_char = chr(msg_type) if 32 <= msg_type < 127 else "?"
     _log_protocol_line(f"[RECEIVED] type=0x{msg_type:02X} '{msg_char}' len={len(body)}")
 
 
-def try_decode_binary(msg_type: int, data: bytes, raw_body: bytes) -> str:
+def try_decode_binary(ws: WorldService, msg_type: int, data: bytes, raw_body: bytes) -> str:
     """Try to decode a binary message and return formatted result string.
 
     Pure function that returns the formatted decode result. Does not log.
@@ -268,22 +272,9 @@ def try_decode_binary(msg_type: int, data: bytes, raw_body: bytes) -> str:
     # so decode_message always succeeds for known types with sufficient data.
     binary_decoded = protocol.decode_message(msg_type, data)
 
-    dispatch_world_state_update(get_world_service(), binary_decoded)
+    dispatch_world_state_update(ws, binary_decoded)
 
     return format_decoded_message(msg_type, binary_decoded)
-
-
-def decode_and_log_binary(msg_type: int, data: bytes, _type_label: str, raw_body: bytes) -> None:
-    """Decode binary message using protocol module and log it.
-
-    Args:
-        msg_type: Message type byte.
-        data: XOR-decoded message data (without msg_type byte).
-        _type_label: Unused parameter (kept for API compatibility).
-        raw_body: Original raw body for length reporting.
-    """
-    result = try_decode_binary(msg_type, data, raw_body)
-    _log_protocol_line(f"[RECEIVED] {result}")
 
 
 def decode_8byte_state(body: bytes, tag: str) -> str:
@@ -515,7 +506,6 @@ def decode_command(body: bytes, tag: str, magic: str | None) -> str:
 
 __all__ = [
     "decode_8byte_state",
-    "decode_and_log_binary",
     "decode_command",
     "decode_join_confirm",
     "decode_message",

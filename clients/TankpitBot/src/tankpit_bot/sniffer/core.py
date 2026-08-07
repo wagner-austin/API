@@ -18,7 +18,6 @@ from tankpit_bot.browser import (
     GameLogEntry,
     PlaywrightNotInstalledError,
     get_current_time_ms,
-    reset_cdp_time_offset,
 )
 from tankpit_bot.browser.lifecycle import (
     cleanup_browser,
@@ -41,7 +40,7 @@ from tankpit_bot.sniffer.constants import (
 )
 from tankpit_bot.sniffer.decoders import decode_message, process_received_message
 from tankpit_bot.sniffer.trackers import mine_tracker, tank_tracker
-from tankpit_bot.sniffer.viewport import reset_viewport_tracking
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.types import (
     CapturedMessage,
     CaptureSession,
@@ -213,7 +212,7 @@ class WebSocketSniffer(BrowserSession):
             # arrive before the session's magic cannot be decoded at
             # all — live decode simply has nothing to print for them.
             if self.xor_table is not None:
-                process_received_message(payload, self.xor_table)
+                process_received_message(get_world_service(), payload, self.xor_table)
         else:
             # Use simple decoder for sent messages
             mine_status = mine_tracker.process_message(payload, "sent")
@@ -307,10 +306,6 @@ class WebSocketSniffer(BrowserSession):
             cdp = context.new_cdp_session(page)
             if _chrome_stream_no_viewport():
                 _maximize_via_cdp(cdp)
-
-            # Reset session state for new session
-            reset_cdp_time_offset()
-            reset_viewport_tracking()
 
             # Set up console listener and CDP handlers
             self._setup_console_listener(cdp)

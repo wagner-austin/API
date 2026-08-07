@@ -5,7 +5,6 @@ from __future__ import annotations
 from tankpit_bot import _test_hooks
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
@@ -16,13 +15,8 @@ from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 class TestDispatchOther:
     """Tests for dispatch_world_state_update with other message types."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
     def teardown_method(self) -> None:
         """Reset world state and hooks after each test."""
-        reset_world_state()
         _test_hooks.path_exists = _test_hooks._real_path_exists
         _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
 
@@ -273,14 +267,6 @@ class TestDispatchOther:
 class TestDispatchLivenessStamp:
     """Tests for the wire-liveness stamp on the dispatch entry point."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_every_dispatched_message_stamps_liveness(self) -> None:
         """Any dispatched binary message refreshes last_game_message_ms.
 
@@ -300,14 +286,6 @@ class TestDispatchLivenessStamp:
 
 class TestChatConsentRecording:
     """Chat senders are recorded for the human-consent contract."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_other_tank_chat_marks_consent(self) -> None:
         """A non-self 0x4D sender lands in chat_seen_tank_ids."""
@@ -344,14 +322,6 @@ class TestChatConsentRecording:
 
 class TestRecentPickupLedgerLookup:
     """The drain-receipt discriminator's ledger scan."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_stale_entries_and_other_tiles_do_not_match(self) -> None:
         """Only a fresh signature covering the tile counts."""

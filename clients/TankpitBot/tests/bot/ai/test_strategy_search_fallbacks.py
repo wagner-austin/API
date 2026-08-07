@@ -12,7 +12,6 @@ from tankpit_bot.bot.ai.types import (
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_state import (
-    reset_world_state,
     update_world_state_from_position,
 )
 from tests.bot.ai._strategy_fixtures import (
@@ -28,12 +27,7 @@ class TestEquipmentSearchHopFallback:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset world state."""
-        reset_world_state()
 
     def test_equipment_search_hops_to_nearest_dot_when_viewport_scanned(self) -> None:
         """Equipment search dot-hops to fresh ground when viewport scanned and no radar."""
@@ -321,12 +315,7 @@ class TestFuelSearchFallbacks:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset world state."""
-        reset_world_state()
 
     def test_locked_fuel_on_water_releases_lock(self) -> None:
         """A water-locked fuel target is released by the lock-continuation.

@@ -21,7 +21,6 @@ from tankpit_bot.bot.types import (
 )
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
@@ -185,12 +184,6 @@ class TestExecute:
 class TestSecondaryCommandDispatch:
     """Tests for multi-command tick dispatch via secondary_command."""
 
-    def setup_method(self) -> None:
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        reset_world_state()
-
     def test_secondary_dispatched_after_primary(self, fake_env: FakeEnv) -> None:
         """When primary succeeds, secondary is also dispatched."""
         bot, _cdp = _make_bot(fake_env)
@@ -310,7 +303,6 @@ class TestFuelBookEntries:
 
     def test_failed_radar_dispatch_records_no_entry(self) -> None:
         """A radar the page refused must not enter the fuel book."""
-        reset_world_state()
         bot = _WorldOnlyBot(make_empty_world_state())
         result = dispatch_command(bot, make_radar_command(), _make_snapshot())
         assert result is False
@@ -320,6 +312,5 @@ class TestFuelBookEntries:
         """Without a self fix the teleport cost cannot be priced."""
         from tankpit_bot.bot.executor import _record_teleport_fuel_entry
 
-        reset_world_state()
         _record_teleport_fuel_entry(10, 20)
         assert get_world_service().fuel_book["entries"] == []

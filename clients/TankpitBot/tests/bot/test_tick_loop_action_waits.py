@@ -11,7 +11,6 @@ from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
     mark_move_target_failed,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
@@ -22,14 +21,6 @@ from tests.conftest import (
 
 class TestPublishTickContext:
     """Tests for ``_publish_tick_context`` (Tier 3.2 event enrichment)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_writes_tick_n_bot_state_and_action_kind(self, fake_env: FakeEnv) -> None:
         """The published context exposes the three structured fields.
@@ -80,14 +71,6 @@ class TestPublishTickContext:
 
 class TestClearRejectedMovement:
     """Tests for _clear_rejected_movement (lines 369-383)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_non_move_collect_kind_returns_false(self, fake_env: FakeEnv) -> None:
         """Actions other than move/collect are not affected by rejection."""
@@ -177,14 +160,6 @@ class TestClearRejectedMovement:
 class TestWaitForMapOpenAction:
     """Tests for _wait_for_map_open_action (line 338)."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_wait_for_map_open_action_returns_true_while_waiting(self, fake_env: FakeEnv) -> None:
         """_wait_for_map_open_action returns True when map data hasn't arrived."""
         from tankpit_bot.bot.tick_loop_actions import _wait_for_map_open_action
@@ -207,14 +182,6 @@ class TestWaitForMapOpenAction:
 
 class TestWaitForMovementActionRejected:
     """Test _wait_for_movement_action when _clear_rejected_movement returns True (line 308)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_wait_for_movement_action_returns_false_on_rejected_move(
         self, fake_env: FakeEnv

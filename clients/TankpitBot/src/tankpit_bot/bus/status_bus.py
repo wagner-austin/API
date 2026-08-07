@@ -22,7 +22,7 @@ from __future__ import annotations
 import threading
 from typing import Protocol
 
-from tankpit_bot.service.types import SessionStatusDict
+from tankpit_bot.bus.session_status import SessionStatusDict
 
 
 class StatusSubscriberProtocol(Protocol):

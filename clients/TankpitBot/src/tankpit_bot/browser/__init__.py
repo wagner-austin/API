@@ -25,9 +25,8 @@ from tankpit_bot.browser.accounts import (
     select_account,
 )
 from tankpit_bot.browser.cdp_utils import (
-    cdp_timestamp_to_ms,
+    CDPClock,
     get_current_time_ms,
-    reset_cdp_time_offset,
 )
 from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
@@ -75,6 +74,7 @@ __all__ = [
     "AccountNotFoundError",
     "BrowserError",
     "BrowserSession",
+    "CDPClock",
     "DOMBarElement",
     "FuelProbeResult",
     "FuelProber",
@@ -85,7 +85,6 @@ __all__ = [
     "JSVariable",
     "LogCategory",
     "PlaywrightNotInstalledError",
-    "cdp_timestamp_to_ms",
     "decode_account",
     "decode_account_list",
     "decode_game_log_entry",
@@ -101,7 +100,6 @@ __all__ = [
     "load_accounts",
     "load_static_key",
     "probe_all",
-    "reset_cdp_time_offset",
     "resolve_account",
     "save_static_key",
     "select_account",

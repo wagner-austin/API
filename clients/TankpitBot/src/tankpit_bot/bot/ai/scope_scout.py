@@ -25,7 +25,7 @@ water-locked container would re-trigger the pan every tick.
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE, is_container_blacklisted
+from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.equipment_search import (
     find_all_tracked_equipment,
@@ -146,10 +146,7 @@ def _water_locked_goals(ctx: DecideCtx) -> list[tuple[int, int]]:
     candidates: list[tuple[int, int]] = [
         (container["x"], container["y"])
         for container in ctx.world["containers"].values()
-        if container["is_fuel"]
-        and container["volume"] > 0
-        and container["failed_pickups"] == 0
-        and not is_container_blacklisted(container["x"], container["y"])
+        if container["is_fuel"] and container["volume"] > 0 and container["failed_pickups"] == 0
     ]
     candidates.extend(
         (equipment["x"], equipment["y"]) for equipment in find_all_tracked_equipment(ctx.world)

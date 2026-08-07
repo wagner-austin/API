@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONObject
 
-from tankpit_bot.bot.ai.modes import (
+from tankpit_bot.types.modes import (
     AI_MODE_STATES,
     AI_MODES,
     is_valid_ai_mode_state,

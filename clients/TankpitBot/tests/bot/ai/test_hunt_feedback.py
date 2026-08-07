@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
@@ -22,10 +21,6 @@ from tests.bot.ai._support import (
 
 class TestDecideKillCooldown:
     """Tests for kill cooldown filtering in decide()."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
 
     def test_killed_tanks_filtered_from_world(self) -> None:
         """Killed tanks do not remain eligible HUNT targets."""
@@ -296,10 +291,6 @@ class TestDecideKillCooldown:
 class TestDecideCombatFeedback:
     """Tests for combat feedback handling in decide()."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
     def test_hit_feedback_after_kill_sees_no_enemy(self) -> None:
         """After a kill, deactivated enemies no longer participate in threat selection.
 
@@ -419,10 +410,6 @@ class TestDecideCombatFeedback:
 
 class TestDecideShotTracking:
     """Tests for shot target tracking in decide()."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
 
     def test_shoot_command_records_target(self) -> None:
         """Shoot decisions record the target for next-tick feedback handling."""

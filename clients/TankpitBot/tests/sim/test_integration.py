@@ -25,7 +25,7 @@ from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.transport import decode_client_payload, encode_tick_payload
 from tankpit_bot.sim.world import SimContainerDict, make_sim_tank, make_sim_world
 from tankpit_bot.sniffer.decoders import process_received_message
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state.types import SelfStateDict
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -60,7 +60,6 @@ def _boot() -> tuple[SimServer, bytes]:
         XorStaticKeyUnavailableError: If the repo's XOR static key is
             unavailable.
     """
-    reset_world_state()
     table = build_session_xor_table(_MAGIC)
     world = make_sim_world("field01_r.gif")
     world["tanks"][_CLIENT] = make_sim_tank(_CLIENT, 2, 1, 100, 100, 800)
@@ -79,7 +78,7 @@ def _deliver(messages: list[BinaryMessage], table: bytes) -> None:
         messages: The sim's decoded batch.
         table: Session XOR table.
     """
-    process_received_message(encode_tick_payload(messages, table), table)
+    process_received_message(get_world_service(), encode_tick_payload(messages, table), table)
 
 
 def test_handshake_reaches_production_world_state() -> None:

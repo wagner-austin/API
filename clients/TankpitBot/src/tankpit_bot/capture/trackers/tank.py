@@ -15,8 +15,6 @@ from tankpit_bot.protocol.constants import RANK_NAMES, TEAM_NAMES
 
 log = get_logger(__name__)
 
-TEAM_NAMES = TEAM_NAMES  # Backward-compatible alias
-
 
 class TankTracker:
     """Tracks tank entry, status, movement, and shooting events.
@@ -105,12 +103,12 @@ class TankTracker:
         if result is None:
             return None
 
-        msg_type, decoded, raw_body = result
+        msg_type, decoded, _raw_body = result
 
         if msg_type == 0x2E:
             if len(decoded) < 8:
                 return None
-            return self._parse_status_sync(decoded, raw_body)
+            return self._parse_status_sync(decoded)
 
         entry = self._dispatch.get(msg_type)
         if entry is None:
@@ -388,17 +386,15 @@ class TankTracker:
         status = decoded[2] if len(decoded) > 2 else 0
         return f"[SUPERVISOR] status={status}"
 
-    def _parse_status_sync(self, decoded: bytearray, raw_body: bytes) -> str:
+    def _parse_status_sync(self, decoded: bytearray) -> str:
         """Parse tank status sync message (0x2E '.').
 
         Args:
             decoded: XOR decoded message data.
-            raw_body: Raw body bytes (unused but kept for signature compatibility).
 
         Returns:
             Status sync string.
         """
-        _ = raw_body  # Unused but part of interface
         subtype = decoded[0] if len(decoded) > 0 else 0
         tank_id = decoded[1] | (decoded[2] << 8) if len(decoded) > 2 else 0
         name = self.get_name(tank_id)

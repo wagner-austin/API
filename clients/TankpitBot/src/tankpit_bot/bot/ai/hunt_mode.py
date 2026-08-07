@@ -21,7 +21,6 @@ from tankpit_bot.bot.ai.combat_target import (
 )
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
-    can_use_radar,
     make_decision,
     radar_spend_worthwhile,
 )
@@ -107,7 +106,6 @@ def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
         viewport_left, viewport_top, _, _ = viewport_visible_bounds(ctx.filtered["viewport"])
         if (
             has_cardinal_combat_shot(ctx.self_state, target)
-            and can_use_radar(ctx)
             # Shared radar-spend economics (s9 flags): a stocked scan
             # must buy a real reveal, not a coverage sliver -- the
             # fully-covered check alone let 1-tile holes spend extras

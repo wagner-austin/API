@@ -79,6 +79,8 @@ def _session_json(
         "end_timestamp_ms": 2000,
         "base_url": "https://tankpit.com",
         "magic": magic,
+        "game_log": [],
+        "tank_names": {},
         "messages": list(messages) if messages is not None else [],
     }
     return dump_json_str(session)

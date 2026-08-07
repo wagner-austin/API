@@ -1,4 +1,4 @@
-"""Tests for :class:`tankpit_bot.service.mode_bridge.ModeBridge`.
+"""Tests for :class:`tankpit_bot.bus.mode_bridge.ModeBridge`.
 
 Covers the single-thread API contract — submit / drain / peek — plus a
 light multi-threaded scenario to prove the internal lock actually
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import threading
 
-from tankpit_bot.service.mode_bridge import ModeBridge
+from tankpit_bot.bus.mode_bridge import ModeBridge
 
 
 class TestModeBridge:
@@ -58,7 +58,7 @@ class TestModeBridge:
 
     def test_every_wire_mode_round_trips(self) -> None:
         """Every :data:`WIRE_MODES` value can round-trip through the bridge."""
-        from tankpit_bot.service.types import WIRE_MODES
+        from tankpit_bot.bus.session_status import WIRE_MODES
 
         bridge = ModeBridge()
         for mode in WIRE_MODES:

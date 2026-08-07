@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
+from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.fleet_manager import (
     FleetManager,
@@ -25,7 +26,7 @@ log = get_logger(__name__)
 
 def main() -> None:
     """Run the ``tankpit-fleet`` manager until interrupted."""
-    service_hooks.load_dotenv()
+    core_hooks.load_dotenv()
     port = resolve_fleet_port()
     manager = FleetManager()
     app = make_fleet_app(manager)

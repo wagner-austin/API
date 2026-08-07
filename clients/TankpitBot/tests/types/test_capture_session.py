@@ -78,6 +78,8 @@ def test_decode_capture_session() -> None:
             }
         ],
         "magic": "decoded_magic_key",
+        "game_log": [],
+        "tank_names": {},
     }
     result = decode_capture_session(data)
     assert result["session_id"] == "abc-123"
@@ -95,6 +97,8 @@ def test_decode_capture_session_with_none_magic() -> None:
         "base_url": "https://example.com",
         "messages": [],
         "magic": None,
+        "game_log": [],
+        "tank_names": {},
     }
     result = decode_capture_session(data)
     assert result["magic"] is None
@@ -108,6 +112,8 @@ def test_decode_capture_session_with_missing_magic() -> None:
         "end_timestamp_ms": 5000,
         "base_url": "https://example.com",
         "messages": [],
+        "game_log": [],
+        "tank_names": {},
     }
     result = decode_capture_session(data)
     assert result["magic"] is None
@@ -183,8 +189,8 @@ def test_decode_capture_session_with_game_log_and_tank_names() -> None:
     assert result["tank_names"]["200"] == "TankB"
 
 
-def test_decode_capture_session_with_non_dict_game_log_entry() -> None:
-    """Test decoding CaptureSession skips non-dict game_log entries."""
+def test_decode_capture_session_rejects_non_dict_game_log_entry() -> None:
+    """A non-object game_log entry is a malformed capture, not one to skip."""
     data: JSONObject = {
         "session_id": "session-skip",
         "start_timestamp_ms": 0,
@@ -202,14 +208,12 @@ def test_decode_capture_session_with_non_dict_game_log_entry() -> None:
         ],
         "tank_names": {},
     }
-    result = decode_capture_session(data)
-    # Only the valid dict entry should be decoded
-    assert len(result["game_log"]) == 1
-    assert result["game_log"][0]["text"] == "Valid entry"
+    with pytest.raises(JSONTypeError, match=r"game_log\[0\] must be an object"):
+        decode_capture_session(data)
 
 
-def test_decode_capture_session_with_non_string_tank_name_values() -> None:
-    """Test decoding CaptureSession skips non-string tank_names."""
+def test_decode_capture_session_rejects_non_string_tank_name_values() -> None:
+    """A non-string tank name is a malformed capture, not one to skip."""
     data: JSONObject = {
         "session_id": "session-names",
         "start_timestamp_ms": 0,
@@ -220,7 +224,5 @@ def test_decode_capture_session_with_non_string_tank_name_values() -> None:
         "game_log": [],
         "tank_names": {"100": "ValidName", "200": 12345, "300": None},
     }
-    result = decode_capture_session(data)
-    # Only the valid string value should be decoded
-    assert len(result["tank_names"]) == 1
-    assert result["tank_names"]["100"] == "ValidName"
+    with pytest.raises(JSONTypeError, match=r"tank_names\['200'\] must be a string"):
+        decode_capture_session(data)

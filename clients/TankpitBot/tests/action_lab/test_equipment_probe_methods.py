@@ -117,9 +117,8 @@ def _make_probe() -> EquipmentProbe:
     return probe
 
 
-def test_build_attempt_result_delegates(real_inventory: None) -> None:
+def test_build_attempt_result_delegates() -> None:
     """_build_attempt_result delegates to build_attempt_result_for_probe."""
-    _ = real_inventory
     probe = _make_probe()
     container = make_container_state(11, 20, False, 0, timestamp_ms=2000)
 
@@ -147,9 +146,8 @@ def test_build_attempt_result_delegates(real_inventory: None) -> None:
     assert result["message_end_index"] == 1
 
 
-def test_build_map_sync_timeout_result_delegates(real_inventory: None) -> None:
+def test_build_map_sync_timeout_result_delegates() -> None:
     """_build_map_sync_timeout_result delegates to the operations builder."""
-    _ = real_inventory
     set_inventory_total(4)
     action_hooks.get_current_time_ms = _Clock(2000)
     probe = _make_probe()
@@ -166,9 +164,8 @@ def test_build_map_sync_timeout_result_delegates(real_inventory: None) -> None:
     assert result["completion_timestamp_ms"] == 2000
 
 
-def test_build_teleport_timeout_result_delegates(real_inventory: None) -> None:
+def test_build_teleport_timeout_result_delegates() -> None:
     """_build_teleport_timeout_result delegates to the operations builder."""
-    _ = real_inventory
     set_inventory_total(2)
     probe = _make_probe()
 
@@ -186,11 +183,8 @@ def test_build_teleport_timeout_result_delegates(real_inventory: None) -> None:
     assert result["status"] == "teleport_timeout"
 
 
-def test_build_reposition_map_sync_timeout_result_delegates(
-    real_inventory: None,
-) -> None:
+def test_build_reposition_map_sync_timeout_result_delegates() -> None:
     """_build_reposition_map_sync_timeout_result delegates correctly."""
-    _ = real_inventory
     set_inventory_total(1)
     action_hooks.get_current_time_ms = _Clock(2500)
     probe = _make_probe()
@@ -217,11 +211,8 @@ def test_build_reposition_map_sync_timeout_result_delegates(
     assert result["completion_timestamp_ms"] == 2500
 
 
-def test_build_reposition_teleport_timeout_result_delegates(
-    real_inventory: None,
-) -> None:
+def test_build_reposition_teleport_timeout_result_delegates() -> None:
     """_build_reposition_teleport_timeout_result delegates correctly."""
-    _ = real_inventory
     set_inventory_total(1)
     probe = _make_probe()
     container = make_container_state(11, 20, False, 0, timestamp_ms=2000)
@@ -248,9 +239,8 @@ def test_build_reposition_teleport_timeout_result_delegates(
     assert result["status"] == "reposition_teleport_timeout"
 
 
-def test_build_radar_timeout_result_delegates(real_inventory: None) -> None:
+def test_build_radar_timeout_result_delegates() -> None:
     """_build_radar_timeout_result delegates to the operations builder."""
-    _ = real_inventory
     set_inventory_total(2)
     action_hooks.get_current_time_ms = _Clock(2200)
     probe = _make_probe()
@@ -273,11 +263,8 @@ def test_build_radar_timeout_result_delegates(real_inventory: None) -> None:
     assert result["completion_timestamp_ms"] == 2200
 
 
-def test_build_no_equipment_visible_result_delegates(
-    real_inventory: None,
-) -> None:
+def test_build_no_equipment_visible_result_delegates() -> None:
     """_build_no_equipment_visible_result delegates to the operations builder."""
-    _ = real_inventory
     set_inventory_total(2)
     action_hooks.get_current_time_ms = _Clock(2500)
     probe = _make_probe()
@@ -332,14 +319,13 @@ def test_make_reposition_target_labels_coordinates() -> None:
     assert target == TeleportTargetDict(label="equipment_reposition_105_107", x=105, y=107)
 
 
-def test_run_pickup_attempt_delegates_on_fast_path(real_inventory: None) -> None:
+def test_run_pickup_attempt_delegates_on_fast_path() -> None:
     """_run_pickup_attempt delegates to the shared pickup operation.
 
     The drain hook grows the inventory total, so the shared operation
     takes the fast path (no move dispatch, no waiting) and builds the
     picked-up result through the probe's builder plumbing.
     """
-    _ = real_inventory
     set_inventory_total(0)
     action_hooks.get_current_time_ms = _Clock(3000)
     probe = _make_probe()

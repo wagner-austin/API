@@ -2,7 +2,7 @@
 
 Reads a JSONL events artifact, collects every ``entity_alignment_sample``
 DIAGNOSTIC (emitted by
-:func:`tankpit_bot.diagnostics.entity_alignment.maybe_emit_entity_alignment_sample`),
+:meth:`tankpit_bot.diagnostics.entity_alignment.EntityAlignmentEmitter.maybe_emit`),
 and for each minified ``activeGame.h`` collection searches all ordered
 pairs of numeric item fields for the ``(x_key, y_key)`` pair that best
 matches the bot's wire-derived container positions. A collection whose

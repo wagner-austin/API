@@ -13,9 +13,6 @@ import pytest
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot import tick_body as tick_body_module
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.sniffer.world_state import (
-    reset_world_state,
-)
 from tests.bot._tick_loop_fakes import (
     _BrowserClosedPage,
     _fail_tick_once_with_browser_closed,
@@ -41,7 +38,6 @@ class TestStopFileDetection:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import run_tick_loop
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
 
         stop_path = Path("C:/tmp/test_stop_file.sentinel")
@@ -160,14 +156,12 @@ class TestInterruptedExitReason:
         """Reset world state + interrupt flag before each test."""
         from tankpit_bot.bot.tick_loop import reset_interrupt_flag
 
-        reset_world_state()
         reset_interrupt_flag()
 
     def teardown_method(self) -> None:
         """Reset world state + interrupt flag after each test."""
         from tankpit_bot.bot.tick_loop import reset_interrupt_flag
 
-        reset_world_state()
         reset_interrupt_flag()
 
     def test_pre_set_interrupt_records_interrupted_row(
@@ -302,14 +296,12 @@ class TestBrowserClosedExit:
         """Reset world state + interrupt flag before each test."""
         from tankpit_bot.bot.tick_loop import reset_interrupt_flag
 
-        reset_world_state()
         reset_interrupt_flag()
 
     def teardown_method(self) -> None:
         """Reset world state + interrupt flag after each test."""
         from tankpit_bot.bot.tick_loop import reset_interrupt_flag
 
-        reset_world_state()
         reset_interrupt_flag()
 
     def test_browser_closed_between_ticks_records_browser_closed(
@@ -384,9 +376,9 @@ class TestBrowserClosedExit:
 
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import run_tick_loop
+        from tankpit_bot.bus.frame_bus import FrameBus
         from tankpit_bot.diagnostics.runs_index import DEFAULT_INDEX_PATH, decode_row
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
-        from tankpit_bot.service.frame_bus import FrameBus
 
         class _ClosedTargetCDP:
             def send(self, method: str, params: JSONObject | None = None) -> JSONObject:

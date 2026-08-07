@@ -6,21 +6,13 @@ detail is now a sibling.
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state.types import make_viewport_state
 
 
 class TestDispatchViewportUpdate:
     """Tests for dispatch with ViewportUpdate (0x5A)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_dispatch_viewport_update_invalidates_absent_tanks(self) -> None:
         """Viewport update does not invalidate tanks absent from ``0x5A``."""
@@ -156,14 +148,6 @@ class TestDispatchViewportUpdate:
 
 class TestViewportContainerExtraction:
     """Tests for fuel/equipment container extraction from viewport entities."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_fuel_cache_from_viewport_entity_creates_fuel_container(self) -> None:
         """A 0x5A fuel cache byte lifts directly into world.containers."""
@@ -317,14 +301,6 @@ class TestViewportContainerExtraction:
 class TestViewportInvalidationEdgeCases:
     """Tests for viewport entity processing edge cases."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_viewport_update_applies_without_self_state(self) -> None:
         """Viewport origin updates even before self movement is known."""
         from tankpit_bot.protocol import ViewportUpdateDict
@@ -437,14 +413,6 @@ class TestViewportInvalidationEdgeCases:
 
 class TestViewportPatchSweep:
     """Reset-then-apply: the 0x5A patch's silence removes stale visible entries."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_landing_patch_sweeps_silent_visible_entries(self) -> None:
         """Visible-layer entries the patch is silent about are removed.

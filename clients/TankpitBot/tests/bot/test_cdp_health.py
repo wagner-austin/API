@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_fuel_total as _update_fuel_total,
@@ -67,10 +67,7 @@ class TestPageClientHealthGate:
         from tankpit_bot._test_hooks import CDPSessionProtocol
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-            update_world_state_from_position,
-        )
+        from tankpit_bot.sniffer.world_state import update_world_state_from_position
 
         class _UnhealthySnapshotCDP(CDPSessionProtocol):
             """CDP returning a healthy-shaped snapshot with ws_ready_state=3 (CLOSED)."""
@@ -112,7 +109,6 @@ class TestPageClientHealthGate:
             def detach(self) -> None:
                 return
 
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 800)
 

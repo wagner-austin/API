@@ -212,6 +212,8 @@ def _resolve_with_tracked_reposition(
     Returns:
         The ``FuelTargetResolution`` produced by the real resolver.
     """
+    from tests.action_lab._teleport_seams import fuel_target_phase_module
+
     from tankpit_bot.action_lab import fuel_target_phase
 
     clock = ReplayClock(2000)
@@ -220,7 +222,7 @@ def _resolve_with_tracked_reposition(
     page = ClockAdvancingPage(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     fuel_target = make_container_state(101, 100, True, 300)
-    original_attempt_runner = fuel_target_phase.run_reposition_attempt
+    original_attempt_runner = fuel_target_phase_module.run_tracked_teleport_attempt
 
     def _capture_page_snapshot(
         phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
@@ -334,7 +336,7 @@ def _resolve_with_tracked_reposition(
             teleport_started_ms=reposition_teleport_started_ms,
         )
 
-    fuel_target_phase.run_reposition_attempt = _run_attempt
+    fuel_target_phase_module.run_tracked_teleport_attempt = _run_attempt
     try:
         return fuel_target_phase.resolve_fuel_target_after_radar(
             page,
@@ -394,7 +396,7 @@ def _resolve_with_tracked_reposition(
             ),
         )
     finally:
-        fuel_target_phase.run_reposition_attempt = original_attempt_runner
+        fuel_target_phase_module.run_tracked_teleport_attempt = original_attempt_runner
 
 
 def _unused_teleport_outcome_waiter(

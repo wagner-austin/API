@@ -11,7 +11,7 @@ from tankpit_bot.sim.lobby import SIM_ACCOUNT, SimLobby
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.session import SimCDPSession, deliver_batch
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.wire.helpers import EncodeError
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -89,7 +89,6 @@ def test_each_lobby_reply_is_its_own_payload() -> None:
 
 def test_the_production_join_flow_reaches_a_room_over_the_seam() -> None:
     """The REAL ``join_room`` drives the sim lobby end to end."""
-    reset_world_state()
     link = _link()
     link.open_lobby()
 
@@ -109,7 +108,6 @@ def test_the_join_flow_registers_the_rooms_field_image() -> None:
     lobby was skipped; without a selected room the bot's decision
     terrain stays ``None`` for the whole session.
     """
-    reset_world_state()
     link = _link()
     link.open_lobby()
     join_room(link, link)
@@ -188,7 +186,6 @@ def test_pressing_any_other_key_is_refused() -> None:
 
 def test_the_production_enforcer_verifies_autoscroll_off_over_the_seam() -> None:
     """The real press-and-verify dance runs against the sim's channel."""
-    reset_world_state()
     link = _link()
     link.open_lobby()
     deliver_batch([], link.server.handshake(), link)
@@ -283,4 +280,4 @@ def _drain(link: SimCDPSession) -> None:
 
     for captured in link.wire_log:
         if captured["direction"] == "received":
-            process_received_message(captured["payload"], link.table)
+            process_received_message(get_world_service(), captured["payload"], link.table)

@@ -13,8 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from tankpit_bot.service.frame_bus import FrameSubscriber, FrameSubscriberProtocol
-from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.bus.frame_bus import FrameSubscriber, FrameSubscriberProtocol
 from tests.bot._tick_loop_fakes import _FakePage
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes import FakeCDPSession
@@ -52,14 +51,6 @@ class _ExplodingFrameBus:
 
 class TestCrashedExitReason:
     """An unhandled tick exception produces ``exit_reason=crashed``."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_unhandled_tick_exception_finalizes_artifacts_and_reraises(
         self, fake_fs: FakeFileSystem, fake_env: FakeEnv

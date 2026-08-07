@@ -14,7 +14,7 @@ from __future__ import annotations
 import threading
 from typing import Protocol
 
-from tankpit_bot.service.types import WireMode
+from tankpit_bot.bus.session_status import WireMode
 
 
 class ModeBridgeProtocol(Protocol):

@@ -13,8 +13,8 @@ from tankpit_bot.action_lab.movement_probe_types import (
     encode_movement_probe_attempt_result,
     encode_movement_probe_session,
 )
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 
 
 def _snapshot(timestamp_ms: int) -> PageClientSnapshotDict:

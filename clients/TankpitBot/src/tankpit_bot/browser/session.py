@@ -17,7 +17,6 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.browser.cdp_utils import (
     get_current_time_ms,
-    reset_cdp_time_offset,
 )
 from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
@@ -125,5 +124,4 @@ class BrowserSession(SessionBase):
 __all__ = [
     "BrowserSession",
     "get_current_time_ms",
-    "reset_cdp_time_offset",
 ]

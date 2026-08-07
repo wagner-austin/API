@@ -17,20 +17,12 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.protocol import MovementResponseDict, TankInfoDict
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
 class TestHuntAcquiresWireConfirmedEnemy:
     """Integration test for HUNT acquisition of a wire-confirmed enemy."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_enemy_visible_in_threat_list_after_wire_confirmation(self) -> None:
         """Wire-confirmed enemy MUST surface in analyze_threats."""

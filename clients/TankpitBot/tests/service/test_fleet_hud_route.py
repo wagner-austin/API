@@ -24,7 +24,8 @@ async def test_hud_route_serves_a_written_frame_verbatim(
     fleet_client: TestClient[web.Request, web.Application],
 ) -> None:
     """A run with a HUD frame gets exactly the bytes it wrote."""
-    spawn = await fleet_client.post("/bots", json={"instance": "alpha", "kills": 5})
+    payload: dict[str, str | int] = {"instance": "alpha", "kills": 5}
+    spawn = await fleet_client.post("/bots", json=payload)
     assert spawn.status == 201
 
     written = '{"mode": "HUNT", "fuel": 812, "kills": 3}'

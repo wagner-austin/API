@@ -24,69 +24,68 @@ from __future__ import annotations
 
 from platform_core.json_utils import JSONObject, dump_json_str
 
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.action_lab.page_client_snapshot_codecs import encode_client_collections
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.browser.page_client_snapshot_codecs import encode_client_collections
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state.types import WorldStateDict, encode_container_state
 
-_last_emitted_signature: frozenset[tuple[int, int, bool]] | None = None
 
+class EntityAlignmentEmitter:
+    """Per-session change-gate for ``entity_alignment_sample`` diagnostics.
 
-def reset_entity_alignment_emitter() -> None:
-    """Reset the change-gate so the next sample always emits.
-
-    Called from test isolation fixtures; a fresh bot process starts
-    with the gate already clear.
+    The gate is one session's memory of what it last wrote, so it is
+    instance state: two sessions in one process each need their own
+    ([[session-state-deglobalisation]]). A fresh instance starts with
+    the gate clear, which is why no reset function exists.
     """
-    global _last_emitted_signature
-    _last_emitted_signature = None
 
+    def __init__(self) -> None:
+        self._last_signature: frozenset[tuple[int, int, bool]] | None = None
 
-def maybe_emit_entity_alignment_sample(
-    world: WorldStateDict,
-    snapshot: PageClientSnapshotDict,
-    *,
-    in_combat: bool,
-) -> bool:
-    """Emit an ``entity_alignment_sample`` DIAGNOSTIC when beliefs changed.
+    def maybe_emit(
+        self,
+        world: WorldStateDict,
+        snapshot: PageClientSnapshotDict,
+        *,
+        in_combat: bool,
+    ) -> bool:
+        """Emit an ``entity_alignment_sample`` DIAGNOSTIC when beliefs changed.
 
-    Args:
-        world: Bot's wire-derived world state for this tick.
-        snapshot: Live page-client snapshot captured in the same tick.
-        in_combat: True while the bot is engaged; bypasses the
-            change-gate so enemy tank dynamics (position, damage) are
-            sampled every tick for offline field-mapping correlation.
+        Args:
+            world: Bot's wire-derived world state for this tick.
+            snapshot: Live page-client snapshot captured in the same tick.
+            in_combat: True while the bot is engaged; bypasses the
+                change-gate so enemy tank dynamics (position, damage) are
+                sampled every tick for offline field-mapping correlation.
 
-    Returns:
-        True when a sample was emitted; False when the capture was
-        skipped because the snapshot carries no world collections
-        (client world object not yet populated) or the belief container
-        signature is unchanged since the last emitted sample outside
-        combat.
-    """
-    global _last_emitted_signature
-    if not snapshot["world_collections"]:
-        return False
-    containers = list(world["containers"].values())
-    signature = frozenset((c["x"], c["y"], c["is_fuel"]) for c in containers)
-    if not in_combat and signature == _last_emitted_signature:
-        return False
-    _last_emitted_signature = signature
-    belief_payload: JSONObject = {
-        "containers": [encode_container_state(c) for c in containers],
-    }
-    emit_diagnostic(
-        diagnostic_kind="entity_alignment_sample",
-        belief_container_count=len(containers),
-        belief_containers_json=dump_json_str(belief_payload),
-        world_collections_json=dump_json_str(
-            encode_client_collections(snapshot["world_collections"])
-        ),
-    )
-    return True
+        Returns:
+            True when a sample was emitted; False when the capture was
+            skipped because the snapshot carries no world collections
+            (client world object not yet populated) or the belief container
+            signature is unchanged since the last emitted sample outside
+            combat.
+        """
+        if not snapshot["world_collections"]:
+            return False
+        containers = list(world["containers"].values())
+        signature = frozenset((c["x"], c["y"], c["is_fuel"]) for c in containers)
+        if not in_combat and signature == self._last_signature:
+            return False
+        self._last_signature = signature
+        belief_payload: JSONObject = {
+            "containers": [encode_container_state(c) for c in containers],
+        }
+        emit_diagnostic(
+            diagnostic_kind="entity_alignment_sample",
+            belief_container_count=len(containers),
+            belief_containers_json=dump_json_str(belief_payload),
+            world_collections_json=dump_json_str(
+                encode_client_collections(snapshot["world_collections"])
+            ),
+        )
+        return True
 
 
 __all__ = [
-    "maybe_emit_entity_alignment_sample",
-    "reset_entity_alignment_emitter",
+    "EntityAlignmentEmitter",
 ]

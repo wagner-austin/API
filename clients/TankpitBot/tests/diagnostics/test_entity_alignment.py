@@ -2,7 +2,7 @@
 
 Every test drives the REAL pipeline:
 :func:`tankpit_bot.runtime_logging.configure_bot_runtime_logging` ->
-:func:`tankpit_bot.diagnostics.entity_alignment.maybe_emit_entity_alignment_sample`
+:meth:`tankpit_bot.diagnostics.entity_alignment.EntityAlignmentEmitter.maybe_emit`
 -> real ``_HookEventArtifactHandler`` -> JSONL via
 :class:`tests.conftest.FakeFileSystem` -> real
 :func:`tankpit_bot.diagnostics.event_stream.load_event_records` ->
@@ -16,11 +16,10 @@ from pathlib import Path
 from platform_core.json_utils import JSONObject, dump_json_str
 from tests.conftest import FakeFileSystem
 
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.action_lab.page_client_snapshot_codecs import encode_client_collections
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.browser.page_client_snapshot_codecs import encode_client_collections
 from tankpit_bot.diagnostics.entity_alignment import (
-    maybe_emit_entity_alignment_sample,
-    reset_entity_alignment_emitter,
+    EntityAlignmentEmitter,
 )
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging
@@ -90,7 +89,7 @@ def test_emit_writes_sample_through_real_pipeline(fake_fs: FakeFileSystem) -> No
     artifacts = configure_bot_runtime_logging("20260610-120000")
     world = _make_world([(146, 44, True), (150, 48, False)])
 
-    emitted = maybe_emit_entity_alignment_sample(
+    emitted = EntityAlignmentEmitter().maybe_emit(
         world,
         _make_snapshot(_COLLECTIONS),
         in_combat=False,
@@ -114,9 +113,10 @@ def test_emit_skips_when_collections_empty(fake_fs: FakeFileSystem) -> None:
     """An empty truth side produces no sample -- there is nothing to align."""
     artifacts = configure_bot_runtime_logging("20260610-120000")
     world = _make_world([(146, 44, True)])
-    assert maybe_emit_entity_alignment_sample(world, _make_snapshot(_COLLECTIONS), in_combat=False)
+    emitter = EntityAlignmentEmitter()
+    assert emitter.maybe_emit(world, _make_snapshot(_COLLECTIONS), in_combat=False)
 
-    emitted = maybe_emit_entity_alignment_sample(
+    emitted = emitter.maybe_emit(
         _make_world([(1, 2, True)]),
         _make_snapshot({}),
         in_combat=False,
@@ -130,9 +130,10 @@ def test_emit_gates_on_unchanged_container_signature(fake_fs: FakeFileSystem) ->
     """A second tick with the same container set emits nothing new."""
     artifacts = configure_bot_runtime_logging("20260610-120000")
     world = _make_world([(146, 44, True), (150, 48, False)])
-    assert maybe_emit_entity_alignment_sample(world, _make_snapshot(_COLLECTIONS), in_combat=False)
+    emitter = EntityAlignmentEmitter()
+    assert emitter.maybe_emit(world, _make_snapshot(_COLLECTIONS), in_combat=False)
 
-    emitted = maybe_emit_entity_alignment_sample(
+    emitted = emitter.maybe_emit(
         world,
         _make_snapshot(_COLLECTIONS),
         in_combat=False,
@@ -145,13 +146,14 @@ def test_emit_gates_on_unchanged_container_signature(fake_fs: FakeFileSystem) ->
 def test_emit_again_when_container_set_changes(fake_fs: FakeFileSystem) -> None:
     """A pickup (container removal) re-opens the gate and emits a second sample."""
     artifacts = configure_bot_runtime_logging("20260610-120000")
-    assert maybe_emit_entity_alignment_sample(
+    emitter = EntityAlignmentEmitter()
+    assert emitter.maybe_emit(
         _make_world([(146, 44, True), (150, 48, False)]),
         _make_snapshot(_COLLECTIONS),
         in_combat=False,
     )
 
-    emitted = maybe_emit_entity_alignment_sample(
+    emitted = emitter.maybe_emit(
         _make_world([(150, 48, False)]),
         _make_snapshot(_COLLECTIONS),
         in_combat=False,
@@ -162,14 +164,18 @@ def test_emit_again_when_container_set_changes(fake_fs: FakeFileSystem) -> None:
     assert [r["fields"]["belief_container_count"] for r in records] == [2, 1]
 
 
-def test_reset_clears_change_gate(fake_fs: FakeFileSystem) -> None:
-    """``reset_entity_alignment_emitter`` lets an identical belief emit again."""
+def test_each_emitter_carries_its_own_gate(fake_fs: FakeFileSystem) -> None:
+    """A second emitter emits the same belief -- the gate is instance state.
+
+    This is the property that replaced ``reset_entity_alignment_emitter``:
+    two sessions in one process must not silence each other's samples
+    ([[session-state-deglobalisation]] step 3).
+    """
     artifacts = configure_bot_runtime_logging("20260610-120000")
     world = _make_world([(146, 44, True)])
-    assert maybe_emit_entity_alignment_sample(world, _make_snapshot(_COLLECTIONS), in_combat=False)
+    assert EntityAlignmentEmitter().maybe_emit(world, _make_snapshot(_COLLECTIONS), in_combat=False)
 
-    reset_entity_alignment_emitter()
-    emitted = maybe_emit_entity_alignment_sample(
+    emitted = EntityAlignmentEmitter().maybe_emit(
         world,
         _make_snapshot(_COLLECTIONS),
         in_combat=False,
@@ -188,7 +194,7 @@ def test_emit_with_empty_belief_captures_blindness_case(fake_fs: FakeFileSystem)
     """
     artifacts = configure_bot_runtime_logging("20260610-120000")
 
-    emitted = maybe_emit_entity_alignment_sample(
+    emitted = EntityAlignmentEmitter().maybe_emit(
         _make_world([]),
         _make_snapshot(_COLLECTIONS),
         in_combat=False,

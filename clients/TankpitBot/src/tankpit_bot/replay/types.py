@@ -8,15 +8,15 @@ from __future__ import annotations
 from platform_core.json_utils import JSONObject, JSONValue, require_int, require_str
 from typing_extensions import TypedDict
 
-from tankpit_bot.bot.ai.modes import (
+from tankpit_bot.bot.ai.types_codecs import decode_enemy_threat, encode_enemy_threat
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.types.modes import (
     AIMode,
     AIModeState,
     is_valid_ai_mode_state,
     require_ai_mode,
     require_ai_mode_state,
 )
-from tankpit_bot.bot.ai.types_codecs import decode_enemy_threat, encode_enemy_threat
-from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 
 
 class ReplayTickTraceDict(TypedDict):

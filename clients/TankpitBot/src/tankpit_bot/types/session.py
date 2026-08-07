@@ -10,6 +10,7 @@ from platform_core.json_utils import (
     JSONValue,
     optional_int,
     optional_str,
+    require_dict,
     require_int,
     require_list,
     require_str,
@@ -113,27 +114,23 @@ def decode_capture_session(data: JSONObject) -> CaptureSession:
             raise JSONTypeError(f"messages[{idx}] must be an object")
         messages.append(decode_captured_message(raw_msg))
 
-    # Decode game log (with backwards compatibility for old sessions)
     game_log: list[GameLogEntryWithTimestamp] = []
-    raw_game_log = data.get("game_log")
-    if raw_game_log is not None and isinstance(raw_game_log, list):
-        for raw_entry in raw_game_log:
-            if isinstance(raw_entry, dict):
-                game_log.append(
-                    GameLogEntryWithTimestamp(
-                        timestamp_ms=require_int(raw_entry, "timestamp_ms"),
-                        text=require_str(raw_entry, "text"),
-                        category=require_str(raw_entry, "category"),
-                    )
-                )
+    for idx, raw_entry in enumerate(require_list(data, "game_log")):
+        if not isinstance(raw_entry, dict):
+            raise JSONTypeError(f"game_log[{idx}] must be an object")
+        game_log.append(
+            GameLogEntryWithTimestamp(
+                timestamp_ms=require_int(raw_entry, "timestamp_ms"),
+                text=require_str(raw_entry, "text"),
+                category=require_str(raw_entry, "category"),
+            )
+        )
 
-    # Decode tank names (with backwards compatibility)
     tank_names: dict[str, str] = {}
-    raw_tank_names = data.get("tank_names")
-    if raw_tank_names is not None and isinstance(raw_tank_names, dict):
-        for key, value in raw_tank_names.items():
-            if isinstance(key, str) and isinstance(value, str):
-                tank_names[key] = value
+    for key, value in require_dict(data, "tank_names").items():
+        if not isinstance(value, str):
+            raise JSONTypeError(f"tank_names[{key!r}] must be a string")
+        tank_names[key] = value
 
     return CaptureSession(
         session_id=require_str(data, "session_id"),

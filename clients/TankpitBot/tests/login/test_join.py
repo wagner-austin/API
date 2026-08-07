@@ -26,7 +26,6 @@ from tankpit_bot.browser.room_join import (
     join_room,
 )
 from tankpit_bot.protocol.framing import encode_frame
-from tankpit_bot.sniffer import world_state
 from tankpit_bot.sniffer.world_state import get_world_service
 from tests.login.conftest import (
     FakeCDPLogin,
@@ -184,7 +183,6 @@ def test_collect_room_entries_skips_non_room_messages_and_short_entries() -> Non
 
 def test_register_room_entries_skips_missing_images() -> None:
     """Room registration stores the field image from ROOM_LIST data."""
-    world_state.reset_world_state()
 
     _register_room_entries(
         [

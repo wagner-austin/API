@@ -57,9 +57,7 @@ class TestLockedResourceTarget:
         """DecideCtx exposes the durable top-level mode and substate."""
         from tankpit_bot.bot.ai.context import DecideCtx
         from tankpit_bot.bot.ai.types import AIStateDict
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
@@ -77,14 +75,11 @@ class TestLockedResourceTarget:
         assert ctx.mode == "HUNT"
         assert ctx.mode_state == "ACQUIRE"
         assert ctx.mode_started_ms == 999
-        reset_world_state()
 
     def test_returns_none_for_wrong_kind(self) -> None:
         """Locked target returns None when kind doesn't match."""
         from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
@@ -92,14 +87,11 @@ class TestLockedResourceTarget:
         ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
         _, target = locked_resource_target(ctx, "equipment")
         assert target is None
-        reset_world_state()
 
     def test_clears_when_container_missing(self) -> None:
         """Locked target clears when container not in filtered world."""
         from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         state = set_resource_target(make_initial_ai_state(), "fuel", 99, 99)
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
@@ -108,14 +100,11 @@ class TestLockedResourceTarget:
         base_state, target = locked_resource_target(ctx, "fuel")
         assert target is None
         assert base_state["resource_target_kind"] == ""
-        reset_world_state()
 
     def test_clears_when_kind_mismatch_fuel(self) -> None:
         """Locked fuel target clears when container is equipment."""
         from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, False, 0)
         self_state = _self_state()
@@ -123,14 +112,11 @@ class TestLockedResourceTarget:
         ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
         _, target = locked_resource_target(ctx, "fuel")
         assert target is None
-        reset_world_state()
 
     def test_clears_when_kind_mismatch_equipment(self) -> None:
         """Locked equipment target clears when container is fuel."""
         from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         state = set_resource_target(make_initial_ai_state(), "equipment", 10, 20)
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
@@ -138,14 +124,11 @@ class TestLockedResourceTarget:
         ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
         _, target = locked_resource_target(ctx, "equipment")
         assert target is None
-        reset_world_state()
 
     def test_clears_when_failed_pickups(self) -> None:
         """Locked target clears when container has failed pickups."""
         from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, True, 500, failed_pickups=2)
         self_state = _self_state()
@@ -153,7 +136,6 @@ class TestLockedResourceTarget:
         ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
         _, target = locked_resource_target(ctx, "fuel")
         assert target is None
-        reset_world_state()
 
 
 class TestLockedResourceTargetMissingContainer:
@@ -170,9 +152,7 @@ class TestLockedResourceTargetMissingContainer:
         import pytest
 
         from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.sniffer.world_state import reset_world_state
 
-        reset_world_state()
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
@@ -182,7 +162,6 @@ class TestLockedResourceTargetMissingContainer:
         ctx.filtered = WorldStateDict(**{**ctx.filtered, "containers": {}})
         with pytest.raises(KeyError):
             locked_resource_target(ctx, "fuel")
-        reset_world_state()
 
 
 class TestMakePickupCommandError:

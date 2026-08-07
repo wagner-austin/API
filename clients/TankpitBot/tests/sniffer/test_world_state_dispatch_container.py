@@ -3,21 +3,13 @@
 from __future__ import annotations
 
 from tankpit_bot.protocol import RadarContainerDict
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
 
 class TestDispatchTilePatchUpdates:
     """Tests for absolute tile patch dispatch in world state."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_dispatch_overlay_update_creates_mine_and_keeps_terrain(self) -> None:
         """Top-level 0x40 lifts overlay bytes into world.mines and leaves terrain alone."""
@@ -138,14 +130,6 @@ class TestDispatchTilePatchUpdates:
 
 class TestDispatchShootEvent:
     """Tests for 0x53 ShootEvent dispatch (protocol path)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_own_shot_with_tank_at_target_marks_hit(self) -> None:
         """Own shot landing on a tracked tank marks confirmed hit."""
@@ -409,14 +393,6 @@ class TestDispatchProtocolDeactivation:
     dispatch_world_state_update routes the integer msg_type 0x41.
     """
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_dispatch_deactivation_marks_liveness_deactivated(self) -> None:
         """Dispatch 0x41 marks the victim ``liveness="deactivated"`` and
         preserves the death tile.
@@ -455,14 +431,6 @@ class TestDispatchProtocolDeactivation:
 class TestIncrementContainerFailedPickups:
     """Tests for increment_container_failed_pickups."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_increments_failed_pickups(self) -> None:
         """Incrementing raises the failed_pickups counter by 1."""
         from tankpit_bot.sniffer.world_state_containers import increment_container_failed_pickups
@@ -486,14 +454,6 @@ class TestIncrementContainerFailedPickups:
 
 class TestRemoveContainerAt:
     """Tests for remove_container_at world state mutation."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_removes_existing_container(self) -> None:
         """remove_container_at removes a container at the given coordinates."""

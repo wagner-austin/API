@@ -12,7 +12,6 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_common import (
     COLLECT_SCORE,
     emit_hop_declined,
-    is_container_blacklisted,
 )
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision, set_resource_target
 from tankpit_bot.bot.ai.equipment_search import find_all_tracked_equipment
@@ -309,7 +308,7 @@ def _hop_toward_fuel_larder(
         return None
     if ctx.terrain is None:
         return None
-    selection = select_fuel_larder_hop(ctx, is_blacklisted=is_container_blacklisted)
+    selection = select_fuel_larder_hop(ctx)
     container = selection["container"]
     if container is None:
         if selection["candidates"] > 0:
@@ -404,8 +403,6 @@ def desperation_fuel_hop(
         if not container["is_fuel"] or container["volume"] <= 0:
             continue
         if container["failed_pickups"] > 0:
-            continue
-        if is_container_blacklisted(container["x"], container["y"]):
             continue
         landing = find_attainable_landing_tile(terrain, container["x"], container["y"])
         if landing is None:
@@ -505,8 +502,6 @@ def walk_for_fuel_last_resort(
         if not container["is_fuel"] or container["volume"] <= 0:
             continue
         if container["failed_pickups"] > 0:
-            continue
-        if is_container_blacklisted(container["x"], container["y"]):
             continue
         candidates.append(
             (abs(container["x"] - sx) + abs(container["y"] - sy), container["x"], container["y"])

@@ -28,7 +28,6 @@ from tankpit_bot.bot.ai.mode_gates import (
     should_exit_collect,
     should_exit_hunt,
 )
-from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
@@ -37,6 +36,7 @@ from tankpit_bot.inventory import InventoryState
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+from tankpit_bot.types.modes import AIMode, AIModeState, is_valid_ai_mode_state
 
 
 def decide(

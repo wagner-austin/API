@@ -16,7 +16,6 @@ from tankpit_bot.bot.states import (
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.state.types import make_self_state
@@ -110,14 +109,6 @@ class TestEarlyWakeSleep:
 class TestWireSilenceWatchdog:
     """Tests for the connection-lost wire-silence watchdog."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_disarmed_before_first_game_message(self) -> None:
         """A zero stamp (boot, lobby) never trips the watchdog."""
         from tankpit_bot.bot.tick_body import _check_wire_silence
@@ -166,14 +157,6 @@ class TestWireSilenceWatchdog:
 
 class TestFriendlyFireDisproof:
     """Tests for consuming err=3 friendly_fire as target disproof."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_friendly_fire_blocks_target_and_releases_matching_lock(self) -> None:
         """One err=3 blocklists the id and clears the matching combat lock.
@@ -224,14 +207,6 @@ class TestFriendlyFireDisproof:
 
 class TestDrainReceipt:
     """A code=4 riding our own pickup is a drain receipt, not a desync."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_own_drain_code4_does_not_mark_desync(self, fake_env: FakeEnv) -> None:
         """Flag s9-4: a +241 pickup drained the container, the same
@@ -291,14 +266,6 @@ class TestDrainReceipt:
 
 class TestTeleportPreconditionReceipt:
     """Code 0 on a teleport blames the map state, never the tile."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_code0_teleport_rejection_leaves_tile_unmarked(self, fake_env: FakeEnv) -> None:
         """Flag s10-1: the map closed server-side while the snapshot

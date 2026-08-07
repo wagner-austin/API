@@ -25,11 +25,11 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
+from tankpit_bot.bus.frame_bus import FrameBusProtocol
+from tankpit_bot.bus.mode_bridge import ModeBridgeProtocol
+from tankpit_bot.bus.session_status import idle_session_status
+from tankpit_bot.bus.status_bus import StatusBusProtocol
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging
-from tankpit_bot.service.frame_bus import FrameBusProtocol
-from tankpit_bot.service.mode_bridge import ModeBridgeProtocol
-from tankpit_bot.service.status_bus import StatusBusProtocol
-from tankpit_bot.service.types import idle_session_status
 
 log = get_logger(__name__)
 

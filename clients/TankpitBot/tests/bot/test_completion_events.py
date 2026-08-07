@@ -19,7 +19,6 @@ from tankpit_bot.runtime_records import (
 )
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_combat import mark_teleport_landed
@@ -44,7 +43,6 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_clear_completed_map_open`` emits map_open completion via MAP_DATA."""
-        reset_world_state()
         update_world_state_from_position(50, 50)
         _update_fuel_total(get_world_service(), 800)
         artifacts = configure_bot_runtime_logging("20260331-230405")
@@ -78,7 +76,6 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_maybe_complete_walk`` emits move completion when tank is on target."""
-        reset_world_state()
         update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
@@ -120,7 +117,6 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_maybe_complete_teleport`` emits teleport completion via TeleportLanded."""
-        reset_world_state()
         update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
@@ -163,7 +159,6 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         fake_fs: FakeFileSystem,
     ) -> None:
         """Adjacent landing near an enemy is expected, not a failed target."""
-        reset_world_state()
         update_world_state_from_position(50, 50)
         configure_bot_runtime_logging("20260331-230405")
         ws = get_world_service()
@@ -215,7 +210,6 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         exemption blacklisted the enemy's tile for it -- the orange-6
         blocked-target case from the 2026-07-27 20-kill run.
         """
-        reset_world_state()
         update_world_state_from_position(50, 50)
         configure_bot_runtime_logging("20260331-230405")
         ws = get_world_service()
@@ -267,7 +261,6 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         30 s failed-move mark so the planner does not re-dispatch the
         same displaced teleport.
         """
-        reset_world_state()
         update_world_state_from_position(50, 50)
         configure_bot_runtime_logging("20260331-230405")
         ws = get_world_service()
@@ -320,7 +313,6 @@ def test_artifact_jsonl_lines_round_trip_through_real_decoder(
     completion-site emit round-trips through the file system end to end
     without any intermediate fixture.
     """
-    reset_world_state()
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
     from tankpit_bot.sniffer.world_state import mark_radar_scan_complete

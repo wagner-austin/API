@@ -54,7 +54,7 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_self_state
 from tankpit_bot.state.types import make_tank_state
 
@@ -98,7 +98,6 @@ def _restore_combat_probe_hooks() -> Generator[None, None, None]:
     combat_module._find_fresh_enemy = original_find_fresh
     combat_module._current_enemy_by_id = original_current
     combat_module.CombatProbe = original_probe_class
-    reset_world_state()
 
 
 def _enemy(tank_id: int = 7, *, x: int = 101, y: int = 100) -> EnemyThreatDict:

@@ -7,8 +7,9 @@ has teeth, plus every skip filter.
 
 from __future__ import annotations
 
+from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.sim.equipment import MERCY_BUNDLE
-from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, TICK_MS
+from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS
 from tankpit_bot.validate.shadow_laws import (
     shadow_corpse_window,
     shadow_damage_tier,
@@ -30,7 +31,7 @@ SELF_ID = 7
 ENEMY_ID = 9
 VICTIM_ID = 12
 
-CORPSE_MS = CORPSE_WINDOW_TICKS * TICK_MS
+CORPSE_MS = CORPSE_WINDOW_TICKS * TICK_RATE_MS
 
 
 def _timeline(
@@ -97,7 +98,7 @@ def _inventory(timestamp_ms: int, counts: list[int]) -> InventoryEventDict:
 
 class TestSyncCadence:
     def test_tick_cadence_is_exact(self) -> None:
-        timeline = _timeline(syncs=_syncs(ENEMY_ID, 0, TICK_MS, 8))
+        timeline = _timeline(syncs=_syncs(ENEMY_ID, 0, TICK_RATE_MS, 8))
         evidence = shadow_sync_cadence([timeline])
         assert (evidence["samples"], evidence["exact"]) == (1, 1)
 
@@ -107,12 +108,12 @@ class TestSyncCadence:
         assert (evidence["samples"], evidence["mismatches"]) == (1, 1)
 
     def test_self_tank_is_excluded(self) -> None:
-        timeline = _timeline(syncs=_syncs(SELF_ID, 0, TICK_MS, 8))
+        timeline = _timeline(syncs=_syncs(SELF_ID, 0, TICK_RATE_MS, 8))
         evidence = shadow_sync_cadence([timeline])
         assert evidence["samples"] == 0
 
     def test_too_few_gaps_is_not_a_sample(self) -> None:
-        timeline = _timeline(syncs=_syncs(ENEMY_ID, 0, TICK_MS, 3))
+        timeline = _timeline(syncs=_syncs(ENEMY_ID, 0, TICK_RATE_MS, 3))
         evidence = shadow_sync_cadence([timeline])
         assert evidence["samples"] == 0
 
@@ -123,8 +124,8 @@ class TestSyncCadence:
         median purely from 18-943 s absence holes around clean 2 s
         cores — the holes are line-of-sight, not cadence.
         """
-        core = _syncs(ENEMY_ID, 0, TICK_MS, 6)
-        resumed = _syncs(ENEMY_ID, 600_000, TICK_MS, 6)
+        core = _syncs(ENEMY_ID, 0, TICK_RATE_MS, 6)
+        resumed = _syncs(ENEMY_ID, 600_000, TICK_RATE_MS, 6)
         timeline = _timeline(syncs=core + resumed)
         evidence = shadow_sync_cadence([timeline])
         assert (evidence["samples"], evidence["exact"]) == (1, 1)

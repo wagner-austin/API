@@ -6,7 +6,6 @@ from tankpit_bot.container import MineDetonationDict
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
     recent_own_mine_hit,
-    reset_world_state,
 )
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state import make_self_state
@@ -32,14 +31,6 @@ def _seed_self(x: int, y: int) -> None:
 
 class TestOwnMineHitStamp:
     """Tests for the 0x45 own-tile detonation stamp."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_detonation_on_own_tile_stamps_the_flip_window(self) -> None:
         """A 0x45 containing our tile is the walk-over signature."""

@@ -10,7 +10,7 @@ hard-to-diagnose ways.
 These tests pin the harness's seams **explicitly** at the unit level:
 
 * The derived snapshot satisfies the real
-  :func:`tankpit_bot.action_lab.page_client_snapshot.decode_page_client_snapshot`.
+  :func:`tankpit_bot.browser.page_client_snapshot.decode_page_client_snapshot`.
 * The page substitute satisfies
   :class:`tankpit_bot._test_hooks.PageProtocol`.
 * The frame cursor honors its declared cursor semantics.
@@ -36,13 +36,12 @@ from tests.action_lab._replay_page import (
 )
 
 from tankpit_bot._test_hooks import PageProtocol
-from tankpit_bot.action_lab.page_client_snapshot import (
+from tankpit_bot.browser.page_client_snapshot import (
     PageClientSnapshotDict,
     decode_page_client_snapshot,
 )
 from tankpit_bot.sniffer.world_state import (
     get_world_state,
-    reset_world_state,
 )
 from tankpit_bot.state import (
     WorldStateDict,
@@ -141,7 +140,6 @@ def test_world_state_derived_cdp_on_and_detach_are_noops() -> None:
 
 def test_replay_page_satisfies_page_protocol() -> None:
     """The replay page exposes every method real production code consumes."""
-    reset_world_state()
     source = FrameBatchSource(payloads=[], batch_size=1)
     clock = ReplayClock()
 
@@ -168,7 +166,6 @@ def test_replay_page_satisfies_page_protocol() -> None:
 
 def test_replay_page_wait_advances_clock_and_feeds_frames() -> None:
     """``wait_for_timeout`` mirrors the production poll-and-drain step."""
-    reset_world_state()
     source = FrameBatchSource(payloads=["AAA", "BBB", "CCC"], batch_size=1)
     clock = ReplayClock()
 
@@ -193,7 +190,6 @@ def test_replay_page_wait_advances_clock_and_feeds_frames() -> None:
 
 def test_replay_page_wait_past_exhaustion_still_advances_clock() -> None:
     """When the recorded frames run out, the clock still ticks toward timeout."""
-    reset_world_state()
     source = FrameBatchSource(payloads=["AAA"], batch_size=1)
     clock = ReplayClock()
 

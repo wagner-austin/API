@@ -129,11 +129,8 @@ def test_total_inventory_count_sums_all_slots() -> None:
     assert total_inventory_count(state) == 15
 
 
-def test_get_completed_outcome_returns_none_when_inventory_unchanged(
-    real_inventory: None,
-) -> None:
+def test_get_completed_outcome_returns_none_when_inventory_unchanged() -> None:
     """No completed outcome is reported while the inventory is unchanged."""
-    _ = real_inventory
     set_inventory_total(2)
     probe = _FakeProbe(_make_world(1000))
 
@@ -147,11 +144,8 @@ def test_get_completed_outcome_returns_none_when_inventory_unchanged(
     assert result is None
 
 
-def test_get_completed_outcome_returns_outcome_when_inventory_grows(
-    real_inventory: None,
-) -> None:
+def test_get_completed_outcome_returns_outcome_when_inventory_grows() -> None:
     """A completed outcome is reported once the real inventory total grows."""
-    _ = real_inventory
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
     set_inventory_total(3)
@@ -167,11 +161,8 @@ def test_get_completed_outcome_returns_outcome_when_inventory_grows(
     assert result == ("picked_up_equipment", 2000, 3)
 
 
-def test_wait_returns_immediately_when_inventory_already_grown(
-    real_inventory: None,
-) -> None:
+def test_wait_returns_immediately_when_inventory_already_grown() -> None:
     """The waiter returns the outcome without sleeping when already grown."""
-    _ = real_inventory
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda provider: 0
@@ -193,13 +184,12 @@ def test_wait_returns_immediately_when_inventory_already_grown(
     assert page.waits == []
 
 
-def test_wait_polls_until_inventory_grows(real_inventory: None) -> None:
+def test_wait_polls_until_inventory_grows() -> None:
     """The waiter polls the real inventory until it observes growth.
 
     The page-wait hook simulates a 0x67 equip_gain frame arriving between the
     2nd and 3rd poll: it grows the real inventory via update_inventory_from_gain.
     """
-    _ = real_inventory
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda provider: 0
@@ -229,11 +219,8 @@ def test_wait_polls_until_inventory_grows(real_inventory: None) -> None:
     assert page.waits == [100.0, 100.0]
 
 
-def test_wait_returns_pickup_timeout_when_budget_exhausts(
-    real_inventory: None,
-) -> None:
+def test_wait_returns_pickup_timeout_when_budget_exhausts() -> None:
     """The waiter reports a pickup timeout when the budget elapses."""
-    _ = real_inventory
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda provider: 0

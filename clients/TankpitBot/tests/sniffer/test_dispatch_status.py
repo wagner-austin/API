@@ -4,21 +4,13 @@ from __future__ import annotations
 
 from tankpit_bot.protocol import TankStatusSyncDict
 from tankpit_bot.protocol.types import MovementResponseDict
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.types.constants import DIRECTION_DEAD_THRESHOLD
 
 
 class TestDispatchTankPositionStatus:
     """Tests for dispatching TankPositionStatus (0x3D) container messages."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_dispatch_creates_tank(self) -> None:
         """Dispatching creates a new tank in world state."""
@@ -161,14 +153,6 @@ class TestDispatchSelfStatus:
     the bot's self_state.fuel.
     """
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_dispatch_updates_fuel(self) -> None:
         """TankStatusSync with fuel updates self_state.fuel."""
         ws = get_world_service()
@@ -296,14 +280,6 @@ class TestDispatchSelfStatus:
 
 class TestDispatchSupervisor:
     """Tests for dispatching Supervisor (0x52) command error messages."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_dispatch_stores_error_code(self) -> None:
         """Supervisor error code is stored on WorldService."""

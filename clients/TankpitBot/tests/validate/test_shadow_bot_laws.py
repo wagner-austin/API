@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.sim.bot_policy import BOT_RETURN_WINDOW_MS
-from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, TICK_MS
+from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS
 from tankpit_bot.validate.shadow_bot_laws import (
     shadow_bot_reactivation,
     shadow_bot_return_fire,
@@ -16,7 +17,7 @@ from tankpit_bot.validate.shadow_timeline import (
     TankSyncEventDict,
 )
 
-CORPSE_MS = CORPSE_WINDOW_TICKS * TICK_MS
+CORPSE_MS = CORPSE_WINDOW_TICKS * TICK_RATE_MS
 
 HUMAN_ID = 7
 BOT_ID = 21

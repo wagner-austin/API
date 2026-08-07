@@ -8,21 +8,12 @@ from __future__ import annotations
 
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
 )
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
 class TestDispatchMapData:
     """Tests for dispatch_world_state_update with 0x4C MapData (Ig)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_map_data_lifts_tank_positions(self) -> None:
         """0x4C advances every tank's authoritative position from the snapshot."""
@@ -80,14 +71,6 @@ class TestDispatchMapData:
 class TestDispatchBuildPickup:
     """Tests for dispatch_world_state_update with 0x42 BuildPickup (Jg)."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_build_pickup_updates_actor_position(self) -> None:
         """0x42 advances the acting tank's position to its source x/y."""
         from tankpit_bot.protocol import BuildPickupDict, TankEntryDict
@@ -119,14 +102,6 @@ class TestDispatchBuildPickup:
 class TestDispatchDecoration:
     """Tests for dispatch_world_state_update with 0x4E Decoration (Sf) messages."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_decoration_is_observation_only_no_state_mutation(self) -> None:
         """0x4E Sf is an announcement: emits a diagnostic, does not mutate tanks."""
         from tankpit_bot.protocol import DecorationDict, TankEntryDict
@@ -148,14 +123,6 @@ class TestDispatchDecoration:
 class TestDispatchSupervisorText:
     """Tests for dispatch_world_state_update with 0x3C SupervisorText (wg)."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_supervisor_text_is_observation_only_no_state_mutation(self) -> None:
         """0x3C wg emits a supervisor_text diagnostic; world state untouched.
 
@@ -175,14 +142,6 @@ class TestDispatchSupervisorText:
 
 class TestDispatchStatistics:
     """Tests for dispatch_world_state_update with 0x56 Statistics (Wg)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_statistics_is_observation_only_no_state_mutation(self) -> None:
         """0x56 Wg emits a self_statistics diagnostic; world state untouched.
@@ -217,14 +176,6 @@ class TestDispatchStatistics:
 
 class TestDispatchSessionBroadcasts:
     """Dispatcher coverage for 0x2F/0x31/0x60/0x7E session broadcasts."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_active_players_stores_roster_on_world_service(self) -> None:
         """0x2F ActivePlayers populates ``ws.active_players``."""
@@ -314,14 +265,6 @@ class TestDispatchSessionBroadcasts:
 class TestDispatchPromotion:
     """Tests for dispatch_world_state_update with 0x2B Promotion (Rf) messages."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
     def test_promotion_updates_self_rank(self) -> None:
         """0x2B Rf sets self_state.rank to ``new_rank`` when self is joined."""
         from tankpit_bot.protocol import PromotionDict
@@ -362,14 +305,6 @@ class TestDispatchPromotion:
 
 class TestDispatchEnemyDetection:
     """Tests for dispatch_world_state_update with EnemyDetection (0x48) messages."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_dispatch_enemy_detection_creates_tank(self) -> None:
         """Dispatch 0x48 creates enemy tank entry via _update_enemy_from_detection."""

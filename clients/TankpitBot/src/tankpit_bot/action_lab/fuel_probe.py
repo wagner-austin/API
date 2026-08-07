@@ -36,7 +36,6 @@ from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
     FuelProbeSessionDict,
 )
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.pickup_phase import (
     PickupPhaseError,
     effective_pickup_timeout_ms,
@@ -60,6 +59,7 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
 )
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state.types import ContainerStateDict
 

@@ -55,7 +55,6 @@ from tankpit_bot._test_hooks import (
     SyncPlaywrightContextManagerProtocol,
 )
 from tankpit_bot.capture.xor import build_session_xor_table
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.types import CaptureSession
 
 __all__ = [
@@ -365,7 +364,6 @@ class RecordedChromiumSession:
         magic = capture["magic"]
         if magic is None:
             raise RuntimeError("capture has no magic key; cannot bootstrap XOR table")
-        reset_world_state()
         probe.xor_table = build_session_xor_table(magic)
 
         self.clock = ReplayClock()

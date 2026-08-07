@@ -30,6 +30,7 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
+from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 from tankpit_bot.sim.ghost import (
@@ -48,7 +49,6 @@ from tankpit_bot.sim.scenarios import (
     _parse_cli,
     _resolve_session_mode,
 )
-from tankpit_bot.sim.server import TICK_MS
 from tankpit_bot.sim.session import build_capture_session, deliver_batch
 from tankpit_bot.sim.world import encode_sim_world
 from tankpit_bot.types import encode_capture_session
@@ -160,7 +160,7 @@ def run_sim_session(
             if tracker is not None:
                 live = server.world["tanks"][SIM_CLIENT_ID]
                 tracker.note_round(round_index, live["x"], live["y"])
-            clock.advance(TICK_MS)
+            clock.advance(TICK_RATE_MS)
             played += 1
     except SessionExitError as error:
         exit_reason = error.reason

@@ -15,20 +15,20 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _isolate_diagnostic_emitters() -> Generator[None, None, None]:
-    """Reset all diagnostic emitter module globals before each test."""
-    from tankpit_bot.diagnostics.entity_alignment import reset_entity_alignment_emitter
+    """Reset the remaining diagnostic module globals before each test.
+
+    The two alignment emitters are gone from this list: their gates are
+    instance state on ``SelfAlignmentEmitter`` / ``EntityAlignmentEmitter``
+    as of step 3, so a test that wants a clear gate constructs one
+    ([[session-state-deglobalisation]]).
+    """
     from tankpit_bot.diagnostics.registry_truth import reset_registry_truth
-    from tankpit_bot.diagnostics.self_alignment import reset_self_alignment_emitter
     from tankpit_bot.ledger.outcome.teleport import reset_teleport_dispatch_tracking
 
-    reset_entity_alignment_emitter()
-    reset_self_alignment_emitter()
     reset_teleport_dispatch_tracking()
     reset_registry_truth()
 
     yield
 
-    reset_entity_alignment_emitter()
-    reset_self_alignment_emitter()
     reset_teleport_dispatch_tracking()
     reset_registry_truth()

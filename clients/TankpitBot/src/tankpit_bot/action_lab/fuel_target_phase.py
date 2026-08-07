@@ -10,16 +10,14 @@ from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace import build_fuel_decision_basis
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict, FuelDecisionBasisDict
 from tankpit_bot.action_lab.fuel_probe_types import FuelProbeAttemptResultDict
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.teleport_attempt import (
     TeleportAttemptProbeProtocol,
     run_tracked_teleport_attempt,
 )
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
-
-run_reposition_attempt = run_tracked_teleport_attempt
 
 
 class FuelTargetPhaseProbeProtocol(TeleportAttemptProbeProtocol, Protocol):
@@ -190,7 +188,7 @@ def _run_blocked_fuel_reposition(
         raise no_landing_tile_error(no_landing_tile_message)
     reposition_target = make_reposition_target(landing_tile[0], landing_tile[1])
     self_state_before_reposition = probe._require_self_state()
-    reposition_attempt = run_reposition_attempt(
+    reposition_attempt = run_tracked_teleport_attempt(
         page,
         probe,
         reposition_target,
@@ -441,5 +439,4 @@ __all__ = [
     "FuelTargetPhaseProbeProtocol",
     "FuelTargetResolution",
     "resolve_fuel_target_after_radar",
-    "run_reposition_attempt",
 ]

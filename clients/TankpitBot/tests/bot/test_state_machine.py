@@ -40,11 +40,9 @@ class TestBotStateUpdates:
         """Test transition from WAITING_FOR_POSITION to IDLE."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -56,11 +54,9 @@ class TestBotStateUpdates:
         """Test transition to LOW_FUEL when fuel below threshold."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -76,11 +72,9 @@ class TestBotStateUpdates:
         """SCANNING completes when a radar response arrives."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -104,11 +98,9 @@ class TestBotStateUpdates:
         """SCANNING completes even when the radar finds zero containers."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -128,11 +120,9 @@ class TestBotStateUpdates:
         """MOVING completes when reaching target position."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -150,11 +140,9 @@ class TestBotStateUpdates:
         """COLLECTING completes when reaching target position."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -173,14 +161,12 @@ class TestBotStateUpdates:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
         from tankpit_bot.sniffer.world_state_containers import (
             update_world_state_from_container_pickup,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -399,11 +385,9 @@ class TestBotStateUpdateBranches:
         """MOVING stays MOVING when not at target."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
@@ -421,11 +405,9 @@ class TestBotStateUpdateBranches:
         """TELEPORTING stays until landing is confirmed."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
             update_world_state_from_position,
         )
 
-        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()

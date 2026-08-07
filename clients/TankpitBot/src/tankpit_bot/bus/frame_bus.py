@@ -3,7 +3,7 @@
 The screencast handler (Playwright thread) publishes each JPEG frame
 Chrome pushes; each ``GET /video`` MJPEG connection owns its own
 :class:`FrameSubscriber` and waits on the next frame. Semantics match
-:mod:`tankpit_bot.service.status_bus` deliberately:
+:mod:`tankpit_bot.bus.status_bus` deliberately:
 
 * **Latest-wins per subscriber.** A slow phone connection sees the
   newest frame, never a growing backlog — stale video frames are

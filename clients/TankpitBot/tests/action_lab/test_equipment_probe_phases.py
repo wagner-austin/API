@@ -48,7 +48,7 @@ def test_run_pickup_attempt_takes_fast_path_against_real_inventory_frame(
 
     for msg in messages[:INVENTORY_GROWTH_FRAME_INDEX]:
         if msg["direction"] == "received":
-            process_received_message(str(msg["payload"]), xor_table)
+            process_received_message(get_world_service(), str(msg["payload"]), xor_table)
 
     assert total_inventory_count(get_inventory_state(get_world_service())) == 0
 
@@ -60,7 +60,7 @@ def test_run_pickup_attempt_takes_fast_path_against_real_inventory_frame(
 
     def _real_drain(probe: BufferedMessageSourceProtocol) -> int:
         drain_calls.append(probe)
-        process_received_message(str(growth_payload), xor_table)
+        process_received_message(get_world_service(), str(growth_payload), xor_table)
         return 1
 
     action_hooks.drain_buffered_messages = _real_drain
@@ -118,7 +118,7 @@ def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_fra
 
     for msg in messages[:INVENTORY_GROWTH_FRAME_INDEX]:
         if msg["direction"] == "received":
-            process_received_message(str(msg["payload"]), xor_table)
+            process_received_message(get_world_service(), str(msg["payload"]), xor_table)
     assert total_inventory_count(get_inventory_state(get_world_service())) == 0
 
     growth_payload = messages[INVENTORY_GROWTH_FRAME_INDEX]["payload"]
@@ -130,7 +130,7 @@ def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_fra
         payload = drain_queue.pop(0)
         if payload is None:
             return 0
-        process_received_message(payload, xor_table)
+        process_received_message(get_world_service(), payload, xor_table)
         return 1
 
     action_hooks.drain_buffered_messages = _scheduled_drain
@@ -190,16 +190,13 @@ def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_fra
     assert page.waits == [100.0]
 
 
-def test_run_pickup_attempt_for_probe_raises_when_move_dispatch_fails(
-    real_inventory: None,
-) -> None:
+def test_run_pickup_attempt_for_probe_raises_when_move_dispatch_fails() -> None:
     """A failed move_to raises the configured dispatch error.
 
     Real inventory tracker is reset to empty, so the immediate-completion
     check sees 0 > inventory_count_before=4 as False, falls into the move
     dispatch, which the probe rejects.
     """
-    _ = real_inventory
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
     probe = _PickupProbe(clock=clock, move_result=False)

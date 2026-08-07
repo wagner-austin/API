@@ -14,11 +14,12 @@ from tests.action_lab._teleport_attempt_harness import (
     _target,
     _WaitForOutcome,
 )
+from tests.action_lab._teleport_seams import teleport_attempt_module
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab import teleport_attempt
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.action_lab.teleport_attempt import run_tracked_teleport_attempt
 from tankpit_bot.action_lab.teleport_phase import (
     TeleportOutcomeWaiterProtocol,
     TeleportPhaseProbeProtocol,
@@ -32,8 +33,8 @@ from tankpit_bot.action_lab.types import (
 
 def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> None:
     """Shared helper raises when teleport returns an impossible map-sync timeout."""
-    original_acquisition = teleport_attempt.run_acquisition_phase
-    original_teleport = teleport_attempt.run_teleport_phase
+    original_acquisition = teleport_attempt_module.run_tracked_acquisition_phase
+    original_teleport = teleport_attempt_module.run_tracked_teleport_command
     expected_page = _Page()
     expected_probe = _Probe()
     expected_target = _target()
@@ -127,11 +128,11 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
         impossible_result["status"] = "map_sync_timeout"
         return (impossible_result, 1800)
 
-    teleport_attempt.run_acquisition_phase = _run_acquisition
-    teleport_attempt.run_teleport_phase = _run_teleport
+    teleport_attempt_module.run_tracked_acquisition_phase = _run_acquisition
+    teleport_attempt_module.run_tracked_teleport_command = _run_teleport
     try:
         with pytest.raises(RuntimeError, match="impossible"):
-            teleport_attempt.run_tracked_teleport_attempt(
+            run_tracked_teleport_attempt(
                 expected_page,
                 expected_probe,
                 expected_target,
@@ -155,14 +156,14 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
                 unexpected_result_message="impossible",
             )
     finally:
-        teleport_attempt.run_acquisition_phase = original_acquisition
-        teleport_attempt.run_teleport_phase = original_teleport
+        teleport_attempt_module.run_tracked_acquisition_phase = original_acquisition
+        teleport_attempt_module.run_tracked_teleport_command = original_teleport
 
 
 def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
     """Shared helper leaves probe state untouched when reset is disabled."""
-    original_acquisition = teleport_attempt.run_acquisition_phase
-    original_teleport = teleport_attempt.run_teleport_phase
+    original_acquisition = teleport_attempt_module.run_tracked_acquisition_phase
+    original_teleport = teleport_attempt_module.run_tracked_teleport_command
     expected_page = _Page()
     expected_probe = _Probe()
     expected_target = _target()
@@ -254,10 +255,10 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
         )
         raise AssertionError("teleport phase should not run after acquisition timeout")
 
-    teleport_attempt.run_acquisition_phase = _run_acquisition
-    teleport_attempt.run_teleport_phase = _run_teleport
+    teleport_attempt_module.run_tracked_acquisition_phase = _run_acquisition
+    teleport_attempt_module.run_tracked_teleport_command = _run_teleport
     try:
-        attempt = teleport_attempt.run_tracked_teleport_attempt(
+        attempt = run_tracked_teleport_attempt(
             expected_page,
             expected_probe,
             expected_target,
@@ -282,8 +283,8 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
             reset_to_idle_before_start=False,
         )
     finally:
-        teleport_attempt.run_acquisition_phase = original_acquisition
-        teleport_attempt.run_teleport_phase = original_teleport
+        teleport_attempt_module.run_tracked_acquisition_phase = original_acquisition
+        teleport_attempt_module.run_tracked_teleport_command = original_teleport
 
     assert expected_probe.reset_idle_calls == 0
     assert attempt.teleport_result is None

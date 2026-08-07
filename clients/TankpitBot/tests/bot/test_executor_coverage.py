@@ -15,7 +15,6 @@ from tankpit_bot.bot.types import (
     make_pickup_fuel_command,
     make_shoot_command,
 )
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state import WorldStateDict, make_empty_world_state
 
 
@@ -103,7 +102,6 @@ class TestDispatchTrackedTargetCommand:
 
     def test_move_dispatch_failure_returns_false(self) -> None:
         """When move_to returns False, the dispatch reports failure."""
-        reset_world_state()
         bot = _DispatchFailBot()
         command = make_move_command(150, 160)
 
@@ -113,7 +111,6 @@ class TestDispatchTrackedTargetCommand:
 
     def test_pickup_fuel_dispatch_failure_returns_false(self) -> None:
         """When pickup_fuel_to returns False, the dispatch reports failure."""
-        reset_world_state()
         bot = _DispatchFailBot()
         command = make_pickup_fuel_command(80, 90)
 
@@ -123,7 +120,6 @@ class TestDispatchTrackedTargetCommand:
 
     def test_pickup_equipment_dispatch_failure_returns_false(self) -> None:
         """When pickup_equipment_to returns False, the dispatch reports failure."""
-        reset_world_state()
         bot = _DispatchFailBot()
         command = make_pickup_equipment_command(120, 130)
 

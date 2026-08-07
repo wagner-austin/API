@@ -34,7 +34,7 @@ from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.inventory import InventoryState
-from tankpit_bot.sniffer.world_state import get_world_service, get_world_state, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service, get_world_state
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.types import CaptureSession, decode_capture_session
 from tests.fakes import FakeCDPSession
@@ -136,8 +136,6 @@ def run_replay(
     magic = session["magic"]
     if magic is None:
         raise RuntimeError(f"capture {capture_path.name} has no magic key")
-
-    reset_world_state()
 
     bot = ReplayBot()
     bot._magic = magic

@@ -54,7 +54,6 @@ from tankpit_bot.action_lab.types import (
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -158,7 +157,6 @@ def _restore_tracking_hooks() -> Generator[None, None, None]:
     tracking_module.capture_page_client_snapshot = original_capture
     tracking_module._wait_for_shot_feedback = original_feedback
     tracking_module.EnemyTrackingProbe = original_probe_class
-    reset_world_state()
 
 
 def _install_common_stubs(threats: list[EnemyThreatDict]) -> None:

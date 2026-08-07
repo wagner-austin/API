@@ -6,7 +6,6 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.protocol import RadarContainerDict
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
@@ -16,13 +15,8 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 class TestDispatchRadar:
     """Tests for dispatch_world_state_update with radar messages."""
 
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
     def teardown_method(self) -> None:
         """Reset world state and hooks after each test."""
-        reset_world_state()
         _test_hooks.path_exists = _test_hooks._real_path_exists
         _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
 
@@ -81,14 +75,6 @@ class TestDispatchRadar:
 
 class TestDispatchRadarEmptyDelta:
     """Tests for tunneled 0x4F empty radar delta dispatch."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
 
     def test_empty_tunneled_radar_marks_pending_delta(self) -> None:
         """Dispatching an empty tunneled 0x4F marks a pending radar empty delta."""

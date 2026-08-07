@@ -180,6 +180,7 @@ def test_anchored_sweep_continues_below_the_start_floor() -> None:
     if decision is None:
         raise AssertionError("expected a decision")
     assert decision["behavior"]["reason_kind"] == "quad_sweep_shift"
+    assert decision["command"]["cmd_type"] == "scope_shift"
     assert decision["command"]["direction"] == SCOPE_SOUTHEAST
 
 
@@ -374,36 +375,10 @@ def test_anchor_math_direct_edges() -> None:
     assert _quadrant_spend_worthwhile(961, 0) is False
 
 
-def test_harvest_skips_blacklisted_containers() -> None:
-    """A session-blacklisted container never draws a shift or a leg."""
-    from tankpit_bot.bot.ai.collect_common import (
-        blacklist_container,
-        reset_container_blacklist,
-    )
-
-    equipment = make_container_state(
-        x=112, y=100, is_fuel=False, volume=0, timestamp_ms=_NOW, failed_pickups=0
-    )
-    ctx = _sweep_ctx(
-        scanned=True,
-        containers={"112,100": equipment},
-        inventory=make_inventory(dual_count=3),
-    )
-    reset_container_blacklist()
-    blacklist_container(112, 100)
-    try:
-        decision = plan_block_harvest_leg(ctx, make_scanned_ai_state())
-    finally:
-        reset_container_blacklist()
-
-    assert decision is None
-
-
 def test_harvest_leg_skips_a_failed_move_target() -> None:
     """A leg whose walk plan fails moves on instead of stalling."""
     from tankpit_bot.sniffer.world_state import (
         mark_move_target_failed,
-        reset_world_state,
     )
 
     equipment = make_container_state(
@@ -415,15 +390,11 @@ def test_harvest_leg_skips_a_failed_move_target() -> None:
         viewport_origin=(100, 92),
         inventory=make_inventory(dual_count=3),
     )
-    reset_world_state()
     # The approach edge tile the leg would walk to is the window's
     # east column clamp (115,100); fail it AND the real target so the
     # movement layer's approach planner yields nothing.
     mark_move_target_failed(125, 100, _NOW)
     mark_move_target_failed(115, 100, _NOW)
-    try:
-        decision = plan_block_harvest_leg(ctx, make_scanned_ai_state())
-    finally:
-        reset_world_state()
+    decision = plan_block_harvest_leg(ctx, make_scanned_ai_state())
 
     assert decision is None

@@ -15,9 +15,9 @@ from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.browser.cdp_utils import (
+    CDPClock,
     _is_valid_base64,
     _pop_sent_frame_metadata,
-    cdp_timestamp_to_ms,
     send_websocket_bytes,
 )
 from tankpit_bot.browser.inject_script import BROWSER_HOOK_SOURCE
@@ -50,6 +50,10 @@ class CDPService:
         self.cdp: CDPSessionProtocol | None = None
         self._on_message_captured: OnMessageCapturedFunc | None = None
         self._on_magic_captured: OnMagicCapturedFunc | None = None
+        # The CDP clock's origin is this session's; anchoring it here
+        # means a second session cannot read its frames through the
+        # first session's offset ([[session-state-deglobalisation]]).
+        self._clock = CDPClock()
 
     def set_callbacks(
         self,
@@ -162,7 +166,7 @@ class CDPService:
         payload = event["response"]["payloadData"]
 
         message = CapturedMessage(
-            timestamp_ms=cdp_timestamp_to_ms(event["timestamp"]),
+            timestamp_ms=self._clock.to_unix_ms(event["timestamp"]),
             direction=direction,
             payload=payload,
             ws_url=ws_url,

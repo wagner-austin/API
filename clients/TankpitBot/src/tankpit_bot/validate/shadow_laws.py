@@ -11,7 +11,7 @@ shadow proves the sim cannot be told apart from the archive.
 Laws shadowed (v1):
 
 - ``sync-cadence``: a VISIBLE tank's 0x2E status syncs ride the wire
-  at the tick cadence (median CLEAN inter-sync gap = ``TICK_MS``;
+  at the tick cadence (median CLEAN inter-sync gap = ``TICK_RATE_MS``;
   absence holes excluded — see ``SYNC_CLEAN_GAP_CEILING_MS``).
 - ``grant-invariants``: every loud 0x67 pickup grants exactly one
   slot, the slot was deficient, counts clip at the corpus rank cap
@@ -33,6 +33,7 @@ from itertools import pairwise
 from statistics import median
 
 from tankpit_bot.physics.capacity import damage_tier, inventory_capacity
+from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.sim.equipment import (
     MERCY_BUNDLE_ROLLS,
     RADAR_SLOT,
@@ -40,7 +41,7 @@ from tankpit_bot.sim.equipment import (
     WEAPON_STACK_ROLL,
     kill_grants_mercy,
 )
-from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, TICK_MS
+from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS
 from tankpit_bot.validate.shadow_timeline import (
     EquipmentGainEventDict,
     InventoryEventDict,
@@ -55,7 +56,7 @@ SYNC_TOLERANCE_MS = 500
 SYNC_MIN_GAPS = 5
 """Minimum CLEAN inter-sync gaps before a tank's cadence is judged."""
 
-SYNC_CLEAN_GAP_CEILING_MS = 3 * TICK_MS
+SYNC_CLEAN_GAP_CEILING_MS = 3 * TICK_RATE_MS
 """Gaps at or above this are absence holes (the tank left the
 viewport between syncs), not cadence evidence. The 2026-08-03 sweep:
 every long-observed "off-law" tank's histogram was a 2 s core plus
@@ -64,7 +65,6 @@ sight, not the broadcast (74/266 false mismatches). The law under
 test is "a VISIBLE tank syncs at the tick", which is also exactly
 what the sim emits (in-window tanks only)."""
 
-PAIRING_WINDOW_MS = TICK_MS
 """Window for pairing a 0x67 with its snapshot / a kill with its bundle
 (the corpus delivers both in the very next frame)."""
 
@@ -83,7 +83,7 @@ def shadow_sync_cadence(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDic
     One sample per non-self tank with at least ``SYNC_MIN_GAPS``
     CLEAN inter-sync gaps (below ``SYNC_CLEAN_GAP_CEILING_MS`` —
     larger gaps are viewport absences, not cadence); exact when the
-    clean median sits within ``SYNC_TOLERANCE_MS`` of ``TICK_MS``.
+    clean median sits within ``SYNC_TOLERANCE_MS`` of ``TICK_RATE_MS``.
     Judging the raw median instead conflated our line of sight with
     the broadcast: 74/266 archive tanks "failed" on 2026-08-03 purely
     from absence holes (2 s cores + 18-943 s holes in every
@@ -122,7 +122,7 @@ def shadow_sync_cadence(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDic
             if len(gaps) < SYNC_MIN_GAPS:
                 continue
             samples += 1
-            if abs(median(gaps) - TICK_MS) <= SYNC_TOLERANCE_MS:
+            if abs(median(gaps) - TICK_RATE_MS) <= SYNC_TOLERANCE_MS:
                 exact += 1
     return ClaimEvidenceDict(
         claim_id="sync-cadence",
@@ -131,7 +131,7 @@ def shadow_sync_cadence(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDic
         mismatches=samples - exact,
         detail=(
             f"per-tank median CLEAN 0x2E gap (holes >= {SYNC_CLEAN_GAP_CEILING_MS}ms"
-            f" excluded) within {SYNC_TOLERANCE_MS}ms of TICK_MS"
+            f" excluded) within {SYNC_TOLERANCE_MS}ms of TICK_RATE_MS"
         ),
     )
 
@@ -183,7 +183,7 @@ def _next_inventory(
         time (the pairing itself is not the law under test).
     """
     for snapshot in inventories:
-        if timestamp_ms <= snapshot["timestamp_ms"] <= timestamp_ms + PAIRING_WINDOW_MS:
+        if timestamp_ms <= snapshot["timestamp_ms"] <= timestamp_ms + TICK_RATE_MS:
             return snapshot
     return None
 
@@ -282,7 +282,7 @@ def _silent_bundle_after(
     for gain in gains:
         if gain["show_message"]:
             continue
-        if timestamp_ms <= gain["timestamp_ms"] <= timestamp_ms + PAIRING_WINDOW_MS:
+        if timestamp_ms <= gain["timestamp_ms"] <= timestamp_ms + TICK_RATE_MS:
             return gain
     return None
 
@@ -393,7 +393,7 @@ def shadow_corpse_window(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDi
 
     One sample per kill whose victim's next 0x58 arrives with no
     intervening quit or id-reuse sync; exact when the gap sits within
-    ``CORPSE_TOLERANCE_MS`` of ``CORPSE_WINDOW_TICKS * TICK_MS``.
+    ``CORPSE_TOLERANCE_MS`` of ``CORPSE_WINDOW_TICKS * TICK_RATE_MS``.
 
     Args:
         timelines: Extracted shadow timelines.
@@ -401,7 +401,7 @@ def shadow_corpse_window(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDi
     Returns:
         Evidence for the ``corpse-window`` claim.
     """
-    predicted_ms = CORPSE_WINDOW_TICKS * TICK_MS
+    predicted_ms = CORPSE_WINDOW_TICKS * TICK_RATE_MS
     samples = 0
     exact = 0
     for timeline in timelines:
@@ -417,14 +417,13 @@ def shadow_corpse_window(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDi
         samples=samples,
         exact=exact,
         mismatches=samples - exact,
-        detail=f"kill->0x58 gap = {predicted_ms}ms (CORPSE_WINDOW_TICKS * TICK_MS)",
+        detail=f"kill->0x58 gap = {predicted_ms}ms (CORPSE_WINDOW_TICKS * TICK_RATE_MS)",
     )
 
 
 __all__ = [
     "ARCHIVE_EQUIPMENT_CAP",
     "CORPSE_TOLERANCE_MS",
-    "PAIRING_WINDOW_MS",
     "SYNC_CLEAN_GAP_CEILING_MS",
     "SYNC_MIN_GAPS",
     "SYNC_TOLERANCE_MS",

@@ -13,7 +13,6 @@ from tankpit_bot.runtime_records import (
 )
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.state import make_self_state
@@ -33,7 +32,6 @@ class TestCompletionEventActions:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_maybe_complete_collection`` emits when tank reaches the pickup tile."""
-        reset_world_state()
         update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
@@ -80,7 +78,6 @@ class TestCompletionEventActions:
         orphans and the bot re-clicks the ghost forever. The
         completion must yield to the in-flight error handler.
         """
-        reset_world_state()
         update_world_state_from_position(50, 50)
         configure_bot_runtime_logging("20260331-230405")
 
@@ -115,7 +112,6 @@ class TestCompletionEventActions:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_maybe_complete_collection`` emits container_consumed when target vanished."""
-        reset_world_state()
         update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
@@ -159,7 +155,6 @@ class TestCompletionEventActions:
         """``_maybe_complete_scan`` emits scan completion via radar_scan_complete."""
         from tankpit_bot.sniffer.world_state import mark_radar_scan_complete
 
-        reset_world_state()
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
@@ -188,7 +183,6 @@ class TestCompletionEventActions:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_clear_stalled_action`` emits with stall_timeout for forced clearance."""
-        reset_world_state()
         update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 

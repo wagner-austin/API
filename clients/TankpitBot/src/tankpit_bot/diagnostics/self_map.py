@@ -2,7 +2,7 @@
 
 Reads a JSONL events artifact, collects every ``self_alignment_sample``
 DIAGNOSTIC (emitted by
-:func:`tankpit_bot.diagnostics.self_alignment.maybe_emit_self_alignment_sample`),
+:meth:`tankpit_bot.diagnostics.self_alignment.SelfAlignmentEmitter.maybe_emit`),
 and for each belief dimension (tank_id, x, y, fuel) intersects the
 minified ``activeGame.i`` keys whose numeric value equals the belief
 value in EVERY sample. Keys that survive across many distinct belief

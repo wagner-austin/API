@@ -12,7 +12,6 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.sniffer.world_state import (
-    reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.state.types import (
@@ -31,12 +30,7 @@ class TestRadarForEquipment:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset world state."""
-        reset_world_state()
 
     def test_forage_radar_in_unscanned_viewport(self) -> None:
         """Equipment recovery forages with a radar in an unscanned viewport.
@@ -71,12 +65,7 @@ class TestExplorationSkipsTeleportLowFuel:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset world state."""
-        reset_world_state()
 
     def test_exploration_skips_teleport_when_cant_afford(self) -> None:
         """Exploration skips teleport candidates when fuel reserve too low."""
@@ -127,12 +116,7 @@ class TestHuntOnlyWhenFull:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        reset_world_state()
         update_world_state_from_position(100, 100)
-
-    def teardown_method(self) -> None:
-        """Reset world state."""
-        reset_world_state()
 
     def _make_cardinal_enemy(self) -> dict[str, TankStateDict]:
         """Return a viewport-fresh live enemy at (101,100), Manhattan 1 from (100,100)."""

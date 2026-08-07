@@ -16,8 +16,8 @@ from tankpit_bot.action_lab.fuel_probe_types import (
     encode_fuel_probe_attempt_result,
     encode_fuel_probe_session,
 )
-from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict, TeleportTargetDict
+from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 
 
 def _snapshot(timestamp_ms: int) -> PageClientSnapshotDict:

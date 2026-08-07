@@ -23,21 +23,21 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 
-from tankpit_bot.service.frame_bus import (
+from tankpit_bot.bus.frame_bus import (
     FrameBus,
 )
-from tankpit_bot.service.http_server import make_app
-from tankpit_bot.service.mode_bridge import ModeBridge
-from tankpit_bot.service.status_bus import (
-    StatusBus,
-    StatusSubscriberProtocol,
-)
-from tankpit_bot.service.types import (
+from tankpit_bot.bus.mode_bridge import ModeBridge
+from tankpit_bot.bus.session_status import (
     SessionStatusDict,
     idle_session_status,
     make_live_stats,
     make_session_status,
 )
+from tankpit_bot.bus.status_bus import (
+    StatusBus,
+    StatusSubscriberProtocol,
+)
+from tankpit_bot.service.http_server import make_app
 from tankpit_bot.service.types_codecs import decode_session_status
 from tests.service._http_fixtures import (
     _noop_shutdown,
@@ -249,8 +249,8 @@ class TestDrainStatusBusToResponseHelper:
     @pytest.mark.asyncio
     async def test_frame_writes_then_close_exits_loop(self) -> None:
         """A published frame emits a ``data:`` line, then close halts the loop."""
+        from tankpit_bot.bus.session_status import idle_session_status
         from tankpit_bot.service.http_server import _drain_status_bus_to_response
-        from tankpit_bot.service.types import idle_session_status
 
         frame = idle_session_status(tick_timestamp_ms=42)
         subscriber = _StubSubscriber(closed=False, frames=[frame])
