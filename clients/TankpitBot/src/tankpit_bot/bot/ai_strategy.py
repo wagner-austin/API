@@ -21,6 +21,8 @@ from tankpit_bot.bot.ai.mode_controller import (
     derive_hunt_mode_state,
     make_hold_decision,
     resolve_owner_from_manual,
+)
+from tankpit_bot.bot.ai.mode_gates import (
     should_enter_hunt,
     should_exit_collect,
     should_exit_hunt,

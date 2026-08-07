@@ -14,10 +14,8 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from tankpit_bot.bot.ai.types import (
-    AIStateDict,
-    BehaviorScoreDict,
-)
+from tankpit_bot.bot.ai.scoring_types import BehaviorScoreDict
+from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.types_codecs import (
     decode_ai_state,
     decode_behavior_score,

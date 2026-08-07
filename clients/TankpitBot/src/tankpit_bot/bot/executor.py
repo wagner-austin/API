@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import BotProtocol
 from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.bot.ai.types import render_reason
+from tankpit_bot.bot.ai.scoring_types import render_reason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,
@@ -32,7 +32,10 @@ from tankpit_bot.physics.supervisor import (
     fuel_pickup_refusal,
     teleport_refusal,
 )
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    emit_ai,
+    emit_diagnostic,
+)
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state.types.coord import coord_key
 
