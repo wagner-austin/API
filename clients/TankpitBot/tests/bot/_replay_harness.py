@@ -31,7 +31,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.sniffer.world_state import get_world_service, get_world_state, reset_world_state

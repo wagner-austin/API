@@ -16,10 +16,10 @@ from collections.abc import Callable
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot.bot.base import Bot
+from tankpit_bot.bot.tick_body import _sync_live_view_demand
 from tankpit_bot.bot.tick_loop import (
     _apply_pending_mode_override,
     _publish_session_status,
-    _sync_live_view_demand,
 )
 from tankpit_bot.service.frame_bus import FrameBus
 from tankpit_bot.service.mode_bridge import ModeBridge

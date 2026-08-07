@@ -209,7 +209,7 @@ class TestBotRunMethod:
         """Teardown quit binds the live CDP session and sends quit_game."""
         from tankpit_bot._test_hooks import CDPSessionProtocol
         from tankpit_bot.bot.base import Bot
-        from tests.fakes.base import FakeCDPSession
+        from tests.fakes.cdp import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         sent: list[tuple[str, bytes]] = []
@@ -238,7 +238,7 @@ class TestBotRunMethod:
 
         from tankpit_bot._test_hooks import CDPSessionProtocol
         from tankpit_bot.bot.base import Bot
-        from tests.fakes.base import FakeCDPSession
+        from tests.fakes.cdp import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)
 
@@ -262,7 +262,7 @@ class TestBotRunMethod:
         explicitly detached session receives nothing.
         """
         from tankpit_bot.bot.base import Bot
-        from tests.fakes.base import FakeCDPSession
+        from tests.fakes.cdp import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp = FakeCDPSession()
@@ -277,7 +277,7 @@ class TestBotRunMethod:
         from playwright._impl._errors import Error as PlaywrightError
 
         from tankpit_bot.bot.base import Bot
-        from tests.fakes.base import FakeCDPSession
+        from tests.fakes.cdp import FakeCDPSession
 
         class _GoneSession(FakeCDPSession):
             def detach(self) -> None:

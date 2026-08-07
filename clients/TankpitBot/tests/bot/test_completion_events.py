@@ -1,53 +1,19 @@
-"""Integration tests for ``action_outcome`` events on every completion gate.
+"""Tests for completion-event detection.
 
-Each test drives a real :class:`tankpit_bot.bot.base.Bot` (or
-:func:`tankpit_bot.bot.tick_loop._has_in_flight_action`) through a
-completion path, then reads the JSONL artifact that
-:func:`configure_bot_runtime_logging` wires up to capture the structured
-event. Assertions exercise the actual decoder
-(:func:`decode_runtime_event_record`) on the actual file contents -- no
-monkeypatching of emit helpers, no in-memory stand-ins for the logging
-pipeline, no fakes for the structured-field plumbing.
-
-The full pipeline tested by each case is:
-
-    bot completion site
-      -> emit_wire_complete(...)
-        -> emit_diagnostic(diagnostic_kind="action_outcome", ..., **fields)
-          -> stdlib logging with RuntimeLogExtraDict on the LogRecord
-            -> _HookEventArtifactHandler.emit(record)
-              -> dump_json_str(encode_runtime_event_record(...))
-                -> _test_hooks.append_text(latest_events_path, line)
-
-Reading the JSONL back through :func:`decode_runtime_event_record`
-proves the contract end to end.
+``test_completion_events.py`` was 631 lines; the per-action completions
+are now a sibling.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from platform_core.json_utils import (
-    JSONObject,
-    load_json_str,
-    narrow_json_to_dict,
+from tankpit_bot.bot.tick_loop_actions import (
+    has_in_flight_action,
 )
-
-from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.states import (
-    ActionKind,
-    BotStateDataDict,
-    InFlightActionDict,
-    StateName,
-    make_in_flight_action,
-    make_initial_state_data,
-)
-from tankpit_bot.bot.tick_loop_actions import _clear_stalled_action, has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.runtime_logging import (
-    RuntimeEventRecordDict,
-    configure_bot_runtime_logging,
-    decode_runtime_event_record,
+from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+from tankpit_bot.runtime_records import (
     require_int_field,
     require_str_field,
 )
@@ -62,66 +28,11 @@ from tankpit_bot.sniffer.world_state_containers import (
 )
 from tankpit_bot.state import make_self_state
 from tankpit_bot.state.types import make_tank_state
+from tests.bot._completion_fixtures import (
+    _decode_action_outcome_lines,
+    _make_bot_with_in_flight,
+)
 from tests.conftest import FakeEnv, FakeFileSystem
-
-
-def _decode_action_outcome_lines(jsonl: str) -> list[RuntimeEventRecordDict]:
-    """Return every ``action_outcome`` event decoded from a JSONL artifact.
-
-    Args:
-        jsonl: Raw newline-delimited JSONL artifact body.
-
-    Returns:
-        Decoded :class:`RuntimeEventRecordDict` instances whose
-        ``diagnostic_kind`` is ``action_outcome``. Other records
-        (``STATE``, ``WIRE``, unrelated diagnostics) are filtered out
-        so completion-site assertions are not coupled to unrelated
-        emissions on the same path.
-    """
-    records: list[RuntimeEventRecordDict] = []
-    for line in jsonl.strip().splitlines():
-        raw: JSONObject = narrow_json_to_dict(load_json_str(line))
-        record = decode_runtime_event_record(raw)
-        if record["fields"].get("diagnostic_kind") == "action_outcome":
-            records.append(record)
-    return records
-
-
-def _make_bot_with_in_flight(
-    *,
-    state: StateName,
-    action_kind: ActionKind,
-    target_x: int,
-    target_y: int,
-    started_ms: int,
-) -> Bot:
-    """Build a :class:`Bot` with a pre-configured in-flight action.
-
-    Args:
-        state: HFSM state name to install.
-        action_kind: Kind for the in-flight action record.
-        target_x: Target X coordinate stamped on the action record.
-        target_y: Target Y coordinate stamped on the action record.
-        started_ms: Dispatch timestamp the bot would have recorded.
-
-    Returns:
-        Bot instance whose ``_state_data`` carries the configured
-        in-flight action and HFSM state.
-    """
-    bot = Bot("https://test.tankpit.com/", headless=True)
-    base_data: BotStateDataDict = make_initial_state_data()
-    action: InFlightActionDict = make_in_flight_action(
-        action_kind,
-        target_x,
-        target_y,
-        started_ms,
-    )
-    bot._state_data = BotStateDataDict(
-        state=state,
-        in_flight_action=action,
-        fuel_threshold=base_data["fuel_threshold"],
-    )
-    return bot
 
 
 class TestActionOutcomeEventsOnAuthoritativeCompletion:
@@ -395,196 +306,6 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
 
         assert completed is True
         assert ws.is_move_target_failed(200, 210, get_current_time_ms()) is True
-
-    def test_collection_completion_emits_event_with_position_reached_signal(
-        self,
-        fake_env: FakeEnv,
-        fake_fs: FakeFileSystem,
-    ) -> None:
-        """``_maybe_complete_collection`` emits when tank reaches the pickup tile."""
-        reset_world_state()
-        update_world_state_from_position(50, 50)
-        artifacts = configure_bot_runtime_logging("20260331-230405")
-
-        bot = _make_bot_with_in_flight(
-            state="COLLECTING",
-            action_kind="collect",
-            target_x=80,
-            target_y=90,
-            started_ms=get_current_time_ms() - 1,
-        )
-        landed_state = make_self_state(
-            tank_id=1,
-            x=80,
-            y=90,
-            team=2,
-            rank=1,
-            fuel=750,
-            leaderboard_position=1,
-        )
-
-        completed = bot._maybe_complete_collection(bot.get_world_state(), landed_state)
-
-        assert completed is True
-        events = _decode_action_outcome_lines(
-            fake_fs.get_written_files()[artifacts["latest_events_path"]]
-        )
-        assert len(events) == 1
-        fields = events[0]["fields"]
-        assert require_str_field(fields, "action_kind") == "collect"
-        assert require_str_field(fields, "outcome") == "position_reached"
-        assert require_int_field(fields, "target_x") == 80
-        assert require_int_field(fields, "target_y") == 90
-
-    def test_collection_completion_defers_while_a_command_error_is_pending(
-        self,
-        fake_env: FakeEnv,
-        fake_fs: FakeFileSystem,
-    ) -> None:
-        """A pending 0x52 blocks position-completion until it is attributed.
-
-        Regression (sim-found 2026-07-22): a same-tile pickup at a
-        consumed container completes instantly by position, so the
-        code=4 "empty container" that should delete the stale belief
-        orphans and the bot re-clicks the ghost forever. The
-        completion must yield to the in-flight error handler.
-        """
-        reset_world_state()
-        update_world_state_from_position(50, 50)
-        configure_bot_runtime_logging("20260331-230405")
-
-        bot = _make_bot_with_in_flight(
-            state="COLLECTING",
-            action_kind="collect",
-            target_x=80,
-            target_y=90,
-            started_ms=get_current_time_ms() - 1,
-        )
-        landed_state = make_self_state(
-            tank_id=1,
-            x=80,
-            y=90,
-            team=2,
-            rank=1,
-            fuel=750,
-            leaderboard_position=1,
-        )
-        ws = get_world_service()
-        ws.last_command_error = 4
-
-        assert bot._maybe_complete_collection(bot.get_world_state(), landed_state) is False
-        assert bot.get_state() == "COLLECTING"
-
-        ws.last_command_error = -1
-        assert bot._maybe_complete_collection(bot.get_world_state(), landed_state) is True
-
-    def test_collection_completion_emits_event_with_container_consumed_signal(
-        self,
-        fake_env: FakeEnv,
-        fake_fs: FakeFileSystem,
-    ) -> None:
-        """``_maybe_complete_collection`` emits container_consumed when target vanished."""
-        reset_world_state()
-        update_world_state_from_position(50, 50)
-        artifacts = configure_bot_runtime_logging("20260331-230405")
-
-        bot = _make_bot_with_in_flight(
-            state="COLLECTING",
-            action_kind="collect",
-            target_x=80,
-            target_y=90,
-            started_ms=get_current_time_ms() - 1,
-        )
-        non_target_self = make_self_state(
-            tank_id=1,
-            x=70,
-            y=85,
-            team=2,
-            rank=1,
-            fuel=750,
-            leaderboard_position=1,
-        )
-
-        completed = bot._maybe_complete_collection(bot.get_world_state(), non_target_self)
-
-        assert completed is True
-        events = _decode_action_outcome_lines(
-            fake_fs.get_written_files()[artifacts["latest_events_path"]]
-        )
-        assert len(events) == 1
-        fields = events[0]["fields"]
-        assert require_str_field(fields, "action_kind") == "collect"
-        assert require_str_field(fields, "outcome") == "container_consumed"
-        assert require_int_field(fields, "target_x") == 80
-        assert require_int_field(fields, "target_y") == 90
-        assert require_int_field(fields, "landed_x") == 70
-        assert require_int_field(fields, "landed_y") == 85
-
-    def test_scan_completion_emits_event_with_radar_scan_complete_signal(
-        self,
-        fake_env: FakeEnv,
-        fake_fs: FakeFileSystem,
-    ) -> None:
-        """``_maybe_complete_scan`` emits scan completion via radar_scan_complete."""
-        from tankpit_bot.sniffer.world_state import mark_radar_scan_complete
-
-        reset_world_state()
-        artifacts = configure_bot_runtime_logging("20260331-230405")
-
-        bot = _make_bot_with_in_flight(
-            state="SCANNING",
-            action_kind="scan",
-            target_x=0,
-            target_y=0,
-            started_ms=get_current_time_ms() - 1,
-        )
-        mark_radar_scan_complete()
-
-        completed = bot._maybe_complete_scan(bot.get_world_state())
-
-        assert completed is True
-        events = _decode_action_outcome_lines(
-            fake_fs.get_written_files()[artifacts["latest_events_path"]]
-        )
-        assert len(events) == 1
-        fields = events[0]["fields"]
-        assert require_str_field(fields, "action_kind") == "scan"
-        assert require_str_field(fields, "outcome") == "radar_complete"
-
-    def test_stalled_action_emits_event_with_stall_timeout_signal(
-        self,
-        fake_env: FakeEnv,
-        fake_fs: FakeFileSystem,
-    ) -> None:
-        """``_clear_stalled_action`` emits with stall_timeout for forced clearance."""
-        reset_world_state()
-        update_world_state_from_position(50, 50)
-        artifacts = configure_bot_runtime_logging("20260331-230405")
-
-        bot = _make_bot_with_in_flight(
-            state="MOVING",
-            action_kind="move",
-            target_x=180,
-            target_y=200,
-            started_ms=1,
-        )
-
-        cleared = _clear_stalled_action(bot, bot._state_data["in_flight_action"])
-
-        assert cleared is True
-        events = _decode_action_outcome_lines(
-            fake_fs.get_written_files()[artifacts["latest_events_path"]]
-        )
-        assert len(events) == 1
-        fields = events[0]["fields"]
-        assert require_str_field(fields, "action_kind") == "move"
-        assert require_str_field(fields, "outcome") == "stall_timeout"
-        assert require_int_field(fields, "target_x") == 180
-        assert require_int_field(fields, "target_y") == 200
-        # timeout_ms carries the configured action stall timeout the gate
-        # compared elapsed time against; any non-zero AI config value is
-        # acceptable.
-        assert require_int_field(fields, "timeout_ms") > 0
 
 
 def test_artifact_jsonl_lines_round_trip_through_real_decoder(

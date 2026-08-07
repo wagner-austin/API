@@ -1,6 +1,7 @@
 """End-to-end tests for the bot's ``C``-panel account stats capture.
 
-Every test drives the REAL pipeline: ``Bot._capture_account_stats`` ->
+Every test drives the REAL pipeline:
+``bot.account_stats_capture.capture_account_stats`` ->
 CDP keypress dispatch + DOM scrape -> real parsing -> JSONL artifact via
 :class:`tests.conftest.FakeFileSystem`. The panel fixture mirrors the
 live probe capture from 20260610-2348.
@@ -14,12 +15,11 @@ from platform_core.json_utils import JSONValue
 
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
+from tankpit_bot.bot.account_stats_capture import capture_account_stats
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.diagnostics.event_stream import load_event_records
-from tankpit_bot.runtime_logging import (
-    RuntimeEventRecordDict,
-    configure_bot_runtime_logging,
-)
+from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.sniffer.world_state import get_self_account
 from tests.conftest import FakeCDPSessionSimple, FakeEnv, FakeFileSystem
 
@@ -125,7 +125,7 @@ def test_capture_emits_single_c_press_and_scrapes(
     bot._cdp = cdp
     bot._page = _MinimalPage()
 
-    bot._capture_account_stats("startup")
+    capture_account_stats(bot._cdp, bot._page, "startup")
 
     methods = [method for method, _ in cdp.get_calls()]
     assert methods == [
@@ -164,7 +164,7 @@ def test_capture_emits_absence_when_panel_not_rendered(
     bot._cdp = cdp
     bot._page = _MinimalPage()
 
-    bot._capture_account_stats("startup")
+    capture_account_stats(bot._cdp, bot._page, "startup")
 
     records = _sample_records(artifacts["latest_events_path"])
     assert len(records) == 1
@@ -184,7 +184,7 @@ def test_capture_without_cdp_is_a_no_op(fake_env: FakeEnv, fake_fs: FakeFileSyst
     bot._cdp = None
     bot._page = None
 
-    bot._capture_account_stats("startup")
+    capture_account_stats(bot._cdp, bot._page, "startup")
 
     assert _sample_records(artifacts["latest_events_path"]) == []
 
@@ -196,6 +196,6 @@ def test_capture_without_page_is_a_no_op(fake_env: FakeEnv, fake_fs: FakeFileSys
     bot._cdp = FakeCDPSessionSimple()
     bot._page = None
 
-    bot._capture_account_stats("startup")
+    capture_account_stats(bot._cdp, bot._page, "startup")
 
     assert _sample_records(artifacts["latest_events_path"]) == []

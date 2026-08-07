@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONObject, narrow_json_to_dict
 
-from tankpit_bot.bot.ai.types import make_behavior_score, make_initial_ai_state
+from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.bot.tick_loop_types import (
     decode_tick_decision,
     encode_tick_decision,

@@ -15,7 +15,7 @@ import pytest
 
 from tankpit_bot.service.frame_bus import FrameSubscriber, FrameSubscriberProtocol
 from tankpit_bot.sniffer.world_state import reset_world_state
-from tests.bot.test_tick_loop_coverage import _FakePage
+from tests.bot._tick_loop_fakes import _FakePage
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes import FakeCDPSession
 

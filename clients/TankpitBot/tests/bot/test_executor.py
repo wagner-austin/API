@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.types import make_behavior_score, make_initial_ai_state
+from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.executor import (
     _format_desired_equipment,
