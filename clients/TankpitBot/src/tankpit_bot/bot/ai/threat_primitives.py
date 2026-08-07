@@ -23,37 +23,30 @@ from tankpit_bot.state.types import (
     WorldStateDict,
 )
 
-# Legacy wire-presence horizon -- kept as a constant for test clock
-# arithmetic (advance_clock past this value to age a target out of the
-# viewport-confirmed threat list). The combat-side gate that used this
-# was removed 2026-06-23: off-viewport pursuit shots fire toward the
-# last known wire position via _locked_target_pursuit, so wire silence
-# is no longer a stop signal.
-_WIRE_PRESENCE_TTL_MS = 7000
+#: Wire-presence horizon: advance a clock past this value to age a
+#: target out of the viewport-confirmed threat list. The combat-side
+#: gate that used it was removed 2026-06-23 -- off-viewport pursuit
+#: shots fire toward the last known wire position via
+#: ``_locked_target_pursuit``, so wire silence is no longer a stop
+#: signal -- and the constant survives as the clock arithmetic every
+#: staleness test does.
+WIRE_PRESENCE_TTL_MS = 7000
 
 
-#: Public alias for cross-module consumers (tests).
-WIRE_PRESENCE_TTL_MS = _WIRE_PRESENCE_TTL_MS
-
-
-# Position-bearing observations (0x3D MovementResponse, 0x47 Movement,
-# 0x28 TankEntry, container TankUpdate*, radar response, MAP_DATA) refresh
-# this timestamp. Combat tempo is ~4-6 s per cycle (teleport + scan +
-# shoot + next decision); a 3 s TTL false-positives "stale-position" on
-# stationary targets we are actively fighting, so the bot would block
-# the live target after one hit and switch to a new one. Live run
-# 20260620-191622: 22 map_opens / 19 teleports / 0 kills because the
-# gate kept firing block_combat_target_and_replan after each shoot.
-# Match the wire-presence TTL so a stationary target stays engageable
-# as long as it is still talking on the wire (TankStatusSync every
-# ~2 s). The long-stale "afterimage" case is now handled at acquisition
-# time by the viewport-presence gate in analyze_threats; the wire-side
-# combat gate was removed 2026-06-23.
-_POSITION_FRESHNESS_TTL_MS = 7000
-
-
-#: Public alias for cross-module consumers (combat_strategy).
-POSITION_FRESHNESS_TTL_MS = _POSITION_FRESHNESS_TTL_MS
+#: Position-bearing observations (0x3D MovementResponse, 0x47 Movement,
+#: 0x28 TankEntry, container TankUpdate*, radar response, MAP_DATA) refresh
+#: this timestamp. Combat tempo is ~4-6 s per cycle (teleport + scan +
+#: shoot + next decision); a 3 s TTL false-positives "stale-position" on
+#: stationary targets we are actively fighting, so the bot would block
+#: the live target after one hit and switch to a new one. Live run
+#: 20260620-191622: 22 map_opens / 19 teleports / 0 kills because the
+#: gate kept firing block_combat_target_and_replan after each shoot.
+#: Match the wire-presence TTL so a stationary target stays engageable
+#: as long as it is still talking on the wire (TankStatusSync every
+#: ~2 s). The long-stale "afterimage" case is now handled at acquisition
+#: time by the viewport-presence gate in analyze_threats; the wire-side
+#: combat gate was removed 2026-06-23.
+POSITION_FRESHNESS_TTL_MS = 7000
 
 
 # The server's homing trace on a departed target, measured live (run
