@@ -26,6 +26,7 @@ param(
     [int]$PinDelta = 0,
     [int]$FastForward = 0,
     [int]$RngTap = 0,
+    [string]$ExtraAgentArgs = "",
     [Parameter(Mandatory = $true)][string]$Module,
     [Parameter(Mandatory = $true)][string]$Catalogue,
     [Parameter(Mandatory = $true)][string]$TypeDump,
@@ -90,6 +91,14 @@ try {
         # line per sample window in the agent log (task #36).
         $agentArgs += ";rngTap=true"
         Write-Host "[play] rng draw tap armed" -ForegroundColor DarkGray
+    }
+    if ($ExtraAgentArgs -ne "") {
+        # Diagnostic passthrough: any agent option the launch knobs above do
+        # not name, e.g. discovery snapshots riding a live match
+        # (discoverAtSeconds + stateOutPath) to capture full rosters around
+        # a divergence window.
+        $agentArgs += ";$ExtraAgentArgs"
+        Write-Host "[play] extra agent args: $ExtraAgentArgs" -ForegroundColor DarkGray
     }
 
     $gameArgs = @(

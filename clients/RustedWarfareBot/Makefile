@@ -346,6 +346,11 @@ PLAY_FASTFORWARD ?= 0
 # counting one and logs a tally per sample window (task #36).
 PLAY_RNGTAP ?= 0
 
+# Diagnostic passthrough for agent options no launch knob names -- e.g.
+# discovery snapshots riding a live match to capture full rosters around a
+# divergence window: PLAY_EXTRA_AGENT="discoverAtSeconds=24,27,30;stateOutPath=runs/x.ndjson"
+PLAY_EXTRA_AGENT ?=
+
 # How many extractors the income probe builds, and how long it stands still
 # between each one. Target-specific variables rather than a recursive $(MAKE):
 # the argument list contains a space, and quoting it through a sub-make under
@@ -360,7 +365,7 @@ INCOME_LOG ?= runs/income.log
 play:
 	@Write-Host ""
 	@Write-Host "==> play (headless match on port $(PLAY_PORT), log: $(PLAY_LOG))" -ForegroundColor Cyan
-	& scripts/make/play.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -Seed $(PLAY_SEED) -Lockstep $(PLAY_LOCKSTEP) -Settle $(PLAY_SETTLE) -PlayLog "$(PLAY_LOG)" -Map "$(PLAY_MAP)" -Opponents $(PLAY_OPPONENTS) -Difficulty $(PLAY_DIFFICULTY) -Tree "$(PLAY_TREE)" -PinDelta $(PLAY_PINDELTA) -FastForward $(PLAY_FASTFORWARD) -RngTap $(PLAY_RNGTAP) -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(PLAY_ARGS)" -Javac "$(JAVAC)" -Jar "$(JAR)"
+	& scripts/make/play.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -Seed $(PLAY_SEED) -Lockstep $(PLAY_LOCKSTEP) -Settle $(PLAY_SETTLE) -PlayLog "$(PLAY_LOG)" -Map "$(PLAY_MAP)" -Opponents $(PLAY_OPPONENTS) -Difficulty $(PLAY_DIFFICULTY) -Tree "$(PLAY_TREE)" -PinDelta $(PLAY_PINDELTA) -FastForward $(PLAY_FASTFORWARD) -RngTap $(PLAY_RNGTAP) -ExtraAgentArgs "$(PLAY_EXTRA_AGENT)" -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(PLAY_ARGS)" -Javac "$(JAVAC)" -Jar "$(JAR)"
 
 # Host a LAN game the bot plays in, for a human to join. The join address is
 # printed at launch; the match starts the moment a player connects. Sparring
