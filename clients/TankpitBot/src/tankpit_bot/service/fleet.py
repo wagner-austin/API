@@ -7,13 +7,21 @@ AI. It runs in a terminal the operator owns, so an orchestration
 harness dying can never kill a live tank (the 41-kill session died at
 46 minutes exactly that way), and the AI drives it with plain HTTP:
 
+* ``GET  /`` — the control page (:mod:`fleet_page`): the same
+  operations as buttons and a live stats table, for the human at the
+  desktop. A skin over the API below, never a second control path.
 * ``GET  /bots`` — every instance, its pid, liveness, and bounds.
 * ``POST /bots`` — spawn one bot process:
   ``{"instance": "alpha", "account": "...", "kills": 30,
   "seconds": 2700}`` (account and bounds optional).
+* ``GET  /bots/{instance}/stats`` — the latest run's digest summary
+  (kills, deaths, rank countdown, duration, clean/crash), computed
+  from the instance's events artifact; works mid-run and on crashes.
 * ``POST /bots/{instance}/stop`` — graceful: writes the instance's
   stop sentinel; the tick loop exits at the next boundary with a full
   teardown (scorecard, capture, archive).
+* ``POST /bots/{instance}/restart`` — respawn a FINISHED instance
+  with the parameters it had (refuses while alive: stop first).
 * ``DELETE /bots/{instance}`` — remove a finished instance from the
   registry (refuses while the process lives).
 
@@ -33,6 +41,7 @@ from aiohttp import web
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
+    JSONValue,
     dump_json_str,
     load_json_bytes,
     narrow_json_to_dict,
@@ -43,8 +52,10 @@ from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks as top_hooks
+from tankpit_bot.diagnostics.run_digest import build_run_digest
 from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir
 from tankpit_bot.service import _test_hooks as service_hooks
+from tankpit_bot.service.fleet_page import FLEET_PAGE_HTML
 
 log = get_logger(__name__)
 
@@ -249,6 +260,75 @@ class FleetManager:
         log.info("Fleet: stop requested for %r (sentinel %s)", instance, sentinel)
         return bot.report()
 
+    def restart(self, instance: str) -> FleetBotDict:
+        """Respawn a finished instance with the parameters it had.
+
+        The fleet never silently kills: restarting a LIVE instance is
+        refused — stop it first, let the teardown run, then restart.
+
+        Args:
+            instance: Registered instance name.
+
+        Returns:
+            The respawned instance's report row.
+
+        Raises:
+            FleetError: If the instance is unknown or still alive.
+        """
+        bot = self._bots.get(instance)
+        if bot is None:
+            raise FleetError(f"unknown instance {instance!r}")
+        if bot.process.poll() is None:
+            raise FleetError(f"instance {instance!r} is still running; stop it first")
+        return self.spawn(
+            instance=instance,
+            account=bot.account,
+            kills=bot.kills,
+            seconds=bot.seconds,
+        )
+
+    def stats(self, instance: str) -> JSONObject:
+        """Summarize a registered instance's latest run from its events.
+
+        Reads ``runs/bot/<instance>/latest.events.jsonl`` through the
+        run-digest builder — the same truth table ``make digest``
+        prints, reduced to the fields the control page shows. Works on
+        live runs (the events file grows in place) and on crashed ones.
+
+        Args:
+            instance: Registered instance name.
+
+        Returns:
+            ``{"available": False}`` when the instance has produced no
+            events yet, else the summary with ``"available": True``.
+
+        Raises:
+            FleetError: If the instance is not registered.
+        """
+        if instance not in self._bots:
+            raise FleetError(f"unknown instance {instance!r}")
+        events_path = bot_run_dir(instance) / "latest.events.jsonl"
+        try:
+            digest = build_run_digest(events_path)
+        except (OSError, ValueError) as error:
+            log.info("Fleet: no stats for %r yet: %s", instance, error)
+            return {"available": False}
+        return {
+            "available": True,
+            "kills": digest["kills"],
+            "deaths": digest["deaths"],
+            "shots": digest["shots"],
+            "teleports": digest["teleports"],
+            "pickups": digest["pickups"],
+            "duration_s": digest["duration_s"],
+            "clean_exit": digest["clean_exit"],
+            "exit_reason": digest["exit_reason"],
+            "rank_name": digest["rank_name"],
+            "rank_number": digest["rank_number"],
+            "promotion_points": digest["promotion_points"],
+            "started_at": digest["started_at"],
+        }
+
     def remove(self, instance: str) -> FleetBotDict:
         """Drop a finished instance from the registry.
 
@@ -312,24 +392,73 @@ def parse_spawn_request(body: bytes) -> tuple[str, str, int, int]:
     return instance, account, kills, seconds
 
 
-def make_fleet_app(manager: FleetManager) -> web.Application:
-    """Build the fleet manager's aiohttp application.
+def _json_response(payload: JSONObject, status: int = 200) -> web.Response:
+    """Build one JSON response.
 
     Args:
-        manager: The fleet registry the routes operate on.
+        payload: JSON-serializable body.
+        status: HTTP status code.
 
     Returns:
-        The configured ``aiohttp.web.Application``.
+        The response.
     """
+    return web.Response(
+        status=status,
+        text=dump_json_str(payload, indent=1),
+        content_type="application/json",
+    )
+
+
+def _add_observation_routes(app: web.Application, manager: FleetManager) -> None:
+    """Wire the read-only routes: the page, the list, the stats.
+
+    Args:
+        app: Application under construction.
+        manager: The fleet registry the routes read.
+    """
+
+    async def control_page(request: web.Request) -> web.Response:
+        """``GET /`` — the human control page (a skin over the API)."""
+        _ = request
+        return web.Response(text=FLEET_PAGE_HTML, content_type="text/html")
 
     async def list_bots(request: web.Request) -> web.Response:
         """``GET /bots`` — every instance's current state."""
         _ = request
-        rows = [encode_fleet_bot(bot) for bot in manager.report()]
-        return web.Response(
-            text=dump_json_str({"bots": rows}, indent=1),
-            content_type="application/json",
-        )
+        rows: list[JSONValue] = [encode_fleet_bot(bot) for bot in manager.report()]
+        return _json_response({"bots": rows})
+
+    async def bot_stats(request: web.Request) -> web.Response:
+        """``GET /bots/{instance}/stats`` — latest-run digest summary."""
+        try:
+            summary = manager.stats(request.match_info["instance"])
+        except FleetError as error:
+            log.warning("Fleet: refused stats (404): %s", error)
+            return web.Response(status=404, text=str(error))
+        return _json_response(summary)
+
+    app.router.add_get("/", control_page)
+    app.router.add_get("/bots", list_bots)
+    app.router.add_get("/bots/{instance}/stats", bot_stats)
+
+
+def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:
+    """Wire the mutating routes: spawn, stop, restart, remove.
+
+    Args:
+        app: Application under construction.
+        manager: The fleet registry the routes operate on.
+    """
+
+    async def restart_bot(request: web.Request) -> web.Response:
+        """``POST /bots/{instance}/restart`` — respawn a finished bot."""
+        try:
+            row = manager.restart(request.match_info["instance"])
+        except FleetError as error:
+            status = 409 if "still running" in str(error) else 404
+            log.warning("Fleet: refused restart (%d): %s", status, error)
+            return web.Response(status=status, text=str(error))
+        return _json_response(encode_fleet_bot(row), status=201)
 
     async def spawn_bot(request: web.Request) -> web.Response:
         """``POST /bots`` — spawn one instance."""
@@ -342,11 +471,7 @@ def make_fleet_app(manager: FleetManager) -> web.Application:
         except FleetError as error:
             log.warning("Fleet: refused spawn (409): %s", error)
             return web.Response(status=409, text=str(error))
-        return web.Response(
-            status=201,
-            text=dump_json_str(encode_fleet_bot(row), indent=1),
-            content_type="application/json",
-        )
+        return _json_response(encode_fleet_bot(row), status=201)
 
     async def stop_bot(request: web.Request) -> web.Response:
         """``POST /bots/{instance}/stop`` — graceful stop via sentinel."""
@@ -355,10 +480,7 @@ def make_fleet_app(manager: FleetManager) -> web.Application:
         except FleetError as error:
             log.warning("Fleet: refused stop (404): %s", error)
             return web.Response(status=404, text=str(error))
-        return web.Response(
-            text=dump_json_str(encode_fleet_bot(row), indent=1),
-            content_type="application/json",
-        )
+        return _json_response(encode_fleet_bot(row))
 
     async def remove_bot(request: web.Request) -> web.Response:
         """``DELETE /bots/{instance}`` — drop a finished instance."""
@@ -368,16 +490,26 @@ def make_fleet_app(manager: FleetManager) -> web.Application:
             status = 409 if "still running" in str(error) else 404
             log.warning("Fleet: refused remove (%d): %s", status, error)
             return web.Response(status=status, text=str(error))
-        return web.Response(
-            text=dump_json_str(encode_fleet_bot(row), indent=1),
-            content_type="application/json",
-        )
+        return _json_response(encode_fleet_bot(row))
 
-    app = web.Application()
-    app.router.add_get("/bots", list_bots)
     app.router.add_post("/bots", spawn_bot)
     app.router.add_post("/bots/{instance}/stop", stop_bot)
+    app.router.add_post("/bots/{instance}/restart", restart_bot)
     app.router.add_delete("/bots/{instance}", remove_bot)
+
+
+def make_fleet_app(manager: FleetManager) -> web.Application:
+    """Build the fleet manager's aiohttp application.
+
+    Args:
+        manager: The fleet registry the routes operate on.
+
+    Returns:
+        The configured ``aiohttp.web.Application``.
+    """
+    app = web.Application()
+    _add_observation_routes(app, manager)
+    _add_lifecycle_routes(app, manager)
     return app
 
 

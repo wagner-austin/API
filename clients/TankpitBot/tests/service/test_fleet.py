@@ -179,6 +179,79 @@ def test_remove_refuses_a_live_instance_and_drops_a_dead_one(
     assert manager.report() == []
 
 
+def test_restart_respawns_a_dead_instance_with_its_parameters(
+    spawner: _FakeSpawner,
+) -> None:
+    """Restart reuses the stored account and bounds, refusing while alive."""
+    manager = FleetManager()
+    manager.spawn(instance="alpha", account="second", kills=30, seconds=2700)
+
+    with pytest.raises(FleetError, match="still running"):
+        manager.restart("alpha")
+    with pytest.raises(FleetError, match="unknown instance"):
+        manager.restart("ghost")
+
+    spawner.processes[0].returncode = 0
+    row = manager.restart("alpha")
+    assert row["pid"] == 1002
+    assert spawner.envs[1] == spawner.envs[0]
+
+
+def test_stats_summarizes_the_instance_events(spawner: _FakeSpawner) -> None:
+    """The stats summary reads the instance's events via the digest."""
+    events = "\n".join(
+        [
+            '{"timestamp":"2026-08-06T10:00:00","level":"INFO","logger":"l",'
+            '"mode":"bot","channel":"STATE","message":"INITIALIZING"}',
+            '{"timestamp":"2026-08-06T10:05:00","level":"INFO","logger":"l",'
+            '"mode":"bot","channel":"COMBAT","message":"kill registered"}',
+        ]
+    )
+    reads: list[Path] = []
+
+    def fake_read(path: Path) -> str:
+        reads.append(Path(path))
+        return events
+
+    original_read = top_hooks.read_text
+    top_hooks.read_text = fake_read
+    try:
+        manager = FleetManager()
+        manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+        summary = manager.stats("alpha")
+    finally:
+        top_hooks.read_text = original_read
+
+    assert reads == [Path("runs/bot/alpha/latest.events.jsonl")]
+    assert summary["available"] is True
+    assert summary["kills"] == 1
+    assert summary["deaths"] == 0
+    assert summary["duration_s"] == 300
+    assert summary["clean_exit"] is False
+
+
+def test_stats_without_events_is_unavailable_not_an_error(
+    spawner: _FakeSpawner,
+) -> None:
+    """A just-spawned bot with no events yet reports available=False."""
+
+    def fake_read(path: Path) -> str:
+        raise OSError(f"no such file {path}")
+
+    original_read = top_hooks.read_text
+    top_hooks.read_text = fake_read
+    try:
+        manager = FleetManager()
+        manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+        summary = manager.stats("alpha")
+        with pytest.raises(FleetError, match="unknown instance"):
+            manager.stats("ghost")
+    finally:
+        top_hooks.read_text = original_read
+
+    assert summary == {"available": False}
+
+
 def test_resolve_fleet_port_contract() -> None:
     """Default, override, and loud rejection."""
     original_get_env = top_hooks.get_env
@@ -224,7 +297,14 @@ def test_main_wires_the_app_onto_the_resolved_port() -> None:
     app, host, port = served[0]
     assert (host, port) == ("127.0.0.1", 27311)
     canonical = {resource.canonical for resource in app.router.resources()}
-    assert canonical == {"/bots", "/bots/{instance}/stop", "/bots/{instance}"}
+    assert canonical == {
+        "/",
+        "/bots",
+        "/bots/{instance}/stats",
+        "/bots/{instance}/stop",
+        "/bots/{instance}/restart",
+        "/bots/{instance}",
+    }
 
 
 def test_real_run_web_app_drives_aiohttp_until_interrupted() -> None:
@@ -307,6 +387,44 @@ async def test_http_spawn_list_stop_remove_cycle(
         assert removed.status == 200
     finally:
         top_hooks.write_text = original_write
+
+
+@pytest.mark.asyncio
+async def test_http_page_stats_and_restart(
+    client: TestClient[web.Request, web.Application],
+    spawner: _FakeSpawner,
+) -> None:
+    """The control page serves, stats answer JSON, restart respawns."""
+    page = await client.get("/")
+    assert page.status == 200
+    assert (page.headers["Content-Type"]).startswith("text/html")
+    body = await page.text()
+    assert "tankpit fleet" in body and "/bots" in body
+
+    ok: dict[str, str | int] = {"instance": "alpha", "kills": 5}
+    assert (await client.post("/bots", json=ok)).status == 201
+
+    def fake_read(path: Path) -> str:
+        raise OSError(f"no events at {path}")
+
+    original_read = top_hooks.read_text
+    top_hooks.read_text = fake_read
+    try:
+        stats = await client.get("/bots/alpha/stats")
+        assert stats.status == 200
+        payload = narrow_json_to_dict(load_json_str(await stats.text()))
+        assert payload == {"available": False}
+        assert (await client.get("/bots/ghost/stats")).status == 404
+    finally:
+        top_hooks.read_text = original_read
+
+    assert (await client.post("/bots/alpha/restart")).status == 409
+    assert (await client.post("/bots/ghost/restart")).status == 404
+    spawner.processes[0].returncode = 0
+    restarted = await client.post("/bots/alpha/restart")
+    assert restarted.status == 201
+    row = narrow_json_to_dict(load_json_str(await restarted.text()))
+    assert row["pid"] == 1002
 
 
 @pytest.mark.asyncio

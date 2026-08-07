@@ -2902,3 +2902,19 @@ Found and fixed along the way:
 - **Artifact-writing miners diffed on their artifacts too**: `mine_container_atlas` reproduced `container_atlas.json` and `container_observations.jsonl` byte-for-byte; `mine_bot_policy` its output JSON.
 
 The 12 scripts not touched read pre-extracted artifacts (correlate_unknowns, crack_all_blobs, solve_*, find_kill_byte, mine_inventory_persistence, mine_radar_floor, verify_tank511, analyze_container_atlas) — no capture pipeline to migrate. Net across the whole arc: every byte of capture decoding in this repo now has exactly one owner. Gate green (guard 0, 100.00% coverage).
+
+---
+## [2026-08-06] lift | The fleet gets its face — control page, stats, restart
+
+User: "i wanna make sure that the tankpit server is completely seprate from the spa and the sunshine and vibeshine stuff. and i want to ensure we can easily run multiple bots on the desktop. with a simple ui, easy for me or the ai to use." The fleet manager was already the separation (own process, port 27300, localhost, zero fiesta/nginx/streaming); this gives it the UI.
+
+- **`GET /`** serves `service/fleet_page.py` — one self-contained HTML file, no external assets: live bot table (state, bounds, kills / deaths / rank countdown / duration, 3 s poll), spawn form, per-row stop / restart / remove. Strictly a skin over the same JSON endpoints the AI drives — never a second control path.
+- **`GET /bots/{instance}/stats`** — the latest run's digest summary (`build_run_digest` over the instance's `latest.events.jsonl`, the same truth table `make digest` prints), reduced to kills, deaths, shots, teleports, pickups, duration, clean/crash + exit reason, rank name / countdown number / promotion points. Works mid-run (the events file grows in place) and on crashed runs; a just-spawned bot answers `{"available": false}` instead of erroring.
+- **`POST /bots/{instance}/restart`** — respawns a FINISHED instance with the exact parameters it had (verified in tests: identical child env). Refuses while alive (409): the fleet never silently kills — stop, let the teardown run its scorecard/capture/archive, then restart.
+- `make_fleet_app` split into observation + lifecycle route builders (C901); `_json_response` helper.
+
+Bot assessment on the way in: nothing to fix — 100/0 century, trap class dead, clearance/unservable proven; what remains parked is doctrine awaiting user rulings (dueling movement, death-spiral escape, F14/F19).
+
+RustedWarfare gets the same fleet+UI shape next (user ruling, including its fast-forward option as a spawn parameter) — its tree is receiving the user's catch-up commit first.
+
+Gate note: committed scoped (fleet.py, fleet_page.py, test_fleet.py only) with the full 19-test fleet suite green and targeted ruff/mypy clean on the scope; the tree-wide `make check` was red at commit time from a PARALLEL session's in-flight protocol->wire refactor (their edits, their gate) — the fleet files do not overlap it.
