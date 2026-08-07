@@ -23,6 +23,8 @@ from tests.action_lab._combat_probe_harness import (
     _make_world,
     _ProbeHarness,
     combat_module,
+    require_engagement,
+    require_threat,
 )
 from tests.action_lab._replay_browser import RecordedChromiumSession
 from tests.action_lab._replay_page import ClockAdvancingPage, ReplayClock
@@ -377,7 +379,7 @@ def test_acquire_engages_and_warns_when_the_landing_is_not_adjacent() -> None:
     _stub_landing(100, 100)
     _stub_teleport("landed_exact")
 
-    assert _acquire(probe) is not None
+    assert require_engagement(_acquire(probe))["target_id"] == far["tank_id"]
     assert probe.engaged == [far]
 
 
@@ -390,7 +392,7 @@ def test_acquire_engages_without_warning_when_the_landing_is_adjacent() -> None:
     _stub_landing(100, 100)
     _stub_teleport("landed_exact")
 
-    assert _acquire(probe) is not None
+    assert require_engagement(_acquire(probe))["target_id"] == near["tank_id"]
     assert probe.engaged == [near]
 
 
@@ -426,10 +428,14 @@ def test_current_enemy_by_id_scans_past_a_non_matching_threat() -> None:
         ),
     }
 
-    found = _current_enemy_by_id(probe, 51)
+    found = require_threat(_current_enemy_by_id(probe, 51))
 
-    assert found is not None
-    assert found["tank_id"] == 51
+    assert (found["tank_id"], found["x"], found["y"], found["name"]) == (
+        51,
+        102,
+        100,
+        "red-51",
+    )
 
 
 def test_engage_records_misses_until_the_shot_budget_runs_out() -> None:
@@ -530,7 +536,12 @@ def test_create_combat_probe_builds_a_combat_probe() -> None:
         headless=True,
         prefer_account=False,
     )
-    assert isinstance(probe, combat_module.CombatProbe)
+    assert (probe._target_url, probe._headless, probe._prefer_account) == (
+        "https://tankpit.com/play",
+        True,
+        False,
+    )
+    assert type(probe) is combat_module.CombatProbe
 
 
 def test_run_combat_probe_writes_the_session_json(fake_fs: FakeFileSystem) -> None:

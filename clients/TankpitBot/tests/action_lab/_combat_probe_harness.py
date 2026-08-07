@@ -356,3 +356,40 @@ _combat_module_import = __import__(
 
 
 combat_module: _CombatModuleProtocol = _combat_module_import
+
+
+def require_engagement(result: CombatEngagementDict | None) -> CombatEngagementDict:
+    """Return the engagement, failing loudly when the probe gave up.
+
+    Lets a caller assert on the engagement's contents rather than on
+    its mere existence, which proves nothing about what happened.
+
+    Args:
+        result: What ``_acquire_and_engage`` returned.
+
+    Returns:
+        The engagement.
+
+    Raises:
+        AssertionError: When the probe returned no engagement.
+    """
+    if result is None:
+        raise AssertionError("expected an engagement; the probe gave up instead")
+    return result
+
+
+def require_threat(threat: EnemyThreatDict | None) -> EnemyThreatDict:
+    """Return the threat, failing loudly when the lookup found nothing.
+
+    Args:
+        threat: What a threat lookup returned.
+
+    Returns:
+        The threat.
+
+    Raises:
+        AssertionError: When the lookup found no threat.
+    """
+    if threat is None:
+        raise AssertionError("expected a threat; the lookup found none")
+    return threat
