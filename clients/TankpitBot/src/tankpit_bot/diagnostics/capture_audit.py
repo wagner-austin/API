@@ -33,7 +33,7 @@ from tankpit_bot.diagnostics.event_stream import scan_diagnostic_records
 from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
 from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
 from tankpit_bot.protocol.framing import FramingError
-from tankpit_bot.runtime_logging import RuntimeEventRecordDict
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.types import CaptureSession
 from tankpit_bot.validate.fight_timeline import extract_human_episodes
@@ -55,8 +55,16 @@ def _xor_with_table(body: bytes, table: bytes) -> bytes:
 
     Mirrors :func:`tankpit_bot.capture.xor.xor_decode_body` at
     ``offset=1``, but passes bytes beyond the table through in the
-    clear instead of raising — an audit reads whatever the archive
-    holds. Folding the two is tracked as its own step
+    clear instead of raising.
+
+    This is the ONE place that arm survives, and it is kept for a
+    measured reason rather than caution: ``runs/sim`` holds 904 frames
+    of up to 8,780 ciphered bytes, written before
+    :func:`tankpit_bot.sim.transport._require_wire_sized` stopped the
+    sim producing them. An audit reads the archive as it is, including
+    its own history. Every byte the REAL server ever sent fits the
+    table — 931 bytes at most across 282,783 bodies — so this branch
+    can only ever fire on our own old sim captures
     ([[session-state-deglobalisation]]).
 
     Args:
