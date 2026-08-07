@@ -17,7 +17,10 @@ class ExceptionsRule:
     _log_call_named = re.compile(
         r"\b(logging|log|logger)\.(debug|info|warning|error|exception|critical)\("
     )
-    _log_call_any = re.compile(r"\.(debug|info|warning|error|exception|critical)\(")
+    # ``write_line`` is the sanctioned output channel of the stdlib-only
+    # clients (RustedWarfareBot's ``_test_hooks.write_line``): calling it
+    # in an except body surfaces the failure exactly as a log call does.
+    _log_call_any = re.compile(r"\.(debug|info|warning|error|exception|critical|write_line)\(")
     _raise_re = re.compile(r"\braise\b")
 
     def run(self, files: list[Path]) -> list[Violation]:

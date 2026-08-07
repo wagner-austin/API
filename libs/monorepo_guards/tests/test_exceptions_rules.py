@@ -99,3 +99,21 @@ def test_exceptions_rule_body_start_skips_blank_lines(tmp_path: Path) -> None:
     violations = rule.run([path])
     # Broad except with both log and raise after a blank line should be allowed
     assert violations == []
+
+
+def test_exceptions_rule_accepts_write_line_as_surfacing(tmp_path: Path) -> None:
+    code = (
+        "try:\n"
+        "    1/0\n"
+        "except ValueError as error:\n"
+        "    _test_hooks.write_line(f'refused: {error}')\n"
+        "    result = None\n"
+    )
+    path = tmp_path / "write_line_ok.py"
+    _write(path, code)
+
+    rule = ExceptionsRule()
+    violations = rule.run([path])
+    # write_line is the stdlib-only clients' output channel; calling it
+    # in a narrow except body surfaces the failure like a log call.
+    assert violations == []
