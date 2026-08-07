@@ -29,8 +29,8 @@ from tankpit_bot._test_hooks import (
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
-from tankpit_bot.action_lab.fuel_probe import (
-    FuelProbe,
+from tankpit_bot.action_lab.fuel_probe import FuelProbe
+from tankpit_bot.action_lab.fuel_probe_targets import (
     FuelProbeError,
     _find_visible_fuel_target,
     _format_visible_fuel_entries,
@@ -409,7 +409,6 @@ def test_run_pickup_attempt_converts_pickup_phase_error() -> None:
     page = ClockAdvancingPage(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     fuel_target = make_container_state(101, 100, True, 300)
-    pickup_attr = "run_tracked_pickup_phase"
     original_run_pickup = fuel_probe_module.run_tracked_pickup_phase
 
     def _raise_pickup_phase_error(
@@ -452,7 +451,7 @@ def test_run_pickup_attempt_converts_pickup_phase_error() -> None:
         )
         raise PickupPhaseError("shared pickup failure")
 
-    setattr(fuel_probe_module, pickup_attr, _raise_pickup_phase_error)
+    fuel_probe_module.run_tracked_pickup_phase = _raise_pickup_phase_error
     try:
         with pytest.raises(FuelProbeError, match="shared pickup failure"):
             probe._run_pickup_attempt(
@@ -498,4 +497,4 @@ def test_run_pickup_attempt_converts_pickup_phase_error() -> None:
                 capture_snapshot=lambda: _snapshot(1900),
             )
     finally:
-        setattr(fuel_probe_module, pickup_attr, original_run_pickup)
+        fuel_probe_module.run_tracked_pickup_phase = original_run_pickup
