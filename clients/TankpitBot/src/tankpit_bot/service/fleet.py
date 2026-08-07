@@ -52,6 +52,7 @@ from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks as top_hooks
+from tankpit_bot.browser.accounts import _ACCOUNTS_PATH, load_accounts
 from tankpit_bot.diagnostics.run_digest import build_run_digest
 from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir
 from tankpit_bot.service import _test_hooks as service_hooks
@@ -171,6 +172,22 @@ class FleetManager:
         """Start with an empty registry."""
         self._bots: dict[str, _ManagedBot] = {}
 
+    def accounts(self) -> list[str]:
+        """Return the configured account usernames.
+
+        Accounts are CONFIG (``accounts.json``), never free text — the
+        spawn surface only accepts a selector from this list, and the
+        control page renders it as a dropdown. Usernames only;
+        passwords never leave the file.
+
+        Returns:
+            Usernames in file order (the first is the default), empty
+            when no accounts file exists.
+        """
+        if not top_hooks.path_exists(_ACCOUNTS_PATH):
+            return []
+        return [account["username"] for account in load_accounts(_ACCOUNTS_PATH)]
+
     def spawn(self, *, instance: str, account: str, kills: int, seconds: int) -> FleetBotDict:
         """Spawn one bot child process under an instance namespace.
 
@@ -197,6 +214,14 @@ class FleetManager:
             )
         if kills < 0 or seconds < 0:
             raise FleetError("bounds must be non-negative")
+        if account:
+            configured = self.accounts()
+            if account not in configured:
+                known = ", ".join(configured) or "none configured"
+                raise FleetError(
+                    f"account {account!r} is not in accounts.json (accounts are "
+                    f"config, not free text; configured: {known})"
+                )
         existing = self._bots.get(instance)
         if existing is not None and existing.process.poll() is None:
             raise FleetError(
@@ -428,6 +453,12 @@ def _add_observation_routes(app: web.Application, manager: FleetManager) -> None
         rows: list[JSONValue] = [encode_fleet_bot(bot) for bot in manager.report()]
         return _json_response({"bots": rows})
 
+    async def list_accounts(request: web.Request) -> web.Response:
+        """``GET /accounts`` — configured usernames, first is default."""
+        _ = request
+        names: list[JSONValue] = list(manager.accounts())
+        return _json_response({"accounts": names})
+
     async def bot_stats(request: web.Request) -> web.Response:
         """``GET /bots/{instance}/stats`` — latest-run digest summary."""
         try:
@@ -438,6 +469,7 @@ def _add_observation_routes(app: web.Application, manager: FleetManager) -> None
         return _json_response(summary)
 
     app.router.add_get("/", control_page)
+    app.router.add_get("/accounts", list_accounts)
     app.router.add_get("/bots", list_bots)
     app.router.add_get("/bots/{instance}/stats", bot_stats)
 

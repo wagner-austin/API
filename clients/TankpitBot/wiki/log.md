@@ -2939,3 +2939,16 @@ Gate note: committed scoped (fleet.py, fleet_page.py, test_fleet.py only) with t
 Conftest reset list: `reset_xor_state` out, `reset_static_key_cache` in. Ten calls either way, but the new one guards a process-wide KEY cache (one key builds every session's table), not session state — so the honest count of session-state resets is nine, and step 11's target shrank by one.
 
 Gate note: `make lint` clean — 0 violations across all 28 guard rules; `pytest -n auto` 5939 passed, 0 failures attributable to this work. Three failures remain in `tests/test_check_undecoded_fields.py` from the same PARALLEL session's in-flight split of `protocol/types.py` into a package: `scripts/check_undecoded_fields.py:34` `DEFAULT_TARGETS` still names the deleted file. That script is untouched by either session and enumerating their ten new modules would be guessing at their intent — their split, their gate.
+
+---
+## [2026-08-06] operation | First fleet-driven live run — one real bug, two human flags, rank 24
+
+First bot ever spawned through `make fleet` + the control page. Take 1 died instantly: the child bootstrap passed its `KEY=VALUE` env freight through argv, and the entry point parses argv — "unrecognized arguments", exit 1, no browser. The fix is one line in the bootstrap (`del sys.argv[1:]` after applying the environment), found only because a live trial was actually run. Take 2: **5 kills / 0 deaths in 385 s, clean `session_complete`, rank countdown 26 -> 24 territory confirmed (panel read 24 at scrape)** — spawn, bounded wind-down, scorecard, and the stats endpoint all proven through the fleet path.
+
+User feedback folded in the same hour:
+- **Accounts are config, not free text** (user ruling): the page's account field is now a dropdown fed by `GET /accounts` (usernames from accounts.json — passwords never leave the file), and `spawn` refuses any selector not in the file. No override path exists.
+- **Page de-barebones'd**: labeled fields with hints (name -> runs/bot/<name>/, 0 = unlimited), status pills (running/finished/exit N), gold rank column, button tooltips, footer explaining that stop is graceful.
+
+The human-flag channel worked end-to-end through a fleet instance — both flags triaged live from the events stream:
+- **Flag 1** (tick 83): the viewport jump was the bot's own `scope(5)` — a ferry scope scout panning SW toward water-locked equipment at (127,15) ([[viewport-shift-protocol]] trigger 2).
+- **Flag 2** (tick 135): the "missed tick" after teleporting to orange-5 is the one-tick gap between the 0x3D position echo (+fuel charge, visually the landing) and the server's TELEPORT_LANDED receipt the sync gate keys on. Loop cadence was a flat 2 s throughout — nothing skipped. Candidate doctrine change, parked for the user: treat self-0x3D + fuel-charge as landing proof (the displacement mining's 534/534 pairing law) and open fire a tick earlier.

@@ -11,6 +11,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks as top_hooks
+from tankpit_bot._test_hooks.fs import PathExistsProtocol, ReadTextProtocol
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import _real_run_web_app, _real_spawn_bot_process
 from tankpit_bot.service.fleet import (
@@ -59,11 +60,44 @@ def spawner() -> Generator[_FakeSpawner, None, None]:
     service_hooks.spawn_bot_process = original
 
 
+def _with_configured_accounts() -> tuple[PathExistsProtocol, ReadTextProtocol]:
+    """Install fake account config carrying ``artax`` and ``second``.
+
+    Returns:
+        The original ``(path_exists, read_text)`` hooks to restore.
+    """
+
+    def fake_exists(path: Path) -> bool:
+        _ = path
+        return True
+
+    def fake_read(path: Path) -> str:
+        _ = path
+        return '[{"username": "artax", "password": "a"}, {"username": "second", "password": "b"}]'
+
+    originals = (top_hooks.path_exists, top_hooks.read_text)
+    top_hooks.path_exists = fake_exists
+    top_hooks.read_text = fake_read
+    return originals
+
+
+def _restore_account_hooks(originals: tuple[PathExistsProtocol, ReadTextProtocol]) -> None:
+    """Restore the account-config hooks.
+
+    Args:
+        originals: The ``(path_exists, read_text)`` pair to put back.
+    """
+    top_hooks.path_exists, top_hooks.read_text = originals
+
+
 def test_spawn_builds_the_instance_environment(spawner: _FakeSpawner) -> None:
     """The child receives instance, bounds, and account via env."""
-    manager = FleetManager()
-
-    row = manager.spawn(instance="alpha", account="second", kills=30, seconds=2700)
+    originals = _with_configured_accounts()
+    try:
+        manager = FleetManager()
+        row = manager.spawn(instance="alpha", account="second", kills=30, seconds=2700)
+    finally:
+        _restore_account_hooks(originals)
 
     assert spawner.envs == [
         {
@@ -76,6 +110,47 @@ def test_spawn_builds_the_instance_environment(spawner: _FakeSpawner) -> None:
     assert row["instance"] == "alpha"
     assert row["alive"] is True
     assert row["pid"] == 1001
+
+
+def test_accounts_lists_configured_usernames_only(spawner: _FakeSpawner) -> None:
+    """The account surface is accounts.json usernames — never passwords."""
+    _ = spawner
+    originals = _with_configured_accounts()
+    try:
+        manager = FleetManager()
+        names = manager.accounts()
+        row = manager.spawn(instance="alpha", account="second", kills=0, seconds=0)
+        with pytest.raises(FleetError, match=r"not in accounts\.json"):
+            manager.spawn(instance="bravo", account="intruder", kills=0, seconds=0)
+    finally:
+        _restore_account_hooks(originals)
+
+    assert names == ["artax", "second"]
+    assert row["account"] == "second"
+
+
+def test_accounts_without_a_file_is_empty_and_default_still_spawns(
+    spawner: _FakeSpawner,
+) -> None:
+    """No accounts.json: the list is empty and only default spawns."""
+
+    def fake_exists(path: Path) -> bool:
+        _ = path
+        return False
+
+    original_exists = top_hooks.path_exists
+    top_hooks.path_exists = fake_exists
+    try:
+        manager = FleetManager()
+        names = manager.accounts()
+        manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+        with pytest.raises(FleetError, match="none configured"):
+            manager.spawn(instance="bravo", account="anyone", kills=0, seconds=0)
+    finally:
+        top_hooks.path_exists = original_exists
+
+    assert names == []
+    assert len(spawner.envs) == 1
 
 
 def test_spawn_without_account_omits_the_selector(spawner: _FakeSpawner) -> None:
@@ -183,16 +258,20 @@ def test_restart_respawns_a_dead_instance_with_its_parameters(
     spawner: _FakeSpawner,
 ) -> None:
     """Restart reuses the stored account and bounds, refusing while alive."""
-    manager = FleetManager()
-    manager.spawn(instance="alpha", account="second", kills=30, seconds=2700)
+    originals = _with_configured_accounts()
+    try:
+        manager = FleetManager()
+        manager.spawn(instance="alpha", account="second", kills=30, seconds=2700)
 
-    with pytest.raises(FleetError, match="still running"):
-        manager.restart("alpha")
-    with pytest.raises(FleetError, match="unknown instance"):
-        manager.restart("ghost")
+        with pytest.raises(FleetError, match="still running"):
+            manager.restart("alpha")
+        with pytest.raises(FleetError, match="unknown instance"):
+            manager.restart("ghost")
 
-    spawner.processes[0].returncode = 0
-    row = manager.restart("alpha")
+        spawner.processes[0].returncode = 0
+        row = manager.restart("alpha")
+    finally:
+        _restore_account_hooks(originals)
     assert row["pid"] == 1002
     assert spawner.envs[1] == spawner.envs[0]
 
@@ -299,6 +378,7 @@ def test_main_wires_the_app_onto_the_resolved_port() -> None:
     canonical = {resource.canonical for resource in app.router.resources()}
     assert canonical == {
         "/",
+        "/accounts",
         "/bots",
         "/bots/{instance}/stats",
         "/bots/{instance}/stop",
@@ -399,7 +479,16 @@ async def test_http_page_stats_and_restart(
     assert page.status == 200
     assert (page.headers["Content-Type"]).startswith("text/html")
     body = await page.text()
-    assert "tankpit fleet" in body and "/bots" in body
+    assert "tankpit fleet" in body and "/bots" in body and "/accounts" in body
+
+    originals = _with_configured_accounts()
+    try:
+        listed_accounts = await client.get("/accounts")
+        assert listed_accounts.status == 200
+        accounts_payload = narrow_json_to_dict(load_json_str(await listed_accounts.text()))
+        assert accounts_payload == {"accounts": ["artax", "second"]}
+    finally:
+        _restore_account_hooks(originals)
 
     ok: dict[str, str | int] = {"instance": "alpha", "kills": 5}
     assert (await client.post("/bots", json=ok)).status == 201

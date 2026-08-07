@@ -370,9 +370,13 @@ _CHILD_BOOTSTRAP = (
     "for pair in sys.argv[1:]:\n"
     "    key, _, value = pair.partition('=')\n"
     "    os.environ[key] = value\n"
+    "del sys.argv[1:]\n"
     "from tankpit_bot.bot.entry import main\n"
     "main()\n"
 )
+# The argv wipe matters: the entry point parses sys.argv, and the
+# KEY=VALUE pairs are bootstrap freight, not bot arguments — the
+# first live fleet spawn died on "unrecognized arguments" without it.
 
 
 def _real_spawn_bot_process(env_overrides: dict[str, str]) -> subprocess.Popen[bytes]:
