@@ -22,12 +22,12 @@ from platform_core.logging import get_logger
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
+from tankpit_bot.action_lab.enemy_tracking_codecs import encode_enemy_tracking_probe_session
 from tankpit_bot.action_lab.enemy_tracking_types import (
     EnemyTrackingProbeSessionDict,
     ShotEventDict,
     TrackedEnemyDict,
     TrackingObservationDict,
-    encode_enemy_tracking_probe_session,
 )
 from tankpit_bot.action_lab.page_client_snapshot import (
     PageClientSnapshotDict,
@@ -56,7 +56,7 @@ from tankpit_bot.action_lab.tracking_observation import (
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.bot.ai.combat_landing import choose_combat_landing_tile
 from tankpit_bot.bot.ai.threats import analyze_threats
-from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
     get_world_service,
@@ -138,7 +138,7 @@ def _build_tracked_records(
             tracked_key = ""
             tracked_value = ""
         else:
-            from tankpit_bot.bot.ai.types import make_enemy_threat as _unused
+            from tankpit_bot.bot.ai.world_types import make_enemy_threat as _unused
 
             del _unused
             tracked_key, tracked_value = _resolve_identity(js_entry, threat["tank_id"])

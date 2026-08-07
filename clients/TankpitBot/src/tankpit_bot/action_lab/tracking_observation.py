@@ -14,7 +14,7 @@ from tankpit_bot.action_lab.enemy_tracking_types import (
     OurTankBeliefDict,
     TrackingObservationDict,
 )
-from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.state.types import TankStateDict, WorldStateDict
 
 #: Empty JS belief used when the JS-side identity could not be paired

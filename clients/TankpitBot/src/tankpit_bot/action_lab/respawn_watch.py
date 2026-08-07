@@ -37,7 +37,7 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     encode_enemy_teleport_probe_session,
 )
 from tankpit_bot.action_lab.probe_entrypoint import run_and_save_standard_probe_session
-from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 
 log = get_logger(__name__)
 

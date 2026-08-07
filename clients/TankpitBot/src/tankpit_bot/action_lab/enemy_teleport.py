@@ -40,8 +40,9 @@ from tankpit_bot.bot.ai.combat_landing import (
     choose_combat_landing_tile,
     has_cardinal_enemy_adjacency,
 )
-from tankpit_bot.bot.ai.threats import analyze_threats, find_closest_threat
-from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.threat_primitives import find_closest_threat
+from tankpit_bot.bot.ai.threats import analyze_threats
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.sniffer.world_state import get_terrain_map
 
 log = get_logger(__name__)

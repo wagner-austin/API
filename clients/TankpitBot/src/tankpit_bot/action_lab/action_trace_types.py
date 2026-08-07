@@ -15,7 +15,7 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from tankpit_bot.state.types import (
+from tankpit_bot.types.constants import (
     ContainerRefreshKind,
     decode_container_refresh_kind,
     encode_container_refresh_kind,
