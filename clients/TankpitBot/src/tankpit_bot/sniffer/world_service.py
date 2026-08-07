@@ -27,17 +27,16 @@ from tankpit_bot.ledger.ammo_book import AmmoBookDict, make_ammo_book
 from tankpit_bot.ledger.damage_book import DamageBookDict, make_damage_book
 from tankpit_bot.ledger.fuel_book import FuelBookDict, make_fuel_book
 from tankpit_bot.runtime_logging import emit_diagnostic
+from tankpit_bot.sniffer.world_service_movement import WorldServiceMovementMixin
+from tankpit_bot.sniffer.world_service_radar import WorldServiceRadarMixin
 from tankpit_bot.state import (
     WorldStateDict,
     make_empty_world_state,
     update_self_position,
     update_self_rank,
-    viewport_scan_key,
 )
 from tankpit_bot.state.types.self_account import SelfAccountDict, make_empty_self_account
 from tankpit_bot.state.viewport_geometry import (
-    regular_radar_bounds,
-    viewport_radar_bounds,
     viewport_visible_bounds,
 )
 
@@ -77,7 +76,7 @@ def _make_empty_inventory() -> InventoryState:
     )
 
 
-class WorldService:
+class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin):
     """Owns all mutable game state for one session.
 
     Instance attributes mirror the 16 module-level globals that were
@@ -252,74 +251,9 @@ class WorldService:
     # Radar / scan event flags
     # -----------------------------------------------------------------
 
-    def mark_radar_scan_complete(self) -> None:
-        """Record that the server completed a radar scan.
-
-        Also answers any pending container-desync latch: EVERY radar
-        response shape lands here (full 0x4F delta, cache refresh,
-        empty-delta resolution), and the ruling is one radar per
-        desync. Session 5 of run 20260730 burned all 22 extra radars
-        in a 2 s loop because the first latch clear lived only on the
-        full-delta path while the server answered with cache
-        refreshes.
-        """
-        self.radar_scan_complete = True
-        self.container_desync_ms = 0
-
-    def check_and_clear_radar_scan_complete(self) -> bool:
-        """Check if a radar scan completed since last check, then clear.
-
-        Returns:
-            True if radar completion was observed.
-        """
-        result = self.radar_scan_complete
-        self.radar_scan_complete = False
-        return result
-
-    def mark_map_data_processed(self) -> None:
-        """Record that a MAP_DATA world-state blob was parsed into positions."""
-        self.map_data_processed = True
-
-    def check_and_clear_map_data_processed(self) -> bool:
-        """Check if a MAP_DATA world-state blob was parsed since last check.
-
-        Returns:
-            True if a MAP_DATA payload was successfully ingested since the
-            last call to this function.
-        """
-        result = self.map_data_processed
-        self.map_data_processed = False
-        return result
-
-    def record_radar_command(self, *, use_extra_radar: bool) -> None:
-        """Record which radar geometry the next server scan should use.
-
-        Args:
-            use_extra_radar: True for extra-radar viewport scans, False for
-                the built-in 5x5 radar.
-        """
-        self.pending_radar_uses_extra = use_extra_radar
-
-    def current_radar_uses_extra(self) -> bool:
-        """Return True when the pending/current scan uses extra radar geometry."""
-        return self.pending_radar_uses_extra
-
     # -----------------------------------------------------------------
     # Radar cache refresh tracking
     # -----------------------------------------------------------------
-
-    def mark_pending_radar_empty_delta(self) -> None:
-        """Record that a zero-delta tunneled radar result was observed."""
-        self.pending_radar_empty_delta_ms = get_current_time_ms()
-
-    def consume_pending_radar_empty_delta(self) -> bool:
-        """Return True if a recent zero-delta tunneled radar result is pending."""
-        if self.pending_radar_empty_delta_ms <= 0:
-            return False
-        now = get_current_time_ms()
-        recent = now - self.pending_radar_empty_delta_ms <= _RADAR_CACHE_REFRESH_WINDOW_MS
-        self.pending_radar_empty_delta_ms = 0
-        return recent
 
     # -----------------------------------------------------------------
     # Position updates
@@ -416,125 +350,6 @@ class WorldService:
         self.self_account["play_time_s"] = play_time_s
         self.self_account["stats_observed_ms"] = timestamp_ms
 
-    def mark_move_target_failed(self, x: int, y: int, timestamp_ms: int) -> None:
-        """Record a move destination that stalled and timed out.
-
-        Args:
-            x: Failed destination X coordinate.
-            y: Failed destination Y coordinate.
-            timestamp_ms: When the failure was detected.
-        """
-        key = f"{x},{y}"
-        self.failed_move_targets[key] = timestamp_ms
-        log.info("MOVE: marked (%d,%d) as failed target", x, y)
-
-    def is_move_target_failed(self, x: int, y: int, now_ms: int) -> bool:
-        """Check if a move target was recently marked as failed.
-
-        Args:
-            x: Destination X coordinate.
-            y: Destination Y coordinate.
-            now_ms: Current timestamp for TTL check.
-
-        Returns:
-            True if the target failed recently and should be avoided.
-        """
-        key = f"{x},{y}"
-        failed_ms = self.failed_move_targets.get(key)
-        if failed_ms is None:
-            return False
-        return (now_ms - failed_ms) < _FAILED_MOVE_TTL_MS
-
-    def clear_failed_move_targets(self) -> None:
-        """Clear all failed move targets. Called on fresh radar data."""
-        self.failed_move_targets.clear()
-
-    def record_movement_rejection(self, timestamp_ms: int) -> None:
-        """Record a server cant_go refusal of a movement leg.
-
-        Every move, walk-pickup, or teleport dispatch the server
-        answers with ``cant_go`` lands here regardless of the
-        command's kind — the shared fact is "the tank tried to move
-        and the server said no." Consumers count refusals in a
-        trailing window to detect a movement-dead tank (run
-        bot-20260730-110x ticks 95-107: twelve consecutive rejected
-        walk-pickups under fire while the escape kept planning walks).
-
-        Args:
-            timestamp_ms: When the rejection arrived.
-        """
-        self.movement_rejections.append(timestamp_ms)
-
-    def recent_movement_rejections(self, now_ms: int, window_ms: int) -> int:
-        """Count movement rejections inside the trailing window.
-
-        Prunes entries older than the window so the record never
-        grows beyond live relevance.
-
-        Args:
-            now_ms: Current wall-clock ms.
-            window_ms: Trailing window length.
-
-        Returns:
-            Number of rejections with ``timestamp > now - window``.
-        """
-        floor = now_ms - window_ms
-        self.movement_rejections = [ts for ts in self.movement_rejections if ts > floor]
-        return len(self.movement_rejections)
-
-    def mark_scan_viewport_failed(
-        self,
-        viewport_left: int,
-        viewport_top: int,
-        timestamp_ms: int,
-    ) -> None:
-        """Record a viewport whose radar scan stalled and timed out.
-
-        Args:
-            viewport_left: Failed viewport left X coordinate.
-            viewport_top: Failed viewport top Y coordinate.
-            timestamp_ms: When the failure was detected.
-        """
-        key = viewport_scan_key(viewport_left, viewport_top)
-        self.failed_scan_viewports[key] = timestamp_ms
-        log.info(
-            "SCAN: marked viewport (%d,%d) as failed target",
-            viewport_left,
-            viewport_top,
-        )
-
-    def is_scan_viewport_failed(
-        self,
-        viewport_left: int,
-        viewport_top: int,
-        now_ms: int,
-    ) -> bool:
-        """Check whether a viewport recently had a stalled radar scan.
-
-        Args:
-            viewport_left: Viewport left X coordinate.
-            viewport_top: Viewport top Y coordinate.
-            now_ms: Current timestamp for TTL evaluation.
-
-        Returns:
-            True if radar recently stalled for that viewport.
-        """
-        key = viewport_scan_key(viewport_left, viewport_top)
-        failed_ms = self.failed_scan_viewports.get(key)
-        if failed_ms is None:
-            return False
-        return (now_ms - failed_ms) < _FAILED_SCAN_VIEWPORT_TTL_MS
-
-    def clear_failed_scan_viewport(self, viewport_left: int, viewport_top: int) -> None:
-        """Clear a failed-scan mark for a specific viewport origin.
-
-        Args:
-            viewport_left: Viewport left X coordinate.
-            viewport_top: Viewport top Y coordinate.
-        """
-        key = viewport_scan_key(viewport_left, viewport_top)
-        self.failed_scan_viewports.pop(key, None)
-
     # -----------------------------------------------------------------
     # Room / terrain map management
     # -----------------------------------------------------------------
@@ -577,19 +392,6 @@ class WorldService:
             Inclusive ``(left, top, right, bottom)`` viewport bounds.
         """
         return viewport_visible_bounds(self.world_state["viewport"])
-
-    def radar_bounds(self) -> tuple[int, int, int, int]:
-        """Return inclusive current radar coverage bounds.
-
-        Returns:
-            Inclusive ``(left, top, right, bottom)`` radar bounds.
-        """
-        self_state = self.world_state["self_state"]
-        if self_state is None:
-            return viewport_radar_bounds(self.world_state["viewport"])
-        if self.pending_radar_uses_extra:
-            return viewport_radar_bounds(self.world_state["viewport"])
-        return regular_radar_bounds(self_state["x"], self_state["y"], self_state["rank"])
 
     # -----------------------------------------------------------------
     # Private helpers

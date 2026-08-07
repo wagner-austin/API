@@ -24,9 +24,9 @@ from tankpit_bot.action_lab.combat_probe_types import (
 )
 from tankpit_bot.action_lab.enemy_teleport import (
     EnemyTeleportProbe,
-    format_enemy_teleport_probe_summary,
     run_enemy_teleport_probe,
 )
+from tankpit_bot.action_lab.enemy_teleport_targeting import format_enemy_teleport_probe_summary
 from tankpit_bot.action_lab.enemy_teleport_types import (
     EnemyTeleportAttemptResultDict,
     EnemyTeleportProbeSessionDict,
@@ -38,10 +38,10 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
 from tankpit_bot.action_lab.fuel_locations import build_distinct_ground_targets
 from tankpit_bot.action_lab.fuel_probe import (
     FuelProbe,
-    FuelProbeError,
     run_fuel_probe,
 )
 from tankpit_bot.action_lab.fuel_probe_diagnostics import format_fuel_probe_summary
+from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
 from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
     FuelProbeSessionDict,
@@ -64,9 +64,9 @@ from tankpit_bot.action_lab.movement_probe_types import (
     encode_movement_probe_attempt_result,
     encode_movement_probe_session,
 )
+from tankpit_bot.action_lab.queue_experiments import QueueProbeError
 from tankpit_bot.action_lab.queue_probe import (
     QueueProbe,
-    QueueProbeError,
     format_queue_probe_summary,
     run_queue_probe,
 )

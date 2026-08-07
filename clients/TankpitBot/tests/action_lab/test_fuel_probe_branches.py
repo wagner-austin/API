@@ -21,6 +21,7 @@ from tests.action_lab._fuel_branches_harness import (
 from tests.action_lab._fuel_probe_harness import (
     _ProbeHarness,
     _terrain,
+    fuel_targets_module,
 )
 from tests.action_lab._replay_page import ReplayClock
 
@@ -32,13 +33,13 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import fuel_collection_phase
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict
-from tankpit_bot.action_lab.fuel_probe import (
-    FuelProbe,
+from tankpit_bot.action_lab.fuel_probe import FuelProbe
+from tankpit_bot.action_lab.fuel_probe_diagnostics import format_fuel_probe_summary
+from tankpit_bot.action_lab.fuel_probe_targets import (
     FuelProbeError,
     _find_visible_fuel_landing_tile,
     _visible_fuel_requires_reposition,
 )
-from tankpit_bot.action_lab.fuel_probe_diagnostics import format_fuel_probe_summary
 from tankpit_bot.action_lab.fuel_target_phase import (
     BuildNoFuelVisibleResultProtocol,
     BuildRepositionMapSyncTimeoutResultProtocol,
@@ -96,8 +97,8 @@ def test_targeting_wrappers_convert_targeting_errors() -> None:
         _ = (current_probe, fuel_target)
         raise FuelTargetingError("self state is unavailable")
 
-    fuel_probe_module.visible_fuel_requires_reposition = _raise_requires_reposition
-    fuel_probe_module.find_visible_fuel_landing_tile = _raise_find_landing
+    fuel_targets_module.visible_fuel_requires_reposition = _raise_requires_reposition
+    fuel_targets_module.find_visible_fuel_landing_tile = _raise_find_landing
 
     with pytest.raises(FuelProbeError, match="terrain map is unavailable"):
         _visible_fuel_requires_reposition(probe, target)
@@ -164,7 +165,7 @@ def test_probe_single_target_raises_when_reposition_has_no_landing_tile() -> Non
         )
 
     _set_common_probe_hooks(_teleport_outcome)
-    fuel_probe_module._find_visible_fuel_landing_tile = lambda probe, fuel_target: None
+    fuel_targets_module._find_visible_fuel_landing_tile = lambda probe, fuel_target: None
 
     with pytest.raises(
         FuelProbeError,
@@ -188,6 +189,7 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
     action_hooks.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
     original_resolve_fuel_target_phase = fuel_collection_phase.resolve_fuel_target_phase
     fuel_probe_module.get_terrain_map = lambda: _terrain({(124, 100), (101, 100), (102, 100)})
+    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
 
     def _teleport_outcome(
         page: action_session.WaitPageProtocol,

@@ -11,7 +11,10 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.browser.cdp_service import CDPService
-from tankpit_bot.sniffer.core import SnifferError, WebSocketSniffer
+from tankpit_bot.sniffer.core import (
+    SnifferError,
+    WebSocketSniffer,
+)
 from tankpit_bot.types import CapturedMessage, decode_capture_session
 from tests.conftest import FakeFileSystem
 from tests.fakes import (

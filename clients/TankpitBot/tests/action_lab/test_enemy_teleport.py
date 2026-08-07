@@ -19,6 +19,7 @@ from tests.action_lab._enemy_teleport_harness import (
     _make_world,
     _ProbeHarness,
     enemy_module,
+    enemy_targeting_module,
 )
 from tests.action_lab._replay_page import ReplayClock
 
@@ -27,9 +28,7 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.enemy_teleport import (
-    EnemyTeleportProbe,
-)
+from tankpit_bot.action_lab.enemy_teleport import EnemyTeleportProbe
 from tankpit_bot.action_lab.teleport import TeleportProbeError
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
@@ -78,7 +77,7 @@ def test_probe_single_enemy_attempt_returns_no_enemy() -> None:
         _ = (probe, started_ms, excluded_tank_ids)
         return None
 
-    enemy_module._require_fresh_enemy_threat = _missing_enemy
+    enemy_targeting_module._require_fresh_enemy_threat = _missing_enemy
 
     result = probe._probe_single_enemy_attempt(
         acquisition_strategy="nearest_enemy",
@@ -115,7 +114,7 @@ def test_probe_single_enemy_attempt_returns_no_landing_tile() -> None:
         _ = (world, self_state, target, terrain, now_ms)
         return (-1, -1)
 
-    enemy_module._require_fresh_enemy_threat = _enemy_found
+    enemy_targeting_module._require_fresh_enemy_threat = _enemy_found
     enemy_module.choose_combat_landing_tile = _no_landing
 
     result = probe._probe_single_enemy_attempt(
@@ -155,7 +154,7 @@ def test_probe_single_enemy_attempt_raises_when_teleport_dispatch_fails() -> Non
         _ = (world, self_state, target, terrain, now_ms)
         return (119, 130)
 
-    enemy_module._require_fresh_enemy_threat = _enemy_found
+    enemy_targeting_module._require_fresh_enemy_threat = _enemy_found
     enemy_module.choose_combat_landing_tile = _landing
 
     with pytest.raises(TeleportProbeError, match="teleport command dispatch failed"):
@@ -249,10 +248,10 @@ def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
         _ = (probe, tank_id)
         return _enemy()
 
-    enemy_module._require_fresh_enemy_threat = _enemy_found
+    enemy_targeting_module._require_fresh_enemy_threat = _enemy_found
     enemy_module.choose_combat_landing_tile = _landing
     enemy_module._wait_for_teleport_outcome = _timeout_result
-    enemy_module._enemy_by_id = _enemy_after
+    enemy_targeting_module._enemy_by_id = _enemy_after
 
     result = probe._probe_single_enemy_attempt(
         acquisition_strategy="nearest_enemy",
@@ -357,10 +356,10 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
         _ = (probe, tank_id)
         return _enemy(x=120, y=130)
 
-    enemy_module._require_fresh_enemy_threat = _enemy_found
+    enemy_targeting_module._require_fresh_enemy_threat = _enemy_found
     enemy_module.choose_combat_landing_tile = _landing
     enemy_module._wait_for_teleport_outcome = _landed_result
-    enemy_module._enemy_by_id = _enemy_after
+    enemy_targeting_module._enemy_by_id = _enemy_after
 
     result = probe._probe_single_enemy_attempt(
         acquisition_strategy="nearest_enemy",
@@ -492,10 +491,10 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
         _ = (probe, tank_id)
         return enemy_after
 
-    enemy_module._require_fresh_enemy_threat = _enemy_found
+    enemy_targeting_module._require_fresh_enemy_threat = _enemy_found
     enemy_module.choose_combat_landing_tile = _landing
     enemy_module._wait_for_teleport_outcome = _landed_result
-    enemy_module._enemy_by_id = _enemy_after
+    enemy_targeting_module._enemy_by_id = _enemy_after
 
     result = probe._probe_single_enemy_attempt(
         acquisition_strategy="nearest_enemy",

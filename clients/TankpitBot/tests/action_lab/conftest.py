@@ -25,10 +25,12 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from tests.action_lab._enemy_teleport_harness import (
     enemy_module,
     enemy_probe_module,
+    enemy_targeting_module,
 )
 from tests.action_lab._fuel_probe_harness import (
     fuel_probe_module,
     fuel_targeting_module,
+    fuel_targets_module,
 )
 from tests.action_lab._viewport_probe_harness import viewport_module
 from tests.fakes.terrain import InMemoryTerrainMap
@@ -38,7 +40,7 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import movement_probe as movement_probe_module
-from tankpit_bot.action_lab import queue_probe as queue_probe_module
+from tankpit_bot.action_lab import queue_experiments as queue_experiments_module
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import (
@@ -279,13 +281,14 @@ def restore_fuel_probe_hooks() -> Generator[None, None, None]:
     original_wait_radar_sync = action_hooks.wait_for_radar_sync
     original_get_terrain_map = fuel_probe_module.get_terrain_map
     original_targeting_terrain = fuel_targeting_module.get_terrain_map
+    original_targets_terrain = fuel_targets_module.get_terrain_map
     original_wait_outcome = fuel_probe_module._wait_for_teleport_outcome
-    original_find_visible = fuel_probe_module._find_visible_fuel_target
-    original_requires_reposition = fuel_probe_module._visible_fuel_requires_reposition
-    original_find_landing = fuel_probe_module._find_visible_fuel_landing_tile
-    original_wait_pickup = fuel_probe_module._wait_for_pickup_outcome
-    original_public_requires = fuel_probe_module.visible_fuel_requires_reposition
-    original_public_landing = fuel_probe_module.find_visible_fuel_landing_tile
+    original_find_visible = fuel_targets_module._find_visible_fuel_target
+    original_requires_reposition = fuel_targets_module._visible_fuel_requires_reposition
+    original_find_landing = fuel_targets_module._find_visible_fuel_landing_tile
+    original_wait_pickup = fuel_targets_module._wait_for_pickup_outcome
+    original_public_requires = fuel_targets_module.visible_fuel_requires_reposition
+    original_public_landing = fuel_targets_module.find_visible_fuel_landing_tile
     original_probe_class = fuel_probe_module.FuelProbe
     yield
     action_hooks.get_current_time_ms = original_get_time
@@ -295,13 +298,14 @@ def restore_fuel_probe_hooks() -> Generator[None, None, None]:
     action_hooks.wait_for_radar_sync = original_wait_radar_sync
     fuel_probe_module.get_terrain_map = original_get_terrain_map
     fuel_targeting_module.get_terrain_map = original_targeting_terrain
+    fuel_targets_module.get_terrain_map = original_targets_terrain
     fuel_probe_module._wait_for_teleport_outcome = original_wait_outcome
-    fuel_probe_module._find_visible_fuel_target = original_find_visible
-    fuel_probe_module._visible_fuel_requires_reposition = original_requires_reposition
-    fuel_probe_module._find_visible_fuel_landing_tile = original_find_landing
-    fuel_probe_module._wait_for_pickup_outcome = original_wait_pickup
-    fuel_probe_module.visible_fuel_requires_reposition = original_public_requires
-    fuel_probe_module.find_visible_fuel_landing_tile = original_public_landing
+    fuel_targets_module._find_visible_fuel_target = original_find_visible
+    fuel_targets_module._visible_fuel_requires_reposition = original_requires_reposition
+    fuel_targets_module._find_visible_fuel_landing_tile = original_find_landing
+    fuel_targets_module._wait_for_pickup_outcome = original_wait_pickup
+    fuel_targets_module.visible_fuel_requires_reposition = original_public_requires
+    fuel_targets_module.find_visible_fuel_landing_tile = original_public_landing
     fuel_probe_module.FuelProbe = original_probe_class
 
 
@@ -319,8 +323,8 @@ def restore_enemy_teleport_hooks() -> Generator[None, None, None]:
     original_get_time = action_hooks.get_current_time_ms
     original_wait_sync = action_hooks.wait_for_world_sync
     original_wait_initial = action_hooks.wait_for_initial_self_state
-    original_require_enemy = enemy_module._require_fresh_enemy_threat
-    original_enemy_by_id = enemy_module._enemy_by_id
+    original_require_enemy = enemy_targeting_module._require_fresh_enemy_threat
+    original_enemy_by_id = enemy_targeting_module._enemy_by_id
     original_choose_landing = enemy_module.choose_combat_landing_tile
     original_wait_outcome = enemy_module._wait_for_teleport_outcome
     original_probe_class = enemy_probe_module.EnemyTeleportProbe
@@ -329,8 +333,8 @@ def restore_enemy_teleport_hooks() -> Generator[None, None, None]:
     action_hooks.get_current_time_ms = original_get_time
     action_hooks.wait_for_world_sync = original_wait_sync
     action_hooks.wait_for_initial_self_state = original_wait_initial
-    enemy_module._require_fresh_enemy_threat = original_require_enemy
-    enemy_module._enemy_by_id = original_enemy_by_id
+    enemy_targeting_module._require_fresh_enemy_threat = original_require_enemy
+    enemy_targeting_module._enemy_by_id = original_enemy_by_id
     enemy_module.choose_combat_landing_tile = original_choose_landing
     enemy_module._wait_for_teleport_outcome = original_wait_outcome
     enemy_probe_module.EnemyTeleportProbe = original_probe_class
@@ -382,14 +386,14 @@ def restore_queue_probe_hooks() -> Generator[None, None, None]:
     orig_playwright = core_hooks.sync_playwright
     orig_wait = action_hooks.wait_for_initial_self_state
     orig_advance = action_hooks.advance_startup_state
-    orig_run_single = queue_probe_module.run_single_experiment
+    orig_run_single = queue_experiments_module.run_single_experiment
     yield
     action_hooks.get_current_time_ms = orig_time
     action_hooks.drain_buffered_messages = orig_drain
     core_hooks.sync_playwright = orig_playwright
     action_hooks.wait_for_initial_self_state = orig_wait
     action_hooks.advance_startup_state = orig_advance
-    queue_probe_module.run_single_experiment = orig_run_single
+    queue_experiments_module.run_single_experiment = orig_run_single
 
 
 @pytest.fixture()

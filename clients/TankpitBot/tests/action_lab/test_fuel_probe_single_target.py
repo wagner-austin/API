@@ -29,9 +29,7 @@ from tankpit_bot._test_hooks import (
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
-from tankpit_bot.action_lab.fuel_probe import (
-    FuelProbeError,
-)
+from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
 from tankpit_bot.action_lab.teleport import TeleportProbeError
 from tankpit_bot.action_lab.teleport_attempt import (
     TeleportAttemptProbeProtocol,
@@ -194,12 +192,11 @@ def test_probe_single_target_rejects_impossible_map_sync_timeout_teleport_outcom
 
 def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
     """Fuel probe rejects a tracked attempt that never produced a teleport result."""
-    from tankpit_bot.action_lab import fuel_probe as fuel_probe_runtime
 
     clock = ReplayClock(1000)
     probe = _ProbeHarness(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
-    original_attempt_runner = fuel_probe_runtime.run_tracked_teleport_attempt
+    original_attempt_runner = fuel_probe_module.run_tracked_teleport_attempt
 
     def _capture_page_snapshot(
         phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
@@ -284,7 +281,7 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
             teleport_started_ms=None,
         )
 
-    fuel_probe_runtime.run_tracked_teleport_attempt = _run_attempt
+    fuel_probe_module.run_tracked_teleport_attempt = _run_attempt
     try:
         with pytest.raises(FuelProbeError, match="fuel attempt ended before teleport dispatch"):
             probe._probe_single_fuel_target(
@@ -297,7 +294,7 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
                 teleport_strategy="sync_before_teleport",
             )
     finally:
-        fuel_probe_runtime.run_tracked_teleport_attempt = original_attempt_runner
+        fuel_probe_module.run_tracked_teleport_attempt = original_attempt_runner
 
 
 def test_finalize_attempt_delay_skips_wait_for_zero_delay() -> None:

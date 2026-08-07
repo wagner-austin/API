@@ -26,9 +26,7 @@ from tests.conftest import FakeFileSystem
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.enemy_teleport import (
-    run_enemy_teleport_probe,
-)
+from tankpit_bot.action_lab.enemy_teleport import run_enemy_teleport_probe
 from tankpit_bot.action_lab.enemy_teleport_types import (
     EnemyTeleportAttemptResultDict,
     decode_enemy_teleport_probe_session,

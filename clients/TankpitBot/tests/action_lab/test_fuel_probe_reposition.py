@@ -18,6 +18,7 @@ from tests.action_lab._fuel_probe_harness import (
     _ProbeHarness,
     fuel_probe_module,
     fuel_targeting_module,
+    fuel_targets_module,
 )
 from tests.action_lab._replay_page import ReplayClock
 from tests.action_lab.conftest import (
@@ -31,10 +32,8 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.fuel_probe import (
-    FuelProbe,
-    FuelProbeError,
-)
+from tankpit_bot.action_lab.fuel_probe import FuelProbe
+from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportPageSnapshotDict,
@@ -175,10 +174,10 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
         return ("picked_up_fuel", 2000, 900)
 
     fuel_probe_module._wait_for_teleport_outcome = _teleport_outcome
-    fuel_probe_module._find_visible_fuel_target = _find_target
-    fuel_probe_module._visible_fuel_requires_reposition = _requires_reposition
-    fuel_probe_module._find_visible_fuel_landing_tile = _find_landing
-    fuel_probe_module._wait_for_pickup_outcome = _pickup_outcome
+    fuel_targets_module._find_visible_fuel_target = _find_target
+    fuel_targets_module._visible_fuel_requires_reposition = _requires_reposition
+    fuel_targets_module._find_visible_fuel_landing_tile = _find_landing
+    fuel_targets_module._wait_for_pickup_outcome = _pickup_outcome
 
     result = probe._probe_single_fuel_target(
         target=target,
@@ -294,6 +293,7 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
     fuel_target = make_container_state(101, 100, True, 300)
     probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
     fuel_probe_module.get_terrain_map = ground_terrain
+    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
     fuel_targeting_module.get_terrain_map = ground_terrain
     action_hooks.wait_for_world_sync = _wait_for_world_sync
     action_hooks.wait_for_radar_sync = _wait_for_world_sync
@@ -436,7 +436,7 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
             current_probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
             return fuel_target
 
-        fuel_probe_module._find_visible_fuel_target = _find_target
+        fuel_targets_module._find_visible_fuel_target = _find_target
         probe.move_result = False
         with pytest.raises(
             FuelProbeError,

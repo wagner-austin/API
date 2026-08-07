@@ -20,7 +20,7 @@ from tests.action_lab._replay_page import (
 )
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
-from tankpit_bot.action_lab.queue_probe import (
+from tankpit_bot.action_lab.queue_experiments import (
     QueueProbeError,
     run_move_then_pickup_experiment,
     run_shoot_then_pickup_experiment,

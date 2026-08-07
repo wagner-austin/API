@@ -21,6 +21,7 @@ from tests.action_lab._fuel_probe_harness import (
     _snapshot,
     _terrain,
     fuel_probe_module,
+    fuel_targets_module,
 )
 from tests.action_lab._replay_browser import RecordedChromiumSession
 from tests.action_lab._replay_page import ReplayClock
@@ -28,10 +29,8 @@ from tests.conftest import FakeFileSystem
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.action_lab import _test_hooks as action_hooks
-from tankpit_bot.action_lab.fuel_probe import (
-    FuelProbeError,
-    run_fuel_probe,
-)
+from tankpit_bot.action_lab.fuel_probe import run_fuel_probe
+from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
 from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
     decode_fuel_probe_session,
@@ -168,6 +167,7 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
             (117, 101),
         }
     )
+    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
 
     session = probe.execute_probe(
         target_pickups=1,
@@ -187,6 +187,7 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
     assert session_browser.browser_type.launches == [False]
 
     fuel_probe_module.get_terrain_map = lambda: None
+    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
     with pytest.raises(FuelProbeError, match="terrain map is unavailable"):
         probe.execute_probe(
             target_pickups=1,
@@ -288,6 +289,7 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
     fuel_probe_module.get_terrain_map = lambda: _terrain(
         {(x, y) for x in range(0, 201) for y in range(0, 201)}
     )
+    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
 
     session = probe.execute_probe(
         target_pickups=2,
@@ -396,6 +398,7 @@ def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
     fuel_probe_module.get_terrain_map = lambda: _terrain(
         {(x, y) for x in range(0, 201) for y in range(0, 201)}
     )
+    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
 
     session = probe.execute_probe(
         target_pickups=1,

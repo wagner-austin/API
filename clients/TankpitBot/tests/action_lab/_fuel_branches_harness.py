@@ -11,6 +11,7 @@ from typing import (
 from tests.action_lab._fuel_probe_harness import (
     _ProbeHarness,
     fuel_targeting_module,
+    fuel_targets_module,
 )
 from tests.action_lab._replay_page import ReplayClock
 from tests.action_lab.conftest import (
@@ -22,9 +23,7 @@ from tankpit_bot._test_hooks import (
     TerrainMapProtocol,
 )
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.fuel_probe import (
-    FuelProbe,
-)
+from tankpit_bot.action_lab.fuel_probe import FuelProbe
 from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
     FuelProbeSessionDict,
@@ -243,11 +242,11 @@ def _session_with_statuses(
 def _set_common_probe_hooks(teleport_outcome: _WaitForTeleportOutcomeProtocol) -> None:
     """Configure common test hooks for fuel-probe branch tests."""
     fuel_probe_module._wait_for_teleport_outcome = teleport_outcome
-    fuel_probe_module._find_visible_fuel_target = lambda probe: make_container_state(
+    fuel_targets_module._find_visible_fuel_target = lambda probe: make_container_state(
         101, 100, True, 300
     )
-    fuel_probe_module._visible_fuel_requires_reposition = lambda probe, fuel_target: True
-    fuel_probe_module._find_visible_fuel_landing_tile = lambda probe, fuel_target: (102, 100)
+    fuel_targets_module._visible_fuel_requires_reposition = lambda probe, fuel_target: True
+    fuel_targets_module._find_visible_fuel_landing_tile = lambda probe, fuel_target: (102, 100)
 
 
 def _set_real_targeting_with_reposition(
@@ -270,6 +269,7 @@ def _set_real_targeting_with_reposition(
     fuel_probe_module._wait_for_teleport_outcome = teleport_outcome
     terrain_provider = _make_rock_wall_terrain_provider()
     fuel_probe_module.get_terrain_map = terrain_provider
+    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
     fuel_targeting_module.get_terrain_map = terrain_provider
     fuel_container = make_container_state(105, 100, True, 300)
     probe._world_state["containers"][f"{fuel_container['x']},{fuel_container['y']}"] = (

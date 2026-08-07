@@ -12,9 +12,7 @@ from tests.action_lab._replay_page import (
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.queue_probe import (
-    QueueProbe,
-)
+from tankpit_bot.action_lab.queue_probe import QueueProbe
 from tankpit_bot.action_lab.queue_probe_types import (
     QueueCommandTimingDict,
     QueueExperimentKind,

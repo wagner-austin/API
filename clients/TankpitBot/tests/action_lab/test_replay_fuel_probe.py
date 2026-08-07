@@ -28,7 +28,7 @@ from tests.action_lab._replay_fuel import (
     replay_fuel_attempt,
 )
 
-from tankpit_bot.action_lab.fuel_probe import FuelProbeError
+from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
 from tankpit_bot.action_lab.types import TeleportTargetDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

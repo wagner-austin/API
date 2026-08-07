@@ -14,14 +14,14 @@ from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot._test_hooks.fs import PathExistsProtocol, ReadTextProtocol
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import _real_run_web_app, _real_spawn_bot_process
-from tankpit_bot.service.fleet import (
+from tankpit_bot.service.fleet import main
+from tankpit_bot.service.fleet_manager import (
     FLEET_PORT_DEFAULT,
     FleetError,
     FleetManager,
-    main,
-    make_fleet_app,
     resolve_fleet_port,
 )
+from tankpit_bot.service.fleet_routes import make_fleet_app
 from tests.conftest import FakeEnv
 
 

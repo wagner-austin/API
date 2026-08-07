@@ -24,8 +24,9 @@ from tests.conftest import FakeFileSystem
 import tankpit_bot.action_lab.queue_probe as queue_probe_module
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.action_lab import _test_hooks as action_hooks
+from tankpit_bot.action_lab import queue_experiments as queue_experiments_module
+from tankpit_bot.action_lab.queue_experiments import QueueExperimentProbeProtocol
 from tankpit_bot.action_lab.queue_probe import (
-    QueueExperimentProbeProtocol,
     QueueProbe,
     format_queue_probe_summary,
     run_queue_probe,
@@ -138,7 +139,7 @@ class TestExecuteProbeIntegration:
             _ = (probe, timeout_ms)
             return experiment_results.pop(0)
 
-        queue_probe_module.run_single_experiment = _fake_run_single
+        queue_experiments_module.run_single_experiment = _fake_run_single
 
         session = harness.execute_probe(
             initial_sync_timeout_ms=5000,

@@ -12,7 +12,7 @@ from tests.action_lab._enemy_teleport_harness import (
 from tests.action_lab._replay_page import ReplayClock
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
-from tankpit_bot.action_lab.enemy_teleport import (
+from tankpit_bot.action_lab.enemy_teleport_targeting import (
     _enemy_by_id,
     _format_enemy_label,
     _make_terminal_result,

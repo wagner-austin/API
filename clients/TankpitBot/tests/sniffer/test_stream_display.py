@@ -14,7 +14,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.sniffer.core import (
+from tankpit_bot.sniffer.chrome_launch import (
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
     _maximize_via_cdp,

@@ -6,10 +6,8 @@ from platform_core.logging import get_logger
 
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks
-from tankpit_bot.action_lab.enemy_tracking import (
-    format_enemy_tracking_probe_summary,
-    run_enemy_tracking_probe,
-)
+from tankpit_bot.action_lab.enemy_tracking import run_enemy_tracking_probe
+from tankpit_bot.action_lab.enemy_tracking_records import format_enemy_tracking_probe_summary
 from tankpit_bot.action_lab.enemy_tracking_types import EnemyTrackingProbeSessionDict
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 

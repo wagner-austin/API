@@ -15,7 +15,7 @@ from tests.action_lab._queue_probe_harness import (
 )
 from tests.action_lab._replay_page import ReplayClock
 
-from tankpit_bot.action_lab.queue_probe import (
+from tankpit_bot.action_lab.queue_experiments import (
     QueueProbeError,
     _build_command_timing,
     _determine_experiment_status,

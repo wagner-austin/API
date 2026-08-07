@@ -42,8 +42,9 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
-from tankpit_bot.action_lab.fuel_probe import (
-    FuelProbe,
+from tankpit_bot.action_lab.fuel_probe import FuelProbe
+from tankpit_bot.action_lab.fuel_probe_attempt_contracts import (
+    RunTrackedTeleportAttemptProtocol,
 )
 from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
@@ -91,24 +92,47 @@ _fuel_targeting_module_import = __import__(
 fuel_targeting_module: _FuelTargetingModuleProtocol = _fuel_targeting_module_import
 
 
-class _FuelProbeModuleProtocol(Protocol):
-    """Typed access to patchable fuel probe module globals."""
+class _FuelTargetsModuleProtocol(Protocol):
+    """Typed access to the patchable fuel-target module globals.
 
-    _wait_for_teleport_outcome: _WaitForTeleportOutcomeProtocol
+    Target selection and pickup-outcome waiting moved to
+    :mod:`tankpit_bot.action_lab.fuel_probe_targets` when the 748-line
+    probe module was split; the probe reaches them through that module,
+    so this is where tests swap them.
+    """
+
     _find_visible_fuel_target: Callable[[FuelProbe], ContainerStateDict | None]
     _visible_fuel_requires_reposition: Callable[[FuelProbe, ContainerStateDict], bool]
     _find_visible_fuel_landing_tile: Callable[
         [FuelProbe, ContainerStateDict], tuple[int, int] | None
     ]
-    # The public names the probe imports from the shared fuel targeting
-    # module. They became patchable when the ``_for_phase`` bridges were
-    # deleted -- those wrappers were pure delegation, so the phase
-    # callables now bind these directly.
+    _wait_for_pickup_outcome: _WaitForPickupOutcomeProtocol
+    # The public names the phase callables bind directly, since the
+    # ``_for_phase`` bridges were pure delegation and were deleted.
     visible_fuel_requires_reposition: Callable[[FuelProbe, ContainerStateDict], bool]
     find_visible_fuel_landing_tile: Callable[
         [FuelProbe, ContainerStateDict], tuple[int, int] | None
     ]
-    _wait_for_pickup_outcome: _WaitForPickupOutcomeProtocol
+    # Target selection reads terrain from THIS module's namespace, so a
+    # scenario exercising the real helpers patches the provider here.
+    get_terrain_map: Callable[[], TerrainMapProtocol | None]
+
+
+_fuel_targets_import = __import__(
+    "tankpit_bot.action_lab.fuel_probe_targets", fromlist=["fuel_probe_targets"]
+)
+
+
+fuel_targets_module: _FuelTargetsModuleProtocol = _fuel_targets_import
+
+
+class _FuelProbeModuleProtocol(Protocol):
+    """Typed access to patchable fuel probe module globals."""
+
+    _wait_for_teleport_outcome: _WaitForTeleportOutcomeProtocol
+    # The probe binds the shared teleport runner into its own
+    # namespace, so tests swap it here rather than at its owner.
+    run_tracked_teleport_attempt: RunTrackedTeleportAttemptProtocol
     run_tracked_pickup_phase: _RunTrackedPickupPhaseProtocol
     get_terrain_map: Callable[[], TerrainMapProtocol | None]
     FuelProbe: type[FuelProbe]

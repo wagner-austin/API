@@ -25,6 +25,7 @@ from tests.action_lab._fuel_probe_harness import (
     _snapshot,
     fuel_probe_module,
     fuel_targeting_module,
+    fuel_targets_module,
 )
 from tests.action_lab._replay_page import (
     ClockAdvancingPage,
@@ -42,9 +43,7 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.fuel_probe import (
-    FuelProbeError,
-)
+from tankpit_bot.action_lab.fuel_probe_targets import FuelProbeError
 from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
 )
@@ -126,7 +125,7 @@ def _run_probe_single_target_scenario(
     action_hooks.wait_for_world_sync = _wait_for_world_sync
     action_hooks.wait_for_radar_sync = _wait_for_world_sync
     fuel_probe_module._wait_for_teleport_outcome = _make_teleport_outcome_callback(teleport_status)
-    fuel_probe_module._wait_for_pickup_outcome = _make_pickup_outcome_callback(pickup_status)
+    fuel_targets_module._wait_for_pickup_outcome = _make_pickup_outcome_callback(pickup_status)
 
     is_reposition_scenario = status in {
         "reposition_map_sync_timeout",
@@ -140,6 +139,7 @@ def _run_probe_single_target_scenario(
         _reposition_blocking_terrain if is_reposition_scenario else ground_terrain
     )
     fuel_probe_module.get_terrain_map = terrain_provider
+    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
     fuel_targeting_module.get_terrain_map = terrain_provider
 
     if fuel_target is not None:

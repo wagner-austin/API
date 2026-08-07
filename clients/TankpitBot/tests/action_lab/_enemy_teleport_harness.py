@@ -31,9 +31,7 @@ from tankpit_bot._test_hooks import (
     TerrainMapProtocol,
 )
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.enemy_teleport import (
-    EnemyTeleportProbe,
-)
+from tankpit_bot.action_lab.enemy_teleport import EnemyTeleportProbe
 from tankpit_bot.action_lab.enemy_teleport_types import (
     EnemyTeleportAttemptResultDict,
     EnemyTeleportProbeSessionDict,
@@ -71,6 +69,17 @@ class _EnemyTeleportModuleProtocol(Protocol):
         tuple[int, int],
     ]
     _wait_for_teleport_outcome: _WaitForTeleportOutcomeProtocol
+
+
+class _EnemyTargetingModuleProtocol(Protocol):
+    """Typed access to the patchable enemy-targeting module globals.
+
+    Enemy selection moved to
+    :mod:`tankpit_bot.action_lab.enemy_teleport_targeting` when the
+    647-line probe module was split; the probe reaches these through
+    that module, so this is where tests swap them.
+    """
+
     _require_fresh_enemy_threat: Callable[
         [EnemyTeleportProbe, int, frozenset[int]],
         EnemyThreatDict | None,
@@ -111,6 +120,12 @@ _enemy_module_import = __import__(
 
 
 enemy_module: _EnemyTeleportModuleProtocol = _enemy_module_import
+
+_enemy_targeting_import = __import__(
+    "tankpit_bot.action_lab.enemy_teleport_targeting",
+    fromlist=["enemy_teleport_targeting"],
+)
+enemy_targeting_module: _EnemyTargetingModuleProtocol = _enemy_targeting_import
 
 
 enemy_probe_module: _EnemyTeleportProbeClassModuleProtocol = _enemy_module_import
