@@ -6,7 +6,7 @@ from collections.abc import Generator
 from typing import Literal
 
 import pytest
-from tests.action_lab._replay_core import ReplayClock
+from tests.action_lab._replay_page import ReplayClock
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler

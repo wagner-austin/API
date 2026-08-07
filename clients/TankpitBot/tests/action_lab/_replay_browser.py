@@ -33,13 +33,15 @@ from collections.abc import Callable
 from pathlib import Path
 
 from platform_core.json_utils import JSONObject, JSONValue
+from tests.action_lab._replay_cdp import WorldStateDerivedCDP
 from tests.action_lab._replay_core import (
+    load_capture,
+    received_payloads,
+)
+from tests.action_lab._replay_page import (
     FrameBatchSource,
     ReplayClock,
     ReplayPage,
-    WorldStateDerivedCDP,
-    load_capture,
-    received_payloads,
 )
 
 from tankpit_bot._test_hooks import (

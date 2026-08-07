@@ -5,13 +5,7 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONTypeError
 
-from tankpit_bot.action_lab.enemy_tracking_types import (
-    EnemyTrackingProbeSessionDict,
-    JSTankBeliefDict,
-    OurTankBeliefDict,
-    ShotEventDict,
-    TrackedEnemyDict,
-    TrackingObservationDict,
+from tankpit_bot.action_lab.enemy_tracking_codecs import (
     decode_enemy_tracking_probe_session,
     decode_js_tank_belief,
     decode_our_tank_belief,
@@ -24,6 +18,14 @@ from tankpit_bot.action_lab.enemy_tracking_types import (
     encode_shot_event,
     encode_tracked_enemy,
     encode_tracking_observation,
+)
+from tankpit_bot.action_lab.enemy_tracking_types import (
+    EnemyTrackingProbeSessionDict,
+    JSTankBeliefDict,
+    OurTankBeliefDict,
+    ShotEventDict,
+    TrackedEnemyDict,
+    TrackingObservationDict,
 )
 from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict

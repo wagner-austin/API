@@ -6,8 +6,11 @@ from collections.abc import Callable, Generator
 from typing import Protocol
 
 import pytest
-from tests.action_lab._replay_core import ReplayClock
-from tests.action_lab.test_fuel_probe import _ProbeHarness, _terrain
+from tests.action_lab._fuel_probe_harness import (
+    _ProbeHarness,
+    _terrain,
+)
+from tests.action_lab._replay_page import ReplayClock
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.action_lab.fuel_targeting import (

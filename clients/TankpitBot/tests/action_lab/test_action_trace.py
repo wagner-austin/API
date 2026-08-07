@@ -102,10 +102,8 @@ def test_action_cycle_tracker_reports_overlap_and_emits_diagnostic(
     """
     from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
-    from tankpit_bot.runtime_logging import (
-        configure_bot_runtime_logging,
-        decode_runtime_event_record,
-    )
+    from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+    from tankpit_bot.runtime_records import decode_runtime_event_record
 
     artifacts = configure_bot_runtime_logging("20260331-230405")
 

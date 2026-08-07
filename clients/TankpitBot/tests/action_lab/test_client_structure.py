@@ -19,10 +19,8 @@ from tankpit_bot.action_lab.client_structure import (
     reset_client_structure_survey,
 )
 from tankpit_bot.diagnostics.event_stream import load_event_records
-from tankpit_bot.runtime_logging import (
-    configure_bot_runtime_logging,
-    require_str_field,
-)
+from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+from tankpit_bot.runtime_records import require_str_field
 
 
 @pytest.fixture(autouse=True)

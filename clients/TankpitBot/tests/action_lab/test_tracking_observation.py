@@ -10,7 +10,10 @@ from tankpit_bot.action_lab.tracking_observation import (
     find_js_tank_entry,
     select_js_identity_key,
 )
-from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
+from tankpit_bot.bot.ai.world_types import (
+    EnemyThreatDict,
+    make_enemy_threat,
+)
 from tankpit_bot.state.types import (
     SelfStateDict,
     TankStateDict,

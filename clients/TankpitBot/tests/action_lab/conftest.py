@@ -22,11 +22,23 @@ from typing import NamedTuple
 
 import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
+from tests.action_lab._enemy_teleport_harness import (
+    enemy_module,
+    enemy_probe_module,
+)
+from tests.action_lab._fuel_probe_harness import (
+    fuel_probe_module,
+    fuel_targeting_module,
+)
+from tests.action_lab._viewport_probe_harness import viewport_module
+from tests.fakes.terrain import InMemoryTerrainMap
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
+from tankpit_bot.action_lab import movement_probe as movement_probe_module
+from tankpit_bot.action_lab import queue_probe as queue_probe_module
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import (
@@ -246,3 +258,143 @@ def set_inventory_total(total: int) -> None:
         counts=[0, total, 0, 0, 0],
         enabled=[True, True, True, True, True],
     )
+
+
+@pytest.fixture(autouse=True)
+def restore_fuel_probe_hooks() -> Generator[None, None, None]:
+    """Restore patched fuel-probe module attributes after each test.
+
+    The six ``test_fuel_probe_*`` modules each reach into
+    ``fuel_probe_module`` / ``fuel_targeting_module`` to swap internals.
+    This lives here rather than in
+    :mod:`tests.action_lab._fuel_probe_harness` because a fixture cannot
+    travel by import without becoming an unused-name violation at every
+    call site. Restoring an attribute a given test never touched is a
+    no-op, so the broader autouse scope costs nothing.
+    """
+    original_get_time = action_hooks.get_current_time_ms
+    original_check_radar = action_hooks.check_and_clear_radar_scan_complete
+    original_drain = action_hooks.drain_buffered_messages
+    original_wait_sync = action_hooks.wait_for_world_sync
+    original_wait_radar_sync = action_hooks.wait_for_radar_sync
+    original_get_terrain_map = fuel_probe_module.get_terrain_map
+    original_targeting_terrain = fuel_targeting_module.get_terrain_map
+    original_wait_outcome = fuel_probe_module._wait_for_teleport_outcome
+    original_find_visible = fuel_probe_module._find_visible_fuel_target
+    original_requires_reposition = fuel_probe_module._visible_fuel_requires_reposition
+    original_find_landing = fuel_probe_module._find_visible_fuel_landing_tile
+    original_wait_pickup = fuel_probe_module._wait_for_pickup_outcome
+    original_public_requires = fuel_probe_module.visible_fuel_requires_reposition
+    original_public_landing = fuel_probe_module.find_visible_fuel_landing_tile
+    original_probe_class = fuel_probe_module.FuelProbe
+    yield
+    action_hooks.get_current_time_ms = original_get_time
+    action_hooks.check_and_clear_radar_scan_complete = original_check_radar
+    action_hooks.drain_buffered_messages = original_drain
+    action_hooks.wait_for_world_sync = original_wait_sync
+    action_hooks.wait_for_radar_sync = original_wait_radar_sync
+    fuel_probe_module.get_terrain_map = original_get_terrain_map
+    fuel_targeting_module.get_terrain_map = original_targeting_terrain
+    fuel_probe_module._wait_for_teleport_outcome = original_wait_outcome
+    fuel_probe_module._find_visible_fuel_target = original_find_visible
+    fuel_probe_module._visible_fuel_requires_reposition = original_requires_reposition
+    fuel_probe_module._find_visible_fuel_landing_tile = original_find_landing
+    fuel_probe_module._wait_for_pickup_outcome = original_wait_pickup
+    fuel_probe_module.visible_fuel_requires_reposition = original_public_requires
+    fuel_probe_module.find_visible_fuel_landing_tile = original_public_landing
+    fuel_probe_module.FuelProbe = original_probe_class
+
+
+@pytest.fixture(autouse=True)
+def restore_enemy_teleport_hooks() -> Generator[None, None, None]:
+    """Restore patched enemy-teleport module attributes after each test.
+
+    The four ``test_enemy_teleport_*`` modules reach into
+    ``enemy_module`` / ``enemy_probe_module`` to swap internals. It lives
+    here rather than in the shared harness because a fixture cannot
+    travel by import without becoming an unused-name violation at every
+    call site. Restoring an attribute a given test never touched is a
+    no-op, so the directory-wide scope costs nothing.
+    """
+    original_get_time = action_hooks.get_current_time_ms
+    original_wait_sync = action_hooks.wait_for_world_sync
+    original_wait_initial = action_hooks.wait_for_initial_self_state
+    original_require_enemy = enemy_module._require_fresh_enemy_threat
+    original_enemy_by_id = enemy_module._enemy_by_id
+    original_choose_landing = enemy_module.choose_combat_landing_tile
+    original_wait_outcome = enemy_module._wait_for_teleport_outcome
+    original_probe_class = enemy_probe_module.EnemyTeleportProbe
+    original_sync_playwright = core_hooks.sync_playwright
+    yield
+    action_hooks.get_current_time_ms = original_get_time
+    action_hooks.wait_for_world_sync = original_wait_sync
+    action_hooks.wait_for_initial_self_state = original_wait_initial
+    enemy_module._require_fresh_enemy_threat = original_require_enemy
+    enemy_module._enemy_by_id = original_enemy_by_id
+    enemy_module.choose_combat_landing_tile = original_choose_landing
+    enemy_module._wait_for_teleport_outcome = original_wait_outcome
+    enemy_probe_module.EnemyTeleportProbe = original_probe_class
+    core_hooks.sync_playwright = original_sync_playwright
+
+
+@pytest.fixture(autouse=True)
+def restore_movement_probe_hooks() -> Generator[None, None, None]:
+    """Restore patched movement-probe hooks after each test.
+
+    Covers what the directory-wide ``restore_action_hooks`` does not:
+    ``sync_playwright``, the startup-state hooks, and the three
+    ``movement_probe`` module attributes the four
+    ``test_movement_probe_*`` modules swap. Autouse here rather than in
+    the harness because a fixture cannot travel by import without
+    becoming an unused-name violation at every call site.
+    """
+    original_get_time = action_hooks.get_current_time_ms
+    original_drain = action_hooks.drain_buffered_messages
+    original_sync_playwright = core_hooks.sync_playwright
+    original_wait_for_initial_self_state = action_hooks.wait_for_initial_self_state
+    original_advance_startup_state = action_hooks.advance_startup_state
+    original_get_terrain_map = movement_probe_module._get_probe_terrain_map
+    original_build_targets = movement_probe_module._build_probe_targets
+    original_wait_for_move_outcome = movement_probe_module._wait_for_move_outcome
+    yield
+    action_hooks.get_current_time_ms = original_get_time
+    action_hooks.drain_buffered_messages = original_drain
+    core_hooks.sync_playwright = original_sync_playwright
+    action_hooks.wait_for_initial_self_state = original_wait_for_initial_self_state
+    action_hooks.advance_startup_state = original_advance_startup_state
+    movement_probe_module._get_probe_terrain_map = original_get_terrain_map
+    movement_probe_module._build_probe_targets = original_build_targets
+    movement_probe_module._wait_for_move_outcome = original_wait_for_move_outcome
+
+
+@pytest.fixture(autouse=True)
+def restore_queue_probe_hooks() -> Generator[None, None, None]:
+    """Restore patched queue-probe hooks after each test.
+
+    Covers what the directory-wide ``restore_action_hooks`` does not:
+    ``sync_playwright``, the startup-state hooks, and
+    ``queue_probe.run_single_experiment``. Autouse here rather than in
+    the harness because a fixture cannot travel by import without
+    becoming an unused-name violation at every call site.
+    """
+    orig_time = action_hooks.get_current_time_ms
+    orig_drain = action_hooks.drain_buffered_messages
+    orig_playwright = core_hooks.sync_playwright
+    orig_wait = action_hooks.wait_for_initial_self_state
+    orig_advance = action_hooks.advance_startup_state
+    orig_run_single = queue_probe_module.run_single_experiment
+    yield
+    action_hooks.get_current_time_ms = orig_time
+    action_hooks.drain_buffered_messages = orig_drain
+    core_hooks.sync_playwright = orig_playwright
+    action_hooks.wait_for_initial_self_state = orig_wait
+    action_hooks.advance_startup_state = orig_advance
+    queue_probe_module.run_single_experiment = orig_run_single
+
+
+@pytest.fixture()
+def _all_ground_terrain() -> Generator[None, None, None]:
+    original = viewport_module.get_terrain_map
+    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap()
+    yield
+    viewport_module.get_terrain_map = original

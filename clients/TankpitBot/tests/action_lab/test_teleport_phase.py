@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Literal
 
 import pytest
-from tests.action_lab._replay_core import ReplayClock
+from tests.action_lab._replay_page import ReplayClock
 
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks

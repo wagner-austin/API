@@ -7,7 +7,11 @@ from pathlib import Path
 
 import pytest
 from tests.action_lab._replay_browser import RecordedChromiumSession
-from tests.action_lab._replay_core import ClockAdvancingPage, ReplayClock, StubSnapshotCDPSession
+from tests.action_lab._replay_cdp import StubSnapshotCDPSession
+from tests.action_lab._replay_page import (
+    ClockAdvancingPage,
+    ReplayClock,
+)
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (

@@ -6,7 +6,11 @@ from collections.abc import Callable, Generator
 
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
-from tests.action_lab._replay_core import ClockAdvancingPage, ReplayClock, StubSnapshotCDPSession
+from tests.action_lab._replay_cdp import StubSnapshotCDPSession
+from tests.action_lab._replay_page import (
+    ClockAdvancingPage,
+    ReplayClock,
+)
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks

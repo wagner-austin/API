@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from tests.action_lab._replay_core import ReplayClock
+from tests.action_lab._replay_page import ReplayClock
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.probe_runtime import ProbeCommandReadyContextDict

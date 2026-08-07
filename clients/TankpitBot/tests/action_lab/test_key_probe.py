@@ -9,10 +9,12 @@ import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from tests.action_lab._replay_browser import RecordedChromiumSession
 from tests.action_lab._replay_core import (
-    ClockAdvancingPage,
-    ReplayClock,
     StubbedBootstrapMixin,
     WorldStateOverrideMixin,
+)
+from tests.action_lab._replay_page import (
+    ClockAdvancingPage,
+    ReplayClock,
 )
 from tests.conftest import FakeFileSystem
 

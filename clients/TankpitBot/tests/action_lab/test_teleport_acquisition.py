@@ -7,7 +7,7 @@ from typing import Literal
 
 import pytest
 from platform_core.json_utils import JSONObject
-from tests.action_lab._replay_core import ReplayClock
+from tests.action_lab._replay_page import ReplayClock
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler

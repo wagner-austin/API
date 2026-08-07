@@ -4,15 +4,16 @@ from __future__ import annotations
 
 from typing import Literal
 
-from tests.action_lab._replay_core import ClockAdvancingPage, ReplayClock
-from tests.action_lab.test_fuel_probe import _ProbeHarness
+from tests.action_lab._fuel_probe_harness import _ProbeHarness
+from tests.action_lab._replay_page import (
+    ClockAdvancingPage,
+    ReplayClock,
+)
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
-from tankpit_bot.action_lab.fuel_probe_attempt import (
-    RunTrackedPickupPhaseProtocol,
-)
+from tankpit_bot.action_lab.fuel_probe_attempt_contracts import RunTrackedPickupPhaseProtocol
 from tankpit_bot.action_lab.fuel_probe_operations import (
     build_attempt_result_for_probe,
     build_map_sync_timeout_result_for_probe,

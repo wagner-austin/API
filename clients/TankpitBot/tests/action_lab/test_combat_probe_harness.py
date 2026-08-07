@@ -5,12 +5,14 @@ from __future__ import annotations
 from collections.abc import Generator
 
 import pytest
+from tests.action_lab._replay_cdp import StubSnapshotCDPSession
 from tests.action_lab._replay_core import (
+    StubbedBootstrapMixin,
+    WorldStateOverrideMixin,
+)
+from tests.action_lab._replay_page import (
     ClockAdvancingPage,
     ReplayClock,
-    StubbedBootstrapMixin,
-    StubSnapshotCDPSession,
-    WorldStateOverrideMixin,
 )
 
 from tankpit_bot import _test_hooks as core_hooks
@@ -26,7 +28,7 @@ from tankpit_bot.action_lab.combat_probe import (
 from tankpit_bot.action_lab.combat_probe_types import (
     CombatEngagementDict,
 )
-from tankpit_bot.bot.ai.types import make_enemy_threat
+from tankpit_bot.bot.ai.world_types import make_enemy_threat
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.state import (
     SelfStateDict,

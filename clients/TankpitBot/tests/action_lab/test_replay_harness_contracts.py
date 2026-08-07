@@ -25,12 +25,14 @@ from __future__ import annotations
 
 import pytest
 from platform_core.json_utils import JSONObject
-from tests.action_lab._replay_core import (
+from tests.action_lab._replay_cdp import (
+    WorldStateDerivedCDP,
+    build_world_derived_snapshot,
+)
+from tests.action_lab._replay_page import (
     FrameBatchSource,
     ReplayClock,
     ReplayPage,
-    WorldStateDerivedCDP,
-    build_world_derived_snapshot,
 )
 
 from tankpit_bot._test_hooks import PageProtocol

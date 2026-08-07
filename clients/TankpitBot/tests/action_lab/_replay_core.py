@@ -1,481 +1,52 @@
-"""Generic, probe-agnostic infrastructure for action-lab replay tests.
+"""Replay harness core: load a capture and drive a probe through it.
 
-Anything in this module is shared by every probe-specific replay
-harness:
-
-* :class:`ReplayClock` -- a controlled wall-clock for hook substitution.
-* :class:`FrameBatchSource` -- a mutable cursor over recorded payloads.
-* :class:`ReplayPage` -- a :class:`PageProtocol` substitute whose
-  ``wait_for_timeout`` advances the clock and feeds the next frame
-  batch into the probe's CDP buffer.
-* :class:`WorldStateDerivedCDP` -- a :class:`CDPSessionProtocol`
-  substitute whose ``Runtime.evaluate`` responses are derived from the
-  live world-state singleton (so snapshot capture sees a
-  deterministic projection of the same truth the real bot would).
-* :func:`load_capture` / :func:`received_payloads` -- shared capture
-  decoding helpers.
-
-The probe-specific harnesses (``_replay_movement.py``, etc.) wire these
-into one ``replay_*_attempt`` function each. Keeping the core here
-guarantees the seam tests in
-:mod:`tests.action_lab.test_replay_harness_contracts` apply to every
-probe equally.
+The capture loaders, the probe context and result types, the bootstrap
+and dispatch mixins, and ``prepare_probe_replay``. The page and CDP
+doubles are :mod:`tests.action_lab._replay_page` and
+:mod:`tests.action_lab._replay_cdp`.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import (
+    dataclass,
+    field,
+)
 from pathlib import Path
-from typing import Generic, Protocol, TypeVar
+from typing import (
+    Generic,
+    Protocol,
+    TypeVar,
+)
 
 from platform_core.json_utils import (
-    JSONObject,
-    JSONValue,
     load_json_str,
     narrow_json_to_dict,
+)
+from tests.action_lab._replay_cdp import WorldStateDerivedCDP
+from tests.action_lab._replay_page import (
+    FrameBatchSource,
+    ReplayClock,
+    ReplayPage,
 )
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (
     BufferedMessageSourceProtocol,
     CDPSessionProtocol,
-    KeyboardProtocol,
     PageProtocol,
-    ResponseProtocol,
 )
-from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sniffer.world_state import get_world_state
-from tankpit_bot.state import SelfStateDict, WorldStateDict
-from tankpit_bot.types import CaptureSession, decode_capture_session
-
-
-@dataclass
-class ReplayClock:
-    """Monotonically advancing clock under harness control.
-
-    Mirrors the production wall-clock signature
-    (``Callable[[], int]``) so the action-lab hook
-    ``action_hooks.get_current_time_ms`` can be pointed at it
-    transparently.
-    """
-
-    now_ms: int = 0
-
-    def __call__(self) -> int:
-        """Return the current controlled timestamp in milliseconds."""
-        return self.now_ms
-
-    def advance(self, delta_ms: int) -> None:
-        """Move the clock forward by ``delta_ms``.
-
-        Args:
-            delta_ms: Milliseconds to advance.
-        """
-        self.now_ms += delta_ms
-
-
-class FrameBatchSource:
-    """Mutable cursor over a captured-frame stream.
-
-    The cursor walks a recorded payload list one batch at a time. The
-    harness uses this instead of a generator/Iterator so the cursor is
-    a first-class object with explicit state -- callers can inspect
-    progress without consuming the source.
-    """
-
-    def __init__(self, payloads: list[str], batch_size: int) -> None:
-        """Initialize the frame cursor.
-
-        Args:
-            payloads: Ordered base64-encoded received payloads.
-            batch_size: Number of payloads returned per ``next_batch``
-                call.
-        """
-        self._payloads = payloads
-        self._batch_size = batch_size
-        self._cursor = 0
-
-    def next_batch(self) -> list[str]:
-        """Pop the next batch.
-
-        Returns:
-            A list of up to ``batch_size`` payloads. Empty when the
-            source is exhausted.
-        """
-        if self._cursor >= len(self._payloads):
-            return []
-        batch = self._payloads[self._cursor : self._cursor + self._batch_size]
-        self._cursor += len(batch)
-        return batch
-
-    @property
-    def consumed(self) -> int:
-        """Return the number of payloads handed out so far."""
-        return self._cursor
-
-
-class _ReplayKeyboard:
-    """No-op keyboard satisfying :class:`KeyboardProtocol`.
-
-    The action-lab attempt loops never exercise keyboard input, so the
-    methods are bare stubs that simply absorb their arguments.
-    """
-
-    def press(self, key: str, *, delay: float | None = None) -> None:
-        """Absorb a key-press request."""
-        _ = (key, delay)
-
-    def type(self, text: str, *, delay: float | None = None) -> None:
-        """Absorb a text-type request."""
-        _ = (text, delay)
-
-
-class ClockAdvancingPage:
-    """``PageProtocol`` whose ``wait_for_timeout`` advances a clock.
-
-    Lifted from per-test ``_FakePage`` forks that all share the same
-    shape: every wait advances a :class:`ReplayClock`, optionally runs
-    an ``on_wait`` callback (used by tests that sequence world-state
-    providers between waits), and records the wait duration. All other
-    PageProtocol methods are no-ops.
-
-    Used by tests that don't need real frame replay (the
-    :class:`ReplayPage` harness already covers that) but still need a
-    page whose ``wait_for_timeout`` ticks deterministically.
-    """
-
-    url = "https://tankpit.com/play"
-
-    def __init__(
-        self,
-        clock: ReplayClock,
-        *,
-        on_wait: Callable[[], None] | None = None,
-    ) -> None:
-        """Initialize with a clock and an optional wait-side-effect.
-
-        Args:
-            clock: Clock advanced by every ``wait_for_timeout`` call.
-            on_wait: Optional callback invoked after each clock tick.
-                Used by tests that sequence world-state snapshots
-                between waits (the callback advances the provider).
-                Tests that need to wire the callback after the page
-                already exists can set ``page.on_wait`` directly.
-        """
-        self._clock = clock
-        self.on_wait = on_wait
-        self._keyboard = _ReplayKeyboard()
-        self.waits: list[float] = []
-
-    @property
-    def keyboard(self) -> KeyboardProtocol:
-        """Return the no-op keyboard."""
-        return self._keyboard
-
-    def goto(
-        self,
-        url: str,
-        *,
-        referer: str | None = None,
-        timeout: float | None = None,
-        wait_until: str | None = None,
-    ) -> ResponseProtocol | None:
-        """Absorb a navigation request; never returns a real response."""
-        _ = (url, referer, timeout, wait_until)
-        return None
-
-    def wait_for_timeout(self, timeout: float) -> None:
-        """Advance the clock by ``timeout`` ms and run ``on_wait``."""
-        self.waits.append(timeout)
-        self._clock.advance(int(timeout))
-        if self.on_wait is not None:
-            self.on_wait()
-
-    def set_content(self, html: str, *, timeout: float | None = None) -> None:
-        _ = (html, timeout)
-
-    def route(self, url: str, handler: RouteFulfillHandler) -> None:
-        _ = (url, handler)
-
-    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
-        """Absorb an event-wait request."""
-        _ = (event, timeout)
-
-    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
-        """Absorb a function-wait request."""
-        _ = (expression, timeout)
-
-    def close(
-        self,
-        *,
-        reason: str | None = None,
-        run_before_unload: bool | None = None,
-    ) -> None:
-        """Absorb a close request."""
-        _ = (reason, run_before_unload)
-
-    def evaluate(self, expression: str) -> JSONValue:
-        """Absorb an evaluate request; never returns a real value."""
-        _ = expression
-        return None
-
-
-class ReplayPage:
-    """Page substitute that feeds frames each ``wait_for_timeout`` call.
-
-    The replay harness owns the frame stream and the clock. Each time
-    the action-lab wait helpers call ``page.wait_for_timeout(ms)``:
-
-    1. The clock advances by ``ms``.
-    2. The next batch of recorded frames is appended to the probe's
-       ``_cdp_message_buffer``.
-
-    When the frame source is exhausted, subsequent waits still advance
-    the clock -- this is how the wait helpers reach their timeout in a
-    recorded session that ends before the requested outcome.
-
-    Implements the full :class:`tankpit_bot._test_hooks.PageProtocol`
-    surface so the harness can assign ``probe._page = ReplayPage(...)``
-    without weakening the production type. The methods action-lab waits
-    do not call are simple stubs.
-    """
-
-    def __init__(
-        self,
-        probe: BufferedMessageSourceProtocol,
-        frame_source: FrameBatchSource,
-        clock: ReplayClock,
-    ) -> None:
-        """Initialize the replay page.
-
-        Args:
-            probe: Probe whose ``_cdp_message_buffer`` receives frames.
-            frame_source: Mutable cursor over the recorded frame stream.
-            clock: Shared replay clock advanced on every wait.
-        """
-        self._probe = probe
-        self._frame_source = frame_source
-        self._clock = clock
-        self._keyboard = _ReplayKeyboard()
-        self._url = "https://tankpit.com/play"
-        self.waits_ms: list[float] = []
-        self.frames_fed: int = 0
-
-    @property
-    def url(self) -> str:
-        """Return the current URL."""
-        return self._url
-
-    @property
-    def keyboard(self) -> KeyboardProtocol:
-        """Return the no-op keyboard satisfying ``KeyboardProtocol``."""
-        return self._keyboard
-
-    def goto(
-        self,
-        url: str,
-        *,
-        referer: str | None = None,
-        timeout: float | None = None,
-        wait_until: str | None = None,
-    ) -> ResponseProtocol | None:
-        """Absorb a navigation request without doing any real network IO."""
-        _ = (referer, timeout, wait_until)
-        self._url = url
-        return None
-
-    def wait_for_timeout(self, timeout: float) -> None:
-        """Advance the clock and feed the next batch of frames.
-
-        Args:
-            timeout: Milliseconds to advance.
-        """
-        self.waits_ms.append(timeout)
-        self._clock.advance(int(timeout))
-        batch = self._frame_source.next_batch()
-        if not batch:
-            return
-        self._probe._cdp_message_buffer.extend(batch)
-        self.frames_fed += len(batch)
-
-    def set_content(self, html: str, *, timeout: float | None = None) -> None:
-        _ = (html, timeout)
-
-    def route(self, url: str, handler: RouteFulfillHandler) -> None:
-        _ = (url, handler)
-
-    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
-        """Absorb an event-wait request without blocking."""
-        _ = (event, timeout)
-
-    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
-        """Absorb a function-wait request without evaluating anything."""
-        _ = (expression, timeout)
-
-    def close(
-        self,
-        *,
-        reason: str | None = None,
-        run_before_unload: bool | None = None,
-    ) -> None:
-        """Absorb a close request."""
-        _ = (reason, run_before_unload)
-
-    def evaluate(self, expression: str) -> JSONValue:
-        """Return ``None`` for any JS expression -- nothing to evaluate."""
-        _ = expression
-        return None
-
-
-def build_world_derived_snapshot() -> JSONObject:
-    """Build a page-client snapshot from the current global world state.
-
-    No browser is running during replay. The :class:`WorldStateDerivedCDP`
-    therefore answers snapshot queries with a deterministic projection of
-    what :mod:`tankpit_bot.sniffer.world_state` already knows. Field
-    semantics mirror the live snapshot but every value here is reachable
-    from the production world-state singletons.
-
-    Returns:
-        JSON-shaped page-client snapshot payload.
-    """
-    world = get_world_state()
-    self_state = world["self_state"]
-    self_fields: dict[str, JSONValue] = {}
-    if self_state is not None:
-        self_fields["x"] = self_state["x"]
-        self_fields["y"] = self_state["y"]
-        self_fields["fuel"] = self_state["fuel"]
-    return {
-        "timestamp_ms": world["timestamp_ms"],
-        "client_present": True,
-        "map_visible": False,
-        "client_state": 0,
-        "client_busy": False,
-        "pending_actions": 0,
-        "heartbeat_age_ms": 0,
-        "last_page_client_send_age_ms": 0,
-        "last_bot_send_age_ms": 0,
-        "ws_ready_state": 1,
-        "current_send_label": None,
-        "sent_frame_meta_queue_length": 0,
-        "self_fields": self_fields,
-        "world_fields": {},
-        "map_fields": {},
-        "world_collections": {},
-    }
-
-
-_DEFAULT_PAGE_CLIENT_SNAPSHOT_VALUE: JSONObject = {
-    "timestamp_ms": 1000,
-    "client_present": True,
-    "map_visible": False,
-    "client_state": 13,
-    "client_busy": False,
-    "pending_actions": 0,
-    "heartbeat_age_ms": 10,
-    "last_page_client_send_age_ms": 20,
-    "last_bot_send_age_ms": 5,
-    "ws_ready_state": 1,
-    "current_send_label": None,
-    "sent_frame_meta_queue_length": 0,
-    "self_fields": {},
-    "world_fields": {},
-    "map_fields": {},
-    "world_collections": {},
-}
-"""Canonical identity page-client snapshot for stub CDP sessions.
-
-Matches the production :class:`PageClientSnapshotDict` shape. Tests
-that need a CDP session purely for type-system reasons (the bootstrap
-or attempt body is fully stubbed) wire :class:`StubSnapshotCDPSession`
-with this value -- one snapshot constant, not nine.
-"""
-
-
-class StubSnapshotCDPSession:
-    """CDPSessionProtocol that returns a fixed snapshot on ``Runtime.evaluate``.
-
-    Other CDP methods return an empty dict; ``on`` and ``detach`` are
-    no-ops. Used by tests whose probe bootstrap or attempt body is
-    fully stubbed (the CDP session is only present to satisfy the
-    type system, never read by production logic).
-
-    When ``snapshot`` is omitted, returns the shared
-    :data:`_DEFAULT_PAGE_CLIENT_SNAPSHOT_VALUE` -- one constant, not
-    eight forked copies.
-    """
-
-    def __init__(self, snapshot: JSONObject | None = None) -> None:
-        """Initialize with an optional snapshot value.
-
-        Args:
-            snapshot: ``Runtime.evaluate`` response payload. When
-                ``None``, the shared identity snapshot is returned.
-        """
-        self._snapshot = snapshot if snapshot is not None else _DEFAULT_PAGE_CLIENT_SNAPSHOT_VALUE
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        """Return the canned snapshot for ``Runtime.evaluate``.
-
-        Args:
-            method: CDP method name.
-            params: CDP method params (ignored).
-
-        Returns:
-            ``{"result": {"value": snapshot}}`` for ``Runtime.evaluate``;
-            an empty dict for every other method.
-        """
-        _ = params
-        if method == "Runtime.evaluate":
-            return {"result": {"value": self._snapshot}}
-        return {}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        """No-op event handler registration."""
-        _ = (event, handler)
-
-    def detach(self) -> None:
-        """No-op CDP session detach."""
-
-
-class WorldStateDerivedCDP:
-    """CDP substitute that derives ``Runtime.evaluate`` results from world state.
-
-    The harness routes every CDP call through this class. Snapshot
-    queries return a payload built from the *current* world-state
-    singletons (see :func:`build_world_derived_snapshot`); all other
-    CDP methods are no-ops. The CDP substitute carries no behavior of
-    its own -- it is a pure projection of world-state truth.
-    """
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        """Service a CDP command.
-
-        Args:
-            method: CDP method name (only ``Runtime.evaluate`` is honored).
-            params: Optional method params.
-
-        Returns:
-            Snapshot payload for snapshot queries; string for WebSocket
-            send evaluations; otherwise an empty evaluate response.
-        """
-        if method == "Runtime.evaluate" and params is not None:
-            expression = params.get("expression", "")
-            if isinstance(expression, str) and "ws.send" in expression:
-                return {"result": {"value": "SENT_REPLAY_BYTES"}}
-            return {"result": {"value": build_world_derived_snapshot()}}
-        return {"result": {"value": None}}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        """No-op event subscription."""
-        _ = (event, handler)
-
-    def detach(self) -> None:
-        """No-op detach."""
-        return
+from tankpit_bot.state import (
+    SelfStateDict,
+    WorldStateDict,
+)
+from tankpit_bot.types import (
+    CaptureSession,
+    decode_capture_session,
+)
 
 
 def load_capture(path: Path) -> CaptureSession:
@@ -842,22 +413,3 @@ def prepare_probe_replay(
         initial_frames=initial_frames,
         restore_clock=_restore_clock,
     )
-
-
-__all__ = [
-    "ClockAdvancingPage",
-    "DispatchCaptureMixin",
-    "FrameBatchSource",
-    "ReplayClock",
-    "ReplayPage",
-    "ReplayProbeContext",
-    "ReplayResult",
-    "StubSnapshotCDPSession",
-    "StubbedBootstrapMixin",
-    "WorldStateDerivedCDP",
-    "WorldStateOverrideMixin",
-    "build_world_derived_snapshot",
-    "load_capture",
-    "prepare_probe_replay",
-    "received_payloads",
-]

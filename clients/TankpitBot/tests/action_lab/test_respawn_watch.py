@@ -6,7 +6,10 @@ from pathlib import Path
 from typing import ClassVar, Literal, Protocol
 
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
-from tests.action_lab._replay_core import ClockAdvancingPage, ReplayClock
+from tests.action_lab._replay_page import (
+    ClockAdvancingPage,
+    ReplayClock,
+)
 from tests.conftest import FakeFileSystem
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
@@ -16,7 +19,10 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     decode_enemy_teleport_probe_session,
 )
 from tankpit_bot.action_lab.respawn_watch import RespawnWatchProbe, run_respawn_watch_probe
-from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
+from tankpit_bot.bot.ai.world_types import (
+    EnemyThreatDict,
+    make_enemy_threat,
+)
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state
