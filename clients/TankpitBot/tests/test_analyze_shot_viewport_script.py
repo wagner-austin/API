@@ -14,7 +14,8 @@ from scripts.analyze_shot_viewport import main
 
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot.capture.xor import build_xor_table, xor_decode_body
+from tankpit_bot.capture.xor import xor_decode_body
+from tankpit_bot.protocol.codec import build_xor_table
 from tankpit_bot.protocol.commands import CMD_SHOOT, TYPE_COMBAT
 from tests.conftest import FakeFileSystem
 

@@ -12,6 +12,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from scripts import _test_hooks
 from tankpit_bot.capture.protocol_census import analyze_protocol_census, format_protocol_census
+from tankpit_bot.capture.xor import XorStaticKeyUnavailableError
 from tankpit_bot.types import decode_capture_session
 
 
@@ -53,7 +54,7 @@ def main() -> None:
 
     try:
         result = analyze_protocol_census(session)
-    except ValueError as exc:
+    except (ValueError, XorStaticKeyUnavailableError) as exc:
         sys.stdout.write(f"{exc}\n")
         raise SystemExit(1) from exc
     sys.stdout.write(format_protocol_census(result))

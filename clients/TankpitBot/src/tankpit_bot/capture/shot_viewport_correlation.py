@@ -27,9 +27,8 @@ from tankpit_bot.capture.viewport_entities import (
     encode_viewport_entity_row,
 )
 from tankpit_bot.capture.xor import (
-    build_xor_table,
+    build_session_xor_table,
     decode_base64_safe,
-    load_xor_static_key,
     xor_decode_body,
 )
 from tankpit_bot.protocol.commands import CMD_SHOOT, deserialize_command
@@ -368,10 +367,7 @@ def analyze_shot_viewport_correlation(session: CaptureSession) -> ShotViewportCo
     magic = session["magic"]
     if magic is None:
         raise ValueError("Capture session has no magic key")
-    static_key, _ = load_xor_static_key(None)
-    if static_key is None:
-        raise ValueError("Could not load xor_static_key.txt")
-    xor_table = build_xor_table(static_key, magic)
+    xor_table = build_session_xor_table(magic)
     viewport_dump = analyze_viewport_entities(session)
     updates = viewport_dump["updates"]
     update_index = 0

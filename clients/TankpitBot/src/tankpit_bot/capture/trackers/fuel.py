@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.capture.xor import build_xor_table, decode_base64_safe, load_xor_static_key
+from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe
 
 log = get_logger(__name__)
 
@@ -25,7 +25,6 @@ class FuelDepositTracker:
     def __init__(self) -> None:
         """Initialize tracker."""
         self._xor_table: bytes | None = None
-        self._static_key: str | None = None
         self._total_deposited: int = 0
 
     def set_magic(self, magic: str) -> None:
@@ -33,11 +32,14 @@ class FuelDepositTracker:
 
         Args:
             magic: The session magic string for XOR encoding.
+
+        Raises:
+            XorStaticKeyUnavailableError: If the static key cannot be
+                read. This used to return silently, leaving
+                ``_xor_table`` None so every later decode ran against
+                no cipher ([[session-state-deglobalisation]]).
         """
-        static_key, self._static_key = load_xor_static_key(self._static_key)
-        if static_key is None:
-            return
-        self._xor_table = build_xor_table(static_key, magic)
+        self._xor_table = build_session_xor_table(magic)
 
     def process_message(self, payload: str) -> str | None:
         """Process a message and return fuel deposit if relevant.

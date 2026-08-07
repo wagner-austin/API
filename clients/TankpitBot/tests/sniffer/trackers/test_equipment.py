@@ -6,7 +6,11 @@ import base64
 
 from tankpit_bot.capture.trackers import EquipmentGainTracker, EquipmentToggleTracker
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import build_test_xor_table, make_payload
+from tests.sniffer.trackers.conftest import (
+    assert_set_magic_requires_static_key,
+    build_test_xor_table,
+    make_payload,
+)
 
 
 def _make_xor_payload(decoded_data: bytes, xor_table: bytes) -> str:
@@ -24,7 +28,6 @@ class TestEquipmentToggleTracker:
         """Test EquipmentToggleTracker initialization."""
         tracker = EquipmentToggleTracker()
         assert tracker._xor_table is None
-        assert tracker._static_key is None
         assert tracker._state == [False, False, False, False, False]
         assert tracker._prev_state is None
 
@@ -177,7 +180,6 @@ class TestEquipmentGainTracker:
         """Test EquipmentGainTracker initialization."""
         tracker = EquipmentGainTracker()
         assert tracker._xor_table is None
-        assert tracker._static_key is None
 
     def test_set_magic_builds_xor_table(self) -> None:
         """Test set_magic builds XOR table from static key."""
@@ -232,18 +234,9 @@ class TestEquipmentGainTrackerProcessMessage:
 class TestEquipmentToggleTrackerEdgeCases:
     """Tests for EquipmentToggleTracker edge cases and uncovered branches."""
 
-    def test_set_magic_returns_early_when_no_static_key(self) -> None:
-        """Test set_magic does nothing when static key missing."""
-        from tankpit_bot import _test_hooks
-        from tests.conftest import FakeFileSystem
-
-        fs = FakeFileSystem()
-        _test_hooks.path_exists = fs.path_exists
-        _test_hooks.read_text = fs.read_text
-
-        tracker = EquipmentToggleTracker()
-        tracker.set_magic("testmagic")
-        assert tracker._xor_table is None
+    def test_set_magic_raises_when_no_static_key(self) -> None:
+        """A missing static key is fatal, not a silent no-op."""
+        assert_set_magic_requires_static_key(EquipmentToggleTracker())
 
     def test_decode_toggle_returns_none_for_short_data(self, fake_fs: FakeFileSystem) -> None:
         """Test _decode_toggle returns None for data < 4 bytes."""
@@ -312,18 +305,9 @@ class TestEquipmentToggleTrackerEdgeCases:
 class TestEquipmentGainTrackerEdgeCases:
     """Tests for EquipmentGainTracker edge cases and uncovered branches."""
 
-    def test_set_magic_returns_early_when_no_static_key(self) -> None:
-        """Test set_magic does nothing when static key missing."""
-        from tankpit_bot import _test_hooks
-        from tests.conftest import FakeFileSystem
-
-        fs = FakeFileSystem()
-        _test_hooks.path_exists = fs.path_exists
-        _test_hooks.read_text = fs.read_text
-
-        tracker = EquipmentGainTracker()
-        tracker.set_magic("testmagic")
-        assert tracker._xor_table is None
+    def test_set_magic_raises_when_no_static_key(self) -> None:
+        """A missing static key is fatal, not a silent no-op."""
+        assert_set_magic_requires_static_key(EquipmentGainTracker())
 
     def test_process_message_returns_none_for_short_data(self, fake_fs: FakeFileSystem) -> None:
         """Test process_message returns None for data < 4 bytes."""

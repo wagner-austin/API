@@ -22,11 +22,11 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 
 from tankpit_bot.browser.types import TEXT_MESSAGE_TYPES
-from tankpit_bot.capture.xor import build_xor_table, decode_base64_safe, load_xor_static_key
+from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe
 from tankpit_bot.protocol import try_decode_binary_message
 from tankpit_bot.protocol.framing import FramingError, split_frames
-from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.types import CaptureSession
+from tankpit_bot.wire.helpers import DecodeError
 
 log = get_logger(__name__)
 
@@ -453,10 +453,7 @@ def analyze_protocol_census(session: CaptureSession) -> ProtocolCensusDict:
     if magic is None:
         raise ValueError("Capture session has no magic key")
 
-    static_key, _ = load_xor_static_key(None)
-    if static_key is None:
-        raise ValueError("Could not load xor_static_key.txt")
-    xor_table = build_xor_table(static_key, magic)
+    xor_table = build_session_xor_table(magic)
 
     acc = _build_census_accumulator()
 

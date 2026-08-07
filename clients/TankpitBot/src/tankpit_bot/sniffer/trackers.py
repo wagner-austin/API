@@ -99,10 +99,15 @@ def extract_magic_from_auth(payload: str) -> str | None:
 
 
 def reset_all_trackers() -> None:
-    """Reset all tracker XOR tables for testing."""
+    """Reset all tracker XOR tables for testing.
+
+    Only the table is cleared. The static KEY is no longer cached
+    per tracker — eleven private copies of one process-wide constant
+    collapsed into ``capture.xor``'s single cache
+    ([[session-state-deglobalisation]]).
+    """
     for tracker in ALL_TRACKERS:
         tracker._xor_table = None
-        tracker._static_key = None
 
 
 __all__ = [

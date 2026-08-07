@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import base64
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.capture.signature import extract_message_signature
 from tankpit_bot.capture.stats import build_message_stats, empty_message_stats
-from tankpit_bot.capture.xor import build_xor_table, load_xor_static_key
 from tests.conftest import FakeFileSystem
 
 # =============================================================================
@@ -306,54 +304,10 @@ class TestBuildSessionSummary:
         assert len(result["combat"]) == 0
 
 
-# =============================================================================
-# Load XOR Static Key Tests
-# =============================================================================
-
-
-class TestLoadXorStaticKey:
-    """Tests for load_xor_static_key function."""
-
-    def test_load_xor_static_key_cached(self, fake_fs: FakeFileSystem) -> None:
-        """Test load_xor_static_key returns cached value."""
-        cached_key = "CACHED_KEY_VALUE"
-        result = load_xor_static_key(cached_key)
-        assert result == (cached_key, cached_key)
-
-    def test_load_xor_static_key_from_file(self, fake_fs: FakeFileSystem) -> None:
-        """Test load_xor_static_key loads from file."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
-
-        static_key = "FILE_KEY_VALUE" + "A" * 986
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
-
-        result = load_xor_static_key(None)
-        assert result == (static_key, static_key)
-
-    def test_load_xor_static_key_missing_file(self) -> None:
-        """Test load_xor_static_key returns None when file missing."""
-        fs = FakeFileSystem()
-        _test_hooks.path_exists = fs.path_exists
-
-        result = load_xor_static_key(None)
-        assert result == (None, None)
-
-
-# =============================================================================
-# Build XOR Table Tests
-# =============================================================================
-
-
-class TestBuildXorTable:
-    """Tests for build_xor_table function."""
-
-    def test_build_xor_table(self) -> None:
-        """Test build_xor_table creates correct XOR table."""
-        static_key = "ABCD"
-        magic = "xy"
-
-        result = build_xor_table(static_key, magic)
-
-        # A(65) ^ x(120) = 57, B(66) ^ y(121) = 59
-        # C(67) ^ x(120) = 59, D(68) ^ y(121) = 61
-        assert result == bytes([57, 59, 59, 61])
+# The XOR key/table tests that stood here are gone with the functions
+# they covered: `load_xor_static_key` was deleted (its cached /
+# from-file / missing-file cases are `tests/capture/test_xor.py::
+# TestBuildSessionXorTable`), and `build_xor_table` now has exactly one
+# owner in `protocol/codec.py`, tested by `tests/test_codec.py` — which
+# also covers the empty-input raises this copy never did.
+# ([[session-state-deglobalisation]])

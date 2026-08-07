@@ -22,7 +22,12 @@ from tankpit_bot.capture.viewport_entities import (
     encode_viewport_entity_update,
     format_viewport_entity_dump,
 )
-from tankpit_bot.capture.xor import build_xor_table, xor_decode_body
+from tankpit_bot.capture.xor import (
+    XorStaticKeyUnavailableError,
+    reset_static_key_cache,
+    xor_decode_body,
+)
+from tankpit_bot.protocol.codec import build_xor_table
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tests.conftest import FakeFileSystem
 
@@ -322,7 +327,8 @@ class TestAnalyzeViewportEntities:
         core_hooks.path_exists = fake_fs.path_exists
         core_hooks.read_text = fake_fs.read_text
         try:
-            with pytest.raises(ValueError, match=r"Could not load xor_static_key\.txt"):
+            reset_static_key_cache()
+            with pytest.raises(XorStaticKeyUnavailableError, match="static XOR key unavailable"):
                 analyze_viewport_entities(_make_session([], "magic"))
         finally:
             core_hooks.path_exists = old_exists

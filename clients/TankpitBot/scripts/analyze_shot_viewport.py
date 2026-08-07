@@ -15,6 +15,7 @@ from tankpit_bot.capture.shot_viewport_correlation import (
     analyze_shot_viewport_correlation,
     format_shot_viewport_correlation,
 )
+from tankpit_bot.capture.xor import XorStaticKeyUnavailableError
 from tankpit_bot.types import decode_capture_session
 
 
@@ -52,7 +53,7 @@ def main() -> None:
 
     try:
         result = analyze_shot_viewport_correlation(session)
-    except ValueError as exc:
+    except (ValueError, XorStaticKeyUnavailableError) as exc:
         sys.stdout.write(f"{exc}\n")
         raise SystemExit(1) from exc
 

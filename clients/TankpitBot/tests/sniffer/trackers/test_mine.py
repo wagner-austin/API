@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import base64
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.capture.trackers import MineTracker
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import build_test_xor_table, make_payload
+from tests.sniffer.trackers.conftest import (
+    assert_set_magic_requires_static_key,
+    build_test_xor_table,
+    make_payload,
+)
 
 
 class TestMineTracker:
@@ -17,7 +20,6 @@ class TestMineTracker:
         """Test MineTracker initialization."""
         tracker = MineTracker()
         assert tracker._xor_table is None
-        assert tracker._static_key is None
         assert tracker._mines_placed == 0
         assert tracker._mines_detonated == 0
 
@@ -117,15 +119,9 @@ def _make_tracker_payload(body: bytes) -> str:
 class TestMineTrackerEdgeCases:
     """Tests for MineTracker edge cases and uncovered branches."""
 
-    def test_set_magic_returns_early_when_no_static_key(self) -> None:
-        """Test set_magic does nothing when static key missing."""
-        fs = FakeFileSystem()
-        _test_hooks.path_exists = fs.path_exists
-        _test_hooks.read_text = fs.read_text
-
-        tracker = MineTracker()
-        tracker.set_magic("testmagic")
-        assert tracker._xor_table is None
+    def test_set_magic_raises_when_no_static_key(self) -> None:
+        """A missing static key is fatal, not a silent no-op."""
+        assert_set_magic_requires_static_key(MineTracker())
 
     def test_process_message_mine_command_sent(self, fake_fs: FakeFileSystem) -> None:
         """Test process_message handles sent mine drop command."""

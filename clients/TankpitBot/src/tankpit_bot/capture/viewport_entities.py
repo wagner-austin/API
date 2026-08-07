@@ -14,9 +14,8 @@ from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, requi
 from platform_core.logging import get_logger
 
 from tankpit_bot.capture.xor import (
-    build_xor_table,
+    build_session_xor_table,
     decode_base64_safe,
-    load_xor_static_key,
     xor_decode_body,
 )
 from tankpit_bot.protocol import try_decode_binary_message
@@ -354,10 +353,7 @@ def analyze_viewport_entities(session: CaptureSession) -> ViewportEntityDumpDict
     if magic is None:
         raise ValueError("Capture session has no magic key")
 
-    static_key, _ = load_xor_static_key(None)
-    if static_key is None:
-        raise ValueError("Could not load xor_static_key.txt")
-    xor_table = build_xor_table(static_key, magic)
+    xor_table = build_session_xor_table(magic)
 
     updates: list[ViewportEntityUpdateDict] = []
     for message_index, message in enumerate(session["messages"]):

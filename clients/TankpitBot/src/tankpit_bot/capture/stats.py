@@ -7,13 +7,15 @@ and generating message statistics.
 from __future__ import annotations
 
 from collections import Counter
-from pathlib import Path
 
-from tankpit_bot import _test_hooks
+from platform_core.logging import get_logger
+
 from tankpit_bot.capture.signature import extract_message_signature, identify_message
-from tankpit_bot.capture.xor import build_xor_table
+from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, build_session_xor_table
 from tankpit_bot.container import DecodeLevel
 from tankpit_bot.types import CaptureSession, MessageStats, UnknownMessageEntry
+
+log = get_logger(__name__)
 
 
 def empty_message_stats() -> MessageStats:
@@ -41,12 +43,15 @@ def build_message_stats(session: CaptureSession) -> MessageStats:
     if not magic:
         return empty_message_stats()
 
-    static_key_path = Path(__file__).parent.parent.parent.parent / "xor_static_key.txt"
-    if not _test_hooks.path_exists(static_key_path):
+    # Same contract as the magic guard above: a capture that cannot be
+    # deciphered yields empty stats, not an error. This used to read
+    # xor_static_key.txt through a private copy of the path expression
+    # ([[session-state-deglobalisation]]).
+    try:
+        xor_table = build_session_xor_table(magic)
+    except XorStaticKeyUnavailableError as error:
+        log.warning("message stats empty: %s", error)
         return empty_message_stats()
-
-    static_key = _test_hooks.read_text(static_key_path).strip()
-    xor_table = build_xor_table(static_key, magic)
 
     decoded_counts: Counter[str] = Counter()
     unknown_counts: Counter[str] = Counter()

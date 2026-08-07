@@ -272,7 +272,6 @@ class TestWebSocketSnifferMethods:
         # Reset trackers
         for tracker in trackers.ALL_TRACKERS:
             tracker._xor_table = None
-            tracker._static_key = None
 
         # Create sniffer with minimal init
         sniffer = object.__new__(WebSocketSniffer)

@@ -201,7 +201,6 @@ class TestSnifferCoverageBranches:
         # First init
         for tracker in trackers.ALL_TRACKERS:
             tracker._xor_table = None
-            tracker._static_key = None
         trackers.init_trackers_with_magic("magic1")
 
         # Capture the xor tables
@@ -419,10 +418,11 @@ class TestSubmoduleCoverage:
         """Test reset_all_trackers clears all tracker state."""
         from tankpit_bot.sniffer import trackers
 
-        # Set some state on trackers
+        # Set some state on trackers. Only the table is per-tracker
+        # now — the eleven private static-key caches collapsed into
+        # capture.xor's ([[session-state-deglobalisation]]).
         for tracker in trackers.ALL_TRACKERS:
             tracker._xor_table = b"test_table"
-            tracker._static_key = "test_key"
 
         # Reset
         trackers.reset_all_trackers()
@@ -430,7 +430,6 @@ class TestSubmoduleCoverage:
         # Verify all are cleared
         for tracker in trackers.ALL_TRACKERS:
             assert tracker._xor_table is None
-            assert tracker._static_key is None
 
     def test_register_tank_name_empty_name(self) -> None:
         """Test register_tank_name ignores empty names."""

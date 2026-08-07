@@ -27,7 +27,11 @@ from typing import Literal
 from platform_core.logging import get_logger
 
 from tankpit_bot import protocol
-from tankpit_bot.capture.xor import build_xor_table, decode_base64_safe, load_xor_static_key
+from tankpit_bot.capture.xor import (
+    XorStaticKeyUnavailableError,
+    build_session_xor_table,
+    decode_base64_safe,
+)
 from tankpit_bot.diagnostics.event_stream import scan_diagnostic_records
 from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
 from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
@@ -376,8 +380,14 @@ def audit_capture(
                 "capture carries no XOR magic -- replay audit skipped",
             )
         ]
-    static_key, _ = load_xor_static_key(None)
-    if static_key is None:
+    # An audit reports conditions rather than raising them: a missing
+    # key means this capture cannot be replayed, which is a finding,
+    # not a crash. Everywhere else the same condition is now fatal
+    # ([[session-state-deglobalisation]]).
+    try:
+        table = build_session_xor_table(magic)
+    except XorStaticKeyUnavailableError as error:
+        log.warning("replay audit skipped: %s", error)
         return [
             make_finding(
                 "capture_unreadable",
@@ -385,7 +395,6 @@ def audit_capture(
                 "XOR static key file missing -- replay audit skipped",
             )
         ]
-    table = build_xor_table(static_key, magic)
     deactivations, supervisor_codes, unknown_subtypes, decode_errors = _replay_received(
         capture, table
     )

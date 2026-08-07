@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import base64
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.capture.trackers import DeactivationTracker
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import build_test_xor_table, make_payload
+from tests.sniffer.trackers.conftest import (
+    assert_set_magic_requires_static_key,
+    build_test_xor_table,
+    make_payload,
+)
 
 
 def _xor_encode_bytes(data: bytes, xor_table: bytes) -> bytes:
@@ -34,7 +37,6 @@ class TestDeactivationTracker:
         """Test DeactivationTracker initialization."""
         tracker = DeactivationTracker()
         assert tracker._xor_table is None
-        assert tracker._static_key is None
         assert tracker._my_tank_id is None
         assert tracker._kills == 0
         assert tracker._deaths == 0
@@ -188,13 +190,6 @@ class TestDeactivationTrackerProcessMessage:
 class TestDeactivationTrackerEdgeCases:
     """Edge case tests for DeactivationTracker."""
 
-    def test_set_magic_returns_early_when_no_static_key(self) -> None:
-        """Test set_magic returns early when static key file is missing."""
-        fs = FakeFileSystem()
-        _test_hooks.path_exists = fs.path_exists
-        _test_hooks.read_text = fs.read_text
-
-        tracker = DeactivationTracker()
-        tracker.set_magic("testmagic")
-        # Should not have set xor_table since static key is missing
-        assert tracker._xor_table is None
+    def test_set_magic_raises_when_no_static_key(self) -> None:
+        """A missing static key is fatal, not a silent no-op."""
+        assert_set_magic_requires_static_key(DeactivationTracker())

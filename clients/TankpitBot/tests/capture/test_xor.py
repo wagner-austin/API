@@ -7,12 +7,12 @@ import pytest
 from tankpit_bot.capture.xor import (
     XorStaticKeyUnavailableError,
     build_session_xor_table,
-    build_xor_table,
     decode_base64_safe,
     is_valid_base64,
     reset_static_key_cache,
     xor_decode_body,
 )
+from tankpit_bot.protocol.codec import build_xor_table
 from tests.conftest import FakeFileSystem
 
 

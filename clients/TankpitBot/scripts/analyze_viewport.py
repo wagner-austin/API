@@ -12,7 +12,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from scripts import _test_hooks
 from tankpit_bot.capture.viewport_analysis import analyze_capture_session, format_viewport_analysis
-from tankpit_bot.capture.xor import build_xor_table, load_xor_static_key
+from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, build_session_xor_table
 from tankpit_bot.types import decode_capture_session
 
 
@@ -53,12 +53,13 @@ def main() -> None:
         sys.stdout.write("Capture session has no magic key\n")
         raise SystemExit(1)
 
-    static_key, _ = load_xor_static_key(None)
-    if static_key is None:
+    # CLI boundary: report the missing key as a message and an exit
+    # code rather than a traceback ([[session-state-deglobalisation]]).
+    try:
+        xor_table = build_session_xor_table(magic)
+    except XorStaticKeyUnavailableError:
         sys.stdout.write("Could not load xor_static_key.txt\n")
-        raise SystemExit(1)
-
-    xor_table = build_xor_table(static_key, magic)
+        raise SystemExit(1) from None
     result = analyze_capture_session(session, xor_table)
     sys.stdout.write(format_viewport_analysis(result))
     sys.stdout.write("\n")

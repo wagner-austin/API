@@ -10,7 +10,7 @@ from collections.abc import Callable
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.capture.xor import build_xor_table, decode_base64_safe, load_xor_static_key
+from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe
 from tankpit_bot.protocol.constants import RANK_NAMES, TEAM_NAMES
 
 log = get_logger(__name__)
@@ -31,7 +31,6 @@ class TankTracker:
     def __init__(self) -> None:
         """Initialize tracker."""
         self._xor_table: bytes | None = None
-        self._static_key: str | None = None
         self._tanks: dict[int, dict[str, str | int]] = {}
         self._dispatch: dict[int, tuple[int, Callable[[bytearray], str | None]]] = {
             0x28: (4, self._parse_tank_join),
@@ -52,11 +51,14 @@ class TankTracker:
 
         Args:
             magic: The session magic string for XOR encoding.
+
+        Raises:
+            XorStaticKeyUnavailableError: If the static key cannot be
+                read. This used to return silently, leaving
+                ``_xor_table`` None so every later decode ran against
+                no cipher ([[session-state-deglobalisation]]).
         """
-        static_key, self._static_key = load_xor_static_key(self._static_key)
-        if static_key is None:
-            return
-        self._xor_table = build_xor_table(static_key, magic)
+        self._xor_table = build_session_xor_table(magic)
 
     def _decode_payload(self, payload: str) -> tuple[int, bytearray, bytes] | None:
         """Decode base64 payload and XOR decrypt.
@@ -463,7 +465,6 @@ class TankExitTracker:
     def __init__(self) -> None:
         """Initialize tracker."""
         self._xor_table: bytes | None = None
-        self._static_key: str | None = None
         self._exited: set[int] = set()
 
     def set_magic(self, magic: str) -> None:
@@ -471,11 +472,14 @@ class TankExitTracker:
 
         Args:
             magic: The session magic string for XOR encoding.
+
+        Raises:
+            XorStaticKeyUnavailableError: If the static key cannot be
+                read. This used to return silently, leaving
+                ``_xor_table`` None so every later decode ran against
+                no cipher ([[session-state-deglobalisation]]).
         """
-        static_key, self._static_key = load_xor_static_key(self._static_key)
-        if static_key is None:
-            return
-        self._xor_table = build_xor_table(static_key, magic)
+        self._xor_table = build_session_xor_table(magic)
 
     def process_message(self, payload: str) -> str | None:
         """Process a message and return tank exit if relevant.

@@ -6,7 +6,11 @@ import base64
 
 from tankpit_bot.capture.trackers import ItemPickupTracker
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import build_test_xor_table, make_payload
+from tests.sniffer.trackers.conftest import (
+    assert_set_magic_requires_static_key,
+    build_test_xor_table,
+    make_payload,
+)
 
 
 def _xor_encode_bytes(data: bytes, xor_table: bytes) -> bytes:
@@ -35,7 +39,6 @@ class TestItemPickupTracker:
         """Test ItemPickupTracker initialization."""
         tracker = ItemPickupTracker()
         assert tracker._xor_table is None
-        assert tracker._static_key is None
         assert tracker._total_armor == 0
         assert tracker._total_missile == 0
         assert tracker._total_homing == 0
@@ -136,18 +139,9 @@ class TestItemPickupTrackerProcessMessage:
 class TestItemPickupTrackerEdgeCases:
     """Tests for ItemPickupTracker edge cases and uncovered branches."""
 
-    def test_set_magic_returns_early_when_no_static_key(self) -> None:
-        """Test set_magic does nothing when static key missing."""
-        from tankpit_bot import _test_hooks
-        from tests.conftest import FakeFileSystem
-
-        fs = FakeFileSystem()
-        _test_hooks.path_exists = fs.path_exists
-        _test_hooks.read_text = fs.read_text
-
-        tracker = ItemPickupTracker()
-        tracker.set_magic("testmagic")
-        assert tracker._xor_table is None
+    def test_set_magic_raises_when_no_static_key(self) -> None:
+        """A missing static key is fatal, not a silent no-op."""
+        assert_set_magic_requires_static_key(ItemPickupTracker())
 
     def test_decode_pickup_wrong_decoded_prefix(self, fake_fs: FakeFileSystem) -> None:
         """Test _decode_pickup returns None when decoded[0] != 0x67."""

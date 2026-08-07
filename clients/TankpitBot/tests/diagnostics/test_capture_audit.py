@@ -12,7 +12,7 @@ import base64
 from tests.conftest import FakeFileSystem
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.capture.xor import build_xor_table, load_xor_static_key
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.diagnostics.capture_audit import audit_capture
 from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
 from tankpit_bot.runtime_logging import RuntimeEventRecordDict
@@ -36,9 +36,7 @@ def _record(**fields: str | int | float | bool) -> RuntimeEventRecordDict:
 
 def _table() -> bytes:
     """Build the XOR table the audit will build (fake key + magic)."""
-    static_key, _ = load_xor_static_key(None)
-    assert static_key is not None
-    return build_xor_table(static_key, _MAGIC)
+    return build_session_xor_table(_MAGIC)
 
 
 def _frame(msg_type: int, plain: bytes) -> bytes:

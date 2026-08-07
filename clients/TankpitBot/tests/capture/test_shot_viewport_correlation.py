@@ -20,7 +20,12 @@ from tankpit_bot.capture.shot_viewport_correlation import (
     format_shot_viewport_correlation,
 )
 from tankpit_bot.capture.viewport_entities import ViewportEntityRowDict
-from tankpit_bot.capture.xor import build_xor_table, xor_decode_body
+from tankpit_bot.capture.xor import (
+    XorStaticKeyUnavailableError,
+    reset_static_key_cache,
+    xor_decode_body,
+)
+from tankpit_bot.protocol.codec import build_xor_table
 from tankpit_bot.protocol.commands import CMD_SHOOT, TYPE_COMBAT
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tests.conftest import FakeFileSystem
@@ -405,7 +410,8 @@ class TestAnalyzeShotViewportCorrelation:
         core_hooks.path_exists = fake_fs.path_exists
         core_hooks.read_text = fake_fs.read_text
         try:
-            with pytest.raises(ValueError, match=r"Could not load xor_static_key\.txt"):
+            reset_static_key_cache()
+            with pytest.raises(XorStaticKeyUnavailableError, match="static XOR key unavailable"):
                 analyze_shot_viewport_correlation(_make_session([], "magic"))
         finally:
             core_hooks.path_exists = old_exists

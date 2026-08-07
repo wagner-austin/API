@@ -25,7 +25,8 @@ from tankpit_bot.capture.viewport_analysis import (
 from tankpit_bot.capture.viewport_analysis_types import (
     ViewportAnalysisStateDict,
 )
-from tankpit_bot.capture.xor import build_xor_table, xor_decode_body
+from tankpit_bot.capture.xor import xor_decode_body
+from tankpit_bot.protocol.codec import build_xor_table
 from tankpit_bot.types.message import CapturedMessage
 from tankpit_bot.types.session import CaptureSession
 

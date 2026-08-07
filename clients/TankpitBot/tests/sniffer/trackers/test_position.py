@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import base64
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.capture.trackers import PositionTracker
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import make_payload
+from tests.sniffer.trackers.conftest import assert_set_magic_requires_static_key, make_payload
 
 
 def test_position_tracker_set_magic_builds_xor_table() -> None:
@@ -168,16 +167,9 @@ def test_position_tracker_variable_subtype() -> None:
 class TestPositionTrackerEdgeCases:
     """Tests for PositionTracker edge cases and uncovered branches."""
 
-    def test_set_magic_returns_early_when_no_static_key(self) -> None:
-        """Test set_magic returns early when static key file is missing."""
-        fs = FakeFileSystem()
-        _test_hooks.path_exists = fs.path_exists
-        _test_hooks.read_text = fs.read_text
-
-        tracker = PositionTracker()
-        tracker.set_magic("testmagic")
-        # Should not have set xor_table since static key is missing
-        assert tracker._xor_table is None
+    def test_set_magic_raises_when_no_static_key(self) -> None:
+        """A missing static key is fatal, not a silent no-op."""
+        assert_set_magic_requires_static_key(PositionTracker())
 
     def test_decode_position_returns_none_for_short_body(self, fake_fs: FakeFileSystem) -> None:
         """Test decode_position returns None when body < 6 bytes."""

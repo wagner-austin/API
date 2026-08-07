@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import base64
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.capture.trackers import RadarTracker
 from tests.conftest import FakeFileSystem
-from tests.sniffer.trackers.conftest import build_test_xor_table, make_payload
+from tests.sniffer.trackers.conftest import (
+    assert_set_magic_requires_static_key,
+    build_test_xor_table,
+    make_payload,
+)
 
 
 class TestRadarTracker:
@@ -17,7 +20,6 @@ class TestRadarTracker:
         """Test RadarTracker initialization."""
         tracker = RadarTracker()
         assert tracker._xor_table is None
-        assert tracker._static_key is None
 
     def test_set_magic_builds_xor_table(self) -> None:
         """Test set_magic builds XOR table from static key."""
@@ -110,15 +112,9 @@ def _make_tracker_payload(body: bytes) -> str:
 class TestRadarTrackerEdgeCases:
     """Tests for RadarTracker edge cases and uncovered branches."""
 
-    def test_set_magic_returns_early_when_no_static_key(self) -> None:
-        """Test set_magic does nothing when static key missing."""
-        fs = FakeFileSystem()
-        _test_hooks.path_exists = fs.path_exists
-        _test_hooks.read_text = fs.read_text
-
-        tracker = RadarTracker()
-        tracker.set_magic("testmagic")
-        assert tracker._xor_table is None
+    def test_set_magic_raises_when_no_static_key(self) -> None:
+        """A missing static key is fatal, not a silent no-op."""
+        assert_set_magic_requires_static_key(RadarTracker())
 
     def test_decode_radar_returns_none_for_short_data(self, fake_fs: FakeFileSystem) -> None:
         """Test _decode_radar returns None for data < 4 bytes."""
