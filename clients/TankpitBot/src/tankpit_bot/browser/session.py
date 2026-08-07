@@ -23,6 +23,7 @@ from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
     GameLogScraper,
 )
+from tankpit_bot.browser.game_log import make_game_log_scraper, poll_game_log
 from tankpit_bot.browser.session_base import SessionBase
 from tankpit_bot.types import (
     CapturedMessage,
@@ -87,7 +88,7 @@ class BrowserSession(SessionBase):
         Args:
             cdp: CDP session for DOM access.
         """
-        self._game_log_scraper = GameLogScraper(cdp)
+        self._game_log_scraper = make_game_log_scraper(cdp)
         log.info("Game log scraper initialized")
 
     def _poll_game_log(self) -> list[GameLogEntry]:
@@ -101,9 +102,7 @@ class BrowserSession(SessionBase):
         Returns:
             List of new entries found since last poll (in arrival order).
         """
-        if self._game_log_scraper is None:
-            return []
-        new_entries = self._game_log_scraper.get_new_entries()
+        new_entries = poll_game_log(self._game_log_scraper)
         for entry in new_entries:
             self._process_game_log_entry(entry)
         return new_entries

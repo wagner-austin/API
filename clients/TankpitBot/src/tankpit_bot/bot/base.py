@@ -33,6 +33,11 @@ from tankpit_bot.browser.dom_scraper import (
     GameLogScraper,
 )
 from tankpit_bot.browser.flag_capture import FlagCaptureService
+from tankpit_bot.browser.game_log import (
+    make_game_log_scraper,
+    poll_game_log,
+    timestamp_game_log_entries,
+)
 from tankpit_bot.browser.lifecycle import (
     cleanup_browser,
     gather_intel,
@@ -329,7 +334,7 @@ class Bot(DispatchMixin):
         Args:
             cdp: Active CDP session for DOM access.
         """
-        self._game_log_scraper = GameLogScraper(cdp)
+        self._game_log_scraper = make_game_log_scraper(cdp)
 
     def _poll_game_log(self) -> list[GameLogEntry]:
         """Poll the game log for new entries since the last scrape.
@@ -337,10 +342,7 @@ class Bot(DispatchMixin):
         Returns:
             New log entries (kills, hits, empty containers, etc.).
         """
-        scraper = self._game_log_scraper
-        if scraper is None:
-            return []
-        return scraper.get_new_entries()
+        return poll_game_log(self._game_log_scraper)
 
     def _record_game_log_witness(self, entries: list[GameLogEntry]) -> None:
         """Timestamp new game-log entries into the capture witness list.
@@ -348,15 +350,7 @@ class Bot(DispatchMixin):
         Args:
             entries: New log entries from this tick's poll, in order.
         """
-        now = get_current_time_ms()
-        for entry in entries:
-            self._game_log_witness.append(
-                GameLogEntryWithTimestamp(
-                    timestamp_ms=now,
-                    text=entry["text"],
-                    category=entry["category"],
-                )
-            )
+        self._game_log_witness.extend(timestamp_game_log_entries(entries))
 
     def maybe_capture_account_stats_once(self) -> None:
         """Capture account stats on the first healthy tick, with bounded retries.
