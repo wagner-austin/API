@@ -291,6 +291,8 @@ final class StateStream {
         appendBool(out, "complete", Perception.isComplete(entity));
         out.append(',');
         appendInt(out, "queued", Perception.queuedCountOf(entity));
+        out.append(',');
+        appendString(out, "damaged_by", Perception.lastDamagerTypeOf(entity));
         out.append('}');
         return out.toString();
     }

@@ -343,26 +343,54 @@ final class CommandChannel {
         if (nextSampleFrame < 0) {
             nextSampleFrame = frame;
         }
+        // Fast-forward: run extra engine ticks up to (never past) the next
+        // sample boundary, so an accelerated run samples the same frames a
+        // realtime run does. A no-op unless a match armed it.
+        frame = FastForward.advanceToward(engine, frame, nextSampleFrame);
         if (frame >= nextSampleFrame) {
-            if (externallyArmed && !everAcked && !connected.get()) {
-                // A match world that has never exchanged a sample is held for
-                // the first planner, so wall-clock spent launching a Python
-                // process costs zero frames. This was the last measured noise
-                // source: the map used to settle on 22 seconds of free-running
-                // wall clock, and runs began from worlds that already differed
-                // (wiki: policy-determinism).
-                awaitFirstPlanner();
-            }
-            if (connected.get()) {
-                offer(StateStream.sample(engine));
-                nextSampleFrame = frame + lockstepFrames;
-                if (!awaitAck()) {
-                    // Released by a departure, not an ack: the boundary was
-                    // never consumed, so the step stays on its frame rather
-                    // than running a whole interval free because a readiness
-                    // probe visited.
-                    nextSampleFrame = frame;
+            // Until a planner has acked once, this loop never returns the
+            // tick to the engine. A readiness probe that connected and left
+            // used to release the hold for exactly one tick, so the run
+            // sampled 0, 75, ... or 1, 76, ... on the probe's coin flip --
+            // the measured one-frame match-start race, and with every
+            // generator pinned it was the LAST divergence between paired
+            // runs (wiki: policy-determinism).
+            while (true) {
+                if (externallyArmed && !everAcked && !connected.get()) {
+                    // A match world that has never exchanged a sample is held
+                    // for the first planner, so wall-clock spent launching a
+                    // Python process costs zero frames. This was the previous
+                    // last measured noise source: the map used to settle on
+                    // 22 seconds of free-running wall clock, and runs began
+                    // from worlds that already differed
+                    // (wiki: policy-determinism).
+                    awaitFirstPlanner();
                 }
+                if (!connected.get()) {
+                    break;
+                }
+                // Generator states beside every sample: two runs' logs, lined
+                // up frame by frame, name the stream and the window where the
+                // draws desynced -- or prove no stream did (see RandomLedger).
+                Log.info("rng frame=" + frame + " " + RandomLedger.describe());
+                RandomTap.flush(frame);
+                offer(StateStream.sample(engine));
+                if (awaitAck()) {
+                    nextSampleFrame = frame + lockstepFrames;
+                    break;
+                }
+                if (everAcked) {
+                    // Released by a departure mid-run, not an ack: the
+                    // boundary was never consumed, so the step stays on its
+                    // frame rather than running a whole interval free
+                    // because the planner died.
+                    nextSampleFrame = frame;
+                    break;
+                }
+                // Released by a departure before any ack -- a readiness
+                // probe visited. Stay on this frame and wait for the real
+                // planner; the world must not move until the first sample
+                // is consumed.
             }
         }
         if (externallyArmed || connected.get()) {

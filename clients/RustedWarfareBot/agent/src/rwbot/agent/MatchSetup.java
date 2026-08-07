@@ -66,6 +66,13 @@ final class MatchSetup {
      */
     private static final String DELTA_OVERRIDE_FIELD = "bu";
 
+    /**
+     * Parks the ambient spawner's accumulator so far below its 10.0 firing
+     * threshold that no run length can climb back: ~1e31 ticks at the pinned
+     * delta, against 3e4 in the longest match.
+     */
+    private static final float AMBIENT_NEVER = -1.0e30f;
+
     /** How long to wait for the game thread before giving up. */
     private static final int READY_TIMEOUT_SECONDS = 90;
 
@@ -98,10 +105,19 @@ final class MatchSetup {
             int difficulty,
             long seed,
             CommandChannel channel,
-            int pinDeltaMs) {
+            int pinDeltaMs,
+            int fastForwardFps) {
         Thread thread =
                 new Thread(
-                        () -> run(map, opponents, difficulty, seed, channel, pinDeltaMs),
+                        () ->
+                                run(
+                                        map,
+                                        opponents,
+                                        difficulty,
+                                        seed,
+                                        channel,
+                                        pinDeltaMs,
+                                        fastForwardFps),
                         "rw-agent-match");
         thread.setDaemon(true);
         thread.start();
@@ -121,7 +137,8 @@ final class MatchSetup {
             int difficulty,
             long seed,
             CommandChannel channel,
-            int pinDeltaMs) {
+            int pinDeltaMs,
+            int fastForwardFps) {
         if (!awaitGameThread()) {
             Log.error(
                     "match setup abandoned: the game thread never became ready within "
@@ -160,8 +177,23 @@ final class MatchSetup {
                         EngineRandom.seed(seed);
                     }
                     start(map, opponents, difficulty);
-                    Orders.onGameThread(
-                            () -> watchForMatch(difficulty, seed, channel, pinDeltaMs));
+                    // The watcher rides the PRE-tick queue from here on. The
+                    // script queue drains AFTER the simulation ticks, so a
+                    // drain-time watcher could not latch until the new world
+                    // had already run free ticks -- wall-clock-valued ones,
+                    // whose pollution of the opponents' think-timer floats
+                    // was the last measured divergence between pinned runs
+                    // (wiki: policy-determinism). The pre-tick queue drains
+                    // at the top of the tick body, before the world updates,
+                    // so the watcher latches BEFORE the new world's first
+                    // update. The engine object itself is a stable singleton
+                    // -- starting a match replaces its game state, not the
+                    // instance -- so the queue survives the start.
+                    Orders.onEngineTick(
+                            EngineHandle.current(),
+                            () ->
+                                    watchForMatch(
+                                            difficulty, seed, channel, pinDeltaMs, fastForwardFps));
                 });
     }
 
@@ -192,21 +224,42 @@ final class MatchSetup {
      * match".
      */
     private static void watchForMatch(
-            int difficulty, long seed, CommandChannel channel, int pinDeltaMs) {
+            int difficulty,
+            long seed,
+            CommandChannel channel,
+            int pinDeltaMs,
+            int fastForwardFps) {
         Object engine = EngineHandle.current();
         boolean live =
                 engine != null
                         && EngineAccess.readField(engine, EngineNames.LOCAL_TEAM) != null
                         && !Perception.ownedUnits(engine).isEmpty();
         if (!live) {
-            Orders.onGameThread(() -> watchForMatch(difficulty, seed, channel, pinDeltaMs));
+            // Re-posted to the PRE-tick queue: liveness flips on the loader
+            // thread mid-pass, and this check must run before the next
+            // tick's world update, not after it -- the whole reason the
+            // watcher rides this queue (see awaitEngineSwap).
+            Orders.onEngineTick(
+                    engine,
+                    () -> watchForMatch(difficulty, seed, channel, pinDeltaMs, fastForwardFps));
             return;
+        }
+        // The generator swap happens before the reseed reads the field, so
+        // the seed lands on the replacement. The tap (diagnostic, measures
+        // the RAW shared stream) takes the slot when asked for; otherwise a
+        // seeded match gets the thread-split generator, which is what makes
+        // the simulation's draws a pure function of the seed while the
+        // particle thread draws its own side stream (see SplitRandom).
+        if (RandomTap.requested()) {
+            RandomTap.install(seed);
+        } else if (seed != 0) {
+            SplitRandom.install(seed);
         }
         if (seed != 0) {
             EngineRandom.seed(seed);
         }
         applyDifficulty(difficulty);
-        pinLogicInterval();
+        pinLogicInterval(fastForwardFps);
         // **The engine's own delta override, and the end of the wall clock.**
         // Pinning the container's logic interval fixes what each update()
         // carries, but not how many updates precede a render -- a render-only
@@ -221,6 +274,24 @@ final class MatchSetup {
         if (pinDeltaMs > 0) {
             EngineAccess.writeFloatField(engine, DELTA_OVERRIDE_FIELD, pinDeltaMs * 0.06f);
         }
+        // Fast-forward drives the engine's own tick entry, so it arms on
+        // the engine rather than the container (see FastForward for the
+        // eight measured reasons the container was the wrong tree).
+        FastForward.arm(engine, fastForwardFps, pinDeltaMs > 0 ? pinDeltaMs : FIXED_LOGIC_MS);
+        // **The ambient spawner is silenced on seeded matches.** Its
+        // accumulator counts the MEASURED delta, so every ~10 units of wall
+        // time it spends two draws from the sim's shared random stream on a
+        // cosmetic effect at a random map tile -- the draw tap measured the
+        // counts wobbling 1-vs-2 per window between identical pinned runs,
+        // and every downstream AI roll inherited the shift. Parked far below
+        // its 10.0 threshold it can never fire, and f.a(0,0) aside, no other
+        // wall-paced drawer remains (wiki: policy-determinism). Cosmetic
+        // only: watch and host runs, unseeded, keep their ambience.
+        if (seed != 0) {
+            Object effects = EngineAccess.readField(engine, EngineNames.EFFECTS_MANAGER);
+            EngineAccess.writeFloatField(effects, EngineNames.AMBIENT_CLOCK, AMBIENT_NEVER);
+            Log.info("ambient spawner silenced; its wall-paced draws are off the sim stream");
+        }
         // **The frame counter is part of the randomness, so it is reset.**
         // The engine's synced draws hash the match seed with the frame
         // counter -- `f.a(min,max,salt)` mixes `l2.bx` into the result four
@@ -232,6 +303,12 @@ final class MatchSetup {
         // (wiki: policy-determinism, engine-tick-and-clock).
         EngineAccess.writeIntField(engine, StateStream.FRAME_FIELD, 0);
         EngineAccess.writeIntField(engine, StateStream.CLOCK_FIELD, 0);
+        // The AI's think-timers are wall-polluted by the load's free ticks
+        // exactly like the counters above; they go back to constructed state
+        // the same moment (see AiTimers).
+        if (seed != 0) {
+            AiTimers.reset();
+        }
         channel.start();
         // Held synchronously, on this very tick: posting the hold instead
         // would let the world run free for however many ticks the queue
@@ -363,7 +440,29 @@ final class MatchSetup {
      * @throws IllegalStateException When the route to the container is
      *     absent, which means the pinned layout moved.
      */
-    private static void pinLogicInterval() {
+    /**
+     * Reads the game container off {@code Main.m.k}, or null before it is
+     * built. Package-visible so the fast-forward diagnostic can compare the
+     * instance it spoofed against the one currently installed.
+     */
+    static Object liveContainer() {
+        try {
+            Class<?> mainClass =
+                    Class.forName(
+                            "com.corrodinggames.rts.java.Main",
+                            false,
+                            Orders.class.getClassLoader());
+            java.lang.reflect.Field instance = mainClass.getDeclaredField("m");
+            instance.setAccessible(true);
+            java.lang.reflect.Field held = mainClass.getDeclaredField("k");
+            held.setAccessible(true);
+            return held.get(instance.get(null));
+        } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException e) {
+            return null;
+        }
+    }
+
+    private static void pinLogicInterval(int fastForwardFps) {
         Object container;
         try {
             Class<?> mainClass =
@@ -397,6 +496,7 @@ final class MatchSetup {
         Log.info(
                 "logic step pinned to " + FIXED_LOGIC_MS
                         + "ms; the simulation no longer measures the wall clock");
+
     }
 
     /** Sets the AI difficulty on the live match. Runs on the game thread. */
@@ -450,20 +550,30 @@ final class MatchSetup {
         // chain of GUI steps. Every attempt to replay that chain by hand
         // reached a different half-started state.
         //
-        // **The opponent count needs no override.** The helper caps teams by
-        // the map's own count, so a two-player map yields exactly one enemy
-        // whatever the GUI's unread default says. Choosing the map is choosing
-        // the opponent count, which is why `matchOpponents` is reported here
-        // rather than sent.
+        // **The opponent count IS sent, and the belief that it need not be
+        // cost a whole measurement arc.** The load path reads
+        // {@code numberOfAIs} off the open document and falls through to the
+        // Java default of FOUR when the element carries no value -- and the
+        // map caps that at its spawn count, not at the number its name
+        // advertises. Every "(2p)"-named map in the skirmish roster except
+        // duel_lake seats four, so the whole cross-map arc silently played
+        // 1v3 (wiki log 2026-08-05). {@code setValueById} is the engine's
+        // own script-callable setter for exactly the attribute
+        // {@code getValueAsInt} reads; writing it between the open and the
+        // load is what the GUI itself would have done. Editing the .rml on
+        // disk was tried long ago and does nothing -- the element has no
+        // value ATTRIBUTE to read from the file; the live document is where
+        // the value lives.
         Class<?> scripts = EngineAccess.pinnedClass(EngineNames.SCRIPTS_CLASS);
         Object instance = EngineAccess.invokeStatic(scripts, "getInstance");
         Method queue =
                 EngineAccess.pinnedMethod(
                         scripts, EngineNames.SCRIPT_QUEUE_METHOD, String.class);
         String script =
-                "open('sandboxOptions.rml', '" + map + "'); loadConfigAndStartNewSandbox('" + map
-                        + "');";
+                "open('sandboxOptions.rml', '" + map + "'); "
+                        + "setValueById('numberOfAIs', '" + opponents + "'); "
+                        + "loadConfigAndStartNewSandbox('" + map + "');";
         EngineAccess.invoke(queue, instance, script);
-        Log.info("match starting on " + map + "; expecting " + opponents + " opponent(s)");
+        Log.info("match starting on " + map + "; asking for " + opponents + " opponent(s)");
     }
 }

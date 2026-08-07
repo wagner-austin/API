@@ -39,6 +39,9 @@ final class BindingCheck {
         Class<?> entity = checkClass(EngineNames.ENTITY_CLASS, problems);
         Class<?> team = checkClass(EngineNames.TEAM_CLASS, problems);
         Class<?> orderable = checkClass(EngineNames.ORDERABLE_CLASS, problems);
+        if (orderable != null) {
+            checkField(orderable, EngineNames.LAST_DAMAGER, problems);
+        }
         Class<?> command = checkClass(EngineNames.COMMAND_CLASS, problems);
         Class<?> controller = checkClass(EngineNames.CONTROLLER_CLASS, problems);
         Class<?> scripts = checkClass(EngineNames.SCRIPTS_CLASS, problems);

@@ -137,6 +137,19 @@ final class EngineNames {
     static final String MAX_HP = "cv";
 
     /**
+     * The unit's last damager, {@code y.bt}.
+     *
+     * <p>The engine maintains this natively and its modding system exposes it
+     * as {@code lastDamagedBy} (the decompiled
+     * {@code UnitReference$LastDamagedByUnitReference} reads exactly this
+     * field). It is what makes death attribution a field read instead of a
+     * combat-event patch: the sampler publishes the damager's type per unit,
+     * and the planner's existing loss diff picks the killer off the previous
+     * sample the same way it already picks the position (wiki: policy-trace).
+     */
+    static final String LAST_DAMAGER = "bt";
+
+    /**
      * The engine's own per-player visibility test, {@code am.d(n)}.
      *
      * <p>Its body fog-tests the entity's cell against the asking player's fog
@@ -421,6 +434,49 @@ final class EngineNames {
 
     /** {@link #PLAYER_STAT_CLASS} constant: the value of everything standing. */
     static final String STAT_BUILDING_VALUE = "buildingValue";
+
+    /**
+     * The engine's pre-update runnable queue ({@code game.i.k}, a public
+     * {@code ConcurrentLinkedQueue}) -- drained at the top of the guarded
+     * tick body, BEFORE the world updates. Work posted here runs on the game
+     * thread like the script queue's, but ahead of the simulation instead of
+     * after it: the seam that lets the match watcher latch before the new
+     * world's first tick (see MatchSetup).
+     */
+    static final String PRETICK_QUEUE = "k";
+
+    /** Static seat count on {@link #TEAM_CLASS} ({@code n.c}). */
+    static final String TEAM_COUNT = "c";
+
+    /** Static seat lookup on {@link #TEAM_CLASS} ({@code n.k(int)}). */
+    static final String TEAM_LOOKUP = "k";
+
+    /**
+     * The AI's own init ({@code a.av()}): sets the deliberately staggered
+     * think cadences ({@code aL = 100 + k*9}, {@code aN = 202 + k*19},
+     * {@code aP = 50 + k*2}, ...) and rebuilds the unit mixes. Re-invoked at
+     * match liveness to erase the wall-valued free ticks the load ran before
+     * the hold latched (see AiTimers).
+     */
+    static final String AI_INIT = "av";
+
+    /**
+     * The effects manager on the engine ({@code l.bR}, type
+     * {@code gameFramework.d.c}) -- owner of the ambient spawner whose two
+     * wall-paced draws were the last source of run divergence
+     * (wiki: policy-determinism).
+     */
+    static final String EFFECTS_MANAGER = "bR";
+
+    /**
+     * The ambient spawner's accumulator inside the effects manager
+     * ({@code d.c.x}): {@code x += delta} per update, and every crossing of
+     * 10.0 spends two draws from the sim's own random stream on a random map
+     * tile. The delta it accumulates is the measured one, not the pinned one,
+     * so the crossings land on wall-clock ticks -- draw-tap-proven to wobble
+     * 1-vs-2 per window between identical pinned runs.
+     */
+    static final String AMBIENT_CLOCK = "x";
 
     static final String PIN = " -- pinned build is 1.15 (code 176, build #28)";
 }

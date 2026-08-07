@@ -35,6 +35,8 @@ final class AgentOptions {
     private final int matchDifficulty;
     private final String hostMap;
     private final int pinDeltaMs;
+    private final int fastForwardFps;
+    private final boolean rngTap;
 
     AgentOptions(
             int lockstepFrames,
@@ -56,8 +58,12 @@ final class AgentOptions {
             int matchOpponents,
             int matchDifficulty,
             String hostMap,
-            int pinDeltaMs) {
+            int pinDeltaMs,
+            int fastForwardFps,
+            boolean rngTap) {
         this.pinDeltaMs = pinDeltaMs;
+        this.fastForwardFps = fastForwardFps;
+        this.rngTap = rngTap;
         this.matchMap = matchMap;
         this.matchOpponents = matchOpponents;
         this.matchDifficulty = matchDifficulty;
@@ -272,8 +278,31 @@ final class AgentOptions {
      * fidelity for bit-exact repeats, which is the harness's trade and not a
      * spectator's; watch and host runs leave this off.
      */
+    /**
+     * Wall-clock multiple to run the simulation at, zero or one for realtime.
+     *
+     * <p>The gym knob. The container's accumulator ties game time to the
+     * wall by construction; the agent feeds it extra pinned steps per tick
+     * instead (see {@code FastForward}), so N here is N identical 3ms steps
+     * per loop pass (task #35).
+     */
+    int fastForwardFps() {
+        return fastForwardFps;
+    }
+
     int pinDeltaMs() {
         return pinDeltaMs;
+    }
+
+    /**
+     * Whether to replace the engine's generator with the per-caller draw tap.
+     *
+     * <p>Diagnostic. The RNG ledger can prove the engine stream desynced; only
+     * the tap ({@code RandomTap}) says which call site drew a different number
+     * of times. Costs a stack walk per draw, so it is off unless asked for.
+     */
+    boolean rngTapRequested() {
+        return rngTap;
     }
 
     /** Whether the frame clock is pinned at all. */

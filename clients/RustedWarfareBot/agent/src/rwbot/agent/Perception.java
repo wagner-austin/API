@@ -190,6 +190,41 @@ final class Perception {
      * @param entity The entity to read.
      * @return ``{current, maximum}``.
      */
+    /**
+     * Returns the type name of the unit that last damaged this one, or empty.
+     *
+     * <p>The read the death ledger rides: the engine keeps {@code y.bt}
+     * current as damage lands, so the sampler needs no combat events -- the
+     * last value published before a unit vanishes names its killer's type.
+     * Deliberately unlike the engine's own {@code lastDamagedBy} reference,
+     * a damager that has since died still answers: the engine blanks a dead
+     * reference because ITS use is targeting, and a corpse cannot be
+     * targeted -- but a killer that traded itself is still the killer, and
+     * attribution wants the type, not a live object.
+     *
+     * @param entity The unit to read.
+     * @return The last damager's type name, or empty when the entity carries
+     *     no such field (map objects), or nothing has damaged it yet.
+     */
+    static String lastDamagerTypeOf(Object entity) {
+        java.lang.reflect.Field field =
+                EngineAccess.fieldIfPresent(entity.getClass(), EngineNames.LAST_DAMAGER);
+        if (field == null) {
+            return "";
+        }
+        Object damager;
+        try {
+            damager = field.get(entity);
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot read " + EngineNames.LAST_DAMAGER + EngineNames.PIN, e);
+        }
+        if (damager == null) {
+            return "";
+        }
+        return typeNameOf(damager);
+    }
+
     static float[] healthOf(Object entity) {
         return new float[] {EngineAccess.readFloat(entity, EngineNames.HP), EngineAccess.readFloat(entity, EngineNames.MAX_HP)};
     }

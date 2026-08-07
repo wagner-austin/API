@@ -27,6 +27,7 @@ final class AgentOptionsParser {
     private static final String STATE_OUT = "stateOutPath";
     private static final String TYPE_FLAGS_OUT = "typeFlagsPath";
     private static final String RANDOM_SEED = "randomSeed";
+    private static final String RNG_TAP = "rngTap";
     private static final String LOCKSTEP = "lockstepFrames";
     private static final String AI_ZONES = "aiZones";
     private static final String ORDER_AT = "orderMoveAtSeconds";
@@ -40,6 +41,7 @@ final class AgentOptionsParser {
     private static final String MATCH_OPPONENTS = "matchOpponents";
     private static final String MATCH_DIFFICULTY = "matchDifficulty";
     private static final String PIN_DELTA = "pinDeltaMs";
+    private static final String FAST_FORWARD = "fastForward";
 
     /**
      * Ceiling on a pinned frame delta, in milliseconds.
@@ -95,7 +97,9 @@ final class AgentOptionsParser {
                     0,
                     0,
                     "",
-                    0);
+                    0,
+                    0,
+                    false);
         }
 
         String matchMap = "";
@@ -118,6 +122,8 @@ final class AgentOptionsParser {
         int channelPort = 0;
         int sampleIntervalMs = DEFAULT_SAMPLE_MS;
         int pinDeltaMs = 0;
+        int fastForwardFps = 0;
+        boolean rngTap = false;
         for (String pair : argument.split(";")) {
             String trimmed = pair.trim();
             if (trimmed.isEmpty()) {
@@ -185,6 +191,10 @@ final class AgentOptionsParser {
                 matchDifficulty = parseDifficulty(value);
             } else if (PIN_DELTA.equals(key)) {
                 pinDeltaMs = parsePinDelta(value);
+            } else if (FAST_FORWARD.equals(key)) {
+                fastForwardFps = parseFastForward(value);
+            } else if (RNG_TAP.equals(key)) {
+                rngTap = parseBoolean(value, RNG_TAP);
             } else {
                 throw new IllegalArgumentException(
                         "unknown agent option " + key + "; supported: " + DISCOVER_AT + ", "
@@ -193,7 +203,7 @@ final class AgentOptionsParser {
                                 + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX + ", " + BUILD_TYPE + ", " + CHANNEL_PORT + ", "
                                 + SAMPLE_MS + ", " + RANDOM_SEED + ", " + LOCKSTEP + ", "
                                 + MATCH_MAP + ", " + MATCH_OPPONENTS + ", " + MATCH_DIFFICULTY + ", " + HOST_MAP
-                                + ", " + PIN_DELTA);
+                                + ", " + PIN_DELTA + ", " + FAST_FORWARD + ", " + RNG_TAP);
             }
         }
         return new AgentOptions(
@@ -216,7 +226,9 @@ final class AgentOptionsParser {
                 matchOpponents,
                 matchDifficulty,
                 hostMap,
-                pinDeltaMs);
+                pinDeltaMs,
+                fastForwardFps,
+                rngTap);
     }
 
     /**
@@ -225,6 +237,30 @@ final class AgentOptionsParser {
      * <p>Zero is what "leave the clock alone" means everywhere else in the
      * options, so it is rejected as a value; omit the key instead.
      */
+    /**
+     * Parses the fast-forward multiplier.
+     *
+     * <p>Zero or one leaves the engine at the wall clock. The value feeds
+     * the accumulator injection (see {@code FastForward}): N means N pinned
+     * 3ms steps per loop pass instead of one -- the same simulation, N times
+     * the wall speed, CPU permitting. Bounded because a nonsensical figure
+     * should fail at the gate, not spin a core.
+     */
+    private static int parseFastForward(String value) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    FAST_FORWARD + " must be a whole number, got: " + value, e);
+        }
+        if (parsed < 0 || parsed > 100) {
+            throw new IllegalArgumentException(
+                    FAST_FORWARD + " must be 0 (wall clock) to 100, got: " + value);
+        }
+        return parsed;
+    }
+
     private static int parsePinDelta(String value) {
         int parsed;
         try {

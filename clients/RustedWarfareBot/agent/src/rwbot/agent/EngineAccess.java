@@ -132,6 +132,23 @@ final class EngineAccess {
     }
 
     /**
+     * Reads a static {@code int} field through the same pinned-name machinery.
+     *
+     * @param owner Class declaring the field.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field value.
+     * @throws IllegalStateException When the field is absent or not an int.
+     */
+    static int readStaticIntField(Class<?> owner, String name) {
+        try {
+            return pinnedField(owner, name).getInt(null);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot read static int " + name + EngineNames.PIN, e);
+        }
+    }
+
+    /**
      * Writes an {@code int} field through the same pinned-name machinery.
      *
      * <p>Exists for exactly one caller so far: the match setup zeroing the

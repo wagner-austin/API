@@ -1,6 +1,5 @@
 package rwbot.agent;
 
-import java.lang.reflect.Method;
 import java.util.Random;
 
 /**
@@ -17,24 +16,31 @@ import java.util.Random;
  * all, which is what lockstep requires and why the engine's own error string
  * for it reads {@code notRandInt}. Everything else goes through a plain
  * {@link Random} constructed with no seed, so it is seeded from the system
- * clock and differs every run.
+ * clock and differs every run. The engine even ships a per-match reset --
+ * {@code f.a()} seeds its second generator to zero -- but every draw helper
+ * reads the FIRST generator, which that reset never touches (bytecode-verified
+ * against the pinned jar): the engine seeds a generator it does not use and
+ * uses a generator it never seeds.
  *
- * <p>The opponents' decisions are on the second path: the weighted unit mix
+ * <p>The opponents' decisions are on the unseeded path: the weighted unit mix
  * that chooses what they build, and the roll that decides whether an attack
  * group targets a position or a unit, both draw from it
  * (wiki: ai-opponent-strategy). Seeding it therefore makes their play
  * repeatable.
  *
- * <p><b>There are two unseeded generators, not one, and pinning only the
- * engine's left runs irreproducible.</b> Twelve call sites go through
- * {@link Math#random()} instead, which draws from a JVM-global generator that
- * seeding the engine's field cannot reach. They are not incidental: the AI
- * chooses <i>which unit to plant a new base at</i> through it
- * ({@code game/a/a.java:1713,1737,1761}), positions its sites and worker
- * destinations on a random disc around them ({@code game/a/o.java:96-97,166-167}
- * -- {@code o.w()}, whose result {@code a.java:1575} hands a worker as a
- * destination), and scatters unit positions by up to eight world units
- * ({@code game/units/y.java:4811-4837}).
+ * <p><b>There are three unseeded generators, not one, and pinning fewer left
+ * runs irreproducible.</b> Twelve call sites go through {@link Math#random()},
+ * which draws from a JVM-global generator that seeding the engine's field
+ * cannot reach. They are not incidental: the AI chooses <i>which unit to plant
+ * a new base at</i> through it ({@code game/a/a.java:1713,1737,1761}),
+ * positions its sites and worker destinations on a random disc around them
+ * ({@code game/a/o.java:96-97,166-167} -- {@code o.w()}, whose result
+ * {@code a.java:1575} hands a worker as a destination), and scatters unit
+ * positions by up to eight world units ({@code game/units/y.java:4811-4837}).
+ * And the AI's unit-mix rebuild shuffles its candidate list through
+ * {@link java.util.Collections#shuffle(java.util.List)}
+ * ({@code game/a/d.java:43}), which draws from Collections' own lazily built
+ * generator -- a third stream the other two pins never reach.
  *
  * <p>So the opponents built their bases somewhere different every run. Two
  * matches from an identical job specification -- same seed, same arguments,
@@ -43,17 +49,20 @@ import java.util.Random;
  * That spread is larger than every policy effect measured against it
  * (wiki: policy-determinism).
  *
- * <p>Both are pinned here. {@link Math}'s holder is lazily initialised, so it
- * is forced before being reached for, and reaching it needs
- * {@code --add-opens java.base/java.lang=ALL-UNNAMED} on the command line --
- * absent that, the reflective access throws rather than silently leaving the
- * generator unpinned.
+ * <p>All three are pinned here. {@link Math}'s holder is lazily initialised, so
+ * it is forced before being reached for, and reaching it needs
+ * {@code --add-opens java.base/java.lang=ALL-UNNAMED} on the command line;
+ * Collections' generator likewise, behind
+ * {@code --add-opens java.base/java.util=ALL-UNNAMED}. Absent either flag the
+ * reflective access throws rather than silently leaving a generator unpinned.
  *
  * <p><b>This still does not make a run bit-for-bit deterministic, and must not
  * be described as if it did.</b> The planner connects over a socket and reads
  * samples on its own schedule, so which frame an order lands on still varies,
  * and the simulation advances by a wall-clock delta that CPU load perturbs.
- * What seeding removes is the dominant uncontrolled source.
+ * What seeding removes is the dominant uncontrolled source. Whether the pinned
+ * streams are then consumed identically run to run is exactly what
+ * {@link RandomLedger} exists to measure.
  */
 final class EngineRandom {
 
@@ -66,32 +75,40 @@ final class EngineRandom {
     /** The field inside {@link #MATH_HOLDER} holding it. */
     private static final String MATH_FIELD = "randomNumberGenerator";
 
+    /** Where {@link java.util.Collections#shuffle(java.util.List)} keeps its generator. */
+    private static final String SHUFFLE_FIELD = "r";
+
     /**
-     * Seeds both unseeded generators: the engine's own and {@link Math}'s.
+     * Seeds all three unseeded generators: the engine's own, {@link Math}'s,
+     * and {@link java.util.Collections}'.
      *
      * @param seed The seed to install.
-     * @throws IllegalStateException When either generator cannot be reached.
+     * @throws IllegalStateException When any generator cannot be reached.
      */
     static void seed(long seed) {
-        seedEngine(seed);
-        seedMath(seed);
+        engineGenerator().setSeed(seed);
+        Log.info("engine random seeded with " + seed + "; opponent choices are now repeatable");
+        mathGenerator().setSeed(seed);
+        Log.info("Math.random seeded with " + seed + "; opponent placement is now repeatable");
+        shuffleGenerator().setSeed(seed);
+        Log.info("Collections.shuffle seeded with " + seed + "; unit-mix order is now repeatable");
     }
 
     /**
-     * Seeds the generator the engine's own helper draws from.
+     * The generator the engine's own draw helpers read.
      *
      * <p>The field is {@code static final}, which is not an obstacle: nothing
-     * is reassigned. The generator object is fetched and told to reseed itself
-     * through {@link Random#setSeed(long)}, which is the same class the engine
-     * would have called had it wanted a repeatable game.
+     * is reassigned. The generator object is fetched and reseeded through
+     * {@link Random#setSeed(long)}, which is the same call the engine's own
+     * per-match reset makes -- against the wrong field (see class doc).
      *
-     * @param seed The seed to install.
+     * @return The live generator instance.
      * @throws IllegalStateException When the pinned name is absent, or the
      *     field does not hold a {@link Random} -- either of which means the
      *     obfuscated layout moved and the seed would otherwise be silently
      *     ignored.
      */
-    private static void seedEngine(long seed) {
+    static Random engineGenerator() {
         Class<?> holder = EngineAccess.pinnedClass(EngineNames.RANDOM_HOLDER_CLASS);
         Object generator;
         try {
@@ -107,29 +124,23 @@ final class EngineRandom {
                             + EngineNames.RANDOM_FIELD + " is not a java.util.Random"
                             + EngineNames.PIN);
         }
-        Method setSeed = EngineAccess.pinnedMethod(Random.class, "setSeed", long.class);
-        EngineAccess.invoke(setSeed, generator, Long.valueOf(seed));
-        Log.info("engine random seeded with " + seed + "; opponent choices are now repeatable");
+        return (Random) generator;
     }
 
     /**
-     * Seeds the JVM-global generator behind {@link Math#random()}.
-     *
-     * <p>Twelve engine call sites use it, including the AI's choice of where to
-     * plant a base and where to send a worker, so leaving it unpinned is what
-     * made two runs of one job specification disagree about the whole match.
+     * The JVM-global generator behind {@link Math#random()}.
      *
      * <p>The holder is initialised on first use, so {@link Math#random()} is
      * called once before the field is read -- reading it beforehand would find
-     * the class uninitialised and construct nothing to seed.
+     * the class uninitialised and construct nothing to reach.
      *
-     * @param seed The seed to install.
+     * @return The live generator instance.
      * @throws IllegalStateException When the holder cannot be reached, which on
      *     this JVM means {@code --add-opens java.base/java.lang=ALL-UNNAMED}
      *     was not passed. Failing loudly is deliberate: a silently unpinned
      *     generator reads as a reproducible run that is not one.
      */
-    private static void seedMath(long seed) {
+    static Random mathGenerator() {
         Math.random();
         Object generator;
         try {
@@ -147,7 +158,91 @@ final class EngineRandom {
             throw new IllegalStateException(
                     "rw-agent: " + MATH_HOLDER + "." + MATH_FIELD + " is not a java.util.Random");
         }
-        ((Random) generator).setSeed(seed);
-        Log.info("Math.random seeded with " + seed + "; opponent placement is now repeatable");
+        return (Random) generator;
+    }
+
+    /**
+     * Replaces the engine's generator object and verifies the swap stuck.
+     *
+     * <p>The holder field is {@code static final}, which reflection on this
+     * JVM (13) refuses to write, so the write goes through
+     * {@code sun.misc.Unsafe} -- reached reflectively rather than imported,
+     * because javac treats the name itself as a warning and the build treats
+     * warnings as errors. The read-back check is structural: a premain swap
+     * was once silently overwritten by the holder's own {@code <clinit>}
+     * (see RandomTap), and a replacement that did not stick must fail the
+     * run, not report a clean one.
+     *
+     * @param replacement The generator to install.
+     * @param what What is being installed, for the failure message.
+     * @throws IllegalStateException When Unsafe or the field cannot be
+     *     reached, or the read-back does not return the replacement.
+     */
+    static void swapEngineGenerator(Random replacement, String what) {
+        Class<?> holder = EngineAccess.pinnedClass(EngineNames.RANDOM_HOLDER_CLASS);
+        try {
+            Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
+            java.lang.reflect.Field theUnsafe = unsafeClass.getDeclaredField("theUnsafe");
+            theUnsafe.setAccessible(true);
+            Object unsafe = theUnsafe.get(null);
+            java.lang.reflect.Field field =
+                    holder.getDeclaredField(EngineNames.RANDOM_FIELD);
+            Object base =
+                    unsafeClass
+                            .getMethod("staticFieldBase", java.lang.reflect.Field.class)
+                            .invoke(unsafe, field);
+            Object offset =
+                    unsafeClass
+                            .getMethod("staticFieldOffset", java.lang.reflect.Field.class)
+                            .invoke(unsafe, field);
+            unsafeClass
+                    .getMethod("putObject", Object.class, long.class, Object.class)
+                    .invoke(unsafe, base, offset, replacement);
+        } catch (ClassNotFoundException | NoSuchFieldException | NoSuchMethodException
+                | IllegalAccessException | java.lang.reflect.InvocationTargetException
+                | RuntimeException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot install " + what + " on "
+                            + EngineNames.RANDOM_HOLDER_CLASS + "." + EngineNames.RANDOM_FIELD, e);
+        }
+        if (engineGenerator() != replacement) {
+            throw new IllegalStateException(
+                    "rw-agent: " + what + " did not stick on "
+                            + EngineNames.RANDOM_HOLDER_CLASS + "." + EngineNames.RANDOM_FIELD
+                            + "; the holder class re-initialised over it");
+        }
+    }
+
+    /**
+     * The generator behind {@link java.util.Collections#shuffle(java.util.List)}.
+     *
+     * <p>Lazily built on the first single-argument shuffle, so one is forced on
+     * an empty list -- a no-op reorder that exists purely to make the field
+     * non-null -- before the field is read.
+     *
+     * @return The live generator instance.
+     * @throws IllegalStateException When the field cannot be reached, which on
+     *     this JVM means {@code --add-opens java.base/java.util=ALL-UNNAMED}
+     *     was not passed.
+     */
+    static Random shuffleGenerator() {
+        java.util.Collections.shuffle(new java.util.ArrayList<Object>());
+        Object generator;
+        try {
+            java.lang.reflect.Field field =
+                    java.util.Collections.class.getDeclaredField(SHUFFLE_FIELD);
+            field.setAccessible(true);
+            generator = field.get(null);
+        } catch (NoSuchFieldException | IllegalAccessException | RuntimeException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot reach java.util.Collections." + SHUFFLE_FIELD
+                            + "; pass --add-opens java.base/java.util=ALL-UNNAMED", e);
+        }
+        if (!(generator instanceof Random)) {
+            throw new IllegalStateException(
+                    "rw-agent: java.util.Collections." + SHUFFLE_FIELD
+                            + " is not a java.util.Random");
+        }
+        return (Random) generator;
     }
 }

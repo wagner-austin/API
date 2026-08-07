@@ -54,6 +54,13 @@ public final class Premain {
             }
         }
 
+        // Intent only: the swap itself waits for match start, because a
+        // premain swap was measured being overwritten by the holder's own
+        // <clinit> (see RandomTap).
+        if (options.rngTapRequested()) {
+            RandomTap.arm();
+        }
+
         // Before anything else that could draw from it. Seeding after the
         // engine has already made choices would pin only the tail of a run.
         if (options.seedRequested()) {
@@ -101,7 +108,8 @@ public final class Premain {
                         options.matchDifficulty(),
                         options.randomSeed(),
                         channel,
-                        options.pinDeltaMs());
+                        options.pinDeltaMs(),
+                        options.fastForwardFps());
             } else {
                 channel.start();
             }

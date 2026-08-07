@@ -72,6 +72,29 @@ final class Orders {
      *     pinned names moved. Callers that need to distinguish those ask
      *     {@link #gameThreadReady()} first.
      */
+    /**
+     * Queues work on the engine's PRE-update queue: it runs on the game
+     * thread at the top of the next tick, BEFORE the world updates.
+     *
+     * <p>The script queue {@link #onGameThread} rides drains after the
+     * simulation; between a match world's creation and a drain-time watcher
+     * noticing it, whole ticks ran free with the wall-clock delta, and the
+     * opponents' think-timers kept the pollution invisibly
+     * (wiki: policy-determinism). Work that must precede a world's first
+     * tick rides here instead.
+     *
+     * @param engine The engine whose next tick should run the task. Posted
+     *     per-engine deliberately: starting a match replaces the engine
+     *     object, and a runnable on the discarded engine's queue never runs.
+     * @param task The work.
+     */
+    static void onEngineTick(Object engine, Runnable task) {
+        Object queue = EngineAccess.readField(engine, EngineNames.PRETICK_QUEUE);
+        Method add =
+                EngineAccess.pinnedMethod(java.util.Collection.class, "add", Object.class);
+        EngineAccess.invoke(add, queue, task);
+    }
+
     static void onGameThread(Runnable task) {
         Class<?> scripts = EngineAccess.pinnedClass(EngineNames.SCRIPTS_CLASS);
         Object instance = EngineAccess.invokeStatic(scripts, "getInstance");
