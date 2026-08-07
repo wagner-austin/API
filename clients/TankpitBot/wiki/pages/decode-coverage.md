@@ -235,17 +235,17 @@ See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] fo
 The coverage table above names wire message types; the block below binds
 each one to its Python constant, and the `physics_claims` guard stage of
 `make check` imports the symbol and compares. The table and the code
-cannot drift apart without the gate going red.
+cannot drift apart without the gate going red.[^guard]
 
 This page is also the **canonical home for the 0x52 supervisor refusal
 vocabulary**. Those eleven codes were previously stated only in passing
 across seven pages with no single authority; `SUPERVISOR_ERROR_NAMES` is
 bound here as a `members` claim, so the whole name table is verified as a
-unit — an omitted code fails as loudly as an invented one.
+unit — an omitted code fails as loudly as an invented one.[^guard]
 
 Reverse coverage makes the binding total: every public symbol of
 `tankpit_bot.protocol.constants` must be claimed exactly once, so a new
-message type added to the module without a wiki claim fails the build.
+message type added to the module without a wiki claim fails the build.[^guard]
 
 ```json claims
 {
@@ -616,3 +616,4 @@ message type added to the module without a wiki claim fails the build.
 [^8]: `runs/bot/bot-20260619-053210` capture: 7/7 single-byte 0x2E bodies had subtype 0x54. The unified dispatcher requires 0x54 ActionDone to have inner ≥ 1 byte so the bare 1-byte form falls through to length-based teleport_landed
 [^11]: 42 corpse messages (direction>=32) found across 18 tanks in all captures; JS `Pg.prototype.h` sets `d.direction = (d.direction & 240) !== 0 ? 33 : 32` on deactivation
 [^12]: `src/tankpit_bot/protocol/decoders/tank.py:175` — `fuel: int | None = x16(data[10], data[11])`, i.e. `byte[10] + byte[11]*256` at inner offsets, after the subtype byte is stripped, matching this row exactly (re-verified 2026-08-06). The correlation figures behind it — 98/152 exact match with `FuelGain` at the same millisecond, the remainder explained by pre/post-update ordering inside one tick, and 8/15 sessions opening at 1100 (Private starting fuel, `RANK_FUEL[Rank.PRIVATE]`, machine-checked on [[client-constants]]) — come from the original 2026-06 sweep and are re-derivable by re-running it over the archive; the counts themselves are not stored.
+[^guard]: `scripts/physics_claims.py:305` — `run_physics_claim_rules`, the `physics_claims` guard stage wired into `scripts/guard.py:16`; it imports each claim's `code` address and compares the value. Reverse coverage is `_reverse_coverage_violations` at `:281`, called at `:331`, which is what makes an unclaimed public symbol a build failure rather than a silent gap. Verified present 2026-08-07.

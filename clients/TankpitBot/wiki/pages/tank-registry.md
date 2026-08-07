@@ -8,8 +8,8 @@ source_paths:
   - "src/tankpit_bot/state"
   - "runs/bot"
 source_git_blobs:
-  "src/tankpit_bot/state": "01f57c7928f05025a5ca0c14ab82ec4ff320031b"
-fact_checked: "2026-06-11"
+  "src/tankpit_bot/state": "9fbcf07602990d544c6e69b0060f4aba1ae2a863"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [protocol]
 ---
@@ -37,7 +37,7 @@ in parentheses after the rank name on the stats panel ("Rank: private
 accumulate ("im currently rank 26. as we get more kills ill move down
 to 25, 24, ..., and eventually 1"); own-tank trace across the archive:
 160 (Jun 10) → 151 (Jun 11) → 27 → 26 (Aug 5, one 20-kill session
-apart). Startup scrape lands in `session_account_stats.rank_number` and, as of 2026-08-06, in the canonical runtime account model `SelfAccountDict` (`state/types/self_account.py`, read via `sniffer.world_state.get_self_account()`) -- the plug-in point for rank-aware features.
+apart). Startup scrape lands in `session_account_stats.rank_number` and, as of 2026-08-06, in the canonical runtime account model `SelfAccountDict` (`state/types/self_account.py`, read via `sniffer.world_state.get_self_account()`) -- the plug-in point for rank-aware features.[^countdown]
 
 - Persistent across sessions AND across deaths (purple-3 died at s=559, respawned still 559)[^2]
 - Counts DOWN as the tank earns promotion points[^2]
@@ -65,3 +65,4 @@ Dead or departed tanks keep their last drawn state for minutes. Not distinguisha
 [^1]: run 20260611-004505 — full registry field verification; damage tier matched 5/5 transitions; viewport position matched motion
 [^2]: run 20260611-004505 — panel rank_points exact match; persistence across death verified on purple-3
 [^3]: run 20260611-110445 + 013801 + 003415 — P/U, l, practice-bot theories tested and retracted
+[^countdown]: User law, 2026-08-05, correcting this page's earlier reading of the `s` field. The registry writer that consumes it is `apply_tank_observation` at `src/tankpit_bot/state/tank_mutations.py:28`. Verified present 2026-08-07.

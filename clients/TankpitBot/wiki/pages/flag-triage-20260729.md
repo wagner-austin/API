@@ -11,9 +11,9 @@ source_paths:
   - "src/tankpit_bot/bot/ai/resource_search.py"
   - "src/tankpit_bot/state/scan_coverage.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/resource_search.py": "0ccd69aaad2608585028649ff3da1c3f4f0c86e5"
+  "src/tankpit_bot/bot/ai/resource_search.py": "686bc58c7432924e24f0f6e23dd920849499a29f"
   "src/tankpit_bot/state/scan_coverage.py": "06c0ae372146a32a3bc5e5e5a4cd300277ebdac6"
-fact_checked: "2026-08-06"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [architecture, combat]
 ---
@@ -153,7 +153,8 @@ contradicted by this run.[^1]
 hello"): the run has ZERO `chat_greeting`/`chat_sent`/`chat_received`
 events — correct behavior given no lock ever formed. The greeting is
 downstream of acquisition (`greeted_target_id` latch untouched all
-run), so F4's fix is the HELLO fix too: first human lock → HELLO
+run — the latch is now `ai_state["greeted_tank_ids"]`,
+`bot/ai/greeting.py:24`), so F4's fix is the HELLO fix too: first human lock → HELLO
 rides the acquisition tick; delivery receipt is the `chat_received`
 self-echo ([[chat-messages]]).[^1]
 
@@ -197,7 +198,7 @@ walks are provably 4-CONNECTED — 1,736 archive steps, alphabet
 exactly nsew, a NEW routing law — but successful walks reach 40
 steps while refusals include 4-connected length 6), (8) route
 confined to the sender's recorded 16x16 viewport (all 8 reachable
-in-window, 4-connected).
+in-window, 4-connected).[^sweep0803]
 
 **2026-08-04 — RESOLVED by the pilot; the sweep asked the wrong
 question.** User law, verbatim: *"you walk until you hit the block
@@ -260,7 +261,7 @@ correct and byte-supported by the genuine blocker stop (18:12:35,
 Belton), but cluster A itself was never a corridor problem. The
 18:40 pair (bot riding at (57,13) water) is the same ferry class.
 
-Open sub-questions, deliberately not guessed at:
+Open sub-questions, deliberately not guessed at:[^sweep0803]
 
 1. A moving tank or a block placed between our 2 s position fixes is
    unobservable in reconstruction, so composition cannot be perfect —
@@ -323,7 +324,10 @@ and alternatives, not blindly continued.[^1]
 1, 00:01:03).** purple-4 stood at (179,138) inside the freshly
 scanned viewport with self ~2 tiles away, and the map-acquire path
 teleported onto him before engaging — only `_combat_close` (which
-requires an existing lock) asked the shot-range question. FIXED same
+requires an existing lock) asked the shot-range question. Both
+functions have since been de-underscored and moved: `_combat_close` is
+`close_target` at `bot/ai/combat_close.py:259` and `_combat_teleport`
+is `teleport_to_target` at `:48`. FIXED same
 night: `_combat_teleport` now short-circuits to the shot when the
 target is in-view within `SHOT_RANGE_TILES`, covering fresh, map,
 and resume acquires.[^1]
@@ -1276,3 +1280,4 @@ under F20 is superseded by these landed pins.[^1]
 [^3]: `runs/bot/bot-20260730-004144.events.jsonl` — its 16 `human_flag` events sit at 00:42:27, 00:43:28, 00:44:22, 00:46:01, 00:46:39, 00:47:44, 00:49:06, 00:50:14, 00:51:40, 00:52:06, 00:53:03, 00:57:08, 00:59:05, 01:00:56, 01:03:58, 01:05:41. Every flag narrated under the non-existent `bot-20260730-004114` heading matches one of these to within ~5 s, so both session-3 sections cover this single run. Verified 2026-07-31.
 [^4]: Code paths for the fixes and directions proposed on this page: `src/tankpit_bot/bot/ai/resource_search.py` and `src/tankpit_bot/state/scan_coverage.py` (both declared in this page's `source_paths`), plus `src/tankpit_bot/bot/ai/intent.py` for the plan-release channel described in [[committed-intent]]. Present as of 2026-07-31; the *proposals* here are directions, not landed code, except where a paragraph says FIXED.
 [^5]: **User ruling, quoted verbatim from the live session** — Austin's narration during or immediately after the run being triaged. The rulings themselves were given in chat and have no transcript in the repo; they are recorded here because they are the authority for the behaviour change, not because they were independently logged. What IS on disk is the run each ruling narrates, and every flag a ruling responds to is timestamped in it: `runs/bot/bot-20260729-232252.events.jsonl` (13 `human_flag` events, `flag_seq` 1-13) and `runs/bot/bot-20260730-004144.events.jsonl` (16), both re-counted 2026-08-06. So a ruling's OCCASION is verifiable to the second even though its wording is not.
+[^sweep0803]: Run capture on disk: `runs/bot/bot-20260803-180918.capture_session.json` (with its `.events.jsonl`), the source of the 10 fresh code-1s. The pairing method — each logged rejection matched to the capture's decoded 0x47 self echoes — is `analysis_scripts/mine_cant_go_choreography.py`, and the resulting partial-walk law is stated on [[walk-mechanics]]. Verified present 2026-08-07. The open sub-questions are recorded as open precisely because this sweep did not settle them.

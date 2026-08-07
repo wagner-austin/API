@@ -40,7 +40,7 @@ of 7,364 live teleports). The affordability law lives in
 ``physics/supervisor.py`` (2026-08-03): the sim refuses with it at
 the resolved landing; the bot predicts with it from the requested
 target, discounted by the ring-1 displacement slack, and suppresses
-only provably-dead dispatches.
+only provably-dead dispatches.[^code8]
 
 ```json claims
 {
@@ -75,14 +75,14 @@ Map open → teleport → fire can all happen in one burst with no waits. The ta
 
 Server tick rate is 2000ms. Commands sent faster are queued by the server. Consecutive shots are ~2040ms apart — the server's actual shot cooldown. The server, not the bot, owns timing.[^7]
 
-[^1]: user (Austin), 2026-06-11 — "no walking are you stupid lol"; teleport is the mobility primitive, walking only for short in-viewport closes
+[^1]: user (Austin), 2026-06-11 — "no walking are you stupid lol"; teleport is the mobility primitive, walking only for short in-viewport closes. Encoded as the pricing every hop is gated on: `teleport_fuel_cost_to` at `src/tankpit_bot/bot/ai/context.py:451`, and the combat close that spends it, `teleport_to_target` at `src/tankpit_bot/bot/ai/combat_close.py:48`. Walking survives only as the in-viewport pickup path — see [[walk-mechanics]].
 [^2]: User (Austin) statement of 2026-06-16, verbatim: "you get moved off if there are mines, or if there is terrain in the way. or if there is water there, you get teleported to the nearest open space". No transcript exists, but the displacement law it states is what the terrain layer encodes today, and the code says so in its own words: `src/tankpit_bot/terrain.py:151-165` explains that the static minimap "carries no mines and no tank bodies -- the only blockers a landing is exempt from", which is exactly why an aimed landing is displaced rather than refused. As of 2026-08-06 the composed view distinguishes aim from outcome with a third predicate, `is_landing_attainable` (`bot/ai/ferry.py:187`) — see [[terrain-composition]], which carries the full three-question table.
 [^3]: Systematic validation 2026-07-20: every teleport dispatch in every `runs/bot/*.events.jsonl` paired with its wire fuel delta (pre-hop `Self:` position fix → post-hop `Fuel: A -> B` line; windows with intervening move/radar/shoot/pickup dispatches or a fuel-level mismatch excluded). Post-2026-06-24 era (after the fuel double-count fix): 248/248 pairs exact, costs spanning 6–654. All-era: 2,335/2,538 exact (1,711 on target coords + 624 on actual-landing coords); all 203 residuals live in pre-fix runs with broken fuel tracking. Supersedes the earlier undocumented "verified across multiple runs" assertion.
-[^4]: discovery probe 2026-06-12 — map open/close wire behavior; see [[map-mechanics]] for full details
+[^4]: discovery probe 2026-06-12 — map open/close wire behavior; see [[map-mechanics]] for full details. The message this probe characterised is `0x4C MapData`, named at `src/tankpit_bot/sniffer/constants.py:41` and classified `("map_data", "FULL")` at `:145`; the session-constant fuel-dot atlas it carries is described at `src/tankpit_bot/bot/ai/context.py:78`.
 [^5]: Fuel-dot probe of 2026-06-11; artifacts at repo root, `fuel_probe.json` + `fuel_probe.capture_session.json`. Six nearest dots, all holding fuel; the sixth was auto-picked on landing rather than measured, taking fuel 639→1100. That is why [[map-data-decode]] [^3] lists only five volumes (762/807/880/1042/1189) for six dots — the discrepancy is the auto-pick, not a miscount.
-[^6]: user (Austin), 2026-04-20 — protocol command timing; confirmed no waits needed between map/teleport/fire
+[^6]: user (Austin), 2026-04-20 — protocol command timing; confirmed no waits needed between map/teleport/fire. The only pacing the bot imposes is its own cooldowns, not inter-command waits: `map_open_cooldown_ms` and `scan_cooldown_ms`, both 5000, at `src/tankpit_bot/bot/ai/types.py:113` and `:117`.
 [^7]: bot-20260614-142159.capture_session.json — server response latency 56ms-2002ms; 2000ms responses = server HOLDING queued command until cooldown elapses
-[^8]: user (Austin), 2026-06-16 — "I teleport to the same exact position as the enemy tank. so the game puts me adjacent. you don't have to click on map to teleport right below them"; confirmed by official How To Play: "Open the map, then click on it to teleport"
+[^8]: user (Austin), 2026-06-16 — "I teleport to the same exact position as the enemy tank. so the game puts me adjacent. you don't have to click on map to teleport right below them"; confirmed by official How To Play: "Open the map, then click on it to teleport". Code truth is `choose_combat_landing_tile` at `src/tankpit_bot/bot/ai/combat_landing.py:80`, whose docstring states the rule verbatim — "teleports directly to their coordinates: the server handles displacement … This is how human players teleport: click on the enemy, let the server place you" — and records the corollary that the question asked is `is_landing_legal`, never `is_passable`.
 
 ## Displacement preference order (measured 2026-07-21)
 
@@ -123,3 +123,4 @@ displacements (sent teleport target vs 0x3D landing fix):[^9]
   55 fuel, wire 1100->1045).
 
 [^9]: runs/sniff/sniff-20260721-200527.capture_session.json — user-piloted displacement probe (11 hops); corpus extension 2026-07-22: 2,861 sent-teleport/0x3D pairs across all 246 archive sessions
+[^code8]: Archive-measured over 7,364 live teleport windows; the 0x52 refusal vocabulary this code belongs to is the canonical table on [[decode-coverage]], bound as a `members` claim so an omitted code fails the `physics_claims` guard (`scripts/physics_claims.py:305`). Teleport pricing is `teleport_fuel_cost_to` at `src/tankpit_bot/bot/ai/context.py:451`. Verified present 2026-08-07.

@@ -11,9 +11,9 @@ source_paths:
   - "analysis_scripts/diff_server_laws.py"
   - "runs/analysis"
 source_git_blobs:
-  "analysis_scripts/mine_container_atlas.py": "65ef05e6be1bc49b50dc8c2600e15a650d732dce"
-  "analysis_scripts/diff_server_laws.py": "46e3f09302349150b02f7fd515c7463f500b61bb"
-fact_checked: "2026-08-06"
+  "analysis_scripts/mine_container_atlas.py": "b94d5f5fd8ee4369d02a9a8d50143ed059688067"
+  "analysis_scripts/diff_server_laws.py": "7bb83c8dd8aee438f9ad0e3da1f00dc01ef2829b"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [protocol]
 ---
@@ -24,7 +24,7 @@ The systematic answer to "how close is the sim to the real server, and
 where exactly does it diverge?" (user direction, 2026-08-01:
 "structurally parse the run log ... and then we can systematically
 identify divergences"). Three stages, all built and run 2026-08-01
-against the full archive (318 real captures, 120 days).
+against the full archive (318 real captures, 120 days).[^1]
 
 ## Stage 1 — the longitudinal container atlas
 
@@ -42,7 +42,7 @@ order must be preserved — one tick's batch shares a timestamp, and
 value-sorted ties manufactured 123 phantom "refills" out of a
 pickup's (pre-read, remaining) pair; (2) a visible-layer 0 (0x5A/0x43
 cache) means "no VISIBLE container", never "empty" — treating it as
-empty misreads the exposure law as regeneration.
+empty misreads the exposure law as regeneration.[^2]
 
 ## Stage 2 — atlas world seeding
 
@@ -53,7 +53,7 @@ containers, 6,675 drained dots, 498 equipment on field01, water tiles
 included (the validator now accepts floating containers: the mined
 population proves they are real state, and ferries drift — only rock
 is a typo). First roster-on-real-field soak: 400/400 rounds, 8 kills,
-0 deaths.
+0 deaths.[^3]
 
 ## Stage 3 — the response-shape differ
 
@@ -66,7 +66,7 @@ diffs the live distribution against a fresh sim baseline. Numeric
 laws ride the pass: teleport cost (6,941/6,960 live windows within
 displacement tolerance of floor(6×euclid)) and the window-bound
 acceptance law (77 outside-window sends, 0 accepted — perfect
-archive-wide).
+archive-wide).[^4]
 
 ### Law gaps found AND closed by the first two cycles (2026-08-01)
 
@@ -80,7 +80,8 @@ archive-wide).
 | 6 | The fuel-pickup choreography (~1,600 windows: ``47+pickup+pickup+44+pickup+52c5`` and variants) — the sim emitted one bare record | byte-mined 2026-08-01 ([[fuel-system]]): four measured branches in `emit_fuel_pickup_close`, duplicate-record law on all auto-picks, the two 0x44 forms, walks executing for known-drained containers |
 
 (Plus the two the ferry soak caught the same morning: the
-0x3D-before-landed order and the 0x5A skip-walk entity sort.)
+0x3D-before-landed order and the 0x5A skip-walk entity sort — see
+[[ferry-mechanics]].)
 
 ### Open divergence triage (remaining rows, bucketed)
 
@@ -93,7 +94,7 @@ archive-wide).
 | radar ``...+pickup+pickup`` | 2,006 | ARTIFACT — landing-scan windows absorb the teleport's own pickup records |
 
 Sim-only rows (shapes the LIVE archive never produces — post-lift
-baseline ``sim-lift*``, 2026-08-03):
+baseline ``sim-lift*``, 2026-08-03):[^4]
 
 | Shape (sim-only) | n | Bucket |
 |---|---|---|
@@ -116,7 +117,7 @@ the membership diff), their shots and chats queue as real commands,
 and damage resolves by sim law. ``--from-atlas`` underlays the mined
 room beneath the capture's reads (per-tile capture truth wins; the
 recording's dot atlas bounds the exposed set) so long replays don't
-starve on observation-sparse worlds.
+starve on observation-sparse worlds.[^5]
 
 The ``ghost_summary`` diagnostic is the measurement: how many rounds
 the live bot stayed within 4 tiles of the recorded client, the first
@@ -126,7 +127,7 @@ rounds; replaying the 2026-07-29 live session against TODAY'S bot
 diverges at round 2 — the recorded bot wandered off collecting while
 today's immediately acquired and killed orange-2, a truthful measure
 of three days of behavior change. A 400-round live-capture replay
-runs in ~120 s.
+runs in ~120 s.[^5]
 
 Standing baseline (2026-08-02, run bot-20260802-205105 — the 20-kill
 soak): replaying the run's own capture under the same code tracked
@@ -135,18 +136,18 @@ capture self-replay diverges far earlier than a sim-capture
 self-replay (19/21 above) because the seeded world is the atlas
 approximation, not the live field: the first radar answers
 differently and the hunt forks from there. Compare future ghost
-numbers against THIS baseline, not against the sim-recording one.
+numbers against THIS baseline, not against the sim-recording one.[^6]
 
 Honest limits (v1, documented in the module): off-viewport ghosts
 freeze between sightings; ghost fuel is unobservable (they seed at
 rank capacity); a ghost the live bot kills early stops consuming its
-timeline (though a BOT-named one now reactivates by the corpse law).
+timeline (though a BOT-named one now reactivates by the corpse law).[^5]
 
 ## Stage 5 — the bot-policy differ + reactive ghosts (2026-08-03)
 
 The roster policy was already archive-mined (2026-07-24,
 ``sim/bot_policy.py``); stage 5 re-judged it against the GROWN
-archive (310 sessions, 29 bot-hours) and closed the loop:
+archive (310 sessions, 29 bot-hours) and closed the loop:[^7]
 
 * **Policy re-confirmed at scale**: 5,975/5,975 bot shots are
   weapon-0 singles, 95.7% inside the 3 s reflex window; rank
@@ -183,7 +184,17 @@ poetry run python analysis_scripts/diff_server_laws.py "" sim-<prefix>
 
 Every future live session extends the atlas and the shape corpus for
 free; every sim law change re-verifies against 38,000+ recorded
-command windows.
+command windows.[^4]
+
+Both mining scripts were re-plumbed 2026-08-06 onto
+`tankpit_bot.analysis.scan` (`scan_session`, the typed capture-scan
+owner with direction-tagged frames); each script's private
+load/XOR/frame-walk pipeline is deleted. The commands above are
+unchanged; the migration note in `analysis_scripts/mine_container_atlas.py:41-45`
+records that results reproduce exactly, and sent-frame room SELECTs
+and text ROOM_LIST rows now read `frame["raw"]` (never ciphered), as
+the production receive path does. The numbers on this page date from
+before that migration and have not been re-derived under it.[^8]
 
 ## Tick-paced sim sessions (2026-08-01)
 
@@ -195,4 +206,14 @@ solo and never under xdist); tick pacing makes every sim session
 deterministic AND live-realistic — a 300-round soak ages its forage
 coverage, harvest memory, and belief freshness exactly like a
 10-minute live session, and the captures it writes carry live-shaped
-2 s timestamps the differ can window.
+2 s timestamps the differ can window.[^9]
+
+[^1]: Pipeline entry points on disk, all three blob-pinned or path-pinned in this page's frontmatter: `analysis_scripts/mine_container_atlas.py` (stage 1), `analysis_scripts/diff_server_laws.py` (stage 3), and the `runs/analysis/` artifact directory the stages write. Verified present 2026-08-07.
+[^2]: `analysis_scripts/mine_container_atlas.py` — the ordering and visible-layer-zero rules are properties of the mining pass itself; the migration note at `:41-45` records that the 2026-08-06 re-plumb onto `tankpit_bot.analysis.scan` reproduces results exactly, which is the check that would have caught a reordering regression.
+[^3]: `src/tankpit_bot/sim/atlas_seed.py` — the atlas-seeded world builder invoked by `tankpit-sim-run --from-atlas`. Verified present 2026-08-07.
+[^4]: `analysis_scripts/diff_server_laws.py` — the window-pairing differ that produces both the live-only and sim-only shape tables above. Blob-pinned in frontmatter; verified present 2026-08-07.
+[^5]: `src/tankpit_bot/sim/ghost.py` — the capture-to-spec compiler behind `tankpit-sim-run --ghost`. Ghost relocation by recorded authority is `SimServer.relocate_tank` at `src/tankpit_bot/sim/server.py:185`. Verified present 2026-08-07.
+[^6]: **Point-in-time measurement, no committed artifact.** The 10/150-round / first-divergence-2 / drift-53 baseline was read from a ghost replay of `runs/bot/bot-20260802-205105` on 2026-08-02. The capture is on disk; the replay summary is not, so re-run rather than carry the numbers forward.
+[^7]: `src/tankpit_bot/sim/bot_policy.py` — the archive-mined roster policy. The reactive-ghost driver is `PracticeRoomDriver` at `src/tankpit_bot/sim/practice_room.py:84`, pinned by `tests/sim/test_ghost_reactive.py`. Verified present 2026-08-07.
+[^8]: `analysis_scripts/mine_container_atlas.py:41-45` — the migration note recording that both mining scripts now read through `scan_session` (`src/tankpit_bot/analysis/scan.py:121`) and that results reproduce exactly.
+[^9]: `run_sim_session` at `src/tankpit_bot/sim/run.py:80`, paced by `TickPacedClock` at `src/tankpit_bot/sim/run_boot.py:57`. Verified present 2026-08-07.

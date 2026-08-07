@@ -8,9 +8,9 @@ source_paths:
   - "tests"
   - "scripts/guard.py"
 source_git_blobs:
-  "tests": "a2ceaaaa48c0f1ef8b2915c74841faa22a7b5e5b"
-  "scripts/guard.py": "bbb7d497792759b7b6cc0df7489e2007a4c2ee6c"
-fact_checked: "2026-08-06"
+  "tests": "ecc452024fb1528bf007907381ce3306952479c2"
+  "scripts/guard.py": "2e03dfbed96320b3893879bf4ee521617dc74781"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [codebase]
 ---
@@ -54,7 +54,7 @@ class FakeBot:
 
 ## MonkeyPatchBanRule
 
-The `_hooks_guard.py` module enforces: **never set module attributes directly in tests**. The guard scans for `setattr` / direct attribute assignment on imported modules. Instead, use the save-and-restore pattern:[^4]
+The rule is **never set module attributes directly in tests**: the guard scans for `setattr` / direct attribute assignment on imported modules. Instead, use the save-and-restore pattern:[^4]
 
 ```python
 # Save original
@@ -85,5 +85,5 @@ Four live-only probe paths are `omit`-ed: `action_lab/combat_probe.py`,
 [^1]: pyproject.toml [tool.coverage.report] — fail_under=100, branch=true, concurrency=greenlet
 [^2]: tankpit_bot/_test_hooks/__init__.py — 8 submodules, all protocol-based
 [^3]: `WeakAssertionRule` (`name = "test-quality"`) in the api monorepo at `libs/monorepo_guards/src/monorepo_guards/test_quality_rules.py:418,421`, reached from this project through `scripts/guard.py`. Its module docstring at `:1-14` enumerates what it rejects: `weak-assertion-is-not-none`, `-isinstance`, `-hasattr`, `-len-zero` (`assert len(x) > 0` "checks existence not content"), `-in-output`, `-key-in-dict`, and `mock-without-assert-called-with`. The stated rationale is the one this page relies on — "Coverage shows lines executed, not correctness proven."
-[^4]: _hooks_guard.py MonkeyPatchBanRule — enforces save-and-restore, 0 violations
+[^4]: `MonkeyPatchBanRule` — enforces save-and-restore, 0 violations. **Corrected 2026-08-07:** this footnote attributed the rule to `_hooks_guard.py`, which enforces nothing. The rule lives in the api monorepo at `libs/monorepo_guards/src/monorepo_guards/monkey_patch_rules.py:79` (`name = "monkey-patch-ban"` at `:82`), registered in the orchestrator's rule list at `orchestrator.py:71`, and reaches this project through `scripts/guard.py`. `src/tankpit_bot/_hooks_guard.py` is the opposite kind of thing — a DI seam whose own docstring says it exists so guard TESTS can inject a fake orchestrator instead of scanning the real monorepo filesystem (`scripts/guard.py:20,57-58,89-90`; reset in `tests/conftest.py:180-181`).
 [^5]: `tests/replay/test_real_session_regressions.py` — 11 regression tests replaying captured sessions through the bot's decision logic, loaded via `tests/replay/fixture_loader.py` from `tests/replay/fixtures/`; the engine itself is covered by `tests/replay/test_engine.py`. Counted 2026-08-06.

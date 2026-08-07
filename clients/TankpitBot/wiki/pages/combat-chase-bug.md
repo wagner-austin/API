@@ -50,13 +50,15 @@ The 2026-06-16 fix removed the multi-hop chase but left a related teleport-after
 
 **User-contract loop (2026-06-26):** open map → teleport adjacent → dual until they teleport away → stay put and fire homing until deactivated. Enemies don't move *within* the viewport; when they leave cardinal adjacency, they teleported, so chasing with another teleport is wasted fuel.[^7]
 
-**Fix:** `_combat_close` (`combat_strategy.py:389`) now branches:[^8]
+**Fix:** `close_target` (`combat_close.py:259`) now branches:[^8]
 
 1. Cardinally adjacent → shoot (server picks dual at point-blank).
 2. Already engaged (`last_shot_target_id == combat_target_id`) → shoot (server picks homing, which tracks).
 3. Fresh acquire, not adjacent → teleport (the one-time initial close).
 
-The engaged-vs-fresh predicate lives in `is_already_engaged` (`combat_strategy.py`) and replaces the duplicated inline expression that previously lived in `_resume_locked_target_off_viewport` (`hunt_mode.py:223`). Both the on-viewport and off-viewport paths now consult the same predicate.[^8]
+The engaged-vs-fresh predicate lives in `is_already_engaged` (`combat_target.py:64`) and replaces the duplicated inline expression that previously lived in `resume_locked_target_off_viewport` (`hunt_lock.py:96`). Both the on-viewport and off-viewport paths now consult the same predicate.[^8]
+
+**Branch 1 has since widened (user ruling 2026-07-29).** It now fires whenever the shot is in range AND the line is clear — `has_cardinal_combat_shot(...) or (has_combat_shot(...) and has_clear_shot_line(...))` — not only at cardinal adjacency. The receipt is purple-8: after a break-driven pickup the bot stood at distance 2 and paid a teleport to regain adjacency instead of shooting. Branch 2 gained the mirror-image guard: an engaged stay-put shot with no clear line re-closes instead of firing, because a half-damage homing arcing over an occluder while the enemy duals back for 90 is the losing trade that killed Artax (flag s3-16).[^8]
 
 ## Follow-up fix (2026-06-26): unlimited homing restored by reverting the OUR_SHOT registry update
 
@@ -86,9 +88,9 @@ The right behaviour for `pickup_equipment` is to dispatch it from inside the vie
 [^6]: live capture 2026-06-21 16:54:26 — bot at (253,141) sent pickup_equipment two times, zero server response bytes; matched prior successful pickup at distance 3 from (252,136)
 
 [^1]: run 2026-06-16 18:26 — bot chased purple-9 through 3 teleport hops at x=4-9, y=128, spending ~54 fuel over ~12s without firing
-[^2]: diagnostic logs show target position shifting between dispatch and check: target=(5,128) at dispatch → target=(4,128) at check
-[^5]: user (Austin), 2026-06-16 — "I teleport to the same exact position as the enemy tank. so the game puts me adjacent"; the bot was computing adjacent tiles client-side instead of letting the server handle it
+[^2]: run capture on disk: `runs/bot/bot-20260616-182446.events.jsonl` (the 18:26 session cited in [^1]) — diagnostic logs show the target position shifting between dispatch and check: target=(5,128) at dispatch → target=(4,128) at check
+[^5]: user (Austin), 2026-06-16 — "I teleport to the same exact position as the enemy tank. so the game puts me adjacent"; the bot was computing adjacent tiles client-side instead of letting the server handle it. The ruling is code truth at `src/tankpit_bot/bot/ai/combat_landing.py:80`, `choose_combat_landing_tile`, whose docstring states it verbatim: "teleports directly to their coordinates: the server handles displacement … This is how human players teleport: click on the enemy, let the server place you." The same docstring records the corollary — the question asked is `is_landing_legal`, never `is_passable`, since an enemy always occupies its own tile and the walk question would reject every direct approach.
 [^7]: run capture on disk: `runs/bot/bot-20260626-144149.*` (the 14:42 session); wiki-log entry "[2026-06-26] update | Combat stay-put: shoot when engaged at distance, don't re-teleport" records the run narrative and the user-contract loop
-[^8]: code truth on disk: `src/tankpit_bot/bot/ai/combat_strategy.py` (`_combat_close` branch order, `is_already_engaged`) — both symbols greppable in the working tree
+[^8]: code truth on disk, re-verified 2026-08-07 after the combat module was split: the branch order is `close_target` at `src/tankpit_bot/bot/ai/combat_close.py:259`, whose docstring enumerates the three branches at `:269-279`; the widened branch 1 is the `has_cardinal_combat_shot(...) or (has_combat_shot(...) and has_clear_shot_line(...))` test at `:290-292` with the purple-8 receipt in the comment at `:293-300`, and the branch-2 terrain guard is at `:303-310`. The predicate is `is_already_engaged` at `src/tankpit_bot/bot/ai/combat_target.py:64`. This footnote previously cited `_combat_close` at `combat_strategy.py:389` and `_resume_locked_target_off_viewport` at `hunt_mode.py:223`; neither symbol nor either path exists — the functions were renamed without the leading underscore and moved to `combat_close.py` and `hunt_lock.py:96`.
 [^9]: wiki-log entry "[2026-06-26] fix | Unlimited homing shots restored by deleting the OUR_SHOT-driven registry update"; root-cause commit `098d3d7` (combat-rework, 2026-06-23) in git history; regression pinned by `tests/sniffer/test_world_state_dispatch_container.py::test_own_homing_does_not_overwrite_locked_target_position` (line 340, verified 2026-07-23)
 [^10]: run capture on disk: `runs/bot/bot-20260703-203416.*` (the 20:34 session); wiki-log entry "[2026-07-03] fix | Pursuit rejection loop: viewport-clamped aim + rejected-shot feedback" records the five 0x52 code-0 rejections, the two-part fix, and the falsification of the 2026-06-26 stale-registry assumption

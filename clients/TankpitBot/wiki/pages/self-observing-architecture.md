@@ -246,7 +246,7 @@ Design conversation: 2026-07-06 session, driven by user's observation "we were m
 Every public symbol of `tankpit_bot.ledger` is bound by the block below
 and checked on every `make check`. Reverse coverage is total, so a new
 book, outcome kind or record field added to the package without a wiki
-claim fails the build.
+claim fails the build.[^guard]
 
 **Read the claim kinds, not the count.** This binding is deliberately
 weaker than the protocol ones, and the split is worth stating plainly:
@@ -258,13 +258,13 @@ behaviour; it catches deletion and rename, nothing more. The
 behavioural guarantees for this package come from
 `scripts/contract_rules.py` (which requires `@enforce_contract` on
 every public `record_*`/`apply_*`/`mutate_*` here) and from the run
-auditor, not from this block.
+auditor, not from this block.[^guard]
 
 One structural note the binding surfaced: `ledger.outcome` re-exports
 all seven outcome Literal aliases from `ledger.outcomes`, so both
 addresses are public and both must be claimed. The seven claims on the
 `outcome` package say so rather than restating the definition, which
-lives on `outcomes`.
+lives on `outcomes`.[^guard]
 
 ```json claims
 {
@@ -783,3 +783,4 @@ lives on `outcomes`.
 [^1]: design source on disk and blob-pinned in frontmatter: `docs/handoffs/self-observing-bot-architecture.md` — the 15-blind-spot inventory, four-layer diagram, phase table, and LoC estimates all transcribe from it; design session recorded in the wiki-log entry "[2026-07-06] design | Self-observing bot architecture (multi-phase; handoff written; NO code landed)", which carries the user's quoted prompt.
 [^2]: code truth on disk for every landed phase: `src/tankpit_bot/contracts/`, `src/tankpit_bot/facts/`, `src/tankpit_bot/ledger/`, guard rule `scripts/contract_rules.py` (runs in `make lint`) — all symbols named in these notes are greppable; landed via the 2026-07-18/19 commits in git history and the wiki-log entries "[2026-07-18] code | Phase 2 outcome fabric", "[2026-07-18] code | Phase 2 typed decisions", "[2026-07-18] code | Phase 2 COMPLETE", and "[2026-07-19] tooling | Deterministic run audit". The run audit itself is a standing instrument (`make analyze`).
 [^3]: the 2026-07-06 20:47:31 deadlock: 26 s of `_is_valid_shoot` self-rejection during that evening's `make run`, recorded in the "[2026-07-06] design" wiki-log entry (motivation section); Phase 0 deleted the veto the same week, and the whole validator family followed 2026-07-21 ([[executor-rejection-loops]]).
+[^guard]: `scripts/physics_claims.py:305` — `run_physics_claim_rules`, the `physics_claims` guard stage wired into `scripts/guard.py:16`; it imports each claim's `code` address and compares the value. Reverse coverage is `_reverse_coverage_violations` at `:281`, called at `:331`, which is what makes an unclaimed public symbol a build failure rather than a silent gap. Verified present 2026-08-07.

@@ -179,7 +179,7 @@ Every opcode, direction byte, type byte and plain-text payload above is
 bound to its Python constant by the claim block below, and the
 `physics_claims` guard stage of `make check` imports each `code`
 address and compares the value. The wiki table and the code cannot
-drift apart without the gate going red.
+drift apart without the gate going red.[^guard]
 
 The binding is **total**: reverse coverage requires every public symbol
 of `tankpit_bot.protocol.commands` to be claimed exactly once, so a
@@ -187,7 +187,7 @@ constant added to the module without a wiki claim is also a build
 failure. Callables and the two TypedDicts carry `law` claims — prose
 plus an existence check — because their behaviour is not an int
 comparison; the 34 integer opcodes and 5 byte payloads are verified
-computationally.
+computationally.[^guard]
 
 What this does and does not prove: it proves the wiki table and the
 Python constants agree. It does **not** independently re-derive either
@@ -549,3 +549,4 @@ reverse-engineering.
 [^1]: tpclient.js lines 25-31 (K subclasses) and 6-10 (va subclasses) — every command class traced 2026-06-19; file pinned via `source_paths` line anchors
 [^2]: tpclient.js Lb class + Cb dispatch + toolbar click handler — same 2026-06-19 trace; target_id semantics wire-confirmed via the id-targeted reroute law ([[shoot-event-format]])
 [^3]: user (Austin), 2026-07-24 — quoted verbatim above; corroborating captures on disk: `bot_watch_probe.capture_session.json` and companions at repo root (the three designed watch runs), recorded in the wiki-log entries of 2026-07-24 ("bot-watch run 1" through "push-on-activity stream discovered")
+[^guard]: `scripts/physics_claims.py:305` — `run_physics_claim_rules`, the `physics_claims` guard stage wired into `scripts/guard.py:16`; it imports each claim's `code` address and compares the value. Reverse coverage is `_reverse_coverage_violations` at `:281`, called at `:331`, which is what makes an unclaimed public symbol a build failure rather than a silent gap. Verified present 2026-08-07.

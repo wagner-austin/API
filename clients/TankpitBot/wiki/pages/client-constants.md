@@ -312,7 +312,7 @@ from tpclient.js; the block below binds them to the Python enums and
 tables that mirror them, verified on every `make check`. `members`
 claims compare the WHOLE container — every enum member, every mapping
 entry, in order where order is meaningful (`RANK_NAMES` is indexed by
-rank, so its order is the fact).
+rank, so its order is the fact).[^guard]
 
 What this proves: the Python vocabulary and this page agree. It does not
 re-derive either from tpclient.js — that extraction is [^1], dated
@@ -432,3 +432,4 @@ re-derive either from tpclient.js — that extraction is [^1], dated
 ```
 
 [^1]: tpclient.js — every constant above carries its `(array/function, line N)` locator inline; file pinned by `source_paths` + `source_git_blobs` (traced 2026-06-19; fuel/action-dispatch facts re-mined 2026-07-06).
+[^guard]: `scripts/physics_claims.py:305` — `run_physics_claim_rules`, the `physics_claims` guard stage wired into `scripts/guard.py:16`; it imports each claim's `code` address and compares the value. Reverse coverage is `_reverse_coverage_violations` at `:281`, called at `:331`, which is what makes an unclaimed public symbol a build failure rather than a silent gap. Verified present 2026-08-07.

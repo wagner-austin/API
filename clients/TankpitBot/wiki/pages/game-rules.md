@@ -111,7 +111,7 @@ accrue per shot during fights, with kills as a bonus, not a gate.[^3]
   The How-To-Play "run out of fuel = deactivated" line describes
   being drained BY ENEMY DAMAGE, not by your own spending
 
-[^1]: in-game "How To Play" screens, transcribed 2026-06-16 from tankpit.com Practice room
-[^3]: user (Austin), 2026-07-20 — self-deactivation-impossibility contract, quoted verbatim above
+[^1]: in-game "How To Play" screens, transcribed 2026-06-16 from the Practice room at https://tankpit.com — the official rules text, quoted inline above. Where a screen's wording was later resolved to an exact formula by client mining, that supersession is recorded in [^2].
+[^3]: user (Austin), 2026-07-20 — self-deactivation-impossibility contract, quoted verbatim above. The consequence the bot depends on is that a strand is survivable rather than fatal, which is why the out-of-fuel path ends the session deliberately instead of treating it as a death: `SessionExitError` with reason `out_of_fuel` from the COLLECT owner `decide_collect_mode` at `src/tankpit_bot/bot/ai/collect_mode.py:199` — see [[fuel-system]] "Marooning hazard". Own-deactivation, when it does happen, is handled at `src/tankpit_bot/bot/tick_body.py:310`.
 [^2]: "Higher rank tanks... have a larger radar" — official text; resolved 2026-07-06 with exact formulas via client mining (tpclient.js Gc gauge draw) + user measurements at ranks 1/3/4/6/7 — see [[game-economy]] and [[radar-mechanics]]
 [^4]: round-order sweep 2026-07-25: `analysis_scripts/mine_round_order.py` (0x53 bursts grouped at 100 ms, order vs sorted shooter ids) over every `runs/**/capture_session.json`; the worked example is the respawn-watch fight (rounds at 13.3-21.3 s: purple-2 510 -> blue-7 524 -> Artax 1301, identical all six rounds, 1 ms emission spacing).

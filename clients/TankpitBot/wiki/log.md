@@ -3039,3 +3039,103 @@ Findings worth carrying forward:
 - **Duplication hides across package boundaries.** `_init_game_log_scraper` / `_poll_game_log` were implemented once on `Bot` and once on `BrowserSession`; the copy only surfaced when `bot/base.py` needed to come back under the ceiling and the honest route down was deleting one.
 
 Verified at write time: guard 0 violations, ruff clean, mypy clean over 1083 files, **6157 tests pass**.
+
+## [2026-08-07] audit | Every stale wiki anchor cleared by re-reading, not by bumping: 32 -> 0
+
+`tankpit-wiki-anchors` reported 32 stale anchors across 23 pages. A
+stale anchor means the page is owed an AUDIT, so each was re-read
+against the tree and corrected before its anchor moved. Result: **64
+anchors, 0 stale**, guard and wiki-structure rules at zero violations.
+
+**Method — three mechanical sweeps first, then read.** Cheap checks
+found the breakage that a careful read would have taken hours to
+notice, and left reading time for the claims that actually needed
+judgement:
+
+1. **Dead paths.** Every `path.py` reference resolved against the
+   tree. Found 8 pointing at files that no longer exist.
+2. **Line numbers past EOF.** Found 4 — including
+   `bot/tick_loop.py:868` on a 516-line file, a citation the tick-loop
+   split had invalidated on two separate pages.
+3. **Symbol proximity.** For each `` `symbol` ... path.py:N `` pair,
+   check the symbol appears within ±12 lines of N. This is the one
+   that earns its keep: it catches citations that still RESOLVE but no
+   longer point at the thing named, which no existence check can see.
+   Found `choose_combat_landing_tile` cited at `:46` when it sits at
+   `:80`, and `decide_collect_mode` at `:199` when it sits at `:42`.
+
+A fourth check — diffing each anchor's recorded git blob against the
+worktree — turned "what drifted?" from a reading problem into a diff.
+For directory anchors the added/removed file list is the right
+granularity, because that is the level a page's claims live at.
+
+**Two claims were wrong about behaviour, not just line numbers:**
+
+- [[testing-patterns]] said "the `_hooks_guard.py` module enforces:
+  never set module attributes directly in tests." It enforces nothing.
+  Its own docstring says it is a DI seam so guard TESTS can inject a
+  fake orchestrator instead of scanning the real monorepo. The rule is
+  `MonkeyPatchBanRule` in `libs/monorepo_guards`, which
+  [[coding-standards]] had right all along — two pages disagreeing
+  about the same rule, and only the mechanical read caught it.
+- [[bot-behavior-contract]]'s ghost-firing row named an
+  `is_wire_present` gate in `_combat_shoot`, pinned by
+  `test_ghost_wire_presence_regression.py`. None of the three names
+  exists: `_combat_shoot` was collapsed into `engage_target` by the
+  thin-wrapper removal, and the test file was never written under that
+  name. The gate is real; every name for it was wrong.
+
+**Findings worth carrying forward:**
+
+- **A stale anchor is not evidence of a wrong page, and a current one
+  is not evidence of a right page.** Of 32 stale anchors, several
+  covered pages whose prose was still exactly true — the tree moved
+  underneath them. Meanwhile the two behavioural errors above sat on
+  pages whose anchors were CURRENT. The anchor tracks whether anyone
+  looked, which is all it claims to track.
+- **Anchors re-stale on the next commit that touches the path.** That
+  is inherent to pinning a tree hash, and is exactly why the tool is a
+  report and not a gate — gating would redden the build on every
+  source commit and reward bumping without reading.
+- **Unexplained: the stale count moved during the run** (32 -> 18 ->
+  23) with no commit behind it. `git reflog` is linear across the
+  whole session and its newest entry predates every one of those
+  readings, so nothing was committed while they were taken. An earlier
+  draft of this entry blamed a concurrent session; that explanation is
+  **withdrawn** — it was assumed, never checked, and the reflog
+  refutes it. The cause is still unknown. Worth a repeat run before
+  trusting a single reading of the report, since the same instability
+  would make any one count unreliable.
+- **Prefer marking a section historical over rewriting it.** Three
+  pages carried present-tense descriptions of deleted code
+  ([[executor-rejection-loops]]'s three "known live instances", its
+  `_tracked_combat_target` footnote). The diagnosis is why the
+  deletion happened and is worth keeping; a banner that says "read
+  this in the past tense", naming what replaced each symbol, preserves
+  it without lying about today.
+- **Record the gap instead of closing it.** Four pages cited planned
+  `tests/integration/*` files that were never written. Three already
+  said so. The fourth now names what IS pinned (cooldown decode, the
+  map-freshness window) and what is NOT (the composite
+  stall-replan-reissue shape) rather than pointing at a file that
+  never existed.
+- **The wiki found a code bug.** `make-targets` documented the fleet
+  manager on `127.0.0.1:27300`; the Makefile's own banner claimed
+  `0.0.0.0:27300`. `service/fleet.py:34` binds loopback — the page was
+  right and the user-facing banner was wrong, so the banner was
+  corrected to match the code.
+
+Pages corrected: [[bot-behavior-contract]], [[bot-service-architecture]],
+[[capture-differ]], [[coding-standards]], [[committed-intent]],
+[[diagnostic-hud]], [[enemy-bot-behavior]], [[executor-rejection-loops]],
+[[ferry-mechanics]], [[fuel-system]], [[inheritance-chain]],
+[[larder-plan]], [[make-targets]], [[map-data-decode]], [[module-map]],
+[[physics-module-roadmap]], [[server-push-gating]], [[services]],
+[[session-state-deglobalisation]], [[shot-range]],
+[[tank-freshness-model]], [[testing-patterns]], [[weapon-log-markers]].
+
+Re-derived rather than restated: the package SCC (13 cyclic / 10
+acyclic, unchanged), the over-600 file count (**0**), the type-safety
+zeros (now counting `scripts/` too), the seven `make shadow` laws, the
+`get_world_service` call-site census (73 in 20 files -> **74 in 23**,
+and the old "21 in `tick_loop.py` alone" is gone with the split).

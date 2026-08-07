@@ -9,8 +9,8 @@ source_paths:
   - "runs/sniff"
   - "src/tankpit_bot/sim/movement.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/movement.py": "2558ccfbe93d108f2f0a70c281b2081cd385a211"
-fact_checked: "2026-08-05"
+  "src/tankpit_bot/sim/movement.py": "972c144ffa6df56bb7998f2f4efb32683b5700cd"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [game-mechanics]
 ---
@@ -51,7 +51,7 @@ click again to reach your destination land tile. it takes two
 actions because you have to embark and disembark."[^4]
 
 Planner consequence: **pickup dispatches route on the CURRENT surface**
-(`SurfaceRouteTerrain` gate at `src/tankpit_bot/bot/ai/movement.py:452`,
+(`SurfaceRouteTerrain` gate at `src/tankpit_bot/bot/ai/movement.py:294`,
 `SurfaceRouteTerrain(terrain, water=riding)` — the PLANNER's movement
 module, not the sim's `sim/movement.py` referenced elsewhere on this
 page) — plain ground when
@@ -65,7 +65,7 @@ crosses the surface boundary in both directions (shore tile ↔ adjacent
 floating container), matching the reachability layer's long-standing
 adjacent-tile completion rule.[^5]
 
-[^4]: live falsification chain, run 2026-07-19 18:19: pickup at (163,44) dispatched while riding a ferry at (167,40) (riding rule made the channel "reachable"), server routed to the disembark stop (167,44) and refused with 0x52 code 1. Offline reproduction: ferry-aware gate=True, single-surface gate=False (the container sat 4 tiles inland — beyond adjacency), matching the server. Fix pinned by `tests/bot/ai/test_movement.py::TestPickupSurfaceRouting`.
+[^4]: live falsification chain, run 2026-07-19 18:19: pickup at (163,44) dispatched while riding a ferry at (167,40) (riding rule made the channel "reachable"), server routed to the disembark stop (167,44) and refused with 0x52 code 1. Offline reproduction: ferry-aware gate=True, single-surface gate=False (the container sat 4 tiles inland — beyond adjacency), matching the server. Fix pinned by `tests/bot/ai/test_movement_exploration.py::TestPickupSurfaceRouting`.
 [^5]: run 2026-07-20 00:57 (bot-20260720-005424): the first fix's ground-ONLY gate was overbroad — equipment on a water tile at (226,196) was never "ground-reachable", so the disembark branch sailed the bot onto the container's own tile and then re-issued a refused move (0x52 code 6) to its own position every tick for 78 ticks (half the session). User contract: containers on water pick up normally while riding. Gate replaced by the surface-matched `SurfaceRouteTerrain`; regression pinned by `test_pickup_of_water_container_while_riding_dispatches` and `test_pickup_on_own_water_tile_while_riding_dispatches`. Whether the server honors cross-surface ADJACENT pickups (clicking a land container from the alongside ferry tile) is untested on the wire; the planner currently assumes yes, symmetric with the land→water-container case.
 
 ## Executable since 2026-07-22
@@ -100,7 +100,7 @@ landing even though its water is not
 is the doctrine's core move). Production law completed for it (F5
 completion): a container floating on water is NEVER walk territory —
 the larder keeps in-viewport water containers instead of ceding them
-to the walk step that can't reach them (`larder._is_walk_territory`).
+to the walk step that can't reach them (`larder._is_walk_territory`).[^ferrylaw]
 
 ## Movement announcements and the no-drift result (measured 2026-08-04)
 
@@ -135,7 +135,7 @@ transition stop that IS the click (boarding the clicked ferry tile)
 closes silently, and a mine walk-over arrest closes silently too (18
 archive detonations, zero paired code-1s). The sim emits all three
 shapes (`sim/emissions.py::emit_move`,
-`MoveOutcomeDict.stop_reason`/`dest_reached`).
+`MoveOutcomeDict.stop_reason`/`dest_reached`).[^ferrylaw]
 
 [^7]: `analysis_scripts/mine_ferry_drift.py`, run over all 312 archive
     captures; sweep recorded at `wiki/log.md:2678-2682` (entry
@@ -185,6 +185,7 @@ acquisition until the stand-off gate replaced strict adjacency (F4 in
 
 The "marooned one-tile island" from run 131003 was actually the tank standing ON A FERRY in a lake. It could have driven across the water the whole time. The walkability model treated all water as impassable. Fixed by making passability ferry-aware.[^3]
 
-[^1]: Originally a user (Austin) statement of 2026-06-12, made in conversation and not recorded in `wiki/log.md` (which opens 2026-06-16 at `log.md:7`). Both halves are now independently held by artifacts in the repo: the go-anywhere-on-water and queue-slot rules are implemented as sim law 2b in `src/tankpit_bot/sim/movement.py:12-15` — "a ferry tile boards; while riding, water is open sea and the ferry moves with the tank. The FIRST queue-consuming surface transition — stepping onto a ferry (boarding) or from water/ferry onto land (disembarking) — STOPS the move at that tile" — and the same contract was restated verbatim by the user on 2026-07-19 and falsified live against the server, which is [^4]. Cite [^4] for the wire proof; this note records provenance only.
-[^2]: `src/tankpit_bot/state/types/constants.py:25-26` — `TERRAIN_FERRY = 5`, `TERRAIN_FERRY_ROCK = 7`; the ASCII glyph is `ASCII_FERRY = "~"` at `:47`. **Corrected 2026-08-05:** this footnote previously pointed at `state/terrain.py`, which does not define them (the module at `src/tankpit_bot/state/types/terrain.py` is a different file, and `src/tankpit_bot/terrain.py` is a third).
+[^1]: Originally a user (Austin) statement of 2026-06-12, made in conversation and not recorded in `wiki/log.md` (which opens 2026-06-16 at `log.md:7`). Both halves are now independently held by artifacts in the repo: the go-anywhere-on-water and queue-slot rules are implemented as sim law 2b in `src/tankpit_bot/sim/movement.py:12-16` — "a ferry tile boards; while riding, water is open sea and the ferry moves with the tank. The FIRST queue-consuming surface transition — stepping onto a ferry (boarding) or from water/ferry onto land (disembarking) — STOPS the move at that tile" — and the same contract was restated verbatim by the user on 2026-07-19 and falsified live against the server, which is [^4]. Cite [^4] for the wire proof; this note records provenance only.
+[^2]: `src/tankpit_bot/types/constants.py:25-26` — `TERRAIN_FERRY = 5`, `TERRAIN_FERRY_ROCK = 7`; the ASCII glyph is `ASCII_FERRY = "~"` at `:47`. **Corrected 2026-08-05:** this footnote previously pointed at `state/terrain.py`, which does not define them (the module at `src/tankpit_bot/state/types/terrain.py` is a different file, and `src/tankpit_bot/terrain.py` is a third). **Moved 2026-08-07:** the module is now `types/constants.py`, not `state/types/constants.py` — it was never state, and while it sat under `state/` it made `physics` and `state` mutually dependent ([[package-layering]]). The three line numbers are unchanged; only the package moved.
 [^3]: `runs/bot/bot-20260612-131003.log:7130-7160` (run 131003, 2026-06-12 13:19:08-13:19:10). The bot teleported toward a fuel dot at (131,182) for 81 fuel (`WORLD: Fuel: 168 -> 87 (-81)`) and the server placed it at **(132,180)**, whose rendered viewport row 180 reads `W W W W @ W # #` — water on both sides, rock below, i.e. the one-tile island. **Corrected 2026-08-05:** this footnote previously gave the tank's position as (131,182); that is the fuel container's tile and the teleport TARGET, rendered `F` on row 182 of the same dump. The tank was never there. "Marooned" is the bot's own state name for the condition (`src/tankpit_bot/bot/ai/collect_hops.py:365`), not a string in this log.
+[^ferrylaw]: The three-question split a ferry surface forces — passability, landing legality, landing attainability — is `is_landing_legal` at `src/tankpit_bot/bot/ai/ferry.py:163` and `:308`, beside `is_landing_attainable` at `:189` and `:326`; see [[terrain-composition]] for the full table. The 2026-08-03 unfinished-command receipts are `runs/bot/bot-20260803-180918.capture_session.json` and its `.events.jsonl`. All paths verified present 2026-08-07.

@@ -17,10 +17,10 @@ source_paths:
   - "src/tankpit_bot/sim"
   - "src/tankpit_bot/validate"
 source_git_blobs:
-  "src/tankpit_bot/physics": "130c17d4a20d81886055bc97dc20140c9656f1c6"
-  "src/tankpit_bot/sim": "bb788868e45c84cac3352a8268b2ff331c035d50"
-  "src/tankpit_bot/validate": "0f9542f68581853517832736b3a063b0bab9f8c2"
-fact_checked: "2026-07-31"
+  "src/tankpit_bot/physics": "3790041eff16b20259291f5b60ed9bf184a35c45"
+  "src/tankpit_bot/sim": "b1cbd663acd02a1b31b21c2514eea04312b46c0c"
+  "src/tankpit_bot/validate": "bbe52d79b8b466d4fb4f3deb66bdf6f198914f8e"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [architecture]
 ---
@@ -158,8 +158,24 @@ Implemented exactly as designed with these recorded deviations:[^2]
   `physics/combat.py` (`REROUTE_TTL_MS` estimate). The
   consumption-equals-hit rule stays prose (it is a bookkeeping
   identity, not a constant). `combat_radar_min` was POLICY, not
-  physics — it moved to its only consumer,
-  `bot/ai/mode_controller.py`, with a docstring saying exactly that.
+  physics — it moved to its only consumer, `bot/ai/mode_controller.py`,
+  with a docstring saying exactly that (now `bot/ai/mode_gates.py:229`,
+  split out of `mode_controller.py` 2026-08-07; still policy, still
+  one consumer, at `:190`).
+
+  **Added since (2026-08-03): `physics/supervisor.py`** — the 0x52
+  refusal laws, the one physics module with two consumers rather than
+  one. The sim server uses the predicates to EMIT a refusal
+  (`sim/emissions.py`, `sim/equipment.py`, `sim/actions.py`); the
+  production bot uses the same predicates to PREDICT it before
+  dispatch (`bot/executor.py`) and to steer target choice
+  (`bot/ai/combat_strategy.py`). Until then the laws lived inline at
+  the sim emission sites and the bot had no predictor at all — the
+  20-kill soak `bot-20260802-205105` dispatched 48 fuel pickups at
+  exactly-full fuel, every one refused code 5 by the live server. It
+  is also the only `physics/` module with an outbound edge inside
+  this codebase (`protocol.constants`); the other five import nothing
+  from `tankpit_bot` at all ([[package-layering]]).
 - **Claim locations**: [[game-economy]] (15 claims: 8 costs +
   teleport probes, 3 damage, capacity/inventory probes,
   deposit-floor), [[radar-mechanics]] (`free-radar-radius` probed at
@@ -223,6 +239,13 @@ Implemented as `src/tankpit_bot/validate/` (not `tools/validate/` —
   overcounts tiles, never fuel, and zero mid-path echoes), hit damage
   (lone-enemy-shot windows; zero-delta = shot at someone else, not a
   sample), and fuel capacity (every reading vs the rank bound).
+- **`fight_timeline.py`** (added 2026-08-03, after the nope-fight
+  autopsy took four read passes because "every summary layer hid one
+  load-bearing fact"): human-fight episodes and per-event fight rows,
+  making the wire's play-by-play a first-class typed product. It
+  CONSUMES `shadow_timeline.extract_shadow_timeline` and adds no
+  second decode path — the same discipline as the analysis-script
+  migration in [[capture-differ]].
 - **`events_validators.py`** — the events.jsonl teleport pairing
   (dispatch → landed_x/y → belief-fuel fixes either side,
   contamination-excluded by action kind, predicted on the ACTUAL
@@ -1060,7 +1083,9 @@ attacker's tile; teleport-off at 7/8 hits by rank) as a certified
 MODEL — distinct from ``sim/opponent.py``, which stays a harness —
 and ``validate/shadow_bot_laws.py`` adds ``bot-return-fire`` as the
 sixth ``make shadow`` law, importing its constants from the sim
-source. First full-archive run: 2,247 samples, 2,125 exact (94.6%),
+source. (It later added ``bot-reactivation`` as the seventh; the
+registry that runs them is ``validate/shadow.py:79-85``, and seven is
+the current count — re-read 2026-08-07.) First full-archive run: 2,247 samples, 2,125 exact (94.6%),
 PASS — and the sample count equals the independent mining script's
 bot-shot population exactly. The shadow timeline gained names /
 shots / positions extraction to feed it. Same day, the "refuel
@@ -1231,6 +1256,6 @@ then a 5-minute `make run` soak analyzed for behavior neutrality
 only). Commit per phase with the soak evidence in the message —
 follow the 2026-07-20 commit style (`6d2afdbe`, `3bd031f9`).[^2]
 
-[^1]: Design conversation 2026-07-20: user framing "wiki as the source of truth... with 3 consumers" (code, archived wire evidence, live wire) and "no handwaving, no half assing it at all. the full complete process verified. quality." Phase ordering user-approved; Phase 1 explicitly agreed as the starting point.
+[^1]: Design conversation 2026-07-20: user framing "wiki as the source of truth... with 3 consumers" (code, archived wire evidence, live wire) and "no handwaving, no half assing it at all. the full complete process verified. quality." The three consumers named in that framing are all on disk and blob-pinned in this page's frontmatter: `src/tankpit_bot/physics` (the law layer, e.g. `fuel_pickup_close_code` at `physics/supervisor.py:52` and `fuel_pickup_refusal` at `:73`), `src/tankpit_bot/sim` (the fake server that replays archived wire, e.g. `emit_fuel_pickup_close` at `sim/emissions.py:213`), and `src/tankpit_bot/validate` (the shadow comparison against live wire, `validate/shadow_laws.py`). Phase ordering user-approved; Phase 1 explicitly agreed as the starting point.
 [^2]: receipts for every design and as-built claim above, three-fold: (1) CODE — the blob-pinned trees in frontmatter (`src/tankpit_bot/physics`, `src/tankpit_bot/sim`, `src/tankpit_bot/validate`) plus `protocol/encoders/`, `ledger/fuel_book.py`/`ammo_book.py`, `scripts/physics_claims.py`, and the named `tests/sim/*` files — every symbol, constant, and law named above is greppable on disk, and design paragraphs describe the plan those trees implement (deviations recorded inline); (2) INSTRUMENTS — `make check` (gate/coverage), `make audit` (per-claim sample counts), `make roundtrip` (72,916-message corpus), `make shadow` (law table), `make sim-run` re-derive every number quoted above on demand; (3) HISTORY — the dated 2026-07-20/21/22 commits in git history and their wiki-log entries, plus soak artifacts under `runs/`.
 [^3]: `src/tankpit_bot/sim/server.py` and `src/tankpit_bot/sim/wire_statements.py` both exist as of 2026-07-31, matching the split this phase describes. The "no law changed" claim is a statement of intent for the split, not a measurement — the shadow verdicts it refers to are the ones recorded earlier on this page.

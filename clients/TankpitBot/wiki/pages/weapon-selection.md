@@ -9,8 +9,8 @@ source_paths:
   - "runs/bot"
   - "src/tankpit_bot/sim/combat.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/combat.py": "68ae3124f0159595579868862a888093fb2bb537"
-fact_checked: "2026-07-02"
+  "src/tankpit_bot/sim/combat.py": "9ac96e652e5784ce463b4e8d21e787d47a7ef89c"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [combat, protocol]
 ---
@@ -108,6 +108,6 @@ A miss (weapon_byte=0) means one of:[^1]
 - Corpses: return **positive hit**. A dead tank still "receives" the shot at the wire level.
 - A miss does NOT mean "hit but no damage" — it means "nothing was at that coordinate."
 
-[^1]: user (Austin), 2026-06-16 — full weapon selection explanation: "homing shot is used whenever you click on an enemy tank but the enemy had already submitted a move command... it will automatically use a homing shot"
+[^1]: user (Austin), 2026-06-16 — full weapon selection explanation: "homing shot is used whenever you click on an enemy tank but the enemy had already submitted a move command... it will automatically use a homing shot". Server-picked rather than bot-picked, which is why no weapon argument is dispatched: the bot sends a shoot at a tile plus the target's `tank_id` and the server chooses. The `weapon=3` homing echo is recorded at `src/tankpit_bot/bot/ai/combat_strategy.py:56`, and the aim it is paired with is clamped by `_clamp_aim_into_viewport` at `:47`.
 [^2]: user (Austin), 2026-07-02 — "check the inventory delta for each shot. that is how we measure hits vs misses"; wire-verified in capture 2026-07-02 01:20 (orange-3 pursuit kill via 5 weapon=3 debits, orange-1 weapon=0 stream with zero debits) and 01:23 (stale-tile weapon=0 loop that motivated the consumption-miss block rule)
 [^3]: user (Austin), 2026-07-20 — missile trigger contract, quoted verbatim above; wire-verified same day (sniff-20260720-213208, 10 weapon=2 echoes)

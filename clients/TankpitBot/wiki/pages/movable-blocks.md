@@ -12,8 +12,8 @@ source_paths:
   - "runs/sniff/sniff-20260720-215930.capture_session.json"
   - "src/tankpit_bot/sim/blocks.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/blocks.py": "5865f6aba13dc12882e06563d31568bb2bab2f77"
-fact_checked: "2026-07-20"
+  "src/tankpit_bot/sim/blocks.py": "905a4e0f19383dbd2c342055e1e819376a70be29"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [combat, game-mechanics]
 ---

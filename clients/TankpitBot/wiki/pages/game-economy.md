@@ -217,14 +217,14 @@ ordered by absolute epoch timestamps. Miner:
 Layer discipline matters: a visible-layer 0 (0x5A/0x43 cache byte)
 says "no VISIBLE container", never "tile empty" — only radar zeros
 and pickup remaining=0 are true empty statements; increases from a
-visible-layer 0 are the exposure law, not refills.
+visible-layer 0 are the exposure law, not refills.[^12]
 
 **1. The field is highly persistent — the atlas snapshot is real.**
 Cross-session volume agreement at the same tile: **98.8% within 1 h
 (n=8,268), 98.1% within a day (n=12,873), 96.8% at 3-7 d, 94.9% at
 7-30 d, 81.4% beyond 30 d**. A week-fresh snapshot of the mined atlas
 is ~97% truthful — good enough to seed the sim with the REAL field
-instead of the statistical model.
+instead of the statistical model.[^12]
 
 **2. Containers GAIN fuel — discrete deposits, NOT regeneration.**
 169 genuine refill events in 120 days: 120 cross-session plus **49
@@ -234,7 +234,7 @@ events — 123 were a same-tick ordering artifact (a pickup's
 remaining-volume record and the pre-pickup 0x5A read share one
 timestamp; sorting by value instead of wire order manufactures an
 "increase" — the miner now carries an intra-payload sequence
-number). Three discriminators close the mechanism:
+number). Three discriminators close the mechanism:[^12]
 
 * **corr(Δv, Δt) = −0.13 over all 169 events** — refill size is
   INDEPENDENT of elapsed time (dt median 53 h, max 2,809 h). An
@@ -261,7 +261,7 @@ on a stocked container until a bot walks up and the volume jumps.
 The 2026-07-25 static-population law stands refined: static
 placement, consumption-dominated, deposit-topped —
 `analysis_scripts/mine_deposit_attribution.py` +
-`runs/analysis/container_refills.json`.
+`runs/analysis/container_refills.json`.[^12]
 
 **3. The stocked population is far larger than the sim's model.**
 Median 62 distinct stocked tiles observed per session; **5,457
@@ -273,12 +273,12 @@ of those coexisted — an instantaneous stocked population of roughly
 density-probe extrapolation). The probe's fresh-ground HIDDEN density
 may still be right; the gap says the visited-area/dotted layer is
 much richer than the 641-dot live census suggested. Sim reseeding
-from the mined atlas (a `--from-atlas` world) is the queued fix.
+from the mined atlas (a `--from-atlas` world) is the queued fix.[^12]
 
 **4. Placement churns only over months.** 175 fuel↔equipment
 type-flip tiles across 120 days; 10,930 cumulative tiles vs ~5-6k
 instantaneous — re-placement happens on the weeks-to-months scale,
-matching the >30 d agreement drop to 81%.
+matching the >30 d agreement drop to 81%.[^12]
 
 ## What's still open
 
@@ -452,3 +452,5 @@ gap-bucketed appearance counts, 64×64-quadrant appearance histogram.
 Re-run to re-derive.
 [^5]: dedicated manual captures on disk: `runs/sniff/sniff-20260720-213208.capture_session.json` (missiles) and `sniff-20260720-214329` (mine presses); the full cost set is machine-checked in the claim block below.
 [^6]: radar isolation sweep 2026-07-24: `analysis_scripts/mine_bot_policy.py` (sent-command-keyed fuel windows) over the full archive; results snapshot `analysis_scripts/bot_policy_sweep_2026-07-24.json`; wiki-log entry "[2026-07-24] mining | Radar cost isolated, self-sync drift is activity-correlated". STANDING instrument since the same day: `validate_radar_cost` in `src/tankpit_bot/validate/archive.py` re-derives this claim on every `make audit` (`radar-cost` row; first run replicated the sweep digit-for-digit — 1,311 samples, 1,293 exact, PASS).
+
+[^12]: Longitudinal container atlas, archive-mined 2026-08-01 over 318 real-wire captures (120.1 days, room 1 / field01) replayed through the production decoders. Miners on disk: `analysis_scripts/mine_container_atlas.py` (extraction), `analysis_scripts/analyze_container_atlas.py` (the persistence pass), `analysis_scripts/mine_deposit_attribution.py` (adjacency attribution). Artifacts on disk: `runs/analysis/container_atlas.json`, `runs/analysis/container_observations.jsonl`, `runs/analysis/container_refills.json`. Method detail and the two mining traps the pass had to close are recorded in [[capture-differ]] stage 1. All four paths verified present 2026-08-07; note the scripts were re-plumbed onto `tankpit_bot.analysis.scan` on 2026-08-06 and these numbers predate that migration.

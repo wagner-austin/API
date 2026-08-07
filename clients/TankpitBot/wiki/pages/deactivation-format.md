@@ -133,4 +133,4 @@ tier 3 (assume healthy), not "full = 0".[^3]
 }
 ```
 
-[^3]: user (Austin), 2026-07-23 — "tanks dont heal. they only can recover health/fuel from picking up fuel containers... when i mouse over a tank on the map, it shows them lighter more hp or darker lower hp". Corpus fit same day: 19,658 tier+fuel pairs, boundaries exactly 275/550/825 = capacity quartiles at rank 1, zero exceptions.
+[^3]: user (Austin), 2026-07-23 — "tanks dont heal. they only can recover health/fuel from picking up fuel containers... when i mouse over a tank on the map, it shows them lighter more hp or darker lower hp". Corpus fit same day: 19,658 tier+fuel pairs, boundaries exactly 275/550/825 = capacity quartiles at rank 1, zero exceptions. The consequence — fuel IS health, so the only recovery path is a fuel pickup — is why the pickup predicate refuses nothing on volume grounds: `minimum_volume=1` at `src/tankpit_bot/bot/ai/collect_pickups.py:253`. Deactivation itself is read off the wire, not inferred from health: `src/tankpit_bot/combat.py:114` and `:119`.

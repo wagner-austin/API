@@ -7,8 +7,8 @@ related:
 source_paths:
   - "Makefile"
 source_git_blobs:
-  "Makefile": "222dcf850d9f0514abfb48dae4ccac6d915dfce9"
-fact_checked: "2026-08-06"
+  "Makefile": "e130075352fca7a71c4f5ff63cd999ba984055e8"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [codebase]
 ---
@@ -38,7 +38,7 @@ hubs: [codebase]
 | `make sim-run-practice` | Production bot vs a REAL practice room (2026-07-25 rework): a stamp-selected mined layout seeds the full 36-bot roster (ids 500-535, 9/team) at archive-observed positions plus the client's real join spawn, on a static container field (~620-dot exposure atlas at the live ~40% hold rate + measured hidden population (840 fuel, half drained + 180 equipment); no runtime spawning — the respawn law was falsified). Bots driven by the certified `sim/bot_policy`. The fidelity soak: 150/150 rounds sustainably, kills across the map, exposure law 18/18 on the sim's own capture. `tankpit-sim-run --practice`. |
 | `make sniff` | WebSocket capture to disk — also the human-session recorder (you play, it records). `OUTPUT=<path>` overrides the capture file location. The former `make play` alias was removed 2026-07-01 (identical command). |
 | `make service` | Long-running SPA-driven HTTP + SSE server on `0.0.0.0:27100` (nginx proxies `/api/tankbot/*`). The phone's Start Bot button POSTs `/start`. Respawn discipline: exit 0 = graceful (stop the loop), nonzero = crash (retry after 5 s, cap 3 consecutive). See [[bot-service-architecture]]. |
-| `make fleet` | AI-operated fleet manager on `127.0.0.1:27300` (`TANKPIT_FLEET_PORT` overrides). Spawns N `tankpit-bot` child processes under instance namespaces over plain HTTP: `GET/POST /bots`, `POST /bots/{instance}/stop` (STOP sentinel), `DELETE /bots/{instance}`. Runs in a user-owned terminal (harness background tasks die ~46 min). Added 2026-08-06 — see [[bot-service-architecture]] fleet section. |
+| `make fleet` | AI-operated fleet manager on `127.0.0.1:27300` (`TANKPIT_FLEET_PORT` overrides)[^3]. Spawns N `tankpit-bot` child processes under instance namespaces over plain HTTP: `GET/POST /bots`, `POST /bots/{instance}/stop` (STOP sentinel), `DELETE /bots/{instance}`. Runs in a user-owned terminal (harness background tasks die ~46 min). Added 2026-08-06 — see [[bot-service-architecture]] fleet section. |
 | `make smoke` | Shortest live join-and-quit check (`scripts/smoke.py`) |
 | `make debug-run` | Live bot run with protocol frame logging turned up |
 
@@ -53,7 +53,7 @@ hubs: [codebase]
 | `make fuel-probe` | 3 fuel pickups via 9 attempts |
 | `make fuel-drill` | Fill tank to 1100 (long-running) |
 | `make equipment-probe` | 3 equipment pickups via 9 attempts |
-| `make combat-probe` | 3 combat engagements, 20 shots each. Coverage-omitted in `pyproject.toml` (live-only path). |
+| `make combat-probe` | 3 combat engagements, 20 shots each |
 | `make track` | Enemy tracking probe — wire-derived positions vs the JS client's truth. Knobs: `TANKPIT_ENEMY_TRACKING_*`. |
 | `make enemy-teleport-probe` | 3 enemy-directed teleports; `-map` and `-nearest` variants pin the acquisition strategy |
 | `make teleport-probe-full` | The full teleport probe sweep (all targets, no strategy split) |
@@ -88,3 +88,4 @@ Bot runs save to `runs/bot/`, sniffer to `runs/sniff/`, probes to `runs/probe/`.
 
 [^1]: Makefile line 1 — `SHELL := powershell.exe`; Make handles PowerShell internally
 [^2]: `runtime_artifacts.py` — `build_bot_run_artifacts` / `build_sniff_run_artifacts` / `build_probe_run_artifacts` each return both an archive path and a `latest_*_path`; no symlink is created anywhere in the module
+[^3]: `src/tankpit_bot/service/fleet.py:33-34` — `run_web_app(app, host="127.0.0.1", port=port)`, logged as "tankpit-fleet listening on 127.0.0.1:%d". The port default is `FLEET_PORT_DEFAULT = 27300` at `src/tankpit_bot/service/fleet_manager.py:24`, overridden by `TANKPIT_FLEET_PORT` and rejected outside `[1024, 65535]` at `:41`. **Found 2026-08-07:** the Makefile's own `fleet` banner claimed `0.0.0.0:27300`, which was never what the process bound — loopback only, unlike `make service`, which does bind `0.0.0.0`. The banner was corrected to match the code rather than this page to match the banner.

@@ -13,12 +13,12 @@ source_paths:
   - "src/tankpit_bot/protocol/codec.py"
   - "tests/conftest.py"
 source_git_blobs:
-  "src/tankpit_bot/sniffer": "630b741c05e1c21db252da1f045ce9e887d8df39"
-  "src/tankpit_bot/ledger": "9fb698ec36f37e2458b1c3528042c04773fa446f"
-  "src/tankpit_bot/capture/xor.py": "1685851c8623f51b461b58fc418ebe8df6c72873"
+  "src/tankpit_bot/sniffer": "9d5d8223ba026a595b4c5ff9fd9b0953cf6987ae"
+  "src/tankpit_bot/ledger": "f39b02960545eebbd7da5b879f4eaa63a4649b94"
+  "src/tankpit_bot/capture/xor.py": "43df3e756872949f3ebe0571afb7f4a3d53c6880"
   "src/tankpit_bot/protocol/codec.py": "76ba3790ab90e303383c2f7a66dd48c96e30467c"
-  "tests/conftest.py": "1142bca727c8e8d2cf191d1941537e76e40c1e46"
-fact_checked: "2026-08-06"
+  "tests/conftest.py": "a6d34fab76028fe59e8e24fc684c138211184262"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [architecture]
 ---
@@ -29,7 +29,7 @@ Seventeen modules hold **per-session** state at module scope. Each is a
 place where two sessions in one process would overwrite each other, and
 each is a value that logically belongs to one game session and nothing
 else. This page is the inventory, the evidence, the archaeology of how
-it happened, and the ordered plan to finish it.
+it happened, and the ordered plan to finish it.[^3]
 
 The plan is not conditional on multi-bot. `tankpit-fleet` already runs
 N bots as child processes, deliberately, so an orchestrator crash
@@ -46,7 +46,7 @@ across "sessions" — the test suite has been simulating the multi-session
 problem all along, and the resets are the workaround.[^2]
 
 Deleting that reset list is the completion criterion for this work. If
-state is instance-scoped, no reset is possible to forget.
+state is instance-scoped, no reset is possible to forget.[^2]
 
 **Progress: 10 calls → 9.** Step 1 removed `reset_xor_state` and put
 `reset_static_key_cache` in its place, so the count is unchanged at
@@ -75,7 +75,7 @@ counted.[^3]
 | ~~`sniffer/xor.py`~~ | ~~`_global_xor_table`, `_global_static_key`~~ | **module deleted, step 1** |
 | `sniffer/world_state.py` | `_service` (a `WorldService`) | rebind |
 | `sniffer/viewport.py` | `_viewport_left`, `_viewport_top` | rebind |
-| `sniffer/trackers.py:42` | `ALL_TRACKERS` (tuple of tracker instances) | in-place |
+| `sniffer/trackers.py:41` | `ALL_TRACKERS` (tuple of tracker instances) | in-place |
 | `ledger/events.py` | `_event_counter` | rebind |
 | `ledger/outcome/teleport.py` | `_pending` | rebind |
 | `ledger/outcome/_emit.py:27-29` | `_attempt_counters`, `_pending_decisions`, `_resolved_decision_ids` | in-place |
@@ -86,9 +86,9 @@ counted.[^3]
 | `diagnostics/self_alignment.py` | `_last_emitted_belief` | rebind |
 | `diagnostics/entity_alignment.py` | `_last_emitted_signature` | rebind |
 | `browser/cdp_utils.py` | `_cdp_time_offset_ms` | rebind |
-| `action_lab/client_structure.py` | `_survey_emitted` | rebind |
+| `browser/client_structure.py` | `_survey_emitted` | rebind |
 | `runtime_logging.py` | `_BOT_ARTIFACTS`, `_SNIFF_ARTIFACTS`, `_PROBE_ARTIFACTS` | rebind |
-| `runtime_logging.py` | `_RUNTIME_CONTEXT_TICK_N`, `_..._BOT_STATE`, `_..._IN_FLIGHT_ACTION_KIND` | rebind |
+| `runtime_context.py:25` | `_RUNTIME_CONTEXT_TICK_N`, `_..._BOT_STATE`, `_..._IN_FLIGHT_ACTION_KIND` | rebind |
 
 ### Legitimately process-level — NOT in scope
 
@@ -97,12 +97,12 @@ counted.[^3]
 | `sniffer/decoders.py` | `_PROTOCOL_FRAME_LOGGING_ENABLED` | a logging switch for the process, not a session fact |
 | `bot/tick_loop.py` | `_INTERRUPT_REQUESTED` | Ctrl+C is a process signal |
 | `analysis/_test_hooks.py` | `read_text`, `list_session_paths` | the DI seam itself ([[testing-patterns]]) |
-| `sniffer/xor.py` static key | the key read from `xor_static_key.txt` | identical for every session; caching it is a property of the key |
+| `capture/xor.py` `_static_key_cache` (`:28`) | the key read from `xor_static_key.txt` | identical for every session; caching it is a property of the key. (Was `sniffer/xor.py`, deleted in step 1; the cache moved, the reasoning did not.) |
 
 ## Why it exists: an interrupted convergence
 
 This is not two competing designs. It is **one design that never
-finished converging**, frozen in place by a package split.
+finished converging**, frozen in place by a package split.[^4]
 
 The pre-split `sniffer.py` monolith (3,204 lines) already contained
 BOTH idioms at once: 73 references passing an `xor_table` explicitly —
@@ -128,7 +128,7 @@ the singleton is what is left of the unfinished half.[^5]
 
 ## Evidence gathered before touching anything
 
-Three measurements, all archive-wide, all 2026-08-06:
+Three measurements, all archive-wide, all 2026-08-06:[^6]
 
 - **The global decoder's bounds-tolerance is dead.** The XOR table is
   1000 bytes; the longest real frame payload is 931; **0 of 279,771**
@@ -147,7 +147,7 @@ Three measurements, all archive-wide, all 2026-08-06:
 | target | call sites | files | note |
 |---|---:|---:|---|
 | `xor_decode` | 8 | 6 | `sniffer/decoders.py` is the only live one |
-| `get_world_service()` | 73 | 20 | 21 in `bot/tick_loop.py` alone |
+| `get_world_service()` | 74 | 23 | re-counted 2026-08-07; the old "21 in `bot/tick_loop.py` alone" no longer holds — that file was split, and the sites now spread across `tick_combat_feedback.py` (14), `tick_loop_command_errors.py` (6), `executor.py` (6), `tick_body.py` (5) and `bot_dispatch.py` (5) |
 
 The live chain is shallower than the count suggests:
 `drain_messages(bot)` already holds the session, and
@@ -163,14 +163,14 @@ rippled into `_test_hooks` protocol members, every fake that satisfies
 those protocols, and every fixture that built a table. The `src` figure
 (21 vs 6) is the honest error in the *reading*; the `tests` figure is
 the part the table never modelled at all. Read the `get_world_service`
-row with the same correction: 73 sites in 20 files is the *src* floor
+row with the same correction: 74 sites in 23 files is the *src* floor
 for step 8, not its size.[^12]
 
 ## Plan
 
 Ordered by coupling, least first. Every step ends with `make check`
 green and a commit, so a collision with concurrent work costs one step
-rather than the refactor.
+rather than the refactor.[^3]
 
 1. ~~**XOR cipher.**~~ **SHIPPED 2026-08-06** (`7481cdca`). Deleted
    `sniffer/xor.py` outright — no shim, no deprecation. Its callers now
@@ -179,7 +179,7 @@ rather than the refactor.
    `SessionBase`, which hands the *same* table to `CommandService`
    instead of building it twice from identical inputs.[^8]
 
-   Three silent failures became loud, which is the real payoff:
+   Three silent failures became loud, which is the real payoff:[^14]
 
    - A missing `xor_static_key.txt` now raises
      `XorStaticKeyUnavailableError`. `build_global_xor_table` returned
@@ -215,85 +215,99 @@ rather than the refactor.
    `entity_alignment`.
 4. **`browser/cdp_utils.py`** — `_cdp_time_offset_ms` onto the CDP
    service, which is already per-session.
-5. **`action_lab/client_structure.py`** — `_survey_emitted`.
+5. **`browser/client_structure.py`** — `_survey_emitted`. (Moved out
+   of `action_lab/` 2026-08-07 with the `action_lab` <-> `bot` cycle
+   cut; the global moved with it, unchanged.)
 6. **Ledger cluster** — events counter, teleport `_pending`, `_rings`,
    `_emit` trackers, `_decisions`, `_transitions`. These form one
    bookkeeping layer and move together.
 7. **`bot/ai/collect_common.py`** — container blacklist.
 8. **`WorldService`** — delete `_service` and `get_world_service()`;
-   thread the instance through the 73 sites. The largest step.
+   thread the instance through the 74 sites. The largest step.
 9. **`sniffer/trackers.py`** — `ALL_TRACKERS`.
-10. **`runtime_logging.py`** — per-session artifacts and context.
+10. **`runtime_logging.py` + `runtime_context.py`** — per-session
+    artifacts and context. The three tick-context globals moved to
+    `runtime_context.py` when `runtime_logging.py` was split
+    (2026-08-07); `runtime_context.py` is their sole owner and the
+    emitter reads them through `get_runtime_context()`, so the split
+    did not duplicate them.
 11. **Delete the conftest reset list.** Its removal is the proof.
 
 ## Found while shipping step 1: the cipher is forked four ways
 
 Deleting `sniffer/xor.py` removed one fork and revealed that it was
-never the only one. Four implementations of the same XOR remain, and
-they do **not** agree at the edges:[^11]
+never the only one. Four implementations of the same XOR existed, and
+they did **not** agree at the edges:[^11]
 
-| site | signature | past the table end |
-|---|---|---|
-| `protocol/codec.py::xor_bytes` | `(table, data, offset=0)` | raises `ValueError`, named and explicit |
-| `capture/xor.py::xor_decode_body` | `(body, table, offset=0)` | raises `IndexError`, incidentally |
-| `diagnostics/capture_audit.py::_xor_with_table` | `(body, table)`, offset fixed at 1 | passes through in the clear |
-| `sim/transport.py::_xor_with_table` | `(table, data)`, offset fixed at 0 | passes through in the clear |
+| site | signature | past the table end | status |
+|---|---|---|---|
+| `protocol/codec.py::xor_bytes` | `(table, data, offset=0)` | raises `ValueError`, named and explicit | survivor |
+| `capture/xor.py::xor_decode_body` | `(body, table, offset=0)` | raises `IndexError`, incidentally | remains |
+| `diagnostics/capture_audit.py::_xor_with_table` | `(body, table)`, offset fixed at 1 | passes through in the clear | remains |
+| ~~`sim/transport.py::_xor_with_table`~~ | ~~`(table, data)`, offset 0~~ | ~~passes through in the clear~~ | **deleted** — calls `capture.xor.xor_decode_body` |
 
-Note the argument order flips between them — `(body, table)` in two,
-`(table, data)` in the other two — so a wrong-order call type-checks
-cleanly and silently produces garbage.[^11]
+Note the argument order flipped between them — `(body, table)` in two,
+`(table, data)` in the other two — so a wrong-order call type-checked
+cleanly and silently produced garbage. The `sim/transport.py` fork is
+gone (2026-08-07): it now imports `xor_decode_body` and passes
+`offset=1` explicitly at its client-command site, so one of the two
+argument orders is retired.[^11]
 
-`capture/xor.py` and `protocol/codec.py` additionally each compute the
-static-key path with the byte-identical expression
-`Path(__file__).parent.parent.parent.parent / "xor_static_key.txt"`,
-resolving to the same `<repo>/xor_static_key.txt`. `codec` at least
-exports it as `DEFAULT_STATIC_KEY_PATH`; `capture` inlines it inside
-`load_xor_static_key`. That is a duplicated constant rather than a
-disagreement — but it is the same fork, and the tests already reach
-across it: `tests/capture/test_xor.py` imports the path from
-`protocol.codec` to seed a file that `capture.xor` reads.[^11]
+The duplicated static-key path is **also closed**.[^12] Both
+`capture/xor.py` and `protocol/codec.py` used to compute it with the
+byte-identical expression
+`Path(__file__).parent.parent.parent.parent / "xor_static_key.txt"`;
+`capture` inlined it inside `load_xor_static_key`. That function is
+deleted — `capture/xor.py` now imports `build_xor_table`,
+`load_static_key` and `DEFAULT_STATIC_KEY_PATH` from `protocol.codec`
+(`:21-22`, used at `:80` and `:103`) and keeps only the
+session-scoped concern: build the table for ONE session's magic, cache
+the process-wide key behind it, and the base64 helpers. Its module
+docstring now says so.
 
-`protocol/codec.py` is the survivor: it is the lower layer and the only
-one with validation. Folding the other three into it is **its own
-step**, not absorbed silently into another, because the pass-through
-tail is a real semantic difference that needs measuring first. The tail
-was already measured dead for the *received-decode* path — 0 of 279,771
-archived payloads exceed the 1000-byte table — but that measurement
-says nothing about the sim's envelope encoder or the audit reader, which
-are the two sites that rely on it. Measure those before deleting the
-arm.[^11]
+**Two forks left, not four.** Folding them into `protocol/codec.py` is
+still its own step: the pass-through tail is a real semantic
+difference, measured dead only for the received-decode path (0 of
+279,771 archived payloads exceed the 1000-byte table), and that
+measurement says nothing about the audit reader — the one remaining
+site that relies on it.[^11]
 
 ## Carried in the same sweep
 
-Two defects found while mapping this, both in scope:
+Two defects found while mapping this, both in scope:[^9]
 
 - **An eleventh fork of the frame walk**, this time in production code:
   `sniffer/decoders.py::process_received_message` re-derives
   `data[offset] | (data[offset + 1] << 8)` instead of calling
   `split_frames`. The other ten forks were in `analysis_scripts/`.[^9]
-- **No file-size enforcement.** [[coding-standards]] sets a 400-600
-  line ceiling and the 2026-07-31 log entry recorded a backlog of 40
-  files over 600. Measured 2026-08-06: **77**, and all four of the
-  worst named in that backlog have GROWN — `test_fuel_probe.py`
-  2698→2948, `test_cdp.py` 2400→2816, `world_state_dispatch.py`
-  1156→1280, `tick_loop.py` 1037→1211. Nothing in `make check` checks
-  file size, so the rule is documented and unenforced. A guard rule
-  belongs with this work because `world_state_dispatch.py` and
-  `tick_loop.py` are simultaneously the two worst offenders and the two
-  heaviest consumers of the globals being removed — splitting them
-  before de-globalising would only spread the coupling.[^10]
+- ~~**No file-size enforcement.**~~ **CLOSED 2026-08-07.**
+  [[coding-standards]] sets a 400-600 line ceiling and the 2026-07-31
+  log entry recorded a backlog of 40 files over 600. Measured
+  2026-08-06: **77**, and all four of the worst named in that backlog
+  had GROWN — `test_fuel_probe.py` 2698→2948, `test_cdp.py` 2400→2816,
+  `world_state_dispatch.py` 1156→1280, `tick_loop.py` 1037→1211.
+  Nothing in `make check` checked file size, so the rule was
+  documented and unenforced. `scripts/file_size_rules.py` now runs in
+  the guard with no allowlist and no baseline, the backlog is 0, and
+  the two files named here as the worst offenders are
+  `world_state_dispatch.py` at 471 lines and `tick_loop.py` at 516 —
+  both split rather than trimmed. That ordering was the right one for
+  the reason given: they are the two heaviest consumers of the globals
+  this page removes, and splitting them first means step 8 threads the
+  `WorldService` instance through modules that are already
+  single-purpose.[^10]
 
 [^1]: `src/tankpit_bot/service/fleet.py:1-28` — the fleet manager's module docstring states the process-per-bot rationale verbatim: it "runs in a terminal the operator owns, so an orchestration harness dying can never kill a live tank (the 41-kill session died at 46 minutes exactly that way)". Registered as `tankpit-fleet` in `pyproject.toml`.
 [^2]: `tests/conftest.py` — the `_isolate_protocol_singletons` autouse fixture calls, in order: `reset_world_state`, `reset_xor_state`, `reset_event_ids`, `reset_action_outcome_tracking`, `reset_outcome_rings`, `reset_teleport_dispatch_tracking`, `reset_decision_records`, `reset_mode_transitions`, `reset_container_blacklist`, `reset_client_structure_survey`. Its own docstring gives the reason — "tests that run later on the same xdist worker can decode bytes with a stale XOR key or read containers seeded by a prior run". Sibling fixtures `_restore_hooks` and `_restore_runtime_logging_state` reset the hook surface and the runtime-logging artifacts.
-[^3]: Inventory taken 2026-08-06 by two sweeps. Sweep one, every `global` declaration under `src/tankpit_bot`: 13 modules, listed in the table. Sweep two, module-level mutable containers mutated in place — which need no `global` and so are invisible to sweep one: `src/tankpit_bot/ledger/ring.py:51` (`_rings`), `src/tankpit_bot/ledger/decision.py:60` (`_decisions`), `src/tankpit_bot/ledger/mode_transition.py:38` (`_transitions`), `src/tankpit_bot/ledger/outcome/_emit.py:27-29` (three), `src/tankpit_bot/bot/ai/collect_common.py:15` (`_blacklisted_container_keys`), and `src/tankpit_bot/sniffer/trackers.py:42` (`ALL_TRACKERS`). A `global`-only sweep undercounts by those six modules, which is why both were run.
+[^3]: Inventory taken 2026-08-06 by two sweeps. Sweep one, every `global` declaration under `src/tankpit_bot`: 13 modules, listed in the table. Sweep two, module-level mutable containers mutated in place — which need no `global` and so are invisible to sweep one: `src/tankpit_bot/ledger/ring.py:51` (`_rings`), `src/tankpit_bot/ledger/decision.py:60` (`_decisions`), `src/tankpit_bot/ledger/mode_transition.py:38` (`_transitions`), `src/tankpit_bot/ledger/outcome/_emit.py:27-29` (three), `src/tankpit_bot/bot/ai/collect_common.py:15` (`_blacklisted_container_keys`), and `src/tankpit_bot/sniffer/trackers.py:41` (`ALL_TRACKERS`). A `global`-only sweep undercounts by those six modules, which is why both were run.
 [^4]: `git show a1c32e9a~1:...sniffer.py` — the pre-split monolith, 3,204 lines. `_global_xor_table` is declared at line 1827 under the comment "# Module-level XOR table for unified decoder", with `_build_global_xor_table` at 1843 and the private `_xor_decode` at 1855; the same file carries 73 `xor_table` references for the table-passing path. Split commits: `a1c32e9a` "Split sniffer.py into sniffer/ package" (13:04:18) and `389231df` "Add capture/ package" (13:04:58), both 2026-01-12.
 [^5]: `src/tankpit_bot/sniffer/world_service.py:80-86` — `class WorldService`, docstring: "Owns all mutable game state for one session. Instance attributes mirror the 16 module-level globals that were previously in ``world_state.py``. Dispatch modules receive a ``WorldService`` instance and mutate it directly." The remaining singleton is `sniffer/world_state.py:19`, `_service = WorldService()`. Live chain: `bot/world_sync.py::drain_messages(bot)` -> `sniffer/decoders.py::process_received_message` -> `_process_single_message`, which is the only step that reaches for the globals.
 [^6]: Measured 2026-08-06 over `runs/bot` (287 captures) with the production primitives: static key and table both 1000 bytes (`capture/xor.py::build_xor_table`), longest frame payload 931 bytes, 0 of 279,771 payloads longer than the table. Framing: 217,678 received payloads split cleanly under `protocol/framing.py::split_frames` with zero `FramingError`; 62,095 sent payloads raised twice. Re-derivable by re-running the sweep over the archive; the counts are not stored.
 [^7]: Same sweep: the only capture with unframed sent payloads is `bot-20260331-230406`, which also carries `magic: null`. `analysis/scan.py::scan_session` checks magic first and returns `no_magic`, so the `unframed_payload` arm cannot be reached from the archive.
 [^8]: Written before the step, describing the state it removed: `src/tankpit_bot/browser/session_base.py::_on_magic_captured` built the table twice from the same inputs — `init_trackers_with_magic(magic)` (which called `build_global_xor_table`) for the decode side, and `self._commands.xor_table = build_xor_table(static_key, magic)` for the send side. `CommandService.xor_table` at `bot/command_service.py:62` was already instance state, consumed at `:76`. As of `7481cdca` the method builds one table and assigns it to both.
-[^12]: Commit `7481cdca` "Make the XOR table a session value, not a module global", 2026-08-06. `git show --stat` reports **79 files changed, 611 insertions(+), 588 deletions(-)** — 21 paths under `src/`, 57 under `tests/`, plus `scripts/decode.py`. Verification at that commit: `make lint` reports 0 violations across all 28 guard rules; `python -m pytest -n auto` reports 5939 passed. Three failures remain in `tests/test_check_undecoded_fields.py`, caused by a concurrent session's in-flight split of `protocol/types.py` into a package — `scripts/check_undecoded_fields.py:34` `DEFAULT_TARGETS` still names the deleted file. That script is untouched by either session and its fix belongs to the split, not to this work.
+[^12]: Commit `7481cdca` "Make the XOR table a session value, not a module global", 2026-08-06. `git show --stat` reports **79 files changed, 611 insertions(+), 588 deletions(-)** — 21 paths under `src/`, 57 under `tests/`, plus `scripts/decode.py`. Verification at that commit: `make lint` reports 0 violations across every guard rule (as of 2026-08-07: 31 from the monorepo orchestrator, plus eight local rules in `scripts/guard.py:127-136` that run unconditionally and report only on violation, two of which -- `file_size_rules` and `layer_rules` -- were added by the layering work); `python -m pytest -n auto` reports 5939 passed. Three failures remained in `tests/test_check_undecoded_fields.py`, caused by a concurrent session's in-flight split of `protocol/types.py` into a package — `scripts/check_undecoded_fields.py` `DEFAULT_TARGETS` still named the deleted file. **Fixed 2026-08-07** with the split it belonged to: the checker's targets accept a package directory as well as a module, through the existing `glob_paths` DI hook rather than a second code path.
 [^14]: `tests/sniffer/test_decoders.py::TestProcessReceivedMessage::test_binary_promotion_takes_binary_route` carried the comment `# XOR table is None in tests so body[1:] passes through verbatim.` (removed in `7481cdca`); it asserted `self_state["rank"] == 5` from a body written as plaintext. It now builds that body through `make_binary_payload`, which ciphers it under the same table the decoder is handed, so the assertion exercises the real cipher round-trip instead of an identity pass. `tests/replay/test_script.py::_install_fake_fs` installed a `_FakeFS` with no `xor_static_key.txt` at all, which the old builder tolerated by leaving the table `None`; it now seeds the key and resets the cache, and its three `TestMainCLI` tests fail loudly without it.
 [^13]: `tests/conftest.py::_isolate_protocol_singletons` after `7481cdca`: the reset list runs `reset_world_state`, `reset_static_key_cache`, `reset_event_ids`, `reset_action_outcome_tracking`, `reset_outcome_rings`, `reset_teleport_dispatch_tracking`, `reset_decision_records`, `reset_mode_transitions`, `reset_container_blacklist`, `reset_client_structure_survey` — ten calls, of which `reset_static_key_cache` guards a process-wide key cache rather than session state. The five deleted per-file duplicates were `_isolate` / `_isolate_world_state` in `tests/action_lab/test_equipment_probe_branches.py`, `test_replay_equipment_probe.py`, `test_replay_fuel_probe.py`, `test_replay_movement_probe.py`, and `test_replay_teleport_probe.py`; the quoted docstring is the one that stood in `test_replay_equipment_probe.py`, `test_replay_fuel_probe.py`, and `test_replay_movement_probe.py` verbatim.
 [^9]: `src/tankpit_bot/sniffer/decoders.py::process_received_message` — the frame loop re-derives the 2-byte little-endian length prefix inline rather than calling `protocol/framing.py::split_frames`, which has owned that arithmetic since the protocol layer was written (`decode_frame_header`, `:37`).
-[^10]: Counted 2026-08-06 with `find src scripts tests -name '*.py' | xargs wc -l | awk '$1>600'`: 77 files. The 2026-07-31 backlog of 40 is enumerated at `wiki/log.md:2437`. `bot/tick_loop.py` holds 21 of the 73 `get_world_service()` call sites.
-[^11]: Read 2026-08-06 while shipping step 1. `src/tankpit_bot/protocol/codec.py:83` `xor_bytes(table, data, offset=0)` raises `InvalidKeyError` on an empty table (line 100) and `ValueError` when `offset + len(data) > len(table)` (lines 106-110) — the only one of the four that names the condition. `src/tankpit_bot/capture/xor.py:136` `xor_decode_body(body, xor_table, offset=0)` indexes `xor_table[i]` unguarded, so the same condition surfaces as a bare `IndexError`. `src/tankpit_bot/diagnostics/capture_audit.py:51` `_xor_with_table(body, table)` and `src/tankpit_bot/sim/transport.py:26` `_xor_with_table(table, data)` each carry an explicit `else` branch copying the byte through unciphered. The key path is the same expression in both `src/tankpit_bot/protocol/codec.py:20` and `src/tankpit_bot/capture/xor.py:28`. The 279,771-payload measurement covers only the received-decode path and was taken before step 1; it does not license deleting the pass-through arm from the sim encoder or the audit reader.
+[^10]: Counted 2026-08-06 with `find src scripts tests -name '*.py' | xargs wc -l | awk '$1>600'`: 77 files. The 2026-07-31 backlog of 40 is enumerated at `wiki/log.md:2437`. At that count `bot/tick_loop.py` held 21 of the 73 `get_world_service()` call sites; after the split the total is 74 across 23 files, with no single file holding more than 14.
+[^11]: Read 2026-08-06 while shipping step 1, re-read 2026-08-07. `src/tankpit_bot/protocol/codec.py:83` `xor_bytes(table, data, offset=0)` raises `InvalidKeyError` on an empty table and `ValueError` when `offset + len(data) > len(table)` — the only one of the four that names the condition. `src/tankpit_bot/capture/xor.py:149` `xor_decode_body(body, xor_table, offset=0)` indexes `xor_table[i]` unguarded, so the same condition surfaces as a bare `IndexError`. `src/tankpit_bot/diagnostics/capture_audit.py:53` `_xor_with_table(body, table)` carries an explicit `else` branch copying the byte through unciphered, and is now the ONLY remaining pass-through site. **Two changes since the 2026-08-06 reading, both narrowing the fork:** `sim/transport.py` no longer defines its own `_xor_with_table` — it imports `xor_decode_body` (`:25`) and calls it at `:62` and `:165`, passing `offset=1` explicitly at the client-command site — and `capture/xor.py` no longer computes the static-key path or loads the key itself; it imports `build_xor_table`, `load_static_key` and `DEFAULT_STATIC_KEY_PATH` from `protocol.codec` (`:21-22`, used at `:80` and `:103`), so `DEFAULT_STATIC_KEY_PATH` at `protocol/codec.py:20` is the single definition. The 279,771-payload measurement covers only the received-decode path and was taken before step 1; it does not license deleting the pass-through arm from the audit reader.

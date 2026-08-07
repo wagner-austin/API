@@ -9,7 +9,7 @@ source_paths:
   - "src/tankpit_bot/bot/config.py"
   - "src/tankpit_bot/browser/live_view.py"
 source_git_blobs:
-  "src/tankpit_bot/service": "bfceaca35cfa2cf3b5ae83fc578638c869825709"
+  "src/tankpit_bot/service": "44d5dab8256704ceb24bbadd697f1756a0ae4693"
   "src/tankpit_bot/bot/config.py": "a81fafe6dda99fc36d1af0e2af7777b574523bbc"
   "src/tankpit_bot/browser/live_view.py": "3fa929e9df72efd53f42d3c3405a469067b66f26"
 fact_checked: "2026-08-06"
@@ -25,8 +25,17 @@ The bot service (`tankpit-bot-service`) is the long-running Python process that 
 
 The service runs a single aiohttp event loop on the main thread. Every session runs on a background executor thread (Playwright's sync API must own its own thread). Three primitives cross that boundary:[^1]
 
-- **`ModeBridge`** (`service/mode_bridge.py`) — a threadsafe latest-wins slot the aiohttp handler writes into when `POST /mode` arrives. The tick loop drains it at the top of every tick and stamps the value onto `ai_state.manual_mode`.
-- **`StatusBus`** (`service/status_bus.py`) — a threadsafe fan-out. The tick loop calls `publish(SessionStatusDict)` after every tick; SSE subscribers on the aiohttp thread wake up and forward the frame. Every subscriber uses latest-wins semantics so a slow SPA never blocks the tick loop.
+> **Where these live (2026-08-07).** The three buses moved from
+> `service/` to a new `bus/` package, along with the
+> `SessionStatusDict` contract. They are cross-thread primitives, not
+> HTTP: `frame_bus.py` imports nothing from `tankpit_bot` at all. While
+> they sat under `service/`, the tick loop had to import the HTTP
+> package to run, and `service` imported `bot` back for the mode
+> vocabulary — a cycle whose real shape was three misfiled files
+> ([[package-layering]]).
+
+- **`ModeBridge`** (`bus/mode_bridge.py`) — a threadsafe latest-wins slot the aiohttp handler writes into when `POST /mode` arrives. The tick loop drains it at the top of every tick and stamps the value onto `ai_state.manual_mode`.
+- **`StatusBus`** (`bus/status_bus.py`) — a threadsafe fan-out. The tick loop calls `publish(SessionStatusDict)` after every tick; SSE subscribers on the aiohttp thread wake up and forward the frame. Every subscriber uses latest-wins semantics so a slow SPA never blocks the tick loop.
 - **`SessionRunner`** (`service/session_runner.py`) — coordinator for one active game session at a time. Its `start()` blocks the caller for the session's lifetime; `request_stop()` writes the same stop-file sentinel `Bot.run` already polls, so the tick loop needs no new signalling code.
 
 The primitives are constructed once at service boot in `_async_main` and shared by reference with the `Bot` (via the bridge/bus fields introduced in Phase A6) and the aiohttp handlers (via closures inside `make_app`).[^1]
@@ -87,11 +96,11 @@ replacement is wire-only, inside this repo:[^3]
   and the picture is PURE GAME pixels — no page chrome, which also
   delivers the user's "game fullscreen" wish without touching the
   client's fullscreen button.
-- **`service/frame_bus.py`** — `FrameBus`, byte-for-byte the
+- **`bus/frame_bus.py`** — `FrameBus`, byte-for-byte the
   `StatusBus` pattern (latest-wins, cache-on-publish, explicit
   unsubscribe) plus a `latest()` accessor for `/frame`. Its
   `subscriber_count()` doubles as the DEMAND signal.
-- **`bot/tick_loop.py::_sync_live_view_demand`** — runs each tick
+- **`bot/tick_body.py::_sync_live_view_demand`** — runs each tick
   inside the `_tick_once` `TargetClosedError` guard: subscribers > 0
   re-`ensure`s the idempotent caster EVERY tick (the repetition
   self-heals across page navigations, which wipe injected JS); zero
@@ -127,7 +136,7 @@ host CAN still fire `make service` via run_command).[^3]
 **Always-on service (2026-07-29).** With the SPA's video served by
 this process, the phone expects the URL to answer at any hour:
 `TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS` (resolver
-`bot/config.py::resolve_idle_exit_seconds`) overrides the 1800 s
+`service/config.py::resolve_idle_exit_seconds`) overrides the 1800 s
 idle window, and `0` disables the self-exit — `exit_when_idle`
 returns immediately. **The shell:startup launcher was removed 2026-07-31 —
 the service no longer starts at logon and `tankpit.austinwagner.org` only
@@ -212,7 +221,9 @@ The pattern is unconditional — the service code always calls the hook directly
 
 ## Why hooks live in `service/_test_hooks.py`, not top-level `_test_hooks/service.py`
 
-The service package pulls `service/types.py`, which transitively imports `tankpit_bot.bot.ai.modes`, whose package init imports `TerrainMapProtocol` from the top-level `_test_hooks` tree. Locating the service hooks inside the service tree (instead of adding a `_test_hooks/service.py` submodule at top level) keeps the import graph acyclic during `_test_hooks` initialisation. The Karpathy-style scoped pattern — `Services/: _test_hooks.py` — is the direct mitigation.[^1]
+The original reason (2026-07-12): the service package pulled `service/types.py`, which transitively imported `tankpit_bot.bot.ai.modes`, whose package init imported `TerrainMapProtocol` from the top-level `_test_hooks` tree. Locating the service hooks inside the service tree (instead of adding a `_test_hooks/service.py` submodule at top level) kept the import graph acyclic during `_test_hooks` initialisation. The Karpathy-style scoped pattern — `Services/: _test_hooks.py` — is the direct mitigation.[^1]
+
+**That premise is gone (2026-08-07).** `bot/ai/modes.py` no longer exists: it was a pure leaf (only `platform_core` and `typing`) whose position inside `bot/ai` was the single thing forcing `service` to import `bot`, and it is now `types/modes.py`. `service/types.py` today imports exactly one thing from this codebase — `WireMode` from `bus/session_status.py` — and `bot` imports `service` zero times ([[package-layering]]). The scoped hooks file is kept because it is the right shape, not because the cycle still exists; the remaining `service` -> `bot` edges are `service_main.py` importing `bot/config.py` and two `_test_hooks` references, all of which run in one direction only.
 
 ## Phase B — SPA bot-controls panel (fiesta side)
 
@@ -288,8 +299,8 @@ The always-on argument (make headed Chromium ready) is a nothing-burger: the ser
 
 See also: [[coding-standards]] (the strictness rules Phases A / B / C were written under), [[inheritance-chain]] (how Bot slots into the runner).
 
-[^1]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/service/` (`mode_bridge.py`, `status_bus.py`, `session_runner.py`, `http_server.py`, `service_main.py`, `probe.py`, `types.py`/`types_codecs.py`, `_test_hooks.py`) and `src/tankpit_bot/bot/config.py` — file inventory re-verified 2026-07-23; `make service` target at `Makefile:209`; landed via the 2026-07-12 Phase A commits in git history.
+[^1]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/service/` (`session_runner.py`, `http_server.py`, `service_main.py`, `probe.py`, `types.py`/`types_codecs.py`, `_test_hooks.py`) and `src/tankpit_bot/bot/config.py` — file inventory re-verified 2026-07-23; `make service` target at `Makefile:209`; landed via the 2026-07-12 Phase A commits in git history.
 [^2]: cross-repo truth in `~/PROJECTS/MCPs`: `fiesta/src/tankbot/` and `fiesta/nginx.conf`; Phase B/C landing commit `6c78deff` ("fiesta: bot-controls SPA panel + /api/tankbot proxy"), later reworked by `88fc8ae5` ("bot-controls view replaced by overlay viewmodel") — see the staleness note; file inventory re-verified against that repo 2026-07-23.
-[^3]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/browser/screencast.py`, `src/tankpit_bot/service/frame_bus.py`, `service/watch_page.py`, `service/http_server.py` (`_add_watch_routes`, `_drain_frame_bus_to_response`, `_latest_frame_snapshot`), `bot/tick_loop.py` (`_sync_screencast_demand`), `service/session_runner.py` (per-session `configure_bot_runtime_logging`). Live proof 2026-07-28: run `runs/bot/bot-20260728-230140.*` (first line `Session artifacts:`, `Screencast started (viewer connected)` / `stopped (no viewers)` bracketing a 3 s `/frame` subscription, `_index.tsv` row) versus the artifactless 22:31 service session (10/10 kills, only `latest.summary.txt` on disk); MJPEG rate measurements 6 vs 28 parts per 10 s (idle vs AUTO). Mouse-stealing diagnosis from the fiesta wiki (`~/PROJECTS/fiesta/wiki`): `arch-virtual-display-headless.md` (SendInput `abs_mouse` path + unfixed offset bug, task #16; isolated virtual display parked non-adjacent) and `hist-2026-07-01-desktop-takeover-incident.md`; nginx prefix-strip proxy `MCPs/fiesta/nginx.conf` `location /api/tankbot/` (forwards all subpaths, `proxy_buffering off`). SPA-port + always-on truth (2026-07-29): MCPs commit `95f27215` (`fiesta/src/profiles/types.ts` `botVideoUrl`, `fiesta/src/tankbot/overlay-viewmodel.ts::computeBotVideoView`, `fiesta/src/boot/bot-overlay.ts` video glue, `fiesta/profiles/tankpit.json` stream-less rewrite; 782 SPA tests, 100% coverage) and this repo commit `59201238` (`bot/config.py::resolve_idle_exit_seconds`, `exit_when_idle` disabled branch, startup launcher `tankpit-bot-service.cmd` in shell:startup); deploy curl-verified on port 8091 (SPA at tankpit root, profile serving `stream: null` + `botVideoUrl`, compiled bundle carrying the `bot-video` glue).
+[^3]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/browser/live_view.py`, `src/tankpit_bot/bus/frame_bus.py`, `service/watch_page.py`, `service/http_server.py` (`_add_watch_routes` at `:236`, `_latest_frame_snapshot` at `:378`, `_drain_frame_bus_to_response` at `:407`), `bot/tick_body.py` (`_sync_live_view_demand` at `:421`), `service/session_runner.py` (per-session `configure_bot_runtime_logging`). **Repinned 2026-08-07:** this footnote named `browser/screencast.py` and `bot/tick_loop.py::_sync_screencast_demand`, neither of which exists. The CDP screencast relay was replaced 2026-07-29 by in-page capture over a `Runtime.addBinding` channel (`live_view.py:1-34` records why: the relay shared the tick thread, so Chrome's ACK-gated frame pacing stalled the stream through every map open and teleport, and a loopback HTTP POST is unusable because Chrome's Local Network Access gate hangs the fetch forever). The demand wiring survived the swap unchanged in shape — subscribers on the frame bus call `ensure` every tick, zero subscribers call `stop` — and moved to `tick_body.py` with the tick-loop split. Live proof 2026-07-28: run `runs/bot/bot-20260728-230140.*` (first line `Session artifacts:`, `Screencast started (viewer connected)` / `stopped (no viewers)` bracketing a 3 s `/frame` subscription, `_index.tsv` row) versus the artifactless 22:31 service session (10/10 kills, only `latest.summary.txt` on disk); MJPEG rate measurements 6 vs 28 parts per 10 s (idle vs AUTO). Mouse-stealing diagnosis from the fiesta wiki (`~/PROJECTS/fiesta/wiki`): `arch-virtual-display-headless.md` (SendInput `abs_mouse` path + unfixed offset bug, task #16; isolated virtual display parked non-adjacent) and `hist-2026-07-01-desktop-takeover-incident.md`; nginx prefix-strip proxy `MCPs/fiesta/nginx.conf` `location /api/tankbot/` (forwards all subpaths, `proxy_buffering off`). SPA-port + always-on truth (2026-07-29): MCPs commit `95f27215` (`fiesta/src/profiles/types.ts` `botVideoUrl`, `fiesta/src/tankbot/overlay-viewmodel.ts::computeBotVideoView`, `fiesta/src/boot/bot-overlay.ts` video glue, `fiesta/profiles/tankpit.json` stream-less rewrite; 782 SPA tests, 100% coverage) and this repo commit `59201238` (`service/config.py::resolve_idle_exit_seconds` (moved out of `bot/config.py` 2026-08-07 — it is a service concern, and while it sat in bot config it was the last function-level import forcing a `bot` -> `service` edge, see [[package-layering]]), `exit_when_idle` disabled branch, startup launcher `tankpit-bot-service.cmd` in shell:startup); deploy curl-verified on port 8091 (SPA at tankpit root, profile serving `stream: null` + `botVideoUrl`, compiled bundle carrying the `bot-video` glue).
 [^5]: code truth on disk: `src/tankpit_bot/service/fleet.py` (FleetManager, routes, `resolve_fleet_port`), `service/_test_hooks.py` (`_CHILD_BOOTSTRAP`, `spawn_bot_process`, `run_web_app` seams), `tests/service/test_fleet.py`; `make fleet` target; landed 2026-08-06.
 [^4]: `Makefile:265-268` — the `service` target (`service: install`) starts the "long-running SPA-driven HTTP + SSE server", listening on `0.0.0.0:27100`. The Startup-folder `.cmd` described here is machine state on the operator's workstation, not a repo artifact, so it is not verifiable from this checkout; only the `make service` entry point it invokes is.

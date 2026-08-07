@@ -8,8 +8,8 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "238116afef165cc82b0d7213e11804b4764cf060"
-fact_checked: "2026-08-05"
+  "src/tankpit_bot": "fee6f258a2eca770e7edb72e4a4911af56ea8cd1"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [codebase]
 ---
@@ -76,5 +76,5 @@ Standalone hookable functions in `browser/lifecycle.py`, used by both bot and sn
 
 [^1]: Architecture phases A-C, landed 2026-06-14 on the merged `combat-rework` branch (commit accounting on [[module-map]] [^1]). Verified against the current tree 2026-08-05, since the whole-tree pin has drifted 84 files since this page was written: the three service modules are `src/tankpit_bot/browser/cdp_service.py`, `src/tankpit_bot/bot/command_service.py`, and `src/tankpit_bot/sniffer/world_service.py`, all present; the two injected as constructor kwargs appear in the `SessionBase.__init__` signature at `src/tankpit_bot/browser/session_base.py:38-45`, which is keyword-only for `headless`, `prefer_account`, `cdp_service`, `command_service`.
 [^2]: Architecture phase D + bot decomposition, 2026-06-16 (same commit accounting as [^1]). The composition it produced is verified in the [[inheritance-chain]] line table, re-measured 2026-08-05. The four standalone lifecycle functions named above are in `src/tankpit_bot/browser/lifecycle.py`.
-[^3]: `src/tankpit_bot/action_lab/probe_factory.py:18` — `create_probe_services()`; `create_probe()` is defined in the same module. Call sites counted 2026-08-05: 14 modules under `src/tankpit_bot/action_lab/` contain `= create_probe(`, matching the list above exactly (`queue_probe.py:542` is the one whose factory import is function-local).
+[^3]: `src/tankpit_bot/action_lab/probe_factory.py:18` — `create_probe_services()`; `create_probe()` is defined in the same module. Call sites re-counted 2026-08-07: 14 modules under `src/tankpit_bot/action_lab/` contain `= create_probe(`, matching the list above exactly (`queue_probe.py:155` is the one whose factory import is function-local).
 [^4]: sniffer/world_state.py:18-33 — `_service = WorldService()` at module scope; `get_world_service()` returns it; `reset_world_state()` rebinds the global for tests. Verified 2026-07-31 against `browser/session_base.py:38-45`, whose `__init__` keyword-only parameters are `headless`, `prefer_account`, `cdp_service`, `command_service` — no `world_service`.

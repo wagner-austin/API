@@ -92,7 +92,7 @@ sweep: **an EXACT landing is a mine-clear receipt** — 88 exact
 landings on live enemy-mine beliefs mean the belief was stale
 (off-screen walk-over detonations never reach the wire); a live
 enemy mine displaces deterministically (534/534 in
-bot-20260805-173034), so landing on the tile proves the mine gone.
+bot-20260805-173034), so landing on the tile proves the mine gone.[^disp]
 
 Doctrine consequence ([[bot-behavior-contract]] §6, ring-2 item
 RESOLVED): aiming an approach teleport at a mine-ringed enemy is
@@ -166,7 +166,7 @@ The detonation removes the enemy mines; the placement does not re-add friendly m
 [^3]: decoder truth on disk: `src/tankpit_bot/container/decoders/mines.py` (`decode_mine_placement`); byte-length fixtures `MINE_PLACEMENT_15`/`MINE_PLACEMENT_19` exercised in `tests/container/test_mines.py:37/:56`; JS sender `Dg` in `tpclient.js` (blob-pinned in frontmatter).
 [^4]: commit `59a097e1` (2026-06-20, "Multi-record ContainerPickup + dispatch-layer pickup dedup") introduced the variable-length `MINE_PLACEMENT_19` fixture and the count-driven decode — the `len == 15` hardcode and its removal are both visible in that commit's diff in git history. "Task #79" was the session-internal tracker id, kept as a historical label only.
 [^7]: probe artifacts on disk: `runs/probe/mine-landing-20260728-161432.json` (three attempts: aim (131,124)→land (132,124), aim (146,93)→land (147,93), aim (145,93)→land (145,92); each `extra_loss: 0`, `mine_survived: true`) with paired `.log` + `.capture_session.json`; probe source `src/tankpit_bot/action_lab/mine_landing_probe.py`; user law (Austin, 2026-07-28, verbatim): "it displaces you".
-[^6]: user (Austin), 2026-07-28, verbatim: "mines explode on walk over and its only the mine occupying the tike you walk on that explodes and your kovement is stopped. so you cant get hit hy more than one mine at a single time" — domain law, correcting the assistant's cascade-on-walk misreading of the shot-triggered chain samples; consistent with the wire-verified 45-fuel walk-into-mine sample ([[game-economy]] t+373.35s row) and the 50-kill run's mine deaths booking single hits.
+[^6]: user (Austin), 2026-07-28, verbatim: "mines explode on walk over and its only the mine occupying the tike you walk on that explodes and your kovement is stopped. so you cant get hit hy more than one mine at a single time" (typos in the original) — executable in the sim at `src/tankpit_bot/sim/movement.py:188` (`_unrevealed_enemy_mine_at`, the per-tile test that stops the mover) and `src/tankpit_bot/sim/actions.py:300` (`process_mine_press`), which together enforce one-mine-per-step rather than a cascade. Domain law, correcting the assistant's cascade-on-walk misreading of the shot-triggered chain samples; consistent with the wire-verified 45-fuel walk-into-mine sample ([[game-economy]] t+373.35s row) and the 50-kill run's mine deaths booking single hits.
 [^8]: user (Austin), 2026-07-30 flag narration during bot-20260729-232252, verbatim: "shots at mines dont go over terrain so it has to be a clear shot... one shot for recruits blows up one mine. for any rank above recruit you blow up the target mine, plus each adjacent mine cardinally or diagonally adjacent... a single shot at the equipment or fuel location will destroy 9 mines as a private and above"; homing/missile over-terrain arc for tanks only, same narration.
 [^5]: cascade wire samples on disk: `runs/bot/practice-vs-real-20260620-150138.capture_session.json` t+62.15s (1+6 two-packet chain) and `runs/sniff/sniff-20260721-212348.capture_session.json` t+173.91 (1+3 chain, user-counted on screen — the frontmatter `verified:` field records this re-confirmation); dispatch semantics locked by `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_cascade_two_packet_chain_real_capture` (line 350, verified 2026-07-23).
 
@@ -213,3 +213,4 @@ other returns the Bresenham raster — so both bind as ``law`` claims
   ]
 }
 ```
+[^disp]: `analysis_scripts/mine_displacement_semantics.py` — the 2026-08-06 archive sweep behind the team-scope claim; its artifact is `runs/analysis/displacement_semantics.json`. Both verified present 2026-08-07.

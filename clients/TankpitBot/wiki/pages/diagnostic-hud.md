@@ -89,9 +89,12 @@ spot in the event stream:
 [^1]: `src/tankpit_bot/browser/overlay.py` (payload + slot renderer);
     `src/tankpit_bot/browser/overlay_hud.py:181` —
     `build_hud_expression`, the install-once template; tick wiring at
-    `src/tankpit_bot/bot/tick_loop.py:868` (step 9, "Update the in-page
-    HUD so a human watching the browser sees what…"). All three
-    re-verified and pinned 2026-08-06.
+    `src/tankpit_bot/bot/tick_body.py:195` (step 9, "Update the in-page
+    HUD so a human watching the browser sees what…"), which calls
+    `update_bot_overlay` at `:230` and mirrors the same payload to
+    `hud.json` at `:231-234`. All three re-verified and pinned
+    2026-08-07; the tick wiring moved from `tick_loop.py` when the tick
+    loop was split into a dispatcher and a per-tick body.
 [^2]: The fiesta SPA, in a DIFFERENT repository —
     `~/PROJECTS/MCPs/fiesta/src/style.css` (`.screen-panel` glass
     recipe, `.console-button` face; 4 matching selectors) and

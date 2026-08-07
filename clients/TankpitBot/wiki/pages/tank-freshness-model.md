@@ -11,8 +11,8 @@ source_paths:
   - "runs/bot/bot-20260620-191622.capture_session.json"
   - "src/tankpit_bot/state"
 source_git_blobs:
-  "src/tankpit_bot/state": "01f57c7928f05025a5ca0c14ab82ec4ff320031b"
-fact_checked: "2026-08-04"
+  "src/tankpit_bot/state": "9fbcf07602990d544c6e69b0060f4aba1ae2a863"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [architecture]
 ---
@@ -75,20 +75,21 @@ is not enough:[^1]
   spectrum). A map-sourced authoritative position therefore DEFERS --
   keeps the existing `(x, y)` and its freshness -- when the existing
   position holds REAL coordinates updated within
-  `MAP_POSITION_DEFER_MS` (2000 ms). The strict predicate is
-  `has_real_coordinates` (tank.py, beside `has_known_position`): the
-  login roster's fresh-stamped `(0, 0)` entries are NOT protected, so
-  the map still lifts sentinel tanks onto real tiles. Stationary
+  `MAP_POSITION_DEFER_MS` (2000 ms, `state/tank_mutations.py:25`).
+  The strict predicate is `has_real_coordinates`
+  (`state/types/tank.py:97`, beside `has_known_position` at `:56`):
+  the login roster's fresh-stamped `(0, 0)` entries are NOT protected,
+  so the map still lifts sentinel tanks onto real tiles. Stationary
   tanks (no update in the window) take the map fix and its freshness
-  exactly as before. Pinned in `tests/world_state/
-  test_tank_observation.py` (defer, wire-never-deferred, sentinel
-  lift).
+  exactly as before. Pinned in
+  `tests/world_state/test_tank_observation.py::TestMapPositionDeferSentinel`
+  (defer, wire-never-deferred, sentinel lift).
 
 ## The single mutator
 
 Every tank-state mutation flows through
-`apply_tank_observation(state, obs)` in `state/mutations.py`. The
-observation -- a `TankObservation` TypedDict -- declares:[^1]
+`apply_tank_observation(state, obs)` at `state/tank_mutations.py:28`.
+The observation -- a `TankObservation` TypedDict -- declares:[^1]
 
 ```
 is_wire_sourced: bool              # True for wire; drives last_wire_seen_ms
@@ -125,8 +126,8 @@ from the registry self-tank id.[^1]
 
 ## Gates
 
-The wire/position TTLs live in `bot/ai/threats.py`, applied inline at
-their decision sites; `VIEWPORT_PRESENCE_TTL_MS` moved to
+The wire/position TTLs live in `bot/ai/threat_primitives.py`, applied
+inline at their decision sites; `VIEWPORT_PRESENCE_TTL_MS` moved to
 `state/types/tank.py` (2026-08-04) beside the field it gates, because
 tile occupancy (`state/occupancy.py`) became its second consumer and
 the two must never drift:[^1]
@@ -162,7 +163,7 @@ Until that first position message a registry entry sits at the
 ``(0, 0)`` construction default (`apply_tank_observation` creates
 unknown tanks from any observation, defaulting absent fields). The
 ``(0, 0)`` state is therefore the NORMAL opening state of every tank
-the bot ever meets -- and (0, 0) is also a legal tile.
+the bot ever meets -- and (0, 0) is also a legal tile.[^pos]
 
 **The canonical predicate** is
 `state.types.has_known_position(tank)`: coordinates differ from the
@@ -175,14 +176,14 @@ the kill-shot timestamp). Seven modules used to hand-copy the inline
 the map corner with the whole roster's phantom bodies for the
 session's first 5 s. All sites now consume the predicate, and the
 guard rule `scripts/state_sentinel_rules.py` bans the inline idiom
-outside `state/types/tank.py`.
+outside `state/types/tank.py`.[^pos]
 
 One deliberate non-consumer: the HELLO greeting
 (`bot/ai/greeting.py`). User ruling 2026-07-31 -- "hello can run
 anytime... as long as the other player is on the map logged in" -- a
 human still at the roster default gets greeted the moment their
 identity broadcast lands; the predicate gates targeting and the
-stand-off visit, never the chat.
+stand-off visit, never the chat.[^pos]
 
 Team and rank share the same defaulting mechanism (`team=0` is a real
 team) but NOT the same exposure: the only creation route without a
@@ -278,17 +279,22 @@ keeps the truth.
 
 ## Tests that lock the contract
 
-Every rule above is pinned by a test in
-`tests/world_state/test_tank_observation.py`:[^1]
+Every rule above is pinned by a test under `tests/world_state/`,
+across three files since the observation suite was split:[^1]
 
-- `TestInvariantTimestampAlwaysAdvances` -- rule 1.
-- `TestInvariantWireSeenRequiresWire` -- rule 2.
-- `TestInvariantPositionFreshnessRequiresAuthoritativePosition` -- rule 3.
-- `TestStorageSourceIsRecorded` -- the `storage_source` that drives rule 4.
-- `TestFieldMergeSemantics` -- present overwrites, `None` preserves.
-- `TestTankCreationOnFirstObservation` -- the create path.
-- `TestOuterTimestampAdvances`, `TestTankObservationCodec` -- outer-stamp
-  and round-trip coverage.
+- `test_tank_observation_invariants.py` — the three freshness rules:
+  `TestInvariantTimestampAlwaysAdvances` (rule 1, `:18`),
+  `TestInvariantWireSeenRequiresWire` (rule 2, `:47`),
+  `TestInvariantPositionFreshnessRequiresAuthoritativePosition`
+  (rule 3, `:89`).
+- `test_tank_observation.py` — the mutator's own semantics:
+  `TestStorageSourceIsRecorded` (`:187`, the `storage_source` that
+  drives rule 4), `TestFieldMergeSemantics` (`:17`, present
+  overwrites / `None` preserves), `TestTankCreationOnFirstObservation`
+  (`:115`, the create path), `TestOuterTimestampAdvances` (`:227`),
+  and `TestMapPositionDeferSentinel` (`:243`, the 2026-08-06 defer).
+- `test_tank_observation_codec.py` — `TestTankObservationCodec`
+  (`:18`), round-trip coverage.
 
 The combat-side regression tests for the kill-shot gate live in
 `tests/bot/ai/test_combat_strategy.py::TestKillShotWireGate` and
@@ -299,9 +305,10 @@ target stickiness across the wire TTL is pinned by
 of these tests is a deliberate contract change and must come with a
 docstring and an update to this page[^9].
 
-[^1]: code truth: `state/mutations.py` (`apply_tank_observation`) + `state/types/tank_observation.py` + `bot/ai/threats.py` gates + `sniffer/world_state_tanks.py` dispatcher (`src/tankpit_bot/state` blob-pinned in frontmatter); invariants locked by `tests/world_state/test_tank_observation.py` and `tests/bot/ai/test_combat_strategy.py`
+[^1]: code truth: `state/tank_mutations.py:28` (`apply_tank_observation`) + `state/types/tank_observation.py` + the TTL constants + `sniffer/world_state_tanks.py` dispatcher (`src/tankpit_bot/state` blob-pinned in frontmatter); invariants locked by the three `tests/world_state/test_tank_observation*.py` files and `tests/bot/ai/test_combat_strategy.py`. **Repinned 2026-08-07:** `state/mutations.py` no longer exists — it was split by the entity it mutates into `tank_mutations.py`, `self_mutations.py`, `terrain_mutations.py` and the existing `container_mutations.py`, so the single-mutator claim above now names the tank file specifically. Two of the three TTLs also moved: `WIRE_PRESENCE_TTL_MS` (`:33`) and `POSITION_FRESHNESS_TTL_MS` (`:49`) are in `bot/ai/threat_primitives.py`, split out of `bot/ai/threats.py`; `VIEWPORT_PRESENCE_TTL_MS` remains at `state/types/tank.py:53`.
 [^2]: runs/bot/bot-20260619-050303.capture_session.json (frontmatter-pinned) — the 25-miss stale-registry loop; three-timestamp fix landed 2026-06-19/20
 [^3]: `make shadow` sync-cadence law (`src/tankpit_bot/validate/shadow_laws.py`), calibration sweep 2026-07-22 over 245 archive sessions
 [^8]: decisive watch capture `bot_watch_probe.capture_session.json` (2026-07-24): 617 s adjacent to purple-2; received t>60 s = 188 self 0x2E, 0 other-tank 0x2E; see [[server-push-gating]] for the seven-run proof
-[^4]: live capture 2026-06-22 — one-homing lock-drop incident that motivated the 0x58 no-op change
-[^9]: Verified present 2026-07-31: `tests/bot/ai/test_combat_strategy.py` (with `class TestKillShotWireGate` at `:984`), `tests/integration/test_combat_gates.py` (which imports `POSITION_FRESHNESS_TTL_MS` and `WIRE_PRESENCE_TTL_MS` at `:26-27` and describes the gate at `:10`), and `tests/scenarios/test_target_stickiness.py`.
+[^4]: live capture 2026-06-22 — one-homing lock-drop incident that motivated the 0x58 no-op change. `0x58` is `TankRemove`, named at `src/tankpit_bot/sniffer/constants.py:49` and classified `("tank_remove", "FULL")` at `:153`; treating it as a no-op for the locked target is what stopped a departure from dropping the lock mid-engagement. The registry side is `apply_tank_observation` at `src/tankpit_bot/state/tank_mutations.py:28` (see [^1]).
+[^9]: Verified present 2026-08-07: `tests/bot/ai/test_combat_strategy.py` (with `class TestKillShotWireGate` at `:30`, moved up from `:984` when that file was split), `tests/integration/test_combat_gates.py`, and `tests/scenarios/test_target_stickiness.py`.
+[^pos]: `src/tankpit_bot/state/types/tank.py:56` — `has_known_position(tank)`, the canonical predicate that discriminates a real coordinate from the `(0, 0)` constructor sentinel; `VIEWPORT_PRESENCE_TTL_MS = 5000` sits at `:53` in the same module. The one deliberate non-consumer is the greeting path, `src/tankpit_bot/bot/ai/greeting.py`, whose latch is `ai_state["greeted_tank_ids"]` (`:24`). Verified present 2026-08-07.

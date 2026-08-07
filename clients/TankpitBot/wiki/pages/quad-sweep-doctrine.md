@@ -8,7 +8,9 @@ related:
   - "[[bot-behavior-contract]]"
 source_paths:
   - "src/tankpit_bot/bot/ai/forage.py"
-fact_checked: "2026-08-06"
+source_git_blobs:
+  "src/tankpit_bot/bot/ai/forage.py": "e399c040d30a0580e802199eca558cef77111304"
+fact_checked: "2026-08-07"
 confidence: high
 hubs: [architecture]
 ---
@@ -19,7 +21,7 @@ User-derived 2026-08-06, built entirely on measured laws. The one
 probe that stood before code was resolved same day from the capture
 archive (§ Shift-framed pickup: resolved). IMPLEMENTED 2026-08-07
 (§ As built) and sim-verified end-to-end against the fake server's
-wire-pinned window laws.
+wire-pinned window laws.[^1]
 
 ## The laws it stands on
 
@@ -76,7 +78,7 @@ wire-pinned window laws.
 - **Opportunistic** (anchor wherever the exit lands): shorter hops,
   some inter-block overlap.
 Lean grid-disciplined while extras are plentiful, opportunistic when
-low. User's call to tune.
+low. User's call to tune.[^2]
 
 ## Shift-framed pickup: resolved (archive-mined 2026-08-06)
 
@@ -84,7 +86,7 @@ The question was whether a pickup dispatched into a SHIFT-framed
 window (not a teleport-centered one) transfers normally — every BOT
 pickup to date fired inside a teleport frame. Answered from recorded
 HUMAN play, no live probe needed: two archived sessions carry twelve
-accepted in-shifted-window actions across seven scope shifts.
+accepted in-shifted-window actions across seven scope shifts.[^3]
 
 `runs/sniff/sniff-20260710-202821.capture_session.json` (the 421.8 s
 human session behind the ANCHOR law): five shift→pickup windows, e.g.
@@ -100,7 +102,7 @@ accepted, plus a 438-volume fuel container taken by move-onto at
 window-bound. **The shifted window IS the acceptance window; the
 harvest loop can be built on it.** Miner: scratchpad
 `mine_shift_pickup.py` (sent-frame classify `21 03 5a dir` scope /
-`21 04 6a` pickup, 0x2E envelope unwrap on the receive side).
+`21 04 6a` pickup, 0x2E envelope unwrap on the receive side).[^3]
 
 ## Where it lands in the bot
 
@@ -108,13 +110,13 @@ Replaces the extras-stocked branch of forage (the branch whose
 veto-then-walk deadlock produced the 2026-08-06 one-tile crawl,
 fixed same day to yield nothing). Quad sweep becomes what
 extras-stocked foraging IS; the free-radar reposition walk remains
-the extras-empty strategy.
+the extras-empty strategy.[^4]
 
 ## As built (2026-08-07, `bot/ai/quad_sweep.py`)
 
 Two COLLECT-cascade branches, both gated on fuel ABOVE the low
 threshold (recon and framing are economy moves — at the break the
-desperation ladder owns every tick):
+desperation ladder owns every tick):[^1]
 
 - **`plan_quad_sweep`** sits between lock continuation and the
   pickups (atomicity: pickups wait the ~8 ticks). Stateless quadrant
@@ -152,7 +154,7 @@ the free ferry scout and mislabeling sweep scans. Scope-shift
 decisions now pre-latch `last_landing_scan_viewport` with the
 anchor-law origin (`latch_scope_shift_landing`, applied by the
 arbitrator): a pan is a deliberate look, not a landing, and the
-pan-er decides whether a radar follows.
+pan-er decides whether a radar follows.[^5]
 
 **Sim verification**: the seam soak runs the doctrine cycle
 end-to-end — atomic NW/NE/SE/SW tiling confirmed against the fake
@@ -161,4 +163,11 @@ framing shift, and equipment collection that ends extras ABOVE the
 sweep's spend. The ferry scenario showed the sweep's pans SUBSUME
 the dedicated scope scout when extras are stocked (the ferry arrives
 in a quadrant pan's 0x5A patch and the larder boards it directly);
-the scout remains the extras-empty fallback.
+the scout remains the extras-empty fallback.[^6]
+
+[^1]: `src/tankpit_bot/bot/ai/quad_sweep.py` — the as-built module, blob-pinned in this page's frontmatter; the COLLECT-cascade entry point is `plan_quad_sweep` at `:168`. Verified present 2026-08-07.
+[^2]: [synthesis] — the grid-disciplined vs opportunistic trade is a tuning choice stated for the operator, not a measured law. The anchor arithmetic it rests on (± 31) is the ANCHOR law established from the human session cited in [^3]; nothing in `src/tankpit_bot/bot/ai/quad_sweep.py` fixes the choice, which is why it is written as "user's call to tune" rather than as behaviour.
+[^3]: Archive-mined 2026-08-06 from two captures on disk: `runs/sniff/sniff-20260710-202821.capture_session.json` (the 421.8 s human session behind the ANCHOR law; five shift→pickup windows) and `runs/sniff/ghost_observe.capture_session.json` (equipment pickups at (149,207) and (155,200), plus a 438-volume fuel container by move-onto at (152,204)). **The miner was a scratchpad script (`mine_shift_pickup.py`) and is not committed** — the captures are the durable artifact; re-derive rather than trust the counts.
+[^4]: `src/tankpit_bot/bot/ai/forage.py` — the module quad sweep replaces the extras-stocked branch of, blob-pinned in this page's frontmatter. Verified present 2026-08-07.
+[^5]: `src/tankpit_bot/bot/ai/mode_controller.py:153` — `latch_scope_shift_landing`, the pre-latch that distinguishes a deliberate pan from a teleport landing so the scan-on-landing gate does not fire on it. Verified present 2026-08-07.
+[^6]: `tests/sim/seam.py` — the shared seam boot the doctrine soak runs under, whose docstring at `:1-4` names the shared "seam" the step-(c) smoke and step-(e) divergence soak both boot from. Verified present 2026-08-07.

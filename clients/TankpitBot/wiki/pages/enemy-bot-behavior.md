@@ -260,11 +260,11 @@ the policy is executable in `sim/bot_policy.py` and the
 future session against it (first full-archive run: 2,247 samples,
 2,125 exact, PASS — [[physics-module-roadmap]] Bot policy as-built).
 
-[^1]: user (Austin), 2026-06-16 — "tank bots stand ground and fight, only move when low HP, then move every time hit; don't collect fuel or equipment; just run until you chase and finish them or use homing"
-[^2]: user (Austin), 2026-06-11 — practice bots never fight each other; retracted a prior theory
+[^1]: user (Austin), 2026-06-16 — "tank bots stand ground and fight, only move when low HP, then move every time hit; don't collect fuel or equipment; just run until you chase and finish them or use homing". The bot-side answer to "they run" is the stay-put contract rather than a chase: `close_target` at `src/tankpit_bot/bot/ai/combat_close.py:259`, whose branch 2 (`is_already_engaged`, `src/tankpit_bot/bot/ai/combat_target.py:64`) fires from the current tile instead of re-teleporting — see [[combat-chase-bug]].
+[^2]: user (Austin), 2026-06-11 — practice bots never fight each other; retracted a prior theory. Independently swept from the archive by `analysis_scripts/mine_bot_policy.py` (see [^8]), which found no bot-on-bot engagement across the corpus.
 [^3]: run 20260611-004505 — purple-3 healed 1→0→3 after bot disengaged; see [[tank-registry]]. Originally read as time-based repair; corrected 2026-07-19 by user: "they do not repair over time. only via fuel pickups" — that healing was a fuel pickup too.
-[^4]: user (Austin), 2026-06-16 — "the bot is able to stay still and just fire homing shots at it. the homing shots go off viewport"
-[^5]: user (Austin), 2026-06-16 — "shields don't return miss. they return a positive hit. a corpse returns a positive hit"
+[^4]: user (Austin), 2026-06-16 — "the bot is able to stay still and just fire homing shots at it. the homing shots go off viewport". Refined 2026-07-03: the seeker tracks off-viewport but the server refuses an AIM outside the viewport, so every dispatch is folded onto the visible bounds by `_clamp_aim_into_viewport` at `src/tankpit_bot/bot/ai/combat_strategy.py:47` while still carrying the target's `tank_id` — see [[combat-chase-bug]] and [[shot-range]].
+[^5]: user (Austin), 2026-06-16 — "shields don't return miss. they return a positive hit. a corpse returns a positive hit". Because a positive hit therefore cannot distinguish a kill, deactivation is read from the wire rather than inferred from shot feedback: `src/tankpit_bot/combat.py:114` and `:119`. The DOM-scrape workaround this ruling originally motivated was deleted 2026-07-19 (`wiki/log.md:1198`) — see [[shoot-event-format]] [^2].
 [^6]: Sigma's TankPit Tournament Guide v3.4, 16-Jan-2015 (`docs/sources/sigmas-tankpit-guide-v3.4.pdf`), §"Fill-fighting to Lieutenant" and Technical Note #1 (shot counts + shade shortcut); §"2 – How to maximize PPH" item 5 (bots return singles); §"Initial equipment fill" tip 1 (chat commands to same-color bots). 2015 human observation, not wire-verified in this project.
 [^7]: user (Austin), 2026-07-19, plus wire forensics from run bot-20260719-222903: orange-2 damage 1 (0x2E sync 22:29:54) -> teleport departure (0x58 22:30:00) -> damage 2 (0x4C map entry 22:30:16). Cross-channel encoding check over the same run's captures: every near-in-time (0x2E sync, 0x4C map) damage pair agrees (1=1 x1, 2=2 x1, 3=3 x15), so the recovery is a real state change, not an encoding artifact.
 
@@ -272,7 +272,7 @@ future session against it (first full-archive run: 2,247 samples,
 
 Three corrections to this page's earlier reactivation account, all from
 run bot-20260805-095935 (32 kills, the first session to farm past 20)
-plus the 08-03 human fight:
+plus the 08-03 human fight:[^s32]
 
 - **Idle tanks emit NOTHING.** 27 of 32 victims never appeared on the
   wire again after death — no 0x2E resync, no anything — for up to 35
@@ -287,7 +287,7 @@ plus the 08-03 human fight:
   map during each of his three corpse windows and returned at +24 s.
   Presence in map data IS aliveness — the server curates the dead out
   within the same second they die. Client liveness rule 4
-  (`state/mutations.py`, 2026-08-05) now consumes this: a deactivated
+  (`state/tank_mutations.py:156-164`, 2026-08-05) now consumes this: a deactivated
   tank listed in a map snapshot flips alive. Before that rule the
   registry filled with phantom corpses (positions faithfully tracking
   their living owners via map updates, liveness stuck dead) and
@@ -326,7 +326,7 @@ from the session's own events, is a client-side geometry trap:
   two tiles from the trap.
 
 Defects exposed and FIXED the same day (no escape hatches — plan-time
-knowledge, not retry counters):
+knowledge, not retry counters):[^s32]
 
 1. **Landing attainability** (`find_attainable_landing_tile`,
    `bot/ai/reachability.py`): every pickup-serving teleport selector
@@ -350,4 +350,5 @@ knowledge, not retry counters):
 The radar burn (gate resource spent by the gate-satisfying loop) is
 mooted by the fix — the loop no longer exists to burn it. Pinned by
 the verbatim session-4 pocket in `tests/bot/ai/test_mine_clearance.py`
-(`_session4_pocket`) and the loop-killer hop test.
+(`_session4_pocket`) and the loop-killer hop test.[^s32]
+[^s32]: Run capture on disk: `runs/bot/bot-20260805-095935.capture_session.json` (32 kills, the first session to farm past 20) plus the 2026-08-03 human fight. The landing fix is `find_attainable_landing_tile` at `src/tankpit_bot/bot/ai/reachability.py:173`; the loop is pinned by the verbatim session-4 pocket `_session4_pocket` at `tests/bot/ai/test_mine_clearance.py:213`, used by the loop-killer hop test at `:265`. All paths verified present 2026-08-07.
