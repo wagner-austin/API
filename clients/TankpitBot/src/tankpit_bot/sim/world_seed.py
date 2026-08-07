@@ -34,7 +34,13 @@ from typing import TypedDict
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.sim.spawn import find_open_tile_near
-from tankpit_bot.sim.world import SimContainerDict, SimEquipmentDict, SimWorldDict, make_sim_tank
+from tankpit_bot.sim.world import (
+    SimContainerDict,
+    SimEquipmentDict,
+    SimWorldDict,
+    make_sim_tank,
+    place_mine,
+)
 
 DOTTED_FUEL_COUNT = 620
 """Seeded map-atlas dots — the measured live census (569-656, ~619)."""
@@ -56,6 +62,92 @@ HIDDEN_DRAINED_PERIOD = 2
 HIDDEN_EQUIPMENT_COUNT = 180
 """Hidden equipment containers, MEASURED same probe: 5 reveals over
 1,792 fresh tiles ≈ 0.0028/tile ≈ 180 map-wide."""
+
+MINE_DENSITY = 0.14
+"""Fraction of passable tiles carrying a mine.
+
+The archive gives TWO densities, and they measure different ground:
+
+* The client's OPENING 0x5A patch holds 88-159 mines of its 324 tiles
+  (34 sessions, median 130) — a 0.27-0.49 carpet. But that patch sits
+  on the spawn, the most fought-over ground in the room.
+* Across everything a session travels, the believed registry runs a
+  median 383 mines in 85 components (27 sessions, replayed through
+  the production dispatcher).
+
+The sim seeds the SHAPE law uniformly at the lower figure. Carpeting
+the whole room at the spawn density leaves no lanes, and the router —
+which paths around revealed hostile mines exactly as the real server
+does — then finds no route at all: the first cut starved a forage
+session at round 11 with ``blocked_walk`` on its only container. Where
+the spawn carpet ENDS is not modelled, because the archive never
+watched the bot more than 32 tiles from its join and so never measured
+it ([[session-state-deglobalisation]]).
+
+The 0x4F radar delta is not an instrument for either figure: it
+reports per-tile WRITES, so a session's median 12 distinct mine tiles
+are the ones that CHANGED, not the ones that exist."""
+
+MINE_SHAPE_CYCLE: tuple[tuple[int, int], ...] = (
+    (1, 1),
+    (1, 2),
+    (1, 1),
+    (3, 1),
+    (1, 1),
+    (2, 3),
+    (1, 1),
+    (2, 1),
+    (1, 1),
+    (1, 3),
+    (3, 3),
+    (1, 1),
+    (3, 2),
+    (1, 1),
+    (2, 2),
+    (4, 3),
+    (1, 1),
+    (1, 2),
+    (3, 4),
+    (1, 3),
+    (2, 3),
+)
+"""Component shapes, in the archive's measured mix.
+
+MEASURED 2026-08-06 by replaying 27 real captures through the
+PRODUCTION dispatcher and splitting the believed mine registry into
+8-connected components (2,236 of them). Real minefields are not a
+scatter and not a uniform grid — they are separate blobs:
+
+* 39.3% are a SINGLE mine;
+* 52.5% are press-sized, 12 tiles or fewer, with 3, 2 and 9 the
+  commonest sizes (9 being a clean 3x3 press);
+* 6.7% irregular clumps, 1.3% walls or lines, 0.3% blankets — the
+  largest seen is 203 tiles in a 17x29 box.
+
+Bounding boxes follow the same story: 1x1 (878), 3x3 (269), 1x2 (253),
+1x3 (185), 2x3 (183), 2x2 (114). Fill ratio is a median 1.00, so the
+blobs are SOLID. This cycle's twenty-one entries reproduce the size
+histogram by count — eight singles, three 2-tile, three 3-tile, one
+4-tile, three 6-tile, one 9-tile, two 12-tile — and leave out the rare
+walls and blankets rather than place them at a rate one-in-three-
+hundred cannot pin down.
+
+Shape matters as much as count. A uniform scatter at the same density
+has no lanes at all, and the sim's router — which paths around
+revealed hostile mines exactly as the real server does — could then
+find no route: a forage session starved at round 11 with
+``blocked_walk`` on its only container, while real sessions carry a
+median 383 believed mines and 85 components and play normally
+([[session-state-deglobalisation]])."""
+
+MINE_TEAM_CYCLE: tuple[int, ...] = (3, 3, 0, 3, 3, 0, 3, 0, 3, 3, 0)
+"""Owning teams, in the archive's measured proportions.
+
+The patch census counted 13,672 mined tiles for team 3 and 7,519 for
+team 0 — 64.5% / 35.5%, which this eleven-slot cycle reproduces at
+7/11 and 4/11. Teams 2 and 1 appeared 35 and 4 times, a combined
+0.18%; placing them at all would mean inventing a rate the sample
+cannot support, so the sim's field is the two colours that own it."""
 
 LARGE_VOLUME_CYCLE: tuple[int, ...] = (
     520,
@@ -273,6 +365,14 @@ _TILE_COUNT = _MAP_SPAN * _MAP_SPAN
 _SEED_STRIDE = 97
 _PROBE_STRIDE = 251
 
+#: Components land on every third row, so a shape up to four tiles tall
+#: cannot fuse with the row band above it into one blob — the merged
+#: result would be the wrong SHAPE even at the right count.
+_MINE_ROW_STRIDE = 3
+#: One component per this many passable tiles within a seeding row.
+#: With the row stride above, this lands :data:`MINE_DENSITY`.
+_MINE_COMPONENT_SPACING = 9
+
 
 def _next_open_tile(
     occupied: set[tuple[int, int]],
@@ -313,6 +413,55 @@ def _next_open_tile(
         occupied.add((x, y))
         return x, y
     raise RuntimeError("seed_field_population: no open tile left on the map")
+
+
+def seed_minefield(world: SimWorldDict, terrain: TerrainMapProtocol) -> int:
+    """Lay the room's standing minefield across the passable map.
+
+    Mines arrive as separate solid COMPONENTS in the measured mix of
+    :data:`MINE_SHAPE_CYCLE` — mostly single mines and press-sized
+    blobs — because that is what the archive shows, and because the
+    gaps between them are what a route needs.
+
+    Mines are seeded INDEPENDENTLY of containers, because the game
+    lets them share a tile ([[mine-mechanics]]: "Containers can
+    coexist with mines on the same tile") and those shared tiles are
+    exactly the ones the bot's clearance and landing-displacement
+    machinery exists for. Living tanks are skipped — a placement never
+    lands under one.
+
+    Deterministic: component origins come from a fixed raster walk, so
+    the same field yields the same minefield on every run.
+
+    Args:
+        world: Simulated world (mutated: ``mines`` filled).
+        terrain: Static terrain of the world's field.
+
+    Returns:
+        How many mines were laid.
+    """
+    occupied = {(tank["x"], tank["y"]) for tank in world["tanks"].values() if tank["alive"]}
+    passable = 0
+    components = 0
+    for linear in range(_TILE_COUNT):
+        x, y = linear % _MAP_SPAN, linear // _MAP_SPAN
+        if not terrain.is_passable(x, y):
+            continue
+        passable += 1
+        if y % _MINE_ROW_STRIDE != 0 or passable % _MINE_COMPONENT_SPACING != 0:
+            continue
+        width, height = MINE_SHAPE_CYCLE[components % len(MINE_SHAPE_CYCLE)]
+        team = MINE_TEAM_CYCLE[components % len(MINE_TEAM_CYCLE)]
+        components += 1
+        for dy in range(height):
+            for dx in range(width):
+                tile_x, tile_y = x + dx, y + dy
+                if not (0 <= tile_x < _MAP_SPAN and 0 <= tile_y < _MAP_SPAN):
+                    continue
+                if not terrain.is_passable(tile_x, tile_y) or (tile_x, tile_y) in occupied:
+                    continue
+                place_mine(world, tile_x, tile_y, team)
+    return len(world["mines"])
 
 
 def seed_field_population(
@@ -402,10 +551,14 @@ __all__ = [
     "HIDDEN_EQUIPMENT_COUNT",
     "HIDDEN_FUEL_COUNT",
     "LARGE_VOLUME_CYCLE",
+    "MINE_DENSITY",
+    "MINE_SHAPE_CYCLE",
+    "MINE_TEAM_CYCLE",
     "PRACTICE_LAYOUTS",
     "SMALL_VOLUME_CYCLE",
     "PracticeLayout",
     "seed_field_population",
+    "seed_minefield",
     "seed_practice_client",
     "select_practice_layout",
 ]

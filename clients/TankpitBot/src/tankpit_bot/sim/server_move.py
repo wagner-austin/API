@@ -1,0 +1,222 @@
+"""Move and teleport command handling for the simulator.
+
+The two position-changing commands and the pickup-stock check they
+share. Mixed into :class:`~tankpit_bot.sim.server.SimServer`, which
+owns the state these annotate.
+"""
+
+from __future__ import annotations
+
+from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
+from tankpit_bot.protocol.constants import (
+    SUPERVISOR_ERROR_CANT_DO,
+    SUPERVISOR_ERROR_EMPTY_CONTAINER,
+)
+from tankpit_bot.protocol.types import (
+    BinaryMessage,
+    SupervisorDict,
+    SyncDict,
+)
+from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.emissions import (
+    emit_equipment_pickup,
+    emit_fuel_pickup_close,
+    emit_move,
+    emit_teleport,
+)
+from tankpit_bot.sim.movement import process_move
+from tankpit_bot.sim.viewport_window import ViewportTracker
+from tankpit_bot.sim.world import SimWorldDict
+
+
+def _fuel_container_volume(world: SimWorldDict, x: int, y: int) -> int:
+    """The fuel volume recorded at a tile before a command resolves."""
+    for container in world["containers"]:
+        if (container["x"], container["y"]) == (x, y):
+            return container["volume"]
+    return 0
+
+
+class SimServerMoveMixin:
+    """Move and teleport command handling for the simulator.
+
+    The attributes below are DECLARATIONS, not assignments: the
+    server's ``__init__`` remains their single owner.
+    """
+
+    world: SimWorldDict
+    terrain: TerrainMapProtocol
+    client_id: int
+    _viewport: ViewportTracker
+
+    def _process_move_command(
+        self,
+        tank_id: int,
+        kind: str,
+        command: ClientCommandDict,
+        messages: list[BinaryMessage],
+        ammo_changed: set[int],
+        moved: set[int],
+    ) -> None:
+        """Route one move-family command (move / pickup clicks).
+
+        The client's destination must lie inside its stored 0x5A
+        window — the real router rejects any target outside it with
+        0x52 code 0, at exactly the boundary column (measured
+        2026-07-25, [[viewport-shift-protocol]]); the check precedes
+        the container validation because the server never answers for
+        a coordinate it does not consider actionable. A fuel-pickup
+        click at a KNOWN container executes its walk and answers with
+        the measured pickup choreography even when the container is
+        drained (archive windows 2026-08-01: the walk echo, the
+        duplicate remaining-0 records, then the code-4 close — the
+        old pre-move refusal was a sim invention; only a click at a
+        tile with NO container record short-circuits). Equipment
+        clicks keep the presence pre-check. A successful walk does
+        NOT re-emit 0x5A: with autoscroll OFF the window is static
+        between teleports.
+
+        Args:
+            tank_id: The commanding tank.
+            kind: The command kind.
+            command: The queued command.
+            messages: This tick's outgoing batch (appended).
+            ammo_changed: Accumulator of tanks whose counts moved.
+            moved: Accumulator of tanks that relocated this tick.
+        """
+        if tank_id == self.client_id and not self._viewport.in_window(command["x"], command["y"]):
+            messages.append(
+                SupervisorDict(
+                    msg_type=0x52,
+                    reset_action=1,
+                    close_map=0,
+                    error_code=SUPERVISOR_ERROR_CANT_DO,
+                )
+            )
+            return
+        if not self._pickup_target_stocked(kind, command["x"], command["y"]):
+            if tank_id == self.client_id:
+                messages.append(
+                    SupervisorDict(
+                        msg_type=0x52,
+                        reset_action=1,
+                        close_map=0,
+                        error_code=SUPERVISOR_ERROR_EMPTY_CONTAINER,
+                    )
+                )
+            return
+        fuel_before = _fuel_container_volume(self.world, command["x"], command["y"])
+        outcome = process_move(self.world, self.terrain, tank_id, command["x"], command["y"])
+        if outcome["kind"] == "moved":
+            moved.add(tank_id)
+        choreographed = kind == "pickup_fuel" and outcome["kind"] == "moved"
+        emit_move(
+            self.world,
+            self.client_id,
+            outcome,
+            messages,
+            include_pickups=not choreographed,
+        )
+        if choreographed:
+            emit_fuel_pickup_close(
+                self.world,
+                self.client_id,
+                tank_id,
+                command["x"],
+                command["y"],
+                volume_before=fuel_before,
+                walked=outcome["path"] != "",
+                messages=messages,
+            )
+        if outcome["kind"] == "moved":
+            emit_equipment_pickup(self.world, self.client_id, tank_id, kind, messages, ammo_changed)
+            if tank_id == self.client_id and outcome["path"] != "":
+                # The 0x3F Sync trails a walk that actually relocated
+                # the client — an own-tile click resolves as a "moved"
+                # outcome with an EMPTY path and draws none. Archive
+                # 2026-08-06: 1,277 of the 1,528 syncs follow a move
+                # command as the most recent thing the client sent,
+                # against ZERO after any of the 13,698 shoots and 14
+                # after 11,247 map opens — the association is specific,
+                # not ambient, and 1,277 against 1,703 move commands is
+                # the gap the empty-path clicks fill. The JS handler is
+                # a view resync (``vg`` -> ``Q(a)``), which is what a
+                # completed walk needs and a standing still does not.
+                messages.append(SyncDict(msg_type=0x3F))
+
+    def _process_teleport_command(
+        self,
+        tank_id: int,
+        command: ClientCommandDict,
+        messages: list[BinaryMessage],
+        ammo_changed: set[int],
+        moved: set[int],
+    ) -> None:
+        """Route one teleport command through the towing gate and law 5.
+
+        Teleport while towing a block is refused with the measured
+        0x52 code 0 ("You can't do this") — three-for-three in the
+        2026-07-20 capture. A landed client hop is the ONE window
+        recenter under autoscroll OFF ([[viewport-shift-protocol]])
+        and resolves equipment on arrival. Wire order of a landed
+        client hop (archive-measured 2026-08-01, 38%+31% of 7,176
+        live teleports fit ``5A -> 3D -> landed [-> pickup]``): the
+        RECENTERED 0x5A leads the batch, then the position statement,
+        then the landed confirm — the response-shape differ caught
+        the sim emitting the 0x5A last.
+
+        Args:
+            tank_id: The hopping tank.
+            command: The queued command.
+            messages: This tick's outgoing batch (appended).
+            ammo_changed: Accumulator of tanks whose counts moved.
+            moved: Accumulator of tanks that relocated this tick.
+        """
+        if self.world["tanks"][tank_id]["carrying"]:
+            if tank_id == self.client_id:
+                messages.append(
+                    SupervisorDict(
+                        msg_type=0x52,
+                        reset_action=1,
+                        close_map=1,
+                        error_code=SUPERVISOR_ERROR_CANT_DO,
+                    )
+                )
+            return
+        landing: list[BinaryMessage] = []
+        if emit_teleport(self.world, self.terrain, self.client_id, tank_id, command, landing):
+            moved.add(tank_id)
+            if tank_id == self.client_id:
+                self._viewport.recenter()
+                messages.append(self._viewport.build_update())
+            messages.extend(landing)
+            emit_equipment_pickup(
+                self.world, self.client_id, tank_id, "teleport", messages, ammo_changed
+            )
+        else:
+            messages.extend(landing)
+
+    def _pickup_target_stocked(self, kind: str, x: int, y: int) -> bool:
+        """Validate a pickup click's destination before any movement.
+
+        A fuel click needs a container RECORD at the tile — even a
+        drained one: the archive shows the walk executing and the
+        remaining-0 choreography answering for empty-but-known
+        containers (2026-08-01); only a click at bare ground draws
+        the moveless code-4 refusal the production belief-removal
+        consumes. Equipment clicks keep the presence check. Plain
+        moves are never validated this way.
+
+        Args:
+            kind: The command kind.
+            x: Clicked tile X.
+            y: Clicked tile Y.
+
+        Returns:
+            True when the command may proceed to the move law.
+        """
+        if kind == "pickup_fuel":
+            return any((c["x"], c["y"]) == (x, y) for c in self.world["containers"])
+        if kind == "pickup_equipment":
+            return any((e["x"], e["y"]) == (x, y) for e in self.world["equipment"])
+        return True

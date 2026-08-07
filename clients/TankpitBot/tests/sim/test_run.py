@@ -18,7 +18,10 @@ from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, reset_static_key_cache
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
-from tankpit_bot.sim.run import main, run_sim_session
+from tankpit_bot.sim.run import (
+    main,
+    run_sim_session,
+)
 from tankpit_bot.sim.scenarios import (
     SIM_FIELD,
     SIM_MAGIC,

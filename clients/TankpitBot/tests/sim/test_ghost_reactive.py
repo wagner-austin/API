@@ -13,7 +13,7 @@ from tankpit_bot.protocol.types import BinaryMessage, ShootEventDict
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.ghost import GhostEventDict, GhostSpecDict
 from tankpit_bot.sim.practice_room import PracticeRoomDriver
-from tankpit_bot.sim.run import _queue_round_opponents
+from tankpit_bot.sim.run_boot import _queue_round_opponents
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap

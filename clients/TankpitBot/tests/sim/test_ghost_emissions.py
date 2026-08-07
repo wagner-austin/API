@@ -127,7 +127,7 @@ def test_seed_ghost_world_relocates_or_skips_blocked_spawns() -> None:
     """A ghost sighted on impassable ground spawns at the nearest open
     tile; one with no open ground nearby is skipped."""
     from tankpit_bot.sim.ghost import GhostSpecDict, GhostTankDict
-    from tankpit_bot.sim.run import _seed_ghost_world
+    from tankpit_bot.sim.run_boot import _seed_ghost_world
 
     spec = GhostSpecDict(
         client_team=0,
@@ -162,7 +162,7 @@ def test_seed_ghost_world_relocates_or_skips_blocked_spawns() -> None:
 def test_dead_ghosts_skip_their_remaining_timeline() -> None:
     """Events of a corpse are dropped, not replayed."""
     from tankpit_bot.sim.ghost import GhostEventDict, GhostSpecDict
-    from tankpit_bot.sim.run import _queue_ghost_round
+    from tankpit_bot.sim.run_boot import _queue_ghost_round
 
     world = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
