@@ -14,6 +14,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
+from tankpit_bot.bot.account_stats_capture import capture_account_stats
 from tankpit_bot.bot.ai.types import (
     AIConfigDict,
     AIStateDict,
@@ -30,7 +31,6 @@ from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
     GameLogScraper,
-    scrape_page_text,
 )
 from tankpit_bot.browser.flag_capture import FlagCaptureService
 from tankpit_bot.browser.lifecycle import (
@@ -45,10 +45,6 @@ from tankpit_bot.browser.session_storage import (
     load_storage_state,
     save_storage_state,
 )
-from tankpit_bot.diagnostics.account_stats import (
-    emit_account_stats_sample,
-    parse_account_stats,
-)
 from tankpit_bot.runtime_logging import emit_state
 from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
@@ -58,21 +54,12 @@ from tankpit_bot.sniffer.core import (
     _chrome_stream_no_viewport,
     _maximize_via_cdp,
 )
-from tankpit_bot.sniffer.world_state import get_world_state, record_account_stats
+from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage, GameLogEntryWithTimestamp
 
 log = get_logger(__name__)
 
-# The C statistics panel paints incrementally: the "Statistics:" header
-# can be in the DOM before the stat lines (a single 1500ms timed read
-# landed in that gap and crashed sessions 20260611-004251/004405/012807).
-# Poll the parse predicate instead of trusting one timed read.
-_ACCOUNT_STATS_POLL_INTERVAL_MS = 300
-_ACCOUNT_STATS_POLL_ATTEMPTS = 10
-# Total wait budget for a single timed panel read (used by the simple
-# capture path; equals one full poll budget).
-_ACCOUNT_STATS_PANEL_RENDER_MS = _ACCOUNT_STATS_POLL_INTERVAL_MS * _ACCOUNT_STATS_POLL_ATTEMPTS
 # The first-tick keypress itself can be swallowed by the client (run
 # 20260611-013801: panel never opened across a full poll budget), so
 # the startup capture retries on later ticks.
@@ -366,53 +353,6 @@ class Bot(DispatchMixin):
                 )
             )
 
-    def _capture_account_stats(self, phase: str) -> None:
-        """Sample the in-game ``C`` statistics panel and emit it.
-
-        The panel carries account-wide ground truth the wire never
-        sends (lifetime play time, kills, deactivations, promotion
-        points); the startup sample baselines every run so consecutive
-        runs' deltas verify the wire 0x41 kill detection. The ``C`` key
-        does not toggle a stateful panel -- each keypress emits a
-        fresh ``Statistics:`` block into the in-game DOM log -- so a
-        single press is enough to scrape, and a second press would
-        only duplicate the block in the log without ``closing``
-        anything.
-
-        Args:
-            phase: Capture point label (e.g. ``startup``).
-        """
-        if self._cdp is None or self._page is None:
-            return
-        for event_type in ("keyDown", "keyUp"):
-            self._cdp.send(
-                "Input.dispatchKeyEvent",
-                {
-                    "type": event_type,
-                    "key": "c",
-                    "code": "KeyC",
-                    "windowsVirtualKeyCode": ord("C"),
-                    "nativeVirtualKeyCode": ord("C"),
-                },
-            )
-        self._page.wait_for_timeout(_ACCOUNT_STATS_PANEL_RENDER_MS)
-        page_text = scrape_page_text(self._cdp)
-        stats = parse_account_stats(page_text)
-        emit_account_stats_sample(stats, phase=phase)
-        if stats is not None:
-            # Canonical account model (state/types/self_account.py):
-            # runtime features read this instead of re-fishing the
-            # diagnostic stream.
-            record_account_stats(
-                rank_name=stats["rank_name"],
-                rank_number=stats["rank_number"],
-                promotion_points=stats["promotion_points"],
-                destroyed_enemies=stats["destroyed_enemies"],
-                deactivated_total=stats["deactivated"],
-                play_time_s=stats["play_time_s"],
-                timestamp_ms=get_current_time_ms(),
-            )
-
     def maybe_capture_account_stats_once(self) -> None:
         """Capture account stats on the first healthy tick, with bounded retries.
 
@@ -425,7 +365,7 @@ class Bot(DispatchMixin):
         if self._account_stats_attempts >= _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS:
             return
         self._account_stats_attempts += 1
-        self._capture_account_stats("startup")
+        capture_account_stats(self._cdp, self._page, "startup")
         self._account_stats_captured = True
 
     # =========================================================================
