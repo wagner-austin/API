@@ -22,12 +22,14 @@ from tankpit_bot._test_hooks import (
     SyncPlaywrightContextManagerProtocol,
 )
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
-from tests.fakes.base import (
+from tests.fakes.page import (
+    FakeKeyboard,
+    FakeResponse,
+)
+from tests.fakes.payloads import (
     _FAKE_MAGIC,
     _FAKE_STATIC_KEY,
     _FAKE_TPCLIENT_URL,
-    FakeKeyboard,
-    FakeResponse,
     _build_captured_raw_messages,
     _decode_injected_websocket_body,
     _extract_enter_room_id,
