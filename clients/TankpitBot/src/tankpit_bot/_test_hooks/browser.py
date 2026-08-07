@@ -234,42 +234,37 @@ class AutoscrollKeyProtocol(Protocol):
         ...
 
 
-class AutoscrollPageProtocol(Protocol):
-    """The slice of the page surface the autoscroll dance needs.
+class PageWaitProtocol(Protocol):
+    """The one page member every poll-and-read flow needs.
 
-    Narrower than :class:`PageProtocol` so tests fake exactly the two
-    members involved; the real Playwright page satisfies it
-    structurally.
+    Three flows wait on the wire — the autoscroll dance, the lobby
+    join, and the account-stats panel read — and each used to name the
+    whole :class:`PageProtocol` for it. Narrowing to what is actually
+    called is what lets the SIMULATOR stand in for a page it has no
+    browser for; the real Playwright page satisfies every one of these
+    structurally ([[session-state-deglobalisation]]).
     """
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Pump the event loop while the wire answers."""
+        ...
+
+
+class AutoscrollPageProtocol(PageWaitProtocol, Protocol):
+    """The slice of the page surface the autoscroll dance needs."""
 
     @property
     def keyboard(self) -> AutoscrollKeyProtocol:
         """Keyboard interface for the ``a`` toggle press."""
         ...
 
-    def wait_for_timeout(self, timeout: float) -> None:
-        """Pump the event loop while the server ack lands."""
-        ...
 
-
-class RoomJoinPageProtocol(Protocol):
-    """The slice of the page surface the lobby join flow needs.
-
-    Narrower than :class:`PageProtocol` for the same reason
-    :class:`AutoscrollPageProtocol` is: the real Playwright page
-    satisfies it structurally, and it is what lets the SIMULATOR drive
-    the production ``join_room`` — the sim has no browser, so a lobby
-    that demanded the full page surface would have forced a second
-    copy of the join flow ([[session-state-deglobalisation]]).
-    """
+class RoomJoinPageProtocol(PageWaitProtocol, Protocol):
+    """The slice of the page surface the lobby join flow needs."""
 
     @property
     def url(self) -> str:
         """Current page URL — one field of the room-entry metadata."""
-        ...
-
-    def wait_for_timeout(self, timeout: float) -> None:
-        """Pump the event loop between lobby-response polls."""
         ...
 
 
@@ -316,6 +311,7 @@ __all__ = [
     "BrowserProtocol",
     "BrowserTypeLaunchProtocol",
     "BrowserTypeProtocol",
+    "PageWaitProtocol",
     "PlaywrightProtocol",
     "RoomJoinPageProtocol",
     "SyncPlaywrightContextManagerProtocol",

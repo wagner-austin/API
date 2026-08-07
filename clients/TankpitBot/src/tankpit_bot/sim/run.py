@@ -302,6 +302,14 @@ def _boot(
     bot._on_magic_captured(SIM_MAGIC)
     link = SimCDPSession(server, SIM_MAGIC, SimLobby(SIM_ACCOUNT))
     bot._cdp = link
+    # The link is the page too: it satisfies the narrow page protocols
+    # the poll-and-read flows take, so the PRODUCTION autoscroll
+    # enforcement and account-stats capture run from the tick body
+    # instead of being skipped for want of a browser. Pointing the
+    # bot's capture list at the link's wire log is what lets the
+    # enforcer find its ack — they are the same session's traffic.
+    bot._page = link
+    bot._messages = link.wire_log
     link.open_lobby()
     # The PRODUCTION lobby flow, against the sim's plaintext channel.
     # This used to be skipped and its one durable effect — a selected
@@ -487,15 +495,6 @@ def run_sim_session(
             if driver is not None:
                 driver.note_batch(server.world, batch)
             deliver_batch(bot._cdp_message_buffer, batch, link)
-            if round_index == 0:
-                # The autoscroll enforcement runs where it does live:
-                # after the wire has established self_state, which the
-                # first tick's handshake drain is what provides. The
-                # production dance presses 'a' and reads the server's
-                # plaintext ack; the sim link is the page client, so
-                # the press really does put A1/A0 on the wire
-                # ([[session-state-deglobalisation]]).
-                _test_hooks.ensure_autoscroll_off(link, link.wire_log)
             if tracker is not None:
                 live = server.world["tanks"][SIM_CLIENT_ID]
                 tracker.note_round(round_index, live["x"], live["y"])
@@ -511,11 +510,14 @@ def run_sim_session(
         )
     finally:
         _test_hooks.get_current_time_ms = original_clock
-        # Leave the way the page client does. However the session
-        # ended — rounds exhausted or a production exit — the socket
-        # gets its quit frame, so the capture holds a teardown instead
-        # of simply stopping mid-stream.
-        link.close_lobby()
+        # The PRODUCTION teardown, not a sim-local imitation: the bot
+        # already owns a graceful quit (``build_quit_command`` — the
+        # plain, un-XOR'd ``-``, sent so the server records a
+        # deliberate lobby exit rather than a socket drop). A sim
+        # session used to just stop mid-stream, so the archive's quit
+        # frames had no counterpart and the teardown path was never
+        # exercised ([[session-state-deglobalisation]]).
+        bot._send_graceful_quit()
     if tracker is not None:
         tracker.emit_summary()
         log.info(

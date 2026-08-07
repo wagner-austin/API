@@ -38,10 +38,10 @@ from tankpit_bot.action_lab.page_client_snapshot import (
 )
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.capture.xor import build_session_xor_table, require_static_key, xor_decode_body
-from tankpit_bot.protocol.commands import COMMAND_PREFIX
+from tankpit_bot.protocol.commands import CMD_STATISTICS, COMMAND_PREFIX, TYPE_QUERY
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.commands import decode_client_command
-from tankpit_bot.sim.lobby import QUIT_BODY, SimLobby, build_auth_frame
+from tankpit_bot.sim.lobby import SimLobby, build_auth_frame
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.transport import (
     encode_plaintext_payload,
@@ -65,6 +65,8 @@ _SIM_ACCOUNT_ID = "62913"
 _SIM_SESSION_TOKEN = "00000000000000000000000000000000"
 _SIM_AUTH_STAMP = "0"
 _AUTOSCROLL_KEY = "a"
+_STATISTICS_KEY = "c"
+_KEY_DOWN = "keyDown"
 
 
 class SimKeyboard:
@@ -101,7 +103,7 @@ class SimKeyboard:
             raise EncodeError(f"sim keyboard: unmodeled key press {key!r}")
         self._link.autoscroll_enabled = not self._link.autoscroll_enabled
         flag = "1" if self._link.autoscroll_enabled else "0"
-        self._link.send_plaintext(f"{_AUTOSCROLL_KEY.upper()}{flag}".encode())
+        self._link.send_page_frame(f"{_AUTOSCROLL_KEY.upper()}{flag}".encode())
 
 
 class SimCDPSession:
@@ -158,26 +160,19 @@ class SimCDPSession:
         """The page client's keyboard, for the autoscroll toggle dance."""
         return SimKeyboard(self)
 
-    def send_plaintext(self, body: bytes) -> None:
-        """Send one plaintext client frame and take the lobby's reply.
+    def send_page_frame(self, body: bytes) -> None:
+        """Send one frame the PAGE CLIENT writes, not the bot.
 
-        This is the page client's own channel — the toggle and the quit
-        frame are its frames, not the bot's, and the bot only reads
-        their acks off the wire.
+        The autoscroll toggle, the quit frame and the key-driven
+        statistics command are the page's, not the bot's — our code
+        presses a key and reads the answer off the wire. They take the
+        same route as an injected send so there is one place that
+        decides command-vs-lobby.
 
         Args:
             body: The frame body, including its lead byte.
         """
-        payload = encode_plaintext_payload([body])
-        self.wire_log.append(
-            CapturedMessage(
-                timestamp_ms=get_current_time_ms(),
-                direction="sent",
-                payload=payload,
-                ws_url=_SIM_WS_URL,
-            )
-        )
-        self._deliver_plaintext(self._handle_lobby_frame(body))
+        self.route_client_payload(encode_plaintext_payload([body]))
 
     def wait_for_timeout(self, timeout: float) -> None:
         """Satisfy the join flow's poll delay without sleeping.
@@ -230,17 +225,9 @@ class SimCDPSession:
         """
         if self.lobby is None:
             raise EncodeError("sim session: open_lobby on a link with no lobby")
-        auth = build_auth_frame(_SIM_ACCOUNT_ID, _SIM_SESSION_TOKEN, _SIM_AUTH_STAMP, self.magic)
-        payload = encode_plaintext_payload([auth])
-        self.wire_log.append(
-            CapturedMessage(
-                timestamp_ms=get_current_time_ms(),
-                direction="sent",
-                payload=payload,
-                ws_url=_SIM_WS_URL,
-            )
+        self.send_page_frame(
+            build_auth_frame(_SIM_ACCOUNT_ID, _SIM_SESSION_TOKEN, _SIM_AUTH_STAMP, self.magic)
         )
-        self._deliver_plaintext(self.lobby.handle_frame(auth))
 
     def _snapshot(self) -> PageClientSnapshotDict:
         """Build the truthful page-client snapshot from sim world state.
@@ -286,10 +273,24 @@ class SimCDPSession:
         """
         end = expression.find("')", start)
         payload = expression[start + len("atob('") : end]
-        # One socket carries two protocols, told apart by the lead
-        # byte: '!' is an in-game command, anything else is lobby.
-        # Splitting has to precede that question, so the frames are
-        # split once here and routed per frame.
+        self.route_client_payload(payload)
+        byte_count = len(payload) * 3 // 4
+        return {"result": {"value": f"SENT_{byte_count}_BYTES via {_SIM_WS_URL}"}}
+
+    def route_client_payload(self, payload: str) -> None:
+        """Route one outbound payload, whoever wrote it.
+
+        Everything the client puts on this socket arrives here: the
+        bot's injected sends, the page client's lobby frames, and the
+        page client's key-driven commands. One socket carries two
+        protocols, told apart by the lead byte — ``!`` is an in-game
+        command, anything else is lobby — and the split has to precede
+        that question, so frames are split once and routed per frame
+        ([[session-state-deglobalisation]]).
+
+        Args:
+            payload: Base64 wire payload of framed client bytes.
+        """
         lobby_replies: list[bytes] = []
         for body in split_client_frames(payload):
             if body[0] != COMMAND_PREFIX:
@@ -313,8 +314,42 @@ class SimCDPSession:
             )
         )
         self._deliver_plaintext(lobby_replies)
-        byte_count = len(payload) * 3 // 4
-        return {"result": {"value": f"SENT_{byte_count}_BYTES via {_SIM_WS_URL}"}}
+
+    def _handle_key_event(self, params: JSONObject | None) -> JSONObject:
+        """Turn a dispatched key event into the frame the page would send.
+
+        The account-stats capture presses ``c`` through CDP and reads
+        the answer; in a browser the page's own script turns that press
+        into the ``CMD_STATISTICS`` command frame. The sim IS that
+        script, so the press really does put the command on the wire —
+        which is what gives the 0x56 answer something to answer
+        ([[session-state-deglobalisation]]).
+
+        Only the down edge sends: the capture dispatches ``keyDown``
+        then ``keyUp``, and acting on both would double every press.
+
+        Args:
+            params: The CDP event parameters.
+
+        Returns:
+            The CDP-shaped response.
+
+        Raises:
+            EncodeError: For a key the sim does not model. A silently
+                swallowed press would let a probe believe it acted.
+        """
+        if params is None:
+            raise EncodeError("sim session: Input.dispatchKeyEvent without params")
+        if require_str(params, "type") != _KEY_DOWN:
+            return {"result": {"value": None}}
+        key = require_str(params, "key")
+        if key != _STATISTICS_KEY:
+            raise EncodeError(f"sim session: unmodeled dispatched key {key!r}")
+        self.send_page_frame(
+            bytes([COMMAND_PREFIX])
+            + xor_decode_body(bytes([TYPE_QUERY, CMD_STATISTICS]), self.table)
+        )
+        return {"result": {"value": None}}
 
     def _handle_lobby_frame(self, body: bytes) -> list[bytes]:
         """Route one non-command client frame to the lobby.
@@ -350,16 +385,33 @@ class SimCDPSession:
             EncodeError: For ``Runtime.evaluate`` expressions the sim
                 does not model — loud, never best-effort.
         """
+        if method == "Input.dispatchKeyEvent":
+            return self._handle_key_event(params)
         if method != "Runtime.evaluate":
             return {"result": {"value": None}}
         if params is None:
             raise EncodeError("sim session: Runtime.evaluate without params")
         expression = require_str(params, "expression")
-        if "__tankpitActiveGame" in expression:
-            return {"result": {"value": encode_page_client_snapshot(self._snapshot())}}
         atob_start = expression.find("atob('")
         if atob_start != -1:
             return self._handle_send_expression(expression, atob_start)
+        return self._answer_query(expression)
+
+    def _answer_query(self, expression: str) -> JSONObject:
+        """Answer one read-only page query from sim truth.
+
+        Args:
+            expression: The evaluate expression.
+
+        Returns:
+            The CDP-shaped response.
+
+        Raises:
+            EncodeError: For an expression the sim does not model —
+                loud, never best-effort.
+        """
+        if "__tankpitActiveGame" in expression:
+            return {"result": {"value": encode_page_client_snapshot(self._snapshot())}}
         if "__sentFrameMetaQueue" in expression:
             return {"result": {"value": None}}
         if "__rawMsgs" in expression:
@@ -372,6 +424,10 @@ class SimCDPSession:
         if "tpclient" in expression:
             return self._answer_tpclient_query(expression)
         if "document.body" in expression:
+            # No DOM. The C-panel's account-lifetime totals are exactly
+            # the numbers the wire never carries, and fabricating a
+            # panel would invent an account history the sim has not
+            # played ([[session-state-deglobalisation]]).
             return {"result": {"value": ""}}
         raise EncodeError(f"sim session: unmodeled evaluate expression: {expression[:80]!r}")
 
@@ -393,20 +449,6 @@ class SimCDPSession:
         if expression.lstrip().startswith("fetch("):
             return {"result": {"value": f'var Ub="{require_static_key()}";'}}
         return {"result": {"value": _SIM_TPCLIENT_URL}}
-
-    def close_lobby(self) -> None:
-        """Send the page client's quit frame, ending the session.
-
-        The archive's 31 sent ``-`` frames are the page client leaving
-        — nothing in the bot sends one, which is why a sim session used
-        to just stop mid-stream with no teardown on the wire at all.
-
-        Raises:
-            EncodeError: If the link was built without a lobby.
-        """
-        if self.lobby is None:
-            raise EncodeError("sim session: close_lobby on a link with no lobby")
-        self.send_plaintext(QUIT_BODY)
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
         """Accept an event registration (the sim delivers via the buffer).

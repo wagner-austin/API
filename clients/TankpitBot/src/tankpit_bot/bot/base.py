@@ -13,7 +13,7 @@ from pathlib import Path
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
+from tankpit_bot._test_hooks import AutoscrollPageProtocol, CDPSessionProtocol, PageProtocol
 from tankpit_bot.bot.account_stats_capture import capture_account_stats
 from tankpit_bot.bot.ai.types import (
     AIConfigDict,
@@ -49,7 +49,7 @@ from tankpit_bot.runtime_logging import emit_state
 from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.status_bus import StatusBus, StatusBusProtocol
-from tankpit_bot.sniffer.core import (
+from tankpit_bot.sniffer.chrome_launch import (
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
     _maximize_via_cdp,
@@ -162,7 +162,12 @@ class Bot(DispatchMixin):
             cdp_service=cdp_service,
             command_service=command_service,
         )
-        self._page: PageProtocol | None = None
+        # Narrower than the full page: the only two things the bot does
+        # with it are the autoscroll toggle dance and the account-stats
+        # panel read, both of which press-and-poll. Naming what is
+        # actually called is what lets the simulator BE the page
+        # ([[session-state-deglobalisation]]).
+        self._page: AutoscrollPageProtocol | None = None
         # One-shot latch for the in-game autoscroll enforcement; the
         # tick loop flips it on the first spawned tick.
         self._autoscroll_enforced: bool = False

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
+from tankpit_bot._test_hooks import CDPSessionProtocol, PageWaitProtocol
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.browser.dom_scraper import scrape_page_text
 from tankpit_bot.diagnostics.account_stats import (
@@ -36,7 +36,7 @@ _ACCOUNT_STATS_PANEL_RENDER_MS = _ACCOUNT_STATS_POLL_INTERVAL_MS * _ACCOUNT_STAT
 
 def capture_account_stats(
     cdp: CDPSessionProtocol | None,
-    page: PageProtocol | None,
+    page: PageWaitProtocol | None,
     phase: str,
 ) -> None:
     """Sample the in-game ``C`` statistics panel and emit it.

@@ -141,14 +141,10 @@ def test_a_plaintext_frame_without_a_lobby_is_refused() -> None:
         link.send("Runtime.evaluate", {"expression": f"atob('{_b64(_frame(b'*1'))}')"})
 
 
-def test_opening_or_closing_a_lobbyless_link_is_refused() -> None:
-    """Both page-client rituals need a lobby to talk to."""
-    link = _link(with_lobby=False)
-
+def test_opening_a_lobbyless_link_is_refused() -> None:
+    """The page-client's opening ritual needs a lobby to talk to."""
     with pytest.raises(EncodeError, match="open_lobby"):
-        link.open_lobby()
-    with pytest.raises(EncodeError, match="close_lobby"):
-        link.close_lobby()
+        _link(with_lobby=False).open_lobby()
 
 
 def test_the_magic_and_tpclient_queries_answer_from_sim_truth() -> None:
@@ -203,18 +199,57 @@ def test_the_production_enforcer_verifies_autoscroll_off_over_the_seam() -> None
     assert link.autoscroll_enabled is False
 
 
-def test_closing_the_lobby_puts_the_quit_frame_on_the_wire() -> None:
-    """A session used to just stop; now it leaves the way a page does."""
+def test_the_production_graceful_quit_reaches_the_lobby() -> None:
+    """A session used to just stop; now the bot's own quit lands.
+
+    ``build_quit_command`` is the bot's, not a sim invention — the
+    plain un-XOR'd ``-`` it sends at teardown so the server records a
+    deliberate lobby exit instead of a socket drop.
+    """
+    from tankpit_bot.protocol.commands import build_quit_command
+
     link = _link()
     link.open_lobby()
 
-    link.close_lobby()
+    link.route_client_payload(_b64(build_quit_command()))
 
     assert _sent_bodies(link)[-1] == b"-"
     lobby = link.lobby
     if lobby is None:
         raise AssertionError("the link was built with a lobby")
     assert lobby.quit is True
+
+
+def test_the_statistics_key_press_puts_the_command_on_the_wire() -> None:
+    """Pressing ``c`` is what the PAGE turns into CMD_STATISTICS.
+
+    The account-stats capture dispatches the key through CDP and reads
+    the panel; in a browser the page's script sends the command frame,
+    which is what the server's 0x56 answers. Only the down edge sends —
+    the capture dispatches keyDown then keyUp
+    ([[session-state-deglobalisation]]).
+    """
+    link = _link()
+    link.open_lobby()
+
+    for event_type in ("keyDown", "keyUp"):
+        link.send("Input.dispatchKeyEvent", {"type": event_type, "key": "c"})
+
+    assert link.sent_commands == ["statistics"]
+    assert [m["msg_type"] for m in link.server.advance_tick()].count(0x56) == 1
+
+
+def test_an_unmodeled_dispatched_key_is_refused() -> None:
+    """A swallowed press would let a probe believe it acted."""
+    link = _link()
+    with pytest.raises(EncodeError, match="unmodeled dispatched key"):
+        link.send("Input.dispatchKeyEvent", {"type": "keyDown", "key": "z"})
+
+
+def test_a_key_event_without_params_is_refused() -> None:
+    """A dispatch with nothing to dispatch is a harness bug."""
+    with pytest.raises(EncodeError, match="without params"):
+        _link().send("Input.dispatchKeyEvent", None)
 
 
 def test_waiting_never_actually_sleeps() -> None:
