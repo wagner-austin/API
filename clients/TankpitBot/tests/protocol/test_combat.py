@@ -8,10 +8,10 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.protocol import (
-    DecodeError,
     decode_deactivation,
     decode_shoot_event,
 )
+from tankpit_bot.wire.helpers import DecodeError
 
 
 class TestDecodeShootEvent:

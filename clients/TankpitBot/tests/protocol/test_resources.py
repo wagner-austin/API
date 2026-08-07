@@ -8,13 +8,13 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.protocol import (
-    DecodeError,
     decode_equipment_gain,
     decode_equipment_toggle,
     decode_fuel_deposit,
     decode_fuel_gain,
     decode_inventory,
 )
+from tankpit_bot.wire.helpers import DecodeError
 
 
 class TestDecodeFuelGain:

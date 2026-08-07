@@ -45,12 +45,12 @@ from tankpit_bot.protocol import (
     SUPERVISOR_ERROR_CANT_GO,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
     TEXT_MSG_TYPES,
-    DecodeError,
     decode_message,
     is_text_message,
     try_decode_binary_message,
     try_decode_message,
 )
+from tankpit_bot.wire.helpers import DecodeError
 
 
 class TestIsTextMessage:

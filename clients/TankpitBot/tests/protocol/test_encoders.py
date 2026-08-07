@@ -59,7 +59,7 @@ from tankpit_bot.protocol.encoders import (
     encode_message_payload,
     encode_plaintext_ack,
 )
-from tankpit_bot.protocol.helpers import EncodeError, pack16, pack24, x16, x24
+from tankpit_bot.wire.helpers import EncodeError, pack16, pack24, x16, x24
 
 
 def test_pack16_and_pack24_invert_the_unpack_helpers() -> None:

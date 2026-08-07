@@ -8,12 +8,12 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.protocol import (
-    DecodeError,
     decode_join_confirm,
     decode_text_message,
     decode_world_info,
     try_decode_plaintext_ack,
 )
+from tankpit_bot.wire.helpers import DecodeError
 
 
 class TestDecodeJoinConfirm:

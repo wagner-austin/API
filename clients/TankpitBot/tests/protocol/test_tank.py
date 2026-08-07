@@ -8,7 +8,6 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.protocol import (
-    DecodeError,
     SupervisorDict,
     decode_action_done,
     decode_supervisor,
@@ -21,6 +20,9 @@ from tankpit_bot.protocol import (
     supervisor_error_code,
     supervisor_is_cant_go,
     supervisor_is_insufficient_fuel,
+)
+from tankpit_bot.wire.helpers import (
+    DecodeError,
     x24,
 )
 

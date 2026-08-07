@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.protocol import DecodeError, decode_map_data
+from tankpit_bot.protocol import decode_map_data
+from tankpit_bot.wire.helpers import DecodeError
 
 
 def _pack(rank: int, damage: int, team: int) -> int:

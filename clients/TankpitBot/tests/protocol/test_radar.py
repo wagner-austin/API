@@ -9,7 +9,6 @@ import pytest
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot.protocol import (
-    DecodeError,
     RadarContainerDict,
     RadarMineClearDict,
     RadarMineDict,
@@ -23,6 +22,7 @@ from tankpit_bot.protocol import (
     require_radar_mine_clear,
     require_radar_scan_result,
 )
+from tankpit_bot.wire.helpers import DecodeError
 
 
 class TestDecodeRadarResult:
@@ -488,7 +488,8 @@ class TestDecodeRadarContainerNotEnoughBytes:
 
     def test_raises_on_not_enough_bytes(self) -> None:
         """Raises DecodeError when not enough bytes."""
-        from tankpit_bot.protocol import DecodeError, decode_radar_container
+        from tankpit_bot.protocol import decode_radar_container
+        from tankpit_bot.wire.helpers import DecodeError
 
         data = bytes([0x00, 0x00, 0x00])  # Only 3 bytes, need 4
         with pytest.raises(DecodeError, match="not enough bytes"):

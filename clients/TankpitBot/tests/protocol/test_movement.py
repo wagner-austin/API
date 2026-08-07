@@ -8,9 +8,11 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.protocol import (
-    DecodeError,
     decode_movement,
     decode_movement_response,
+)
+from tankpit_bot.wire.helpers import (
+    DecodeError,
     x24,
 )
 
