@@ -309,6 +309,95 @@ class TestWebSocketSnifferMethods:
         # Call _on_message_captured - this should hit the mine_status branch
         sniffer._on_message_captured(message)
 
+    def test_on_message_captured_live_decodes_received(
+        self,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """A received frame is decoded live once the session magic is known.
+
+        The guard is ``xor_table is not None``: frames that arrive
+        before the magic cannot be decoded at all, so live decode has
+        nothing to print for them. This drives the other side of it --
+        table present, so the unified decoder runs and the frame lands
+        in world state.
+        """
+        from tankpit_bot.capture.xor import build_session_xor_table
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.encoders.movement import encode_movement
+        from tankpit_bot.protocol.framing import encode_frame
+        from tankpit_bot.protocol.types import MovementDict
+        from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+        from tankpit_bot.state.types import make_tank_state
+        from tankpit_bot.types import CapturedMessage
+
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
+        reset_world_state()
+        xor_table = build_session_xor_table("testmagic")
+
+        # 0x47 for a non-self tank moves whichever registry tank is
+        # standing on the start tile, so the registry has to know it.
+        get_world_service().world_state["tanks"] = {
+            "9": make_tank_state(
+                tank_id=9,
+                x=50,
+                y=60,
+                team=1,
+                rank=1,
+                damage_state=3,
+                name="red-9",
+                is_bot=False,
+                is_self=False,
+                timestamp_ms=1000,
+            )
+        }
+
+        sniffer = object.__new__(WebSocketSniffer)
+        sniffer._cdp_service = CDPService()
+        sniffer._live_decode = True
+        sniffer._magic = "testmagic"
+        sniffer._autosave_paths = ()
+        sniffer._game_log_scraper = None
+        sniffer._game_log_entries = []
+        sniffer._cdp_message_buffer = []
+        sniffer.xor_table = xor_table
+
+        # 0x47 Movement: tank 9 starts at (50, 60) and walks one tile
+        # east. Built with the production encoder, so a change to the
+        # wire layout surfaces here instead of passing against a
+        # hand-rolled shape that agrees with nothing.
+        plaintext = encode_movement(
+            MovementDict(
+                msg_type=0x47,
+                tank_id=9,
+                start_x=50,
+                start_y=60,
+                direction=0,
+                damage_state=3,
+                lb_score=0,
+                rank=1,
+                flag=0,
+                is_carrying=False,
+                waypoints=[],
+                path_tiles=1,
+                path="e",
+            )
+        )
+        body = bytes([0x47]) + bytes(plaintext[i] ^ xor_table[i] for i in range(len(plaintext)))
+        payload = base64.b64encode(encode_frame(body)).decode()
+
+        sniffer._on_message_captured(
+            CapturedMessage(
+                timestamp_ms=12345,
+                direction="received",
+                payload=payload,
+                ws_url="wss://example.com",
+            )
+        )
+
+        # The decode is the point: the walking tank reaches the registry.
+        tanks = get_world_service().get_world_state()["tanks"]
+        assert [(t["tank_id"], t["x"], t["y"]) for t in tanks.values()] == [(9, 51, 60)]
+
     def test_autosave_capture_no_paths_is_noop(self) -> None:
         """Returns immediately when autosave is not configured."""
         sniffer = object.__new__(WebSocketSniffer)
