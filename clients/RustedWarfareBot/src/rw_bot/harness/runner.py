@@ -67,6 +67,10 @@ class SweepConfig(TypedDict):
             an unpinned run of one seed are different simulations, so mixing
             them inside a batch would be an uncontrolled arm
             ([[policy-determinism]]).
+        fast_forward: Wall-clock multiple every match runs at, or zero for
+            realtime. Batch-level because it is certified bit-exact -- a fast
+            batch IS the realtime batch, only sooner (log 2026-08-06) -- and a
+            knob that varied per job would suggest otherwise.
     """
 
     out_dir: str
@@ -76,6 +80,7 @@ class SweepConfig(TypedDict):
     source_game_dir: str
     tree: str
     pin_delta: int
+    fast_forward: int
     match: MatchConfig | None
 
 
@@ -119,6 +124,7 @@ def decode_sweep_config(
         source_game_dir=require_non_empty_str(payload, "source_game_dir"),
         tree=require_non_empty_str(payload, "tree"),
         pin_delta=require_int(payload, "pin_delta"),
+        fast_forward=require_int(payload, "fast_forward"),
         match=match,
     )
 
@@ -140,6 +146,7 @@ def encode_sweep_config(config: SweepConfig) -> dict[str, str | int]:
         "source_game_dir": config["source_game_dir"],
         "tree": config["tree"],
         "pin_delta": config["pin_delta"],
+        "fast_forward": config["fast_forward"],
     }
 
 
@@ -333,6 +340,7 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
             config["match"],
             config["tree"],
             config["pin_delta"],
+            config["fast_forward"],
         )
     )
     card = scorecard(output)

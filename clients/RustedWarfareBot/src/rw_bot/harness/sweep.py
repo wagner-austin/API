@@ -302,6 +302,7 @@ def make_argv(
     match: MatchConfig | None = None,
     tree: str = "",
     pin_delta: int = 0,
+    fast_forward: int = 0,
 ) -> tuple[str, ...]:
     """Return the command that plays one match.
 
@@ -336,6 +337,11 @@ def make_argv(
             the option existed requires -- its agent rejects the unknown key
             -- so the default stays off until those trees retire
             ([[policy-determinism]]).
+        fast_forward: Wall-clock multiple to run the simulation at, or zero
+            for realtime. N identical pinned steps per loop pass -- the same
+            simulation N times as fast, certified bit-exact against realtime
+            at 10 (log 2026-08-06). Zero for the same frozen-tree reason as
+            the pin: an older agent rejects the unknown key.
 
     Returns:
         The argument vector, program first.
@@ -358,6 +364,8 @@ def make_argv(
         argv.append(f"PLAY_TREE={tree}")
     if pin_delta:
         argv.append(f"PLAY_PINDELTA={pin_delta}")
+    if fast_forward:
+        argv.append(f"PLAY_FASTFORWARD={fast_forward}")
     if match is not None:
         argv.extend(
             [
