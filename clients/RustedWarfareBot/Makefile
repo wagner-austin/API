@@ -337,6 +337,13 @@ PLAY_TREE ?=
 # one seed produce one answer ([[policy-determinism]]); trees frozen before the
 # option exists must run with 0, so the default stays off until they retire.
 PLAY_PINDELTA ?= 0
+# Fast-forward: target logic updates per second, 0 for the engine's own
+# pacing. With the delta pinned this multiplies wall-clock speed without
+# touching the simulation (task #35).
+PLAY_FASTFORWARD ?= 0
+# Diagnostic draw tap: 1 replaces the engine's generator with a per-caller
+# counting one and logs a tally per sample window (task #36).
+PLAY_RNGTAP ?= 0
 
 # How many extractors the income probe builds, and how long it stands still
 # between each one. Target-specific variables rather than a recursive $(MAKE):
@@ -352,7 +359,7 @@ INCOME_LOG ?= runs/income.log
 play:
 	@Write-Host ""
 	@Write-Host "==> play (headless match on port $(PLAY_PORT), log: $(PLAY_LOG))" -ForegroundColor Cyan
-	& scripts/make/play.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -Seed $(PLAY_SEED) -Lockstep $(PLAY_LOCKSTEP) -Settle $(PLAY_SETTLE) -PlayLog "$(PLAY_LOG)" -Map "$(PLAY_MAP)" -Opponents $(PLAY_OPPONENTS) -Difficulty $(PLAY_DIFFICULTY) -Tree "$(PLAY_TREE)" -PinDelta $(PLAY_PINDELTA) -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(PLAY_ARGS)" -Javac "$(JAVAC)" -Jar "$(JAR)"
+	& scripts/make/play.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -Seed $(PLAY_SEED) -Lockstep $(PLAY_LOCKSTEP) -Settle $(PLAY_SETTLE) -PlayLog "$(PLAY_LOG)" -Map "$(PLAY_MAP)" -Opponents $(PLAY_OPPONENTS) -Difficulty $(PLAY_DIFFICULTY) -Tree "$(PLAY_TREE)" -PinDelta $(PLAY_PINDELTA) -FastForward $(PLAY_FASTFORWARD) -RngTap $(PLAY_RNGTAP) -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(PLAY_ARGS)" -Javac "$(JAVAC)" -Jar "$(JAR)"
 
 # Host a LAN game the bot plays in, for a human to join. The join address is
 # printed at launch; the match starts the moment a player connects. Sparring
@@ -413,13 +420,19 @@ SWEEP_MATCH ?=
 # positional); trees frozen before the option exists must leave it empty.
 SWEEP_PINDELTA ?=
 
+# Wall-clock multiple every match in the batch runs at, empty for realtime.
+# The gym knob, certified bit-exact against realtime at 10 (log 2026-08-06).
+# Eighth positional, so it requires SWEEP_PINDELTA set; trees frozen before
+# the option exists must leave it empty.
+SWEEP_FASTFORWARD ?=
+
 # Depends on the agent jar because the batch freezes a copy of it: matches
 # play from the snapshot, so the jar has to be current when the snapshot is
 # taken rather than compiled per match ([[policy-loop]]).
 sweep: agent
 	@Write-Host ""
 	@Write-Host "==> sweep $(SWEEP_NAME) ($(SWEEP_WORKERS) workers, jobs: $(SWEEP_JOBS))" -ForegroundColor Cyan
-	poetry run python -m scripts.sweep "$(SWEEP_JOBS)" "$(SWEEP_NAME)" $(SWEEP_WORKERS) $(SWEEP_LOCKSTEP) $(SWEEP_MATCH) $(SWEEP_PINDELTA)
+	poetry run python -m scripts.sweep "$(SWEEP_JOBS)" "$(SWEEP_NAME)" $(SWEEP_WORKERS) $(SWEEP_LOCKSTEP) $(SWEEP_MATCH) $(SWEEP_PINDELTA) $(SWEEP_FASTFORWARD)
 
 income: PLAY_MODULE = scripts.income
 income: PLAY_ARGS = $(INCOME_STAGES) $(INCOME_IDLE)
