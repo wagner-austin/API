@@ -58,7 +58,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Args:
         argv: ``<job-file> <name> [workers] [lockstep] [map difficulty
-            [pin-delta-ms]]``. ``None`` reads the process arguments.
+            [pin-delta-ms [fast-forward]]]``. ``None`` reads the process
+            arguments.
 
     Returns:
         ``EXIT_OK`` when every match in the file has a result, ``EXIT_INCOMPLETE``
@@ -72,9 +73,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         OSError: When the job file cannot be read or a result cannot be written.
     """
     args = list(argv) if argv is not None else _test_hooks.read_argv()
-    if len(args) not in (2, 3, 4, 6, 7):
+    if len(args) not in (2, 3, 4, 6, 7, 8):
         _test_hooks.write_line(
-            "usage: sweep <job-file> <name> [workers] [lockstep] [map difficulty [pin-delta-ms]]"
+            "usage: sweep <job-file> <name> [workers] [lockstep] "
+            "[map difficulty [pin-delta-ms [fast-forward]]]"
         )
         return EXIT_BAD_USAGE
 
@@ -111,7 +113,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             # Zero leaves the engine on the wall clock, which is what a tree
             # frozen before the option existed requires; a pinned batch says
             # so explicitly ([[policy-determinism]]).
-            "pin_delta": int(args[6]) if len(args) == 7 else 0,
+            "pin_delta": int(args[6]) if len(args) >= 7 else 0,
+            # The gym knob, certified bit-exact against realtime at 10
+            # (log 2026-08-06): a fast batch is the realtime batch, sooner.
+            "fast_forward": int(args[7]) if len(args) == 8 else 0,
         },
         match,
     )

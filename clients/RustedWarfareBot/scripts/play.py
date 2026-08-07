@@ -57,6 +57,24 @@ DEFAULT_MAX_SAMPLES = 120
 #: that is not going to fill.
 OPENING_SETTLE_SAMPLES = 40
 
+#: Largest roster a configured match can start with. Every match this harness
+#: sets up opens as a command center and a builder; the engine's BOOT SANDBOX
+#: -- the ten-player default world the planner can now sample before the
+#: configured world goes live, its frame counter already pinned to zero --
+#: opens with factories, gunships and turrets, twenty-one units strong. A plan
+#: compiled against that roster inserts no factory and is dead at its first
+#: combat entry (log 2026-08-06: 0/24 at Very Hard AND at Hard). Rosters
+#: richer than this are the sandbox, and the planner waits for the wholesale
+#: world swap instead of compiling against furniture it is about to lose.
+FRESH_ROSTER_MAX = 4
+
+#: Samples a sandbox-rich opening may wait for the configured world to swap
+#: in. Short and separate from the settle bound: a real swap lands within a
+#: sample or two of the hold releasing, so eight covers it with margin, while
+#: a default-map probe -- whose rich world IS its real world -- pays two
+#: seconds, not ten.
+SANDBOX_SWAP_SAMPLES = 8
+
 EXIT_OK = 0
 EXIT_INCOMPLETE = 1
 EXIT_BAD_USAGE = 2
@@ -344,11 +362,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         opening = channel.next_sample()
         channel.send_ack()
         settled += 1
+    # A configured match replaces the boot world wholesale, so the swap is a
+    # roster sharing no identity with the sandbox's; a world still unswapped
+    # after the window is a run already in its real world (the default-map
+    # probes), and compiling against it is then correct.
+    if len([e for e in opening["entities"] if e["mine"] and e["complete"]]) > FRESH_ROSTER_MAX:
+        sandbox_ids = {e["unit_id"] for e in opening["entities"] if e["mine"]}
+        waited = 0
+        while waited < SANDBOX_SWAP_SAMPLES:
+            candidate = channel.next_sample()
+            channel.send_ack()
+            waited += 1
+            mine_now = {e["unit_id"] for e in candidate["entities"] if e["mine"]}
+            if mine_now and not (mine_now & sandbox_ids):
+                opening = candidate
+                break
+
     owned = [e["type_name"] for e in opening["entities"] if e["mine"] and e["complete"]]
     goals = doctrine["goals"]
     plan = expand(goals, tree, owned, catalogue)
 
     sys.stdout.write(f"doctrine: {doctrine['name']}\n")
+    # The expansion's whole input, because the plan is only as good as the
+    # roster it compiled against -- an 8-entry plan with no factory hid for a
+    # day because nothing recorded what "owned" was at compile time
+    # (log 2026-08-06).
+    sys.stdout.write(f"owned at compile (frame {opening['frame']}): {' '.join(sorted(owned))}\n")
     sys.stdout.write(f"goals: {' -> '.join(goals)}\n")
     sys.stdout.write(f"plan:  {' -> '.join(plan)}\n")
     for name in plan:

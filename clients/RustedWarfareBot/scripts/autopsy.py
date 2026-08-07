@@ -38,6 +38,14 @@ PROBES = (1500, 2000, 2500, 3400)
 #: trace was taken at.
 FRAMES_PER_SAMPLE = 75
 
+#: Fewest columns a line must split into to be a tick row. Thirteen is the
+#: original shape; the income pair (2026-08-05) landed between ``rival`` and
+#: ``world`` precisely so that every column this script indexes -- extractors
+#: at 4, lost at 5, worth at 10, rival at 11 -- kept its position, which is
+#: why one bound reads both the 13-column archive and the 15-column current
+#: shape instead of splitting the trace record into eras.
+_MIN_COLUMNS = 13
+
 
 class TracePoint(TypedDict):
     """One sample of a match, the columns autopsies read.
@@ -87,10 +95,11 @@ class MatchAutopsy(TypedDict):
 def decode_trace(text: str) -> tuple[TracePoint, ...]:
     """Read a recorder trace into its autopsy columns.
 
-    The trace is the recorder's fixed-width table: a header naming thirteen
-    columns, then one row per sample. Anything that is not such a row -- the
-    header, a blank line -- is skipped by shape, the same tolerance
-    :func:`scripts.analyze_sweep.drops` reads with.
+    The trace is the recorder's fixed-width table: a header naming the columns
+    -- thirteen before the income pair, fifteen since -- then one row per
+    sample. Anything that is not such a row -- the header, a blank line -- is
+    skipped by shape, the same tolerance :func:`scripts.analyze_sweep.drops`
+    reads with, and :data:`_MIN_COLUMNS` says why one bound reads both shapes.
 
     Args:
         text: The trace file's content.
@@ -101,7 +110,7 @@ def decode_trace(text: str) -> tuple[TracePoint, ...]:
     points: list[TracePoint] = []
     for line in text.splitlines():
         parts = line.split()
-        if len(parts) < 13 or not parts[0].lstrip("-").isdigit():
+        if len(parts) < _MIN_COLUMNS or not parts[0].lstrip("-").isdigit():
             continue
         points.append(
             TracePoint(
