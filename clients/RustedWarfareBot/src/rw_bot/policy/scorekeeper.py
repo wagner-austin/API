@@ -31,6 +31,7 @@ from rw_bot.policy.scoreboard import (
     standing_of,
     worth_of,
 )
+from rw_bot.policy.trace import losses_between, owned_by_id
 from rw_bot.policy.verdict import GRADE_SURVIVED, eliminated, grade
 from rw_bot.wire.state import Entity, Sample
 
@@ -99,6 +100,14 @@ class Scorekeeper:
         self._income_end = 0
         self._players_start = 0
         self._players_end = 0
+        # The death ledger's running tallies: killer type -> count, split by
+        # whether the victim could move. Fed by the same roster diff the
+        # trace's loss table uses, so the two never disagree about a death
+        # ([[policy-trace]]). Untouched vanishings (empty killer) are not
+        # kills and are left out of a table whose name claims they are.
+        self._previous_owned: Mapping[int, Entity] = {}
+        self._unit_deaths: dict[str, int] = {}
+        self._building_deaths: dict[str, int] = {}
 
     def observe(
         self,
@@ -131,6 +140,15 @@ class Scorekeeper:
         self.targets_end = len(targets)
         self._engageable_end = len(engageable(self._profiles, army, targets))
         self.visible_now = {entity["unit_id"] for entity in targets}
+        current_owned = owned_by_id(sample)
+        for loss in losses_between(self._previous_owned, current_owned, sample["frame"]):
+            if not loss["killer"]:
+                continue
+            stats = self._catalogue.get(loss["type_name"])
+            mobile = stats is None or stats["speed"] > 0.0
+            tally = self._unit_deaths if mobile else self._building_deaths
+            tally[loss["killer"]] = tally.get(loss["killer"], 0) + 1
+        self._previous_owned = current_owned
         self.extractors_end = count_extractors(sample)
         self._players_end = sample["players_left"]
 
@@ -251,6 +269,8 @@ class Scorekeeper:
             standing_end=self._standing_end,
             composition_end=self._composition_end,
             enemy_types_end=self._enemy_types_end,
+            units_lost_to=_ranked(self._unit_deaths),
+            buildings_lost_to=_ranked(self._building_deaths),
             income_end=self._income_end,
             players_start=self._players_start,
             players_end=self._players_end,
@@ -264,6 +284,23 @@ class Scorekeeper:
             credits_at_end=self._credits_at_end,
             outcome=outcome,
         )
+
+
+def _ranked(tally: Mapping[str, int]) -> tuple[tuple[str, int], ...]:
+    """Order a killer tally commonest first, ties by name.
+
+    Args:
+        tally: Killer type name to death count.
+
+    Returns:
+        The ranked pairs, deterministic across runs.
+    """
+    return tuple(sorted(tally.items(), key=_by_count_then_name))
+
+
+def _by_count_then_name(item: tuple[str, int]) -> tuple[int, str]:
+    """Sort key: most deaths first, names breaking ties."""
+    return (-item[1], item[0])
 
 
 __all__ = ["Scorekeeper"]

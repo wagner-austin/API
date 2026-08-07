@@ -43,6 +43,13 @@ class Loss(TypedDict):
         type_name: What it was.
         x: World x where it was last seen.
         y: World y where it was last seen.
+        killer: Type name of the unit that last damaged it before it went,
+            empty when nothing had -- a unit that vanished untouched left
+            the roster some other way (a conversion completing, a roster
+            read mid-change), and the blank is that distinction on the
+            record. Read off the PREVIOUS sample exactly as the position
+            is: the engine keeps ``lastDamagedBy`` current as damage lands
+            ([[policy-trace]]).
     """
 
     frame: int
@@ -50,6 +57,7 @@ class Loss(TypedDict):
     type_name: str
     x: float
     y: float
+    killer: str
 
 
 class Tick(TypedDict):
@@ -77,6 +85,22 @@ class Tick(TypedDict):
             because the endpoints cannot show a dip, and a dip is the only
             evidence in the whole report that the army ever cost an opponent
             anything ([[policy-verdict]]).
+        income: Credits per second, the engine's own figure for the local
+            player. The number every economy verdict regresses toward, carried
+            per sample because the endpoints hide when it moved: ``income 0/s``
+            at the end is the shared shape of every wipe, and the sample it
+            went to zero is the finding ([[policy-economy]]).
+        rival_income: The same figure for the player :func:`~rw_bot.policy.\
+scoreboard.best_rival` reads its worth from, so the pair describes one
+            opponent. Worth is the accumulated past; income is the compounding
+            rate the match is actually decided by, and the asymmetry between
+            this column and ours is the race law in one number per sample
+            ([[policy-economy]]).
+        plan: The opening plan's outcome this observation -- ``building``,
+            ``done``, ``blocked`` or ``stalled``. Appended for the exact-timing
+            collapse (log 2026-08-06): every ledger counted totals, and the
+            question that decided the diagnosis -- WHEN did the plan die, and
+            did it ever come back -- had no record anywhere.
         world: A deterministic digest of every visible entity's identity,
             position and health -- CRC32 over a canonical rendering, never
             Python's randomised ``hash``. The divergence detector: two
@@ -98,7 +122,10 @@ class Tick(TypedDict):
     refused: int
     worth: int
     rival: int
+    income: int
+    rival_income: int
     world: int
+    plan: str
 
 
 def owned_by_id(sample: Sample) -> Mapping[int, Entity]:
@@ -142,6 +169,7 @@ def losses_between(
             type_name=entity["type_name"],
             x=entity["x"],
             y=entity["y"],
+            killer=entity["damaged_by"],
         )
         for unit_id, entity in previous.items()
         if unit_id not in current
@@ -163,23 +191,31 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
     Returns:
         The lines, without newline terminators.
     """
+    # The income pair sits between rival and world rather than at the end, so
+    # every column an existing reader indexes (extractors 4, lost 5, worth 10,
+    # rival 11) keeps its position and only the world digest moves. A reader of
+    # the digest is comparing two traces of one build, which agree on shape; a
+    # reader of the figures is often crossing the change, and those are the
+    # indices that must not shift ([[policy-trace]]).
     lines = [
         f"{'frame':>8}{'army':>6}{'credits':>9}{'enemies':>9}{'extractors':>12}"
         f"{'lost':>6}{'producers':>11}{'idle':>6}{'orders':>8}{'refused':>9}"
-        f"{'worth':>9}{'rival':>9}{'world':>12}"
+        f"{'worth':>9}{'rival':>9}{'income':>8}{'rival_income':>14}{'world':>12}"
+        f"{'plan':>10}"
     ]
     lines.extend(
         f"{t['frame']:>8}{t['army']:>6}{t['credits']:>9}"
         f"{t['enemies']:>9}{t['extractors']:>12}{t['lost']:>6}"
         f"{t['producers']:>11}{t['idle']:>6}{t['orders']:>8}{t['refused']:>9}"
-        f"{t['worth']:>9}{t['rival']:>9}{t['world']:>12}"
+        f"{t['worth']:>9}{t['rival']:>9}{t['income']:>8}{t['rival_income']:>14}"
+        f"{t['world']:>12}{t['plan']:>10}"
         for t in ticks
     )
     lines.append("")
-    lines.append(f"{'frame':>8}{'unit':>8}  {'type':<18}{'x':>9}{'y':>9}")
+    lines.append(f"{'frame':>8}{'unit':>8}  {'type':<18}{'x':>9}{'y':>9}  {'killer':<18}")
     lines.extend(
         f"{loss['frame']:>8}{loss['unit_id']:>8}  {loss['type_name']:<18}"
-        f"{loss['x']:>9.0f}{loss['y']:>9.0f}"
+        f"{loss['x']:>9.0f}{loss['y']:>9.0f}  {loss['killer'] or '-':<18}"
         for loss in losses
     )
     return tuple(lines)

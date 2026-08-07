@@ -178,11 +178,35 @@ def best_rival(sample: Sample) -> int:
     return max((worth_of(p) for p in sample["players"] if p["hostile"]), default=0)
 
 
+def rival_income(sample: Sample) -> int:
+    """Return the income of the player :func:`best_rival` reads its worth from.
+
+    The same selection as :func:`best_rival` -- the hostile with the largest
+    total worth -- rather than the largest hostile income, so the two columns
+    describe one opponent. Worth is what they have accumulated; income is the
+    rate they are compounding at, and a trace that read the worth of one player
+    beside the income of another would chart a rivalry between nobody
+    ([[policy-economy]]).
+
+    Args:
+        sample: One observation of the world.
+
+    Returns:
+        That player's income, or zero when nothing hostile remains.
+    """
+    strongest: PlayerStat | None = None
+    for player in sample["players"]:
+        if player["hostile"] and (strongest is None or worth_of(player) > worth_of(strongest)):
+            strongest = player
+    return 0 if strongest is None else strongest["income"]
+
+
 __all__ = [
     "best_rival",
     "composition_of",
     "deepest_dip",
     "local_player",
+    "rival_income",
     "standing_of",
     "worth_of",
 ]

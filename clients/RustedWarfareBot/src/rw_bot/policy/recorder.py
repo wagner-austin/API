@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
+from rw_bot.policy.scoreboard import local_player, rival_income
 from rw_bot.policy.trace import (
     Loss,
     Tick,
@@ -58,6 +59,7 @@ class Recorder:
         refused: int,
         worth: int,
         rival: int,
+        plan: str,
     ) -> None:
         """Record one observation.
 
@@ -72,6 +74,7 @@ class Recorder:
             refused: Credit claims the budget turned down this observation.
             worth: Everything the player holds.
             rival: The strongest hostile player's total.
+            plan: The opening plan's outcome this observation.
         """
         if self._path is None:
             return
@@ -79,6 +82,12 @@ class Recorder:
         gone = losses_between(self._previous, current, sample["frame"])
         self._previous = current
         self.losses.extend(gone)
+        # The income pair is read off the sample here rather than passed in,
+        # like the losses and the digest: no other pass wants these numbers,
+        # and the scoreboard rows ride every sample already. ``local`` is None
+        # only on a stream that predates the player record, where zero is the
+        # honest column ([[policy-economy]]).
+        local = local_player(sample)
         self.ticks.append(
             Tick(
                 frame=sample["frame"],
@@ -93,7 +102,10 @@ class Recorder:
                 refused=refused,
                 worth=worth,
                 rival=rival,
+                income=0 if local is None else local["income"],
+                rival_income=rival_income(sample),
                 world=world_digest(sample),
+                plan=plan,
             )
         )
 

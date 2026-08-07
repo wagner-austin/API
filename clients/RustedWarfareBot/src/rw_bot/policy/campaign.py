@@ -422,6 +422,7 @@ def play(
                 refused_now,
                 scores.worth_end,
                 scores.rival_worth_end,
+                build_outcome,
             )
 
             # The engine's verdict is the only thing that ends a match early.

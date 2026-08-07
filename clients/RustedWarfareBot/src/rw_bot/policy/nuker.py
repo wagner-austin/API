@@ -15,9 +15,10 @@ turrets starved the 45,000 forever -- the launcher was never ordered until
 cover was silenced. **The launch flag is a lie about ammo**: the row reads
 available at zero warheads, and a launch fired early is dropped without a
 word, so every launch is refired until the world answers. **Targets are
-matched by what they are worth**, not by name: the warhead goes to the
-most expensive hostile structure in sight, because a finisher that snipes
-scouts is a 11,000-credit mistake.
+matched by what the blast erases**, not by any one name: the warhead goes
+to the centre of the richest 250-radius circle of hostile structures,
+because an area weapon aimed at one building -- however pricey -- is an
+11,000-credit strike paying back less than it cost.
 
 Doctrine-gated (``nukes``), because the big-ticket law stands: saving
 toward any large purchase during contested Very Hard play has lost four
@@ -64,6 +65,11 @@ LAUNCH_RETRY_SAMPLES: Final = 300
 #: consecutive ticks.
 ARM_RETRY_SAMPLES: Final = 60
 
+#: The warhead's blast radius, from the asset: 5,400 area damage over 250,
+#: enough to kill any structure inside (`nuke_launcher.ini`,
+#: projectile_nukeProjectile).
+BLAST_RADIUS: Final = 250.0
+
 #: Income per second below which the launcher does not fund at all.
 #:
 #: **Measured, twice.** The first screen withheld the 45,000 from tick one
@@ -109,30 +115,44 @@ def _economy_stands(sample: Sample) -> bool:
 
 
 def best_target(sample: Sample, catalogue: Mapping[str, UnitStats]) -> Entity | None:
-    """Choose the most expensive hostile structure in sight.
+    """Choose the hostile structure whose blast circle erases the most worth.
 
     Structures rather than units because the warhead flies for seconds and
-    a structure will still be there; the priciest because the finisher's
-    job is converting 11,000 credits into more than 11,000 of their loss.
+    a structure will still be there. Scored by the summed price of every
+    hostile structure inside :data:`BLAST_RADIUS` of the candidate --
+    the warhead is an area weapon, and choosing the priciest SINGLE
+    structure aimed 11,000 credits at buildings worth less than that.
+    The packed base core -- command centre, factories, extractors inside
+    one circle -- is what the finisher exists to erase.
 
     Args:
         sample: One observation of the world.
         catalogue: Unit stats by type name, for price and immobility.
 
     Returns:
-        The target, or None while no hostile structure is visible.
+        The structure at the centre of the richest blast circle, or None
+        while no hostile structure is visible.
     """
-    best: Entity | None = None
-    best_price = 0
+    structures: list[tuple[Entity, int]] = []
     for entity in sample["entities"]:
         if not entity["hostile"]:
             continue
         stats = catalogue.get(entity["type_name"])
         if stats is None or stats["speed"] != 0.0:
             continue
-        if best is None or stats["price"] > best_price:
-            best = entity
-            best_price = stats["price"]
+        structures.append((entity, stats["price"]))
+    best: Entity | None = None
+    best_worth = 0
+    limit = BLAST_RADIUS**2
+    for candidate, _ in structures:
+        worth = sum(
+            price
+            for other, price in structures
+            if (other["x"] - candidate["x"]) ** 2 + (other["y"] - candidate["y"]) ** 2 <= limit
+        )
+        if best is None or worth > best_worth:
+            best = candidate
+            best_worth = worth
     return best
 
 
@@ -313,6 +333,7 @@ class Nuker:
 
 __all__ = [
     "ARM_RETRY_SAMPLES",
+    "BLAST_RADIUS",
     "FUNDING_INCOME_FLOOR",
     "LAUNCHER_TYPE",
     "LAUNCH_RETRY_SAMPLES",

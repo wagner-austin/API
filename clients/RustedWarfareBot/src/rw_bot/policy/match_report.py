@@ -113,6 +113,15 @@ class MatchReport(TypedDict):
             were invisible in every figure above -- a turret is neither army nor
             income, so twelve full matches could not answer whether one had ever
             been built ([[policy-holding-ground]]).
+        units_lost_to: Killer type and count for every MOBILE unit of ours
+            that vanished with a last damager on record, commonest killer
+            first. The death ledger's answer to "what kills our units":
+            inferred losses without a damager are deliberately absent,
+            because a conversion completing is not a kill
+            ([[policy-trace]]).
+        buildings_lost_to: The same table for our structures -- "what
+            destroys our buildings", the perimeter-erosion class named by
+            enemy type instead of guessed at.
         composition_end: How many of each armed type were held at the last
             observation, commonest first. A composition is something the caller
             *asks* for, and asking is not getting: a type the engine never
@@ -186,6 +195,8 @@ class MatchReport(TypedDict):
     workers_end: int
     standing_end: tuple[tuple[str, int], ...]
     composition_end: tuple[tuple[str, int], ...]
+    units_lost_to: tuple[tuple[str, int], ...]
+    buildings_lost_to: tuple[tuple[str, int], ...]
     enemy_types_end: tuple[tuple[str, int], ...]
     income_end: int
     players_start: int
@@ -252,6 +263,8 @@ def format_report(report: MatchReport) -> tuple[str, ...]:
         f"workers        {report['workers_end']}",
         f"structures     {_format_composition(report['standing_end'])}",
         f"composition    {_format_composition(report['composition_end'])}",
+        f"units lost to  {_format_composition(report['units_lost_to'])}",
+        f"works lost to  {_format_composition(report['buildings_lost_to'])}",
         f"enemy fields   {_format_composition(report['enemy_types_end'])}",
         f"income         {report['income_end']}/s",
         f"enemies seen   {report['targets_seen']} -> {report['targets_end']}"
