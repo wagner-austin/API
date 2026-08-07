@@ -48,9 +48,11 @@ from tankpit_bot.sim.emissions import (
     emit_radar,
     emit_teleport,
 )
+from tankpit_bot.sim.ferries import drift_ferries
 from tankpit_bot.sim.movement import process_move
 from tankpit_bot.sim.viewport_window import ViewportTracker
 from tankpit_bot.sim.wire_statements import (
+    full_status_statement,
     identity_statement,
     position_statement,
     queued_tank_id,
@@ -119,7 +121,8 @@ class SimServer:
         harness's ``place_self``): the client's OWN identity (0x21)
         first — the archive convention the audit validators rely on is
         that the first TankInfo of a session names the player's own
-        tank (``validate.wire_timeline``) — then own position (0x3D),
+        tank (``validate.wire_timeline``) — then its FULL status
+        (0x3E), the viewport patch (0x5A), own position (0x3D),
         absolute fuel (0x44), and inventory (0x49), then an identity
         (0x21) for every other living tank and a position statement
         (0x3D) only for those inside the client's viewport — tank
@@ -127,14 +130,22 @@ class SimServer:
         tanks surface as map blips ([[map-data-decode]]) until they
         enter the viewport.
 
+        The 0x3E and the 0x5A-before-0x3D ordering come from the
+        archive, not from taste: 285 of 285 real sessions open with
+        ``0x21, 0x3E, 0x5A, 0x3D…, 0x2E`` and then a run of other
+        tanks' identities. The sim had no 0x3E anywhere, which is why
+        that family showed 286 real frames against zero sim ones
+        ([[session-state-deglobalisation]]).
+
         Returns:
             The decoded messages of the join burst, in order.
         """
         client = self.world["tanks"][self.client_id]
         messages: list[BinaryMessage] = [
             identity_statement(self.world, self.client_id),
-            position_statement(self.world, self.client_id),
+            full_status_statement(self.world, self.client_id),
             self._viewport.build_update(),
+            position_statement(self.world, self.client_id),
             FuelGainDict(msg_type=0x44, fuel_total=client["fuel"], is_free=False, flag=1),
             InventoryDict(
                 msg_type=0x49,
@@ -549,6 +560,11 @@ class SimServer:
                 # them if the landing is in view, and the sync
                 # loop resumes their tier-3 cadence either way.
                 reactivate_practice_bot(self.world, self.terrain, tank_id)
+        # Ferries drift on the tick (measured median gap 2003 ms) and
+        # BEFORE the viewport refresh below, so a ferry crossing the
+        # patch grid repaints it in the same batch that announced the
+        # move ([[ferry-mechanics]], [[session-state-deglobalisation]]).
+        drift_ferries(self.world, self.terrain, messages)
         self._viewport.emit_transitions(messages)
         # Dynamic-layer refresh is EVENT-driven, never walk-driven:
         # the client's window is static between teleports (autoscroll

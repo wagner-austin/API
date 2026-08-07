@@ -246,17 +246,24 @@ def test_handshake_covers_client_and_living_tanks_only() -> None:
 
     The first 0x21 of a session names the player's own tank — the
     archive convention ``validate.wire_timeline`` keys self-attribution
-    on, so the sim must open the same way the real server does.
+    on, so the sim must open the same way the real server does. The
+    0x3E full status and the 0x5A-before-0x3D ordering are archived
+    too: 285 of 285 real sessions open ``0x21, 0x3E, 0x5A, 0x3D``
+    ([[session-state-deglobalisation]]).
     """
     server = _server()
     server.world["tanks"][12] = make_sim_tank(12, 3, 1, 20, 20, 100)
     server.world["tanks"][12]["alive"] = False
     burst = server.handshake()
     kinds = _kinds(burst)
-    assert kinds == [0x21, 0x3D, 0x5A, 0x44, 0x49, 0x21, 0x3D]
+    assert kinds == [0x21, 0x3E, 0x5A, 0x3D, 0x44, 0x49, 0x21, 0x3D]
     own = burst[0]
     assert own["msg_type"] == 0x21
     assert own["tank_id"] == 9
+    status = burst[1]
+    assert status["msg_type"] == 0x3E
+    assert status["tank_id"] == 9
+    assert status["name"] == server.world["tanks"][9]["name"]
     viewport = burst[2]
     assert viewport["msg_type"] == 0x5A
     assert (viewport["viewport_left"], viewport["viewport_top"]) == (2, 2)

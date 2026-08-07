@@ -12,6 +12,7 @@ from tankpit_bot.protocol.types import (
     MovementDict,
     MovementResponseDict,
     TankInfoDict,
+    TankStatusDict,
     TankStatusSyncDict,
 )
 from tankpit_bot.sim.commands import ClientCommandDict
@@ -122,6 +123,42 @@ def identity_statement(world: SimWorldDict, tank_id: int) -> TankInfoDict:
     )
 
 
+def full_status_statement(world: SimWorldDict, tank_id: int) -> TankStatusDict:
+    """Build the 0x3E full status the join burst carries for own tank.
+
+    Every one of the 285 archived real sessions opens with the same
+    five received frames and then ``0x21 identity, 0x3E full status,
+    0x5A viewport, 0x3D position, 0x2E sync`` — the 0x3E always names
+    the player's own tank. The sim's handshake had no 0x3E at all, so
+    286 archived frames of this family had no sim counterpart
+    ([[session-state-deglobalisation]]).
+
+    Leaderboard score, leaderboard position and decorations are zero
+    for the same reason ``identity_statement`` zeroes them: the sim
+    keeps no cross-session standings, and inventing a rank would be a
+    number the bot could read and believe.
+
+    Args:
+        world: Simulated world.
+        tank_id: The described tank.
+
+    Returns:
+        The full status message.
+    """
+    tank = world["tanks"][tank_id]
+    return TankStatusDict(
+        msg_type=0x3E,
+        team=tank["team"],
+        rank=tank["rank"],
+        damage_state=damage_tier(tank["fuel"], tank["rank"]),
+        tank_id=tank_id,
+        decoration_state=bytes(4),
+        leaderboard_score=0,
+        leaderboard_position=0,
+        name=tank["name"],
+    )
+
+
 def position_statement(world: SimWorldDict, tank_id: int) -> MovementResponseDict:
     """Build a 0x3D position statement for one tank.
 
@@ -148,6 +185,7 @@ def position_statement(world: SimWorldDict, tank_id: int) -> MovementResponseDic
 
 
 __all__ = [
+    "full_status_statement",
     "identity_statement",
     "movement_echo",
     "position_statement",
