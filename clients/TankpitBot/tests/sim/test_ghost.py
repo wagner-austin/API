@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import base64
+
 import pytest
 from platform_core.json_utils import (
     dump_json_str,
@@ -15,6 +17,9 @@ from platform_core.json_utils import (
     narrow_json_to_str,
 )
 
+from tankpit_bot.capture.xor import build_session_xor_table, xor_decode_body
+from tankpit_bot.protocol.constants import MSG_DEACTIVATE
+from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.protocol.types import (
     ChatMessageDict,
 )
@@ -32,6 +37,7 @@ from tankpit_bot.sim.world import (
 from tests.conftest import FakeFileSystem
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 from tests.sim._ghost_fixtures import (
+    _MAGIC,
     _T0,
     _capture,
     _fight_capture,
@@ -80,6 +86,30 @@ def test_compiler_dot_atlas_seeds_unread_dots_as_drained() -> None:
     drained = [c for c in spec["containers"] if c["volume"] == 0]
     assert {(c["x"], c["y"]) for c in drained} == {(140, 90), (150, 95)}
     assert all(c["dotted"] for c in drained)
+
+
+def test_compiler_skips_an_undecodable_frame() -> None:
+    """A frame the decoder rejects is dropped, and the walk continues.
+
+    The compiler reads a recording to replay it, so one corrupt frame
+    must not cost the frames after it in the same payload -- the same
+    rule the FramingError branch above already keeps for a corrupt
+    payload. Proven by splicing a truncated ``0x41`` Deactivation (the
+    decoder requires 6 bytes; this carries 2) in front of a known-good
+    capture's first received payload and asserting the compiled spec
+    is byte-identical to the one compiled without it.
+    """
+    table = build_session_xor_table(_MAGIC)
+    truncated = bytes([MSG_DEACTIVATE]) + xor_decode_body(b"", table)
+
+    session = narrow_json_to_dict(load_json_str(_fight_capture()))
+    messages = narrow_json_to_list(session["messages"])
+    first = narrow_json_to_dict(messages[0])
+    first["payload"] = base64.b64encode(
+        encode_frame(truncated) + base64.b64decode(narrow_json_to_str(first["payload"]))
+    ).decode("ascii")
+
+    assert compile_ghost_spec(dump_json_str(session)) == compile_ghost_spec(_fight_capture())
 
 
 def test_compiler_refuses_a_selfless_capture() -> None:
