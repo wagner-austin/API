@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
+from tankpit_bot.bot.ai.types import (
+    AIStateDict,
+    make_initial_ai_state,
+)
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.ledger.damage_book import confirm_incoming_damage, record_incoming_shot
 from tankpit_bot.sniffer.world_state import get_world_service

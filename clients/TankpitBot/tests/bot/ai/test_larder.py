@@ -313,7 +313,7 @@ def test_walk_dominant_range_excludes_close_offscreen_containers() -> None:
 def _ferry_tile(x: int, y: int, observed_ms: int) -> TerrainTileDict:
     """Return a wire-terrain ferry belief at the given tile."""
     from tankpit_bot.state.types import make_terrain_tile
-    from tankpit_bot.state.types.constants import TERRAIN_FERRY
+    from tankpit_bot.types.constants import TERRAIN_FERRY
 
     return make_terrain_tile(x, y, TERRAIN_FERRY, observed_ms=observed_ms)
 

@@ -379,7 +379,7 @@ def test_stale_human_exists_filters_and_reasons() -> None:
     returns True.
     """
     consent_human(90)
-    from tankpit_bot.bot.ai.threats import stale_human_exists
+    from tankpit_bot.bot.ai.threat_acquisition import stale_human_exists
 
     ally_human = make_tank_state(
         tank_id=70,

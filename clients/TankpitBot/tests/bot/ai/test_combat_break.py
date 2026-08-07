@@ -8,7 +8,11 @@ from tankpit_bot.bot.ai.combat_break import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
-from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict, make_enemy_threat
+from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.ai.world_types import (
+    EnemyThreatDict,
+    make_enemy_threat,
+)
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import TankStateDict, make_container_state, make_tank_state

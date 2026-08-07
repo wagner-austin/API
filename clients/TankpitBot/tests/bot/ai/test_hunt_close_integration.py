@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.combat_strategy import combat_landing_tile as _combat_landing_tile
+from tankpit_bot.bot.ai.combat_target import combat_landing_tile as _combat_landing_tile
 from tankpit_bot.bot.ai.context import DecideCtx, filter_killed_tanks
-from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict
+from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import TankStateDict, make_tank_state

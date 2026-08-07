@@ -10,7 +10,10 @@ override short-circuits the auto path.
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
+from tankpit_bot.bot.ai.types import (
+    AIStateDict,
+    make_initial_ai_state,
+)
 from tankpit_bot.bot.ai_strategy import decide
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 

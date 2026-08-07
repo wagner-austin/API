@@ -269,7 +269,7 @@ class TestDisplacedLandingScanEconomics:
     def test_displaced_landing_in_live_coverage_skips_the_radar(self) -> None:
         """Flag s9-2: a displaced harvest landing in fully-scanned
         ground latched WITHOUT spending an extra."""
-        from tankpit_bot.bot.ai.collect_mode import _scan_on_landing_decision
+        from tankpit_bot.bot.ai.collect_mode_outcomes import _scan_on_landing_decision
 
         world, self_state = make_world(
             fuel=900,

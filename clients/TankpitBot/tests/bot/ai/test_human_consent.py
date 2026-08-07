@@ -12,12 +12,12 @@ from tankpit_bot.bot.ai.combat_landing import (
     GREETING_STANDOFF_TILES,
     choose_greeting_landing_tile,
 )
-from tankpit_bot.bot.ai.threats import (
-    analyze_threats,
-    find_acquisition_target,
+from tankpit_bot.bot.ai.threat_acquisition import find_acquisition_target
+from tankpit_bot.bot.ai.threat_primitives import (
     human_combat_consented,
     make_enemy_threat_from_tank,
 )
+from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.ledger.damage_book import record_incoming_shot
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.state.types import (

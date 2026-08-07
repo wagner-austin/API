@@ -7,7 +7,10 @@ from tankpit_bot.bot.ai.combat_landing import (
     combat_landing_candidates,
     has_cardinal_enemy_adjacency,
 )
-from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
+from tankpit_bot.bot.ai.world_types import (
+    EnemyThreatDict,
+    make_enemy_threat,
+)
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,

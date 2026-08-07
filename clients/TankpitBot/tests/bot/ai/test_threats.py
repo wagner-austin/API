@@ -1,113 +1,26 @@
-"""Tests for AI threat analysis."""
+"""Tests for threat analysis: the per-tick viewport scan.
+
+``test_threats.py`` was 737 lines; acquisition is now a sibling,
+mirroring the source split.
+"""
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.threats import (
-    analyze_threats,
-    find_acquisition_target,
+from tankpit_bot.bot.ai.threat_acquisition import find_acquisition_target
+from tankpit_bot.bot.ai.threat_primitives import (
     find_closest_threat,
-    find_locked_target_pursuit,
     manhattan_distance,
     threats_in_range,
 )
-from tankpit_bot.state.types import (
-    SelfStateDict,
-    TankStateDict,
-    WorldStateDict,
-    make_self_state,
-    make_tank_state,
-    make_viewport_state,
+from tankpit_bot.bot.ai.threats import (
+    analyze_threats,
 )
-from tankpit_bot.state.types.constants import TankLiveness
+from tests.bot.ai._threat_fixtures import (
+    _self_at,
+    _tank,
+    _world,
+)
 from tests.in_memory_terrain_map import InMemoryTerrainMap
-
-
-def _tank(
-    key: str,
-    x: int = 0,
-    y: int = 0,
-    team: int = 1,
-    damage_state: int = 0,
-    direction: int = 0,
-    name: str = "",
-    is_bot: bool = True,
-    is_self: bool = False,
-    liveness: TankLiveness = "alive",
-) -> TankStateDict:
-    """Create a TankStateDict with defaults for testing.
-
-    Args:
-        key: Tank ID as string.
-        x: X coordinate.
-        y: Y coordinate.
-        team: Team ID.
-        damage_state: Damage state (0-3).
-        direction: Sprite direction (0-31 alive, 32-33 dead).
-        name: Player name (defaults to "tank-{key}").
-        is_bot: Whether this is a bot.
-        is_self: Whether this is the player's tank.
-        liveness: Lifecycle state. Defaults to ``"alive"``.
-
-    Returns:
-        TankStateDict with the provided values.
-    """
-    # Default names are practice-bot style (``red-{key}``): these
-    # fixtures test the distance/freshness/liveness gates, and bot
-    # classification keeps them clear of BOTH human-only gates (the
-    # 2026-07-28 rank window and the 2026-07-30 consent contract).
-    # Tests about the human gates pass explicit human names.
-    return make_tank_state(
-        tank_id=int(key),
-        x=x,
-        y=y,
-        team=team,
-        rank=1,
-        damage_state=damage_state,
-        direction=direction,
-        name=name or f"red-{key}",
-        is_bot=is_bot,
-        is_self=is_self,
-        liveness=liveness,
-    )
-
-
-def _world(tanks: dict[str, TankStateDict]) -> WorldStateDict:
-    """Build a WorldStateDict with only the given tanks.
-
-    Args:
-        tanks: Dict mapping tank_id string keys to TankStateDicts.
-
-    Returns:
-        WorldStateDict with the provided tanks.
-    """
-    return WorldStateDict(
-        self_state=None,
-        tanks=tanks,
-        containers={},
-        mines={},
-        terrain={},
-        viewport=make_viewport_state(left=0, top=0, width=18, height=18),
-        scanned_tiles={},
-        timestamp_ms=0,
-    )
-
-
-def _self_at(x: int = 100, y: int = 100) -> SelfStateDict:
-    """Create self state at given position on team 0."""
-    return make_self_state(
-        tank_id=1,
-        x=x,
-        y=y,
-        team=0,
-        rank=4,
-        fuel=800,
-        leaderboard_position=1,
-    )
-
-
-# =============================================================================
-# manhattan_distance
-# =============================================================================
 
 
 class TestManhattanDistance:
@@ -132,11 +45,6 @@ class TestManhattanDistance:
     def test_negative_direction(self) -> None:
         """Distance is always positive regardless of direction."""
         assert manhattan_distance(20, 20, 10, 5) == 25
-
-
-# =============================================================================
-# analyze_threats
-# =============================================================================
 
 
 class TestAnalyzeThreats:
@@ -275,7 +183,7 @@ class TestAnalyzeThreats:
         owns the corpse classification; the threat selector is a single
         liveness check.
         """
-        from tankpit_bot.state.mutations import apply_tank_observation
+        from tankpit_bot.state.tank_mutations import apply_tank_observation
         from tankpit_bot.state.types import make_tank_observation
 
         world = _world({"10": _tank("10", x=110, y=100, team=1)})
@@ -311,11 +219,6 @@ class TestAnalyzeThreats:
         assert len(threats) == 3
 
 
-# =============================================================================
-# find_closest_threat
-# =============================================================================
-
-
 class TestFindClosestThreat:
     """Tests for find_closest_threat."""
 
@@ -335,11 +238,6 @@ class TestFindClosestThreat:
         closest = find_closest_threat(threats)
         assert closest == threats[0]
         assert closest["tank_id"] == 20
-
-
-# =============================================================================
-# threats_in_range
-# =============================================================================
 
 
 class TestThreatsInRange:
@@ -575,161 +473,3 @@ class TestFindAcquisitionTarget:
         if result is None:
             raise AssertionError("expected the affordable diagonal enemy")
         assert result["tank_id"] == 20
-
-
-class TestFindLockedTargetPursuit:
-    """Tests for ``find_locked_target_pursuit`` (locked-target chase)."""
-
-    def test_returns_none_when_no_lock(self) -> None:
-        """``locked_target_id == -1`` means no lock to pursue."""
-        world = _world({})
-
-        result = find_locked_target_pursuit(
-            world,
-            _self_at(),
-            locked_target_id=-1,
-            killed={},
-        )
-
-        assert result is None
-
-    def test_returns_none_when_locked_target_killed(self) -> None:
-        """A locked target on the kill cooldown is not pursued.
-
-        Once the bot has observed a kill, the cooldown applies even
-        if the registry still lists the tank. Otherwise the pursuit
-        path would re-engage corpses for a few seconds.
-        """
-        tank = _tank("50", x=105, y=100, team=1)
-        tank["timestamp_ms"] = 100000
-        world = _world({"50": tank})
-
-        result = find_locked_target_pursuit(
-            world,
-            _self_at(),
-            locked_target_id=50,
-            killed={"50": 99500},
-        )
-
-        assert result is None
-
-    def test_returns_none_when_target_not_in_registry(self) -> None:
-        """A locked id that is no longer in ``world["tanks"]`` cannot be pursued."""
-        world = _world({})
-
-        result = find_locked_target_pursuit(
-            world,
-            _self_at(),
-            locked_target_id=50,
-            killed={},
-        )
-
-        assert result is None
-
-    def test_returns_none_when_target_deactivated(self) -> None:
-        """A deactivated (corpse-window) tank is not a pursuit target."""
-        tank = _tank("50", x=105, y=100, team=1, liveness="deactivated")
-        tank["timestamp_ms"] = 100000
-        world = _world({"50": tank})
-
-        result = find_locked_target_pursuit(
-            world,
-            _self_at(),
-            locked_target_id=50,
-            killed={},
-        )
-
-        assert result is None
-
-    def test_returns_none_when_target_at_origin(self) -> None:
-        """A tank with no position-bearing wire (still at (0,0)) is unfireable."""
-        tank = _tank("50", x=0, y=0, team=1)
-        tank["timestamp_ms"] = 100000
-        world = _world({"50": tank})
-
-        result = find_locked_target_pursuit(
-            world,
-            _self_at(),
-            locked_target_id=50,
-            killed={},
-        )
-
-        assert result is None
-
-    def test_returns_pursuit_threat_even_when_timestamp_is_stale(self) -> None:
-        """Pursuit fires at the cached coords regardless of timestamp staleness.
-
-        The earlier 5 s freshness gate was removed 2026-06-22 -- it
-        was tripping on tanks the server stopped broadcasting 0x2E
-        for (typically because they teleported far away), ending
-        pursuit prematurely. Ammo only decrements on confirmed hit,
-        so over-pursuing burns no resources -- the loop is bounded
-        by 0x41 Deactivation or the kill cooldown, both authoritative
-        death signals.
-        """
-        tank = _tank("50", x=105, y=100, team=1, name="prey")
-        tank["timestamp_ms"] = 80000  # 20 s stale at now_ms=100000 -- old gate would have tripped
-
-        world = _world({"50": tank})
-
-        result = find_locked_target_pursuit(
-            world,
-            _self_at(),
-            locked_target_id=50,
-            killed={},
-        )
-
-        if result is None:
-            raise AssertionError("expected pursuit threat even with stale timestamp")
-        assert result["tank_id"] == 50
-        assert result["x"] == 105
-        assert result["y"] == 100
-
-    def test_returns_pursuit_threat_for_alive_locked_target(self) -> None:
-        """An alive locked target returns a pursuit threat at cached coords."""
-        tank = _tank("50", x=105, y=100, team=1, name="prey")
-        tank["timestamp_ms"] = 100000
-        world = _world({"50": tank})
-
-        result = find_locked_target_pursuit(
-            world,
-            _self_at(),
-            locked_target_id=50,
-            killed={},
-        )
-
-        if result is None:
-            raise AssertionError("expected a pursuit threat for alive target")
-        assert result["tank_id"] == 50
-        assert result["x"] == 105
-        assert result["y"] == 100
-
-
-def test_pursuit_trace_dead_when_target_missing_from_registry() -> None:
-    """An id absent from the registry has no live trace (audit gap pin)."""
-    from tankpit_bot.bot.ai.threats import pursuit_trace_is_live
-    from tests.bot.ai._support import make_world
-
-    world, _self_state = make_world(self_x=100, self_y=100, fuel=800)
-
-    assert pursuit_trace_is_live(world, 999, 100000) is False
-
-
-def test_pursuit_homing_budget_spent_for_a_vanished_target() -> None:
-    """A stamped target missing from the registry stays spent, never re-fired."""
-    from tankpit_bot.bot.ai.threats import pursuit_homing_budget_spent
-    from tests.bot.ai._support import make_world
-
-    world, _self_state = make_world(self_x=100, self_y=100, fuel=800)
-
-    assert pursuit_homing_budget_spent(world, 999, 999, 95000) is True
-
-
-def test_pursuit_homing_budget_fresh_for_a_different_target() -> None:
-    """The stamp binds to one target id; another lock has a fresh budget."""
-    from tankpit_bot.bot.ai.threats import pursuit_homing_budget_spent
-    from tests.bot.ai._support import make_world
-
-    world, _self_state = make_world(self_x=100, self_y=100, fuel=800)
-
-    assert pursuit_homing_budget_spent(world, 999, 42, 95000) is False

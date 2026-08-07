@@ -290,7 +290,7 @@ def test_hop_toward_equipment_boards_a_ferry_for_water_locked_drop() -> None:
     to the pickup.
     """
     from tankpit_bot.state.types import make_terrain_tile
-    from tankpit_bot.state.types.constants import TERRAIN_FERRY
+    from tankpit_bot.types.constants import TERRAIN_FERRY
 
     containers = {
         "150,100": make_container_state(

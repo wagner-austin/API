@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.forage import plan_forage_search, select_forage_target
-from tankpit_bot.bot.ai.mode_controller import (
+from tankpit_bot.bot.ai.mode_gates import (
     should_enter_collect,
     should_exit_collect,
 )

@@ -26,8 +26,8 @@ from tankpit_bot.protocol.commands import (
     SCOPE_WEST,
 )
 from tankpit_bot.state.types import ContainerStateDict, WorldStateDict
-from tankpit_bot.state.types.constants import TERRAIN_FERRY
 from tankpit_bot.state.types.terrain import make_terrain_tile
+from tankpit_bot.types.constants import TERRAIN_FERRY
 from tests.bot.ai._support import (
     make_container,
     make_inventory,

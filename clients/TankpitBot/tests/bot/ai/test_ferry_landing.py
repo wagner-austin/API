@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.state.types import TerrainTileDict, make_empty_world_state, make_terrain_tile
-from tankpit_bot.state.types.constants import TERRAIN_FERRY
+from tankpit_bot.types.constants import TERRAIN_FERRY
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 _NOW = 100000

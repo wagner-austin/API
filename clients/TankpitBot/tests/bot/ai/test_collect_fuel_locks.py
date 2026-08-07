@@ -168,7 +168,7 @@ def test_locked_fuel_holds_when_water_locked() -> None:
         }
     )
     from tankpit_bot.state.types import make_terrain_tile
-    from tankpit_bot.state.types.constants import TERRAIN_FERRY
+    from tankpit_bot.types.constants import TERRAIN_FERRY
 
     world["terrain"]["121,101"] = make_terrain_tile(121, 101, TERRAIN_FERRY, observed_ms=100000)
     terrain_data[(121, 101)] = "W"

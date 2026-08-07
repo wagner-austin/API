@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.mode_controller import (
+from tankpit_bot.bot.ai.mode_gates import (
     held_human_combat_lock,
     human_fight_resume_fuel_floor,
     human_fight_resume_permitted,

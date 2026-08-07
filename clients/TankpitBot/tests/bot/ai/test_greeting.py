@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.greeting import attach_human_greeting
-from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score, make_initial_ai_state
+from tankpit_bot.bot.ai.scoring_types import make_behavior_score
+from tankpit_bot.bot.ai.types import (
+    AIStateDict,
+    make_initial_ai_state,
+)
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import (
     make_chat_command,

@@ -5,8 +5,11 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.movement import viewport_exploration_candidates
-from tankpit_bot.bot.ai.types import AIStateDict, make_default_ai_config
+from tankpit_bot.bot.ai.movement_exploration import viewport_exploration_candidates
+from tankpit_bot.bot.ai.types import (
+    AIStateDict,
+    make_default_ai_config,
+)
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_state import reset_world_state

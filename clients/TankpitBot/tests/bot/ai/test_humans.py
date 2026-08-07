@@ -9,7 +9,7 @@ from tankpit_bot.bot.ai.humans import (
     is_human_rank_protected,
     threat_priority_tier,
 )
-from tankpit_bot.bot.ai.threats import find_acquisition_target
+from tankpit_bot.bot.ai.threat_acquisition import find_acquisition_target
 from tankpit_bot.protocol.naming import is_human_name, is_practice_bot_name
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.state.types import (

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.collect_mode import _hop_escapes_attacker
+from tankpit_bot.bot.ai.collect_mode_outcomes import _hop_escapes_attacker
 from tankpit_bot.bot.ai.context import make_decision
-from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
+from tankpit_bot.bot.ai.types import (
+    AIStateDict,
+    make_initial_ai_state,
+)
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_pickup_fuel_command, make_teleport_command
 
