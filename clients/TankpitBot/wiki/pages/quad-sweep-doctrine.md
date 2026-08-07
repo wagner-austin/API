@@ -16,8 +16,9 @@ hubs: [architecture]
 # Quad-Sweep Doctrine — stationary recon, loop harvest
 
 User-derived 2026-08-06, built entirely on measured laws. Design is
-RECORDED, not yet implemented; one probe stands before code (§ Open
-probe).
+RECORDED, not yet implemented; the one probe that stood before code
+was resolved same day from the capture archive (§ Shift-framed
+pickup: resolved) — no open questions remain.
 
 ## The laws it stands on
 
@@ -76,13 +77,29 @@ probe).
 Lean grid-disciplined while extras are plentiful, opportunistic when
 low. User's call to tune.
 
-## Open probe (blocks implementation)
+## Shift-framed pickup: resolved (archive-mined 2026-08-06)
 
-A pickup has never been dispatched into a SHIFT-framed window (every
-live pickup to date fired inside a teleport-centered frame). The
-window-bound acceptance law says in-window is in-window, but one
-live probe must confirm a pickup from a shifted frame transfers
-normally before the harvest loop is built on it.
+The question was whether a pickup dispatched into a SHIFT-framed
+window (not a teleport-centered one) transfers normally — every BOT
+pickup to date fired inside a teleport frame. Answered from recorded
+HUMAN play, no live probe needed: two archived sessions carry twelve
+accepted in-shifted-window actions across seven scope shifts.
+
+`runs/sniff/sniff-20260710-202821.capture_session.json` (the 421.8 s
+human session behind the ANCHOR law): five shift→pickup windows, e.g.
+shift dir=2 → `0x5A (144,157)` → `PICKUP_EQUIP (148,165)` → `0x47`
+walk echo + duplicate `0x43` pickup records 610 ms later; likewise
+windows (129,157), (160,159), (96,201), (110,19) — every accepted
+target inside the shifted 16×16, standard choreography every time.
+`runs/sniff/ghost_observe.capture_session.json` corroborates: shift →
+`0x5A (142,195)` → equipment pickups at (149,207) and (155,200)
+accepted, plus a 438-volume fuel container taken by move-onto at
+(152,204). The only rejections in either corpus were `0x52` err=1
+(no path — the retry succeeded) and code 7 (inventory full) — none
+window-bound. **The shifted window IS the acceptance window; the
+harvest loop can be built on it.** Miner: scratchpad
+`mine_shift_pickup.py` (sent-frame classify `21 03 5a dir` scope /
+`21 04 6a` pickup, 0x2E envelope unwrap on the receive side).
 
 ## Where it lands in the bot
 
