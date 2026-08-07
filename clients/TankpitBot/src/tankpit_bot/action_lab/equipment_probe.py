@@ -8,13 +8,13 @@ from tankpit_bot.action_lab import equipment_probe_operations as _equipment_prob
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict
 from tankpit_bot.action_lab.equipment_collection_phase import (
-    run_tracked_equipment_collection_phase as _shared_run_tracked_equipment_collection_phase,
+    run_tracked_equipment_collection_phase,
 )
 from tankpit_bot.action_lab.equipment_probe_attempt import (
     run_single_equipment_target_attempt as _shared_run_single_equipment_target_attempt,
 )
 from tankpit_bot.action_lab.equipment_probe_diagnostics import (
-    format_equipment_probe_summary as _shared_format_equipment_probe_summary,
+    format_equipment_probe_summary,
 )
 from tankpit_bot.action_lab.equipment_probe_types import (
     EquipmentProbeAttemptResultDict,
@@ -53,7 +53,6 @@ _EQUIPMENT_PROBE_TELEPORT_STRATEGY: Literal[
     "immediate_after_map_open",
 ] = DEFAULT_TELEPORT_STRATEGY
 run_tracked_teleport_attempt = _shared_run_tracked_teleport_attempt
-run_tracked_equipment_collection_phase = _shared_run_tracked_equipment_collection_phase
 
 
 class EquipmentProbeError(Exception):
@@ -449,9 +448,6 @@ class EquipmentProbe(ProbeBase):
             no_landing_tile_message="visible equipment target has no teleport landing tile",
             missing_dispatch_message="equipment attempt ended before teleport dispatch",
         )
-
-
-format_equipment_probe_summary = _shared_format_equipment_probe_summary
 
 
 __all__ = [

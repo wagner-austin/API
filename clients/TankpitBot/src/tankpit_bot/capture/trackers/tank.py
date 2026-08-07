@@ -15,7 +15,7 @@ from tankpit_bot.protocol.constants import RANK_NAMES, TEAM_NAMES
 
 log = get_logger(__name__)
 
-TEAM_COLORS = TEAM_NAMES  # Backward-compatible alias
+TEAM_NAMES = TEAM_NAMES  # Backward-compatible alias
 
 
 class TankTracker:
@@ -524,4 +524,4 @@ class TankExitTracker:
         return set(self._exited)
 
 
-__all__ = ["RANK_NAMES", "TEAM_COLORS", "TankExitTracker", "TankTracker"]
+__all__ = ["RANK_NAMES", "TEAM_NAMES", "TankExitTracker", "TankTracker"]

@@ -138,22 +138,6 @@ def decode_message(msg_type: int, data: bytes) -> BinaryMessage:
     raise DecodeError(f"decode_message: unknown type 0x{msg_type:02X}")
 
 
-def try_decode_message(msg_type: int, data: bytes) -> DecodedMessage | None:
-    """Try to decode a message, returning None if unsupported.
-
-    Unlike decode_message(), this does not raise DecodeError for unknown types.
-    Use this when you want to handle unknown types gracefully without exceptions.
-
-    Args:
-        msg_type: First byte of message (NOT XOR encoded).
-        data: Remaining message bytes (XOR decoded).
-
-    Returns:
-        Decoded message object, or None if type is unknown/unsupported.
-    """
-    return try_decode_binary_message(msg_type, data)
-
-
 def try_decode_binary_message(msg_type: int, data: bytes) -> BinaryMessage | None:
     """Try to decode a binary message, returning None if unsupported.
 
@@ -250,7 +234,6 @@ __all__ = [
     "supervisor_is_cant_go",
     "supervisor_is_insufficient_fuel",
     "try_decode_binary_message",
-    "try_decode_message",
     "try_decode_plaintext_ack",
     "viewport_entity_has_equipment_cache",
     "viewport_entity_has_fuel_cache",
