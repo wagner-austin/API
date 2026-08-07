@@ -29,7 +29,13 @@ CORPSE_WINDOW_TICKS = 11
 
 
 class CombatLedger:
-    """Owns the deferred firing debits and the corpse-window clocks."""
+    """Owns the deferred firing debits and the corpse-window clocks.
+
+    It also keeps the two kill counters the 0x56 Statistics answer
+    reports, because this is the one place a deactivation resolves —
+    counting them anywhere else would mean a second reading of the
+    same event ([[session-state-deglobalisation]]).
+    """
 
     def __init__(
         self,
@@ -49,6 +55,10 @@ class CombatLedger:
         self._client_id = client_id
         self._pending_debits: list[tuple[int, int]] = []
         self._died_at: dict[int, int] = {}
+        self.client_destroyed = 0
+        """Tanks the client has deactivated this session (0x56 ``destroyed``)."""
+        self.client_deactivated = 0
+        """Times the client has been deactivated this session (0x56 ``deactivated``)."""
 
     def apply_pending_debits(self) -> None:
         """Bill last tick's firing costs (measured charge latency)."""
@@ -130,6 +140,10 @@ class CombatLedger:
             )
             self._maybe_emit_kill_mercy_bundle(tank_id, outcome_messages, ammo_changed)
             self._died_at[outcome["victim_id"]] = self._world["tick"]
+            if tank_id == self._client_id:
+                self.client_destroyed += 1
+            if outcome["victim_id"] == self._client_id:
+                self.client_deactivated += 1
 
     def _maybe_emit_kill_mercy_bundle(
         self,

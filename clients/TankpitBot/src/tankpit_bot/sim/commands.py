@@ -22,6 +22,7 @@ from tankpit_bot.protocol.commands import (
     CMD_RADAR,
     CMD_SCOPE,
     CMD_SHOOT,
+    CMD_STATISTICS,
     CMD_TOGGLE_EQUIPMENT,
 )
 from tankpit_bot.wire.helpers import require_min_length, x16
@@ -39,6 +40,7 @@ ClientCommandKind = Literal[
     "block",
     "chat",
     "scope",
+    "statistics",
     "other",
 ]
 
@@ -53,6 +55,11 @@ _BARE_KINDS: dict[int, ClientCommandKind] = {
     CMD_RADAR: "radar",
     CMD_MINE: "mine",
     CMD_MAP_OPEN: "map_open",
+    # The statistics key. 279 of 386 archived 0x56 frames follow it as
+    # the client's most recent sent command, which is what makes the
+    # server's answer a RESPONSE rather than a broadcast
+    # ([[session-state-deglobalisation]]).
+    CMD_STATISTICS: "statistics",
 }
 
 

@@ -27,8 +27,17 @@ _SYNC_BODY = bytes([1])
 def encode_sync(message: SyncDict) -> bytes:
     """Encode a 0x3F Sync payload (inverse of ``decode_sync``).
 
+    The body is one byte and it is NOT padding: the JS reads it as a
+    flag (``vg.h`` keeps ``1 === a[0]``) and acts on it, resyncing the
+    view when it is set. ``decode_sync`` still drops it and this
+    encoder still writes the constant, because every one of the 1,770
+    archived bodies carries 0x01 — unlike the promotion-bar byte,
+    which had 219 counterexamples and therefore had to become a field.
+    A single 0x00 body anywhere is what would falsify this
+    ([[session-state-deglobalisation]]).
+
     Args:
-        message: Decoded sync heartbeat (carries nothing).
+        message: Decoded sync (the flag is not modelled — see above).
 
     Returns:
         The 1-byte wire body.

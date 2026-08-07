@@ -123,7 +123,7 @@ def test_pickup_walk_emits_gain_snapshot_and_pickup_record() -> None:
     server.queue_command(9, _pickup_equipment(12, 10))
     messages = server.advance_tick()
     kinds = [m["msg_type"] for m in messages]
-    assert kinds == [0x47, 0x67, 0x49, "container_pickup", 0x2E]
+    assert kinds == [0x47, 0x67, 0x49, "container_pickup", 0x3F, 0x2E]
     gain = messages[1]
     assert gain["msg_type"] == 0x67
     assert gain["gained"] == [0, WEAPON_STACK, 0, 0, 0]

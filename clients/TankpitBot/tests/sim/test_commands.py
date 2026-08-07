@@ -13,6 +13,7 @@ from tankpit_bot.protocol.commands import (
     CMD_PICKUP_FUEL,
     CMD_RADAR,
     CMD_SHOOT,
+    CMD_STATISTICS,
     CMD_TOGGLE_EQUIPMENT,
 )
 from tankpit_bot.sim.commands import decode_client_command
@@ -45,8 +46,18 @@ def test_shoot_decodes_with_and_without_target_id() -> None:
 
 
 def test_bare_commands_decode_without_coords() -> None:
-    """Radar / mine / map-open carry no coordinates."""
-    for command, kind in ((CMD_RADAR, "radar"), (CMD_MINE, "mine"), (CMD_MAP_OPEN, "map_open")):
+    """Radar / mine / map-open / statistics carry no coordinates.
+
+    The statistics key used to decode as ``other`` and fall through to
+    the map-data arm, so the sim answered a stats request with a map
+    ([[session-state-deglobalisation]]).
+    """
+    for command, kind in (
+        (CMD_RADAR, "radar"),
+        (CMD_MINE, "mine"),
+        (CMD_MAP_OPEN, "map_open"),
+        (CMD_STATISTICS, "statistics"),
+    ):
         decoded = decode_client_command(bytes([2, command]))
         assert decoded["kind"] == kind
         assert decoded["x"] == 0

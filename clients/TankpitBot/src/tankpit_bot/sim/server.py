@@ -32,6 +32,7 @@ from tankpit_bot.protocol.types import (
     FuelGainDict,
     InventoryDict,
     SupervisorDict,
+    SyncDict,
 )
 from tankpit_bot.sim.actions import build_map_data
 from tankpit_bot.sim.bot_policy import reactivate_practice_bot
@@ -56,6 +57,7 @@ from tankpit_bot.sim.wire_statements import (
     identity_statement,
     position_statement,
     queued_tank_id,
+    statistics_statement,
     status_sync,
 )
 from tankpit_bot.sim.world import SimWorldDict
@@ -74,6 +76,7 @@ _SUPPORTED_KINDS = frozenset(
         "block",
         "chat",
         "scope",
+        "statistics",
     }
 )
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
@@ -162,6 +165,11 @@ class SimServer:
             messages.append(identity_statement(self.world, tank_id))
             if tank_id in self._viewport.visible:
                 messages.append(position_statement(self.world, tank_id))
+        # The enter-game sync. 285 of the 286 archived CMD_ENTER_GAME
+        # sends draw exactly one 0x3F, and the median session carries
+        # exactly one sync in total — joining IS the common case
+        # ([[session-state-deglobalisation]]).
+        messages.append(SyncDict(msg_type=0x3F))
         return messages
 
     def announce_tank(self, tank_id: int) -> None:
@@ -255,7 +263,13 @@ class SimServer:
         ammo_changed: set[int],
         moved: set[int],
     ) -> None:
-        """Route one queued command to its law processor.
+        """Route one queued command that spends ammo or relocates.
+
+        The kinds whose consequences feed this tick's accumulators are
+        routed here; everything else goes to
+        :meth:`_process_stateless_command`, which needs neither. The
+        split is what keeps either router readable as the command
+        vocabulary grows.
 
         Args:
             tank_id: The commanding tank.
@@ -287,6 +301,22 @@ class SimServer:
                 self.world, self.client_id, self._viewport.window, tank_id, messages, ammo_changed
             )
             return
+        self._process_stateless_command(tank_id, command, messages)
+
+    def _process_stateless_command(
+        self,
+        tank_id: int,
+        command: ClientCommandDict,
+        messages: list[BinaryMessage],
+    ) -> None:
+        """Route one queued command with no ammo or movement effect.
+
+        Args:
+            tank_id: The commanding tank.
+            command: The queued command.
+            messages: This tick's outgoing batch (appended).
+        """
+        kind = command["kind"]
         if kind == "mine":
             emit_mine_press(self.world, self.terrain, tank_id, messages)
             return
@@ -301,6 +331,18 @@ class SimServer:
             return
         if kind == "scope":
             self._process_scope_command(tank_id, command, messages)
+            return
+        if kind == "statistics":
+            # Per-connection, like every other answer: the statistics
+            # of the tank that asked, and only to that tank.
+            if tank_id == self.client_id:
+                messages.append(
+                    statistics_statement(
+                        self.world["tick"],
+                        self._combat.client_destroyed,
+                        self._combat.client_deactivated,
+                    )
+                )
             return
         messages.append(build_map_data(self.world))
 
@@ -437,6 +479,19 @@ class SimServer:
             )
         if outcome["kind"] == "moved":
             emit_equipment_pickup(self.world, self.client_id, tank_id, kind, messages, ammo_changed)
+            if tank_id == self.client_id and outcome["path"] != "":
+                # The 0x3F Sync trails a walk that actually relocated
+                # the client — an own-tile click resolves as a "moved"
+                # outcome with an EMPTY path and draws none. Archive
+                # 2026-08-06: 1,277 of the 1,528 syncs follow a move
+                # command as the most recent thing the client sent,
+                # against ZERO after any of the 13,698 shoots and 14
+                # after 11,247 map opens — the association is specific,
+                # not ambient, and 1,277 against 1,703 move commands is
+                # the gap the empty-path clicks fill. The JS handler is
+                # a view resync (``vg`` -> ``Q(a)``), which is what a
+                # completed walk needs and a standing still does not.
+                messages.append(SyncDict(msg_type=0x3F))
 
     def _process_teleport_command(
         self,

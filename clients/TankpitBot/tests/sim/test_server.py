@@ -165,7 +165,15 @@ def test_arrival_pickup_and_mine_walk_emit_container_messages() -> None:
     server.world["mines"].append(SimMineDict(x=11, y=10, team=1))
     server.queue_command(9, _move(11, 10))
     messages = server.advance_tick()
-    assert _kinds(messages) == [0x47, 0x45, "container_pickup", "container_pickup", 0x2E, 0x2E]
+    assert _kinds(messages) == [
+        0x47,
+        0x45,
+        "container_pickup",
+        "container_pickup",
+        0x3F,
+        0x2E,
+        0x2E,
+    ]
     assert messages[2] == messages[3]
     pickup = messages[2]
     if pickup["msg_type"] != "container_pickup":
@@ -248,7 +256,8 @@ def test_handshake_covers_client_and_living_tanks_only() -> None:
     archive convention ``validate.wire_timeline`` keys self-attribution
     on, so the sim must open the same way the real server does. The
     0x3E full status and the 0x5A-before-0x3D ordering are archived
-    too: 285 of 285 real sessions open ``0x21, 0x3E, 0x5A, 0x3D``
+    too: 285 of 285 real sessions open ``0x21, 0x3E, 0x5A, 0x3D``, and
+    285 of the 286 archived enter-game sends draw exactly one 0x3F
     ([[session-state-deglobalisation]]).
     """
     server = _server()
@@ -256,7 +265,7 @@ def test_handshake_covers_client_and_living_tanks_only() -> None:
     server.world["tanks"][12]["alive"] = False
     burst = server.handshake()
     kinds = _kinds(burst)
-    assert kinds == [0x21, 0x3E, 0x5A, 0x3D, 0x44, 0x49, 0x21, 0x3D]
+    assert kinds == [0x21, 0x3E, 0x5A, 0x3D, 0x44, 0x49, 0x21, 0x3D, 0x3F]
     own = burst[0]
     assert own["msg_type"] == 0x21
     assert own["tank_id"] == 9
@@ -526,7 +535,15 @@ def test_pickup_click_routes_through_the_move_law() -> None:
     server.world["containers"].append(SimContainerDict(x=12, y=10, volume=30, dotted=True))
     server.queue_command(9, _command(("pickup_fuel", 100), 12, 10))
     messages = server.advance_tick()
-    assert _kinds(messages) == [0x47, "container_pickup", "container_pickup", 0x52, 0x2E, 0x2E]
+    assert _kinds(messages) == [
+        0x47,
+        "container_pickup",
+        "container_pickup",
+        0x52,
+        0x3F,
+        0x2E,
+        0x2E,
+    ]
     assert messages[1] == messages[2]
     assert [(c["error_code"], c["reset_action"]) for c in _supervisors(messages)] == [(4, 1)]
 
@@ -595,3 +612,87 @@ def test_drained_pickup_answers_empty_container_only_to_the_client() -> None:
         ),
     )
     assert _supervisors(server.advance_tick()) == []
+
+
+def _statistics_key() -> ClientCommandDict:
+    """The decoded ``CMD_STATISTICS`` key press."""
+    return ClientCommandDict(
+        kind="statistics", command=118, x=0, y=0, target_id=0, slot=0, message_id=0, direction=0
+    )
+
+
+def test_the_statistics_key_is_answered_with_the_session_counters() -> None:
+    """0x56 answers the statistics key, and counts this session.
+
+    279 of the 386 archived 0x56 frames follow ``CMD_STATISTICS`` as
+    the client's most recent sent command, which is what makes the
+    frame a response rather than a broadcast
+    ([[session-state-deglobalisation]]).
+    """
+    server = _server()
+    server.queue_command(9, _statistics_key())
+    batch = server.advance_tick()
+
+    reports = [m for m in batch if m["msg_type"] == 0x56]
+    assert reports == [
+        {
+            "msg_type": 0x56,
+            "playtime_hours": 0,
+            "playtime_minutes": 0,
+            "playtime_seconds": 2,
+            "destroyed": 0,
+            "deactivated": 0,
+            "score": 0,
+        }
+    ]
+
+
+def test_statistics_playtime_counts_the_session_from_tick_zero() -> None:
+    """Playtime is ticks x 2 s, carried into hours/minutes/seconds."""
+    server = _server()
+    server.world["tick"] = 1849  # 3700 s -> 1 h 01 m 40 s on the next tick
+    server.queue_command(9, _statistics_key())
+
+    reports = [m for m in server.advance_tick() if m["msg_type"] == 0x56]
+    assert [
+        (r["playtime_hours"], r["playtime_minutes"], r["playtime_seconds"]) for r in reports
+    ] == [(1, 1, 40)]
+
+
+def test_statistics_counts_the_clients_kills_not_the_rooms() -> None:
+    """``destroyed`` is the client's own kill count."""
+    server = _server()
+    server.world["tanks"][9]["counts"][SLOT_DUAL] = 3
+    server.world["tanks"][11]["fuel"] = 45
+    server.queue_command(9, _shoot(15, 10))
+    assert 0x41 in _kinds(server.advance_tick())
+
+    server.queue_command(9, _statistics_key())
+    reports = [m for m in server.advance_tick() if m["msg_type"] == 0x56]
+    assert [(r["destroyed"], r["deactivated"]) for r in reports] == [(1, 0)]
+
+
+def test_another_tanks_statistics_key_is_not_answered_to_the_client() -> None:
+    """Every server answer is per-connection, this one included."""
+    server = _server()
+    server.queue_command(11, _statistics_key())
+    assert [m for m in server.advance_tick() if m["msg_type"] == 0x56] == []
+
+
+def test_a_walk_draws_a_sync_and_a_standstill_does_not() -> None:
+    """0x3F trails a walk that relocated the client, and only that.
+
+    1,277 of the 1,528 archived syncs follow a move command, against
+    zero after any of the 13,698 shoots; the JS handler is a view
+    resync, which a standstill does not need
+    ([[session-state-deglobalisation]]).
+    """
+    server = _server()
+    server.queue_command(9, _move(12, 10))
+    assert 0x3F in _kinds(server.advance_tick())
+
+    server.queue_command(9, _move(12, 10))  # already there: empty path
+    assert 0x3F not in _kinds(server.advance_tick())
+
+    server.queue_command(9, _shoot(15, 10))
+    assert 0x3F not in _kinds(server.advance_tick())

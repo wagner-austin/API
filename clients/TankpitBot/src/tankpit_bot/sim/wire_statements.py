@@ -8,9 +8,11 @@ emission helpers compose these into per-tick batches.
 from __future__ import annotations
 
 from tankpit_bot.physics.capacity import damage_tier
+from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.protocol.types import (
     MovementDict,
     MovementResponseDict,
+    StatisticsDict,
     TankInfoDict,
     TankStatusDict,
     TankStatusSyncDict,
@@ -123,6 +125,40 @@ def identity_statement(world: SimWorldDict, tank_id: int) -> TankInfoDict:
     )
 
 
+def statistics_statement(tick: int, destroyed: int, deactivated: int) -> StatisticsDict:
+    """Build the 0x56 answer to a client statistics request.
+
+    The trigger is measured, not guessed: of 386 archived 0x56 frames,
+    279 follow the client's own ``CMD_STATISTICS`` (118) as the most
+    recent sent command, and the constant already carried that name.
+    The other two predecessors (map_open, radar) are simply whatever
+    key was pressed before it ([[session-state-deglobalisation]]).
+
+    Playtime counts THIS session from tick zero, and ``score`` is 0,
+    for the reason ``identity_statement`` zeroes the leaderboard: the
+    sim keeps no account standing across sessions, and a fabricated
+    lifetime total is a number the bot could read and believe.
+
+    Args:
+        tick: The world tick (2 s each) the request resolved on.
+        destroyed: Tanks the client has deactivated this session.
+        deactivated: Times the client has been deactivated.
+
+    Returns:
+        The statistics message.
+    """
+    elapsed = tick * TICK_RATE_MS // 1000
+    return StatisticsDict(
+        msg_type=0x56,
+        playtime_hours=elapsed // 3600,
+        playtime_minutes=elapsed % 3600 // 60,
+        playtime_seconds=elapsed % 60,
+        destroyed=destroyed,
+        deactivated=deactivated,
+        score=0,
+    )
+
+
 def full_status_statement(world: SimWorldDict, tank_id: int) -> TankStatusDict:
     """Build the 0x3E full status the join burst carries for own tank.
 
@@ -190,5 +226,6 @@ __all__ = [
     "movement_echo",
     "position_statement",
     "queued_tank_id",
+    "statistics_statement",
     "status_sync",
 ]

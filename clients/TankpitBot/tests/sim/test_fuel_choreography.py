@@ -86,6 +86,7 @@ def test_clamped_pickup_emits_the_five_message_gain_shape() -> None:
         0x44,
         "container_pickup",
         0x52,
+        0x3F,
         0x2E,
         0x2E,
     ]
@@ -142,6 +143,7 @@ def test_walk_to_a_drained_container_still_executes_and_closes_code_4() -> None:
         "container_pickup",
         "container_pickup",
         0x52,
+        0x3F,
         0x2E,
         0x2E,
     ]
