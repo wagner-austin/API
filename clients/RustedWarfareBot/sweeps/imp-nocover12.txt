@@ -1,0 +1,12 @@
+imp-nocover|12345|doctrines/flame-nocover.doctrine|10000
+imp-nocover|1337|doctrines/flame-nocover.doctrine|10000
+imp-nocover|141421|doctrines/flame-nocover.doctrine|10000
+imp-nocover|16180|doctrines/flame-nocover.doctrine|10000
+imp-nocover|173205|doctrines/flame-nocover.doctrine|10000
+imp-nocover|223606|doctrines/flame-nocover.doctrine|10000
+imp-nocover|244948|doctrines/flame-nocover.doctrine|10000
+imp-nocover|24601|doctrines/flame-nocover.doctrine|10000
+imp-nocover|264575|doctrines/flame-nocover.doctrine|10000
+imp-nocover|2718|doctrines/flame-nocover.doctrine|10000
+imp-nocover|271828|doctrines/flame-nocover.doctrine|10000
+imp-nocover|282842|doctrines/flame-nocover.doctrine|10000
