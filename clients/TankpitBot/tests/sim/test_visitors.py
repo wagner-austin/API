@@ -51,17 +51,29 @@ def test_a_visitor_arrives_on_the_measured_period() -> None:
 
 
 def test_the_entry_reports_no_position() -> None:
-    """15 of 16 archived entries carry (0, 0): the tank is not in view."""
+    """15 of 16 archived entries carry (0, 0): the tank is not in view.
+
+    Entries arrive at rank 0 or 1 and damage 3 — a new tank at
+    capacity ([[session-state-deglobalisation]]).
+    """
     world = _world()
     churn = RoomChurn()
 
     arrival = _run_to(churn, world, VISITOR_ARRIVAL_PERIOD_TICKS)
 
-    entry = arrival[0]
-    assert (entry["x"], entry["y"]) == (VISITOR_ENTRY_X, VISITOR_ENTRY_Y)
-    assert entry["tank_id"] == VISITOR_ID_BASE
-    assert entry["damage_state"] == 3
-    assert entry["rank"] in (0, 1)
+    assert arrival == [
+        {
+            "msg_type": 0x28,
+            # First entries of the archive's team and rank cycles.
+            "team": 0,
+            "tank_id": VISITOR_ID_BASE,
+            "rank": 1,
+            "damage_state": 3,
+            "score": 0,
+            "x": VISITOR_ENTRY_X,
+            "y": VISITOR_ENTRY_Y,
+        }
+    ]
 
 
 def test_the_visitor_really_joins_the_world() -> None:
@@ -125,7 +137,19 @@ def test_successive_visitors_take_fresh_ids() -> None:
 
     second = _run_to(churn, world, VISITOR_ARRIVAL_PERIOD_TICKS * 2)
 
-    assert [message["tank_id"] for message in second] == [VISITOR_ID_BASE + 1]
+    assert second == [
+        {
+            "msg_type": 0x28,
+            # Second entries of the team and rank cycles.
+            "team": 3,
+            "tank_id": VISITOR_ID_BASE + 1,
+            "rank": 0,
+            "damage_state": 3,
+            "score": 0,
+            "x": VISITOR_ENTRY_X,
+            "y": VISITOR_ENTRY_Y,
+        }
+    ]
 
 
 def test_a_sealed_map_admits_nobody() -> None:

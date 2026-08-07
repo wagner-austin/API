@@ -32,11 +32,11 @@ from collections.abc import Callable
 
 from platform_core.json_utils import JSONObject, require_str
 
-from tankpit_bot.action_lab.page_client_snapshot import (
+from tankpit_bot.browser.cdp_utils import get_current_time_ms
+from tankpit_bot.browser.page_client_snapshot import (
     PageClientSnapshotDict,
     encode_page_client_snapshot,
 )
-from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.capture.xor import build_session_xor_table, require_static_key, xor_decode_body
 from tankpit_bot.protocol.commands import CMD_STATISTICS, COMMAND_PREFIX, TYPE_QUERY
 from tankpit_bot.protocol.types import BinaryMessage

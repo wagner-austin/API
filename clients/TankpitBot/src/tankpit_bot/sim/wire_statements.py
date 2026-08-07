@@ -19,6 +19,7 @@ from tankpit_bot.protocol.types import (
 )
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.movement import MoveOutcomeDict
+from tankpit_bot.sim.progression import STEADY_PROMO_STATE
 from tankpit_bot.sim.world import SimWorldDict
 
 
@@ -64,7 +65,12 @@ def movement_echo(world: SimWorldDict, outcome: MoveOutcomeDict) -> MovementDict
     )
 
 
-def status_sync(tank_id: int, world: SimWorldDict, include_fuel: bool) -> TankStatusSyncDict:
+def status_sync(
+    tank_id: int,
+    world: SimWorldDict,
+    include_fuel: bool,
+    promo_state: int = STEADY_PROMO_STATE,
+) -> TankStatusSyncDict:
     """Build a 0x2E status sync for one tank.
 
     The real wire carries the fuel field ONLY on the recipient's own
@@ -77,6 +83,10 @@ def status_sync(tank_id: int, world: SimWorldDict, include_fuel: bool) -> TankSt
         tank_id: The synced tank.
         world: Simulated world.
         include_fuel: True only for the connected client's tank.
+        promo_state: The promotion bar. Defaults to the wire's resting
+            value — the sim used to emit 0, which the real server
+            carries on 189 of 62,528 own-tank frames while 10 accounts
+            for 62,209 ([[session-state-deglobalisation]]).
 
     Returns:
         The status sync (long form with fuel, or short form).
@@ -89,7 +99,7 @@ def status_sync(tank_id: int, world: SimWorldDict, include_fuel: bool) -> TankSt
         damage_state=damage_tier(tank["fuel"], tank["rank"]),
         rank=tank["rank"],
         lb_score=0,
-        promo_state=0,
+        promo_state=promo_state,
         # The promotion bar rides with the fuel field or not at all.
         # Lit is the overwhelming wire majority (70,313 of 70,532
         # long-form bodies); the sim never darkens it because nothing

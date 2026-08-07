@@ -41,6 +41,7 @@ from tankpit_bot.sim.emissions import (
     emit_radar,
 )
 from tankpit_bot.sim.ferries import drift_ferries
+from tankpit_bot.sim.progression import RankProgression
 from tankpit_bot.sim.server_move import SimServerMoveMixin
 from tankpit_bot.sim.viewport_window import ViewportTracker
 from tankpit_bot.sim.visitors import RoomChurn
@@ -109,6 +110,7 @@ class SimServer(SimServerMoveMixin):
         self._viewport = ViewportTracker(world, terrain, client_id)
         self._combat = CombatLedger(world, terrain, client_id)
         self._churn = RoomChurn()
+        self._progression = RankProgression(client_id)
 
     def handshake(self) -> list[BinaryMessage]:
         """Build the session-start burst the client receives on join.
@@ -428,6 +430,17 @@ class SimServer(SimServerMoveMixin):
                 continue
             self._process_command(tank_id, command, messages, ammo_changed, moved)
         self._queue = []
+        # A deactivation of the CLIENT demotes it to recruit, silently,
+        # in the same batch as the 0x41 — three archived demotions,
+        # every one at a zero-second gap. The batch is read rather than
+        # the ledger being told about ranks: one 0x41 is the fact, and
+        # the ledger's job is to produce it, not to interpret it
+        # ([[session-state-deglobalisation]]).
+        if any(
+            message["msg_type"] == 0x41 and message["victim_id"] == self.client_id
+            for message in messages
+        ):
+            self._progression.note_deactivation(self.world, messages)
         for tank_id in self._combat.expire_corpses(messages):
             if tank_id in self._roster_ids:
                 # Roster bots come back the same tick their corpse
@@ -456,9 +469,19 @@ class SimServer(SimServerMoveMixin):
         refresh = self._viewport.build_update()
         if refresh["entities"]:
             messages.append(refresh)
+        # The promotion that ends a recovery window, before the syncs
+        # so this tick's bar already reads the restored steady state.
+        self._progression.advance(self.world, messages)
         for tank_id in sorted(self.world["tanks"]):
             if self.world["tanks"][tank_id]["alive"]:
-                messages.append(status_sync(tank_id, self.world, tank_id == self.client_id))
+                messages.append(
+                    status_sync(
+                        tank_id,
+                        self.world,
+                        tank_id == self.client_id,
+                        self._progression.promo_state,
+                    )
+                )
         if self.client_id in ammo_changed:
             client = self.world["tanks"][self.client_id]
             messages.append(
