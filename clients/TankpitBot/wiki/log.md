@@ -2987,3 +2987,8 @@ Digest grew five counters, all flowing to `make digest`, the fleet stats endpoin
 - **damage_dealt / damage_taken**: the damage book's fuel-confirmed per-enemy totals, now summed (`damage_book.total_fuel`, wiki-claimed) and emitted numerically on the teardown `damage_ledger` diagnostic; pre-extension archives read 0 by design.
 - **inventory_first** joins inventory_last in the stats payload (armor·dual·missile·homing·radar, start -> now).
 Physics-claim gate did its job twice: forced the wiki claim for the new public symbol AND caught fuel-system.md still claiming the falsified 25/tile rate — re-written to the measured 3/tile derivation. Full suite 5,974 green.
+
+---
+## [2026-08-06] doctrine | Quad-sweep harvest designed end-to-end — recorded in [[quad-sweep-doctrine]]
+
+Full design session with the user, every step priced on measured laws (ANCHOR, window-bound acceptance, walking 0.22 s/tile, teleport 6x euclid): atomic stationary 4-shift/4-radar sweep tiling the 31x31, walkable-ordered harvest loop ending nearest the next block, shift-before-walk legs, exit hop as the cycle's only big fuel spend, grid-vs-opportunistic anchor knob. Two of my errors corrected by the user against recorded law along the way (shifts are TANK-anchored, not window-relative; walking never moves the window). One probe blocks implementation: a pickup fired from a shift-framed window.
