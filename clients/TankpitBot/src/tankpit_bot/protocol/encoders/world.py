@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import pack16
 from tankpit_bot.protocol.types import (
     CacheUpdateDict,
     OverlayUpdateDict,
@@ -13,6 +12,7 @@ from tankpit_bot.protocol.types import (
     ViewportUpdateDict,
 )
 from tankpit_bot.state.viewport_geometry import VIEWPORT_PATCH_WIDTH
+from tankpit_bot.wire.helpers import pack16
 
 # The overlay nibble the wire uses for "no mine here". decode maps every
 # nibble >= 8 to the 255 sentinel; the corpus (2026-07-21, 3,724 bodies)

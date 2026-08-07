@@ -7,7 +7,6 @@ step a, 2026-07-21) so every server-message encoder has one home.
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import pack16
 from tankpit_bot.protocol.types import (
     EnemyDetectionDict,
     RadarContainerDict,
@@ -16,6 +15,7 @@ from tankpit_bot.protocol.types import (
     RadarResultDict,
     RadarScanResultDict,
 )
+from tankpit_bot.wire.helpers import pack16
 
 
 def encode_radar_result(message: RadarResultDict) -> bytes:

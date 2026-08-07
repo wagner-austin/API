@@ -9,7 +9,6 @@ byte-identical against the full capture archive on 2026-07-21
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import pack16, pack24
 from tankpit_bot.protocol.types import (
     TankEntryDict,
     TankExitDict,
@@ -18,6 +17,7 @@ from tankpit_bot.protocol.types import (
     TankStatusDict,
     TankStatusSyncDict,
 )
+from tankpit_bot.wire.helpers import pack16, pack24
 
 
 def encode_tank_info(message: TankInfoDict) -> bytes:

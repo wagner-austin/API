@@ -74,8 +74,8 @@ from tankpit_bot.protocol.encoders.world import (
     encode_terrain_update,
     encode_viewport_update,
 )
-from tankpit_bot.protocol.helpers import EncodeError
 from tankpit_bot.protocol.types import AutoscrollAckDict, BinaryMessage, ChatAckDict
+from tankpit_bot.wire.helpers import EncodeError
 
 
 def _pair_tank(message: BinaryMessage) -> tuple[int, bytes] | None:

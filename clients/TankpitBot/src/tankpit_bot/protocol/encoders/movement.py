@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import pack16, pack24
 from tankpit_bot.protocol.types import MovementDict, MovementResponseDict
+from tankpit_bot.wire.helpers import pack16, pack24
 
 
 def encode_movement(message: MovementDict) -> bytes:

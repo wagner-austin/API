@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import pack16
 from tankpit_bot.protocol.types import MapDataDict
+from tankpit_bot.wire.helpers import pack16
 
 _MAP_WIDTH = 256
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import pack16
 from tankpit_bot.protocol.types import (
     EquipmentGainDict,
     EquipmentToggleDict,
@@ -10,6 +9,7 @@ from tankpit_bot.protocol.types import (
     FuelGainDict,
     InventoryDict,
 )
+from tankpit_bot.wire.helpers import pack16
 
 
 def encode_fuel_gain(message: FuelGainDict) -> bytes:

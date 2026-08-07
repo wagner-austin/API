@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.helpers import pack16
 from tankpit_bot.protocol.types import DeactivationDict, ShootEventDict
+from tankpit_bot.wire.helpers import pack16
 
 _MINE_KILLER_BASE = 65530
 
