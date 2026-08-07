@@ -15,7 +15,7 @@ from tankpit_bot.container.types import (
     TeleportLandedDict,
     UnknownContainerDict,
 )
-from tankpit_bot.protocol.helpers import pack16
+from tankpit_bot.wire.helpers import pack16
 
 
 def encode_container_pickup(message: ContainerPickupDict) -> bytes:
