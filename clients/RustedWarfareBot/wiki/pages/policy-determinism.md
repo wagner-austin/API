@@ -10,6 +10,8 @@ source_paths:
   - "runs/sweeps/noise"
   - "runs/sweeps/noise-seeded"
   - "agent/src/rwbot/agent/EngineRandom.java"
+  - "agent/src/rwbot/agent/TickBracket.java"
+  - "runs/bracket-ff1-trace.ndjson"
   - "src/rw_bot/harness/sweep.py"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: "2026-07-27"
@@ -74,10 +76,43 @@ The stack, in dependency order:
 1. **Three seeded streams** — the engine's own generator (whose shipped per-match reset seeds the WRONG field, bytecode-verified), `Math.random()`, and `Collections.shuffle`'s generator — seeded at premain and reseeded at match start (`EngineRandom`).
 2. **The probe-race latch** (`CommandChannel`): until a planner has acked once, a departure re-enters the wait on the same frame; a readiness probe can no longer release the world for one tick.
 3. **The ambient silencer** (`MatchSetup`): the effects manager's spawner accumulates the MEASURED delta and spends two sim-stream draws per ~10 wall-units; its accumulator is parked at -1e30 on seeded matches.
-4. **The tick-split generator** (`SplitRandom`): every draw walks its stack — through the tick entries (`game.i.a(F)V` / `a(FI)V` / `b(FI)V`, matched by descriptor because `i.a(m.l,float)` is the world DRAW pass) means the seeded sim stream; reaching the render loop first means a salted side stream. Kills the unit-sway redraws and every other render-paced drawer at once, with no bytecode.
+4. **The tick-split generator** (`SplitRandom`): simulation draws are served from the seeded sim stream, everything render-paced from a salted side stream. Kills the unit-sway redraws and every other render-paced drawer at once, with no bytecode.
 5. **The pre-tick watcher** (`Orders.onEngineTick` → `game.i.k`): the match watcher rides the engine's pre-update runnable queue, so pins, reseed, frame-zero, AI-timer reset and the hold all land BEFORE the new world's first update. Zero free ticks; the opponents' think-timer floats never see a wall-valued delta.
 
 What this retires: the noise floor above no longer binds seeded solo runs — same seed now means same match. Chaos remains real across seeds (that is the game), so paired-seed comparison stays the standard; what changed is that a seed is now a controlled experiment at either speed, and fast panels are bit-exact replays of realtime panels at a third of the wall clock.
+
+## Solved again, one level deeper: the same seed across INVOCATIONS (2026-08-07)
+
+The 400/400 above only ever compared runs within one batch, and the property
+it certified was narrower than the sentence claimed: same-seed runs from
+SEPARATE invocations forked — always in the opponent's behavior (an extra
+anti-air turret, different factory queues), always surfacing at a
+consequential roll (frame 7050 on duel_lake, realtime and 10x alike) — while
+parallel replicas agreed for whole panels. The hunt disproved, each with an
+artifact: the load-drawn synced seed `bJ` (a real hole — the load assigns it
+from a generator draw the menu world races; pinned from the match seed at
+liveness — but cross-pairs matching with different `bJ` killed it as the
+cause), entity ids, menu rotation, per-dir file state, identity hashes
+(`-XX:hashCode=2` armed, fork unchanged, flag removed), and the draw tap's
+per-window counts, which turned out to be wall-cut windows over bit-identical
+worlds — a measurement artifact, not a signal.
+
+What survived every test was the split itself: item 4 classified each draw by
+**walking its stack**, and a per-draw classification that consults the
+JIT-shaped frame stream is process-varying in a way no seed can reach. One
+draw routed differently shifts the sim stream; the world forks at the next
+behavioral roll; twin processes share a JIT timeline, which is exactly why
+within-batch certification passed for a day while sequential invocations
+never once agreed. The walk is deleted. Routing now asks a phase flag
+(`TickBracket`): raised at the top of each tick by a ride on the pre-tick
+queue, lowered after the simulation by a ride on the script queue — ordering
+the engine itself guarantees — self-sustaining from the latch, fast-forward's
+extra ticks bracketed explicitly. Certified: separate invocations bit-exact
+at 10x (250 samples) and realtime (150), and 10x-vs-realtime bit-exact
+(`runs/bracket-*-trace.ndjson`). Regime note: the bracket changes draw
+routing, so pre-bracket seeds do not replay under it; batches state their
+regime by frozen tree, and every panel to date stands as the within-batch
+experiment it actually was.
 
 ## The standing rules
 
@@ -132,6 +167,35 @@ maps into every reused clone, loudly (`_sync_maps`,
 `runs/seat-probe5.log` is the repro). The reader-side tells beyond the
 players line: `owned at compile` in the run log, and the fresh-start worth
 -- a real duel opens at 3,500 ([[policy-exact-timing]]).
+
+The agent-side half landed 2026-08-06 (`WrongWorldGuard`): the match
+watcher's liveness predicate now carries a map term -- no world but the
+requested one can receive the setup or open the channel, however a load
+fails -- the engine's own automated-testing switch (`l.aT`) is armed so a
+failing load crashes at its origin with the map named in the stack trace,
+and a requested world that never arrives halts the JVM at 60s (exit 70,
+under the harness's 90s port wait so the agent's diagnosis wins the log).
+Verified both ways: a missing map dies loudly twice over, and the real
+duel plays through untouched. Building it also settled how the old latch
+ever worked, from artifacts rather than inference: **every pre-guard run
+latched on the menu world** -- the latch sits ~5 log lines after "match
+starting" in poisoned and healthy batches alike, the AiTimers line says
+"10 team(s)", and the first map scan reads the menu's 10 pools -- because
+the menu background is a running mission demo that passes a
+player-and-units predicate, and the start script executes a full frame
+after the runnable that queues it. The whole setup ran against the menu;
+the load then proceeded under the hold and swapped the world beneath the
+open channel. It worked anyway for two measured reasons: difficulty
+survived because the reflective write lands before `open()` and the
+document round-trips current settings back through `loadConfigCommon`
+(frame-0 income ratios read exactly 1.78/1.39 across every batch,
+poisoned included), and the compile stayed clean only when play.py's
+sandbox-swap wait held the planner past the swap -- the poisoning was
+never an agent-side race lost, it was the planner compiling before a swap
+the agent had no part in signalling. The gated latch replaces both lucky
+mechanisms with construction, and makes the documented reseed semantics
+true for the first time: the match now starts from exactly the seed,
+after the load, instead of from whatever the load left of it.
 
 [^4]: `.decompiled/com/corrodinggames/librocket/scripts/Root.java:626-645`
     (`loadConfigCommon`: the element reads and the fallback), `:204-211`

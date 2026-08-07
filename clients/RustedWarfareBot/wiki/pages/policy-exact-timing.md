@@ -44,12 +44,20 @@ Two traps this regime opened, both paid for and fixed the same day:
   game dir lacks fails its load with an engine alert nothing reads, and
   the run drifts into the boot sandbox instead -- which is how six stale
   worker clones voided the whole cross-map batch family
-  ([[policy-determinism]], the seating section). Clones now re-sync maps
-  on every prepare; the agent-side die-loudly guard is queued.
+  ([[policy-determinism]], the seating section). Clones re-sync maps on
+  every prepare, and the agent-side guard landed the same day
+  (`WrongWorldGuard`): the watcher latches only on the requested map, a
+  failing load crashes at its origin, and a world that never arrives
+  halts the JVM at 60s naming what was live instead.
 * **Cross-regime comparability.** A batch states its regime by its frozen
   tree and, since 2026-08-06, its scorecard's `match` line. Panels that
   froze different regimes are different experiments whatever their names
-  say ([[harness-match-service]]: freeze, verify, go).
+  say ([[harness-match-service]]: freeze, verify, go). 2026-08-07 addendum:
+  every panel above certified within-batch only — same-seed runs from
+  separate invocations forked until the tick bracket landed
+  ([[policy-determinism]], the cross-invocation section). The panels stand
+  as the within-batch experiments they were; cross-invocation replay of a
+  seed is a property only bracket-regime trees have.
 
 ## The ladder as re-founded (duel_lake 1v1, champion flame-nocover)
 
