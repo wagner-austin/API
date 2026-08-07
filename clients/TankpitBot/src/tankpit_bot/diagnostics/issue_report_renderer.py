@@ -10,7 +10,7 @@ from tankpit_bot.diagnostics.issue_report_types import (
     IssueReportDict,
     SessionScorecardDict,
 )
-from tankpit_bot.diagnostics.session_scorecard import (
+from tankpit_bot.diagnostics.session_scorecard_render import (
     render_fuel_low_water_lines,
     render_shot_billing_lines,
     render_state_budget_lines,
