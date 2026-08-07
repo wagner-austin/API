@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 
 import pytest
 from aiohttp import web
-from aiohttp.test_utils import TestClient, TestServer
+from aiohttp.test_utils import TestClient
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
+from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot._test_hooks.fs import PathExistsProtocol, ReadTextProtocol
 from tankpit_bot.service import _test_hooks as service_hooks
@@ -21,43 +21,8 @@ from tankpit_bot.service.fleet_manager import (
     FleetManager,
     resolve_fleet_port,
 )
-from tankpit_bot.service.fleet_routes import make_fleet_app
 from tests.conftest import FakeEnv
-
-
-class _FakeProcess:
-    """Controllable child-process double."""
-
-    def __init__(self, pid: int) -> None:
-        self.pid = pid
-        self.returncode: int | None = None
-
-    def poll(self) -> int | None:
-        return self.returncode
-
-
-class _FakeSpawner:
-    """Records spawn environments and hands out process doubles."""
-
-    def __init__(self) -> None:
-        self.envs: list[dict[str, str]] = []
-        self.processes: list[_FakeProcess] = []
-
-    def __call__(self, env_overrides: dict[str, str]) -> _FakeProcess:
-        self.envs.append(dict(env_overrides))
-        process = _FakeProcess(pid=1001 + len(self.processes))
-        self.processes.append(process)
-        return process
-
-
-@pytest.fixture()
-def spawner() -> Generator[_FakeSpawner, None, None]:
-    """Install a recording spawner for the duration of one test."""
-    original = service_hooks.spawn_bot_process
-    fake = _FakeSpawner()
-    service_hooks.spawn_bot_process = fake
-    yield fake
-    service_hooks.spawn_bot_process = original
+from tests.service._fleet_fixtures import _FakeSpawner
 
 
 def _with_configured_accounts() -> tuple[PathExistsProtocol, ReadTextProtocol]:
@@ -384,16 +349,16 @@ def test_main_wires_the_app_onto_the_resolved_port() -> None:
     def fake_run(app: web.Application, *, host: str, port: int) -> None:
         served.append((app, host, port))
 
-    original_dotenv = service_hooks.load_dotenv
+    original_dotenv = core_hooks.load_dotenv
     original_run = service_hooks.run_web_app
     original_get_env = top_hooks.get_env
     try:
-        service_hooks.load_dotenv = fake_dotenv
+        core_hooks.load_dotenv = fake_dotenv
         service_hooks.run_web_app = fake_run
         top_hooks.get_env = FakeEnv({"TANKPIT_FLEET_PORT": "27311"})
         main()
     finally:
-        service_hooks.load_dotenv = original_dotenv
+        core_hooks.load_dotenv = original_dotenv
         service_hooks.run_web_app = original_run
         top_hooks.get_env = original_get_env
 
@@ -448,22 +413,9 @@ def test_real_spawn_bot_process_launches_a_live_python_child() -> None:
         raise AssertionError("child still running after kill + wait")
 
 
-@pytest.fixture()
-async def client(
-    spawner: _FakeSpawner,
-) -> AsyncGenerator[TestClient[web.Request, web.Application], None]:
-    """Serve the fleet app on a random test port."""
-    manager = FleetManager()
-    app = make_fleet_app(manager)
-    test_client: TestClient[web.Request, web.Application] = TestClient(TestServer(app))
-    await test_client.start_server()
-    yield test_client
-    await test_client.close()
-
-
 @pytest.mark.asyncio
 async def test_http_spawn_list_stop_remove_cycle(
-    client: TestClient[web.Request, web.Application],
+    fleet_client: TestClient[web.Request, web.Application],
     spawner: _FakeSpawner,
 ) -> None:
     """The full AI-driven lifecycle over plain HTTP."""
@@ -476,23 +428,23 @@ async def test_http_spawn_list_stop_remove_cycle(
     top_hooks.write_text = fake_write
     try:
         payload: dict[str, str | int] = {"instance": "alpha", "kills": 30}
-        created = await client.post("/bots", json=payload)
+        created = await fleet_client.post("/bots", json=payload)
         assert created.status == 201
 
-        listed = await client.get("/bots")
+        listed = await fleet_client.get("/bots")
         body = narrow_json_to_dict(load_json_str(await listed.text()))
         bots = body["bots"]
         assert isinstance(bots, list) and len(bots) == 1
 
-        stopped = await client.post("/bots/alpha/stop")
+        stopped = await fleet_client.post("/bots/alpha/stop")
         assert stopped.status == 200
         assert written == [(Path("runs/bot/alpha/STOP"), "")]
 
-        blocked = await client.delete("/bots/alpha")
+        blocked = await fleet_client.delete("/bots/alpha")
         assert blocked.status == 409
 
         spawner.processes[0].returncode = 0
-        removed = await client.delete("/bots/alpha")
+        removed = await fleet_client.delete("/bots/alpha")
         assert removed.status == 200
     finally:
         top_hooks.write_text = original_write
@@ -500,11 +452,11 @@ async def test_http_spawn_list_stop_remove_cycle(
 
 @pytest.mark.asyncio
 async def test_http_page_stats_and_restart(
-    client: TestClient[web.Request, web.Application],
+    fleet_client: TestClient[web.Request, web.Application],
     spawner: _FakeSpawner,
 ) -> None:
     """The control page serves, stats answer JSON, restart respawns."""
-    page = await client.get("/")
+    page = await fleet_client.get("/")
     assert page.status == 200
     assert (page.headers["Content-Type"]).startswith("text/html")
     body = await page.text()
@@ -512,7 +464,7 @@ async def test_http_page_stats_and_restart(
 
     originals = _with_configured_accounts()
     try:
-        listed_accounts = await client.get("/accounts")
+        listed_accounts = await fleet_client.get("/accounts")
         assert listed_accounts.status == 200
         accounts_payload = narrow_json_to_dict(load_json_str(await listed_accounts.text()))
         assert accounts_payload == {"accounts": ["artax", "second"]}
@@ -520,7 +472,7 @@ async def test_http_page_stats_and_restart(
         _restore_account_hooks(originals)
 
     ok: dict[str, str | int] = {"instance": "alpha", "kills": 5}
-    assert (await client.post("/bots", json=ok)).status == 201
+    assert (await fleet_client.post("/bots", json=ok)).status == 201
 
     def fake_read(path: Path) -> str:
         raise OSError(f"no events at {path}")
@@ -528,28 +480,28 @@ async def test_http_page_stats_and_restart(
     original_read = top_hooks.read_text
     top_hooks.read_text = fake_read
     try:
-        stats = await client.get("/bots/alpha/stats")
+        stats = await fleet_client.get("/bots/alpha/stats")
         assert stats.status == 200
         payload = narrow_json_to_dict(load_json_str(await stats.text()))
         assert payload == {"available": False}
-        assert (await client.get("/bots/ghost/stats")).status == 404
-        activity = await client.get("/bots/alpha/activity")
+        assert (await fleet_client.get("/bots/ghost/stats")).status == 404
+        activity = await fleet_client.get("/bots/alpha/activity")
         assert activity.status == 200
         activity_payload = narrow_json_to_dict(load_json_str(await activity.text()))
         assert activity_payload == {"available": False}
-        assert (await client.get("/bots/ghost/activity")).status == 404
-        hud = await client.get("/bots/alpha/hud")
+        assert (await fleet_client.get("/bots/ghost/activity")).status == 404
+        hud = await fleet_client.get("/bots/alpha/hud")
         assert hud.status == 200
         hud_payload = narrow_json_to_dict(load_json_str(await hud.text()))
         assert hud_payload == {"available": False}
-        assert (await client.get("/bots/ghost/hud")).status == 404
+        assert (await fleet_client.get("/bots/ghost/hud")).status == 404
     finally:
         top_hooks.read_text = original_read
 
-    assert (await client.post("/bots/alpha/restart")).status == 409
-    assert (await client.post("/bots/ghost/restart")).status == 404
+    assert (await fleet_client.post("/bots/alpha/restart")).status == 409
+    assert (await fleet_client.post("/bots/ghost/restart")).status == 404
     spawner.processes[0].returncode = 0
-    restarted = await client.post("/bots/alpha/restart")
+    restarted = await fleet_client.post("/bots/alpha/restart")
     assert restarted.status == 201
     row = narrow_json_to_dict(load_json_str(await restarted.text()))
     assert row["pid"] == 1002
@@ -557,19 +509,19 @@ async def test_http_page_stats_and_restart(
 
 @pytest.mark.asyncio
 async def test_http_rejections_are_typed_statuses(
-    client: TestClient[web.Request, web.Application],
+    fleet_client: TestClient[web.Request, web.Application],
     spawner: _FakeSpawner,
 ) -> None:
     """400 for malformed spawns, 409 for duplicates, 404 for ghosts."""
     bad: dict[str, str | int] = {"instance": "../escape"}
-    assert (await client.post("/bots", json=bad)).status == 409
+    assert (await fleet_client.post("/bots", json=bad)).status == 409
 
     malformed: dict[str, str] = {"kills": "many"}
-    assert (await client.post("/bots", json=malformed)).status == 400
+    assert (await fleet_client.post("/bots", json=malformed)).status == 400
 
     ok: dict[str, str | int] = {"instance": "alpha"}
-    assert (await client.post("/bots", json=ok)).status == 201
-    assert (await client.post("/bots", json=ok)).status == 409
+    assert (await fleet_client.post("/bots", json=ok)).status == 201
+    assert (await fleet_client.post("/bots", json=ok)).status == 409
 
-    assert (await client.post("/bots/ghost/stop")).status == 404
-    assert (await client.delete("/bots/ghost")).status == 404
+    assert (await fleet_client.post("/bots/ghost/stop")).status == 404
+    assert (await fleet_client.delete("/bots/ghost")).status == 404
