@@ -39,12 +39,14 @@ from tankpit_bot.sim.session import SimCDPSession, deliver_batch
 from tankpit_bot.sim.spawn import find_open_tile_near
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
 from tankpit_bot.sim.world_seed import (
-    MINE_DENSITY,
-    seed_ferries,
     seed_field_population,
-    seed_minefield,
     seed_practice_client,
     select_practice_layout,
+)
+from tankpit_bot.sim.world_seed_mines import (
+    MINE_DENSITY,
+    seed_ferries,
+    seed_minefield,
 )
 from tankpit_bot.sniffer.world_state import reset_world_state
 

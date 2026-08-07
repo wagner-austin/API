@@ -6,7 +6,11 @@ from pathlib import Path
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
-from tankpit_bot.sim.world_seed import MINE_DENSITY, MINE_TEAM_CYCLE, seed_minefield
+from tankpit_bot.sim.world_seed_mines import (
+    MINE_DENSITY,
+    MINE_TEAM_CYCLE,
+    seed_minefield,
+)
 from tankpit_bot.state.viewport_geometry import VIEWPORT_PATCH_HEIGHT, VIEWPORT_PATCH_WIDTH
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 

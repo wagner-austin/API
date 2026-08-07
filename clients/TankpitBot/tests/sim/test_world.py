@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONValue, narrow_json_to_list
 
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.sim.world import (
@@ -111,8 +111,7 @@ def test_decode_rejects_two_mines_on_one_tile() -> None:
     world = make_sim_world("field01_r.gif")
     place_mine(world, 10, 11, 0)
     encoded = encode_sim_world(world)
-    mines = encoded["mines"]
-    assert isinstance(mines, list)
+    mines = narrow_json_to_list(encoded["mines"])
     encoded["mines"] = [*mines, {"x": 10, "y": 11, "team": 2}]
 
     with pytest.raises(ValueError, match="two mines on tile 10,11"):

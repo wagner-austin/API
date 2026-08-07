@@ -145,7 +145,7 @@ def test_the_room_floats_ferries_on_its_water() -> None:
     from pathlib import Path
 
     from tankpit_bot import _test_hooks
-    from tankpit_bot.sim.world_seed import seed_ferries
+    from tankpit_bot.sim.world_seed_mines import seed_ferries
 
     terrain = _test_hooks.load_terrain_map(Path("field01_r.gif"))
     world = make_sim_world("field01_r.gif")
@@ -163,7 +163,7 @@ def test_seeded_ferries_never_stack() -> None:
     from pathlib import Path
 
     from tankpit_bot import _test_hooks
-    from tankpit_bot.sim.world_seed import seed_ferries
+    from tankpit_bot.sim.world_seed_mines import seed_ferries
 
     world = make_sim_world("field01_r.gif")
     seed_ferries(world, _test_hooks.load_terrain_map(Path("field01_r.gif")))
@@ -177,7 +177,7 @@ def test_a_scenarios_own_ferry_survives_the_seeding() -> None:
     from pathlib import Path
 
     from tankpit_bot import _test_hooks
-    from tankpit_bot.sim.world_seed import seed_ferries
+    from tankpit_bot.sim.world_seed_mines import seed_ferries
 
     world = make_sim_world("field01_r.gif")
     world["ferries"].append(SimFerryDict(x=118, y=112))
@@ -192,7 +192,7 @@ def test_a_seeded_room_drifts_its_ferries_on_the_tick() -> None:
     from pathlib import Path
 
     from tankpit_bot import _test_hooks
-    from tankpit_bot.sim.world_seed import seed_ferries
+    from tankpit_bot.sim.world_seed_mines import seed_ferries
 
     terrain = _test_hooks.load_terrain_map(Path("field01_r.gif"))
     world = make_sim_world("field01_r.gif")

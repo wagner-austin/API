@@ -43,6 +43,7 @@ from tankpit_bot.sim.emissions import (
 from tankpit_bot.sim.ferries import drift_ferries
 from tankpit_bot.sim.server_move import SimServerMoveMixin
 from tankpit_bot.sim.viewport_window import ViewportTracker
+from tankpit_bot.sim.visitors import RoomChurn
 from tankpit_bot.sim.wire_statements import (
     full_status_statement,
     identity_statement,
@@ -107,6 +108,7 @@ class SimServer(SimServerMoveMixin):
         self._pending_announcements: list[BinaryMessage] = []
         self._viewport = ViewportTracker(world, terrain, client_id)
         self._combat = CombatLedger(world, terrain, client_id)
+        self._churn = RoomChurn()
 
     def handshake(self) -> list[BinaryMessage]:
         """Build the session-start burst the client receives on join.
@@ -439,6 +441,11 @@ class SimServer(SimServerMoveMixin):
         # patch grid repaints it in the same batch that announced the
         # move ([[ferry-mechanics]], [[session-state-deglobalisation]]).
         drift_ferries(self.world, self.terrain, messages)
+        # Room churn runs BEFORE the viewport diff, so a visitor who
+        # lands inside the client's window is announced by the same
+        # membership pass that announces any other arrival
+        # ([[session-state-deglobalisation]]).
+        self._churn.advance(self.world, self.terrain, messages)
         self._viewport.emit_transitions(messages)
         # Dynamic-layer refresh is EVENT-driven, never walk-driven:
         # the client's window is static between teleports (autoscroll
