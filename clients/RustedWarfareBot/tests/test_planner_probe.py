@@ -30,7 +30,7 @@ def _entity(index: int, unit_id: int, type_name: str, x: float, y: float) -> str
     return (
         f'{{"kind":"entity","frame":1,"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":{x},"y":{y},'
-        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
+        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0,"damaged_by":""}}'
     )
 
 

@@ -37,6 +37,7 @@ def _config(
     out_dir: str = "runs/sweeps/demo",
     match: MatchConfig | None = None,
     pin_delta: int = 0,
+    fast_forward: int = 0,
 ) -> SweepConfig:
     return SweepConfig(
         out_dir=out_dir,
@@ -46,6 +47,7 @@ def _config(
         source_game_dir=_SOURCE,
         tree=f"{out_dir}/.tree",
         pin_delta=pin_delta,
+        fast_forward=fast_forward,
         match=match,
     )
 
@@ -223,6 +225,8 @@ def test_a_partial_transcript_does_not_count_as_a_result() -> None:
 
 def test_a_configuration_round_trips_through_its_payload() -> None:
     assert decode_sweep_config(encode_sweep_config(_config())) == _config()
+    fast = _config(fast_forward=10)
+    assert decode_sweep_config(encode_sweep_config(fast)) == fast
 
 
 def test_an_outcome_round_trips_through_its_payload() -> None:

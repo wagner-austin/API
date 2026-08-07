@@ -48,6 +48,17 @@ def test_a_trace_decodes_by_shape_and_skips_the_header() -> None:
     )
 
 
+def test_the_fifteen_column_shape_reads_at_the_same_indices() -> None:
+    """The income pair landed between rival and world so that extractors,
+    lost, worth and rival kept their positions -- one decoder reads the
+    13-column archive and the current shape alike."""
+    frame = 20 * FRAMES_PER_SAMPLE
+    row = f"{frame} 0 4000 2 6 1 1 1 0 0 24000 22000 54 180 12345\n"
+    assert decode_trace(_HEADER + row) == (
+        TracePoint(sample=20, extractors=6, lost=1, worth=24000, rival=22000),
+    )
+
+
 def test_an_autopsy_names_the_peak_the_collapse_and_the_race() -> None:
     """A losing shape: worth peaks mid-game against a larger rival, halves
     later, and the race finished at five extractors -- the stall figure the

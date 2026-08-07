@@ -12,6 +12,7 @@ from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.campaign import play
 from rw_bot.policy.expander import economy_floor
+from rw_bot.policy.match_report import format_report
 from rw_bot.wire.state import Sample
 from tests.campaign_fixtures import (
     BUILDER,
@@ -395,3 +396,27 @@ def test_the_army_mix_is_reported_so_a_denied_composition_is_visible() -> None:
     peer = ScriptedPeer(lines(world))
     report = play(AgentChannel(peer), (), catalogue, placements, profiles_for(catalogue), 1)
     assert report["composition_end"] == (("c_tank", 3), ("c_artillery", 1))
+
+
+def test_deaths_are_attributed_to_their_killers_in_the_report() -> None:
+    """The death ledger end to end: a damaged tank and a damaged extractor
+    vanish and the report names both killers, split mobile against
+    standing; the builder that vanished untouched appears in neither table,
+    because a unit nothing hit left the roster some other way."""
+    before = sample(
+        CENTRE,
+        entity(1, "c_tank", x=500.0, damaged_by="c_artillery"),
+        entity(2, "c_tank", x=520.0, damaged_by="c_artillery"),
+        entity(3, "c_tank", x=540.0, damaged_by="c_helicopter"),
+        entity(400, "extractorT1", x=300.0, damaged_by="c_bomber"),
+        entity(214, "builder", x=50.0),
+        credits=1000,
+    )
+    after = sample(CENTRE, credits=1000)
+    peer = ScriptedPeer(lines(before, after))
+    report = play(AgentChannel(peer), (), CATALOGUE, PLACEMENTS, PROFILES, 2)
+    assert report["units_lost_to"] == (("c_artillery", 2), ("c_helicopter", 1))
+    assert report["buildings_lost_to"] == (("c_bomber", 1),)
+    printed = format_report(report)
+    assert "units lost to  c_artillery x2, c_helicopter x1" in printed
+    assert "works lost to  c_bomber x1" in printed

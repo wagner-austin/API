@@ -41,7 +41,7 @@ def _entity_line(frame: int, index: int, unit_id: int, type_name: str, x: float)
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":{x},"y":200.0,'
         f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,'
-        f'"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
+        f'"hp":100.0,"max_hp":100.0,"complete":true,"queued":0,"damaged_by":""}}'
     )
 
 

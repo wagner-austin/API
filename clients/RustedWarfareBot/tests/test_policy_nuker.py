@@ -165,30 +165,33 @@ def test_an_incomplete_launcher_is_not_asked_to_arm() -> None:
     assert orders["launch"] is None
 
 
-def test_the_launch_goes_to_the_priciest_hostile_structure() -> None:
-    """Priciest wins in either roster order: a cheaper structure seen after
-    the choice must not displace it."""
+def test_the_launch_goes_to_the_richest_blast_circle() -> None:
+    """An area weapon aims at clusters. A factory standing 200 from a
+    command centre shares its blast circle (7,000 erased together); a
+    lone command centre across the map scores only itself (6,000). The
+    sum wins -- targeting the priciest single structure would aim at
+    either centre and waste the circle."""
     nuker = Nuker()
     world = sample(
         _CENTRE,
         _LAUNCHER,
         enemy(80, "landFactory", x=900.0),
-        enemy(81, "commandCenterT2", x=1200.0, y=300.0),
+        enemy(81, "commandCenterT2", x=1100.0),
         enemy(82, "c_tank", x=700.0),
-        enemy(83, "landFactory", x=1500.0),
+        enemy(84, "commandCenterT2", x=3000.0, y=2000.0),
         credits=1_000,
         options=(_LAUNCH_NUKE,),
     )
     orders = nuker.advance(world, CATALOGUE, Budget(1_000, reserve=0), (), _workforce(), 1)
     launch = orders["launch"]
     if launch is None:
-        raise AssertionError("the standing target was not fired at")
+        raise AssertionError("the standing cluster was not fired at")
     assert launch == {
         "kind": "ability_at",
         "unit_id": 500,
         "key": "c_launchNuke",
-        "x": 1200.0,
-        "y": 300.0,
+        "x": 900.0,
+        "y": 0.0,
     }
 
 

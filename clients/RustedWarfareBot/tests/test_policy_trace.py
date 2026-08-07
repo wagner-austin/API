@@ -65,7 +65,7 @@ def test_a_unit_that_left_the_roster_is_reported_with_where_it_stood() -> None:
     before = owned_by_id(_sample(_entity(1, "c_tank", 900.0, 250.0), _entity(2, "builder")))
     after = owned_by_id(_sample(_entity(2, "builder")))
     assert losses_between(before, after, 12) == (
-        Loss(frame=12, unit_id=1, type_name="c_tank", x=900.0, y=250.0),
+        Loss(frame=12, unit_id=1, type_name="c_tank", x=900.0, y=250.0, killer=""),
     )
 
 
@@ -103,10 +103,13 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
                 refused=0,
                 worth=3500,
                 rival=9000,
+                income=54,
+                rival_income=180,
                 world=123456789,
+                plan="building",
             ),
         ),
-        (Loss(frame=7, unit_id=1, type_name="c_tank", x=900.0, y=250.0),),
+        (Loss(frame=7, unit_id=1, type_name="c_tank", x=900.0, y=250.0, killer="c_artillery"),),
     )
     assert lines[0].split() == [
         "frame",
@@ -121,7 +124,10 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "refused",
         "worth",
         "rival",
+        "income",
+        "rival_income",
         "world",
+        "plan",
     ]
     assert lines[1].split() == [
         "7",
@@ -136,11 +142,14 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "0",
         "3500",
         "9000",
+        "54",
+        "180",
         "123456789",
+        "building",
     ]
     assert lines[2] == ""
-    assert lines[3].split() == ["frame", "unit", "type", "x", "y"]
-    assert lines[4].split() == ["7", "1", "c_tank", "900", "250"]
+    assert lines[3].split() == ["frame", "unit", "type", "x", "y", "killer"]
+    assert lines[4].split() == ["7", "1", "c_tank", "900", "250", "c_artillery"]
 
 
 def test_a_run_that_lost_nothing_still_renders_both_headers() -> None:
@@ -160,9 +169,22 @@ def test_a_run_that_lost_nothing_still_renders_both_headers() -> None:
                 refused=0,
                 worth=0,
                 rival=0,
+                income=0,
+                rival_income=0,
                 world=0,
+                plan="done",
             ),
         ),
         (),
     )
-    assert lines[-1].split() == ["frame", "unit", "type", "x", "y"]
+    assert lines[-1].split() == ["frame", "unit", "type", "x", "y", "killer"]
+
+
+def test_the_income_pair_sits_before_the_world_digest() -> None:
+    """Existing readers index extractors 4, lost 5, worth 10 and rival 11 by
+    position, so the new pair lands at 12-13 and only the digest moves."""
+    header = format_trace((), ())[0].split()
+    assert header.index("income") == 12
+    assert header.index("rival_income") == 13
+    assert header.index("world") == 14
+    assert header.index("plan") == 15

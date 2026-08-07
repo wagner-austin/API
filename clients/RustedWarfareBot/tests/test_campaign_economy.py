@@ -38,6 +38,7 @@ from tests.wire_fixtures import (
     entity,
     lines,
     option,
+    player,
     pool,
     sample,
 )
@@ -308,11 +309,28 @@ def test_every_observation_is_acknowledged() -> None:
 
 
 def test_the_trace_is_written_when_a_path_is_given(tmp_path: Path) -> None:
+    """No players on the wire is the stream that predates the record, and the
+    income pair reads zero there rather than inventing a figure."""
     target = tmp_path / "trace.txt"
     run_campaign(sample(CENTRE, *WAVE, ENEMY), times=2, trace=target)
     written = target.read_text(encoding="utf-8")
     assert "frame" in written
     assert "army" in written
+    first_row = written.splitlines()[1].split()
+    assert first_row[12] == "0"
+    assert first_row[13] == "0"
+
+
+def test_the_trace_carries_the_income_pair_off_the_scoreboard(tmp_path: Path) -> None:
+    """Ours at column 12, the strongest rival's at 13 -- distinct figures, so a
+    swap of the pair could not pass ([[policy-economy]])."""
+    us = player(0, index=0, local=True, hostile=False, income=54, building_value=3000)
+    them = player(1, index=1, income=180, army_value=4200, building_value=1500)
+    target = tmp_path / "trace.txt"
+    run_campaign(sample(CENTRE, *WAVE, ENEMY, players=(us, them)), times=2, trace=target)
+    first_row = target.read_text(encoding="utf-8").splitlines()[1].split()
+    assert first_row[12] == "54"
+    assert first_row[13] == "180"
 
 
 def test_the_report_renders_as_lines() -> None:

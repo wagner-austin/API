@@ -77,6 +77,24 @@ def test_a_pinned_batch_passes_the_delta_to_every_match() -> None:
         assert not [part for part in host.commands[0] if part.startswith("PLAY_PINDELTA")]
 
 
+def test_a_fast_batch_passes_the_multiple_to_every_match() -> None:
+    """The eighth positional: the gym knob, certified bit-exact against
+    realtime at 10x (log 2026-08-06). A batch that omits it stays silent so
+    trees frozen before the option existed keep running."""
+    with FakeHost() as host:
+        _plant(host, "duel|1|doctrines/default.doctrine|1500")
+        code = main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1", "3", "10"])
+        assert code == EXIT_OK
+        assert "PLAY_FASTFORWARD=10" in host.commands[0]
+        assert "PLAY_PINDELTA=3" in host.commands[0]
+        host.commands.clear()
+        del host.files["runs/sweeps/demo/duel-s1.txt"]
+
+        code = main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1", "3"])
+        assert code == EXIT_OK
+        assert not [part for part in host.commands[0] if part.startswith("PLAY_FASTFORWARD")]
+
+
 def test_every_match_in_the_file_is_played_once() -> None:
     with FakeHost() as host:
         _plant(

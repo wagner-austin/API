@@ -37,7 +37,7 @@ def _entity_line(frame: int, index: int, unit_id: int, type_name: str) -> str:
     return (
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":100.0,"y":200.0,'
-        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
+        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0,"damaged_by":""}}'
     )
 
 
@@ -152,7 +152,9 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
     # One read for the opening observation the plan is expanded against, then
     # one per loop sample. The loop no longer stops when the plan finishes: a
     # completed opening is where playing starts ([[policy-loop]]).
-    peer = ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 3)
+    # The rich opening pays the sandbox-swap window before the loop's own
+    # samples, so the peer supplies it.
+    peer = ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 12)
     with StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "2"]) == EXIT_OK
     # The world already holds a finished Land Factory, so expansion inserts
@@ -160,6 +162,8 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
     # insertion cases exercise, seen from the other side.
     assert capsys.readouterr().out.splitlines() == [
         "doctrine: default",
+        "owned at compile (frame 1): builder c_tank c_tank c_tank c_tank "
+        "extractorT1 extractorT1 extractorT1 landFactory",
         "goals: extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> c_tank",
         "plan:  extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> c_tank",
         "  extractorT1 costs 700, goes on a resource pool",
@@ -200,6 +204,8 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         # that bought none read identically ([[policy-economy]]).
         "structures     extractorT1 x3, landFactory x1",
         "composition    c_tank x4",
+        "units lost to  none",
+        "works lost to  none",
         "enemy fields   none",
         "income         0/s",
         "enemies seen   0 -> 0 (0 engageable)",
@@ -234,7 +240,7 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"]) == EXIT_INCOMPLETE
     # One more header line than before: the plan now announces its total price
     # against the opening balance.
-    assert capsys.readouterr().out.splitlines()[12:] == [
+    assert capsys.readouterr().out.splitlines()[13:] == [
         "verdict        survived (sample_limit)",
         # The extractor has no pool in this scripted world, so the plan reaches
         # past it to the factory and reports what blocks *that* -- an entry
@@ -265,6 +271,8 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
         # No army, so no mix -- named rather than left blank, because an empty
         # field reads as a measurement that failed to happen.
         "composition    none",
+        "units lost to  none",
+        "works lost to  none",
         "enemy fields   none",
         "income         0/s",
         "enemies seen   0 -> 0 (0 engageable)",
@@ -294,7 +302,7 @@ def test_the_sample_budget_defaults_when_not_given(
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH)]) == EXIT_OK
     # One more header line than before: the plan now announces its total price
     # against the opening balance.
-    assert capsys.readouterr().out.splitlines()[11:] == [
+    assert capsys.readouterr().out.splitlines()[12:] == [
         "verdict        survived (sample_limit)",
         "plan           7/7 -- done: all 7 plan entries satisfied",
         "build orders   0",
@@ -322,6 +330,8 @@ def test_the_sample_budget_defaults_when_not_given(
         "workers        1",
         "structures     extractorT1 x3, landFactory x1",
         "composition    c_tank x4",
+        "units lost to  none",
+        "works lost to  none",
         "enemy fields   none",
         "income         0/s",
         "enemies seen   0 -> 0 (0 engageable)",
@@ -440,8 +450,9 @@ def test_the_style_can_be_given_as_a_doctrine_file(
     assert code in (EXIT_OK, EXIT_INCOMPLETE)
     printed = capsys.readouterr().out.splitlines()
     assert printed[0] == "doctrine: tanks"
-    assert printed[1] == "goals: c_tank -> c_tank"
-    assert printed[2] == "plan:  c_tank -> c_tank"
+    assert printed[1] == "owned at compile (frame 1): builder landFactory"
+    assert printed[2] == "goals: c_tank -> c_tank"
+    assert printed[3] == "plan:  c_tank -> c_tank"
 
 
 def test_a_dash_means_the_default_doctrine_and_no_trace(
@@ -542,12 +553,12 @@ def test_the_opening_settles_by_content_not_by_clock(
     populated = _sample_lines(2, 9000, _BUILDER, *built)
     # Two empty observations, one populated one the settle consumes, then the
     # loop's own two samples.
-    peer = ScriptedPeer(empty + empty + populated * 3)
+    peer = ScriptedPeer(empty + empty + populated * 12)
     with StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "2"]) == EXIT_OK
     printed = capsys.readouterr().out.splitlines()
     # The plan was expanded against the populated world, not the empty one.
-    assert printed[2] == (
+    assert printed[3] == (
         "plan:  extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> c_tank"
     )
 
@@ -564,3 +575,49 @@ def test_a_world_that_never_populates_is_a_failed_start_not_a_slow_one() -> None
     with StubbedConnect(peer), pytest.raises(ExpansionError) as caught:
         main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"])
     assert caught.value.code == "RW-EXPAND-001"
+
+
+_SANDBOX = (
+    (100, "commandCenter"),
+    (101, "builder"),
+    (102, "landFactory"),
+    (103, "gunShip"),
+    (104, "airFactory"),
+)
+
+
+def test_the_plan_waits_out_the_boot_sandbox_before_compiling(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The exact-timing regime can serve the engine's ten-player boot world
+    before the configured match goes live, frame counter already pinned to
+    zero. A plan compiled against that roster inserts no factory -- it
+    believes it owns two -- and is dead at its first combat entry
+    (log 2026-08-06: 0/24 at Very Hard AND at Hard). The swap is a roster
+    sharing no identity with the sandbox's."""
+    sandbox = _sample_lines(1, 4000, *_SANDBOX)
+    duel = _sample_lines(2, 4000, _BUILDER)
+    peer = ScriptedPeer(sandbox + duel * 4)
+    with StubbedConnect(peer):
+        # Incomplete is right: a bare builder cannot finish a nine-entry plan
+        # in two samples. The compile is what is under test.
+        assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "2"]) == EXIT_INCOMPLETE
+    printed = capsys.readouterr().out.splitlines()
+    assert printed[1] == "owned at compile (frame 2): builder"
+    assert printed[3] == "plan:  " + " -> ".join(_EXPANDED)
+
+
+def test_a_rich_world_that_never_swaps_is_the_run_s_real_world(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The default-map probes play the sandbox itself; for them the rich
+    roster is the truth and compiling against it is correct. The wait is
+    bounded so those runs pay a window, not the match."""
+    sandbox = _sample_lines(1, 4000, *_SANDBOX)
+    peer = ScriptedPeer(sandbox * 12)
+    with StubbedConnect(peer):
+        main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"])
+    printed = capsys.readouterr().out.splitlines()
+    assert printed[1].startswith("owned at compile (frame 1):")
+    # The sandbox owns a factory, so expansion inserts nothing.
+    assert printed[3] == "plan:  " + " -> ".join(DEFAULT_GOALS)

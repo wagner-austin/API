@@ -27,7 +27,7 @@ _FRAME = (
 _ENTITY = (
     '{"kind":"entity","frame":7,"index":0,"id":214,"type":"builder",'
     '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,'
-    '"hp":170.0,"max_hp":170.0,"complete":true,"queued":0}'
+    '"hp":170.0,"max_hp":170.0,"complete":true,"queued":0,"damaged_by":""}'
 )
 _POOL = (
     '{"kind":"pool","frame":7,"index":0,"tile_x":115,"tile_y":6,'

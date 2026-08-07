@@ -216,6 +216,16 @@ def test_a_pinned_batch_says_so_and_an_unpinned_one_stays_silent() -> None:
     assert not [element for element in unpinned if element.startswith("PLAY_PINDELTA")]
 
 
+def test_a_fast_batch_says_so_and_a_realtime_one_stays_silent() -> None:
+    """The gym knob rides the same silence rule as the pin: certified
+    bit-exact at 10x (log 2026-08-06), but a tree frozen before the option
+    existed runs an agent that rejects the unknown key."""
+    fast = make_argv(_job(seed=777), ".game-w2", 75, "demo", fast_forward=10)
+    assert "PLAY_FASTFORWARD=10" in fast
+    realtime = make_argv(_job(seed=777), ".game-w2", 75, "demo")
+    assert not [element for element in realtime if element.startswith("PLAY_FASTFORWARD")]
+
+
 def test_a_frozen_tree_owns_the_doctrine_path_too() -> None:
     """The first snapshot batch proved this within the hour: matches imported
     frozen code but read the working tree's doctrine file, a field was added
@@ -270,6 +280,8 @@ def _report() -> MatchReport:
         workers_end=33,
         enemy_types_end=(("c_tank", 40), ("extractorT2", 3)),
         composition_end=(("c_tank", 20),),
+        units_lost_to=(("c_artillery", 3),),
+        buildings_lost_to=(),
         standing_end=(("extractorT1", 13), ("c_turret_t1", 4), ("landFactory", 1)),
         income_end=122,
         players_start=5,

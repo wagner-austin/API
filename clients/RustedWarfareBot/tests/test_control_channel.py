@@ -44,7 +44,7 @@ def _entity(index: int, unit_id: int, type_name: str) -> str:
     return (
         f'{{"kind":"entity","frame":854,"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":1.0,"y":2.0,'
-        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
+        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0,"damaged_by":""}}'
     )
 
 
@@ -181,7 +181,7 @@ def test_successive_samples_are_read_in_order() -> None:
             _FRAME_1,
             '{"kind":"entity","frame":9,"index":0,"id":1,"type":"builder",'
             '"class":"u","x":0.0,"y":0.0,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,'
-            '"hp":1.0,"max_hp":1.0,"complete":true,"queued":0}',
+            '"hp":1.0,"max_hp":1.0,"complete":true,"queued":0,"damaged_by":""}',
             '{"kind":"frame","frame":10,"clock_ms":33,"visible":0,"pools":0,"options":0,"players":0,'
             '"credits":4000,"defeated":false,"wiped":false,"players_left":6}',
         ]
@@ -197,7 +197,7 @@ def test_an_entity_count_disagreeing_with_the_frame_still_fails_the_decoder() ->
         [
             _FRAME_1,
             '{"kind":"entity","frame":99,"index":0,"id":1,"type":"b","class":"u",'
-            '"x":0.0,"y":0.0,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":1.0,"max_hp":1.0,"complete":true,"queued":0}',
+            '"x":0.0,"y":0.0,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":1.0,"max_hp":1.0,"complete":true,"queued":0,"damaged_by":""}',
         ]
     )
     with pytest.raises(WireError) as caught:

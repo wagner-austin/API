@@ -48,6 +48,7 @@ def entity(
     max_hp: float = 100.0,
     complete: bool = True,
     queued: int = 0,
+    damaged_by: str = "",
 ) -> Entity:
     """Build one entity.
 
@@ -70,6 +71,7 @@ def entity(
         max_hp: Health at full.
         complete: Whether construction has finished.
         queued: Units queued for production.
+        damaged_by: Type name of the last damager, empty for untouched.
 
     Returns:
         The entity.
@@ -93,6 +95,7 @@ def entity(
         max_hp=max_hp,
         complete=complete,
         queued=queued,
+        damaged_by=damaged_by,
     )
 
 
