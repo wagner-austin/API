@@ -20,12 +20,11 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe, xor_decode_body
 from tankpit_bot.protocol import decode_message
 from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.types import CapturedMessage, CaptureSession
 
 _TRACKED_TYPES = frozenset({0x21, 0x2E, 0x47, 0x49, 0x53, 0x64})
@@ -136,17 +135,20 @@ def _split_frame_bodies(payload: str) -> list[bytes]:
     return bodies
 
 
-def _ingest_sent(timeline: WireTimelineDict, timestamp_ms: int, body: bytes) -> None:
+def _ingest_sent(
+    timeline: WireTimelineDict, timestamp_ms: int, body: bytes, xor_table: bytes
+) -> None:
     """Record one sent client command into the timeline.
 
     Args:
         timeline: Timeline being built.
         timestamp_ms: Frame timestamp.
         body: Raw message body (XOR-encoded after the prefix byte).
+        xor_table: The owning session's XOR table.
     """
     if body[0] != COMMAND_PREFIX:
         return
-    decoded = xor_decode(body)
+    decoded = xor_decode_body(body, xor_table, offset=1)
     if len(decoded) < 2:
         return
     x = decoded[2] if len(decoded) > 2 else 0
@@ -230,18 +232,21 @@ def _ingest_combat_and_identity(
         )
 
 
-def _ingest_received(timeline: WireTimelineDict, timestamp_ms: int, body: bytes) -> None:
+def _ingest_received(
+    timeline: WireTimelineDict, timestamp_ms: int, body: bytes, xor_table: bytes
+) -> None:
     """Record one received wire message into the timeline.
 
     Args:
         timeline: Timeline being built.
         timestamp_ms: Frame timestamp.
         body: Raw message body (msg_type byte + XOR-encoded rest).
+        xor_table: The owning session's XOR table.
     """
     msg_type = body[0]
     if msg_type not in _TRACKED_TYPES:
         return
-    decoded_data = xor_decode(body)
+    decoded_data = xor_decode_body(body, xor_table, offset=1)
     if len(decoded_data) < MSG_MIN_LENGTHS[msg_type]:
         return
     message = decode_message(msg_type, decoded_data)
@@ -253,9 +258,10 @@ def _ingest_received(timeline: WireTimelineDict, timestamp_ms: int, body: bytes)
 def extract_wire_timeline(session: CaptureSession) -> WireTimelineDict:
     """Extract the validator-relevant wire timeline from one session.
 
-    Resets and rebuilds the global XOR state for the session's magic
-    key (same discipline as ``replay.engine``), then walks every
-    captured frame in timestamp order.
+    Builds the XOR table from this session's own magic and holds it as
+    a LOCAL, so two sessions can be extracted concurrently. It was a
+    module global until 2026-08-06, which forced every archive walk to
+    be sequential ([[session-state-deglobalisation]] step 1).
 
     Args:
         session: Loaded and validated capture session.
@@ -265,12 +271,12 @@ def extract_wire_timeline(session: CaptureSession) -> WireTimelineDict:
 
     Raises:
         ValueError: If the session has no magic key (cannot XOR-decode).
+        XorStaticKeyUnavailableError: If the static key cannot be read.
     """
     magic = session["magic"]
     if magic is None:
         raise ValueError("Cannot extract timeline without magic key")
-    reset_xor_state()
-    build_global_xor_table(magic)
+    xor_table = build_session_xor_table(magic)
     timeline = WireTimelineDict(
         session_id=session["session_id"],
         self_id=None,
@@ -288,9 +294,9 @@ def extract_wire_timeline(session: CaptureSession) -> WireTimelineDict:
     for msg in ordered:
         for body in _split_frame_bodies(msg["payload"]):
             if msg["direction"] == "sent":
-                _ingest_sent(timeline, msg["timestamp_ms"], body)
+                _ingest_sent(timeline, msg["timestamp_ms"], body, xor_table)
             else:
-                _ingest_received(timeline, msg["timestamp_ms"], body)
+                _ingest_received(timeline, msg["timestamp_ms"], body, xor_table)
     return timeline
 
 

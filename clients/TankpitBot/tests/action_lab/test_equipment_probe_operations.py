@@ -11,11 +11,11 @@ to hang indefinitely in ``make check``.
 
 from __future__ import annotations
 
-from platform_core.json_utils import JSONValue
 from tests.action_lab.conftest import (
     INVENTORY_GROWTH_FRAME_INDEX,
     INVENTORY_TOTAL_AFTER_GROWTH,
     FailIfWaitedPage,
+    ReplayPipeline,
     set_inventory_total,
 )
 
@@ -156,6 +156,7 @@ class _PickupProbe:
         self.reset_calls = 0
         self._overlaps: list[ActionPhaseOverlapDict] = []
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
 
     @property
     def messages(self) -> list[CapturedMessage]:
@@ -463,7 +464,7 @@ def test_build_no_equipment_visible_result_for_probe_uses_inventory_hook(
 
 
 def test_run_pickup_attempt_takes_fast_path_against_real_inventory_frame(
-    replay_pipeline: list[dict[str, JSONValue]],
+    replay_pipeline: ReplayPipeline,
 ) -> None:
     """Real captured 0x49 frame, real decoders, real inventory tracker.
 
@@ -475,11 +476,12 @@ def test_run_pickup_attempt_takes_fast_path_against_real_inventory_frame(
     takes the fast path: no move dispatched, no waiter entered, result
     inventory_count_after matches the real tracker's new total.
     """
-    messages = replay_pipeline
+    messages = replay_pipeline.messages
+    xor_table = replay_pipeline.xor_table
 
     for msg in messages[:INVENTORY_GROWTH_FRAME_INDEX]:
         if msg["direction"] == "received":
-            process_received_message(str(msg["payload"]))
+            process_received_message(str(msg["payload"]), xor_table)
 
     assert total_inventory_count(get_inventory_state(get_world_service())) == 0
 
@@ -491,7 +493,7 @@ def test_run_pickup_attempt_takes_fast_path_against_real_inventory_frame(
 
     def _real_drain(probe: BufferedMessageSourceProtocol) -> int:
         drain_calls.append(probe)
-        process_received_message(str(growth_payload))
+        process_received_message(str(growth_payload), xor_table)
         return 1
 
     action_hooks.drain_buffered_messages = _real_drain
@@ -535,7 +537,7 @@ def test_run_pickup_attempt_takes_fast_path_against_real_inventory_frame(
 
 
 def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_frame(
-    replay_pipeline: list[dict[str, JSONValue]],
+    replay_pipeline: ReplayPipeline,
 ) -> None:
     """Slow-path against real captured bytes.
 
@@ -544,11 +546,12 @@ def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_fra
     2. Wait-loop iter 1 — no-op, inventory still 0, page.wait_for_timeout(100).
     3. Wait-loop iter 2 — process the real growth frame, inventory 0 -> 112.
     """
-    messages = replay_pipeline
+    messages = replay_pipeline.messages
+    xor_table = replay_pipeline.xor_table
 
     for msg in messages[:INVENTORY_GROWTH_FRAME_INDEX]:
         if msg["direction"] == "received":
-            process_received_message(str(msg["payload"]))
+            process_received_message(str(msg["payload"]), xor_table)
     assert total_inventory_count(get_inventory_state(get_world_service())) == 0
 
     growth_payload = messages[INVENTORY_GROWTH_FRAME_INDEX]["payload"]
@@ -560,7 +563,7 @@ def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_fra
         payload = drain_queue.pop(0)
         if payload is None:
             return 0
-        process_received_message(payload)
+        process_received_message(payload, xor_table)
         return 1
 
     action_hooks.drain_buffered_messages = _scheduled_drain

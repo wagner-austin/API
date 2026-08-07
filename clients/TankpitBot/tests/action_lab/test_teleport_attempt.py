@@ -43,6 +43,7 @@ class _Probe:
         self.started_cycles: list[tuple[str, str]] = []
         self.reset_idle_calls = 0
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
 
     @property
     def messages(self) -> list[CapturedMessage]:

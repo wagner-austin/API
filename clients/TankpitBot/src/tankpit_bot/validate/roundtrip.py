@@ -20,6 +20,7 @@ from pathlib import Path
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from platform_core.logging import get_logger
 
+from tankpit_bot.capture.xor import build_session_xor_table, xor_decode_body
 from tankpit_bot.protocol import (
     is_text_message,
     try_decode_binary_message,
@@ -30,12 +31,11 @@ from tankpit_bot.protocol.encoders import (
     encode_message_payload,
     encode_plaintext_ack,
 )
-from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.types import CaptureSession, decode_capture_session
 from tankpit_bot.validate.types import ClaimEvidenceDict
 from tankpit_bot.validate.wire_timeline import _split_frame_bodies
+from tankpit_bot.wire.helpers import DecodeError
 
 log = get_logger(__name__)
 
@@ -95,24 +95,24 @@ def _roundtrip_session(session: CaptureSession, tally: _Tally) -> None:
         session: Loaded capture session (must have a magic key).
         tally: Accumulator shared across sessions.
     """
-    reset_xor_state()
     magic = session["magic"]
     if magic is None:
         return
-    build_global_xor_table(magic)
+    xor_table = build_session_xor_table(magic)
     for msg in session["messages"]:
         if msg["direction"] != "received":
             continue
         for body in _split_frame_bodies(msg["payload"]):
-            _roundtrip_body(body, tally)
+            _roundtrip_body(body, xor_table, tally)
 
 
-def _roundtrip_body(body: bytes, tally: _Tally) -> None:
+def _roundtrip_body(body: bytes, xor_table: bytes, tally: _Tally) -> None:
     """Round-trip one received frame body into the tally.
 
     Args:
         body: Raw frame body (msg_type byte + XOR-encoded rest, or a
             plaintext ack).
+        xor_table: The owning session's XOR table.
         tally: Accumulator shared across sessions.
     """
     msg_type = body[0]
@@ -120,7 +120,7 @@ def _roundtrip_body(body: bytes, tally: _Tally) -> None:
         return
     if msg_type not in MSG_MIN_LENGTHS or is_text_message(msg_type):
         return
-    payload = xor_decode(body)
+    payload = xor_decode_body(body, xor_table, offset=1)
     if len(payload) < MSG_MIN_LENGTHS[msg_type]:
         tally.invalid_frames += 1
         return

@@ -76,24 +76,26 @@ get_argv: Callable[[], list[str]] = _real_get_argv
 class ProcessReceivedMessageProtocol(Protocol):
     """Protocol for processing a received WebSocket message payload."""
 
-    def __call__(self, payload: str) -> None:
+    def __call__(self, payload: str, xor_table: bytes) -> None:
         """Process a received message payload.
 
         Args:
             payload: Base64-encoded WebSocket frame payload.
+            xor_table: The owning session's XOR table.
         """
         ...
 
 
-def _real_process_received_message(payload: str) -> None:
+def _real_process_received_message(payload: str, xor_table: bytes) -> None:
     """Real implementation - delegates to sniffer decoders.
 
     Args:
         payload: Base64-encoded WebSocket frame payload.
+        xor_table: The owning session's XOR table.
     """
     from tankpit_bot.sniffer.decoders import process_received_message
 
-    process_received_message(payload)
+    process_received_message(payload, xor_table)
 
 
 process_received_message_hook: ProcessReceivedMessageProtocol = _real_process_received_message

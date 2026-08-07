@@ -15,7 +15,6 @@ boundary -- the same boundary the live tank-pit page is on top of.
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -26,8 +25,6 @@ from tests.action_lab._replay_equipment import (
 
 from tankpit_bot.action_lab.equipment_probe import EquipmentProbeError
 from tankpit_bot.action_lab.types import TeleportTargetDict
-from tankpit_bot.sniffer.world_state import reset_world_state
-from tankpit_bot.sniffer.xor import reset_xor_state
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EQUIPMENT_CAPTURE = REPO_ROOT / "fuel_probe.capture_session.json"
@@ -35,21 +32,6 @@ EQUIPMENT_CAPTURE = REPO_ROOT / "fuel_probe.capture_session.json"
 was made during an HFSM ``COLLECT`` session -- the bot does
 equipment scans + pickups throughout, so it is the right capture for
 the equipment-probe replay harness."""
-
-
-@pytest.fixture(autouse=True)
-def _isolate_world_state() -> Generator[None, None, None]:
-    """Reset world-state and XOR singletons around every test.
-
-    The replay harness builds a global XOR table from the capture's
-    magic key; without an explicit teardown reset, that table would
-    leak into subsequent tests that decode bytes with a different key.
-    """
-    reset_world_state()
-    reset_xor_state()
-    yield
-    reset_world_state()
-    reset_xor_state()
 
 
 @pytest.fixture()

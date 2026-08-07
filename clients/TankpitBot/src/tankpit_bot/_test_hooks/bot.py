@@ -19,17 +19,28 @@ from tankpit_bot.state.types import WorldStateDict
 
 
 class BufferedMessageSourceProtocol(Protocol):
-    """Interface for objects that buffer received protocol payloads."""
+    """Interface for objects that buffer received protocol payloads.
+
+    Attributes:
+        _cdp_message_buffer: Frames captured since the last drain.
+        xor_table: The SESSION's XOR table, or None until its magic is
+            captured. Frames cannot be decoded without it
+            ([[session-state-deglobalisation]]).
+    """
 
     _cdp_message_buffer: list[str]
+    xor_table: bytes | None
 
 
-class BotProtocol(Protocol):
+class BotProtocol(BufferedMessageSourceProtocol, Protocol):
     """Interface for bot command dispatch used by executor and world_sync.
 
     Defines the minimal set of methods these consumers need from the Bot
     class.  tick_loop.py uses Bot directly for AI state access.  Tests
     inject a FakeBot satisfying this protocol instead of mocking.
+
+    The message buffer and its session XOR table are inherited from
+    :class:`BufferedMessageSourceProtocol` rather than redeclared.
     """
 
     @property
@@ -40,8 +51,6 @@ class BotProtocol(Protocol):
             CDP session or None if not connected.
         """
         ...
-
-    _cdp_message_buffer: list[str]
 
     def move_to(self, x: int, y: int) -> bool:
         """Send move command.

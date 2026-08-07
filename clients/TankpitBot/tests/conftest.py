@@ -219,6 +219,7 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     """
     from tankpit_bot.action_lab.client_structure import reset_client_structure_survey
     from tankpit_bot.bot.ai.collect_common import reset_container_blacklist
+    from tankpit_bot.capture.xor import reset_static_key_cache
     from tankpit_bot.ledger.decision import reset_decision_records
     from tankpit_bot.ledger.events import reset_event_ids
     from tankpit_bot.ledger.mode_transition import reset_mode_transitions
@@ -226,10 +227,13 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     from tankpit_bot.ledger.outcome.teleport import reset_teleport_dispatch_tracking
     from tankpit_bot.ledger.ring import reset_outcome_rings
     from tankpit_bot.sniffer.world_state import reset_world_state
-    from tankpit_bot.sniffer.xor import reset_xor_state
 
     reset_world_state()
-    reset_xor_state()
+    # The SESSION XOR table is no longer global — it is a value the
+    # caller owns ([[session-state-deglobalisation]] step 1). What
+    # remains is the process-wide static-KEY cache, which a test with a
+    # faked filesystem can poison for later tests.
+    reset_static_key_cache()
     reset_event_ids()
     reset_action_outcome_tracking()
     reset_outcome_rings()
@@ -240,7 +244,7 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     reset_client_structure_survey()
     yield
     reset_world_state()
-    reset_xor_state()
+    reset_static_key_cache()
     reset_event_ids()
     reset_action_outcome_tracking()
     reset_outcome_rings()

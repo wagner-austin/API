@@ -12,7 +12,7 @@ from pathlib import Path
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks, protocol
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.capture.xor import decode_base64_safe, xor_decode_body
 from tankpit_bot.parser import is_room_info_text
 from tankpit_bot.protocol.constants import MSG_PROMOTION, RANK_NAMES
 from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
@@ -24,7 +24,6 @@ from tankpit_bot.sniffer.world_state import (
     set_selected_room,
 )
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
-from tankpit_bot.sniffer.xor import xor_decode
 
 log = get_logger(__name__)
 
@@ -124,13 +123,16 @@ def decode_received_text_message(payload: str) -> None:
         _log_protocol_line(result)
 
 
-def try_decode_received(payload: str) -> str | None:
+def try_decode_received(payload: str, xor_table: bytes) -> str | None:
     """Try to decode a received message and return formatted result.
 
     Pure function that returns the decoded message string or None. Does not log.
 
     Args:
         payload: Base64-encoded message payload.
+        xor_table: The SESSION's XOR table. Passed in rather than read
+            from a module global so two sessions cannot decode each
+            other's frames ([[session-state-deglobalisation]]).
 
     Returns:
         Decoded message string, or None if payload is invalid/empty.
@@ -156,7 +158,7 @@ def try_decode_received(payload: str) -> str | None:
         return decode_text_message(text, len(body), "RECEIVED", body)
 
     # Binary messages - XOR decode and use protocol module
-    decoded_data = xor_decode(body)
+    decoded_data = xor_decode_body(body, xor_table, offset=1)
     if len(decoded_data) == 0:
         return f"[RECEIVED] EMPTY: type=0x{msg_type:02X}"
 
@@ -164,7 +166,7 @@ def try_decode_received(payload: str) -> str | None:
     return "[RECEIVED] " + try_decode_binary(msg_type, decoded_data, body)
 
 
-def process_received_message(payload: str) -> None:
+def process_received_message(payload: str, xor_table: bytes) -> None:
     """Decode, log, and dispatch received messages to world state.
 
     A single WebSocket frame can contain multiple logical messages, each
@@ -173,6 +175,12 @@ def process_received_message(payload: str) -> None:
 
     Args:
         payload: Base64-encoded WebSocket frame payload.
+        xor_table: The SESSION's XOR table. Passed in rather than read
+            from a module global so two sessions cannot decode each
+            other's frames ([[session-state-deglobalisation]] step 1).
+            The world service this dispatches into is still reached
+            through its module singleton; that is step 8 of the same
+            plan and is deliberately not bundled here.
     """
     data = decode_base64_safe(payload)
     if data is None or len(data) < 3:
@@ -187,15 +195,16 @@ def process_received_message(payload: str) -> None:
             break
         body = data[offset : offset + msg_len]
         offset += msg_len
-        _process_single_message(body)
+        _process_single_message(body, xor_table)
 
 
-def _process_single_message(body: bytes) -> None:
+def _process_single_message(body: bytes, xor_table: bytes) -> None:
     """Process a single logical message (after frame splitting).
 
     Args:
         body: Non-empty message body bytes (without length prefix).
             The frame parser guarantees msg_len > 0 before calling.
+        xor_table: The SESSION's XOR table.
     """
     msg_type = body[0]
 
@@ -215,7 +224,7 @@ def _process_single_message(body: bytes) -> None:
         return
 
     # Binary messages — XOR decode, log, and dispatch
-    decoded_data = xor_decode(body)
+    decoded_data = xor_decode_body(body, xor_table, offset=1)
     if len(decoded_data) == 0:
         return
 

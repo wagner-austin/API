@@ -48,6 +48,58 @@ def build_xor_table(static_key: str, magic: str) -> bytes:
     return bytes(table)
 
 
+#: Process-wide cache of the static key. Unlike a session's table this
+#: is NOT session state: the same key builds every session's table, so
+#: reading ``xor_static_key.txt`` once is a property of the key itself.
+_static_key_cache: str | None = None
+
+
+class XorStaticKeyUnavailableError(Exception):
+    """Raised when ``xor_static_key.txt`` cannot be read.
+
+    No session table can be built without it, and decoding against a
+    missing key yields plausible garbage rather than an error, so
+    callers must stop rather than continue.
+    """
+
+
+def build_session_xor_table(magic: str) -> bytes:
+    """Build the XOR table belonging to one session.
+
+    The returned table is a VALUE the caller owns. It replaced a module
+    global that a second session would silently overwrite, decoding the
+    first session's frames against the wrong key
+    ([[session-state-deglobalisation]]).
+
+    Args:
+        magic: The session magic captured from the client.
+
+    Returns:
+        The XOR table for that session.
+
+    Raises:
+        XorStaticKeyUnavailableError: If the static key cannot be read.
+    """
+    global _static_key_cache
+    static_key, _static_key_cache = load_xor_static_key(_static_key_cache)
+    if static_key is None:
+        raise XorStaticKeyUnavailableError(
+            "static XOR key unavailable (xor_static_key.txt missing); "
+            "cannot build a session XOR table"
+        )
+    return build_xor_table(static_key, magic)
+
+
+def reset_static_key_cache() -> None:
+    """Clear the cached static key.
+
+    Only tests that exercise key loading need this; in production the
+    key is a process-wide constant that is never invalidated.
+    """
+    global _static_key_cache
+    _static_key_cache = None
+
+
 def is_valid_base64(payload: str) -> bool:
     """Check if payload is valid base64.
 
@@ -99,9 +151,12 @@ def xor_decode_body(body: bytes, xor_table: bytes, offset: int = 0) -> bytes:
 
 
 __all__ = [
+    "XorStaticKeyUnavailableError",
+    "build_session_xor_table",
     "build_xor_table",
     "decode_base64_safe",
     "is_valid_base64",
     "load_xor_static_key",
+    "reset_static_key_cache",
     "xor_decode_body",
 ]

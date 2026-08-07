@@ -9,7 +9,7 @@ module that already owned it:
 * the base64 payload —
   :func:`tankpit_bot.capture.xor.decode_base64_safe`
 * the frame walk — :func:`tankpit_bot.protocol.framing.split_frames`
-* the cipher — :mod:`tankpit_bot.sniffer.xor`
+* the cipher — :func:`tankpit_bot.capture.xor.build_session_xor_table`
 
 Nothing here re-implements any of them. The value this module adds is
 the ORDER, the XOR lifecycle around a session, and a typed answer for
@@ -41,9 +41,12 @@ from tankpit_bot.analysis.types import (
     ScannedSessionDict,
     SkippedSessionDict,
 )
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.capture.xor import (
+    build_session_xor_table,
+    decode_base64_safe,
+    xor_decode_body,
+)
 from tankpit_bot.protocol.framing import FramingError, split_frames
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.types import CaptureSession, decode_capture_session
 
 log = get_logger(__name__)
@@ -78,10 +81,10 @@ def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
     dropping half the traffic - the command-correlating miners
     (displacement semantics, cost pairing) need both sides.
 
-    The XOR table is global state owned by :mod:`tankpit_bot.sniffer.xor`,
-    so this resets it and rebuilds it from the session's own magic
-    before decoding. Sessions must therefore be decoded one at a time,
-    which :func:`scan_session` guarantees.
+    The XOR table is built from this session's own magic and held as a
+    LOCAL, so sessions no longer have to be decoded one at a time. It
+    was a module global until 2026-08-06, which is why the archive walk
+    was sequential ([[session-state-deglobalisation]] step 1).
 
     Args:
         session: A session whose ``magic`` is known to be present.
@@ -99,8 +102,7 @@ def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
     magic = session["magic"]
     if magic is None:
         raise ValueError("session has no XOR magic; nothing in it can be decoded")
-    reset_xor_state()
-    build_global_xor_table(magic)
+    xor_table = build_session_xor_table(magic)
     frames: list[DecodedFrameDict] = []
     for message in session["messages"]:
         payload = decode_base64_safe(message["payload"])
@@ -115,7 +117,7 @@ def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
                     direction=message["direction"],
                     msg_type=body[0],
                     raw=body,
-                    body=xor_decode(body),
+                    body=xor_decode_body(body, xor_table, offset=1),
                 )
             )
     return frames
@@ -171,8 +173,9 @@ def scan_archive(directory: Path) -> list[ScannedSessionDict | SkippedSessionDic
 
     Returns:
         One result per session, in sorted-by-name order, each either a
-        decode or a skip. Sessions are processed sequentially because
-        the XOR table is global state.
+        decode or a skip. The order is for reproducibility only —
+        each session owns its XOR table, so nothing here forces
+        sequential processing ([[session-state-deglobalisation]]).
 
     Raises:
         OSError: If a file cannot be read.

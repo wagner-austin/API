@@ -14,20 +14,20 @@ from pathlib import Path
 from platform_core.logging import get_logger, setup_rich_logging
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe, xor_decode_body
 from tankpit_bot.sniffer.constants import TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.decoders import decode_text_message, try_decode_binary
-from tankpit_bot.sniffer.xor import build_global_xor_table, xor_decode
 from tankpit_bot.types import decode_capture_session
 
 log = get_logger(__name__)
 
 
-def _decode_sent(payload: str) -> str | None:
+def _decode_sent(payload: str, xor_table: bytes) -> str | None:
     """Decode a sent message payload.
 
     Args:
         payload: Base64-encoded message payload.
+        xor_table: The session's XOR table.
 
     Returns:
         Decoded message string, or None if invalid.
@@ -46,7 +46,7 @@ def _decode_sent(payload: str) -> str | None:
 
     # XOR command (0x21 = '!')
     if first == 0x21:
-        decoded = xor_decode(body)
+        decoded = xor_decode_body(body, xor_table, offset=1)
         if len(decoded) < 2:
             return f"[SENT] CMD: len={len(body)} hex={body.hex()}"
         msg_type = decoded[0]
@@ -55,11 +55,12 @@ def _decode_sent(payload: str) -> str | None:
     return f"[SENT] RAW: len={len(body)} hex={body[:20].hex()}"
 
 
-def _decode_received(payload: str) -> str | None:
+def _decode_received(payload: str, xor_table: bytes) -> str | None:
     """Decode a received message payload.
 
     Args:
         payload: Base64-encoded message payload.
+        xor_table: The session's XOR table.
 
     Returns:
         Decoded message string, or None if invalid.
@@ -77,7 +78,7 @@ def _decode_received(payload: str) -> str | None:
         return decode_text_message(text, len(body), "RECEIVED", body)
 
     # Binary messages - XOR decode
-    decoded_data = xor_decode(body)
+    decoded_data = xor_decode_body(body, xor_table, offset=1)
     if len(decoded_data) == 0:
         return f"[RECEIVED] EMPTY: type=0x{msg_type:02X}"
 
@@ -110,15 +111,19 @@ def main() -> None:
         log.error("No magic key in session — cannot XOR-decode binary messages")
         sys.exit(1)
 
-    # Build XOR table
-    build_global_xor_table(magic)
+    # Build this session's XOR table
+    xor_table = build_session_xor_table(magic)
 
     # Decode each message
     for i, msg in enumerate(messages):
         direction = msg["direction"]
         payload = msg["payload"]
 
-        result = _decode_sent(payload) if direction == "sent" else _decode_received(payload)
+        result = (
+            _decode_sent(payload, xor_table)
+            if direction == "sent"
+            else _decode_received(payload, xor_table)
+        )
 
         if result is not None:
             log.info("[%3d] %s", i, result)

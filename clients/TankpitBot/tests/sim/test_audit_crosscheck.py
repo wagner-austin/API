@@ -19,10 +19,10 @@ from platform_core.json_utils import dump_json_str
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.tick_loop import _tick_once
 from tankpit_bot.protocol.commands import build_move_command
-from tankpit_bot.protocol.helpers import EncodeError
 from tankpit_bot.sim.session import SimCDPSession, build_capture_session, deliver_batch
 from tankpit_bot.types import encode_capture_session
 from tankpit_bot.validate.audit import EXACTNESS_FLOOR, collect_evidence
+from tankpit_bot.wire.helpers import EncodeError
 from tests.sim.seam import RICH_CONTAINERS, SEAM_CLIENT_ID, SEAM_MAGIC, SeamClock, boot_seam
 
 

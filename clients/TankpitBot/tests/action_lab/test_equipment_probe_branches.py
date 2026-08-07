@@ -10,7 +10,6 @@ probing logic.
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -18,22 +17,10 @@ from tests.action_lab._replay_equipment import replay_equipment_attempt
 
 from tankpit_bot.action_lab.equipment_probe import EquipmentProbeError
 from tankpit_bot.action_lab.types import TeleportTargetDict
-from tankpit_bot.sniffer.world_state import reset_world_state
-from tankpit_bot.sniffer.xor import reset_xor_state
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CAPTURE = REPO_ROOT / "fuel_probe.capture_session.json"
 TARGET = TeleportTargetDict(label="pivot", x=131, y=110)
-
-
-@pytest.fixture(autouse=True)
-def _isolate() -> Generator[None, None, None]:
-    """Reset singletons around every test."""
-    reset_world_state()
-    reset_xor_state()
-    yield
-    reset_world_state()
-    reset_xor_state()
 
 
 def test_cdp_unavailable_raises() -> None:

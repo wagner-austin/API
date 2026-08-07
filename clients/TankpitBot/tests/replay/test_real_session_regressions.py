@@ -12,14 +12,16 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.replay.engine import replay_session
 from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.sniffer.world_state import reset_world_state
-from tankpit_bot.sniffer.xor import reset_xor_state
 from tests.replay.fixture_loader import get_replay_fixture_path, load_capture_fixture
 
 
 def _reset_replay_globals() -> None:
-    """Reset global replay state shared by the decoder pipeline."""
+    """Reset global replay state shared by the decoder pipeline.
+
+    The XOR table is no longer among it — each replay builds its own
+    from the capture's magic ([[session-state-deglobalisation]]).
+    """
     reset_world_state()
-    reset_xor_state()
     reset_viewport_tracking()
 
 

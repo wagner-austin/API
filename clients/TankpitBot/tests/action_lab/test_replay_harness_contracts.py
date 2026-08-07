@@ -148,6 +148,7 @@ def test_replay_page_satisfies_page_protocol() -> None:
 
         def __init__(self) -> None:
             self._cdp_message_buffer: list[str] = []
+            self.xor_table: bytes | None = None
 
     sink = _SinkBuffer()
     page: PageProtocol = ReplayPage(sink, source, clock)
@@ -174,6 +175,7 @@ def test_replay_page_wait_advances_clock_and_feeds_frames() -> None:
 
         def __init__(self) -> None:
             self._cdp_message_buffer: list[str] = []
+            self.xor_table: bytes | None = None
 
     sink = _SinkBuffer()
     page = ReplayPage(sink, source, clock)
@@ -198,6 +200,7 @@ def test_replay_page_wait_past_exhaustion_still_advances_clock() -> None:
 
         def __init__(self) -> None:
             self._cdp_message_buffer: list[str] = []
+            self.xor_table: bytes | None = None
 
     sink = _SinkBuffer()
     page = ReplayPage(sink, source, clock)

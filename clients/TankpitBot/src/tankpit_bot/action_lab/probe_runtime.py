@@ -10,6 +10,7 @@ from tankpit_bot._test_hooks import (
     BrowserContextProtocol,
     BrowserProtocol,
     BrowserTypeProtocol,
+    BufferedMessageSourceProtocol,
     CDPSessionProtocol,
     PageProtocol,
     PlaywrightProtocol,
@@ -25,8 +26,13 @@ from tankpit_bot.state import SelfStateDict
 from tankpit_bot.types import CapturedMessage
 
 
-class ProbeRuntimeStateProtocol(Protocol):
-    """Mutable probe state needed for shared runtime bootstrap."""
+class ProbeRuntimeStateProtocol(BufferedMessageSourceProtocol, Protocol):
+    """Mutable probe state needed for shared runtime bootstrap.
+
+    The message buffer and its session XOR table come from
+    :class:`BufferedMessageSourceProtocol` — one definition of what a
+    drainable source is.
+    """
 
     _start_timestamp_ms: int
     _target_url: str
@@ -34,7 +40,6 @@ class ProbeRuntimeStateProtocol(Protocol):
     _messages: list[CapturedMessage]
     _ws_urls: dict[str, str]
     _magic: str | None
-    _cdp_message_buffer: list[str]
     _cdp: CDPSessionProtocol | None
     _page: PageProtocol | None
 

@@ -32,10 +32,10 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.sniffer.world_state import get_world_service, get_world_state, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
-from tankpit_bot.sniffer.xor import build_global_xor_table
 from tankpit_bot.types import CaptureSession, decode_capture_session
 from tests.fakes import FakeCDPSession
 
@@ -138,10 +138,10 @@ def run_replay(
         raise RuntimeError(f"capture {capture_path.name} has no magic key")
 
     reset_world_state()
-    build_global_xor_table(magic)
 
     bot = ReplayBot()
     bot._magic = magic
+    bot.xor_table = build_session_xor_table(magic)
     bot._cdp = FakeCDPSession(emit_runtime_frames=False)
 
     payloads = _received_payloads(session)

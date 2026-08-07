@@ -65,6 +65,7 @@ class _FakeProbe:
     def __init__(self, world: WorldStateDict) -> None:
         self._world = world
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
         self._captured_messages: list[CapturedMessage] = []
 
     def get_world_state(self) -> WorldStateDict:

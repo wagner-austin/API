@@ -23,11 +23,28 @@ from tankpit_bot.analysis.scan import (
     scan_archive,
     scan_session,
 )
+from tankpit_bot.capture.xor import build_session_xor_table, xor_decode_body
 from tankpit_bot.protocol.framing import FramingError, encode_frame
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.types import CaptureSession
 
 MAGIC = "abcdefgh"
+
+
+def _expected_body(body: bytes) -> bytes:
+    """Return the plaintext a frame body decodes to under ``MAGIC``.
+
+    Built through the same production cipher the scanner uses, from
+    this fixture's own magic — the table is a value, so the expectation
+    no longer depends on global decoder state
+    ([[session-state-deglobalisation]]).
+
+    Args:
+        body: Raw frame body (type byte + ciphered rest).
+
+    Returns:
+        The decoded payload without the leading type byte.
+    """
+    return xor_decode_body(body, build_session_xor_table(MAGIC), offset=1)
 
 
 def _payload(*bodies: bytes) -> str:
@@ -134,15 +151,13 @@ def test_decode_session_frames_decodes_body_with_the_real_cipher(tmp_path: Path)
         _session_json(messages=[_received(_payload(body), timestamp_ms=4242)]),
     )
     frames = decode_session_frames(load_capture_session(path))
-    reset_xor_state()
-    build_global_xor_table(MAGIC)
     assert frames == [
         {
             "timestamp_ms": 4242,
             "direction": "received",
             "msg_type": 0x53,
             "raw": body,
-            "body": xor_decode(body),
+            "body": _expected_body(body),
         }
     ]
 
@@ -183,15 +198,13 @@ def test_decode_session_frames_tags_sent_frames(tmp_path: Path) -> None:
     }
     path = _write(tmp_path, "f.capture_session.json", _session_json(messages=[sent]))
     frames = decode_session_frames(load_capture_session(path))
-    reset_xor_state()
-    build_global_xor_table(MAGIC)
     assert frames == [
         {
             "timestamp_ms": 1,
             "direction": "sent",
             "msg_type": 0x70,
             "raw": body,
-            "body": xor_decode(body),
+            "body": _expected_body(body),
         }
     ]
 
@@ -268,8 +281,6 @@ def test_scan_session_returns_frames_for_a_decodable_capture(tmp_path: Path) -> 
     result = scan_session(path)
     if "frames" not in result:
         raise AssertionError(f"expected a decoded session, got a skip: {result}")
-    reset_xor_state()
-    build_global_xor_table(MAGIC)
     assert result == {
         "path": str(path),
         "session_id": "s-1",
@@ -279,7 +290,7 @@ def test_scan_session_returns_frames_for_a_decodable_capture(tmp_path: Path) -> 
                 "direction": "received",
                 "msg_type": 0x4C,
                 "raw": body,
-                "body": xor_decode(body),
+                "body": _expected_body(body),
             }
         ],
     }

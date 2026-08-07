@@ -6,7 +6,7 @@ from tankpit_bot.protocol import TankStatusSyncDict
 from tankpit_bot.protocol.types import MovementResponseDict
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
-from tankpit_bot.state.types.constants import DIRECTION_DEAD_THRESHOLD
+from tankpit_bot.types.constants import DIRECTION_DEAD_THRESHOLD
 
 
 class TestDispatchTankPositionStatus:

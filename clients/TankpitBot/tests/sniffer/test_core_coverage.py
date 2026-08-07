@@ -6,6 +6,7 @@ import base64
 
 import pytest
 
+from tankpit_bot.capture.xor import build_session_xor_table, reset_static_key_cache
 from tests.conftest import FakeFileSystem
 
 # =============================================================================
@@ -15,62 +16,6 @@ from tests.conftest import FakeFileSystem
 
 class TestSnifferCoverageBranches:
     """Tests to cover remaining sniffer.py branches."""
-
-    def test_build_global_xor_table_no_static_key(self, fake_fs: FakeFileSystem) -> None:
-        """Test build_global_xor_table returns early when no static key file."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
-        from tankpit_bot.sniffer import xor
-
-        # Ensure no static key file
-        fake_fs.remove(DEFAULT_STATIC_KEY_PATH)
-
-        # Reset global state
-        xor._global_xor_table = None
-        xor._global_static_key = None
-
-        # Call without static key file existing
-        xor.build_global_xor_table("testmagic")
-
-        # Should remain None since no static key
-        assert xor._global_xor_table is None
-
-    def test_xor_decode_with_table(self, fake_fs: FakeFileSystem) -> None:
-        """Test xor_decode decodes correctly when xor table is set."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
-        from tankpit_bot.sniffer import xor
-
-        static_key = "ABCDEF" + "A" * 994
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
-
-        # Reset and build xor table
-        xor._global_xor_table = None
-        xor._global_static_key = None
-        xor.build_global_xor_table("testmagic")
-
-        xor_table = xor._global_xor_table
-        assert xor_table is not None and len(xor_table) == 1000, "XOR table should be 1000 bytes"
-
-        # Test decode with body longer than 2 bytes
-        body = bytes([0x2E, 0x41, 0x42, 0x43, 0x44])
-        result = xor.xor_decode(body)
-        assert len(result) == 4  # Should skip first byte (msg_type)
-
-    def test_xor_decode_extends_past_table(self, fake_fs: FakeFileSystem) -> None:
-        """Test xor_decode handles body longer than xor table."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
-        from tankpit_bot.sniffer import xor
-
-        static_key = "AB"  # Very short key
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
-
-        xor._global_xor_table = None
-        xor._global_static_key = None
-        xor.build_global_xor_table("t")
-
-        # Body longer than the xor table
-        body = bytes([0x2E, 0x01, 0x02, 0x03, 0x04, 0x05])
-        result = xor.xor_decode(body)
-        assert len(result) == 5
 
     def test_update_viewport_origin_sets_both_edges(self) -> None:
         """Test viewport origin storage uses explicit left/top values."""
@@ -355,15 +300,10 @@ class TestSnifferCoverageBranches:
     def test_process_received_message_with_result(self, fake_fs: FakeFileSystem) -> None:
         """Test process_received_message logs result when message decodes."""
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
-        from tankpit_bot.sniffer import decoders, xor
+        from tankpit_bot.sniffer import decoders
 
-        static_key = "ABCDEF" + "A" * 994
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
-
-        # Reset and build XOR table
-        xor._global_xor_table = None
-        xor._global_static_key = None
-        xor.build_global_xor_table("testmagic")
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
+        reset_static_key_cache()
 
         # Create a valid message payload (simple text message)
         # Format: 2-byte length + body
@@ -372,23 +312,16 @@ class TestSnifferCoverageBranches:
         payload = base64.b64encode(header + body).decode()
 
         # This should decode and log (we just verify no crash)
-        decoders.process_received_message(payload)
+        decoders.process_received_message(payload, build_session_xor_table("testmagic"))
 
     def test_process_received_message_binary(self, fake_fs: FakeFileSystem) -> None:
         """Test process_received_message handles binary messages."""
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
-        from tankpit_bot.sniffer import decoders, xor
+        from tankpit_bot.sniffer import decoders
 
-        static_key = "ABCDEF" + "A" * 994
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
-
-        # Reset and build XOR table
-        xor._global_xor_table = None
-        xor._global_static_key = None
-        xor.build_global_xor_table("testmagic")
-
-        xor_table = xor._global_xor_table
-        assert xor_table is not None and len(xor_table) > 0
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
+        reset_static_key_cache()
+        xor_table = build_session_xor_table("testmagic")
 
         # Create a binary message (not a text type)
         # Use 0x41 'A' for Deactivation message: victim=1, killer=2, rank=3, points=5
@@ -401,7 +334,7 @@ class TestSnifferCoverageBranches:
         payload = base64.b64encode(header + body).decode()
 
         # This should decode through the binary path
-        decoders.process_received_message(payload)
+        decoders.process_received_message(payload, xor_table)
 
 
 # =============================================================================
@@ -481,19 +414,6 @@ class TestLogJsFuelFindings:
 
 class TestSubmoduleCoverage:
     """Tests for uncovered branches in sniffer submodules."""
-
-    def test_get_global_xor_table(self) -> None:
-        """Test get_global_xor_table returns table or None."""
-        from tankpit_bot.sniffer import xor
-
-        original_table = xor._global_xor_table
-        xor._global_xor_table = None
-        assert xor.get_global_xor_table() is None
-
-        xor._global_xor_table = b"test"
-        assert xor.get_global_xor_table() == b"test"
-
-        xor._global_xor_table = original_table
 
     def test_reset_all_trackers(self) -> None:
         """Test reset_all_trackers clears all tracker state."""

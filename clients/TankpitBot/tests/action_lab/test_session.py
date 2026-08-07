@@ -32,6 +32,7 @@ class _SequencedProvider:
         self._worlds = worlds
         self._index = 0
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
         self._messages: list[CapturedMessage] = []
         self._magic: str | None = None
 

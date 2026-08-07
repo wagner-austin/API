@@ -7,9 +7,9 @@ import base64
 import pytest
 
 from tankpit_bot.protocol.commands import CMD_MOVE, COMMAND_PREFIX, TYPE_MOVEMENT
-from tankpit_bot.protocol.helpers import DecodeError, pack16
 from tankpit_bot.protocol.types import SyncDict
 from tankpit_bot.sim.transport import decode_client_payload, encode_tick_payload
+from tankpit_bot.wire.helpers import DecodeError, pack16
 
 _TINY_TABLE = bytes([0x07])
 

@@ -10,11 +10,7 @@ from __future__ import annotations
 
 import base64
 
-from tankpit_bot.sniffer.xor import (
-    build_global_xor_table,
-    get_global_xor_table,
-    reset_xor_state,
-)
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.types import CapturedMessage, CaptureSession
 
 MAGIC = "auditmagic"
@@ -35,13 +31,10 @@ def xor_encode_body(msg_type: int, payload: bytes) -> bytes:
         ``[msg_type] + xor(payload)`` bytes.
 
     Raises:
-        RuntimeError: If the repo's XOR static key is unavailable.
+        XorStaticKeyUnavailableError: If the repo's XOR static key is
+            unavailable.
     """
-    reset_xor_state()
-    build_global_xor_table(MAGIC)
-    table = get_global_xor_table()
-    if table is None:
-        raise RuntimeError("XOR static key unavailable — cannot build test frames")
+    table = build_session_xor_table(MAGIC)
     encoded = bytearray(len(payload))
     for index in range(len(payload)):
         key = table[index] if index < len(table) else 0

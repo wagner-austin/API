@@ -15,8 +15,8 @@ from tankpit_bot.protocol.commands import (
     CMD_SHOOT,
     CMD_TOGGLE_EQUIPMENT,
 )
-from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sim.commands import decode_client_command
+from tankpit_bot.wire.helpers import DecodeError
 
 
 def test_coordinate_commands_decode_kind_and_coords() -> None:

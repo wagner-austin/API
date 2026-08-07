@@ -16,11 +16,7 @@ from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import send_websocket_bytes
-from tankpit_bot.protocol.codec import (
-    DEFAULT_STATIC_KEY_PATH,
-    build_xor_table,
-    load_static_key,
-)
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sniffer.trackers import init_trackers_with_magic
 from tankpit_bot.types import CapturedMessage
 
@@ -65,6 +61,10 @@ class SessionBase:
         )
         self._cdp: CDPSessionProtocol | None = None
         self._static_key: str | None = None
+        #: This session's XOR table, None until its magic is captured.
+        #: Public because the decode path reads it through
+        #: ``BufferedMessageSourceProtocol``.
+        self.xor_table: bytes | None = None
         self._commands = (
             command_service
             if command_service is not None
@@ -180,15 +180,27 @@ class SessionBase:
             self._cdp_message_buffer.append(message["payload"])
 
     def _on_magic_captured(self, magic: str) -> None:
-        """Build XOR table and init trackers when magic key is captured.
+        """Build this session's XOR table and init trackers.
+
+        One table serves both directions: the command service encodes
+        with it and the decode path decodes with it. It used to be built
+        TWICE from the same inputs — once into a module global for
+        decode, once onto the command service for encode — which is what
+        made two sessions in one process impossible
+        ([[session-state-deglobalisation]] step 1).
 
         Args:
             magic: The session magic string.
+
+        Raises:
+            XorStaticKeyUnavailableError: If the static key cannot be
+                read. Decoding against a missing key yields garbage, so
+                the session must not continue.
         """
+        self.xor_table = build_session_xor_table(magic)
+        self._commands.xor_table = self.xor_table
         init_trackers_with_magic(magic)
-        static_key = load_static_key(DEFAULT_STATIC_KEY_PATH)
-        self._commands.xor_table = build_xor_table(static_key, magic)
-        log.info("Built XOR table for command encoding")
+        log.info("Built session XOR table for command encoding and frame decoding")
 
 
 __all__ = [

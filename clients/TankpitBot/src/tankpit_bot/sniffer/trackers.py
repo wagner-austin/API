@@ -22,7 +22,6 @@ from tankpit_bot.capture.trackers import (
 )
 from tankpit_bot.capture.xor import decode_base64_safe
 from tankpit_bot.protocol.codec import extract_magic_from_auth_payload
-from tankpit_bot.sniffer.xor import build_global_xor_table
 
 # Global tracker instances
 position_tracker = PositionTracker()
@@ -79,8 +78,6 @@ def init_trackers_with_magic(magic: str) -> None:
     for tracker in ALL_TRACKERS:
         if tracker._xor_table is None:
             tracker.set_magic(magic)
-    # Also build global XOR table for unified decoder
-    build_global_xor_table(magic)
 
 
 def extract_magic_from_auth(payload: str) -> str | None:

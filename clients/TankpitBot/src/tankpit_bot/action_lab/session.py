@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
-from tankpit_bot._test_hooks import CDPSessionProtocol
+from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
@@ -42,10 +42,15 @@ class WorldStateProviderProtocol(Protocol):
         ...
 
 
-class BufferedWorldStateProviderProtocol(WorldStateProviderProtocol, Protocol):
-    """Minimal world-state provider that also buffers raw protocol messages."""
+class BufferedWorldStateProviderProtocol(
+    WorldStateProviderProtocol, BufferedMessageSourceProtocol, Protocol
+):
+    """Minimal world-state provider that also buffers raw protocol messages.
 
-    _cdp_message_buffer: list[str]
+    The buffer and its session XOR table come from
+    :class:`BufferedMessageSourceProtocol` rather than being redeclared
+    here — one definition of what a drainable source is.
+    """
 
     @property
     def messages(self) -> list[CapturedMessage]:

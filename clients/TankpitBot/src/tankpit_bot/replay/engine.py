@@ -30,6 +30,7 @@ from tankpit_bot.bot.types import (
     ShootCommandDict,
     TeleportCommandDict,
 )
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.replay.types import ReplaySessionResultDict, ReplayTickTraceDict
 from tankpit_bot.sniffer.viewport import reset_viewport_tracking
@@ -41,7 +42,6 @@ from tankpit_bot.sniffer.world_state import (
 )
 from tankpit_bot.sniffer.world_state_combat import drain_killed_tank_ids
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CaptureSession
 
@@ -63,8 +63,8 @@ def _sort_by_timestamp(pair: tuple[int, str]) -> int:
 def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
     """Replay a captured session and return per-tick decision traces.
 
-    Resets all global decoder/world state, builds the XOR table from the
-    session's magic key, then processes received messages in tick-sized
+    Resets the global world/viewport state, builds this session's XOR
+    table as a LOCAL, then processes received messages in tick-sized
     batches. After each batch the planner runs and its decision is
     recorded.
 
@@ -76,16 +76,16 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
 
     Raises:
         ValueError: If session has no magic key (cannot XOR-decode).
+        XorStaticKeyUnavailableError: If the static key cannot be read.
     """
     magic = session["magic"]
     if magic is None:
         raise ValueError("Cannot replay session without magic key")
 
-    # Reset all global state for a clean replay
+    # Reset the remaining global state for a clean replay
     reset_world_state()
-    reset_xor_state()
     reset_viewport_tracking()
-    build_global_xor_table(magic)
+    xor_table = build_session_xor_table(magic)
 
     # Filter to received messages only, sorted by timestamp
     received_payloads: list[tuple[int, str]] = [
@@ -119,6 +119,7 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
             total_messages += len(batch)
             result = _process_tick_batch(
                 batch,
+                xor_table,
                 ai_state,
                 tick_index,
                 batch_start_ms,
@@ -135,7 +136,7 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
     # appends at least one payload per iteration, and empty received_payloads
     # returns early before reaching this point.
     total_messages += len(batch)
-    result = _process_tick_batch(batch, ai_state, tick_index, batch_start_ms)
+    result = _process_tick_batch(batch, xor_table, ai_state, tick_index, batch_start_ms)
     if result[1] is not None:
         traces.append(result[1])
 
@@ -149,6 +150,7 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
 
 def _process_tick_batch(
     payloads: list[str],
+    xor_table: bytes,
     ai_state: AIStateDict,
     tick_index: int,
     timestamp_ms: int,
@@ -157,6 +159,7 @@ def _process_tick_batch(
 
     Args:
         payloads: Base64-encoded received message payloads.
+        xor_table: The replayed session's XOR table.
         ai_state: Current AI state carried forward from the previous tick.
         tick_index: Current tick counter.
         timestamp_ms: Timestamp for this tick batch.
@@ -165,7 +168,7 @@ def _process_tick_batch(
         Tuple of (updated AI state, trace or None if self_state unavailable).
     """
     for payload in payloads:
-        _test_hooks.process_received_message_hook(payload)
+        _test_hooks.process_received_message_hook(payload, xor_table)
 
     # Merge kills from protocol into AI state
     new_kills = drain_killed_tank_ids(get_world_service())

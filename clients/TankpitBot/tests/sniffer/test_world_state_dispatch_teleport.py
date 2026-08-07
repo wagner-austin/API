@@ -168,7 +168,7 @@ class TestFerryBeliefDisproof:
         )
         from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
         from tankpit_bot.state.types import make_terrain_tile
-        from tankpit_bot.state.types.constants import TERRAIN_FERRY
+        from tankpit_bot.types.constants import TERRAIN_FERRY
 
         update_world_state_from_position(118, 108)
         ws = get_world_service()
@@ -191,7 +191,7 @@ class TestFerryBeliefDisproof:
         )
         from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
         from tankpit_bot.state.types import make_terrain_tile
-        from tankpit_bot.state.types.constants import TERRAIN_FERRY
+        from tankpit_bot.types.constants import TERRAIN_FERRY
 
         update_world_state_from_position(111, 104)
         ws = get_world_service()

@@ -46,16 +46,15 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe, xor_decode_body
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
 from tankpit_bot.protocol.commands import TICK_RATE_MS
-from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sim.world import SimContainerDict, SimEquipmentDict
 from tankpit_bot.sniffer.decoders import _is_text_route
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.state.viewport_geometry import viewport_patch_world_coords
+from tankpit_bot.wire.helpers import DecodeError
 
 log = get_logger(__name__)
 
@@ -435,8 +434,7 @@ def compile_ghost_spec(capture_text: str) -> GhostSpecDict:
     raw_messages = session.get("messages")
     if not isinstance(magic, str) or not magic or raw_messages is None:
         raise RuntimeError("ghost capture is missing its magic or messages")
-    reset_xor_state()
-    build_global_xor_table(magic)
+    xor_table = build_session_xor_table(magic)
     walk = _Walk()
     messages = [narrow_json_to_dict(m) for m in narrow_json_to_list(raw_messages)]
     messages.sort(key=lambda m: narrow_json_to_int(m["timestamp_ms"]))
@@ -453,7 +451,7 @@ def compile_ghost_spec(capture_text: str) -> GhostSpecDict:
             if _is_text_route(body[0], body):
                 continue
             try:
-                decoded = decode_message(body[0], xor_decode(body))
+                decoded = decode_message(body[0], xor_decode_body(body, xor_table, offset=1))
             except DecodeError as error:
                 log.debug("ghost compile: undecodable frame skipped (%s)", error)
                 continue

@@ -22,11 +22,11 @@ from tankpit_bot.protocol.commands import (
     SCOPE_WEST,
     build_scope_command,
 )
-from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sim.commands import decode_client_command
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.viewport_window import ViewportTracker
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
+from tankpit_bot.wire.helpers import DecodeError
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 

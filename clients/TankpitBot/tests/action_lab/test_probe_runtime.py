@@ -48,6 +48,7 @@ class _ProbeHarness:
         self._ws_urls = {"a": "b"}
         self._magic: str | None = "old"
         self._cdp_message_buffer = ["x"]
+        self.xor_table: bytes | None = None
         self._cdp: CDPSessionProtocol | None = None
         self._page: PageProtocol | None = None
         self._world_state = make_empty_world_state()

@@ -45,6 +45,7 @@ from tankpit_bot._test_hooks import (
     ResponseProtocol,
 )
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CaptureSession, decode_capture_session
@@ -746,6 +747,7 @@ class _ReplayProbeShape(Protocol):
     _magic: str | None
     _page: PageProtocol | None
     _cdp: CDPSessionProtocol | None
+    xor_table: bytes | None
 
 
 def prepare_probe_replay(
@@ -758,7 +760,6 @@ def prepare_probe_replay(
     drain_messages: Callable[[BufferedMessageSourceProtocol], int],
     update_state_from_world: Callable[[], None],
     reset_world_state: Callable[[], None],
-    build_global_xor_table: Callable[[str], None],
 ) -> ReplayProbeContext:
     """Wire a real probe up to a captured session for one attempt.
 
@@ -788,8 +789,6 @@ def prepare_probe_replay(
         update_state_from_world: Production
             ``probe._update_state_from_world`` bound method.
         reset_world_state: Production ``reset_world_state`` callable.
-        build_global_xor_table: Production ``build_global_xor_table``
-            callable.
 
     Returns:
         :class:`ReplayProbeContext` -- everything the caller needs to
@@ -808,7 +807,7 @@ def prepare_probe_replay(
         raise RuntimeError(f"capture {capture_path.name} has no magic key")
 
     reset_world_state()
-    build_global_xor_table(magic)
+    probe.xor_table = build_session_xor_table(magic)
 
     probe._magic = magic
     probe._cdp = None if omit_cdp else WorldStateDerivedCDP()

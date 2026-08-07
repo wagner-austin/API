@@ -39,6 +39,7 @@ class _Provider:
     def __init__(self) -> None:
         """Initialize the provider."""
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
         self._messages: list[CapturedMessage] = []
 
     @property

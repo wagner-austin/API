@@ -38,6 +38,7 @@ class _Probe:
     def __init__(self, *, radar_result: bool = True) -> None:
         """Initialize the probe."""
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
         self._messages: list[CapturedMessage] = []
         self._cycles: list[ActionPhaseCycleDict] = []
         self._ended: list[ActionPhaseCycleDict] = []

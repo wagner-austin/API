@@ -27,7 +27,6 @@ from tankpit_bot.action_lab.fuel_probe_types import FuelProbeAttemptResultDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.bot.world_sync import drain_messages
 from tankpit_bot.sniffer.world_state import reset_world_state
-from tankpit_bot.sniffer.xor import build_global_xor_table
 
 FuelReplayResult = ReplayResult[FuelProbeAttemptResultDict]
 
@@ -124,7 +123,6 @@ def replay_fuel_attempt(
         drain_messages=drain_messages,
         update_state_from_world=probe._update_state_from_world,
         reset_world_state=reset_world_state,
-        build_global_xor_table=build_global_xor_table,
     )
     try:
         attempt = probe._probe_single_fuel_target(

@@ -20,7 +20,7 @@ from tankpit_bot.sniffer.decoders import (
     set_protocol_frame_logging,
 )
 from tests.conftest import FakeFileSystem
-from tests.sniffer.conftest import make_payload
+from tests.sniffer.conftest import make_binary_payload, make_payload, sniffer_xor_table
 
 # =============================================================================
 # Basic Decode Message Tests
@@ -163,15 +163,16 @@ def test_process_received_message_respects_protocol_frame_logging(
 ) -> None:
     """Protocol frame logging can be disabled for concise bot terminal output."""
     payload = make_payload(b"$1|0")
+    table = sniffer_xor_table()
 
     set_protocol_frame_logging(False)
     with caplog.at_level(logging.INFO):
-        process_received_message(payload)
+        process_received_message(payload, table)
     assert not caplog.records
 
     set_protocol_frame_logging(True)
     with caplog.at_level(logging.INFO):
-        process_received_message(payload)
+        process_received_message(payload, table)
     assert any("[RECEIVED] RESPONSE: $1|0" in record.message for record in caplog.records)
 
 
@@ -183,7 +184,7 @@ def test_process_received_message_logs_plaintext_chat_ack(
 
     set_protocol_frame_logging(True)
     with caplog.at_level(logging.INFO):
-        process_received_message(payload)
+        process_received_message(payload, sniffer_xor_table())
     assert any("ChatAck" in record.message for record in caplog.records)
 
 
@@ -462,7 +463,7 @@ class TestTryDecodeReceived:
         # '+' (0x2B) is a text message type
         body = b"+field=42\n"
         payload = base64.b64encode(len(body).to_bytes(2, "little") + body).decode()
-        result = try_decode_received(payload)
+        result = try_decode_received(payload, sniffer_xor_table())
         if result is None:
             raise AssertionError("Expected non-None result")
         assert "[RECEIVED]" in result
@@ -472,7 +473,7 @@ class TestTryDecodeReceived:
         from tankpit_bot.sniffer.decoders import try_decode_received
 
         payload = base64.b64encode(len(b"A1").to_bytes(2, "little") + b"A1").decode()
-        result = try_decode_received(payload)
+        result = try_decode_received(payload, sniffer_xor_table())
         if result is None:
             raise AssertionError("Expected non-None result")
         assert "[RECEIVED]" in result
@@ -485,7 +486,7 @@ class TestTryDecodeReceived:
         # 1-byte binary body → xor_decode strips msg_type → empty decoded data
         body = bytes([0x47])
         payload = base64.b64encode(len(body).to_bytes(2, "little") + body).decode()
-        result = try_decode_received(payload)
+        result = try_decode_received(payload, sniffer_xor_table())
         if result is None:
             raise AssertionError("Expected non-None result")
         assert "EMPTY" in result
@@ -499,7 +500,7 @@ class TestTryDecodeReceived:
         # xor_decode produces 1-byte decoded data, type not in MSG_MIN_LENGTHS
         body = bytes([0x01, 0xAB])
         payload = base64.b64encode(len(body).to_bytes(2, "little") + body).decode()
-        result = try_decode_received(payload)
+        result = try_decode_received(payload, sniffer_xor_table())
         if result is None:
             raise AssertionError("Expected non-None result")
         assert "[RECEIVED]" in result
@@ -511,14 +512,14 @@ class TestTryDecodeReceived:
 
         # Payload that decodes to less than 3 bytes
         payload = base64.b64encode(b"\x01\x00").decode()
-        result = try_decode_received(payload)
+        result = try_decode_received(payload, sniffer_xor_table())
         assert result is None
 
     def test_try_decode_received_invalid_base64(self) -> None:
         """Test try_decode_received returns None for invalid base64."""
         from tankpit_bot.sniffer.decoders import try_decode_received
 
-        result = try_decode_received("not valid base64!!!")
+        result = try_decode_received("not valid base64!!!", sniffer_xor_table())
         assert result is None
 
 
@@ -661,7 +662,7 @@ class TestProcessReceivedMessage:
         # xor_decode strips msg_type → empty decoded_data → early return
         frame = b"\x01\x00\x01"
         payload = base64.b64encode(frame).decode()
-        process_received_message(payload)  # should not raise
+        process_received_message(payload, sniffer_xor_table())  # should not raise
 
     def test_unknown_binary_type_logs_fallback(self) -> None:
         """process_received_message logs fallback for unrecognized binary type."""
@@ -672,7 +673,7 @@ class TestProcessReceivedMessage:
         body = bytes([0x01, 0xAB, 0xCD])
         frame = len(body).to_bytes(2, "little") + body
         payload = base64.b64encode(frame).decode()
-        process_received_message(payload)  # should log fallback, not raise
+        process_received_message(payload, sniffer_xor_table())  # log fallback, not raise
 
     def test_decodable_binary_dispatches(self) -> None:
         """process_received_message decodes and dispatches a valid binary message.
@@ -687,7 +688,7 @@ class TestProcessReceivedMessage:
         body = bytes([0x3F, 0x00])
         frame = len(body).to_bytes(2, "little") + body
         payload = base64.b64encode(frame).decode()
-        process_received_message(payload)  # should decode, log, and dispatch
+        process_received_message(payload, sniffer_xor_table())  # decode, log, dispatch
 
     def test_malformed_frame_length_breaks_early(self) -> None:
         """process_received_message breaks on zero-length or oversized sub-message."""
@@ -696,7 +697,7 @@ class TestProcessReceivedMessage:
         # Frame with msg_len=0 → triggers break at line 127
         frame = b"\x00\x00"
         payload = base64.b64encode(frame).decode()
-        process_received_message(payload)  # should not raise
+        process_received_message(payload, sniffer_xor_table())  # should not raise
 
     def test_oversized_submessage_breaks_early(self) -> None:
         """process_received_message breaks when sub-message extends beyond frame."""
@@ -705,7 +706,7 @@ class TestProcessReceivedMessage:
         # Frame claims 100 bytes but only has 2 → offset + msg_len > len(data)
         frame = b"\x64\x00\x01\x02"
         payload = base64.b64encode(frame).decode()
-        process_received_message(payload)  # should not raise
+        process_received_message(payload, sniffer_xor_table())  # should not raise
 
     def test_chat_message_decodes_and_dispatches(self) -> None:
         """process_received_message decodes 0x4D ChatMessage through full path.
@@ -719,7 +720,7 @@ class TestProcessReceivedMessage:
         body = bytes([0x4D, 0x01, 0x02, 0x03])
         frame = len(body).to_bytes(2, "little") + body
         payload = base64.b64encode(frame).decode()
-        process_received_message(payload)  # should decode, log, and dispatch
+        process_received_message(payload, sniffer_xor_table())  # decode, log, dispatch
 
     def test_binary_promotion_takes_binary_route(self) -> None:
         """0x2B with 3-byte body disambiguates to binary Rf, not text WorldInfo.
@@ -745,12 +746,14 @@ class TestProcessReceivedMessage:
             timestamp_ms=500,
         )
 
-        # Binary Rf body: 0x2B + 2 XOR-decoded bytes (new_rank=5, banner=1).
-        # XOR table is None in tests so body[1:] passes through verbatim.
-        body = bytes([0x2B, 5, 1])
-        frame = len(body).to_bytes(2, "little") + body
-        payload = base64.b64encode(frame).decode()
-        process_received_message(payload)
+        # Binary Rf body: 0x2B + 2 ciphered bytes decoding to
+        # (new_rank=5, banner=1). Encoded under the same session table
+        # the decoder is handed, so this exercises the real cipher —
+        # the table used to be a module global left at None here, which
+        # let the plaintext pass through verbatim
+        # ([[session-state-deglobalisation]]).
+        payload = make_binary_payload(0x2B, bytes([5, 1]))
+        process_received_message(payload, sniffer_xor_table())
 
         self_state = get_world_service().world_state["self_state"]
         if self_state is None:
@@ -765,10 +768,8 @@ class TestProcessReceivedMessage:
 
         reset_world_state()
         # Long ROOM_LIST / WorldInfo body; well above the 3-byte Rf threshold.
-        body = b"+1|RoomName|24|1,1,1|0|n|field24.gif|2026"
-        frame = len(body).to_bytes(2, "little") + body
-        payload = base64.b64encode(frame).decode()
-        process_received_message(payload)
+        payload = make_payload(b"+1|RoomName|24|1,1,1|0|n|field24.gif|2026")
+        process_received_message(payload, sniffer_xor_table())
 
         # No self_state should have been created since this is not binary Rf.
         assert get_world_service().world_state["self_state"] is None

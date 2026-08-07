@@ -83,7 +83,21 @@ def _empty_session(magic: str | None = "testmagic") -> CaptureSession:
 
 
 def _install_fake_fs(fs: _FakeFS) -> None:
-    """Install fake FS hooks for testing."""
+    """Install fake FS hooks for testing.
+
+    Seeds the static XOR key: a replay builds its session table from
+    it and now RAISES when it is missing, where the module global used
+    to stay ``None`` and hand the decoders undeciphered bytes
+    ([[session-state-deglobalisation]]).
+
+    Args:
+        fs: The fake file system to install.
+    """
+    from tankpit_bot.capture.xor import reset_static_key_cache
+    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+    fs.write(DEFAULT_STATIC_KEY_PATH, "Y" + "A" * 999)
+    reset_static_key_cache()
     _test_hooks.write_text = fs.write
     _test_hooks.read_text = fs.read
     _test_hooks.path_exists = fs.exists
@@ -280,7 +294,6 @@ class TestMainCLI:
 
         from tankpit_bot.sniffer.viewport import reset_viewport_tracking
         from tankpit_bot.sniffer.world_state import reset_world_state
-        from tankpit_bot.sniffer.xor import reset_xor_state
 
         fs = _FakeFS()
         session = _empty_session()
@@ -292,7 +305,6 @@ class TestMainCLI:
         result = main()
         _restore_hooks()
         reset_world_state()
-        reset_xor_state()
         reset_viewport_tracking()
         assert result == 0
 
@@ -314,7 +326,6 @@ class TestMainCLI:
 
         from tankpit_bot.sniffer.viewport import reset_viewport_tracking
         from tankpit_bot.sniffer.world_state import reset_world_state
-        from tankpit_bot.sniffer.xor import reset_xor_state
 
         fs = _FakeFS()
         session = _empty_session()
@@ -326,7 +337,6 @@ class TestMainCLI:
         result = main()
         _restore_hooks()
         reset_world_state()
-        reset_xor_state()
         reset_viewport_tracking()
         assert result == 0
 
@@ -356,14 +366,13 @@ class TestMainCLI:
         from tankpit_bot.sniffer.decoders import process_received_message as real_prm
         from tankpit_bot.sniffer.viewport import reset_viewport_tracking
         from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
-        from tankpit_bot.sniffer.xor import reset_xor_state
         from tankpit_bot.state.types import WorldStateDict
 
         call_count = 0
 
-        def _injecting_hook(payload: str) -> None:
+        def _injecting_hook(payload: str, xor_table: bytes) -> None:
             nonlocal call_count
-            real_prm(payload)
+            real_prm(payload, xor_table)
             call_count += 1
             if call_count == 1:
                 svc = get_world_service()
@@ -414,6 +423,5 @@ class TestMainCLI:
         _test_hooks.process_received_message_hook = original_hook
         _restore_hooks()
         reset_world_state()
-        reset_xor_state()
         reset_viewport_tracking()
         assert result == 0

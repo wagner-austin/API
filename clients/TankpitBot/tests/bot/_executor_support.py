@@ -116,6 +116,7 @@ class _WorldOnlyBot:
         self._world = world
         self._cdp = None
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
 
     def get_world_state(self) -> WorldStateDict:
         """Return the injected world-state snapshot."""

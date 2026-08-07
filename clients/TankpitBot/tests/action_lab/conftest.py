@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
@@ -26,11 +27,11 @@ from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import (
     update_inventory_from_protocol,
 )
-from tankpit_bot.sniffer.xor import build_global_xor_table
 from tankpit_bot.types import CapturedMessage, decode_capture_session
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -44,6 +45,23 @@ Discovered by replaying the capture through process_received_message and
 watching get_inventory_state(get_world_service())."""
 
 INVENTORY_TOTAL_AFTER_GROWTH = 112
+
+
+class ReplayPipeline(NamedTuple):
+    """A capture's frames paired with the table they were encoded under.
+
+    The table travels WITH the frames because it is session state, not
+    process state ([[session-state-deglobalisation]]) — a test holding
+    the frames without the table cannot decode them.
+
+    Attributes:
+        messages: Every captured message, both directions, in capture
+            order.
+        xor_table: The table built from this capture's own magic.
+    """
+
+    messages: list[CapturedMessage]
+    xor_table: bytes
 
 
 class FailIfWaitedPage:
@@ -67,12 +85,13 @@ class FailIfWaitedPage:
 
 
 @pytest.fixture()
-def replay_pipeline() -> Generator[list[CapturedMessage], None, None]:
-    """Reset world state, rebuild XOR table from real captured session magic.
+def replay_pipeline() -> Generator[ReplayPipeline, None, None]:
+    """Reset world state and build the capture's own XOR table.
 
-    Yields the typed captured-message list so tests can replay specific frames
-    through the real decoder pipeline via ``process_received_message``.
-    Restores world state after.
+    Yields the typed captured-message list together with the table
+    those frames were encoded under, so tests can replay specific
+    frames through the real decoder pipeline via
+    ``process_received_message``. Restores world state after.
     """
     session_text = core_hooks.read_text(FUEL_PROBE_CAPTURE_PATH)
     session = decode_capture_session(narrow_json_to_dict(load_json_str(session_text)))
@@ -82,8 +101,10 @@ def replay_pipeline() -> Generator[list[CapturedMessage], None, None]:
             f"Capture {FUEL_PROBE_CAPTURE_PATH.name} has no magic key — cannot replay binary frames"
         )
     reset_world_state()
-    build_global_xor_table(magic)
-    yield session["messages"]
+    yield ReplayPipeline(
+        messages=session["messages"],
+        xor_table=build_session_xor_table(magic),
+    )
     reset_world_state()
 
 

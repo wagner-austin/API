@@ -13,6 +13,7 @@ from platform_core.json_utils import (
     narrow_json_to_str,
 )
 
+from tankpit_bot.capture.xor import build_session_xor_table, xor_decode_body
 from tankpit_bot.protocol.types import (
     BinaryMessage,
     ChatMessageDict,
@@ -27,7 +28,6 @@ from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.transport import encode_tick_payload
 from tankpit_bot.sim.wire_statements import identity_statement, position_statement
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
-from tankpit_bot.sniffer.xor import build_global_xor_table, get_global_xor_table, reset_xor_state
 from tests.conftest import FakeFileSystem
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -52,10 +52,7 @@ def _capture(timeline: list[tuple[int, list[BinaryMessage]]]) -> str:
     Returns:
         The ``capture_session.json`` text the compiler consumes.
     """
-    reset_xor_state()
-    build_global_xor_table(_MAGIC)
-    table = get_global_xor_table()
-    assert table is not None
+    table = build_session_xor_table(_MAGIC)
     messages = [
         {
             "timestamp_ms": t,
@@ -370,13 +367,12 @@ def _rich_capture() -> str:
     # 0x43 CacheUpdate rides the wire as a TOP-LEVEL frame — inside a
     # 0x2E envelope the 0x43 subtype byte means container_pickup, so
     # the sim's envelope encoder cannot carry it. Craft the raw frame:
-    # the type byte travels in the clear; ``xor_decode`` strips it and
-    # XORs the remainder, so encoding the payload = decoding a body
-    # with any placeholder type byte in front.
-    from tankpit_bot.sniffer.xor import xor_decode as _xor
-
+    # the type byte travels in the clear; ``xor_decode_body`` at
+    # ``offset=1`` strips it and XORs the remainder, so encoding the
+    # payload = decoding a body with any placeholder type byte in front.
+    table = build_session_xor_table(_MAGIC)
     cache_payload = bytes([143, 90, 260 & 0xFF, 260 >> 8])
-    cache_body = bytes([0x43]) + _xor(bytes(1) + cache_payload)
+    cache_body = bytes([0x43]) + xor_decode_body(bytes(1) + cache_payload, table, offset=1)
     cache_frame = bytes([len(cache_body), 0]) + cache_body
     stray_messages.append(
         {

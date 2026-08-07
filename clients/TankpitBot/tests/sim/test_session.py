@@ -17,10 +17,10 @@ from tankpit_bot.action_lab.page_client_snapshot import decode_page_client_snaps
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop import _tick_once
 from tankpit_bot.protocol.commands import CMD_MAP_OPEN, build_query_command
-from tankpit_bot.protocol.helpers import EncodeError
 from tankpit_bot.protocol.types import DeactivationDict
 from tankpit_bot.sim.session import deliver_batch
 from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.wire.helpers import EncodeError
 from tests.sim.seam import SEAM_CLIENT_ID, SEAM_ENEMY_ID, boot_seam
 
 _CLIENT = SEAM_CLIENT_ID

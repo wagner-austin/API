@@ -18,11 +18,10 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.capture.xor import build_session_xor_table, decode_base64_safe, xor_decode_body
 from tankpit_bot.protocol import decode_message
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.types import CapturedMessage, CaptureSession
 
 _TRACKED_TYPES = frozenset({0x21, 0x28, 0x29, 0x2E, 0x3D, 0x41, 0x47, 0x49, 0x53, 0x58, 0x67})
@@ -281,18 +280,21 @@ def _ingest_combat_events(
         )
 
 
-def _ingest_received(timeline: ShadowTimelineDict, timestamp_ms: int, body: bytes) -> None:
+def _ingest_received(
+    timeline: ShadowTimelineDict, timestamp_ms: int, body: bytes, xor_table: bytes
+) -> None:
     """Record one received wire message into the timeline.
 
     Args:
         timeline: Timeline being built.
         timestamp_ms: Frame timestamp.
         body: Raw message body (msg_type byte + XOR-encoded rest).
+        xor_table: The owning session's XOR table.
     """
     msg_type = body[0]
     if msg_type not in _TRACKED_TYPES:
         return
-    decoded_data = xor_decode(body)
+    decoded_data = xor_decode_body(body, xor_table, offset=1)
     if len(decoded_data) < MSG_MIN_LENGTHS[msg_type]:
         return
     message = decode_message(msg_type, decoded_data)
@@ -304,8 +306,8 @@ def _ingest_received(timeline: ShadowTimelineDict, timestamp_ms: int, body: byte
 def extract_shadow_timeline(session: CaptureSession) -> ShadowTimelineDict:
     """Extract the shadow-law event timeline from one session.
 
-    Resets and rebuilds the global XOR state for the session's magic
-    key (same discipline as ``wire_timeline``), then walks every
+    Builds the XOR table from this session's own magic and holds it as
+    a LOCAL (same discipline as ``wire_timeline``), then walks every
     received frame in timestamp order.
 
     Args:
@@ -316,12 +318,12 @@ def extract_shadow_timeline(session: CaptureSession) -> ShadowTimelineDict:
 
     Raises:
         ValueError: If the session has no magic key (cannot XOR-decode).
+        XorStaticKeyUnavailableError: If the static key cannot be read.
     """
     magic = session["magic"]
     if magic is None:
         raise ValueError("Cannot extract shadow timeline without magic key")
-    reset_xor_state()
-    build_global_xor_table(magic)
+    xor_table = build_session_xor_table(magic)
     timeline = ShadowTimelineDict(
         session_id=session["session_id"],
         self_id=None,
@@ -340,7 +342,7 @@ def extract_shadow_timeline(session: CaptureSession) -> ShadowTimelineDict:
         if msg["direction"] != "received":
             continue
         for body in _split_frame_bodies(msg["payload"]):
-            _ingest_received(timeline, msg["timestamp_ms"], body)
+            _ingest_received(timeline, msg["timestamp_ms"], body, xor_table)
     return timeline
 
 

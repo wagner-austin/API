@@ -22,11 +22,11 @@ import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks as core_hooks
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.sniffer.decoders import process_received_message
 from tankpit_bot.sniffer.world_state import get_world_service, get_world_state, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
-from tankpit_bot.sniffer.xor import build_global_xor_table
 from tankpit_bot.types import CaptureSession, decode_capture_session
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -53,12 +53,12 @@ def _replay_all_received(session: CaptureSession) -> int:
     if magic is None:
         raise RuntimeError("capture has no magic key — cannot replay binary frames")
     reset_world_state()
-    build_global_xor_table(magic)
+    xor_table = build_session_xor_table(magic)
     count = 0
     for msg in session["messages"]:
         if msg["direction"] != "received":
             continue
-        process_received_message(msg["payload"])
+        process_received_message(msg["payload"], xor_table)
         count += 1
     return count
 
@@ -69,14 +69,14 @@ def _replay_through(session: CaptureSession, *, stop_at_index: int) -> int:
     if magic is None:
         raise RuntimeError("capture has no magic key")
     reset_world_state()
-    build_global_xor_table(magic)
+    xor_table = build_session_xor_table(magic)
     received = 0
     for i, msg in enumerate(session["messages"]):
         if i >= stop_at_index:
             break
         if msg["direction"] != "received":
             continue
-        process_received_message(msg["payload"])
+        process_received_message(msg["payload"], xor_table)
         received += 1
     return received
 
@@ -321,12 +321,12 @@ def test_fuel_probe_radar_uses_decrement_extra_radars_individually() -> None:
 
     for stop_index, expected_radar in zip(radar_use_indices, expected_radar_totals, strict=True):
         reset_world_state()
-        build_global_xor_table(magic)
+        xor_table = build_session_xor_table(magic)
         for i, msg in enumerate(session["messages"]):
             if i > stop_index:
                 break
             if msg["direction"] == "received":
-                process_received_message(msg["payload"])
+                process_received_message(msg["payload"], xor_table)
 
         inv = get_inventory_state(get_world_service())
         assert inv["extra_radars"]["count"] == expected_radar, (

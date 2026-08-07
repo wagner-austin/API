@@ -35,11 +35,7 @@ from tankpit_bot.sniffer.constants import (
     DEFAULT_TARGET_URL,
 )
 from tankpit_bot.sniffer.decoders import decode_message, process_received_message
-from tankpit_bot.sniffer.trackers import (
-    init_trackers_with_magic,
-    mine_tracker,
-    tank_tracker,
-)
+from tankpit_bot.sniffer.trackers import mine_tracker, tank_tracker
 from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.types import (
     CapturedMessage,
@@ -298,14 +294,6 @@ class WebSocketSniffer(BrowserSession):
         for path in self._autosave_paths:
             _test_hooks.write_text(path, json_str)
 
-    def _on_magic_captured(self, magic: str) -> None:
-        """Initialize trackers when magic key is captured.
-
-        Args:
-            magic: The session magic string.
-        """
-        init_trackers_with_magic(magic)
-
     def _on_message_captured(self, message: CapturedMessage) -> None:
         """Log decoded message if live decode is enabled.
 
@@ -324,8 +312,11 @@ class WebSocketSniffer(BrowserSession):
             return
 
         if direction == "received":
-            # Use unified decoder for received messages
-            process_received_message(payload)
+            # Use unified decoder for received messages. Frames that
+            # arrive before the session's magic cannot be decoded at
+            # all — live decode simply has nothing to print for them.
+            if self.xor_table is not None:
+                process_received_message(payload, self.xor_table)
         else:
             # Use simple decoder for sent messages
             mine_status = mine_tracker.process_message(payload, "sent")

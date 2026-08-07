@@ -76,6 +76,7 @@ class _MoveWaitProbe:
     def __init__(self, worlds: _SequencedWorld) -> None:
         self._worlds = worlds
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
 
     def _update_state_from_world(self) -> None:
         return None
@@ -297,6 +298,7 @@ class _MissingSelfWaitProbe:
         self._states = states
         self._index = 0
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
         self._world = _make_world(1000, 100, 100, 900)
 
     def _update_state_from_world(self) -> None:

@@ -121,6 +121,7 @@ class _FakeExperimentProbe:
     def __init__(self, worlds: _SequencedWorld, clock: ReplayClock) -> None:
         self._worlds = worlds
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
         self._page = ClockAdvancingPage(clock, on_wait=worlds.advance)
         self._messages_list: list[CapturedMessage] = []
         self._commands_sent: list[str] = []

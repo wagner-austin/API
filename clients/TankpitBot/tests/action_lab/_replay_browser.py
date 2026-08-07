@@ -52,8 +52,8 @@ from tankpit_bot._test_hooks import (
     PlaywrightProtocol,
     SyncPlaywrightContextManagerProtocol,
 )
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sniffer.world_state import reset_world_state
-from tankpit_bot.sniffer.xor import build_global_xor_table
 from tankpit_bot.types import CaptureSession
 
 __all__ = [
@@ -333,7 +333,7 @@ class RecordedChromiumSession:
     matching production semantics, no per-call rebuilds.
 
     The session is anchored to a captured WebSocket recording: the
-    capture's magic key bootstraps the global XOR table on
+    capture's magic key builds the PROBE's own XOR table on
     construction, and the recorded received-payloads feed into the
     page substitute's frame source so the replay timeline matches the
     live game.
@@ -364,7 +364,7 @@ class RecordedChromiumSession:
         if magic is None:
             raise RuntimeError("capture has no magic key; cannot bootstrap XOR table")
         reset_world_state()
-        build_global_xor_table(magic)
+        probe.xor_table = build_session_xor_table(magic)
 
         self.clock = ReplayClock()
         self.frame_source = FrameBatchSource(received_payloads(capture), frames_per_wait)

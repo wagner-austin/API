@@ -33,6 +33,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.naming import is_practice_bot_name
 from tankpit_bot.runtime_artifacts import make_run_stamp
@@ -70,7 +71,6 @@ from tankpit_bot.sim.world_seed import (
     select_practice_layout,
 )
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
-from tankpit_bot.sniffer.xor import build_global_xor_table, get_global_xor_table, reset_xor_state
 from tankpit_bot.types import encode_capture_session
 
 log = get_logger(__name__)
@@ -235,16 +235,14 @@ def _boot(
         already delivered.
 
     Raises:
-        RuntimeError: If the XOR static key or the field terrain GIF
-            is unavailable, or a scenario seed sits on impassable
-            ground — a sim run needs all three right, loudly.
+        XorStaticKeyUnavailableError: If the XOR static key cannot be
+            read — the sim's binary seam needs the real cipher.
+        RuntimeError: If the field terrain GIF is unavailable, or a
+            scenario seed sits on impassable ground — a sim run needs
+            both right, loudly.
     """
     reset_world_state()
-    reset_xor_state()
-    build_global_xor_table(SIM_MAGIC)
-    table = get_global_xor_table()
-    if table is None:
-        raise RuntimeError("XOR static key unavailable — cannot boot the sim session")
+    table = build_session_xor_table(SIM_MAGIC)
     gif_path = Path(world["field"])
     if not _test_hooks.path_exists(gif_path):
         raise RuntimeError(f"terrain GIF {gif_path} not found — run `make download-fields` first")

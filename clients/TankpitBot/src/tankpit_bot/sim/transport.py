@@ -2,8 +2,9 @@
 
 Server -> client: every decoded message becomes a length-prefixed
 0x2E envelope frame (the real wire tunnels everything through the
-container), XOR'd exactly the way ``sniffer.xor.xor_decode`` inverts
-it — the production ingestion path consumes the output unchanged.
+container), XOR'd exactly the way ``capture.xor.xor_decode_body``
+inverts it — the production ingestion path consumes the output
+unchanged.
 
 Client -> server: the bot's ``!``-prefixed command frames (as built
 by ``protocol.commands``) decode back into typed
@@ -16,9 +17,9 @@ import base64
 
 from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.protocol.encoders import encode_envelope_body
-from tankpit_bot.protocol.helpers import DecodeError, pack16
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.commands import ClientCommandDict, decode_client_command
+from tankpit_bot.wire.helpers import DecodeError, pack16
 
 _ENVELOPE_TYPE = 0x2E
 
@@ -26,8 +27,10 @@ _ENVELOPE_TYPE = 0x2E
 def _xor_with_table(table: bytes, data: bytes) -> bytes:
     """XOR data against the session table, passing through beyond it.
 
-    Mirrors ``sniffer.xor.xor_decode`` (which is its own inverse):
-    bytes past the table length travel in the clear.
+    Mirrors ``capture.xor.xor_decode_body`` (which is its own
+    inverse) at ``offset=0``, but bytes past the table length travel
+    in the clear here rather than raising. Folding the two is tracked
+    as its own step ([[session-state-deglobalisation]]).
 
     Args:
         table: Session XOR table.

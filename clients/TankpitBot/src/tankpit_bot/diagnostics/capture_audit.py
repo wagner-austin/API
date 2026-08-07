@@ -31,12 +31,12 @@ from tankpit_bot.capture.xor import build_xor_table, decode_base64_safe, load_xo
 from tankpit_bot.diagnostics.event_stream import scan_diagnostic_records
 from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
 from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
-from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.runtime_logging import RuntimeEventRecordDict
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.types import CaptureSession
 from tankpit_bot.validate.fight_timeline import extract_human_episodes
 from tankpit_bot.validate.shadow_timeline import extract_shadow_timeline
+from tankpit_bot.wire.helpers import DecodeError
 
 log = get_logger(__name__)
 
@@ -51,8 +51,11 @@ _SUPERVISOR_CANT_GO = 1
 def _xor_with_table(body: bytes, table: bytes) -> bytes:
     """XOR-decode a message body against a local table (skip type byte).
 
-    Mirrors :func:`tankpit_bot.sniffer.xor.xor_decode` without the
-    module-global table so replay never disturbs live decoder state.
+    Mirrors :func:`tankpit_bot.capture.xor.xor_decode_body` at
+    ``offset=1``, but passes bytes beyond the table through in the
+    clear instead of raising — an audit reads whatever the archive
+    holds. Folding the two is tracked as its own step
+    ([[session-state-deglobalisation]]).
 
     Args:
         body: Raw message body bytes including the leading type byte.

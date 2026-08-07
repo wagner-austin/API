@@ -10,6 +10,7 @@ link.
 from __future__ import annotations
 
 from tankpit_bot.bot.base import Bot
+from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.session import SimCDPSession, deliver_batch
 from tankpit_bot.sim.world import (
@@ -21,11 +22,6 @@ from tankpit_bot.sim.world import (
     make_sim_world,
 )
 from tankpit_bot.sniffer.world_state import reset_world_state
-from tankpit_bot.sniffer.xor import (
-    build_global_xor_table,
-    get_global_xor_table,
-    reset_xor_state,
-)
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 SEAM_MAGIC = "simmagic"
@@ -133,14 +129,11 @@ def boot_seam(
         with the join handshake already delivered to the bot's buffer.
 
     Raises:
-        RuntimeError: If the repo's XOR static key is unavailable.
+        XorStaticKeyUnavailableError: If the repo's XOR static key is
+            unavailable.
     """
     reset_world_state()
-    reset_xor_state()
-    build_global_xor_table(SEAM_MAGIC)
-    table = get_global_xor_table()
-    if table is None:
-        raise RuntimeError("XOR static key unavailable — cannot boot the seam")
+    table = build_session_xor_table(SEAM_MAGIC)
     world = make_sim_world("field01_r.gif")
     world["tanks"][SEAM_CLIENT_ID] = make_sim_tank(SEAM_CLIENT_ID, 2, 1, 100, 100, client_fuel)
     world["tanks"][SEAM_CLIENT_ID]["counts"] = list(counts)

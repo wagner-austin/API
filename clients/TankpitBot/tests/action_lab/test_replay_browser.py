@@ -46,6 +46,7 @@ class _BufferProbe:
     def __init__(self) -> None:
         """Initialize an empty message buffer."""
         self._cdp_message_buffer: list[str] = []
+        self.xor_table: bytes | None = None
 
 
 def _make_session() -> RecordedChromiumSession:

@@ -2,7 +2,18 @@
 
 from __future__ import annotations
 
-from tankpit_bot.capture.xor import decode_base64_safe, is_valid_base64, xor_decode_body
+import pytest
+
+from tankpit_bot.capture.xor import (
+    XorStaticKeyUnavailableError,
+    build_session_xor_table,
+    build_xor_table,
+    decode_base64_safe,
+    is_valid_base64,
+    reset_static_key_cache,
+    xor_decode_body,
+)
+from tests.conftest import FakeFileSystem
 
 
 class TestIsValidBase64:
@@ -97,3 +108,80 @@ class TestXorDecodeBody:
         xor_table = bytes([0x10, 0x20, 0x30, 0x40])
         result = xor_decode_body(body, xor_table)
         assert result == bytes([0x51, 0x62])
+
+
+class TestBuildSessionXorTable:
+    """Tests for the per-session table builder.
+
+    The table is a VALUE the caller owns; it replaced a module global
+    that a second session would silently overwrite
+    ([[session-state-deglobalisation]] step 1).
+    """
+
+    def test_returns_the_table_for_the_given_magic(self, fake_fs: FakeFileSystem) -> None:
+        """The result equals the static key combined with that magic."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "ABCDEF"
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        reset_static_key_cache()
+
+        assert build_session_xor_table("testmagic") == build_xor_table(static_key, "testmagic")
+
+    def test_two_magics_yield_two_independent_tables(self, fake_fs: FakeFileSystem) -> None:
+        """A second session's table does not disturb the first's.
+
+        This is the property the module global could not provide: the
+        second build overwrote the first, so the first session's frames
+        decoded against the wrong key.
+        """
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF")
+        reset_static_key_cache()
+
+        first = build_session_xor_table("alpha1")
+        second = build_session_xor_table("bravo2")
+
+        assert first != second
+        assert first == build_session_xor_table("alpha1")
+
+    def test_raises_when_the_static_key_is_missing(self, fake_fs: FakeFileSystem) -> None:
+        """A missing key raises rather than yielding a silent identity decode."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+        fake_fs.remove(DEFAULT_STATIC_KEY_PATH)
+        reset_static_key_cache()
+
+        with pytest.raises(XorStaticKeyUnavailableError, match=r"xor_static_key\.txt missing"):
+            build_session_xor_table("testmagic")
+
+    def test_the_static_key_is_read_once_and_cached(self, fake_fs: FakeFileSystem) -> None:
+        """Deleting the key file after a build still serves later builds.
+
+        The KEY is process-wide (the same key builds every session's
+        table); only the TABLE is session state.
+        """
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF")
+        reset_static_key_cache()
+        first = build_session_xor_table("testmagic")
+
+        fake_fs.remove(DEFAULT_STATIC_KEY_PATH)
+
+        assert build_session_xor_table("testmagic") == first
+
+    def test_resetting_the_cache_re_reads_the_key(self, fake_fs: FakeFileSystem) -> None:
+        """After a reset the next build sees the file's current contents."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF")
+        reset_static_key_cache()
+        first = build_session_xor_table("testmagic")
+
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "UVWXYZ")
+        reset_static_key_cache()
+
+        assert build_session_xor_table("testmagic") == build_xor_table("UVWXYZ", "testmagic")
+        assert build_session_xor_table("testmagic") != first
