@@ -5,10 +5,12 @@ introduced alongside the raw world-state types (Phase 1a); the
 retrofits of ``ContainerStateDict`` / ``TankStateDict`` / the rest are
 Phases 1b-1d.
 
-This package is a LEAF: it defines the vocabulary and imports no other
-``tankpit_bot`` package. The Fact[T] projections that read world state
-back live in :mod:`tankpit_bot.state.projections`, above ``state``,
-because ``state/types`` imports this vocabulary.
+This package is a near-LEAF: it defines the vocabulary and its only
+outbound edge is to :mod:`tankpit_bot.contracts`, itself a leaf, which
+enforces the confidence bounds and provenance rootedness. The Fact[T]
+projections that read world state back live in
+:mod:`tankpit_bot.state.projections`, above ``state``, because
+``state/types`` imports this vocabulary.
 """
 
 from tankpit_bot.facts.confidence import (
