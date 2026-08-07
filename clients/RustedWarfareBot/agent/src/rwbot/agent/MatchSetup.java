@@ -365,13 +365,21 @@ final class MatchSetup {
         if (seed != 0) {
             AiTimers.reset();
         }
+        // Marked live BEFORE the hold, deliberately: holdNow blocks until
+        // the planner connects, and under a full parallel panel that wait
+        // can legitimately outlast the wrong-world deadline -- measured on
+        // the first Impossible probe, where the deadline halted a verified,
+        // held, healthy world whose planner was 60s behind (one job of
+        // twelve). The guard's question -- did the requested world arrive --
+        // is answered by this line; how long the planner takes to show up
+        // was never part of it.
+        WrongWorldGuard.markLive();
         channel.start();
         // Held synchronously, on this very tick: posting the hold instead
         // would let the world run free for however many ticks the queue
         // takes, and those are exactly the frames this design exists to
         // remove.
         channel.holdNow();
-        WrongWorldGuard.markLive();
         Log.info("match live; frame zeroed, channel open, world held for the planner");
     }
 
