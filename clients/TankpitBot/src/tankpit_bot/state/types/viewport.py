@@ -4,7 +4,7 @@ Phase 1d of the self-observing architecture: the viewport carries the
 fact metadata flat. Its provenance origin is always
 ``wire_0x5A_viewport_patch`` -- 0x5A ViewportUpdate is the only wire
 message that sets the viewport (see wiki ``viewport-shift-protocol``).
-The Fact[T] projection lives in :mod:`tankpit_bot.facts.world_facts`.
+The Fact[T] projection lives in :mod:`tankpit_bot.state.projections.world`.
 """
 
 from __future__ import annotations

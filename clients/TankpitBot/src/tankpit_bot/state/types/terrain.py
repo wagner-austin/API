@@ -8,7 +8,7 @@ mutators in :mod:`tankpit_bot.state.container_mutations`.
 Phase 1d of the self-observing architecture: the tile carries the
 fact metadata flat. Terrain arrives on two channels -- 0x5A viewport
 patch grids (the default) and 0x4A terrain updates. The Fact[T]
-projection lives in :mod:`tankpit_bot.facts.world_facts`.
+projection lives in :mod:`tankpit_bot.state.projections.world`.
 """
 
 from __future__ import annotations

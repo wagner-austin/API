@@ -3,7 +3,7 @@
 Phase 1c of the self-observing architecture: the tank carries the full
 fact metadata flat -- ``source`` plus the four freshness timestamps
 (pre-existing) and the ``confidence`` / ``provenance`` fields. The
-Fact[T] projection lives in :mod:`tankpit_bot.facts.tank_facts`.
+Fact[T] projection lives in :mod:`tankpit_bot.state.projections.tank`.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from tankpit_bot.facts.provenance import (
     make_provenance,
 )
 from tankpit_bot.facts.source import FactSource
-from tankpit_bot.state.types.constants import (
+from tankpit_bot.types.constants import (
     EntitySource,
     TankLiveness,
     require_entity_source,
@@ -233,7 +233,7 @@ class TankStateDict(TypedDict):
             TankEntry, MovementResponse, TankStatusSync, Movement) flips
             a non-alive tank back to ``alive`` -- the respawn flow.
             ``analyze_threats`` filters to ``liveness == "alive"``;
-            ``_combat_shoot`` thus cannot fire at a corpse or empty
+            ``engage_target`` thus cannot fire at a corpse or empty
             tile. Empirical capture 2026-06-20: bot used to shoot the
             corpse 3 times during the 22 s window because no 0x41
             handler updated the tank state.

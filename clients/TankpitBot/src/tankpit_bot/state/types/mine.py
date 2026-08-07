@@ -3,7 +3,7 @@
 Phase 1d of the self-observing architecture: the mine carries the full
 fact metadata flat -- ``source``/``timestamp_ms`` (pre-existing) plus
 ``confidence`` and ``provenance``. The Fact[T] projection lives in
-:mod:`tankpit_bot.facts.world_facts`.
+:mod:`tankpit_bot.state.projections.world`.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from tankpit_bot.facts.provenance import (
     make_provenance,
 )
 from tankpit_bot.facts.source import FactSource
-from tankpit_bot.state.types.constants import EntitySource, require_entity_source
+from tankpit_bot.types.constants import EntitySource, require_entity_source
 
 _MINE_FACT_SOURCE_BY_ENTITY_SOURCE: dict[EntitySource, FactSource] = {
     "viewport": "wire_0x5A_viewport_patch",

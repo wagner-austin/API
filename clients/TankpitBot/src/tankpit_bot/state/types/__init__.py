@@ -4,7 +4,7 @@ This package replaced the previous monolithic ``state/types.py``. Every
 public name remains importable from ``tankpit_bot.state.types`` exactly
 as before; the submodules group code by entity domain:
 
-* :mod:`tankpit_bot.state.types.constants` -- enumerations and shared
+* :mod:`tankpit_bot.types.constants` -- enumerations and shared
   literal validators (entity source, container refresh kind).
 * :mod:`tankpit_bot.state.types.coord` -- string-key helpers for the
   coordinate-indexed collections.
@@ -22,40 +22,6 @@ collapsed into the single :func:`tankpit_bot.state.types._helpers.decode_entity_
 
 from __future__ import annotations
 
-from tankpit_bot.state.types.constants import (
-    ASCII_ALLY,
-    ASCII_BRIDGE,
-    ASCII_ENEMY,
-    ASCII_EQUIPMENT,
-    ASCII_FERRY,
-    ASCII_FUEL,
-    ASCII_GROUND,
-    ASCII_MINE,
-    ASCII_ROCK,
-    ASCII_SELF,
-    ASCII_UNKNOWN,
-    ASCII_WATER,
-    CONTAINER_REFRESH_KINDS,
-    DAMAGE_CRITICAL,
-    DAMAGE_FULL,
-    DAMAGE_LIGHT,
-    DAMAGE_MEDIUM,
-    ENTITY_SOURCES,
-    TEAM_BLUE,
-    TEAM_ORANGE,
-    TEAM_PURPLE,
-    TEAM_RED,
-    TERRAIN_BLOCK_BRIDGE,
-    TERRAIN_BLOCK_LAND,
-    TERRAIN_BLOCK_STACKED,
-    TERRAIN_FERRY,
-    TERRAIN_FERRY_ROCK,
-    TERRAIN_GROUND,
-    ContainerRefreshKind,
-    EntitySource,
-    decode_container_refresh_kind,
-    encode_container_refresh_kind,
-)
 from tankpit_bot.state.types.container import (
     ContainerStateDict,
     decode_container_state,
@@ -116,38 +82,8 @@ from tankpit_bot.state.types.world import (
 )
 
 __all__ = [
-    "ASCII_ALLY",
-    "ASCII_BRIDGE",
-    "ASCII_ENEMY",
-    "ASCII_EQUIPMENT",
-    "ASCII_FERRY",
-    "ASCII_FUEL",
-    "ASCII_GROUND",
-    "ASCII_MINE",
-    "ASCII_ROCK",
-    "ASCII_SELF",
-    "ASCII_UNKNOWN",
-    "ASCII_WATER",
-    "CONTAINER_REFRESH_KINDS",
-    "DAMAGE_CRITICAL",
-    "DAMAGE_FULL",
-    "DAMAGE_LIGHT",
-    "DAMAGE_MEDIUM",
-    "ENTITY_SOURCES",
-    "TEAM_BLUE",
-    "TEAM_ORANGE",
-    "TEAM_PURPLE",
-    "TEAM_RED",
-    "TERRAIN_BLOCK_BRIDGE",
-    "TERRAIN_BLOCK_LAND",
-    "TERRAIN_BLOCK_STACKED",
-    "TERRAIN_FERRY",
-    "TERRAIN_FERRY_ROCK",
-    "TERRAIN_GROUND",
     "VIEWPORT_PRESENCE_TTL_MS",
-    "ContainerRefreshKind",
     "ContainerStateDict",
-    "EntitySource",
     "MineStateDict",
     "SelfAccountDict",
     "SelfStateDict",
@@ -157,7 +93,6 @@ __all__ = [
     "ViewportStateDict",
     "WorldStateDict",
     "coord_key",
-    "decode_container_refresh_kind",
     "decode_container_state",
     "decode_mine_state",
     "decode_self_account",
@@ -167,7 +102,6 @@ __all__ = [
     "decode_terrain_tile",
     "decode_viewport_state",
     "decode_world_state",
-    "encode_container_refresh_kind",
     "encode_container_state",
     "encode_mine_state",
     "encode_self_account",

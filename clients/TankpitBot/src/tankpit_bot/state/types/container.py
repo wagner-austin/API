@@ -3,7 +3,7 @@
 Phase 1b of the self-observing architecture: the container carries the
 full fact metadata flat -- ``source``/``refresh_kind``/``timestamp_ms``
 (pre-existing) plus ``confidence`` and ``provenance``. The Fact[T]
-projection lives in :mod:`tankpit_bot.facts.container_facts`.
+projection lives in :mod:`tankpit_bot.state.projections.container`.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from tankpit_bot.facts.provenance import (
     make_provenance,
 )
 from tankpit_bot.facts.source import FactSource
-from tankpit_bot.state.types.constants import (
+from tankpit_bot.types.constants import (
     ContainerRefreshKind,
     EntitySource,
     decode_container_refresh_kind,

@@ -44,8 +44,8 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from tankpit_bot.facts.source import FactSource, require_fact_source
-from tankpit_bot.state.types.constants import EntitySource, require_entity_source
 from tankpit_bot.state.types.tank import tank_default_fact_source
+from tankpit_bot.types.constants import EntitySource, require_entity_source
 
 
 class TankObservation(TypedDict):

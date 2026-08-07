@@ -3,7 +3,7 @@
 Phase 1d of the self-observing architecture: the self state carries
 the fact metadata flat -- ``observed_ms``, ``confidence`` and
 ``provenance``. The Fact[T] projection lives in
-:mod:`tankpit_bot.facts.world_facts`.
+:mod:`tankpit_bot.state.projections.world`.
 """
 
 from __future__ import annotations
