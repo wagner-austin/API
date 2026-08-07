@@ -5,10 +5,9 @@ from __future__ import annotations
 from collections.abc import Generator
 
 import pytest
-from tests.action_lab._replay_cdp import StubSnapshotCDPSession
-from tests.action_lab._replay_core import (
-    StubbedBootstrapMixin,
-    WorldStateOverrideMixin,
+from tests.action_lab._combat_probe_harness import (
+    _ExecuteHarness,
+    _ProbeHarness,
 )
 from tests.action_lab._replay_page import (
     ClockAdvancingPage,
@@ -16,10 +15,8 @@ from tests.action_lab._replay_page import (
 )
 
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot._test_hooks import PageProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.combat_probe import (
-    CombatProbe,
     _current_enemy_by_id,
     _enemy_from_world_state,
     _find_fresh_enemy,
@@ -31,108 +28,8 @@ from tankpit_bot.action_lab.combat_probe_types import (
 from tankpit_bot.bot.ai.world_types import make_enemy_threat
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.state import (
-    SelfStateDict,
-    WorldStateDict,
-    make_empty_world_state,
-    make_self_state,
     make_tank_state,
 )
-from tankpit_bot.state.types import make_viewport_state
-
-
-def _make_world(
-    timestamp_ms: int,
-    x: int,
-    y: int,
-    fuel: int,
-) -> WorldStateDict:
-    world = make_empty_world_state()
-    return WorldStateDict(
-        self_state=make_self_state(
-            tank_id=1,
-            x=x,
-            y=y,
-            team=2,
-            rank=1,
-            fuel=fuel,
-            leaderboard_position=5,
-        ),
-        tanks=world["tanks"],
-        containers=world["containers"],
-        mines=world["mines"],
-        terrain=world["terrain"],
-        viewport=make_viewport_state(left=x - 8, top=y - 8, width=16, height=16),
-        scanned_tiles=world["scanned_tiles"],
-        timestamp_ms=timestamp_ms,
-    )
-
-
-class _ProbeHarness(CombatProbe):
-    def __init__(self) -> None:
-        super().__init__(
-            "https://tankpit.com/play",
-            headless=True,
-            prefer_account=False,
-        )
-        self._self_state: SelfStateDict | None = make_self_state(
-            tank_id=1,
-            x=100,
-            y=100,
-            team=2,
-            rank=1,
-            fuel=900,
-            leaderboard_position=1,
-        )
-        self._world_state = _make_world(1000, 100, 100, 900)
-        self._fake_page = ClockAdvancingPage(ReplayClock(1000))
-        self._cdp = StubSnapshotCDPSession()
-        self.shoot_calls: list[tuple[int, int, int]] = []
-
-    def _require_page(self) -> PageProtocol:
-        return self._fake_page
-
-    def get_world_state(self) -> WorldStateDict:
-        return self._world_state
-
-    def get_self_state(self) -> SelfStateDict | None:
-        return self._self_state
-
-    def shoot(self, x: int, y: int, target_id: int = 0) -> bool:
-        self.shoot_calls.append((x, y, target_id))
-        return True
-
-
-class _ExecuteHarness(
-    StubbedBootstrapMixin,
-    WorldStateOverrideMixin,
-    CombatProbe,
-):
-    def __init__(self) -> None:
-        CombatProbe.__init__(
-            self,
-            "https://tankpit.com/play",
-            headless=False,
-            prefer_account=True,
-        )
-        self._init_bootstrap_stubs()
-        self._world_state = _make_world(900, 100, 100, 900)
-        self.engagement_results: list[CombatEngagementDict | None] = []
-        self.excluded_ids_log: list[frozenset[int]] = []
-        self._call_count = 0
-
-    def _acquire_and_engage(
-        self,
-        *,
-        acquisition_timeout_ms: int,
-        teleport_timeout_ms: int,
-        max_shots: int,
-        excluded_ids: frozenset[int],
-    ) -> CombatEngagementDict | None:
-        _ = (acquisition_timeout_ms, teleport_timeout_ms, max_shots)
-        self.excluded_ids_log.append(excluded_ids)
-        result = self.engagement_results[self._call_count]
-        self._call_count += 1
-        return result
 
 
 @pytest.fixture(autouse=True)
