@@ -116,12 +116,6 @@ mypy-init-return = true
 
 [tool.coverage.run]
 source = ["src", "scripts"]
-omit = [
-    "src/tankpit_bot/action_lab/combat_probe.py",
-    "src/tankpit_bot/action_lab/enemy_tracking.py",
-    "scripts/combat_probe.py",
-    "scripts/enemy_tracking_probe.py",
-]
 branch = true
 # Playwright's sync API drives the browser on a greenlet; without this,
 # coverage loses the tracer across its context switches and under-counts
