@@ -149,3 +149,29 @@ def test_manager_activity_requires_a_registered_instance() -> None:
     manager = FleetManager()
     with pytest.raises(FleetError, match="unknown instance"):
         manager.activity("ghost")
+
+
+def test_spawn_derives_the_instance_from_the_account() -> None:
+    """No name given: the account (or the default) names the instance."""
+    from tankpit_bot.service import _test_hooks as service_hooks
+    from tests.service.test_fleet import (
+        _FakeSpawner,
+        _restore_account_hooks,
+        _with_configured_accounts,
+    )
+
+    fake = _FakeSpawner()
+    original_spawn = service_hooks.spawn_bot_process
+    service_hooks.spawn_bot_process = fake
+    originals = _with_configured_accounts()
+    try:
+        manager = FleetManager()
+        named = manager.spawn(instance="", account="second", kills=0, seconds=0)
+        default = manager.spawn(instance="", account="", kills=0, seconds=0)
+        assert manager.derive_instance("We!rd Name") == "we-rd-name"
+    finally:
+        _restore_account_hooks(originals)
+        service_hooks.spawn_bot_process = original_spawn
+
+    assert named["instance"] == "second"
+    assert default["instance"] == "artax"

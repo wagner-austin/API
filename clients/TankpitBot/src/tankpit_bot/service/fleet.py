@@ -189,6 +189,31 @@ class FleetManager:
             return []
         return [account["username"] for account in load_accounts(_ACCOUNTS_PATH)]
 
+    def derive_instance(self, account: str) -> str:
+        """Derive the instance name from the account — programmatic, reliable.
+
+        One account can hold at most one live tank (the game refuses a
+        second login), so the account IS the natural bot identity: the
+        instance is its username lowered and sanitized to the
+        namespace grammar. No account configured falls back to
+        ``bot``. Callers may still name instances explicitly through
+        the API; the control page never asks a human to invent one.
+
+        Args:
+            account: Selected account username, empty for the default.
+
+        Returns:
+            A valid instance name.
+        """
+        configured = self.accounts()
+        source = account or (configured[0] if configured else "bot")
+        cleaned = "".join(
+            ch if ch.isascii() and (ch.isalnum() or ch in "-_") else "-" for ch in source.lower()
+        )[:32]
+        if not cleaned or not (cleaned[0].isascii() and cleaned[0].isalnum()):
+            cleaned = f"b{cleaned}"[:32]
+        return cleaned
+
     def spawn(self, *, instance: str, account: str, kills: int, seconds: int) -> FleetBotDict:
         """Spawn one bot child process under an instance namespace.
 
@@ -208,6 +233,8 @@ class FleetManager:
             FleetError: If the name is invalid, already registered and
                 alive, or the bounds are negative.
         """
+        if not instance:
+            instance = self.derive_instance(account)
         if not _INSTANCE_NAME.match(instance):
             raise FleetError(
                 f"instance {instance!r} is not a valid instance name "

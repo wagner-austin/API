@@ -125,10 +125,6 @@ __CARD_CSS__
 </table>
 </div>
 <form id="spawn">
-  <div class="field wide"><label for="instance">Name</label>
-    <input id="instance" placeholder="e.g. alpha" required
-           pattern="[a-z0-9][a-z0-9_-]{0,31}">
-    <div class="hint">logs land in runs/bot/&lt;name&gt;/</div></div>
   <div class="field wide"><label for="account">Account</label>
     <select id="account"><option value="">default</option></select>
     <div class="hint">from accounts.json</div></div>
@@ -312,7 +308,6 @@ document.getElementById("spawn").addEventListener("submit", async (event) => {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
-      instance: document.getElementById("instance").value.trim(),
       account: document.getElementById("account").value,
       kills: Number(document.getElementById("kills").value) || 0,
       seconds: Number(document.getElementById("seconds").value) || 0,
@@ -320,7 +315,7 @@ document.getElementById("spawn").addEventListener("submit", async (event) => {
   });
   document.getElementById("error").textContent = response.ok
     ? "" : "launch failed (" + response.status + "): " + await response.text();
-  if (response.ok) { document.getElementById("instance").value = ""; poll(); }
+  if (response.ok) poll();
 });
 
 loadAccounts();
