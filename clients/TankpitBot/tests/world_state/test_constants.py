@@ -1,6 +1,6 @@
 """Tests for state module constants."""
 
-from tankpit_bot.state import (
+from tankpit_bot.types.constants import (
     ASCII_ALLY,
     ASCII_ENEMY,
     ASCII_EQUIPMENT,

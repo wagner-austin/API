@@ -6,6 +6,17 @@ import pytest
 
 from tankpit_bot._pillow import load_pillow_image_module
 from tankpit_bot.state import (
+    add_mine,
+    apply_tank_observation,
+    make_empty_world_state,
+    render_world_ascii,
+    terrain_to_ascii,
+    update_container_from_radar,
+    update_self_from_movement_response,
+)
+from tankpit_bot.state.types import make_tank_observation
+from tankpit_bot.terrain import TerrainMap
+from tankpit_bot.types.constants import (
     ASCII_ALLY,
     ASCII_BRIDGE,
     ASCII_ENEMY,
@@ -25,16 +36,7 @@ from tankpit_bot.state import (
     TERRAIN_FERRY,
     TERRAIN_FERRY_ROCK,
     TERRAIN_GROUND,
-    add_mine,
-    apply_tank_observation,
-    make_empty_world_state,
-    render_world_ascii,
-    terrain_to_ascii,
-    update_container_from_radar,
-    update_self_from_movement_response,
 )
-from tankpit_bot.state.types import make_tank_observation
-from tankpit_bot.terrain import TerrainMap
 
 _IMAGE = load_pillow_image_module()
 

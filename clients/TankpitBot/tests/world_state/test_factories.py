@@ -1,6 +1,14 @@
 """Tests for state factory functions."""
 
 from tankpit_bot.state import (
+    make_container_state,
+    make_empty_world_state,
+    make_mine_state,
+    make_self_state,
+    make_tank_state,
+    make_terrain_tile,
+)
+from tankpit_bot.types.constants import (
     DAMAGE_FULL,
     DAMAGE_LIGHT,
     TEAM_BLUE,
@@ -8,12 +16,6 @@ from tankpit_bot.state import (
     TEAM_RED,
     TERRAIN_BLOCK_BRIDGE,
     TERRAIN_GROUND,
-    make_container_state,
-    make_empty_world_state,
-    make_mine_state,
-    make_self_state,
-    make_tank_state,
-    make_terrain_tile,
 )
 
 

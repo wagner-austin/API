@@ -4,9 +4,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot.state import (
-    CONTAINER_REFRESH_KINDS,
     add_mine,
-    decode_container_refresh_kind,
     decode_container_state,
     decode_mine_state,
     decode_self_state,
@@ -14,10 +12,14 @@ from tankpit_bot.state import (
     decode_terrain_tile,
     decode_viewport_state,
     decode_world_state,
-    encode_container_refresh_kind,
     encode_world_state,
     make_empty_world_state,
     update_container_from_radar,
+)
+from tankpit_bot.types.constants import (
+    CONTAINER_REFRESH_KINDS,
+    decode_container_refresh_kind,
+    encode_container_refresh_kind,
 )
 
 
