@@ -137,6 +137,55 @@ def test_a_finished_match_is_filed_as_its_scorecard() -> None:
         )
 
 
+def test_a_scorecard_states_the_match_it_played() -> None:
+    """The batch name was the only record of map and difficulty, and a
+    dataset built across batches cannot read names. The card states its own
+    setup, label-padded like every report line."""
+    match = MatchConfig(map_path="maps/skirmish/[p2]duel_lake.tmx", opponents=1, difficulty=2)
+    with FakeHost() as host:
+        assert play_job(_job(seed=42), ".game-w1", _config(match=match)) is True
+        assert host.files["runs/sweeps/demo/tank-s42.txt"] == (
+            "### tank-s42",
+            "match          1 opponent(s) at difficulty 2 (1.8x AI income) "
+            "on maps/skirmish/[p2]duel_lake.tmx",
+            "verdict        survived (sample_limit)",
+            "army           0 -> 9",
+        )
+
+
+def test_a_reused_clone_receives_maps_the_pinned_copy_gained() -> None:
+    """Clone reuse is cheap and was silently stale: six maps added to the
+    pinned copy after the clones were made never reached them, the engine's
+    load failed with an alert nothing read, and every match on those maps
+    played the boot sandbox instead -- the "seating anomaly", solved
+    (log 2026-08-06). The sync is reported, never silent."""
+    with FakeHost() as host:
+        host.plant_source(_SOURCE)
+        host.dirs.add(f"{_SOURCE}/assets/maps")
+        host.dirs.add(f"{_SOURCE}/assets/maps/skirmish")
+        host.files[f"{_SOURCE}/assets/maps/skirmish/[p2]duel_lake.tmx"] = ("map",)
+        host.files[f"{_SOURCE}/assets/maps/skirmish/[p2]lake_2p.tmx"] = ("map",)
+        # An existing, otherwise-complete clone that predates lake_2p.
+        host.plant_source(".game-w1")
+        host.dirs.add(".game-w1/assets/maps")
+        host.dirs.add(".game-w1/assets/maps/skirmish")
+        host.files[".game-w1/assets/maps/skirmish/[p2]duel_lake.tmx"] = ("map",)
+
+        assert prepare_clone(0, _config()) == ".game-w1"
+        assert ".game-w1/assets/maps/skirmish/[p2]lake_2p.tmx" in host.files
+        assert any("synced 1 map(s)" in line for line in host.printed)
+
+
+def test_a_clone_with_every_map_syncs_nothing_and_says_nothing() -> None:
+    with FakeHost() as host:
+        host.plant_source(_SOURCE)
+        host.dirs.add(f"{_SOURCE}/assets/maps")
+        host.dirs.add(f"{_SOURCE}/assets/maps/skirmish")
+        host.files[f"{_SOURCE}/assets/maps/skirmish/[p2]duel_lake.tmx"] = ("map",)
+        assert prepare_clone(0, _config()) == ".game-w1"
+        assert not any("synced" in line for line in host.printed)
+
+
 def test_every_match_starts_from_the_pinned_settings_not_the_last_match_s() -> None:
     """The game rewrites preferences.ini on each boot, so without this the
     second match a worker plays starts from the first one's leavings and two

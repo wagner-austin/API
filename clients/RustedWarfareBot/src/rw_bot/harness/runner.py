@@ -24,7 +24,7 @@ from rw_bot.harness.clone import (
     entries_to_copy,
     verify,
 )
-from rw_bot.harness.match import MatchConfig
+from rw_bot.harness.match import MatchConfig, describe
 from rw_bot.harness.sweep import (
     SweepJob,
     assigned,
@@ -264,11 +264,42 @@ def prepare_clone(index: int, config: SweepConfig) -> str:
         _test_hooks.make_dirs(destination)
         for entry in entries_to_copy(_test_hooks.list_names(source)):
             _test_hooks.copy_entry(source / entry, destination)
+    synced = _sync_maps(source, destination)
+    if synced:
+        _test_hooks.write_line(f"[sweep] {name} synced {synced} map(s) from {source}")
     verify(
         name,
         [needed for needed in REQUIRED_ENTRIES if _test_hooks.path_exists(destination / needed)],
     )
     return name
+
+
+#: Where the skirmish maps live inside a game directory. The one asset a
+#: match CONFIG names, which is what makes staleness here different in kind
+#: from any other: a map added to the pinned copy after a clone was made
+#: never reached it, the engine's load failed with an alert nothing read,
+#: and it fell back to its boot sandbox -- a 3-to-5-player FFA that played
+#: out as the "seating anomaly" and silently voided the xmap batch family
+#: (log 2026-08-06). Reuse stays cheap; the maps are re-synced every time.
+MAPS_DIR = "assets/maps/skirmish"
+
+
+def _sync_maps(source: Path, destination: Path) -> int:
+    """Copy skirmish maps the pinned copy has and the clone lacks.
+
+    Args:
+        source: The pinned game directory.
+        destination: The worker's clone.
+
+    Returns:
+        How many maps were copied, for the launch log -- a healed clone is
+        reported, never silent.
+    """
+    have = set(_test_hooks.list_names(destination / MAPS_DIR))
+    missing = [entry for entry in _test_hooks.list_names(source / MAPS_DIR) if entry not in have]
+    for entry in missing:
+        _test_hooks.copy_entry(source / MAPS_DIR / entry, destination / MAPS_DIR)
+    return len(missing)
 
 
 def reset_volatile_files(game_dir: str, config: SweepConfig) -> None:
@@ -348,7 +379,13 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
         _test_hooks.write_text_lines(out_dir / f"{name}.partial", (f"### {name} FAILED", *output))
         _test_hooks.write_line(f"[sweep] {name} FAILED, transcript kept as {name}.partial")
         return False
-    _test_hooks.write_text_lines(out_dir / f"{name}.txt", (f"### {name}", *card))
+    # The scorecard states its own match, because the batch name is the only
+    # other record of what was played -- and a dataset built from cards across
+    # batches (export_matches) cannot tell Hard from Very Hard by name alone.
+    # Same label discipline as every report line: lowercase label padded to
+    # the sweep's width, so scorecard_fields reads it like any other figure.
+    setup = () if config["match"] is None else (f"{'match':<15}{describe(config['match'])}",)
+    _test_hooks.write_text_lines(out_dir / f"{name}.txt", (f"### {name}", *setup, *card))
     _test_hooks.write_line(f"[sweep] {name} done")
     return True
 
