@@ -1,27 +1,178 @@
-"""Tests for sniffer world state core operations (terrain, position, radar, inventory)."""
+"""Tests for world-state core, rendering, rooms, and rejections.
+
+``test_world_state_core.py`` was 701 lines; inventory detail is now a
+sibling.
+"""
 
 from __future__ import annotations
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.protocol.types import (
-    EquipmentGainDict,
-    EquipmentToggleDict,
-    InventoryDict,
-)
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
     reset_world_state,
     update_world_state_from_position,
 )
-from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.world_state_inventory import (
     get_inventory_state,
     update_inventory_from_gain,
     update_inventory_from_protocol,
-    update_inventory_from_toggle,
 )
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+
+class TestInventoryTracking:
+    """Tests for binary protocol inventory tracking (0x49, 0x67, 0x74)."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_full_signal_without_self_state_is_noop(self) -> None:
+        """Code-7 reconciliation is a no-op when rank is unknown."""
+        from tankpit_bot.sniffer.world_state_inventory import (
+            update_inventory_from_full_signal,
+        )
+
+        assert update_inventory_from_full_signal(get_world_service()) == []
+        inv = get_inventory_state(get_world_service())
+        assert inv["dual_shots"]["count"] == 0
+
+    def test_full_signal_reconciles_every_slot_to_capacity(self) -> None:
+        """Code 7 is an authoritative all-slots-full statement.
+
+        User mechanic (2026-07-18): containers fill whatever is empty
+        and the server sends Inventory full only when ALL items are at
+        cap -- so the rejection snaps every drifted shadow count up to
+        the rank capacity.
+        """
+        from tankpit_bot.physics.capacity import inventory_capacity
+        from tankpit_bot.sniffer.world_state import update_world_state_from_position
+        from tankpit_bot.sniffer.world_state_inventory import (
+            update_inventory_from_full_signal,
+        )
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+        changes = update_inventory_from_full_signal(ws)
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("position update must create self_state")
+        cap = inventory_capacity(self_state["rank"])
+        assert len(changes) == 5
+        inv = get_inventory_state(ws)
+        assert inv["armor_shields"]["count"] == cap
+        assert inv["dual_shots"]["count"] == cap
+        assert inv["missile_shots"]["count"] == cap
+        assert inv["homing_shots"]["count"] == cap
+        assert inv["extra_radars"]["count"] == cap
+
+    def test_initial_inventory_is_empty(self) -> None:
+        """Test inventory starts at zero counts, all disabled."""
+        inv = get_inventory_state(get_world_service())
+        assert inv["armor_shields"]["count"] == 0
+        assert inv["armor_shields"]["enabled"] is False
+        assert inv["dual_shots"]["count"] == 0
+        assert inv["dual_shots"]["enabled"] is False
+        assert inv["missile_shots"]["count"] == 0
+        assert inv["homing_shots"]["count"] == 0
+        assert inv["extra_radars"]["count"] == 0
+
+    def test_update_from_protocol_sets_absolute_counts(self) -> None:
+        """Test 0x49 message sets absolute inventory counts."""
+        update_inventory_from_protocol(
+            get_world_service(),
+            counts=[10, 5, 3, 2, 1],
+            enabled=[True, False, True, True, False],
+        )
+        inv = get_inventory_state(get_world_service())
+        assert inv["armor_shields"]["count"] == 10
+        assert inv["dual_shots"]["count"] == 5
+        assert inv["dual_shots"]["enabled"] is False
+        assert inv["missile_shots"]["count"] == 3
+        assert inv["homing_shots"]["count"] == 2
+        assert inv["extra_radars"]["count"] == 1
+        assert inv["extra_radars"]["enabled"] is False
+
+    def test_update_from_protocol_returns_changes(self) -> None:
+        """Test 0x49 message returns all changes from initial state.
+
+        Initial state has enabled=False for all slots. First protocol
+        message sets enabled=True + armor count=10, so all 5 slots
+        report enabled_changed and armor also reports a count delta.
+        """
+        changes = update_inventory_from_protocol(
+            get_world_service(),
+            counts=[10, 0, 0, 0, 0],
+            enabled=[True, True, True, True, True],
+        )
+        # All 5 slots changed enabled state (False→True), armor also changed count
+        assert len(changes) == 5
+        armor_change = next(c for c in changes if c["item"] == "armor_shields")
+        assert armor_change["delta"] == 10
+        assert armor_change["enabled_changed"] is True
+
+    def test_update_from_protocol_no_changes_when_same(self) -> None:
+        """Test 0x49 message returns empty when counts unchanged."""
+        update_inventory_from_protocol(
+            get_world_service(),
+            counts=[10, 5, 3, 2, 1],
+            enabled=[True, True, True, True, True],
+        )
+        changes = update_inventory_from_protocol(
+            get_world_service(),
+            counts=[10, 5, 3, 2, 1],
+            enabled=[True, True, True, True, True],
+        )
+        assert changes == []
+
+    def test_update_from_gain_adds_deltas(self) -> None:
+        """Test 0x67 message adds gained amounts to current counts."""
+        update_inventory_from_protocol(
+            get_world_service(),
+            counts=[10, 5, 3, 2, 1],
+            enabled=[True, True, True, True, True],
+        )
+        update_inventory_from_gain(get_world_service(), gained=[5, 0, 2, 0, 3])
+
+        inv = get_inventory_state(get_world_service())
+        assert inv["armor_shields"]["count"] == 15
+        assert inv["dual_shots"]["count"] == 5
+        assert inv["missile_shots"]["count"] == 5
+        assert inv["homing_shots"]["count"] == 2
+        assert inv["extra_radars"]["count"] == 4
+
+    def test_update_from_gain_returns_changes(self) -> None:
+        """Test 0x67 message returns changes for non-zero gains."""
+        update_inventory_from_protocol(
+            get_world_service(),
+            counts=[10, 5, 3, 2, 1],
+            enabled=[True, True, True, True, True],
+        )
+        changes = update_inventory_from_gain(get_world_service(), gained=[5, 0, 0, 0, 0])
+        assert len(changes) == 1
+        assert changes[0]["item"] == "armor_shields"
+        assert changes[0]["delta"] == 5
+        assert changes[0]["old_count"] == 10
+        assert changes[0]["new_count"] == 15
+
+    def test_update_from_gain_preserves_enabled(self) -> None:
+        """Test 0x67 message does not change enabled flags."""
+        update_inventory_from_protocol(
+            get_world_service(),
+            counts=[10, 5, 3, 2, 1],
+            enabled=[True, False, True, False, True],
+        )
+        update_inventory_from_gain(get_world_service(), gained=[1, 1, 1, 1, 1])
+
+        inv = get_inventory_state(get_world_service())
+        assert inv["armor_shields"]["enabled"] is True
+        assert inv["dual_shots"]["enabled"] is False
+        assert inv["homing_shots"]["enabled"] is False
 
 
 class TestWorldStateCore:
@@ -305,296 +456,6 @@ class TestRoomTracking:
 
         assert get_world_service().room_images == {}
         assert get_world_service().selected_room is None
-
-
-class TestInventoryTracking:
-    """Tests for binary protocol inventory tracking (0x49, 0x67, 0x74)."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state after each test."""
-        reset_world_state()
-
-    def test_full_signal_without_self_state_is_noop(self) -> None:
-        """Code-7 reconciliation is a no-op when rank is unknown."""
-        from tankpit_bot.sniffer.world_state_inventory import (
-            update_inventory_from_full_signal,
-        )
-
-        assert update_inventory_from_full_signal(get_world_service()) == []
-        inv = get_inventory_state(get_world_service())
-        assert inv["dual_shots"]["count"] == 0
-
-    def test_full_signal_reconciles_every_slot_to_capacity(self) -> None:
-        """Code 7 is an authoritative all-slots-full statement.
-
-        User mechanic (2026-07-18): containers fill whatever is empty
-        and the server sends Inventory full only when ALL items are at
-        cap -- so the rejection snaps every drifted shadow count up to
-        the rank capacity.
-        """
-        from tankpit_bot.physics.capacity import inventory_capacity
-        from tankpit_bot.sniffer.world_state import update_world_state_from_position
-        from tankpit_bot.sniffer.world_state_inventory import (
-            update_inventory_from_full_signal,
-        )
-
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
-        changes = update_inventory_from_full_signal(ws)
-        self_state = ws.world_state["self_state"]
-        if self_state is None:
-            raise AssertionError("position update must create self_state")
-        cap = inventory_capacity(self_state["rank"])
-        assert len(changes) == 5
-        inv = get_inventory_state(ws)
-        assert inv["armor_shields"]["count"] == cap
-        assert inv["dual_shots"]["count"] == cap
-        assert inv["missile_shots"]["count"] == cap
-        assert inv["homing_shots"]["count"] == cap
-        assert inv["extra_radars"]["count"] == cap
-
-    def test_initial_inventory_is_empty(self) -> None:
-        """Test inventory starts at zero counts, all disabled."""
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["count"] == 0
-        assert inv["armor_shields"]["enabled"] is False
-        assert inv["dual_shots"]["count"] == 0
-        assert inv["dual_shots"]["enabled"] is False
-        assert inv["missile_shots"]["count"] == 0
-        assert inv["homing_shots"]["count"] == 0
-        assert inv["extra_radars"]["count"] == 0
-
-    def test_update_from_protocol_sets_absolute_counts(self) -> None:
-        """Test 0x49 message sets absolute inventory counts."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, False, True, True, False],
-        )
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["count"] == 10
-        assert inv["dual_shots"]["count"] == 5
-        assert inv["dual_shots"]["enabled"] is False
-        assert inv["missile_shots"]["count"] == 3
-        assert inv["homing_shots"]["count"] == 2
-        assert inv["extra_radars"]["count"] == 1
-        assert inv["extra_radars"]["enabled"] is False
-
-    def test_update_from_protocol_returns_changes(self) -> None:
-        """Test 0x49 message returns all changes from initial state.
-
-        Initial state has enabled=False for all slots. First protocol
-        message sets enabled=True + armor count=10, so all 5 slots
-        report enabled_changed and armor also reports a count delta.
-        """
-        changes = update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 0, 0, 0, 0],
-            enabled=[True, True, True, True, True],
-        )
-        # All 5 slots changed enabled state (False→True), armor also changed count
-        assert len(changes) == 5
-        armor_change = next(c for c in changes if c["item"] == "armor_shields")
-        assert armor_change["delta"] == 10
-        assert armor_change["enabled_changed"] is True
-
-    def test_update_from_protocol_no_changes_when_same(self) -> None:
-        """Test 0x49 message returns empty when counts unchanged."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, True, True, True, True],
-        )
-        changes = update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, True, True, True, True],
-        )
-        assert changes == []
-
-    def test_update_from_gain_adds_deltas(self) -> None:
-        """Test 0x67 message adds gained amounts to current counts."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, True, True, True, True],
-        )
-        update_inventory_from_gain(get_world_service(), gained=[5, 0, 2, 0, 3])
-
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["count"] == 15
-        assert inv["dual_shots"]["count"] == 5
-        assert inv["missile_shots"]["count"] == 5
-        assert inv["homing_shots"]["count"] == 2
-        assert inv["extra_radars"]["count"] == 4
-
-    def test_update_from_gain_returns_changes(self) -> None:
-        """Test 0x67 message returns changes for non-zero gains."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, True, True, True, True],
-        )
-        changes = update_inventory_from_gain(get_world_service(), gained=[5, 0, 0, 0, 0])
-        assert len(changes) == 1
-        assert changes[0]["item"] == "armor_shields"
-        assert changes[0]["delta"] == 5
-        assert changes[0]["old_count"] == 10
-        assert changes[0]["new_count"] == 15
-
-    def test_update_from_gain_preserves_enabled(self) -> None:
-        """Test 0x67 message does not change enabled flags."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, False, True, False, True],
-        )
-        update_inventory_from_gain(get_world_service(), gained=[1, 1, 1, 1, 1])
-
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["enabled"] is True
-        assert inv["dual_shots"]["enabled"] is False
-        assert inv["homing_shots"]["enabled"] is False
-
-    def test_update_from_toggle_changes_enabled(self) -> None:
-        """Test 0x74 message updates enabled flags."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, True, True, True, True],
-        )
-        update_inventory_from_toggle(
-            get_world_service(),
-            enabled=[False, True, False, True, False],
-        )
-
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["enabled"] is False
-        assert inv["dual_shots"]["enabled"] is True
-        assert inv["missile_shots"]["enabled"] is False
-        assert inv["homing_shots"]["enabled"] is True
-        assert inv["extra_radars"]["enabled"] is False
-
-    def test_update_from_toggle_preserves_counts(self) -> None:
-        """Test 0x74 message does not change counts."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, True, True, True, True],
-        )
-        update_inventory_from_toggle(
-            get_world_service(),
-            enabled=[False, False, False, False, False],
-        )
-
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["count"] == 10
-        assert inv["dual_shots"]["count"] == 5
-        assert inv["missile_shots"]["count"] == 3
-
-    def test_update_from_toggle_returns_changes(self) -> None:
-        """Test 0x74 message returns changes for toggled items."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, True, True, True, True],
-        )
-        changes = update_inventory_from_toggle(
-            get_world_service(),
-            enabled=[False, True, True, True, True],
-        )
-        assert len(changes) == 1
-        assert changes[0]["item"] == "armor_shields"
-        assert changes[0]["enabled_changed"] is True
-        assert changes[0]["now_enabled"] is False
-
-    def test_update_from_protocol_logs_used_on_decrease(self) -> None:
-        """Test 0x49 message with decreased counts returns negative delta."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 5, 3, 2, 1],
-            enabled=[True, True, True, True, True],
-        )
-        changes = update_inventory_from_protocol(
-            get_world_service(),
-            counts=[9, 5, 3, 2, 1],
-            enabled=[True, True, True, True, True],
-        )
-        assert len(changes) == 1
-        assert changes[0]["item"] == "armor_shields"
-        assert changes[0]["delta"] == -1
-        assert changes[0]["old_count"] == 10
-        assert changes[0]["new_count"] == 9
-
-    def test_reset_clears_inventory(self) -> None:
-        """Test reset_world_state clears inventory to empty."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[40, 30, 20, 10, 5],
-            enabled=[False, False, False, False, False],
-        )
-        reset_world_state()
-
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["count"] == 0
-        assert inv["armor_shields"]["enabled"] is False
-
-    def test_dispatch_inventory_message(self) -> None:
-        """Test dispatch_world_state_update handles 0x49 message."""
-        msg = InventoryDict(
-            msg_type=0x49,
-            show=False,
-            alternate=True,
-            counts=[40, 30, 20, 10, 5],
-            enabled=[True, True, True, True, True],
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["count"] == 40
-        assert inv["extra_radars"]["count"] == 5
-
-    def test_dispatch_equipment_gain_message(self) -> None:
-        """Test dispatch_world_state_update handles 0x67 message."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 10, 10, 10, 10],
-            enabled=[True, True, True, True, True],
-        )
-        msg = EquipmentGainDict(
-            msg_type=0x67,
-            show_message=True,
-            gained=[5, 3, 0, 0, 2],
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["count"] == 15
-        assert inv["dual_shots"]["count"] == 13
-        assert inv["missile_shots"]["count"] == 10
-        assert inv["extra_radars"]["count"] == 12
-
-    def test_dispatch_equipment_toggle_message(self) -> None:
-        """Test dispatch_world_state_update handles 0x74 message."""
-        update_inventory_from_protocol(
-            get_world_service(),
-            counts=[10, 10, 10, 10, 10],
-            enabled=[True, True, True, True, True],
-        )
-        msg = EquipmentToggleDict(
-            msg_type=0x74,
-            enabled=[False, True, False, True, False],
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        inv = get_inventory_state(get_world_service())
-        assert inv["armor_shields"]["enabled"] is False
-        assert inv["dual_shots"]["enabled"] is True
-        assert inv["missile_shots"]["enabled"] is False
 
 
 class TestFailedMoveTargets:

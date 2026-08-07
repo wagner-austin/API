@@ -353,7 +353,7 @@ class TestRecentPickupLedgerLookup:
 
     def test_stale_entries_and_other_tiles_do_not_match(self) -> None:
         """Only a fresh signature covering the tile counts."""
-        from tankpit_bot.sniffer.world_state_dispatch import was_recent_pickup_at
+        from tankpit_bot.sniffer.world_state_dispatch_containers import was_recent_pickup_at
 
         ws = get_world_service()
         ws.recent_pickup_signatures[((150, 150, 0),)] = 90000
