@@ -39,11 +39,11 @@ PROBES = (1500, 2000, 2500, 3400)
 FRAMES_PER_SAMPLE = 75
 
 #: Fewest columns a line must split into to be a tick row. Thirteen is the
-#: original shape; the income pair (2026-08-05) landed between ``rival`` and
-#: ``world`` precisely so that every column this script indexes -- extractors
-#: at 4, lost at 5, worth at 10, rival at 11 -- kept its position, which is
-#: why one bound reads both the 13-column archive and the 15-column current
-#: shape instead of splitting the trace record into eras.
+#: original shape; the income pair (2026-08-05), the plan outcome and the
+#: worker count (2026-08-06) all landed at or after position 12 precisely so
+#: that every column this script indexes -- extractors at 4, lost at 5,
+#: worth at 10, rival at 11 -- kept its position, which is why one bound
+#: reads every era of the trace record instead of splitting it.
 _MIN_COLUMNS = 13
 
 
@@ -56,6 +56,9 @@ class TracePoint(TypedDict):
         lost: Own units lost so far.
         worth: Our total worth.
         rival: The strongest rival's army value.
+        income: Our credits per second, 0 in traces that predate the income
+            pair -- unrecorded, not zero-earning.
+        rival_income: The strongest rival's, same caveat.
     """
 
     sample: int
@@ -63,6 +66,8 @@ class TracePoint(TypedDict):
     lost: int
     worth: int
     rival: int
+    income: int
+    rival_income: int
 
 
 class MatchAutopsy(TypedDict):
@@ -78,6 +83,9 @@ class MatchAutopsy(TypedDict):
             the peak, -1 when it never did -- the collapse marker.
         extractors_at_race: Extractors standing at the first probe, the
             race's finish line.
+        income_at_race: Our income at that probe, and the rival's beside it
+            -- the race law read directly instead of inferred from worth.
+        rival_income_at_race: See ``income_at_race``.
         ratios: Our worth over their army value at each probe, in
             :data:`PROBES` order, 0.0 where their army was zero.
     """
@@ -89,6 +97,8 @@ class MatchAutopsy(TypedDict):
     rival_at_peak: int
     halved_sample: int
     extractors_at_race: int
+    income_at_race: int
+    rival_income_at_race: int
     ratios: tuple[float, ...]
 
 
@@ -119,6 +129,8 @@ def decode_trace(text: str) -> tuple[TracePoint, ...]:
                 lost=int(parts[5]),
                 worth=int(parts[10]),
                 rival=int(parts[11]),
+                income=int(parts[12]) if len(parts) >= 15 else 0,
+                rival_income=int(parts[13]) if len(parts) >= 15 else 0,
             )
         )
     return tuple(points)
@@ -173,6 +185,8 @@ def autopsy(points: Sequence[TracePoint], stem: str) -> MatchAutopsy | None:
         rival_at_peak=peak["rival"],
         halved_sample=halved["sample"] if halved is not None else -1,
         extractors_at_race=_at(points, PROBES[0])["extractors"],
+        income_at_race=_at(points, PROBES[0])["income"],
+        rival_income_at_race=_at(points, PROBES[0])["rival_income"],
         ratios=tuple(
             round(point["worth"] / point["rival"], 2) if point["rival"] > 0 else 0.0
             for probe in PROBES
@@ -199,6 +213,8 @@ def rows(batch: Path) -> tuple[str, ...]:
         "rival_at_peak",
         "halved_sample",
         "extr_at_race",
+        "inc_at_race",
+        "rivinc_at_race",
         *(f"ratio_s{probe}" for probe in PROBES),
     )
     lines = ["\t".join(header)]
@@ -216,6 +232,8 @@ def rows(batch: Path) -> tuple[str, ...]:
                     str(record["rival_at_peak"]),
                     str(record["halved_sample"]),
                     str(record["extractors_at_race"]),
+                    str(record["income_at_race"]),
+                    str(record["rival_income_at_race"]),
                     *(str(ratio) for ratio in record["ratios"]),
                 )
             )

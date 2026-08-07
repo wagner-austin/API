@@ -43,8 +43,12 @@ def _trace(*points: tuple[int, int, int, int, int]) -> str:
 def test_a_trace_decodes_by_shape_and_skips_the_header() -> None:
     points = decode_trace(_trace((0, 0, 0, 3500, 3500), (1500, 6, 0, 24000, 22000)))
     assert points == (
-        TracePoint(sample=0, extractors=0, lost=0, worth=3500, rival=3500),
-        TracePoint(sample=1500, extractors=6, lost=0, worth=24000, rival=22000),
+        TracePoint(
+            sample=0, extractors=0, lost=0, worth=3500, rival=3500, income=0, rival_income=0
+        ),
+        TracePoint(
+            sample=1500, extractors=6, lost=0, worth=24000, rival=22000, income=0, rival_income=0
+        ),
     )
 
 
@@ -55,7 +59,9 @@ def test_the_fifteen_column_shape_reads_at_the_same_indices() -> None:
     frame = 20 * FRAMES_PER_SAMPLE
     row = f"{frame} 0 4000 2 6 1 1 1 0 0 24000 22000 54 180 12345\n"
     assert decode_trace(_HEADER + row) == (
-        TracePoint(sample=20, extractors=6, lost=1, worth=24000, rival=22000),
+        TracePoint(
+            sample=20, extractors=6, lost=1, worth=24000, rival=22000, income=54, rival_income=180
+        ),
     )
 
 
@@ -81,6 +87,8 @@ def test_an_autopsy_names_the_peak_the_collapse_and_the_race() -> None:
         rival_at_peak=45000,
         halved_sample=3400,
         extractors_at_race=5,
+        income_at_race=0,
+        rival_income_at_race=0,
         ratios=(
             round(22000 / 28000, 2),
             round(30000 / 45000, 2),
@@ -110,6 +118,8 @@ def test_a_win_never_halves_and_a_dead_rival_reads_as_zero_ratio() -> None:
         rival_at_peak=0,
         halved_sample=-1,
         extractors_at_race=6,
+        income_at_race=0,
+        rival_income_at_race=0,
         ratios=(round(25000 / 24000, 2), round(30000 / 20000, 2), round(34000 / 5000, 2), 0.0),
     )
 
@@ -129,7 +139,7 @@ def test_main_prints_the_batch_table(tmp_path: Path, capsys: pytest.CaptureFixtu
     (batch / "empty.ndjson").write_text(_HEADER, encoding="utf-8")
     assert main(["night"], root=tmp_path) == EXIT_OK
     lines = capsys.readouterr().out.splitlines()
-    assert lines[0].split("\t")[:7] == [
+    assert lines[0].split("\t")[:9] == [
         "file",
         "samples",
         "peak_worth",
@@ -137,8 +147,10 @@ def test_main_prints_the_batch_table(tmp_path: Path, capsys: pytest.CaptureFixtu
         "rival_at_peak",
         "halved_sample",
         "extr_at_race",
+        "inc_at_race",
+        "rivinc_at_race",
     ]
-    assert lines[0].split("\t")[7:] == [f"ratio_s{probe}" for probe in PROBES]
+    assert lines[0].split("\t")[9:] == [f"ratio_s{probe}" for probe in PROBES]
     assert len(lines) == 2
     assert lines[1].split("\t")[:3] == ["a", "2000", "30000"]
 
