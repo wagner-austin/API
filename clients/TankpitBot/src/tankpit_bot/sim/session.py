@@ -37,14 +37,71 @@ from tankpit_bot.action_lab.page_client_snapshot import (
     encode_page_client_snapshot,
 )
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
+from tankpit_bot.capture.xor import build_session_xor_table, require_static_key, xor_decode_body
+from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.protocol.types import BinaryMessage
+from tankpit_bot.sim.commands import decode_client_command
+from tankpit_bot.sim.lobby import QUIT_BODY, SimLobby, build_auth_frame
 from tankpit_bot.sim.server import SimServer
-from tankpit_bot.sim.transport import decode_client_payload, encode_tick_payload
+from tankpit_bot.sim.transport import (
+    encode_plaintext_payload,
+    encode_tick_payload,
+    split_client_frames,
+)
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tankpit_bot.wire.helpers import EncodeError
 
 _WS_OPEN = 1
 _SIM_WS_URL = "wss://sim.tankpit.local/ws"
+_SIM_PAGE_URL = "https://sim.tankpit.local/"
+_SIM_TPCLIENT_URL = "https://sim.tankpit.local/tpclient.js"
+_RAW_MESSAGE_WINDOW = 500
+"""The page hook keeps the most recent 500 received payloads."""
+
+# The AUTH frame's account fields. They are the page client's identity,
+# not the bot's, and nothing downstream reads them — only the trailing
+# magic matters ([[session-state-deglobalisation]]).
+_SIM_ACCOUNT_ID = "62913"
+_SIM_SESSION_TOKEN = "00000000000000000000000000000000"
+_SIM_AUTH_STAMP = "0"
+_AUTOSCROLL_KEY = "a"
+
+
+class SimKeyboard:
+    """The page client's keyboard, as far as the sim models one.
+
+    Only the ``a`` autoscroll toggle is wired. Pressing it is what the
+    PAGE does — the browser sends ``A1``/``A0`` (the flipped state, not
+    a bare "toggle"; the archive's 75 sends are all one or the other and
+    the server echoes them back verbatim). Every other key raises,
+    because a silently-ignored press would let a probe believe it acted
+    ([[session-state-deglobalisation]]).
+    """
+
+    def __init__(self, link: SimCDPSession) -> None:
+        """Bind the keyboard to the link whose socket it types on.
+
+        Args:
+            link: The sim link standing in for the page client.
+        """
+        self._link = link
+
+    def press(self, key: str, *, delay: float | None = None) -> None:
+        """Press one key.
+
+        Args:
+            key: The key name.
+            delay: Hold time — irrelevant with no real input stack.
+
+        Raises:
+            EncodeError: For any key but the autoscroll toggle.
+        """
+        del delay
+        if key != _AUTOSCROLL_KEY:
+            raise EncodeError(f"sim keyboard: unmodeled key press {key!r}")
+        self._link.autoscroll_enabled = not self._link.autoscroll_enabled
+        flag = "1" if self._link.autoscroll_enabled else "0"
+        self._link.send_plaintext(f"{_AUTOSCROLL_KEY.upper()}{flag}".encode())
 
 
 class SimCDPSession:
@@ -55,20 +112,135 @@ class SimCDPSession:
     every decoded command for assertions and diagnostics.
     """
 
-    def __init__(self, server: SimServer, table: bytes) -> None:
-        """Bind the session to a sim server and its XOR table.
+    def __init__(self, server: SimServer, magic: str, lobby: SimLobby | None = None) -> None:
+        """Bind the session to a sim server and its session magic.
+
+        The magic is the parameter rather than the table because the
+        table is DERIVED from it and the AUTH frame carries it — a link
+        holding both could hold two that disagree.
 
         Args:
             server: The sim server this link speaks to.
-            table: Session XOR table (the bot must share it).
+            magic: The session magic. Its table is built here, and the
+                bot must end up with the same one.
+            lobby: The pre-play protocol half. When given, the link
+                stands in for the page client as well as the socket:
+                it opens by sending the AUTH frame and answers the
+                production ``join_room`` flow from
+                :mod:`tankpit_bot.sim.lobby`. When omitted the link
+                starts already in-room, which is what the seam tests
+                want ([[session-state-deglobalisation]]).
         """
         self.server = server
-        self.table = table
+        self.magic = magic
+        self.table = build_session_xor_table(magic)
+        self.lobby = lobby
         self.sent_commands: list[str] = []
         self.wire_log: list[CapturedMessage] = []
+        self.raw_messages: list[str] = []
+        """Received payloads, the ``window.__rawMsgs`` hook's contents.
+
+        Received only — the browser hook pushes from the socket's
+        ``message`` handler, so sent frames never appear there."""
         self.map_visible = False
+        self.autoscroll_enabled = False
+        """The server-persisted autoscroll setting this connection sees.
+
+        Starts OFF, which is the state the production enforcer's
+        press-verify round trip proves and restores."""
+        self.url = _SIM_PAGE_URL
+        """The page URL, one field of the room-entry metadata."""
         self._last_send_ms: int | None = None
         self._detached = False
+
+    @property
+    def keyboard(self) -> SimKeyboard:
+        """The page client's keyboard, for the autoscroll toggle dance."""
+        return SimKeyboard(self)
+
+    def send_plaintext(self, body: bytes) -> None:
+        """Send one plaintext client frame and take the lobby's reply.
+
+        This is the page client's own channel — the toggle and the quit
+        frame are its frames, not the bot's, and the bot only reads
+        their acks off the wire.
+
+        Args:
+            body: The frame body, including its lead byte.
+        """
+        payload = encode_plaintext_payload([body])
+        self.wire_log.append(
+            CapturedMessage(
+                timestamp_ms=get_current_time_ms(),
+                direction="sent",
+                payload=payload,
+                ws_url=_SIM_WS_URL,
+            )
+        )
+        self._deliver_plaintext(self._handle_lobby_frame(body))
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Satisfy the join flow's poll delay without sleeping.
+
+        The production loop pumps the browser's event loop between
+        polls. The sim answers every query synchronously from world
+        truth, so there is nothing to wait FOR — a real sleep here
+        would only add ten seconds of dead time to every soak.
+
+        Args:
+            timeout: The requested delay, in milliseconds.
+        """
+        del timeout
+
+    def _deliver_plaintext(self, frames: list[bytes]) -> None:
+        """Record lobby replies as received wire and page-hook traffic.
+
+        ONE payload per frame. The browser hook pushes once per
+        websocket ``message`` event and ``decode_captured_body`` treats
+        a second frame in the same payload as corruption, so a batched
+        room list would arrive as an error rather than two rooms — and
+        the archive shows the real server sending each row separately
+        anyway.
+
+        Args:
+            frames: The lobby's plaintext reply frames.
+        """
+        for body in frames:
+            payload = encode_plaintext_payload([body])
+            self.raw_messages.append(payload)
+            self.wire_log.append(
+                CapturedMessage(
+                    timestamp_ms=get_current_time_ms(),
+                    direction="received",
+                    payload=payload,
+                    ws_url=_SIM_WS_URL,
+                )
+            )
+
+    def open_lobby(self) -> None:
+        """Send the page client's AUTH frame and take the room list.
+
+        The AUTH frame is the page client's, not the bot's — our code
+        only reads it, to lift the session magic. This link IS the page
+        client, so it sends one, and the room list arrives as the
+        server's answer rather than as pre-seeded state.
+
+        Raises:
+            EncodeError: If the link was built without a lobby.
+        """
+        if self.lobby is None:
+            raise EncodeError("sim session: open_lobby on a link with no lobby")
+        auth = build_auth_frame(_SIM_ACCOUNT_ID, _SIM_SESSION_TOKEN, _SIM_AUTH_STAMP, self.magic)
+        payload = encode_plaintext_payload([auth])
+        self.wire_log.append(
+            CapturedMessage(
+                timestamp_ms=get_current_time_ms(),
+                direction="sent",
+                payload=payload,
+                ws_url=_SIM_WS_URL,
+            )
+        )
+        self._deliver_plaintext(self.lobby.handle_frame(auth))
 
     def _snapshot(self) -> PageClientSnapshotDict:
         """Build the truthful page-client snapshot from sim world state.
@@ -114,8 +286,16 @@ class SimCDPSession:
         """
         end = expression.find("')", start)
         payload = expression[start + len("atob('") : end]
-        commands = decode_client_payload(payload, self.table)
-        for command in commands:
+        # One socket carries two protocols, told apart by the lead
+        # byte: '!' is an in-game command, anything else is lobby.
+        # Splitting has to precede that question, so the frames are
+        # split once here and routed per frame.
+        lobby_replies: list[bytes] = []
+        for body in split_client_frames(payload):
+            if body[0] != COMMAND_PREFIX:
+                lobby_replies.extend(self._handle_lobby_frame(body))
+                continue
+            command = decode_client_command(xor_decode_body(body, self.table, offset=1))
             self.sent_commands.append(command["kind"])
             if command["kind"] == "map_open":
                 self.map_visible = True
@@ -132,8 +312,29 @@ class SimCDPSession:
                 ws_url=_SIM_WS_URL,
             )
         )
+        self._deliver_plaintext(lobby_replies)
         byte_count = len(payload) * 3 // 4
         return {"result": {"value": f"SENT_{byte_count}_BYTES via {_SIM_WS_URL}"}}
+
+    def _handle_lobby_frame(self, body: bytes) -> list[bytes]:
+        """Route one non-command client frame to the lobby.
+
+        Args:
+            body: The plaintext frame body.
+
+        Returns:
+            The lobby's reply frames.
+
+        Raises:
+            EncodeError: If the link has no lobby. A plaintext frame on
+                an in-room link is a harness bug, not a condition to
+                absorb — the seam would silently drop the bot's join.
+        """
+        if self.lobby is None:
+            raise EncodeError(
+                f"sim session: plaintext frame 0x{body[0]:02X} on a link with no lobby"
+            )
+        return self.lobby.handle_frame(body)
 
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
         """Answer one CDP command from sim truth.
@@ -162,10 +363,50 @@ class SimCDPSession:
         if "__sentFrameMetaQueue" in expression:
             return {"result": {"value": None}}
         if "__rawMsgs" in expression:
-            return {"result": {"value": []}}
+            # The page hook keeps the most recent 500 RECEIVED
+            # payloads; the join flow reads it to find its room list,
+            # join confirm and enter response.
+            return {"result": {"value": list(self.raw_messages[-_RAW_MESSAGE_WINDOW:])}}
+        if "tankpit.magic" in expression:
+            return {"result": {"value": self.magic}}
+        if "tpclient" in expression:
+            return self._answer_tpclient_query(expression)
         if "document.body" in expression:
             return {"result": {"value": ""}}
         raise EncodeError(f"sim session: unmodeled evaluate expression: {expression[:80]!r}")
+
+    def _answer_tpclient_query(self, expression: str) -> JSONObject:
+        """Answer the two tpclient queries the room-entry step makes.
+
+        The join flow asks for the loaded script's URL and then fetches
+        its source to lift the static key. The sim has no browser, but
+        it HAS the key — the same ``xor_static_key.txt`` the production
+        cipher reads — so it answers with a source line carrying it, in
+        the shape ``load_tpclient_static_key`` matches.
+
+        Args:
+            expression: The evaluate expression.
+
+        Returns:
+            The CDP-shaped response.
+        """
+        if expression.lstrip().startswith("fetch("):
+            return {"result": {"value": f'var Ub="{require_static_key()}";'}}
+        return {"result": {"value": _SIM_TPCLIENT_URL}}
+
+    def close_lobby(self) -> None:
+        """Send the page client's quit frame, ending the session.
+
+        The archive's 31 sent ``-`` frames are the page client leaving
+        — nothing in the bot sends one, which is why a sim session used
+        to just stop mid-stream with no teardown on the wire at all.
+
+        Raises:
+            EncodeError: If the link was built without a lobby.
+        """
+        if self.lobby is None:
+            raise EncodeError("sim session: close_lobby on a link with no lobby")
+        self.send_plaintext(QUIT_BODY)
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
         """Accept an event registration (the sim delivers via the buffer).
@@ -250,6 +491,7 @@ def build_capture_session(link: SimCDPSession, magic: str, session_id: str) -> C
 
 __all__ = [
     "SimCDPSession",
+    "SimKeyboard",
     "build_capture_session",
     "deliver_batch",
 ]

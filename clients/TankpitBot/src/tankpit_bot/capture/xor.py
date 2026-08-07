@@ -54,6 +54,33 @@ class XorBodyTooLongError(CodecError):
     """
 
 
+def require_static_key() -> str:
+    """Return the process-wide static key, reading it once.
+
+    Args:
+        None.
+
+    Returns:
+        The 1000-character static key every session's table is built
+        from.
+
+    Raises:
+        XorStaticKeyUnavailableError: If the key file is missing.
+            Decoding against a missing key yields plausible garbage
+            rather than an error, so callers must stop rather than
+            continue.
+    """
+    global _static_key_cache
+    if _static_key_cache is None:
+        if not _test_hooks.path_exists(DEFAULT_STATIC_KEY_PATH):
+            raise XorStaticKeyUnavailableError(
+                "static XOR key unavailable (xor_static_key.txt missing); "
+                "cannot build a session XOR table"
+            )
+        _static_key_cache = load_static_key(DEFAULT_STATIC_KEY_PATH)
+    return _static_key_cache
+
+
 def build_session_xor_table(magic: str) -> bytes:
     """Build the XOR table belonging to one session.
 
@@ -73,15 +100,7 @@ def build_session_xor_table(magic: str) -> bytes:
     Raises:
         XorStaticKeyUnavailableError: If the static key cannot be read.
     """
-    global _static_key_cache
-    if _static_key_cache is None:
-        if not _test_hooks.path_exists(DEFAULT_STATIC_KEY_PATH):
-            raise XorStaticKeyUnavailableError(
-                "static XOR key unavailable (xor_static_key.txt missing); "
-                "cannot build a session XOR table"
-            )
-        _static_key_cache = load_static_key(DEFAULT_STATIC_KEY_PATH)
-    return build_xor_table(_static_key_cache, magic)
+    return build_xor_table(require_static_key(), magic)
 
 
 def reset_static_key_cache() -> None:
@@ -160,6 +179,7 @@ __all__ = [
     "build_session_xor_table",
     "decode_base64_safe",
     "is_valid_base64",
+    "require_static_key",
     "reset_static_key_cache",
     "xor_decode_body",
 ]

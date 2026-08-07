@@ -252,6 +252,27 @@ class AutoscrollPageProtocol(Protocol):
         ...
 
 
+class RoomJoinPageProtocol(Protocol):
+    """The slice of the page surface the lobby join flow needs.
+
+    Narrower than :class:`PageProtocol` for the same reason
+    :class:`AutoscrollPageProtocol` is: the real Playwright page
+    satisfies it structurally, and it is what lets the SIMULATOR drive
+    the production ``join_room`` — the sim has no browser, so a lobby
+    that demanded the full page surface would have forced a second
+    copy of the join flow ([[session-state-deglobalisation]]).
+    """
+
+    @property
+    def url(self) -> str:
+        """Current page URL — one field of the room-entry metadata."""
+        ...
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Pump the event loop between lobby-response polls."""
+        ...
+
+
 class AutoscrollEnforcerProtocol(Protocol):
     """Session-start autoscroll-off enforcement seam.
 
@@ -296,6 +317,7 @@ __all__ = [
     "BrowserTypeLaunchProtocol",
     "BrowserTypeProtocol",
     "PlaywrightProtocol",
+    "RoomJoinPageProtocol",
     "SyncPlaywrightContextManagerProtocol",
     "SyncPlaywrightFactoryProtocol",
     "_real_ensure_autoscroll_off",

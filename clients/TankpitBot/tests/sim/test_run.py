@@ -21,6 +21,7 @@ from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 from tankpit_bot.sim.run import main, run_sim_session
 from tankpit_bot.sim.scenarios import (
     SIM_FIELD,
+    SIM_MAGIC,
     _require_seeds_passable,
     make_default_sim_world,
     make_ferry_sim_world,
@@ -32,7 +33,7 @@ from tankpit_bot.sim.world_seed import (
     select_practice_layout,
 )
 from tankpit_bot.types import decode_capture_session
-from tests.conftest import FakeFileSystem
+from tests.conftest import FakeEnv, FakeFileSystem
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
@@ -89,7 +90,7 @@ def test_run_writes_capture_world_and_events(fake_fs: FakeFileSystem) -> None:
     capture = decode_capture_session(
         narrow_json_to_dict(load_json_str(files[result["capture_path"]]))
     )
-    assert capture["magic"] == "simmagic"
+    assert capture["magic"] == SIM_MAGIC
     assert capture["messages"] != []
     world_snapshot = narrow_json_to_dict(load_json_str(files[result["world_path"]]))
     assert world_snapshot["field"] == SIM_FIELD
@@ -405,3 +406,22 @@ def test_practice_atlas_composition_replaces_the_statistical_field(
     # or picked) are seeded.
     containers = narrow_json_to_list(world_doc["containers"])
     assert len(containers) <= 2
+
+
+def test_a_session_whose_join_never_reaches_a_room_fails_loudly(
+    fake_fs: FakeFileSystem,
+    fake_env: FakeEnv,
+) -> None:
+    """A sim run that never entered a room is not a session.
+
+    The lobby is the real production flow now, so it can genuinely
+    fail — ask for a room the sim does not advertise and the join
+    times out. Booting on anyway would put the bot in a world it never
+    joined, which is the shape the hand-installed selected room used to
+    hide ([[session-state-deglobalisation]]).
+    """
+    _install_fake_terrain(fake_fs)
+    fake_env.set("TANKPIT_ROOM", "Atlantis")
+
+    with pytest.raises(RuntimeError, match="did not reach a room"):
+        run_sim_session(3, opponent=True, stamp="20260807-000001")

@@ -9,7 +9,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
+from tankpit_bot._test_hooks import CDPSessionProtocol, RoomJoinPageProtocol
 from tankpit_bot.browser.cdp_helpers import (
     decode_captured_body,
     get_magic_key,
@@ -117,7 +117,7 @@ def _resolve_room_id(
 
 
 def _wait_for_room_entry(
-    page: PageProtocol,
+    page: RoomJoinPageProtocol,
     cdp: CDPSessionProtocol,
     room_name: str,
 ) -> RoomInfo | None:
@@ -144,7 +144,7 @@ def _wait_for_room_entry(
 
 
 def _wait_for_room_id(
-    page: PageProtocol,
+    page: RoomJoinPageProtocol,
     cdp: CDPSessionProtocol,
     room_name: str,
 ) -> str | None:
@@ -187,7 +187,7 @@ def _has_join_confirm(cdp: CDPSessionProtocol, room_id: str, *, start_index: int
 
 
 def _wait_for_join_confirm(
-    page: PageProtocol,
+    page: RoomJoinPageProtocol,
     cdp: CDPSessionProtocol,
     room_id: str,
     *,
@@ -236,7 +236,7 @@ def _has_enter_response(cdp: CDPSessionProtocol, room_id: str, *, start_index: i
 
 
 def _wait_for_enter_response(
-    page: PageProtocol,
+    page: RoomJoinPageProtocol,
     cdp: CDPSessionProtocol,
     room_id: str,
     *,
@@ -263,13 +263,15 @@ def _wait_for_enter_response(
 
 
 def join_room(
-    page: PageProtocol,
+    page: RoomJoinPageProtocol,
     cdp: CDPSessionProtocol,
 ) -> bool:
     """Join the configured room through the lobby websocket protocol.
 
     Args:
-        page: Playwright page.
+        page: Anything offering the two members the poll loop needs —
+            the Playwright page in production, the simulator's link in
+            a sim session.
         cdp: Active CDP session.
 
     Returns:

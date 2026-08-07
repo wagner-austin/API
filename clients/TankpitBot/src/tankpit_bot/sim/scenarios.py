@@ -23,7 +23,18 @@ from tankpit_bot.sim.world import (
     make_sim_world,
 )
 
-SIM_MAGIC = "simmagic"
+SIM_MAGIC = "simmagic5uk3et4epiexu"
+"""The sim session's magic, in the shape the real server issues.
+
+Twenty lowercase alphanumerics, like every magic in the archive
+(``fjoodiu5uk3et4epiexu``, ``jhw7j98myv3i0g2qx5b9``, …). This was
+``"simmagic"`` — eight characters — which the PRODUCTION extractor
+refuses outright (``extract_magic_from_auth_payload`` requires ten or
+more), so the moment the sim started putting a real AUTH frame on the
+wire, the bot could not have read its own cipher out of it. A shape
+the real reader rejects is not a simulation of it
+([[session-state-deglobalisation]])."""
+
 SIM_CLIENT_ID = 9
 SIM_ENEMY_ID = 11
 SIM_FIELD = "field01_r.gif"

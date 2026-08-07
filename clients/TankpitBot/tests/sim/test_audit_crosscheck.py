@@ -81,7 +81,7 @@ def test_sim_wire_survives_the_archive_audit(tmp_path: Path) -> None:
 
 def test_capture_assembly_refuses_an_empty_session() -> None:
     """A link that never carried traffic cannot become a capture."""
-    _bot, server, _link, table = boot_seam()
-    fresh = SimCDPSession(server, table)
+    _bot, server, _link, _table = boot_seam()
+    fresh = SimCDPSession(server, SEAM_MAGIC)
     with pytest.raises(EncodeError):
         build_capture_session(fresh, SEAM_MAGIC, "empty")

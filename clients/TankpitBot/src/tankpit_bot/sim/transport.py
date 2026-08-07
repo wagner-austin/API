@@ -98,6 +98,51 @@ def _require_wire_sized(message: BinaryMessage, plaintext: bytes, table: bytes) 
     )
 
 
+def encode_plaintext_payload(frames: list[bytes]) -> str:
+    """Encode lobby frames as a wire payload, in the clear.
+
+    Lobby traffic is the one thing on this wire that is neither XOR'd
+    nor enveloped: the archive's room lists, join confirms, enter
+    responses and toggle acks are all plaintext top-level frames
+    ([[session-state-deglobalisation]]).
+
+    Args:
+        frames: Frame bodies including their lead byte.
+
+    Returns:
+        Base64 payload holding one length-prefixed frame per body.
+    """
+    out = bytearray()
+    for body in frames:
+        out += pack16(len(body)) + body
+    return base64.b64encode(bytes(out)).decode("ascii")
+
+
+def split_client_frames(payload: str) -> list[bytes]:
+    """Split a client payload into frame bodies without reading them.
+
+    The lobby and the command channel share one socket, and they are
+    told apart by the leading byte — ``!`` is a command, anything else
+    is lobby. Splitting has to happen before that question can be
+    asked, so it is its own step here rather than a branch inside
+    :func:`decode_client_payload`.
+
+    Args:
+        payload: Base64 payload as sent by the bot.
+
+    Returns:
+        The frame bodies, in order.
+
+    Raises:
+        DecodeError: If the payload is not valid base64 or a frame is
+            torn.
+    """
+    try:
+        return split_payload_frames(payload)
+    except FramingError as error:
+        raise DecodeError(f"undecodable client payload: {error}") from error
+
+
 def decode_client_payload(payload: str, table: bytes) -> list[ClientCommandDict]:
     """Decode a client frame payload into typed commands.
 
@@ -113,14 +158,8 @@ def decode_client_payload(payload: str, table: bytes) -> list[ClientCommandDict]
         DecodeError: If the payload is not valid base64, a frame is
             torn, or a frame does not carry the ``!`` command prefix.
     """
-    # The split is shared; only the translation into this module's
-    # DecodeError is local ([[session-state-deglobalisation]]).
-    try:
-        frames = split_payload_frames(payload)
-    except FramingError as error:
-        raise DecodeError(f"undecodable client payload: {error}") from error
     commands: list[ClientCommandDict] = []
-    for body in frames:
+    for body in split_client_frames(payload):
         if body[0] != COMMAND_PREFIX:
             raise DecodeError(f"client frame missing '!' prefix: 0x{body[0]:02X}")
         commands.append(decode_client_command(xor_decode_body(body, table, offset=1)))
@@ -129,5 +168,7 @@ def decode_client_payload(payload: str, table: bytes) -> list[ClientCommandDict]
 
 __all__ = [
     "decode_client_payload",
+    "encode_plaintext_payload",
     "encode_tick_payload",
+    "split_client_frames",
 ]

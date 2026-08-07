@@ -24,7 +24,10 @@ from tankpit_bot.sim.world import (
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-SEAM_MAGIC = "simmagic"
+SEAM_MAGIC = "seammagic5uk3et4epiexu"
+"""Twenty-plus lowercase alphanumerics, the shape every archived magic
+has — the production AUTH reader rejects anything under ten characters
+([[session-state-deglobalisation]])."""
 SEAM_CLIENT_ID = 9
 SEAM_ENEMY_ID = 11
 
@@ -151,7 +154,7 @@ def boot_seam(
     bot = Bot("https://sim.tankpit.local/", headless=True)
     bot._magic = SEAM_MAGIC
     bot._on_magic_captured(SEAM_MAGIC)
-    link = SimCDPSession(server, table)
+    link = SimCDPSession(server, SEAM_MAGIC)
     bot._cdp = link
     deliver_batch(bot._cdp_message_buffer, server.handshake(), link)
     return bot, server, link, table

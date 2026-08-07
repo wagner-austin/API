@@ -33,7 +33,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
-from tankpit_bot.capture.xor import build_session_xor_table
+from tankpit_bot.browser.room_join import join_room
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.naming import is_practice_bot_name
 from tankpit_bot.runtime_artifacts import make_run_stamp
@@ -46,6 +46,7 @@ from tankpit_bot.sim.ghost import (
     ghost_events_for_tick,
     seed_ghost_world_population,
 )
+from tankpit_bot.sim.lobby import SIM_ACCOUNT, SimLobby
 from tankpit_bot.sim.opponent import decide_opponent, maybe_revive_opponent
 from tankpit_bot.sim.practice_room import PracticeRoomDriver, seed_practice_roster
 from tankpit_bot.sim.scenarios import (
@@ -70,7 +71,7 @@ from tankpit_bot.sim.world_seed import (
     seed_practice_client,
     select_practice_layout,
 )
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.types import encode_capture_session
 
 log = get_logger(__name__)
@@ -242,24 +243,10 @@ def _boot(
             both right, loudly.
     """
     reset_world_state()
-    table = build_session_xor_table(SIM_MAGIC)
     gif_path = Path(world["field"])
     if not _test_hooks.path_exists(gif_path):
         raise RuntimeError(f"terrain GIF {gif_path} not found — run `make download-fields` first")
     terrain = _test_hooks.load_terrain_map(gif_path)
-    # The lobby TEXT handshake (ROOM_LIST + SELECT) is outside the
-    # binary seam, but a session always has a selected room — without
-    # it the bot's decision terrain stays None for the whole run ("No
-    # selected room is available for terrain-map loading") and every
-    # terrain-gated behavior (greeting stand-off landings, larder
-    # landing legality, LOS composition) silently self-disables.
-    # First surfaced by the 2026-07-31 human-opponent soak: the greet
-    # approach could never vouch a landing, so the session exited
-    # no_viable_targets two rounds in. Register the sim room exactly
-    # as the lobby decoders would have.
-    service = get_world_service()
-    service.register_room_image("sim", gif_path.name.replace("_r.gif", ".gif"))
-    service.set_selected_room("sim")
     driver: PracticeRoomDriver | None = None
     roster_ids: frozenset[int] = frozenset()
     if practice:
@@ -306,10 +293,25 @@ def _boot(
     _require_seeds_passable(world, terrain)
     server = SimServer(world, terrain, client_id=SIM_CLIENT_ID, roster_ids=roster_ids)
     bot = Bot("https://sim.tankpit.local/", headless=True)
+    # The bot lifts the magic off the page client's AUTH frame live, via
+    # a CDP event stream the sim has no counterpart for; the link sends
+    # that frame but cannot deliver it back through that path, so the
+    # magic is handed over directly and the frame stands for itself on
+    # the wire ([[session-state-deglobalisation]]).
     bot._magic = SIM_MAGIC
     bot._on_magic_captured(SIM_MAGIC)
-    link = SimCDPSession(server, table)
+    link = SimCDPSession(server, SIM_MAGIC, SimLobby(SIM_ACCOUNT))
     bot._cdp = link
+    link.open_lobby()
+    # The PRODUCTION lobby flow, against the sim's plaintext channel.
+    # This used to be skipped and its one durable effect — a selected
+    # room, without which the bot's decision terrain stays None for the
+    # whole run and every terrain-gated behaviour silently self-disables
+    # (2026-07-31 human-opponent soak) — was hand-installed instead. Now
+    # it comes from the room list the way it does live, and 1,571
+    # archived lobby frames per session finally have a sim counterpart.
+    if not join_room(link, link):
+        raise RuntimeError("sim lobby: the production join flow did not reach a room")
     deliver_batch(bot._cdp_message_buffer, server.handshake(), link)
     return bot, server, link, driver
 
@@ -485,6 +487,15 @@ def run_sim_session(
             if driver is not None:
                 driver.note_batch(server.world, batch)
             deliver_batch(bot._cdp_message_buffer, batch, link)
+            if round_index == 0:
+                # The autoscroll enforcement runs where it does live:
+                # after the wire has established self_state, which the
+                # first tick's handshake drain is what provides. The
+                # production dance presses 'a' and reads the server's
+                # plaintext ack; the sim link is the page client, so
+                # the press really does put A1/A0 on the wire
+                # ([[session-state-deglobalisation]]).
+                _test_hooks.ensure_autoscroll_off(link, link.wire_log)
             if tracker is not None:
                 live = server.world["tanks"][SIM_CLIENT_ID]
                 tracker.note_round(round_index, live["x"], live["y"])
@@ -500,6 +511,11 @@ def run_sim_session(
         )
     finally:
         _test_hooks.get_current_time_ms = original_clock
+        # Leave the way the page client does. However the session
+        # ended — rounds exhausted or a production exit — the socket
+        # gets its quit frame, so the capture holds a teardown instead
+        # of simply stopping mid-stream.
+        link.close_lobby()
     if tracker is not None:
         tracker.emit_summary()
         log.info(
