@@ -17,6 +17,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.browser.room_join import join_room
 from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.protocol.commands import CMD_MINE
 from tankpit_bot.protocol.naming import is_practice_bot_name
 from tankpit_bot.sim.atlas_seed import seed_atlas_population
 from tankpit_bot.sim.commands import ClientCommandDict
@@ -323,6 +324,27 @@ def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int)
                     command=115,
                     x=event["x"],
                     y=event["y"],
+                    target_id=0,
+                    slot=0,
+                    message_id=0,
+                    direction=0,
+                ),
+            )
+        elif event["kind"] == "mine":
+            # The recording says this player pressed mine here; the
+            # sim's own 3x3 law turns that into the 0x4B. The archive
+            # holds exactly one such press, so replaying the recording
+            # is the only honest way to produce the family — a rule
+            # invented from n=1 would not be a law
+            # ([[session-state-deglobalisation]]).
+            server.relocate_tank(event["tank_id"], event["x"], event["y"])
+            server.queue_command(
+                event["tank_id"],
+                ClientCommandDict(
+                    kind="mine",
+                    command=CMD_MINE,
+                    x=0,
+                    y=0,
                     target_id=0,
                     slot=0,
                     message_id=0,

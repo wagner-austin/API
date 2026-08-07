@@ -93,7 +93,7 @@ class GhostEventDict(TypedDict):
 
     tick: int
     tank_id: int
-    kind: Literal["place", "shoot", "chat"]
+    kind: Literal["place", "shoot", "chat", "mine"]
     x: int
     y: int
     message_id: int
@@ -139,6 +139,7 @@ class _Walk:
         self.positions: dict[int, list[tuple[int, int, int]]] = {}
         self.shots: list[tuple[int, int, int, int]] = []
         self.chats: list[tuple[int, int, int, int, int]] = []
+        self.mine_presses: list[tuple[int, int, int, int]] = []
         self.first_reads: dict[tuple[int, int], tuple[int, bool]] = {}
         self.dot_atlas: set[tuple[int, int]] | None = None
         self.client_fuel: int | None = None
@@ -240,6 +241,20 @@ def _consume_combat_social(walk: _Walk, t: int, decoded: BinaryMessage) -> bool:
                 y = chat_y if isinstance(chat_y, int) else 0
                 walk.chats.append((walk.tick(t), sender_id, message_id, x, y))
             return True
+        case {
+            "msg_type": 0x4B,
+            "tank_id": int(placer_id),
+            "positions": [(int(centre_x), int(centre_y)), *_],
+        }:
+            # A recorded mine press. The 0x4B reports the tiles that
+            # took a mine, and the FIRST is the placer's own — the one
+            # archived placement centres its seven tiles on (133,124),
+            # the placer's position. Replaying the press (rather than
+            # the tiles) lets the sim's own 3x3 law produce the frame
+            # ([[mine-mechanics]], [[session-state-deglobalisation]]).
+            if placer_id != walk.self_id:
+                walk.mine_presses.append((walk.tick(t), placer_id, centre_x, centre_y))
+            return True
     return False
 
 
@@ -334,7 +349,25 @@ def _assemble_ghosts(walk: _Walk) -> tuple[list[GhostTankDict], list[GhostEventD
             events.append(
                 GhostEventDict(tick=tick, tank_id=tank_id, kind="place", x=x, y=y, message_id=0)
             )
-    ghost_ids = {ghost["tank_id"] for ghost in ghosts}
+    events.extend(_ghost_actions(walk, {ghost["tank_id"] for ghost in ghosts}))
+    events.sort(key=lambda event: (event["tick"], event["tank_id"]))
+    return ghosts, events, unplaced
+
+
+def _ghost_actions(walk: _Walk, ghost_ids: set[int]) -> list[GhostEventDict]:
+    """Lift every recorded ACTION a ghost took into a replay event.
+
+    Positions are the roster's business; this is what the recorded
+    players DID — shot, chatted, laid mines.
+
+    Args:
+        walk: The walked capture state.
+        ghost_ids: Tanks that made it onto the roster.
+
+    Returns:
+        The action events, unsorted.
+    """
+    events: list[GhostEventDict] = []
     for tick, shooter_id, aim_x, aim_y in walk.shots:
         if shooter_id in ghost_ids:
             events.append(
@@ -349,8 +382,12 @@ def _assemble_ghosts(walk: _Walk) -> tuple[list[GhostTankDict], list[GhostEventD
                     tick=tick, tank_id=sender_id, kind="chat", x=x, y=y, message_id=message_id
                 )
             )
-    events.sort(key=lambda event: (event["tick"], event["tank_id"]))
-    return ghosts, events, unplaced
+    for tick, placer_id, x, y in walk.mine_presses:
+        if placer_id in ghost_ids:
+            events.append(
+                GhostEventDict(tick=tick, tank_id=placer_id, kind="mine", x=x, y=y, message_id=0)
+            )
+    return events
 
 
 def _assemble(walk: _Walk) -> GhostSpecDict:
