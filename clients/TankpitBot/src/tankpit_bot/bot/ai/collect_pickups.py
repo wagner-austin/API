@@ -185,7 +185,7 @@ meaningfully stocked container within honest walking range.
 """
 
 
-def _pickup_not_worth_walk(
+def pickup_not_worth_walk(
     ctx: DecideCtx,
     container: ContainerStateDict,
 ) -> bool:
@@ -252,7 +252,7 @@ def _first_walkworthy_fuel(
         ctx.terrain,
         minimum_volume=1,
     ):
-        if not fuel_critical and _pickup_not_worth_walk(ctx, container):
+        if not fuel_critical and pickup_not_worth_walk(ctx, container):
             walk_tiles = abs(container["x"] - ctx.self_state["x"]) + abs(
                 container["y"] - ctx.self_state["y"]
             )
@@ -310,6 +310,7 @@ def select_and_pickup_fuel(
 
 __all__ = [
     "mine_clearance_decision",
+    "pickup_not_worth_walk",
     "select_and_pickup_equipment",
     "select_and_pickup_fuel",
     "select_equipment_target",

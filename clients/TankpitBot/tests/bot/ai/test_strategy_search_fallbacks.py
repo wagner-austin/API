@@ -364,7 +364,7 @@ class TestFuelSearchFallbacks:
 
     def test_fuel_search_hop_when_scanned_no_visible_fuel(self) -> None:
         """Fuel search hops to fresh sector when viewport tiles fully swept."""
-        world, self_state = _make_world(fuel=150, scanned=True)
+        world, self_state = _make_world(fuel=150, scanned=True, block_scanned=False)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 

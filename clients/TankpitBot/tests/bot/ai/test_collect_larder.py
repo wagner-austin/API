@@ -65,12 +65,20 @@ def test_fuel_larder_hop_beats_discovery_and_holds_the_lock() -> None:
     tick belonged to forage_radar -- the plan's ruling is that radar
     is spent only when knowledge is exhausted. The hop locks the
     container and suppresses the landing scan.
+
+    Re-scoped 2026-08-06 ([[quad-sweep-doctrine]]): with extras
+    stocked and the block virgin the quad sweep now leads (squeeze
+    the current block dry before paying for a hop), so this fixture
+    empties the extras -- the larder-beats-forage ordering it pins is
+    unchanged below the sweep.
     """
+    inventory = make_inventory()
+    inventory["extra_radars"]["count"] = 0
     ctx = _collect_ctx(
         fuel=700,
         scanned=False,
         containers={"140,100": _remembered_fuel(140, 100, 700)},
-        inventory=make_inventory(),
+        inventory=inventory,
     )
 
     decision = decide_collect_mode(ctx)
@@ -87,6 +95,34 @@ def test_fuel_larder_hop_beats_discovery_and_holds_the_lock() -> None:
     assert updated["resource_target_x"] == 140
     assert updated["resource_target_y"] == 100
     assert updated["suppress_landing_scan"] is True
+
+
+def test_virgin_block_sweeps_before_the_larder_hop() -> None:
+    """With extras stocked and the block unscanned, the sweep leads.
+
+    The [[quad-sweep-doctrine]] cycle (2026-08-06): recon the 31x31
+    around the tank for four free-standing extras BEFORE paying
+    teleport fuel for remembered stock -- the block may hold closer
+    containers, and the exit hop comes only when it is squeezed dry.
+    """
+    ctx = _collect_ctx(
+        fuel=700,
+        scanned=False,
+        containers={"140,100": _remembered_fuel(140, 100, 700)},
+        inventory=make_inventory(),
+    )
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected collect decision")
+    # The sweep opens by scanning the still-fresh CURRENT window, then
+    # steers to the quadrants on later ticks.
+    assert decision["behavior"]["reason_kind"] == "quad_sweep_radar"
+    assert decision["command"]["cmd_type"] == "radar"
+    updated = decision["updated_ai_state"]
+    assert updated["sweep_anchor_x"] == 100
+    assert updated["sweep_anchor_y"] == 100
 
 
 def test_equipment_hop_holds_the_lock_and_suppresses_the_scan() -> None:
@@ -180,7 +216,13 @@ def test_fresh_viewport_without_the_flag_still_radars_on_landing() -> None:
 
 
 def test_unprofitable_larder_hands_the_tick_to_discovery() -> None:
-    """A sliver container far away does not stop forage from scanning."""
+    """A sliver container far away does not stop the tick from scanning.
+
+    Re-pinned 2026-08-06: with extras stocked and the block virgin the
+    scanning tick is now the quad sweep's first shift rather than a
+    bare forage radar ([[quad-sweep-doctrine]]) -- the contract this
+    test guards (the sliver does NOT win the tick) is unchanged.
+    """
     ctx = _collect_ctx(
         fuel=400,
         scanned=False,
@@ -192,7 +234,7 @@ def test_unprofitable_larder_hands_the_tick_to_discovery() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason_kind"] == "forage_radar"
+    assert decision["behavior"]["reason_kind"] == "quad_sweep_radar"
     assert decision["command"]["cmd_type"] == "radar"
 
 

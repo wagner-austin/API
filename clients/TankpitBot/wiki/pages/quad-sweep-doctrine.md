@@ -15,10 +15,11 @@ hubs: [architecture]
 
 # Quad-Sweep Doctrine — stationary recon, loop harvest
 
-User-derived 2026-08-06, built entirely on measured laws. Design is
-RECORDED, not yet implemented; the one probe that stood before code
-was resolved same day from the capture archive (§ Shift-framed
-pickup: resolved) — no open questions remain.
+User-derived 2026-08-06, built entirely on measured laws. The one
+probe that stood before code was resolved same day from the capture
+archive (§ Shift-framed pickup: resolved). IMPLEMENTED 2026-08-07
+(§ As built) and sim-verified end-to-end against the fake server's
+wire-pinned window laws.
 
 ## The laws it stands on
 
@@ -108,3 +109,56 @@ veto-then-walk deadlock produced the 2026-08-06 one-tile crawl,
 fixed same day to yield nothing). Quad sweep becomes what
 extras-stocked foraging IS; the free-radar reposition walk remains
 the extras-empty strategy.
+
+## As built (2026-08-07, `bot/ai/quad_sweep.py`)
+
+Two COLLECT-cascade branches, both gated on fuel ABOVE the low
+threshold (recon and framing are economy moves — at the break the
+desperation ladder owns every tick):
+
+- **`plan_quad_sweep`** sits between lock continuation and the
+  pickups (atomicity: pickups wait the ~8 ticks). Stateless quadrant
+  math — the four windows derive from the tank tile by the anchor
+  law each tick — plus ONE latch pair, `sweep_anchor_x/y`: a sweep
+  STARTS (latching the anchor) only when the 31x31 block holds >=480
+  uncovered tiles (~half), and CONTINUES only while the tank stands
+  exactly on its anchor, so any movement aborts the remainder and
+  harvest walking can never re-trigger a sweep on the dragged block.
+  Each tick: radar the framed pending quadrant; else radar the
+  CURRENT window if it still clears the shared spend floors
+  (self-correcting whatever the scope answered); else steer with the
+  next quadrant's shift. Spend economics are the shared radar floors
+  (32 tiles, 128 at the last-extra reserve).
+- **`plan_block_harvest_leg`** sits after mine clearance, BEFORE the
+  larder (a free shift beats any teleport while block stock
+  remains). Greedy nearest-by-Manhattan over pursuable out-of-window
+  containers within Chebyshev 31: shift-before-walk per leg — frame
+  the target when the anchored shift changes the window, else hand
+  the movement layer a plain walk toward it (edge-approach walk,
+  teleport only when no walkable edge serves). Once framed, the
+  ordinary in-window pickup branches take the container next tick.
+  Kind gates: equipment refused at full inventory, fuel at cap and
+  by the worth-the-walk rate; block-reachability via the bounded
+  collection-path check (skipped when no terrain view exists — the
+  assume-reachable stance the pickup search takes).
+  The planned "end the loop nearest the next block" ordering is NOT
+  in this cut — greedy nearest is the v1 approximation; the exit-hop
+  bias is a later refinement alongside the anchor-layout knob.
+
+**Landing-latch interaction** (found in the ferry sim soak): the
+scan-on-landing gate keyed "origin changed" as "landed", so every
+deliberate pan drew next tick's unconditional landing radar — taxing
+the free ferry scout and mislabeling sweep scans. Scope-shift
+decisions now pre-latch `last_landing_scan_viewport` with the
+anchor-law origin (`latch_scope_shift_landing`, applied by the
+arbitrator): a pan is a deliberate look, not a landing, and the
+pan-er decides whether a radar follows.
+
+**Sim verification**: the seam soak runs the doctrine cycle
+end-to-end — atomic NW/NE/SE/SW tiling confirmed against the fake
+server's wire-pinned window laws, in-window pickups, a harvest
+framing shift, and equipment collection that ends extras ABOVE the
+sweep's spend. The ferry scenario showed the sweep's pans SUBSUME
+the dedicated scope scout when extras are stocked (the ferry arrives
+in a quadrant pan's 0x5A patch and the larder boards it directly);
+the scout remains the extras-empty fallback.

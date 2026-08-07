@@ -87,6 +87,56 @@ def is_collection_reachable_in_viewport(
         True if a collection path exists entirely inside the current viewport.
     """
     left, top, right, bottom = viewport_visible_bounds(world["viewport"])
+    return is_collection_reachable_within_bounds(
+        terrain,
+        start_x,
+        start_y,
+        goal_x,
+        goal_y,
+        left=left,
+        top=top,
+        right=right,
+        bottom=bottom,
+    )
+
+
+def is_collection_reachable_within_bounds(
+    terrain: TerrainMapProtocol,
+    start_x: int,
+    start_y: int,
+    goal_x: int,
+    goal_y: int,
+    *,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+) -> bool:
+    """Return True when a pickup can be completed inside supplied bounds.
+
+    The bounds-parameterized core of
+    :func:`is_collection_reachable_in_viewport`: the same
+    goal-or-cardinal-service rule, evaluated against any rectangle.
+    The quad-sweep harvest ([[quad-sweep-doctrine]]) calls it with the
+    tank->target bounding box (plus margin) instead of the current
+    window -- window anchoring lets a leg-by-leg walk follow any path
+    such a rectangle contains, so this answers "can the block serve
+    this container at all", not "can the current window".
+
+    Args:
+        terrain: Terrain map for passability checks.
+        start_x: Starting X coordinate.
+        start_y: Starting Y coordinate.
+        goal_x: Pickup target X coordinate.
+        goal_y: Pickup target Y coordinate.
+        left: Inclusive minimum X bound.
+        top: Inclusive minimum Y bound.
+        right: Inclusive maximum X bound.
+        bottom: Inclusive maximum Y bound.
+
+    Returns:
+        True if a collection path exists entirely inside the bounds.
+    """
     if terrain.is_passable(goal_x, goal_y) and _viewport_path_exists(
         terrain,
         start_x,
@@ -229,5 +279,6 @@ def _viewport_path_exists(
 __all__ = [
     "find_attainable_landing_tile",
     "is_collection_reachable_in_viewport",
+    "is_collection_reachable_within_bounds",
     "is_move_reachable_in_viewport",
 ]

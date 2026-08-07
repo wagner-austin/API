@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.collect_pickups import (
     _first_walkworthy_fuel,
-    _pickup_not_worth_walk,
+    pickup_not_worth_walk,
     select_and_pickup_fuel,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
@@ -42,7 +42,7 @@ def test_pickup_refused_when_clamped_gain_not_worth_the_walk() -> None:
         failed_pickups=0,
     )
 
-    assert _pickup_not_worth_walk(ctx, container) is True
+    assert pickup_not_worth_walk(ctx, container) is True
 
 
 def test_adjacent_clamped_sliver_is_worth_taking() -> None:
@@ -69,7 +69,7 @@ def test_adjacent_clamped_sliver_is_worth_taking() -> None:
         failed_pickups=0,
     )
 
-    assert _pickup_not_worth_walk(ctx, container) is False
+    assert pickup_not_worth_walk(ctx, container) is False
 
 
 def test_big_clamped_container_is_worth_a_long_walk() -> None:
@@ -97,7 +97,7 @@ def test_big_clamped_container_is_worth_a_long_walk() -> None:
         failed_pickups=0,
     )
 
-    assert _pickup_not_worth_walk(ctx, container) is False
+    assert pickup_not_worth_walk(ctx, container) is False
 
 
 def test_unclamped_pickup_is_worth_it_at_the_exact_rate_boundary() -> None:
@@ -123,7 +123,7 @@ def test_unclamped_pickup_is_worth_it_at_the_exact_rate_boundary() -> None:
         failed_pickups=0,
     )
 
-    assert _pickup_not_worth_walk(ctx, container) is False
+    assert pickup_not_worth_walk(ctx, container) is False
 
 
 def test_critical_fuel_takes_any_reachable_sliver() -> None:
@@ -181,7 +181,7 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
     tiles east -- effective gain 8 against a ``3 * 3 = 9``
     threshold (measured-speed pricing, 2026-08-06). The at-cap gate
     passes (fuel below cap), the fuel
-    target is selected successfully, but ``_pickup_not_worth_walk``
+    target is selected successfully, but ``pickup_not_worth_walk``
     fires and the planner returns None instead of dispatching. The
     container is left untouched -- not blacklisted -- so a later
     tick with more headroom (or from an adjacent tile) can still

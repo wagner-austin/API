@@ -27,8 +27,14 @@ def _make_world(
     containers: dict[str, ContainerStateDict] | None = None,
     tanks: dict[str, TankStateDict] | None = None,
     scanned: bool = True,
+    block_scanned: bool | None = None,
 ) -> tuple[WorldStateDict, SelfStateDict]:
-    """Build a world state for testing."""
+    """Build a world state for testing.
+
+    ``block_scanned`` defaults to follow ``scanned``; pass ``False``
+    for covered-viewport-but-fresh-surroundings (search-hop landings
+    inside the 31x31 ring must not read as freshly scanned).
+    """
     self_state = make_self_state(
         tank_id=1,
         x=self_x,
@@ -40,12 +46,18 @@ def _make_world(
     )
     vp_left = self_x - 8
     vp_top = self_y - 8
+    # ``scanned`` covers the whole 31x31 quad-sweep block, not just
+    # the viewport: a fixture that says "the ground here is known"
+    # must also decline the sweep's block gate, or the sweep outranks
+    # the cascade rung under test ([[quad-sweep-doctrine]]).
+    cover_block = scanned if block_scanned is None else block_scanned
+    if cover_block:
+        left, top = max(self_x - 15, 0), max(self_y - 15, 0)
+        right, bottom = min(self_x + 15, 255), min(self_y + 15, 255)
+    else:
+        left, top, right, bottom = vp_left, vp_top, vp_left + 15, vp_top + 15
     scanned_tiles: dict[str, int] = (
-        {
-            f"{x},{y}": 100000
-            for y in range(vp_top, vp_top + 16)
-            for x in range(vp_left, vp_left + 16)
-        }
+        {f"{x},{y}": 100000 for y in range(top, bottom + 1) for x in range(left, right + 1)}
         if scanned
         else {}
     )

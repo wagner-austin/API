@@ -397,6 +397,8 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "pursuit_shot_ms": state["pursuit_shot_ms"],
         "visited_tank_ids": dict(state["visited_tank_ids"]),
         "last_scope_scout_ms": state["last_scope_scout_ms"],
+        "sweep_anchor_x": state["sweep_anchor_x"],
+        "sweep_anchor_y": state["sweep_anchor_y"],
     }
 
 
@@ -524,6 +526,8 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         pursuit_shot_target_id=require_int(data, "pursuit_shot_target_id"),
         pursuit_shot_ms=require_int(data, "pursuit_shot_ms"),
         last_scope_scout_ms=require_int(data, "last_scope_scout_ms"),
+        sweep_anchor_x=require_int(data, "sweep_anchor_x"),
+        sweep_anchor_y=require_int(data, "sweep_anchor_y"),
         visited_tank_ids=_require_str_int_mapping(data, "visited_tank_ids"),
     )
 

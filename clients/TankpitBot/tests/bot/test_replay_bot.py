@@ -59,13 +59,24 @@ def test_fuel_probe_replay_enters_collect_mode(
     assert "COLLECT" in modes
 
 
-def test_fuel_probe_replay_acquires_an_equipment_resource_target(
+def test_fuel_probe_replay_routes_the_stocked_session_into_the_quad_sweep(
     fuel_probe_session: ReplaySession,
 ) -> None:
-    """The bot picks an equipment target as containers become visible via radar."""
-    targets = {t.resource_target for t in fuel_probe_session.ticks}
-    equipment_targets = {t for t in targets if t.startswith("equipment@")}
-    assert equipment_targets
+    """Replay routes the extras-stocked wire input into quad-sweep recon.
+
+    Re-pinned 2026-08-06 ([[quad-sweep-doctrine]]): the recorded
+    session's wire restocks extras early, and the new COLLECT cascade
+    then spends ticks on the atomic block sweep BEFORE any pickup.
+    The pre-doctrine pin (an ``equipment@`` resource target) cannot
+    recur in replay: synthetic commands never perturb the recorded
+    stream, so the sweep's scope shifts are answered by nothing and
+    the pickup phase stays out of reach. The invariant kept here is
+    decision ROUTING: the sweep engages (scope-shift dispatches) and
+    every tick stays in COLLECT.
+    """
+    commands = {cmd for _tick, cmd in fuel_probe_session.all_dispatched}
+    assert any(cmd.startswith("scope(") for cmd in commands)
+    assert all(t.ai_mode in ("UNSET", "COLLECT") for t in fuel_probe_session.ticks)
 
 
 def test_fuel_probe_replay_dispatches_at_least_one_command(
@@ -99,12 +110,20 @@ def test_fuel_probe_replay_first_dispatched_command_is_radar(
     assert first_command == "radar"
 
 
-def test_fuel_probe_replay_dispatches_a_pickup_attempt(
+def test_fuel_probe_replay_dispatches_sweep_radars_beyond_the_landing_scan(
     fuel_probe_session: ReplaySession,
 ) -> None:
-    """The bot reaches a pickup phase and dispatches ``pickup_equipment``."""
-    commands = {cmd for _tick, cmd in fuel_probe_session.all_dispatched}
-    assert "pickup_equipment" in commands
+    """The bot spends multiple radars: the landing scan plus sweep scans.
+
+    Re-pinned 2026-08-06 with the quad-sweep routing (see the sweep
+    test above for why the pickup phase is unreachable in replay).
+    The recorded session repositions several times; each fresh block
+    draws a sweep radar on its still-fresh window, so the dispatched
+    radar count must exceed the single scan-on-landing the
+    pre-doctrine flow produced per landing.
+    """
+    radar_count = sum(1 for _tick, cmd in fuel_probe_session.all_dispatched if cmd == "radar")
+    assert radar_count >= 3
 
 
 def test_fuel_probe_replay_observes_visible_containers(

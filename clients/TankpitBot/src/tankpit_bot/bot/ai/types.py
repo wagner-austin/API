@@ -244,6 +244,13 @@ class AIStateDict(TypedDict):
             reveals no ferry leaves no negative belief behind, so
             without it the scout would re-fire every tick the larder
             declines the same water-locked container.
+        sweep_anchor_x: X of the quad sweep's anchor tile (-1 when no
+            sweep is latched). The sweep is atomic ([[quad-sweep-doctrine]]):
+            it continues only while the tank stands exactly on this
+            tile, so ANY movement abandons the remaining quadrants and
+            the block-freshness gate governs the next start.
+        sweep_anchor_y: Y of the quad sweep's anchor tile (-1 when no
+            sweep is latched).
     """
 
     config: AIConfigDict
@@ -282,6 +289,8 @@ class AIStateDict(TypedDict):
     pursuit_shot_ms: int
     visited_tank_ids: dict[str, int]
     last_scope_scout_ms: int
+    sweep_anchor_x: int
+    sweep_anchor_y: int
 
 
 def make_respawn_ai_state(previous: AIStateDict) -> AIStateDict:
@@ -375,6 +384,8 @@ def make_initial_ai_state(
         pursuit_shot_ms=0,
         visited_tank_ids={},
         last_scope_scout_ms=0,
+        sweep_anchor_x=-1,
+        sweep_anchor_y=-1,
     )
 
 

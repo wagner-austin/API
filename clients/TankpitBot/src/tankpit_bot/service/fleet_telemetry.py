@@ -19,6 +19,7 @@ rate a UI choice instead of an IO amplifier.
 from __future__ import annotations
 
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
+from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.diagnostics.event_stream import load_event_records
@@ -32,6 +33,8 @@ TELEMETRY_CACHE_TTL_MS = 2000
 _FEED_CHANNELS = ("AI", "WORLD", "STATE", "COMBAT")
 _FEED_LENGTH = 6
 _FUEL_PREFIX = "Fuel: "
+
+log = get_logger(__name__)
 
 
 def _last_fuel_total(records: list[RuntimeEventRecordDict]) -> int:
@@ -157,7 +160,8 @@ class FleetTelemetry:
         events_path = bot_run_dir(instance) / "latest.events.jsonl"
         try:
             digest = build_run_digest(events_path)
-        except (OSError, ValueError, JSONTypeError):
+        except (OSError, ValueError, JSONTypeError) as error:
+            log.debug("Fleet stats unavailable for %s: %s", instance, error)
             return self._store("stats", instance, {"available": False})
         timeline_kills: list[JSONValue] = [row["kills"] for row in digest["timeline"]]
         inventory_last: list[JSONValue] = list(digest["inventory_last"])
@@ -209,7 +213,8 @@ class FleetTelemetry:
         events_path = bot_run_dir(instance) / "latest.events.jsonl"
         try:
             records = load_event_records(events_path)
-        except (OSError, JSONTypeError):
+        except (OSError, JSONTypeError) as error:
+            log.debug("Fleet activity unavailable for %s: %s", instance, error)
             return self._store("activity", instance, {"available": False})
         if not records:
             return self._store("activity", instance, {"available": False})

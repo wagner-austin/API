@@ -265,7 +265,7 @@ def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> 
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ((116, 100),))
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ((140, 100),))
 
     decision = decide_hunt_mode(ctx)
 

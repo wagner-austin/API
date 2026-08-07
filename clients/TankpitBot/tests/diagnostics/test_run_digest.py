@@ -387,6 +387,14 @@ def test_combat_and_radar_yield_counters(tmp_path: Path) -> None:
             outcome="miss",
         ),
         _event(
+            "2026-08-06T21:00:11",
+            "DIAGNOSTIC",
+            "diagnostic_kind=action_outcome",
+            diagnostic_kind="action_outcome",
+            action_kind="shoot",
+            outcome="reject",
+        ),
+        _event(
             "2026-08-06T21:00:12",
             "DIAGNOSTIC",
             "diagnostic_kind=damage_ledger",

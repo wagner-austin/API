@@ -189,7 +189,7 @@ def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ((116, 100),))
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ((140, 100),))
 
     decision = decide_hunt_mode(ctx)
 
@@ -264,7 +264,7 @@ def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ((116, 100),))
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ((140, 100),))
 
     decision = decide_hunt_mode(ctx)
 

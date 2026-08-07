@@ -8,6 +8,7 @@ the substate derivations. The entry/exit predicates it consults are
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
+from tankpit_bot.bot.ai.quad_sweep import anchored_window_origin
 from tankpit_bot.bot.ai.scoring_types import make_behavior_score
 from tankpit_bot.bot.ai.tactics import compute_desired_equipment
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -147,6 +148,59 @@ def _bump_dispatch_counter(state: AIStateDict, command: BotCommand) -> AIStateDi
     if command["cmd_type"] == "teleport":
         return AIStateDict(**{**state, "live_teleports": state["live_teleports"] + 1})
     return state
+
+
+def latch_scope_shift_landing(
+    decision: TickDecisionDict,
+    window_left: int,
+    window_top: int,
+    sx: int,
+    sy: int,
+) -> TickDecisionDict:
+    """Latch the landing-scan gate for the window a scope shift opens.
+
+    The ``last_landing_scan_viewport`` latch predates scope shifts as
+    a window-move trigger ("the viewport origin changes only on
+    teleport"), so without this step every deliberate pan — a quad
+    sweep steer, a harvest framing shift, the free ferry scout — read
+    as a fresh LANDING next tick and drew the unconditional landing
+    radar, taxing pans that are free by ruling (larder/scout,
+    2026-07-27) and mislabeling the sweep's own quadrant scans. A pan
+    is a deliberate look, not a landing: the pan-er decides whether a
+    radar follows (the sweep's ``quad_sweep_radar`` does; the scout
+    stays free). The latch is set to the origin the anchor law says
+    the server's 0x5A will state ([[viewport-shift-protocol]]).
+
+    Args:
+        decision: Planner decision about to leave the arbitrator.
+        window_left: Current stored window origin X.
+        window_top: Current stored window origin Y.
+        sx: Self X.
+        sy: Self Y.
+
+    Returns:
+        The decision, with the landing latch pre-set when its command
+        is a scope shift; unchanged otherwise.
+    """
+    if decision["command"]["cmd_type"] != "scope_shift":
+        return decision
+    left, top = anchored_window_origin(
+        window_left,
+        window_top,
+        sx,
+        sy,
+        decision["command"]["direction"],
+    )
+    state = AIStateDict(
+        **{**decision["updated_ai_state"], "last_landing_scan_viewport": f"{left},{top}"}
+    )
+    return make_tick_decision(
+        command=decision["command"],
+        behavior=decision["behavior"],
+        updated_ai_state=state,
+        desired_equipment=decision["desired_equipment"],
+        secondary_command=decision["secondary_command"],
+    )
 
 
 def apply_dispatch_counters(decision: TickDecisionDict) -> TickDecisionDict:
@@ -296,7 +350,14 @@ def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
     """
     reason = decision["behavior"]["reason_kind"]
     command_type = decision["command"]["cmd_type"]
-    if reason in ("forage_radar", "forage_sweep", "scan_on_landing", "desync_rescan"):
+    if reason in (
+        "forage_radar",
+        "forage_sweep",
+        "scan_on_landing",
+        "desync_rescan",
+        "quad_sweep_shift",
+        "quad_sweep_radar",
+    ):
         return "SENSE"
     if reason in ("search_collect_local", "ferry_scope_scout"):
         # The free viewport pan is a SEARCH beat: the tick looks at
@@ -315,6 +376,7 @@ __all__ = [
     "clear_mode_on_decision",
     "derive_collect_mode_state",
     "derive_hunt_mode_state",
+    "latch_scope_shift_landing",
     "make_hold_decision",
     "resolve_owner_from_manual",
     "set_ai_mode",

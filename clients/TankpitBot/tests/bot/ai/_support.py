@@ -225,6 +225,7 @@ def make_world(
     containers: dict[str, ContainerStateDict] | None = None,
     tanks: dict[str, TankStateDict] | None = None,
     scanned: bool = True,
+    block_scanned: bool | None = None,
 ) -> tuple[WorldStateDict, SelfStateDict]:
     """Create world and self state for bot AI tests.
 
@@ -234,7 +235,14 @@ def make_world(
         fuel: Current fuel amount.
         containers: Optional visible containers.
         tanks: Optional visible tanks.
-        scanned: Whether the current viewport is fully tile-covered.
+        scanned: Whether the current 16x16 viewport is tile-covered.
+        block_scanned: Whether the whole 31x31 quad-sweep block is
+            covered. Defaults to follow ``scanned``: a pre-sweep test
+            that says "the ground here is known" means the sweep's
+            block gate must decline too, or the sweep outranks the
+            cascade rung under test. Pass ``False`` explicitly when a
+            test needs covered-viewport-but-fresh-surroundings (e.g.
+            search-hop landings inside the block ring).
 
     Returns:
         Tuple of world state and self state.
@@ -249,10 +257,14 @@ def make_world(
         leaderboard_position=5,
     )
     viewport = make_viewport_state(left=self_x - 8, top=self_y - 8, width=16, height=16)
-    left = viewport["left"]
-    top = viewport["top"]
-    right = left + viewport["width"] - 1
-    bottom = top + viewport["height"] - 1
+    cover_block = scanned if block_scanned is None else block_scanned
+    if cover_block:
+        left, top = max(self_x - 15, 0), max(self_y - 15, 0)
+        right, bottom = min(self_x + 15, 255), min(self_y + 15, 255)
+    else:
+        left, top = viewport["left"], viewport["top"]
+        right = left + viewport["width"] - 1
+        bottom = top + viewport["height"] - 1
     scanned_tiles: dict[str, int] = (
         {f"{x},{y}": 100000 for y in range(top, bottom + 1) for x in range(left, right + 1)}
         if scanned

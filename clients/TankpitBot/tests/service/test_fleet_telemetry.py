@@ -175,3 +175,64 @@ def test_spawn_derives_the_instance_from_the_account() -> None:
 
     assert named["instance"] == "second"
     assert default["instance"] == "artax"
+
+
+def test_activity_cache_hit_and_the_feed_cap() -> None:
+    """Activity caches like stats, skips non-feed channels, caps the feed."""
+    noisy_lines = "\n".join(
+        [
+            f'{{"timestamp":"2026-08-06T20:00:{sec:02d}","level":"INFO","logger":"l",'
+            f'"mode":"bot","channel":"AI","message":"decision {sec}"}}'
+            for sec in range(1, 9)
+        ]
+        # Newest line is a non-feed channel: the tail walk must skip
+        # it instead of surfacing raw protocol noise in the feed.
+        + [
+            '{"timestamp":"2026-08-06T20:00:09","level":"INFO","logger":"l",'
+            '"mode":"bot","channel":"PROTO","message":"raw frame"}'
+        ]
+    )
+    reader = _CountingReader(noisy_lines)
+    clock = _FixedClock()
+    original_read = top_hooks.read_text
+    original_time = top_hooks.get_current_time_ms
+    top_hooks.read_text = reader
+    top_hooks.get_current_time_ms = clock
+    try:
+        telemetry = FleetTelemetry()
+        first = telemetry.activity("alpha")
+        second = telemetry.activity("alpha")
+        reads_within_window = reader.calls
+    finally:
+        top_hooks.read_text = original_read
+        top_hooks.get_current_time_ms = original_time
+
+    assert reads_within_window == 1
+    assert second == first
+    feed = first["feed"]
+    assert isinstance(feed, list) and len(feed) == 6
+    newest = feed[-1]
+    assert isinstance(newest, dict) and newest["message"] == "decision 8"
+    oldest = feed[0]
+    # The PROTO line is skipped and the cap keeps only the newest six.
+    assert isinstance(oldest, dict) and oldest["message"] == "decision 3"
+
+
+def test_activity_without_fuel_state_or_tick_reads_sentinels() -> None:
+    """Streams that never state fuel/state/tick answer the sentinels."""
+    bare_lines = (
+        '{"timestamp":"2026-08-06T20:00:00","level":"INFO","logger":"l",'
+        '"mode":"bot","channel":"AI","message":"no telemetry fields"}'
+    )
+    reader = _CountingReader(bare_lines)
+    original_read = top_hooks.read_text
+    top_hooks.read_text = reader
+    try:
+        tail = FleetTelemetry().activity("alpha")
+    finally:
+        top_hooks.read_text = original_read
+
+    assert tail["available"] is True
+    assert tail["fuel"] == -1
+    assert tail["state"] == ""
+    assert tail["tick"] == -1

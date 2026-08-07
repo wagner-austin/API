@@ -93,12 +93,12 @@ class TestRecoverEquipmentSearch:
             inventory,
             100000,
             None,
-            map_fuel_dots=((116, 100),),
+            map_fuel_dots=((140, 100),),
         )
 
         assert decision["behavior"]["reason_kind"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["command"]["target_x"] == 116
+        assert decision["command"]["target_x"] == 140
         assert decision["command"]["target_y"] == 100
 
     def test_equipment_search_bails_out_after_max_failures(self) -> None:
@@ -173,7 +173,7 @@ class TestRecoverEquipmentSearch:
             inventory,
             100000,
             None,
-            map_fuel_dots=((116, 100),),
+            map_fuel_dots=((140, 100),),
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
@@ -290,6 +290,8 @@ class TestRecoverEquipmentSearch:
             make_inventory(),
             100000,
             None,
+            # In-block dot stays: at fuel 150 the sweep is gated off
+            # (fuel-low), and a farther dot would be unaffordable.
             map_fuel_dots=((116, 100),),
         )
 
@@ -394,7 +396,7 @@ class TestRecoverEquipmentSearch:
             inventory,
             100000,
             None,
-            map_fuel_dots=((116, 100),),
+            map_fuel_dots=((140, 100),),
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"

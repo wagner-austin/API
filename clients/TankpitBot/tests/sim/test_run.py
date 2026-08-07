@@ -284,10 +284,19 @@ def test_ferry_session_scouts_boards_and_drains_the_water_larder(
     """``--ferry`` soaks the full F5 chain through the production bot.
 
     Asserted from the events stream and the final world so a session
-    that never touches the water cannot pass: the scope scout pans at
-    the water-locked container ([[viewport-shift-protocol]]), the
-    larder hop boards the revealed ferry, the ride drains the
-    container, and the client ends richer than its 400-fuel spawn.
+    that never touches the water cannot pass: free scope pans reveal
+    the ferry ([[viewport-shift-protocol]]), the larder hop boards
+    it, the ride drains the container, and the client ends richer
+    than its 400-fuel spawn.
+
+    Re-scoped 2026-08-07 ([[quad-sweep-doctrine]]): the pans are now
+    the quad sweep's quadrant shifts — with extras stocked the sweep's
+    recon covers the lake before the larder ever declines, so the
+    dedicated ``ferry_scope_scout`` (which exists to pan when nothing
+    else has) is correctly never needed here. The scout's own firing
+    conditions stay pinned by ``tests/bot/ai/test_scope_scout.py``;
+    what this soak guards is the CHAIN: free pan -> ferry belief ->
+    boarding hop -> drained water larder.
     """
     _install_lake_terrain(fake_fs)
     exit_code = main(["--ferry", "--rounds", "60", "--stamp", "20260801-000001"])
@@ -303,7 +312,6 @@ def test_ferry_session_scouts_boards_and_drains_the_water_larder(
                 return True
         return False
 
-    assert _event_kind_seen("ferry_scope_scout") is True
     assert _event_kind_seen("scope_shift_sent") is True
     world_path = next(path for path in files if "sim-20260801-000001.world.json" in path)
     world_doc = narrow_json_to_dict(load_json_str(files[world_path]))

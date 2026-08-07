@@ -139,7 +139,7 @@ class TestPreHuntTopOffBias:
         """Two-dot world: a far pair vs a lone dot next to the enemy."""
         from tankpit_bot.state.types import make_tank_state
 
-        world, self_state = make_world(self_x=100, self_y=100, fuel=fuel)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=fuel, block_scanned=False)
         world["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=100,

@@ -19,6 +19,7 @@ from tankpit_bot.bot.ai.mode_controller import (
     clear_ai_mode,
     derive_collect_mode_state,
     derive_hunt_mode_state,
+    latch_scope_shift_landing,
     make_hold_decision,
     resolve_owner_from_manual,
 )
@@ -35,6 +36,7 @@ from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
+from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 
 def decide(
@@ -93,7 +95,7 @@ def decide(
                 derive_collect_mode_state(collect_decision),
                 timestamp_ms,
             )
-            return apply_dispatch_counters(owned)
+            return apply_dispatch_counters(_latch_pans(ctx, owned))
         if ctx.ai_state["wind_down"]:
             # Winding down and nothing left to collect: ending early
             # and clean beats idling out the clock or re-engaging.
@@ -111,7 +113,31 @@ def decide(
         derive_hunt_mode_state(decision),
         timestamp_ms,
     )
-    return apply_dispatch_counters(attach_human_greeting(ctx, owned))
+    return apply_dispatch_counters(_latch_pans(ctx, attach_human_greeting(ctx, owned)))
+
+
+def _latch_pans(ctx: DecideCtx, decision: TickDecisionDict) -> TickDecisionDict:
+    """Pre-latch the landing-scan gate for any scope-shift decision.
+
+    See :func:`~tankpit_bot.bot.ai.mode_controller.latch_scope_shift_landing`:
+    a pan is a deliberate look, not a landing, so the shifted window
+    must not draw next tick's unconditional landing radar.
+
+    Args:
+        ctx: Decision context (window origin and self position).
+        decision: The owned decision about to leave the arbitrator.
+
+    Returns:
+        The decision with the latch applied when it pans.
+    """
+    left, top, _right, _bottom = viewport_visible_bounds(ctx.world["viewport"])
+    return latch_scope_shift_landing(
+        decision,
+        left,
+        top,
+        ctx.self_state["x"],
+        ctx.self_state["y"],
+    )
 
 
 def _resolve_owner_mode(ctx: DecideCtx, manual: AIMode | None) -> AIMode:

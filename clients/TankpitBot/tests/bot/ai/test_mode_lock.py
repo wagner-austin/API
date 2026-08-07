@@ -250,10 +250,10 @@ def test_unset_mode_enters_recover_fuel_after_fuel_decision() -> None:
 def test_collect_mode_owns_tick_below_full_threshold() -> None:
     """Fuel recovery persists until the configured full threshold is reached.
 
-    Container volume kept small so ``_pickup_not_worth_walk`` does not refuse
+    Container volume kept small so ``pickup_not_worth_walk`` does not refuse
     the pickup: corporal cap 1200, fuel 800, walk 3 tiles, volume 200
     --> 800 + 3 + 200 = 1003 <= 1200. Overflow-refusal is covered by
-    the ``_pickup_not_worth_walk`` tests in test_collect_mode_fuel.py.
+    the ``pickup_not_worth_walk`` tests in test_collect_mode_fuel.py.
     """
     containers: dict[str, ContainerStateDict] = {
         "102,101": make_container_state(

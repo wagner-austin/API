@@ -29,6 +29,7 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.equipment_search import describe_container_search
 from tankpit_bot.bot.ai.forage import plan_forage_search
+from tankpit_bot.bot.ai.quad_sweep import plan_block_harvest_leg, plan_quad_sweep
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
@@ -55,8 +56,16 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
        this gate, the cascade picks up whatever 0x5A enumerated first
        and only later discovers (via the forage step below) extra
        containers radar would have shown up front.
+    2b. Quad sweep ([[quad-sweep-doctrine]], 2026-08-06): with extras
+       stocked and the 31x31 block substantially unscanned, the
+       atomic 4-shift/4-radar recon fires before any pickup --
+       movement mid-sweep re-anchors later quadrants off the grid.
     3. Pick up the best equipment in the current viewport.
     4. Pick up the best fuel in the current viewport (skipped at cap).
+    4b. Block harvest ([[quad-sweep-doctrine]]): frame a swept-block
+       container with a free scope shift (or walk a leg toward a far
+       one) so the next tick's pickup branches serve it -- strictly
+       cheaper than any larder teleport while block stock remains.
     5. Larder ([[larder-plan]], 2026-07-27): harvest KNOWN stock
        before any discovery -- teleport to tracked equipment when
        below combat-ready, else to the best-scoring tracked fuel
@@ -100,6 +109,14 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     if locked_decision is not None:
         return locked_decision
 
+    # Atomic quad sweep ([[quad-sweep-doctrine]]): with extras stocked
+    # and the block substantially unscanned, the 4-shift/4-radar recon
+    # runs BEFORE any pickup -- movement mid-sweep slides later
+    # quadrant windows off the grid, so pickups wait the ~8 ticks.
+    sweep_decision = plan_quad_sweep(ctx, base_state)
+    if sweep_decision is not None:
+        return sweep_decision
+
     equip_decision = select_and_pickup_equipment(ctx, base_state)
     if equip_decision is not None:
         return equip_decision
@@ -125,22 +142,9 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
         ),
     )
 
-    clearance_decision = mine_clearance_decision(ctx, base_state)
-    if clearance_decision is not None:
-        return clearance_decision
-
-    larder_decision = larder_harvest(ctx, base_state)
-    if larder_decision is not None:
-        return larder_decision
-
-    # The larder just declined — if what stopped it was a water-locked
-    # container with no fresh ferry belief, one FREE viewport pan at
-    # the water beats paying for discovery ([[viewport-shift-protocol]]
-    # scope scout; F5 ferry doctrine). A ferry the pan reveals makes
-    # the next tick's larder hop ``ferry_served``.
-    scout_decision = scope_scout_for_ferry(ctx, base_state)
-    if scout_decision is not None:
-        return scout_decision
+    pursuit_decision = _known_stock_pursuit(ctx, base_state)
+    if pursuit_decision is not None:
+        return pursuit_decision
 
     forage_decision = plan_forage_search(
         ctx,
@@ -163,6 +167,52 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
         return search
 
     return _exhausted_collect_outcome(ctx, base_state)
+
+
+def _known_stock_pursuit(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Serve KNOWN stock: clearance, block harvest, larder, ferry scout.
+
+    The middle of the cascade (steps between the in-window pickups and
+    discovery), cheapest tool first:
+
+    1. Mine clearance: a shot that exposes a covered container.
+    2. Block harvest ([[quad-sweep-doctrine]]): a free scope shift
+       that frames a swept-block container (or a walk leg toward a
+       far one) -- strictly cheaper than any larder teleport, so it
+       outranks the larder while the block still holds servable
+       stock.
+    3. Larder: teleport to tracked stock beyond the block.
+    4. Ferry scope scout: when the larder's decline was a water-locked
+       container with no fresh ferry belief, one FREE viewport pan at
+       the water beats paying for discovery
+       ([[viewport-shift-protocol]] scope scout; F5 ferry doctrine).
+       A ferry the pan reveals makes the next tick's larder hop
+       ``ferry_served``.
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state threaded from the gates.
+
+    Returns:
+        The first serving decision, or ``None`` when no known stock
+        can be served (the cascade proceeds to discovery).
+    """
+    clearance_decision = mine_clearance_decision(ctx, base_state)
+    if clearance_decision is not None:
+        return clearance_decision
+
+    harvest_decision = plan_block_harvest_leg(ctx, base_state)
+    if harvest_decision is not None:
+        return harvest_decision
+
+    larder_decision = larder_harvest(ctx, base_state)
+    if larder_decision is not None:
+        return larder_decision
+
+    return scope_scout_for_ferry(ctx, base_state)
 
 
 def _sense_and_safety_gates(
