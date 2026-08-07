@@ -1,20 +1,8 @@
-"""Universal page-client snapshot shared by all live action probes.
+"""One snapshot of the in-page game client's runtime state.
 
-Reads ``window.__tankpitActiveGame`` -- the live tankpit JS client object
-captured by the browser inject script in ``browser/session.py`` -- so any
-probe can verify post-action state from the same source the canvas reads
-from. The 12 fields here were previously teleport-only; lifting them
-across probes lets movement, fuel, equipment, and enemy-teleport probes
-all answer "did the bot actually accomplish the action" without watching
-the screen.
-
-Architecture notes:
-* ``PageClientSnapshotDict`` carries only the universal client metadata.
-  Teleport probes need a per-attempt ``phase`` label and so wrap this
-  type with ``TeleportPageSnapshotDict`` in ``types.py``.
-* Capture is a single CDP ``Runtime.evaluate`` call returning a strict
-  JSON object that the decoder validates field-by-field.
-* No fallback: a missing or malformed snapshot raises immediately.
+Holds the record shape, its codec, and the CDP capture call. The
+nested block codecs are
+:mod:`tankpit_bot.action_lab.page_client_snapshot_codecs`.
 """
 
 from __future__ import annotations
@@ -23,94 +11,23 @@ from typing import TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
-    JSONTypeError,
     JSONValue,
     require_dict,
     require_int,
 )
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
-
-
-class PageClientSnapshotDict(TypedDict):
-    """Observed page-client state at one instant in time.
-
-    Attributes:
-        timestamp_ms: Wall-clock timestamp when the snapshot was captured.
-        client_present: Whether the inject script has captured the game
-            object on ``window.__tankpitActiveGame``.
-        map_visible: Whether the client believes the map overlay is open
-            (``activeGame.map.h``). ``None`` when the map object is
-            unavailable.
-        client_state: Internal page-client action state identifier
-            (``activeGame.s``).
-        client_busy: Whether the page client marks itself busy
-            (``activeGame.Ha``).
-        pending_actions: Length of the client action queue
-            (``activeGame.h.j.actions``).
-        heartbeat_age_ms: Milliseconds since the most recent server
-            heartbeat seen by the client transport (``activeGame.va.j``).
-        last_page_client_send_age_ms: Milliseconds since the page client
-            itself sent a frame (browser-hook record).
-        last_bot_send_age_ms: Milliseconds since the bot's injected
-            ``_send_bytes`` ran (browser-hook record).
-        ws_ready_state: Browser WebSocket ``readyState`` for the
-            captured socket.
-        current_send_label: Bot send label currently active in the
-            browser hook, used to correlate sends to attempt phases.
-        sent_frame_meta_queue_length: Pending outbound metadata queue
-            length on the page side.
-        self_fields: Primitive properties of ``activeGame.i`` (the
-            self-tank object), keyed by minified name; primitives of
-            its direct child objects appear under dotted keys
-            (``h.j``). Flat-only capture proved blind to the fields
-            that matter -- run 20260611-005x held every flat tank field
-            static through a wire-confirmed damage countdown -- so one
-            nested level is captured, bounded by a per-object field
-            cap. Empty when the client object is not yet captured. The
-            semantic-to-minified mapping is identified offline by
-            comparing values to a known-good world state.
-        world_fields: Primitive properties of ``activeGame.h`` (the
-            world object) keyed by minified name, including one nested
-            level under dotted keys. Empty when the client object is
-            not yet captured.
-        map_fields: Primitive properties of ``activeGame.map`` (the
-            map object) keyed by minified name, including one nested
-            level under dotted keys. Empty when the map object is
-            unavailable.
-        world_collections: Every collection-like property of the world
-            object and of its direct children -- arrays of objects AND
-            keyed objects whose values are objects. Depth-two entries
-            use dotted keys (the live tank registry is
-            ``activeGame.P.j``, keyed by tank id, found by the
-            structure survey in run 20260610-223x), with each item
-            reduced to its primitive fields plus one nested level under
-            dotted keys. This is the truth side for entity
-            (container/tank/mine) divergence detection: the semantic
-            meaning of each collection key is identified offline by
-            matching item coordinate pairs against the bot's
-            wire-derived world state. Items are capped per collection
-            and fields per item to bound capture size; non-object items
-            and items with no primitive fields are skipped.
-    """
-
-    timestamp_ms: int
-    client_present: bool
-    map_visible: bool | None
-    client_state: int | None
-    client_busy: bool | None
-    pending_actions: int | None
-    heartbeat_age_ms: int | None
-    last_page_client_send_age_ms: int | None
-    last_bot_send_age_ms: int | None
-    ws_ready_state: int | None
-    current_send_label: str | None
-    sent_frame_meta_queue_length: int
-    self_fields: dict[str, int | float | bool | str | None]
-    world_fields: dict[str, int | float | bool | str | None]
-    map_fields: dict[str, int | float | bool | str | None]
-    world_collections: dict[str, list[dict[str, int | float | bool | str | None]]]
-
+from tankpit_bot.action_lab.page_client_snapshot_codecs import (
+    _extract_runtime_value,
+    _require_bool_field,
+    _require_client_collections,
+    _require_client_field_map,
+    _require_optional_bool,
+    _require_optional_int,
+    _require_optional_str,
+    encode_client_collections,
+    encode_client_field_map,
+)
 
 _CAPTURE_EXPRESSION = """
 (() => {
@@ -284,270 +201,84 @@ _CAPTURE_EXPRESSION = """
 """
 
 
-def _extract_runtime_value(result: JSONObject) -> JSONValue:
-    """Return the ``Runtime.evaluate`` value field.
+class PageClientSnapshotDict(TypedDict):
+    """Observed page-client state at one instant in time.
 
-    Args:
-        result: Raw CDP result object returned by ``cdp.send``.
-
-    Returns:
-        The evaluated JavaScript value.
-
-    Raises:
-        ValueError: If the CDP result is missing the value field.
+    Attributes:
+        timestamp_ms: Wall-clock timestamp when the snapshot was captured.
+        client_present: Whether the inject script has captured the game
+            object on ``window.__tankpitActiveGame``.
+        map_visible: Whether the client believes the map overlay is open
+            (``activeGame.map.h``). ``None`` when the map object is
+            unavailable.
+        client_state: Internal page-client action state identifier
+            (``activeGame.s``).
+        client_busy: Whether the page client marks itself busy
+            (``activeGame.Ha``).
+        pending_actions: Length of the client action queue
+            (``activeGame.h.j.actions``).
+        heartbeat_age_ms: Milliseconds since the most recent server
+            heartbeat seen by the client transport (``activeGame.va.j``).
+        last_page_client_send_age_ms: Milliseconds since the page client
+            itself sent a frame (browser-hook record).
+        last_bot_send_age_ms: Milliseconds since the bot's injected
+            ``_send_bytes`` ran (browser-hook record).
+        ws_ready_state: Browser WebSocket ``readyState`` for the
+            captured socket.
+        current_send_label: Bot send label currently active in the
+            browser hook, used to correlate sends to attempt phases.
+        sent_frame_meta_queue_length: Pending outbound metadata queue
+            length on the page side.
+        self_fields: Primitive properties of ``activeGame.i`` (the
+            self-tank object), keyed by minified name; primitives of
+            its direct child objects appear under dotted keys
+            (``h.j``). Flat-only capture proved blind to the fields
+            that matter -- run 20260611-005x held every flat tank field
+            static through a wire-confirmed damage countdown -- so one
+            nested level is captured, bounded by a per-object field
+            cap. Empty when the client object is not yet captured. The
+            semantic-to-minified mapping is identified offline by
+            comparing values to a known-good world state.
+        world_fields: Primitive properties of ``activeGame.h`` (the
+            world object) keyed by minified name, including one nested
+            level under dotted keys. Empty when the client object is
+            not yet captured.
+        map_fields: Primitive properties of ``activeGame.map`` (the
+            map object) keyed by minified name, including one nested
+            level under dotted keys. Empty when the map object is
+            unavailable.
+        world_collections: Every collection-like property of the world
+            object and of its direct children -- arrays of objects AND
+            keyed objects whose values are objects. Depth-two entries
+            use dotted keys (the live tank registry is
+            ``activeGame.P.j``, keyed by tank id, found by the
+            structure survey in run 20260610-223x), with each item
+            reduced to its primitive fields plus one nested level under
+            dotted keys. This is the truth side for entity
+            (container/tank/mine) divergence detection: the semantic
+            meaning of each collection key is identified offline by
+            matching item coordinate pairs against the bot's
+            wire-derived world state. Items are capped per collection
+            and fields per item to bound capture size; non-object items
+            and items with no primitive fields are skipped.
     """
-    result_obj = require_dict(result, "result")
-    if "value" not in result_obj:
-        raise ValueError(f"Runtime.evaluate result missing value: {result_obj}")
-    return result_obj["value"]
 
-
-def _require_optional_int(data: JSONObject, field: str) -> int | None:
-    """Return an optional integer field from a JSON object.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to validate.
-
-    Returns:
-        Integer value or None when the field is null.
-
-    Raises:
-        JSONTypeError: If the field is present but not an integer.
-    """
-    raw = data.get(field)
-    if raw is None:
-        return None
-    if isinstance(raw, bool) or not isinstance(raw, int):
-        raise JSONTypeError(f"Field '{field}' must be an integer or null")
-    return raw
-
-
-def _require_optional_bool(data: JSONObject, field: str) -> bool | None:
-    """Return an optional boolean field from a JSON object.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to validate.
-
-    Returns:
-        Boolean value or None when the field is null.
-
-    Raises:
-        JSONTypeError: If the field is present but not a boolean.
-    """
-    raw = data.get(field)
-    if raw is None:
-        return None
-    if not isinstance(raw, bool):
-        raise JSONTypeError(f"Field '{field}' must be a boolean or null")
-    return raw
-
-
-def _require_optional_str(data: JSONObject, field: str) -> str | None:
-    """Return an optional string field from a JSON object.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to validate.
-
-    Returns:
-        String value or None when the field is null.
-
-    Raises:
-        JSONTypeError: If the field is present but not a string.
-    """
-    raw = data.get(field)
-    if raw is None:
-        return None
-    if not isinstance(raw, str):
-        raise JSONTypeError(f"Field '{field}' must be a string or null")
-    return raw
-
-
-def _require_bool_field(data: JSONObject, field: str) -> bool:
-    """Return a required boolean field from a JSON object.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to validate.
-
-    Returns:
-        Boolean value.
-
-    Raises:
-        JSONTypeError: If the field is not a boolean.
-    """
-    raw = data.get(field)
-    if not isinstance(raw, bool):
-        raise JSONTypeError(f"Field '{field}' must be a boolean")
-    return raw
-
-
-def _require_client_field_value(
-    value: JSONValue,
-    field: str,
-    key: str,
-) -> int | float | bool | str | None:
-    """Validate one entry of a client field map as a JSON primitive.
-
-    Args:
-        value: Raw value associated with ``key``.
-        field: Outer field name (for error reporting).
-        key: Inner key inside the field map (for error reporting).
-
-    Returns:
-        Validated primitive value.
-
-    Raises:
-        JSONTypeError: If ``value`` is a list or dict (only primitives are
-            accepted in field maps; the JS-side primitivesOnly filter is
-            the source of truth, this is the strict re-check).
-    """
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float, str)):
-        return value
-    raise JSONTypeError(
-        f"Field '{field}' entry '{key}' must be a JSON primitive (got {type(value).__name__})"
-    )
-
-
-def decode_client_field_map(
-    raw: JSONObject,
-    *,
-    field: str,
-) -> dict[str, int | float | bool | str | None]:
-    """Decode a raw JSON object as a minified-key field map.
-
-    Args:
-        raw: JSON object whose entries are all expected to be primitives.
-        field: Outer field name used in error messages.
-
-    Returns:
-        Validated mapping of minified key names to primitive scalars.
-
-    Raises:
-        JSONTypeError: If any entry holds a non-primitive value.
-    """
-    result: dict[str, int | float | bool | str | None] = {}
-    for key, value in raw.items():
-        result[key] = _require_client_field_value(value, field, key)
-    return result
-
-
-def _require_client_field_map(
-    data: JSONObject,
-    field: str,
-) -> dict[str, int | float | bool | str | None]:
-    """Decode a discovery field map (minified key -> primitive value).
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to read and validate.
-
-    Returns:
-        Validated mapping of minified key names to primitive scalars.
-
-    Raises:
-        JSONTypeError: If the field is missing, not an object, or contains
-            non-primitive values.
-    """
-    raw = data.get(field)
-    if not isinstance(raw, dict):
-        raise JSONTypeError(f"Field '{field}' must be an object")
-    return decode_client_field_map(raw, field=field)
-
-
-def encode_client_field_map(
-    field_map: dict[str, int | float | bool | str | None],
-) -> JSONObject:
-    """Encode a discovery field map as a JSON object.
-
-    Args:
-        field_map: Mapping of minified key names to primitive scalars.
-
-    Returns:
-        JSON-ready object that preserves insertion order.
-    """
-    result: JSONObject = {}
-    for key, value in field_map.items():
-        result[key] = value
-    return result
-
-
-def decode_client_collections(
-    raw: JSONObject,
-    *,
-    field: str,
-) -> dict[str, list[dict[str, int | float | bool | str | None]]]:
-    """Decode a raw JSON object as a minified-key collection map.
-
-    Args:
-        raw: JSON object whose values are lists of primitive field maps.
-        field: Outer field name used in error messages.
-
-    Returns:
-        Validated mapping of minified property names to item lists.
-
-    Raises:
-        JSONTypeError: If any value is not a list, any item is not an
-            object, or any item field holds a non-primitive value.
-    """
-    result: dict[str, list[dict[str, int | float | bool | str | None]]] = {}
-    for key, value in raw.items():
-        if not isinstance(value, list):
-            raise JSONTypeError(f"Field '{field}' entry '{key}' must be a list")
-        items: list[dict[str, int | float | bool | str | None]] = []
-        for index, item in enumerate(value):
-            if not isinstance(item, dict):
-                raise JSONTypeError(f"Field '{field}' entry '{key}[{index}]' must be an object")
-            items.append(decode_client_field_map(item, field=f"{field}.{key}[{index}]"))
-        result[key] = items
-    return result
-
-
-def _require_client_collections(
-    data: JSONObject,
-    field: str,
-) -> dict[str, list[dict[str, int | float | bool | str | None]]]:
-    """Decode a required collection map field from a snapshot payload.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to read and validate.
-
-    Returns:
-        Validated mapping of minified property names to item lists.
-
-    Raises:
-        JSONTypeError: If the field is missing, not an object, or fails
-            item validation.
-    """
-    raw = data.get(field)
-    if not isinstance(raw, dict):
-        raise JSONTypeError(f"Field '{field}' must be an object")
-    return decode_client_collections(raw, field=field)
-
-
-def encode_client_collections(
-    collections: dict[str, list[dict[str, int | float | bool | str | None]]],
-) -> JSONObject:
-    """Encode a collection map as a JSON object.
-
-    Args:
-        collections: Mapping of minified property names to item lists.
-
-    Returns:
-        JSON-ready object that preserves insertion order.
-    """
-    result: JSONObject = {}
-    for key, items in collections.items():
-        encoded_items: list[JSONValue] = [encode_client_field_map(item) for item in items]
-        result[key] = encoded_items
-    return result
+    timestamp_ms: int
+    client_present: bool
+    map_visible: bool | None
+    client_state: int | None
+    client_busy: bool | None
+    pending_actions: int | None
+    heartbeat_age_ms: int | None
+    last_page_client_send_age_ms: int | None
+    last_bot_send_age_ms: int | None
+    ws_ready_state: int | None
+    current_send_label: str | None
+    sent_frame_meta_queue_length: int
+    self_fields: dict[str, int | float | bool | str | None]
+    world_fields: dict[str, int | float | bool | str | None]
+    map_fields: dict[str, int | float | bool | str | None]
+    world_collections: dict[str, list[dict[str, int | float | bool | str | None]]]
 
 
 def encode_page_client_snapshot(snapshot: PageClientSnapshotDict) -> JSONObject:
@@ -644,10 +375,6 @@ def capture_page_client_snapshot(cdp: CDPSessionProtocol) -> PageClientSnapshotD
 __all__ = [
     "PageClientSnapshotDict",
     "capture_page_client_snapshot",
-    "decode_client_collections",
-    "decode_client_field_map",
     "decode_page_client_snapshot",
-    "encode_client_collections",
-    "encode_client_field_map",
     "encode_page_client_snapshot",
 ]

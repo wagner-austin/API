@@ -11,10 +11,10 @@ from tankpit_bot.action_lab.action_trace_types import (
     ActionPhaseOverlapDict,
     FuelDecisionBasisDict,
 )
-from tankpit_bot.action_lab.fuel_probe_attempt import (
+from tankpit_bot.action_lab.fuel_probe_attempt import run_fuel_pickup_attempt
+from tankpit_bot.action_lab.fuel_probe_attempt_contracts import (
     FuelProbePickupAttemptProtocol,
     RunTrackedPickupPhaseProtocol,
-    run_fuel_pickup_attempt,
 )
 from tankpit_bot.action_lab.fuel_probe_results import (
     build_attempt_result as _shared_build_attempt_result,

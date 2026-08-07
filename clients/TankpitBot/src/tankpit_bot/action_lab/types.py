@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-)
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 
 
 class TeleportTargetDict(TypedDict):
