@@ -13,7 +13,13 @@ from tankpit_bot.sim.combat import (
     WEAPON_SINGLE,
     process_shot,
 )
-from tankpit_bot.sim.world import SimMineDict, SimWorldDict, make_sim_tank, make_sim_world
+from tankpit_bot.sim.world import (
+    SimMineDict,
+    SimWorldDict,
+    make_sim_tank,
+    make_sim_world,
+    place_mine,
+)
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 _NOBODY: frozenset[int] = frozenset()
@@ -138,21 +144,17 @@ def test_deactivation_at_zero_fuel() -> None:
 def test_shooting_a_mine_cascades_two_packets() -> None:
     """The shot mine and its adjacent chain arrive as two packets."""
     world = _arena()
-    world["mines"] = [
-        SimMineDict(x=13, y=12, team=1),
-        SimMineDict(x=14, y=12, team=1),
-        SimMineDict(x=13, y=13, team=1),
-        SimMineDict(x=20, y=20, team=1),
-    ]
+    for mine_x, mine_y in ((13, 12), (14, 12), (13, 13), (20, 20)):
+        place_mine(world, mine_x, mine_y, 1)
     outcome = process_shot(world, InMemoryTerrainMap(), 9, 13, 12, _NOBODY, 0, None)
     assert outcome["mine_cascade"] == [[(13, 12)], [(14, 12), (13, 13)]]
-    assert world["mines"] == [SimMineDict(x=20, y=20, team=1)]
+    assert world["mines"] == {"20,20": SimMineDict(x=20, y=20, team=1)}
 
 
 def test_lone_mine_is_one_packet() -> None:
     """A solo mine detonates without a chain packet."""
     world = _arena()
-    world["mines"] = [SimMineDict(x=13, y=12, team=1)]
+    place_mine(world, 13, 12, 1)
     outcome = process_shot(world, InMemoryTerrainMap(), 9, 13, 12, _NOBODY, 0, None)
     assert outcome["mine_cascade"] == [[(13, 12)]]
 

@@ -22,7 +22,8 @@ from tankpit_bot.protocol.types import MapDataDict, MapTankEntry, RadarContainer
 from tankpit_bot.sim.blocks import blocks_at
 from tankpit_bot.sim.combat import SLOT_RADAR
 from tankpit_bot.sim.movement import PickupRecordDict, ferry_at, resolve_pickup
-from tankpit_bot.sim.world import SimMineDict, SimWorldDict
+from tankpit_bot.sim.world import SimWorldDict, place_mine
+from tankpit_bot.state.scan_coverage import tile_key
 
 # Ring-1 displacement preference when the teleport target is blocked
 # (wiki [[teleport-mechanics]], 2026-07-21: E, then N, then W measured;
@@ -101,7 +102,8 @@ def _tile_blocked_for_landing(
     for tank in world["tanks"].values():
         if tank["alive"] and tank["tank_id"] != tank_id and (tank["x"], tank["y"]) == (x, y):
             return True
-    return any(mine["team"] != team and (mine["x"], mine["y"]) == (x, y) for mine in world["mines"])
+    mine = world["mines"].get(tile_key(x, y))
+    return mine is not None and mine["team"] != team
 
 
 def process_teleport(
@@ -219,7 +221,7 @@ def process_radar(
     )
     mines = [
         RadarMineDict(x=m["x"], y=m["y"], team=m["team"])
-        for m in world["mines"]
+        for m in world["mines"].values()
         if inside(m["x"], m["y"])
     ]
     # A scan is the REVEAL event, and reveals are TEAM-scoped (user
@@ -332,19 +334,14 @@ def process_mine_press(
                 for other in world["tanks"].values()
             ):
                 continue
-            enemy_mines = [
-                mine
-                for mine in world["mines"]
-                if mine["team"] != tank["team"] and (mine["x"], mine["y"]) == (x, y)
-            ]
-            if enemy_mines:
-                for mine in enemy_mines:
-                    world["mines"].remove(mine)
-                outcome["detonated"].append((x, y))
+            key = tile_key(x, y)
+            standing = world["mines"].get(key)
+            if standing is not None:
+                if standing["team"] != tank["team"]:
+                    del world["mines"][key]
+                    outcome["detonated"].append((x, y))
                 continue
-            if any((mine["x"], mine["y"]) == (x, y) for mine in world["mines"]):
-                continue
-            world["mines"].append(SimMineDict(x=x, y=y, team=tank["team"]))
+            place_mine(world, x, y, tank["team"])
             outcome["placed"].append((x, y))
     return outcome
 

@@ -20,6 +20,7 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.state.scan_coverage import tile_key
 
 EQUIPMENT_SLOTS = 5
 
@@ -135,14 +136,24 @@ class SimWorldDict(TypedDict):
     walk around VISIBLE enemy mines only ([[walk-mechanics]]); a
     hidden one is walked into and detonates. Detonated mines need no
     key cleanup — routing intersects these keys with the live mine
-    list.
+    set.
+
+    ``mines`` is keyed by the SAME ``"x,y"`` string, because at most
+    one mine occupies a tile (``actions.process_mine_press`` skips an
+    already-mined tile) — so a mapping states the invariant a list
+    could only enforce by scanning. It was a list, and every mine
+    lookup in :mod:`tankpit_bot.sim` was therefore a linear scan run
+    per candidate tile per step: measured on field01, a 20-walk burst
+    went from 1.8 ms to 1,902 ms per walk between an empty field and a
+    realistically dense one, which is what made a real minefield
+    impossible to seed at all ([[session-state-deglobalisation]]).
     """
 
     field: str
     tick: int
     tanks: dict[int, SimTankDict]
     containers: list[SimContainerDict]
-    mines: list[SimMineDict]
+    mines: dict[str, SimMineDict]
     equipment: list[SimEquipmentDict]
     ferries: list[SimFerryDict]
     blocks: list[SimBlockDict]
@@ -190,6 +201,21 @@ def make_sim_tank(
     )
 
 
+def place_mine(world: SimWorldDict, x: int, y: int, team: int) -> None:
+    """Put one team's mine on a tile, replacing whatever stood there.
+
+    The mapping's constructor: it owns the ``"x,y"`` key, so no caller
+    can file a mine under a key its own coordinates disagree with.
+
+    Args:
+        world: Simulated world (mutated).
+        x: Tile X.
+        y: Tile Y.
+        team: Owning team.
+    """
+    world["mines"][tile_key(x, y)] = SimMineDict(x=x, y=y, team=team)
+
+
 def make_sim_world(field: str) -> SimWorldDict:
     """Build an empty world on the given terrain field.
 
@@ -205,7 +231,7 @@ def make_sim_world(field: str) -> SimWorldDict:
         tick=0,
         tanks={},
         containers=[],
-        mines=[],
+        mines={},
         equipment=[],
         ferries=[],
         blocks=[],
@@ -330,7 +356,11 @@ def encode_sim_world(world: SimWorldDict) -> JSONObject:
         {"x": c["x"], "y": c["y"], "volume": c["volume"], "dotted": c["dotted"]}
         for c in world["containers"]
     ]
-    mines: list[JSONValue] = [{"x": m["x"], "y": m["y"], "team": m["team"]} for m in world["mines"]]
+    # The JSON shape stays a LIST: the key is derivable from x and y,
+    # so serializing it too would let a document disagree with itself.
+    mines: list[JSONValue] = [
+        {"x": m["x"], "y": m["y"], "team": m["team"]} for m in world["mines"].values()
+    ]
     equipment: list[JSONValue] = [{"x": e["x"], "y": e["y"]} for e in world["equipment"]]
     ferries: list[JSONValue] = [{"x": f["x"], "y": f["y"]} for f in world["ferries"]]
     blocks: list[JSONValue] = [{"x": b["x"], "y": b["y"]} for b in world["blocks"]]
@@ -388,6 +418,34 @@ def _decode_xy_list(data: JSONObject, key: str) -> list[tuple[int, int]]:
     ]
 
 
+def _decode_mines(data: JSONObject) -> dict[str, SimMineDict]:
+    """Decode the mine list into its tile-keyed form.
+
+    Args:
+        data: JSON object carrying the world fields.
+
+    Returns:
+        Mines keyed by ``"x,y"``.
+
+    Raises:
+        ValueError: If two records claim the same tile — the mapping's
+            one-mine-per-tile invariant, checked where a document
+            enters rather than discovered later by a lookup.
+    """
+    mines: dict[str, SimMineDict] = {}
+    for record in _require_record_list(data, "mines"):
+        mine = SimMineDict(
+            x=require_int(record, "x"),
+            y=require_int(record, "y"),
+            team=require_int(record, "team"),
+        )
+        key = tile_key(mine["x"], mine["y"])
+        if key in mines:
+            raise ValueError(f"SimWorld.mines: two mines on tile {key}")
+        mines[key] = mine
+    return mines
+
+
 def decode_sim_world(data: JSONObject) -> SimWorldDict:
     """Decode a world from a JSON object with validation.
 
@@ -421,14 +479,7 @@ def decode_sim_world(data: JSONObject) -> SimWorldDict:
         )
         for record in _require_record_list(data, "containers")
     ]
-    mines = [
-        SimMineDict(
-            x=require_int(record, "x"),
-            y=require_int(record, "y"),
-            team=require_int(record, "team"),
-        )
-        for record in _require_record_list(data, "mines")
-    ]
+    mines = _decode_mines(data)
     raw_revealed = data.get("revealed_mine_keys_by_team")
     if not isinstance(raw_revealed, dict):
         raise ValueError("SimWorld.revealed_mine_keys_by_team: expected an object")
@@ -470,4 +521,5 @@ __all__ = [
     "encode_sim_world",
     "make_sim_tank",
     "make_sim_world",
+    "place_mine",
 ]

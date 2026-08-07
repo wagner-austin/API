@@ -41,6 +41,7 @@ from tankpit_bot.physics.damage import (
 )
 from tankpit_bot.sim.blocks import BLOCK_LAND, BLOCK_STACKED, block_tile_value
 from tankpit_bot.sim.world import SimTankDict, SimWorldDict
+from tankpit_bot.state.scan_coverage import tile_key
 
 WEAPON_SINGLE = 0
 WEAPON_DUAL = 1
@@ -275,19 +276,20 @@ def _detonate_mines(world: SimWorldDict, x: int, y: int, outcome: ShotOutcomeDic
         y: Impact tile Y.
         outcome: Outcome being built (mutated).
     """
-    direct = [mine for mine in world["mines"] if (mine["x"], mine["y"]) == (x, y)]
-    if not direct:
+    if world["mines"].pop(tile_key(x, y), None) is None:
         return
-    for mine in direct:
-        world["mines"].remove(mine)
-    chain = [
-        mine for mine in list(world["mines"]) if abs(mine["x"] - x) <= 1 and abs(mine["y"] - y) <= 1
-    ]
-    for mine in chain:
-        world["mines"].remove(mine)
+    # The cascade is the eight neighbours, read by key rather than by
+    # sweeping the field — the minefield is dense enough that a sweep
+    # per impact dominated the tick ([[session-state-deglobalisation]]).
+    chain: list[tuple[int, int]] = []
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            neighbour = world["mines"].pop(tile_key(x + dx, y + dy), None)
+            if neighbour is not None:
+                chain.append((neighbour["x"], neighbour["y"]))
     outcome["mine_cascade"].append([(x, y)])
     if chain:
-        outcome["mine_cascade"].append([(mine["x"], mine["y"]) for mine in chain])
+        outcome["mine_cascade"].append(chain)
 
 
 def _reroute_departed(

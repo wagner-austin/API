@@ -9,10 +9,10 @@ from tankpit_bot.sim.movement import MINE_WALK_COST, process_move
 from tankpit_bot.sim.world import (
     SimBlockDict,
     SimContainerDict,
-    SimMineDict,
     SimWorldDict,
     make_sim_tank,
     make_sim_world,
+    place_mine,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -85,11 +85,11 @@ def test_empty_container_is_not_a_pickup() -> None:
 def test_walking_into_enemy_mine_detonates_and_bills_45() -> None:
     """The destination's enemy mine costs 45 and disappears."""
     world = _world_with_tank()
-    world["mines"].append(SimMineDict(x=11, y=10, team=2))
+    place_mine(world, 11, 10, 2)
     outcome = process_move(world, InMemoryTerrainMap(), 9, 11, 10)
     assert outcome["kind"] == "moved"
     assert outcome["mine_positions"] == [(11, 10)]
-    assert world["mines"] == []
+    assert world["mines"] == {}
     assert world["tanks"][9]["fuel"] == 1000 - 1 - MINE_WALK_COST
 
 
@@ -100,12 +100,12 @@ def test_revealed_enemy_mine_forces_detour_own_mine_does_not() -> None:
     only happens once the mover's team has been shown the mine.
     """
     world = _world_with_tank()
-    world["mines"].append(SimMineDict(x=10, y=11, team=2))
+    place_mine(world, 10, 11, 2)
     world["revealed_mine_keys_by_team"]["0"] = ["10,11"]
     detoured = process_move(world, InMemoryTerrainMap(), 9, 10, 12)
     assert detoured["kind"] == "moved"
     assert len(detoured["path"]) == 4
-    world["mines"][0] = SimMineDict(x=10, y=11, team=0)
+    place_mine(world, 10, 11, 0)
     world["tanks"][9]["x"], world["tanks"][9]["y"] = 10, 10
     direct = process_move(world, InMemoryTerrainMap(), 9, 10, 12)
     assert direct["path"] == "ss"
@@ -120,14 +120,14 @@ def test_hidden_enemy_mine_is_walked_into_and_arrests_the_move() -> None:
     pays the 45, and arrests there — no code 1.
     """
     world = _world_with_tank()
-    world["mines"].append(SimMineDict(x=10, y=11, team=2))
+    place_mine(world, 10, 11, 2)
     outcome = process_move(world, InMemoryTerrainMap(), 9, 10, 12)
     assert outcome["kind"] == "moved"
     assert outcome["path"] == "s"
     assert outcome["mine_positions"] == [(10, 11)]
     assert (world["tanks"][9]["x"], world["tanks"][9]["y"]) == (10, 11)
     assert world["tanks"][9]["fuel"] == 1000 - 1 - MINE_WALK_COST
-    assert world["mines"] == []
+    assert world["mines"] == {}
 
 
 def test_teammate_scan_reveals_for_the_whole_color() -> None:
@@ -140,14 +140,14 @@ def test_teammate_scan_reveals_for_the_whole_color() -> None:
     world = _world_with_tank()
     world["tanks"][12] = make_sim_tank(12, 0, 1, 12, 11, 500)
     world["tanks"][12]["counts"][SLOT_RADAR] = 1
-    world["mines"].append(SimMineDict(x=10, y=11, team=2))
+    place_mine(world, 10, 11, 2)
     scan = process_radar(world, 12, None)
     assert scan["mines"] != []
     assert "10,11" in world["revealed_mine_keys_by_team"]["0"]
     detoured = process_move(world, InMemoryTerrainMap(), 9, 10, 12)
     assert detoured["kind"] == "moved"
     assert len(detoured["path"]) == 4
-    assert world["mines"] != []
+    assert world["mines"] != {}
 
 
 def test_other_tank_blocks_interior_and_destination() -> None:
@@ -206,12 +206,12 @@ def test_revealed_mine_severing_the_corridor_stops_the_walk_before_it() -> None:
     stops before the mine rather than detonating it.
     """
     world = _world_with_tank()
-    world["mines"].append(SimMineDict(x=13, y=10, team=2))
+    place_mine(world, 13, 10, 2)
     world["revealed_mine_keys_by_team"]["0"] = ["13,10"]
     outcome = process_move(world, _corridor_terrain(), 9, 15, 10)
     assert outcome["kind"] == "cant_go"
     assert outcome["path"] == "ee"
-    assert world["mines"] != []
+    assert world["mines"] != {}
     assert (world["tanks"][9]["x"], world["tanks"][9]["y"]) == (12, 10)
 
 
@@ -247,7 +247,7 @@ def test_hidden_mine_on_the_severed_fallback_walk_detonates_instead() -> None:
     """
     world = _world_with_tank()
     world["tanks"][11] = make_sim_tank(11, 1, 1, 14, 10, 500)
-    world["mines"].append(SimMineDict(x=12, y=10, team=2))
+    place_mine(world, 12, 10, 2)
     outcome = process_move(world, _corridor_terrain(), 9, 15, 10)
     assert outcome["kind"] == "moved"
     assert outcome["path"] == "ee"

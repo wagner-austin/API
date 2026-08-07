@@ -13,10 +13,10 @@ from tankpit_bot.sim.actions import (
 from tankpit_bot.sim.combat import SLOT_RADAR
 from tankpit_bot.sim.world import (
     SimContainerDict,
-    SimMineDict,
     SimWorldDict,
     make_sim_tank,
     make_sim_world,
+    place_mine,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -41,19 +41,19 @@ def test_teleport_lands_on_clear_target_and_bills_actual_distance() -> None:
 def test_teleport_displacement_prefers_east_then_north_then_west() -> None:
     """Ring-1 displacement follows the measured E -> N -> W order."""
     world = _world()
-    world["mines"].append(SimMineDict(x=130, y=140, team=1))
+    place_mine(world, 130, 140, 1)
     east = process_teleport(world, InMemoryTerrainMap(), 9, 130, 140)
     assert (east["landed_x"], east["landed_y"]) == (131, 140)
     assert east["cost"] == teleport_cost(100, 100, 131, 140)
 
     world = _world()
-    world["mines"].append(SimMineDict(x=130, y=140, team=1))
+    place_mine(world, 130, 140, 1)
     terrain = InMemoryTerrainMap(terrain_data={(131, 140): "#"})
     north = process_teleport(world, terrain, 9, 130, 140)
     assert (north["landed_x"], north["landed_y"]) == (130, 139)
 
     world = _world()
-    world["mines"].append(SimMineDict(x=130, y=140, team=1))
+    place_mine(world, 130, 140, 1)
     terrain = InMemoryTerrainMap(terrain_data={(131, 140): "#", (130, 139): "#"})
     west = process_teleport(world, terrain, 9, 130, 140)
     assert (west["landed_x"], west["landed_y"]) == (129, 140)
@@ -63,14 +63,14 @@ def test_teleport_south_is_the_last_resort_and_full_ring_blocks() -> None:
     """South lands only when E/N/W are blocked; a sealed ring rejects."""
     walls = {(131, 140): "#", (130, 139): "#", (129, 140): "#"}
     world = _world()
-    world["mines"].append(SimMineDict(x=130, y=140, team=1))
+    place_mine(world, 130, 140, 1)
     south = process_teleport(world, InMemoryTerrainMap(terrain_data=dict(walls)), 9, 130, 140)
     assert (south["landed_x"], south["landed_y"]) == (130, 141)
 
     sealed = dict(walls)
     sealed[(130, 141)] = "#"
     world = _world()
-    world["mines"].append(SimMineDict(x=130, y=140, team=1))
+    place_mine(world, 130, 140, 1)
     blocked = process_teleport(world, InMemoryTerrainMap(terrain_data=sealed), 9, 130, 140)
     assert blocked["kind"] == "blocked"
     assert (world["tanks"][9]["x"], world["tanks"][9]["y"]) == (100, 100)
@@ -85,7 +85,7 @@ def test_teleport_blockers_tank_blocks_own_mine_does_not() -> None:
     assert (displaced["landed_x"], displaced["landed_y"]) == (131, 140)
 
     world = _world()
-    world["mines"].append(SimMineDict(x=130, y=140, team=0))
+    place_mine(world, 130, 140, 0)
     direct = process_teleport(world, InMemoryTerrainMap(), 9, 130, 140)
     assert (direct["landed_x"], direct["landed_y"]) == (130, 140)
 
@@ -119,7 +119,7 @@ def test_radar_consumes_extra_for_the_viewport_window() -> None:
     world["containers"].append(SimContainerDict(x=107, y=100, volume=0, dotted=True))
     world["containers"].append(SimContainerDict(x=92, y=100, volume=70, dotted=True))
     world["containers"].append(SimContainerDict(x=91, y=100, volume=70, dotted=True))
-    world["mines"].append(SimMineDict(x=100, y=107, team=1))
+    place_mine(world, 100, 107, 1)
     outcome = process_radar(world, 9)
     assert outcome["consumed_extra"] is True
     assert world["tanks"][9]["counts"][SLOT_RADAR] == 1
@@ -201,8 +201,8 @@ def test_mine_press_places_skips_and_trades_one_to_one() -> None:
     """The 3x3 press: clear tiles filled, blockers skipped, 1:1 trades."""
     world = _world()
     world["tanks"][11] = make_sim_tank(11, 1, 1, 101, 100, 500)
-    world["mines"].append(SimMineDict(x=99, y=100, team=1))
-    world["mines"].append(SimMineDict(x=100, y=99, team=0))
+    place_mine(world, 99, 100, 1)
+    place_mine(world, 100, 99, 0)
     terrain = InMemoryTerrainMap(terrain_data={(99, 99): "#"})
     outcome = process_mine_press(world, terrain, 9)
     assert outcome["detonated"] == [(99, 100)]
@@ -211,5 +211,5 @@ def test_mine_press_places_skips_and_trades_one_to_one() -> None:
     assert (100, 99) not in outcome["placed"]
     assert (100, 100) in outcome["placed"]
     assert len(outcome["placed"]) == 5
-    own_positions = {(m["x"], m["y"]) for m in world["mines"] if m["team"] == 0}
+    own_positions = {(m["x"], m["y"]) for m in world["mines"].values() if m["team"] == 0}
     assert set(outcome["placed"]) | {(100, 99)} == own_positions

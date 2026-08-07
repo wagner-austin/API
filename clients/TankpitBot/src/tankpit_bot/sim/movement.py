@@ -27,6 +27,7 @@ from tankpit_bot.physics.damage import SINGLE_HIT_VICTIM_COST
 from tankpit_bot.sim.blocks import BLOCK_BRIDGE, block_tile_value
 from tankpit_bot.sim.pathfind import route
 from tankpit_bot.sim.world import SimFerryDict, SimTankDict, SimWorldDict
+from tankpit_bot.state.scan_coverage import tile_key
 
 # Walking into an enemy mine costs the mine's 45 (wiki [[game-economy]],
 # same magnitude as a single hit).
@@ -177,11 +178,10 @@ def _blocked_by_world(world: SimWorldDict, mover: SimTankDict, x: int, y: int) -
             and (tank["x"], tank["y"]) == (x, y)
         ):
             return True
-    if any(
-        mine["team"] != mover["team"] and (mine["x"], mine["y"]) == (x, y)
-        for mine in world["mines"]
-    ):
-        return f"{x},{y}" in _team_revealed_keys(world, mover["team"])
+    key = tile_key(x, y)
+    mine = world["mines"].get(key)
+    if mine is not None and mine["team"] != mover["team"]:
+        return key in _team_revealed_keys(world, mover["team"])
     return False
 
 
@@ -198,11 +198,10 @@ def _unrevealed_enemy_mine_at(world: SimWorldDict, mover: SimTankDict, x: int, y
         True when an enemy mine the mover's team has never been shown
         occupies the tile — the walk-over detonation case.
     """
-    if any(
-        mine["team"] != mover["team"] and (mine["x"], mine["y"]) == (x, y)
-        for mine in world["mines"]
-    ):
-        return f"{x},{y}" not in _team_revealed_keys(world, mover["team"])
+    key = tile_key(x, y)
+    mine = world["mines"].get(key)
+    if mine is not None and mine["team"] != mover["team"]:
+        return key not in _team_revealed_keys(world, mover["team"])
     return False
 
 
@@ -238,11 +237,12 @@ def _resolve_arrival(world: SimWorldDict, tank_id: int, outcome: MoveOutcomeDict
     """
     tank = world["tanks"][tank_id]
     x, y = tank["x"], tank["y"]
-    for mine in list(world["mines"]):
-        if mine["team"] != tank["team"] and (mine["x"], mine["y"]) == (x, y):
-            world["mines"].remove(mine)
-            tank["fuel"] = max(0, tank["fuel"] - MINE_WALK_COST)
-            outcome["mine_positions"].append((x, y))
+    key = tile_key(x, y)
+    mine = world["mines"].get(key)
+    if mine is not None and mine["team"] != tank["team"]:
+        del world["mines"][key]
+        tank["fuel"] = max(0, tank["fuel"] - MINE_WALK_COST)
+        outcome["mine_positions"].append((x, y))
     resolve_pickup(world, tank_id, outcome["pickups"])
 
 

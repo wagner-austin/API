@@ -16,10 +16,10 @@ from tankpit_bot.sim.movement import process_move, tile_surface
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import (
     SimBlockDict,
-    SimMineDict,
     SimWorldDict,
     make_sim_tank,
     make_sim_world,
+    place_mine,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 from tests.sim.seam import boot_seam
@@ -78,12 +78,14 @@ def test_drop_on_land_kills_any_mine_silently() -> None:
     world = _world()
     world["tanks"][9]["carrying"] = True
     world["blocks"] = []
-    world["mines"].append(SimMineDict(x=10, y=11, team=0))
-    world["mines"].append(SimMineDict(x=10, y=11, team=1))
+    # One mine per tile now: the second placement replaces the first,
+    # which is the invariant the drop then clears.
+    place_mine(world, 10, 11, 0)
+    place_mine(world, 10, 11, 1)
     dropped = process_block_press(world, _map_with_pond(), 9, 10, 11)
     assert dropped["kind"] == "dropped"
     assert dropped["tile_value"] == BLOCK_LAND
-    assert world["mines"] == []
+    assert world["mines"] == {}
     assert world["tanks"][9]["carrying"] is False
 
 

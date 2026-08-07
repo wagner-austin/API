@@ -16,10 +16,10 @@ from tankpit_bot.sim.spawn import (
 from tankpit_bot.sim.world import (
     SimContainerDict,
     SimEquipmentDict,
-    SimMineDict,
     SimWorldDict,
     make_sim_tank,
     make_sim_world,
+    place_mine,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -39,7 +39,7 @@ def test_tile_occupancy_blocks_every_entity_kind() -> None:
     from tankpit_bot.sim.world import SimBlockDict
 
     world = _world()
-    world["mines"].append(SimMineDict(x=50, y=50, team=1))
+    place_mine(world, 50, 50, 1)
     world["blocks"].append(SimBlockDict(x=55, y=55))
     assert _tile_occupied(world, 55, 55) is True
     assert _tile_occupied(world, 10, 10) is True
@@ -55,7 +55,7 @@ def test_global_scan_walks_past_an_occupied_first_probe() -> None:
     world = _world()
     seed = (30 * 97) % 65536
     first = (seed % 256, seed // 256)
-    world["mines"].append(SimMineDict(x=first[0], y=first[1], team=1))
+    place_mine(world, first[0], first[1], 1)
     position = find_open_tile(world, InMemoryTerrainMap(), 30)
     if position is None:
         raise AssertionError("an open map must yield a placement tile")
@@ -78,7 +78,7 @@ def test_ring_search_skips_bounds_and_occupied_rings() -> None:
     for dx in range(-6, 7):
         for dy in range(-6, 7):
             if max(abs(dx), abs(dy)) == 6 and 0 <= 2 + dx < 256 and 0 <= 2 + dy < 256:
-                world["mines"].append(SimMineDict(x=2 + dx, y=2 + dy, team=1))
+                place_mine(world, 2 + dx, 2 + dy, 1)
     position = find_open_tile_near(
         world, InMemoryTerrainMap(), 2, 2, tick=5, min_radius=6, max_radius=7
     )

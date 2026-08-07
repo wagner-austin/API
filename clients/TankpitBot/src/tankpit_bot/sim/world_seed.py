@@ -338,7 +338,7 @@ def seed_field_population(
     }
     occupied.update((c["x"], c["y"]) for c in world["containers"])
     occupied.update((e["x"], e["y"]) for e in world["equipment"])
-    occupied.update((m["x"], m["y"]) for m in world["mines"])
+    occupied.update((m["x"], m["y"]) for m in world["mines"].values())
     occupied.update((b["x"], b["y"]) for b in world["blocks"])
     index = seed
     for dot_i in range(DOTTED_FUEL_COUNT):

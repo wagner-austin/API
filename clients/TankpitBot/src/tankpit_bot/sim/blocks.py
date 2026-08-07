@@ -22,6 +22,7 @@ from typing import Literal, TypedDict
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.sim.world import SimBlockDict, SimWorldDict
+from tankpit_bot.state.scan_coverage import tile_key
 
 BLOCK_BRIDGE = 1
 BLOCK_LAND = 2
@@ -137,9 +138,7 @@ def process_block_press(
     world["blocks"].append(SimBlockDict(x=target_x, y=target_y))
     tank["carrying"] = False
     if not water:
-        world["mines"] = [
-            mine for mine in world["mines"] if (mine["x"], mine["y"]) != (target_x, target_y)
-        ]
+        world["mines"].pop(tile_key(target_x, target_y), None)
     outcome["kind"] = "dropped"
     outcome["tile_value"] = block_tile_value(world, terrain, target_x, target_y)
     return outcome

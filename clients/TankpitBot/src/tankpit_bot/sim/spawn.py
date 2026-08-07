@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.sim.world import SimWorldDict
+from tankpit_bot.state.scan_coverage import tile_key
 
 _MAP_SPAN = 256
 _TILE_COUNT = _MAP_SPAN * _MAP_SPAN
@@ -45,7 +46,7 @@ def _tile_occupied(world: SimWorldDict, x: int, y: int) -> bool:
             return True
     if any((block["x"], block["y"]) == (x, y) for block in world["blocks"]):
         return True
-    return any((mine["x"], mine["y"]) == (x, y) for mine in world["mines"])
+    return tile_key(x, y) in world["mines"]
 
 
 def find_open_tile(

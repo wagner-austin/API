@@ -11,13 +11,13 @@ from tankpit_bot.sim.world import (
     SimContainerDict,
     SimEquipmentDict,
     SimFerryDict,
-    SimMineDict,
     decode_sim_tank,
     decode_sim_world,
     encode_sim_tank,
     encode_sim_world,
     make_sim_tank,
     make_sim_world,
+    place_mine,
 )
 
 
@@ -54,7 +54,7 @@ def test_world_codec_round_trip() -> None:
     world = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 5, 5, 1000)
     world["containers"].append(SimContainerDict(x=3, y=4, volume=200, dotted=True))
-    world["mines"].append(SimMineDict(x=7, y=8, team=2))
+    place_mine(world, 7, 8, 2)
     world["equipment"].append(SimEquipmentDict(x=9, y=2))
     world["ferries"].append(SimFerryDict(x=11, y=6))
     world["blocks"].append(SimBlockDict(x=2, y=14))

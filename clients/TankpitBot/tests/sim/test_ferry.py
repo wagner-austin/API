@@ -142,10 +142,10 @@ def test_mine_walk_over_arrest_closes_silently() -> None:
     Archive 2026-07-29/30: 18 detonations, zero paired code-1s.
     """
     from tankpit_bot.sim.emissions import emit_move
-    from tankpit_bot.sim.world import SimMineDict
+    from tankpit_bot.sim.world import place_mine
 
     world = _world(10, 10)
-    world["mines"].append(SimMineDict(x=11, y=10, team=2))
+    place_mine(world, 11, 10, 2)
     outcome = process_move(world, _channel_map(), 9, 12, 10)
     assert outcome["kind"] == "moved"
     assert outcome["stop_reason"] == "mine"
