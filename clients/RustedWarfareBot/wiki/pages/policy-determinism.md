@@ -116,6 +116,23 @@ Verified live: lake_2p, opponents=1, `players 2 -> 2`
 scorecard read, always. A verdict whose seating was never checked is a
 verdict about an unknown experiment.
 
+The rule promptly earned its keep against a second, stranger-looking case:
+worker clones seated three players with the override verifiably reading
+two -- "a value nobody wrote", dir-dependent, override-independent. Run to
+ground on 2026-08-06, it was never a seating mechanism at all: six maps
+added to the pinned copy after the clones were made (the true-1v1 set,
+lake_2p among them) had never reached them, the engine failed the map load
+**with an alert nothing read**, and fell back to its boot sandbox -- a
+3-to-5-player FFA whose seat count varies with the background-map
+rotation. Every scorecard of the xmap-2* batches and duel-lake_2p reads
+`players 4 -> N` with a sandbox opening (worth 37,800, army 12 at s0):
+**that whole cross-map family never played its named maps and its
+conclusions are void.** `prepare_clone` now re-syncs the pinned copy's
+maps into every reused clone, loudly (`_sync_maps`,
+`runs/seat-probe5.log` is the repro). The reader-side tells beyond the
+players line: `owned at compile` in the run log, and the fresh-start worth
+-- a real duel opens at 3,500 ([[policy-exact-timing]]).
+
 [^4]: `.decompiled/com/corrodinggames/librocket/scripts/Root.java:626-645`
     (`loadConfigCommon`: the element reads and the fallback), `:204-211`
     (`setValueById`).

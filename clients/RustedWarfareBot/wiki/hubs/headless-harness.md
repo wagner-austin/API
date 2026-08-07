@@ -11,3 +11,5 @@ Run artifacts are archived under `runs/` and are the primary sources this wiki c
 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 [Playing Matches in Parallel](../pages/harness-parallel-matches.md) -- what actually had to be separated to run several headless matches at once, and why lockstep is not optional for a batch
+
+[The Exact-Timing Regime — the Ladder Re-Founded](../pages/policy-exact-timing.md) -- the certified seed-pure simulation, the un-handicapped AI it revealed, the boot-sandbox compile trap, and the honest ladder every new rate is measured against

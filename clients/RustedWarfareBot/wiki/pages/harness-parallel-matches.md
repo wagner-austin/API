@@ -55,6 +55,8 @@ Everything else is copied by **exclusion rather than an allow-list**, so a direc
 
 The clone is verified before a worker is given it. A copy missing the JVM fails ninety seconds later as *"the agent never opened port N"*, which reads like a fault in the agent rather than a truncated copy.
 
+Verification checks the entries a match needs to LAUNCH; it cannot know which map the batch will ask for, and reuse made that gap expensive: maps added to the pinned copy after a clone was made never reached it, the engine's load failed with an unread alert, and the match drifted into the boot sandbox ([[policy-determinism]], the seating section -- the whole xmap family was voided this way). Since 2026-08-06 `prepare_clone` re-syncs the pinned copy's skirmish maps into every reused clone and reports what it copied.
+
 ## Settings are reset before every match, not once per clone
 
 The game rewrites `preferences.ini` on each boot, so without a reset the second match a worker plays starts from the first one's leavings, and two workers that have played different numbers of matches start from different settings. Measured across four clones, the files had already diverged into three distinct versions.
