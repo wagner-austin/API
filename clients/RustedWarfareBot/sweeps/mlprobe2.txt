@@ -1,0 +1,3 @@
+flame-early|12345|doctrines/flame-early.doctrine|10000
+flame-early|777|doctrines/flame-early.doctrine|10000
+flame-early|8128|doctrines/flame-early.doctrine|10000

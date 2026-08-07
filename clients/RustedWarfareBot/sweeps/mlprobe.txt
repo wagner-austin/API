@@ -1,0 +1,3 @@
+flame-close|12345|doctrines/flame-close.doctrine|10000
+flame-close|777|doctrines/flame-close.doctrine|10000
+flame-close|8128|doctrines/flame-close.doctrine|10000
