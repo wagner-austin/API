@@ -32,7 +32,10 @@ from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import make_chat_command
 from tankpit_bot.protocol.chat import CHAT_HELLO
 from tankpit_bot.protocol.naming import is_human_name
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    emit_ai,
+    emit_diagnostic,
+)
 
 
 def attach_human_greeting(ctx: DecideCtx, decision: TickDecisionDict) -> TickDecisionDict:

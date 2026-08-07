@@ -10,12 +10,14 @@ held-lock pursuit and escape in :mod:`hunt_lock`; relay travel in
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.combat_close import close_target
 from tankpit_bot.bot.ai.combat_strategy import (
-    clear_combat_target,
-    close_target,
     engage_target,
-    get_locked_target,
     has_cardinal_combat_shot,
+)
+from tankpit_bot.bot.ai.combat_target import (
+    clear_combat_target,
+    get_locked_target,
 )
 from tankpit_bot.bot.ai.context import (
     DecideCtx,

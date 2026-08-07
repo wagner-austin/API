@@ -20,29 +20,27 @@ from tankpit_bot.bot.ai.equipment_search import (
     is_reachable,
 )
 from tankpit_bot.bot.ai.pathfinding import find_path, path_length
+from tankpit_bot.bot.ai.scoring_types import (
+    BEHAVIOR_MODES,
+    BehaviorMode,
+    BehaviorScoreDict,
+    make_behavior_score,
+)
 from tankpit_bot.bot.ai.tactics import (
     compute_desired_equipment,
     should_proactive_radar,
 )
-from tankpit_bot.bot.ai.threats import (
-    analyze_threats,
+from tankpit_bot.bot.ai.threat_primitives import (
     find_closest_threat,
     manhattan_distance,
     threats_in_range,
 )
+from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import (
-    BEHAVIOR_MODES,
     AIConfigDict,
     AIStateDict,
-    BehaviorMode,
-    BehaviorScoreDict,
-    EnemyThreatDict,
-    PathStepDict,
-    make_behavior_score,
     make_default_ai_config,
-    make_enemy_threat,
     make_initial_ai_state,
-    make_path_step,
 )
 from tankpit_bot.bot.ai.types_codecs import (
     decode_ai_config,
@@ -55,6 +53,12 @@ from tankpit_bot.bot.ai.types_codecs import (
     encode_behavior_score,
     encode_enemy_threat,
     encode_path_step,
+)
+from tankpit_bot.bot.ai.world_types import (
+    EnemyThreatDict,
+    PathStepDict,
+    make_enemy_threat,
+    make_path_step,
 )
 
 __all__ = [

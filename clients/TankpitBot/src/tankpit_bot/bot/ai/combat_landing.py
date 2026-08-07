@@ -6,8 +6,8 @@ from collections.abc import Callable
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import hostile_mines
-from tankpit_bot.bot.ai.threats import manhattan_distance
-from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.threat_primitives import manhattan_distance
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.state.occupancy import is_tank_body_present

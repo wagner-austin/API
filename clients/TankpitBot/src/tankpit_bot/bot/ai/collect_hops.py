@@ -19,7 +19,10 @@ from tankpit_bot.bot.ai.equipment_search import find_all_tracked_equipment
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.intent import release_collect_plan
 from tankpit_bot.bot.ai.larder import select_fuel_larder_hop
-from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted, weapon_reserves_below_break
+from tankpit_bot.bot.ai.mode_gates import (
+    hunt_entry_permitted,
+    weapon_reserves_below_break,
+)
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -27,7 +30,10 @@ from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_teleport_command
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    emit_ai,
+    emit_diagnostic,
+)
 from tankpit_bot.state.types import ContainerStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 

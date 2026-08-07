@@ -10,17 +10,23 @@ live in :mod:`hunt_lock`; relay travel in :mod:`hunt_relay`.
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.combat_landing import choose_greeting_landing_tile
-from tankpit_bot.bot.ai.combat_strategy import (
-    clear_combat_target,
+from tankpit_bot.bot.ai.combat_close import (
     close_target,
-    engage_target,
-    get_locked_target,
-    has_cardinal_combat_shot,
+    teleport_to_target,
+)
+from tankpit_bot.bot.ai.combat_landing import choose_greeting_landing_tile
+from tankpit_bot.bot.ai.combat_prep import (
     open_map_for_target,
     refuel_for_hunt,
+)
+from tankpit_bot.bot.ai.combat_strategy import (
+    engage_target,
+    has_cardinal_combat_shot,
+)
+from tankpit_bot.bot.ai.combat_target import (
+    clear_combat_target,
+    get_locked_target,
     select_new_combat_target,
-    teleport_to_target,
 )
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
@@ -41,19 +47,24 @@ from tankpit_bot.bot.ai.hunt_relay import (
     relay_toward_unaffordable_enemy,
     stale_human_needs_map_refresh,
 )
-from tankpit_bot.bot.ai.threats import (
-    find_acquisition_target,
+from tankpit_bot.bot.ai.scoring_types import ReasonKind
+from tankpit_bot.bot.ai.threat_acquisition import find_acquisition_target
+from tankpit_bot.bot.ai.threat_primitives import (
     human_combat_consented,
     make_enemy_threat_from_tank,
     manhattan_distance,
 )
-from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict, ReasonKind
+from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_teleport_command
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.protocol.naming import is_human_name, is_practice_bot_name
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    emit_ai,
+    emit_diagnostic,
+)
 from tankpit_bot.state.types import has_known_position
 
 

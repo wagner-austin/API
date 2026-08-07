@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.bot.ai.threats import manhattan_distance
+from tankpit_bot.bot.ai.threat_primitives import manhattan_distance
 from tankpit_bot.state.types import (
     ContainerStateDict,
     MineStateDict,

@@ -47,7 +47,7 @@ from collections import deque
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.state.types import WorldStateDict
-from tankpit_bot.state.types.constants import ASCII_FERRY, TERRAIN_FERRY
+from tankpit_bot.types.constants import ASCII_FERRY, TERRAIN_FERRY
 
 FERRY_SEARCH_RADIUS = 12
 """Chebyshev radius around the goal container searched for a ferry.

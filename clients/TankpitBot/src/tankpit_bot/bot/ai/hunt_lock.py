@@ -14,28 +14,36 @@ from tankpit_bot.bot.ai.combat_break import (
     INCOMING_RATE_WINDOW_MS,
     assess_engagement_break,
 )
-from tankpit_bot.bot.ai.combat_strategy import (
-    block_combat_target_and_replan,
-    engage_target,
-    get_locked_target,
-    is_already_engaged,
+from tankpit_bot.bot.ai.combat_close import teleport_to_target
+from tankpit_bot.bot.ai.combat_prep import (
     open_map_for_target,
     refuel_for_hunt,
-    teleport_to_target,
+)
+from tankpit_bot.bot.ai.combat_strategy import engage_target
+from tankpit_bot.bot.ai.combat_target import (
+    block_combat_target_and_replan,
+    get_locked_target,
+    is_already_engaged,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.mode_controller import human_fight_resume_fuel_floor
-from tankpit_bot.bot.ai.threats import (
-    analyze_threats,
-    find_locked_target_pursuit,
+from tankpit_bot.bot.ai.mode_gates import human_fight_resume_fuel_floor
+from tankpit_bot.bot.ai.threat_primitives import (
     pursuit_homing_budget_spent,
     pursuit_trace_is_live,
 )
-from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict
+from tankpit_bot.bot.ai.threats import (
+    analyze_threats,
+    find_locked_target_pursuit,
+)
+from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.naming import is_human_name, is_practice_bot_name
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    emit_ai,
+    emit_diagnostic,
+)
 from tankpit_bot.sniffer.world_state import get_incoming_damage_window
 
 

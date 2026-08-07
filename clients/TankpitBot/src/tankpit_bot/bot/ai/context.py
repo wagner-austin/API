@@ -8,15 +8,17 @@ rather than from ``ai_strategy`` to avoid circular dependencies.
 from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot.bot.ai.scoring_types import (
+    BehaviorMode,
+    ReasonKind,
+    make_behavior_score,
+)
 from tankpit_bot.bot.ai.tactics import compute_desired_equipment
 from tankpit_bot.bot.ai.types import (
     AIConfigDict,
     AIStateDict,
-    BehaviorMode,
-    EnemyThreatDict,
-    ReasonKind,
-    make_behavior_score,
 )
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand

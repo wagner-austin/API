@@ -45,7 +45,10 @@ from tankpit_bot.protocol.commands import (
     SCOPE_SOUTHWEST,
     SCOPE_WEST,
 )
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    emit_ai,
+    emit_diagnostic,
+)
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 SCOPE_SCOUT_COOLDOWN_MS = 30000

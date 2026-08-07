@@ -15,7 +15,7 @@ from tankpit_bot.bot.ai.equipment import (
     is_container_pursuable,
 )
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_in_viewport
-from tankpit_bot.bot.ai.threats import manhattan_distance
+from tankpit_bot.bot.ai.threat_primitives import manhattan_distance
 from tankpit_bot.state.types import (
     ContainerStateDict,
     SelfStateDict,

@@ -31,7 +31,7 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import DUAL_SHOT_COST
 from tankpit_bot.physics.damage import DUAL_HIT_VICTIM_COST, HOMING_HIT_VICTIM_COST

@@ -33,12 +33,19 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
-from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode, ReasonKind
+from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
+from tankpit_bot.bot.ai.scoring_types import (
+    BehaviorMode,
+    ReasonKind,
+)
+from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_teleport_command
 from tankpit_bot.physics.capacity import fuel_capacity
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    emit_ai,
+    emit_diagnostic,
+)
 from tankpit_bot.state.scan_coverage import (
     HARVEST_MEMORY_TTL_MS,
     is_viewport_scanned_within,

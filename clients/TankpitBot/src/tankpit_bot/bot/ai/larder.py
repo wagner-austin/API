@@ -24,7 +24,7 @@ from typing_extensions import TypedDict
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
-from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
+from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost

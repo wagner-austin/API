@@ -30,15 +30,17 @@ from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.pathfinding import find_path
 from tankpit_bot.state.occupancy import occupied_tank_keys
 from tankpit_bot.state.types import (
-    TERRAIN_BLOCK_BRIDGE,
-    TERRAIN_BLOCK_LAND,
-    TERRAIN_BLOCK_STACKED,
-    TERRAIN_FERRY,
     TerrainTileDict,
     WorldStateDict,
     coord_key,
 )
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+from tankpit_bot.types.constants import (
+    TERRAIN_BLOCK_BRIDGE,
+    TERRAIN_BLOCK_LAND,
+    TERRAIN_BLOCK_STACKED,
+    TERRAIN_FERRY,
+)
 
 _ASCII_FERRY = "~"
 

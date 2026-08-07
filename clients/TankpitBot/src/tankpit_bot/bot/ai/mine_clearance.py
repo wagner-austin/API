@@ -34,8 +34,8 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
-from tankpit_bot.physics.line_of_sight import is_shot_line_clear, shot_line_tiles
 from tankpit_bot.state import SelfStateDict, WorldStateDict
+from tankpit_bot.state.line_of_sight import is_shot_line_clear, shot_line_tiles
 from tankpit_bot.state.types import ContainerStateDict, MineStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 

@@ -13,8 +13,12 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
-from tankpit_bot.bot.ai.threats import find_relay_travel_target, stale_human_exists
-from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict
+from tankpit_bot.bot.ai.threat_acquisition import (
+    find_relay_travel_target,
+    stale_human_exists,
+)
+from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_teleport_command
 from tankpit_bot.physics.capacity import fuel_capacity

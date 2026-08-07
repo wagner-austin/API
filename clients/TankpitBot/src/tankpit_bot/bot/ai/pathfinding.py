@@ -10,7 +10,10 @@ from __future__ import annotations
 import heapq
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
-from tankpit_bot.bot.ai.types import PathStepDict, make_path_step
+from tankpit_bot.bot.ai.world_types import (
+    PathStepDict,
+    make_path_step,
+)
 
 # 4-directional movement: right, down, left, up
 _DIRECTIONS: tuple[tuple[int, int], ...] = ((1, 0), (0, 1), (-1, 0), (0, -1))
