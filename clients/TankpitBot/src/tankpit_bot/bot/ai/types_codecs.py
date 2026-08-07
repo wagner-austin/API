@@ -24,16 +24,20 @@ from tankpit_bot.bot.ai.modes import (
     require_ai_mode,
     require_ai_mode_state,
 )
-from tankpit_bot.bot.ai.types import (
+from tankpit_bot.bot.ai.scoring_types import (
     BEHAVIOR_MODES,
     REASON_KINDS,
-    AIConfigDict,
-    AIStateDict,
     BehaviorMode,
     BehaviorScoreDict,
+    ReasonKind,
+)
+from tankpit_bot.bot.ai.types import (
+    AIConfigDict,
+    AIStateDict,
+)
+from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
     PathStepDict,
-    ReasonKind,
 )
 
 
