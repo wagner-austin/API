@@ -17,3 +17,5 @@ Codebase design decisions, patterns, and coding standards. (13 pages)
 [Flag Triage 2026-07-29](../pages/flag-triage-20260729.md) -- first live flag session: 10 flags, 4 root causes (direction-blind top-off hop, 63% zero-yield hop churn, missing mine-shot clearance, mine-ring acquisition cloak), fix-status table
 
 [Larder Plan](../pages/larder-plan.md) -- IMPLEMENTED and live-proven 2026-07-27: harvest radar-verified containers the bot already remembers as a COLLECT cascade priority; own-tile equipment pickup probe answered YES 3/3; the under-fire refuel now shares the same query
+
+[Session-State De-globalisation](../pages/session-state-deglobalisation.md) -- the 17 modules holding per-session state at module scope, why the divergence exists (a 40-second package split froze an unfinished convergence), the archive measurements that make the cipher swap a lift, and the 11-step ordered plan whose completion criterion is deleting the conftest reset list
