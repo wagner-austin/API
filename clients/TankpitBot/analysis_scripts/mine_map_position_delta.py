@@ -30,7 +30,7 @@ from pathlib import Path
 from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
-from tankpit_bot.protocol.helpers import DecodeError
+from tankpit_bot.wire.helpers import DecodeError
 from tankpit_bot.sniffer.decoders import _is_text_route
 
 PAIR_WINDOW_MS = 2_000

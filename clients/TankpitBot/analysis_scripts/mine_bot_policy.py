@@ -21,7 +21,7 @@ from tankpit_bot.analysis.scan import scan_session as scan_capture_session
 from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message
 from tankpit_bot.protocol.commands import CMD_RADAR, COMMAND_PREFIX
-from tankpit_bot.protocol.helpers import DecodeError
+from tankpit_bot.wire.helpers import DecodeError
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 
 # Migrated 2026-08-06 onto tankpit_bot.analysis.scan (the typed
