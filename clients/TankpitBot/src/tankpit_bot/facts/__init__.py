@@ -1,9 +1,14 @@
-"""Facts layer: every belief carries source, time, confidence, provenance.
+"""Facts vocabulary: every belief carries source, time, confidence, provenance.
 
 Phase 1 of the self-observing bot architecture. ``Fact[T]`` is
 introduced alongside the raw world-state types (Phase 1a); the
 retrofits of ``ContainerStateDict`` / ``TankStateDict`` / the rest are
 Phases 1b-1d.
+
+This package is a LEAF: it defines the vocabulary and imports no other
+``tankpit_bot`` package. The Fact[T] projections that read world state
+back live in :mod:`tankpit_bot.state.projections`, above ``state``,
+because ``state/types`` imports this vocabulary.
 """
 
 from tankpit_bot.facts.confidence import (
