@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.bot.ai.types import BehaviorScoreDict, make_initial_ai_state
+from tankpit_bot.bot.ai.scoring_types import BehaviorScoreDict
+from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,

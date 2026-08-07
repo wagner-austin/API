@@ -36,7 +36,11 @@ import types
 from collections.abc import Callable, Sequence
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.bot.ai.types import AIConfigDict, AIStateDict, make_initial_ai_state
+from tankpit_bot.bot.ai.types import (
+    AIConfigDict,
+    AIStateDict,
+    make_initial_ai_state,
+)
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict

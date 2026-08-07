@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.bot.ai.threats import WIRE_PRESENCE_TTL_MS, analyze_threats
+from tankpit_bot.bot.ai.threat_primitives import WIRE_PRESENCE_TTL_MS
+from tankpit_bot.bot.ai.threats import analyze_threats
 from tests.scenarios._harness import BotScenario
 from tests.scenarios._wire_builders import movement_response
 
@@ -94,7 +95,7 @@ def test_bot_holds_lock_when_target_drops_off_threat_list() -> None:
 
     Pre-2026-06-23 there were two competing gates that broke this:
     the viewport-presence gate dropped the lock when the target
-    aged out, and the wire-presence gate in ``_combat_shoot``
+    aged out, and the wire-presence gate in ``engage_target``
     blocked pursuit shots after the wire TTL elapsed. Both removed
     -- the test was flipped 2026-06-23 to assert lock preservation
     instead of release.
