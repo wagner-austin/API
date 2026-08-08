@@ -14,6 +14,8 @@ from collections.abc import Mapping
 
 from rw_bot.policy.doctrine import (
     DERIVE_RESERVE,
+    NAVTILT_BEHIND,
+    NAVTILT_OFF,
     NO_HEAVIES,
     Doctrine,
     DoctrineError,
@@ -43,6 +45,7 @@ _BAD_FLAME_COUNT = "RW-DOCTRINE-021"
 _BAD_CLOSE_RATIO = "RW-DOCTRINE-022"
 _BAD_GUN_COUNT = "RW-DOCTRINE-023"
 _BAD_NUKE_COUNT = "RW-DOCTRINE-024"
+_BAD_NAVTILT = "RW-DOCTRINE-025"
 
 
 def _count(
@@ -130,6 +133,12 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             _BAD_HP_FLOOR,
             f"field 'hp_floor' is a percent of health, 0-100 with 0 for never, got {hp_floor}",
         )
+    navtilt = require_int(payload, "navtilt")
+    if navtilt < NAVTILT_OFF or navtilt > NAVTILT_BEHIND:
+        raise DoctrineError(
+            _BAD_NAVTILT,
+            f"field 'navtilt' is 0 off, 1 always, or 2 only-when-behind, got {navtilt}",
+        )
     creep = require_int(payload, "creep")
     if creep < 0 or creep > 100:
         raise DoctrineError(
@@ -155,7 +164,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         rush=require_bool(payload, "rush"),
         creep=creep,
         riposte=require_bool(payload, "riposte"),
-        navtilt=require_bool(payload, "navtilt"),
+        navtilt=navtilt,
         tech=tech,
         lurk=lurk,
         allin=allin,

@@ -43,7 +43,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         rush=False,
         creep=0,
         riposte=False,
-        navtilt=False,
+        navtilt=0,
         tech=0,
         lurk=0,
         allin=0,
@@ -317,3 +317,15 @@ def test_an_hp_floor_outside_the_percent_range_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-017"
+
+
+def test_navtilt_accepts_its_three_modes_and_rejects_the_rest() -> None:
+    """0 off, 1 always, 2 only-when-behind -- the adaptive mode navpair48
+    designed (log 2026-08-08). Anything else is a typo, loudly."""
+    payload = dict(encode_doctrine(_doctrine()))
+    payload["navtilt"] = 2
+    assert decode_doctrine(payload)["navtilt"] == 2
+    payload["navtilt"] = 3
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-025"

@@ -53,6 +53,7 @@ from rw_bot.policy.dispatching import (
     send_recon,
     send_tech,
 )
+from rw_bot.policy.doctrine import NAVTILT_OFF
 from rw_bot.policy.expander import Expander
 from rw_bot.policy.intel import Intel
 from rw_bot.policy.ledger import Outlays
@@ -67,7 +68,7 @@ from rw_bot.policy.runner import AFFORD_STALL_SAMPLES, DEFAULT_STALL_SAMPLES, Or
 from rw_bot.policy.rush import Rusher
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.policy.scouting import SCOUT_TYPE, ScoutRunner
-from rw_bot.policy.situation import Closer, Momentum, strike_window
+from rw_bot.policy.situation import Closer, Momentum, read_situation, strike_window
 from rw_bot.policy.spending import (
     build_plan,
     replace_losses,
@@ -91,7 +92,7 @@ def play(
     expand: bool = True,
     max_workers: int = DEFAULT_MAX_WORKERS,
     counter: bool = False,
-    navtilt: bool = False,
+    navtilt: int = NAVTILT_OFF,
     cover: bool = True,
     intercept: bool = False,
     guard_cap: int = 0,
@@ -157,8 +158,9 @@ def play(
             where they can be usefully employed is credits standing still
             instead of fighting ([[policy-production]]).
         counter: Tilt production toward the layers the opponent fields.
-        navtilt: Whether the counter tilt's naval clause runs
-            ([[policy-exact-timing]], the naval wall).
+        navtilt: When the counter tilt's naval clause runs -- off, on any
+            seen fleet, or only while the scoreboard reads losing
+            ([[policy-exact-timing]], the naval wall; log 2026-08-08).
         cover: Buy turrets beside bare structures at all.
         intercept: Turn the reserve on a raider inside our outpost radius.
         guard_cap: The most reserve units an interception commits; 0 is all.
@@ -342,7 +344,14 @@ def play(
             )
             if counter:
                 threats = mobile_threats(intel, catalogue) if scout else tuple(targets)
-                composition_now = counter_composition(composition_now, threats, profiles, navtilt)
+                # The behind-gate reads the engine's own unfogged broadcast:
+                # a fogged-out scoreboard reads as not-behind, which errs
+                # toward leaving the mix alone -- the navpair48 direction.
+                picture = read_situation(sample)
+                behind = picture is not None and picture["our_army"] < picture["rival_army"]
+                composition_now = counter_composition(
+                    composition_now, threats, profiles, navtilt, behind
+                )
             capable = wanted_producers(sample, composition_now)
             queues_open = sum(
                 1

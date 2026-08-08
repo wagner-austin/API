@@ -37,6 +37,17 @@ NO_HEAVIES: Final = "none"
 #: stops testing what it claims ([[policy-economy]]).
 DERIVE_RESERVE: Final = -1
 
+#: The naval clause never runs.
+NAVTILT_OFF: Final = 0
+
+#: The naval clause runs whenever a fleet is in the remembered picture.
+NAVTILT_ALWAYS: Final = 1
+
+#: The naval clause runs only while the scoreboard reads losing -- the
+#: adaptive mode navpair48 designed: respond to the enemy AND the
+#: trajectory, and never touch a winning recipe (log 2026-08-08).
+NAVTILT_BEHIND: Final = 2
+
 #: Fields carried as whole numbers in a doctrine file.
 INT_FIELDS: Final = (
     "max_workers",
@@ -51,6 +62,7 @@ INT_FIELDS: Final = (
     "decoys",
     "hp_floor",
     "strike",
+    "navtilt",
     "medics",
     "bunkers",
     "flame",
@@ -70,7 +82,6 @@ FLAG_FIELDS: Final = (
     "scout",
     "rush",
     "riposte",
-    "navtilt",
     "kite",
     "income_ladder",
 )
@@ -161,13 +172,16 @@ class Doctrine(TypedDict):
             community's whole answer to the cheating difficulties, and
             every third structure the walk lays is a repair bay
             ([[ai-opponent-strategy]], [[community-play-strategies]]).
-        navtilt: Whether the counter tilt answers WATER-layer threats by
-            repeating the mix's fleet-outranging types. Conditional by
-            construction -- it spends nothing until a fleet is seen -- and
-            a knob rather than unconditional code because its first panel
-            read net -2 with every upgrade a naval rescue and every
-            downgrade a chaos re-roll, which is a question a paired panel
-            answers, not a default (log 2026-08-07).
+        navtilt: When the counter tilt answers WATER-layer threats by
+            repeating the mix's fleet-outranging types.
+            :data:`NAVTILT_OFF` never, :data:`NAVTILT_ALWAYS` whenever a
+            fleet is seen, :data:`NAVTILT_BEHIND` only while the scoreboard
+            reads losing (our army value under the strongest rival's). The
+            third mode is navpair48's lesson made policy: at 48-seed scale
+            every rescue fired where the control was LOSING to the fleet
+            and every cost came from re-rolling a seed the control was
+            winning -- so the response gates on trajectory, and a winning
+            recipe is never touched (log 2026-08-08).
         riposte: Whether the whole reserve releases the moment an intrusion
             ends -- the human counter-punch: let the attack burn itself on
             the defences, then push into the window before the opponent's
@@ -318,7 +332,7 @@ class Doctrine(TypedDict):
     rush: bool
     creep: int
     riposte: bool
-    navtilt: bool
+    navtilt: int
     tech: int
     lurk: int
     allin: int
@@ -369,7 +383,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     rush=False,
     creep=0,
     riposte=False,
-    navtilt=False,
+    navtilt=NAVTILT_OFF,
     tech=0,
     lurk=0,
     allin=0,
@@ -393,6 +407,9 @@ __all__ = [
     "DOCTRINE_FIELDS",
     "FLAG_FIELDS",
     "INT_FIELDS",
+    "NAVTILT_ALWAYS",
+    "NAVTILT_BEHIND",
+    "NAVTILT_OFF",
     "NO_HEAVIES",
     "STR_FIELDS",
     "Doctrine",

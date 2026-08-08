@@ -36,6 +36,7 @@ from typing import Final, TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile, profile_of
+from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BEHIND
 from rw_bot.policy.intel import Intel
 
 
@@ -165,7 +166,8 @@ def counter_composition(
     composition: Sequence[str],
     targets: Sequence[Threat],
     profiles: Mapping[str, CombatProfile],
-    naval: bool,
+    naval: int,
+    behind: bool,
 ) -> tuple[str, ...]:
     """Return the mix, tilted until it answers the air and naval shares.
 
@@ -193,13 +195,26 @@ def counter_composition(
     amplifies only what the doctrine already holds
     (log 2026-08-07, the arm ladder).
 
+    The clause's arming is the doctrine's ``navtilt`` mode, and the
+    behind-gated mode is navpair48's finding made policy: at 48 paired
+    seeds every rescue fired where the control was LOSING to the fleet,
+    and every cost was a re-rolled win -- so under
+    :data:`~rw_bot.policy.doctrine.NAVTILT_BEHIND` the tilt reads the
+    scoreboard first and never perturbs a winning trajectory
+    (log 2026-08-08).
+
     Args:
         composition: The army mix to hold, repeats meaningful as a ratio.
         targets: The hostile entities currently visible.
         profiles: Combat profiles by type name, for reach and layers.
-        naval: Whether the naval clause runs -- the doctrine's ``navtilt``
-            knob, so a control arm and a tilt arm are one frozen tree apart
-            by a job line rather than a code checkout.
+        naval: The doctrine's ``navtilt`` mode --
+            :data:`~rw_bot.policy.doctrine.NAVTILT_OFF` never,
+            :data:`~rw_bot.policy.doctrine.NAVTILT_ALWAYS` on any seen
+            fleet, :data:`~rw_bot.policy.doctrine.NAVTILT_BEHIND` only
+            while losing.
+        behind: Whether the scoreboard reads losing -- our army value
+            under the strongest rival's -- read by the caller from the
+            engine's own unfogged broadcast.
 
     Returns:
         The mix to produce against, repeats meaningful as a ratio.
@@ -217,7 +232,8 @@ def counter_composition(
         return _hits_air(profiles, name)
 
     mix = _tilted(mix, flying, len(targets), hits_air, profiles)
-    if not naval:
+    armed = naval == NAVTILT_ALWAYS or (naval == NAVTILT_BEHIND and behind)
+    if not armed:
         return mix
     fleet = tuple(t for t in targets if t["movement"] == _NAVAL_LAYER)
     if not fleet:
