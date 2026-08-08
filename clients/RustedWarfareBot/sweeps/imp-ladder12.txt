@@ -1,0 +1,15 @@
+# imp-ladder12: compounding answered with compounding.
+# The retimed income ladder (extractorT3 withhold) on the champion,
+# post-certification, at the rung whose mechanism is compounding income.
+imp-ladder|12345|doctrines/flame-ladder.doctrine|10000
+imp-ladder|1337|doctrines/flame-ladder.doctrine|10000
+imp-ladder|141421|doctrines/flame-ladder.doctrine|10000
+imp-ladder|16180|doctrines/flame-ladder.doctrine|10000
+imp-ladder|173205|doctrines/flame-ladder.doctrine|10000
+imp-ladder|223606|doctrines/flame-ladder.doctrine|10000
+imp-ladder|244948|doctrines/flame-ladder.doctrine|10000
+imp-ladder|24601|doctrines/flame-ladder.doctrine|10000
+imp-ladder|264575|doctrines/flame-ladder.doctrine|10000
+imp-ladder|2718|doctrines/flame-ladder.doctrine|10000
+imp-ladder|271828|doctrines/flame-ladder.doctrine|10000
+imp-ladder|282842|doctrines/flame-ladder.doctrine|10000
