@@ -164,7 +164,7 @@ def test_the_handler_serves_over_a_real_socket() -> None:
     """GET and POST both travel the stdlib socket shell."""
     with FakeHost():
         conn = FakeConnection()
-        server = MatchServiceServer(("127.0.0.1", 0), conn)
+        server = MatchServiceServer(("127.0.0.1", 0), lambda: conn)
         try:
             body = _submission("wired")
             request = (

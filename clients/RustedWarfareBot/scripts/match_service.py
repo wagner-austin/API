@@ -16,7 +16,7 @@ can submit a batch and watch its counts with nothing but HTTP.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from rw_bot.harness import _test_hooks as host_hooks
@@ -33,17 +33,26 @@ SERVICE_PORT_DEFAULT = 27501
 
 
 class MatchServiceServer(HTTPServer):
-    """The service's HTTP server, carrying its connection to the handlers."""
+    """The service's HTTP server, carrying its connection opener.
 
-    def __init__(self, address: tuple[str, int], conn: Connection) -> None:
+    An opener rather than a connection, and production taught the
+    difference: the door's first build held one connection for its whole
+    life, the server dropped it during an idle gap, and every later
+    request -- including the one submitting an 84-match screen -- died on
+    the corpse (2026-08-08, `OperationalError 10053`). At this door's
+    request rate a connection per request costs milliseconds and means an
+    idle door holds no session to lose.
+    """
+
+    def __init__(self, address: tuple[str, int], opener: Callable[[], Connection]) -> None:
         """Bind the server.
 
         Args:
             address: ``(host, port)`` to bind.
-            conn: The open queue connection every request operates on.
+            opener: Opens a queue connection; called once per request.
         """
         super().__init__(address, MatchServiceRequestHandler)
-        self.queue_connection = conn
+        self.open_queue_connection = opener
 
 
 class MatchServiceRequestHandler(BaseHTTPRequestHandler):
@@ -65,9 +74,11 @@ class MatchServiceRequestHandler(BaseHTTPRequestHandler):
             raise MatchServiceError("RW-SERVICE-002", "handler bound to a non-service server")
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length) if length else b""
-        status, content_type, payload = route_service_request(
-            server.queue_connection, method, self.path, body
-        )
+        conn = server.open_queue_connection()
+        try:
+            status, content_type, payload = route_service_request(conn, method, self.path, body)
+        finally:
+            conn.close()
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
@@ -111,15 +122,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         host_hooks.write_line("usage: match_service <dsn> [port]")
         return EXIT_BAD_USAGE
     port = int(args[1]) if len(args) == 2 else SERVICE_PORT_DEFAULT
-    conn = _test_hooks.connect(args[0])
+    dsn = args[0]
+
+    def opener() -> Connection:
+        return _test_hooks.connect(dsn)
+
     # The door migrates at startup like every worker does, so a read route
     # never meets a table an older writer shaped.
-    bootstrap(conn)
-    server = MatchServiceServer(("127.0.0.1", port), conn)
+    startup = opener()
+    bootstrap(startup)
+    startup.close()
+    server = MatchServiceServer(("127.0.0.1", port), opener)
     host_hooks.write_line(f"[service] listening on http://127.0.0.1:{port}/")
     host_hooks.serve_forever(server)
     server.server_close()
-    conn.close()
     return EXIT_OK
 
 
