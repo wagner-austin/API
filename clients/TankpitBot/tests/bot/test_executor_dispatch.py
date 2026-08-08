@@ -17,7 +17,8 @@ from tankpit_bot.bot.types import (
 )
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 from tankpit_bot.state.types import WorldStateDict, make_container_state
 from tankpit_bot.state.types.coord import coord_key
@@ -289,9 +290,18 @@ class TestDispatchRefusalPrediction:
         assert "Runtime.evaluate" not in fake_cdp._sent_methods
 
     def test_missing_self_state_stays_optimistic(self, fake_env: FakeEnv) -> None:
-        """No self belief proves nothing: pickup and teleport dispatch."""
+        """No self belief proves nothing: pickup and teleport dispatch.
+
+        The bot gets a FRESH world rather than a global reset.
+        ``reset_world_state()`` rebinds the module global, and the bot
+        now holds its service as an attribute — so the reset left
+        ``bot.world`` pointing at the pre-reset object with
+        ``_make_bot``'s seeded position still in it, and the test
+        silently stopped exercising the missing-self-state path
+        ([[session-state-deglobalisation]] step 8).
+        """
         bot, fake_cdp = _make_bot(fake_env)
-        reset_world_state()
+        bot.world = WorldService()
         picked = dispatch_command(bot, make_pickup_fuel_command(80, 90), _make_snapshot())
         hopped = dispatch_command(
             bot, make_teleport_command(200, 200), _make_snapshot(map_visible=True)

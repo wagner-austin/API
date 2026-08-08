@@ -15,7 +15,7 @@ resource target, invalid resource-target source).
 
 from __future__ import annotations
 
-from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot import _test_hooks
 from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.contracts.enforcement import enforce_contract, require
 from tankpit_bot.ledger.outcome._emit import emit_action_outcome
@@ -121,7 +121,7 @@ def record_teleport_dispatch(
     ledger.pending_teleport = PendingTeleportDispatchDict(
         target_x=target_x,
         target_y=target_y,
-        started_ms=get_current_time_ms(),
+        started_ms=_test_hooks.get_current_time_ms(),
         message_index=message_index,
         sent_window=sent_window,
     )

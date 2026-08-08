@@ -39,6 +39,7 @@ from tankpit_bot.action_lab.types import (
     TeleportPageSnapshotDict,
     TeleportTargetDict,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     ContainerStateDict,
     coord_key,
@@ -272,7 +273,7 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
 
     drain_calls = 0
 
-    def _pickup_before_move(provider: BufferedMessageSourceProtocol) -> int:
+    def _pickup_before_move(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         nonlocal drain_calls
         _ = provider
         drain_calls += 1

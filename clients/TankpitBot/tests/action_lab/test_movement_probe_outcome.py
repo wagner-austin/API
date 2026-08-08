@@ -39,7 +39,7 @@ def test_wait_for_move_outcome_returns_arrived_exact() -> None:
     page = ClockAdvancingPage(clock, on_wait=worlds.advance)
     probe = _MoveWaitProbe(worlds)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
     status, completion_ms, elapsed_ms, settled_x, settled_y = _wait_for_move_outcome(
         page,
         probe,
@@ -66,7 +66,7 @@ def test_wait_for_move_outcome_returns_timeout() -> None:
     page = ClockAdvancingPage(clock, on_wait=worlds.advance)
     probe = _MoveWaitProbe(worlds)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
     status, completion_ms, elapsed_ms, settled_x, settled_y = _wait_for_move_outcome(
         page,
         probe,
@@ -89,7 +89,7 @@ def test_wait_for_move_outcome_raises_when_self_state_disappears_mid_wait() -> N
     )
     probe = _MissingSelfWaitProbe([make_self_state(1, 100, 100, 2, 1, 900, 5), None])
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
     with pytest.raises(MovementProbeError, match="disappeared while waiting for movement"):
         _wait_for_move_outcome(
             page,
@@ -109,7 +109,7 @@ def test_wait_for_move_outcome_raises_when_self_state_missing_after_timeout() ->
     )
     probe = _MissingSelfWaitProbe([None])
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
     with pytest.raises(MovementProbeError, match="disappeared after movement timeout"):
         _wait_for_move_outcome(
             page,

@@ -63,7 +63,7 @@ def run_tracked_radar_phase(
         Exception: Raised via ``dispatch_failure_error`` if the radar command
             fails to dispatch.
     """
-    action_hooks.drain_buffered_messages(probe)
+    action_hooks.drain_buffered_messages(probe, probe.world)
     clear_stale_radar_completion()
     radar_cycle = probe._start_action_phase("radar", attempt_label=attempt_label)
     radar_started_ms = action_hooks.get_current_time_ms()

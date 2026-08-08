@@ -25,6 +25,7 @@ from tankpit_bot.browser.lifecycle import (
     navigate_and_login,
 )
 from tankpit_bot.capture.summary import build_session_summary
+from tankpit_bot.capture.trackers import MineTracker
 from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.runtime_artifacts import SniffRunArtifactsDict
 from tankpit_bot.runtime_logging import configure_sniff_runtime_logging
@@ -39,8 +40,6 @@ from tankpit_bot.sniffer.constants import (
     DEFAULT_TARGET_URL,
 )
 from tankpit_bot.sniffer.decoders import decode_message, process_received_message
-from tankpit_bot.sniffer.trackers import mine_tracker, tank_tracker
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.types import (
     CapturedMessage,
     CaptureSession,
@@ -110,6 +109,20 @@ class WebSocketSniffer(BrowserSession):
         self._autosave_paths = autosave_paths
         self._game_log_entries: list[dict[str, str | int]] = []
         self._combat_tracker: CombatTracker | None = None
+        # The sniffer's live-decode narration of outbound mine presses.
+        # Sniffer-owned rather than global: it is the ONLY surviving
+        # tracker instance, and the bot never reads it
+        # ([[session-state-deglobalisation]] step 9).
+        self._mine_tracker = MineTracker()
+
+    def _on_magic_captured(self, magic: str) -> None:
+        """Build the session table, then arm the sniffer's mine tracker.
+
+        Args:
+            magic: The session magic string.
+        """
+        super()._on_magic_captured(magic)
+        self._mine_tracker.set_magic(magic)
 
     def _init_combat_tracker(self) -> None:
         """Initialize the per-capture combat tracker.
@@ -152,10 +165,23 @@ class WebSocketSniffer(BrowserSession):
     def _build_capture_session(self) -> CaptureSession:
         """Build the current capture session snapshot.
 
+        Names come from the live world-state tank registry, which the
+        wire dispatch populates. They used to come from a ``TankTracker``
+        that nothing ever fed: ``process_message`` was never called on
+        it, so ``get_all_names()`` always answered ``{}`` and every
+        capture ever written carried an empty ``tank_names`` -- 432 of
+        432 archived captures, checked 2026-08-07. The registry has the
+        names (37 of 37 on the fuel_probe capture), so the field is now
+        populated instead of deleted ([[session-state-deglobalisation]]).
+
         Returns:
             CaptureSession containing the current in-memory capture state.
         """
-        tank_names = {str(k): v for k, v in tank_tracker.get_all_names().items()}
+        tank_names = {
+            tank_id: tank["name"]
+            for tank_id, tank in self.world.world_state["tanks"].items()
+            if tank["name"]
+        }
 
         from tankpit_bot.types import GameLogEntryWithTimestamp
 
@@ -212,10 +238,10 @@ class WebSocketSniffer(BrowserSession):
             # arrive before the session's magic cannot be decoded at
             # all — live decode simply has nothing to print for them.
             if self.xor_table is not None:
-                process_received_message(get_world_service(), payload, self.xor_table)
+                process_received_message(self.world, payload, self.xor_table)
         else:
             # Use simple decoder for sent messages
-            mine_status = mine_tracker.process_message(payload, "sent")
+            mine_status = self._mine_tracker.process_message(payload, "sent")
             if mine_status:
                 log.info(mine_status)
             decoded = decode_message(payload, direction, self._magic)

@@ -23,6 +23,7 @@ from tankpit_bot.action_lab.equipment_probe_operations import (
     run_pickup_attempt_for_probe,
 )
 from tankpit_bot.sniffer.decoders import process_received_message
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state import (
@@ -58,7 +59,7 @@ def test_run_pickup_attempt_takes_fast_path_against_real_inventory_frame(
 
     drain_calls: list[BufferedMessageSourceProtocol] = []
 
-    def _real_drain(probe: BufferedMessageSourceProtocol) -> int:
+    def _real_drain(probe: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         drain_calls.append(probe)
         process_received_message(get_world_service(), str(growth_payload), xor_table)
         return 1
@@ -124,7 +125,7 @@ def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_fra
     growth_payload = messages[INVENTORY_GROWTH_FRAME_INDEX]["payload"]
     drain_queue: list[str | None] = [None, None, str(growth_payload)]
 
-    def _scheduled_drain(probe: BufferedMessageSourceProtocol) -> int:
+    def _scheduled_drain(probe: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         if not drain_queue:
             return 0
         payload = drain_queue.pop(0)

@@ -14,20 +14,6 @@ from tankpit_bot.state.viewport_geometry import (
 )
 
 
-class TestTankNameRegistry:
-    """Tests for the tank-name registry (PlayerIdMapper was deleted)."""
-
-    def test_reset_player_id_mapper_clears_names(self) -> None:
-        """reset_player_id_mapper clears the tank-name registry."""
-        from tankpit_bot.sniffer import player_tracking
-        from tankpit_bot.sniffer.player_tracking import reset_player_id_mapper
-
-        player_tracking._tank_names[100] = "TestTank"
-        reset_player_id_mapper()
-
-        assert len(player_tracking._tank_names) == 0
-
-
 class TestViewportGeometry:
     """Tests for visible viewport and radar envelope geometry."""
 

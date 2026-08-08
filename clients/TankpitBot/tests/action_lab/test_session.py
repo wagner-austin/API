@@ -22,6 +22,8 @@ from tankpit_bot.action_lab.session import (
     wait_for_radar_sync,
     wait_for_world_sync,
 )
+from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     WorldStateDict,
     make_empty_world_state,
@@ -33,6 +35,7 @@ from tankpit_bot.types import CapturedMessage
 
 class _SequencedProvider:
     def __init__(self, worlds: list[WorldStateDict]) -> None:
+        self.world = get_world_service()
         self._worlds = worlds
         self._index = 0
         self._cdp_message_buffer: list[str] = []
@@ -129,7 +132,7 @@ def test_wait_for_world_sync_returns_newer_timestamp() -> None:
     )
     page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     assert wait_for_world_sync(page, provider, 1000, 500) == 1200
 
@@ -145,7 +148,7 @@ def test_wait_for_world_sync_times_out() -> None:
     )
     page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     assert wait_for_world_sync(page, provider, 1000, 250) is None
 
@@ -161,7 +164,7 @@ def test_wait_for_radar_sync_returns_completion_timestamp() -> None:
     )
     page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
     radar_results = [False, False, True]
 
     def _check_radar_complete() -> bool:
@@ -183,7 +186,7 @@ def test_wait_for_radar_sync_times_out() -> None:
     )
     page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
     action_hooks.check_and_clear_radar_scan_complete = lambda: False
 
     assert wait_for_radar_sync(page, provider, 1000, 250) is None
@@ -201,7 +204,7 @@ def test_wait_for_radar_sync_ignores_stale_completion_without_new_activity() -> 
     action_hooks.get_current_time_ms = clock
     drain_results = [0, 1]
 
-    def _drain(source: BufferedMessageSourceProtocol, /) -> int:
+    def _drain(source: BufferedMessageSourceProtocol, ws: WorldService, /) -> int:
         _ = source
         if len(drain_results) == 0:
             return 0
@@ -230,7 +233,7 @@ def test_wait_for_initial_self_state_returns_fresh_self_state() -> None:
     )
     page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     timestamp_ms, self_state = wait_for_initial_self_state(page, provider, 1000, 500)
 
@@ -251,7 +254,7 @@ def test_wait_for_initial_self_state_raises_on_timeout() -> None:
     )
     page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     with pytest.raises(
         ActionLabSessionError,
@@ -299,7 +302,7 @@ def test_wait_for_initial_self_state_drains_buffered_messages_before_reading() -
     page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
 
-    def _drain(source: BufferedMessageSourceProtocol, /) -> int:
+    def _drain(source: BufferedMessageSourceProtocol, ws: WorldService, /) -> int:
         _ = source
         provider.advance()
         return 1

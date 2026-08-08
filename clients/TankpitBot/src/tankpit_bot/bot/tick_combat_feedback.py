@@ -3,10 +3,11 @@
 Whether a dispatched shot has resolved, what it resolved to, and the
 friendly-fire disproof that clears a wrong target.
 
-This module concentrates **13 of the 21** ``get_world_service()`` call
-sites the session-state work has to thread an instance through -- they
-were already one cluster inside the old 1,221-line module and are now
-addressable on their own.
+This module used to concentrate the largest cluster of
+``get_world_service()`` call sites -- 17 of them at its peak. All but
+one now read ``bot.world``; the survivor is ``_merge_protocol_kills``,
+whose only argument is the AI state
+([[session-state-deglobalisation]] step 8).
 """
 
 from __future__ import annotations
@@ -117,11 +118,11 @@ def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:
     target_id = bot._ai_state["last_shot_target_id"]
     if target_id == -1:
         return False
-    if peek_combat_hit(get_world_service()):
+    if peek_combat_hit(bot.world):
         return False
-    if peek_our_shot_response(get_world_service()):
+    if peek_our_shot_response(bot.world):
         return False
-    if peek_command_error(get_world_service()) in _SHOT_REJECTING_COMMAND_ERRORS:
+    if peek_command_error(bot.world) in _SHOT_REJECTING_COMMAND_ERRORS:
         # The server refused the shot outright -- no ShootEvent or
         # ammo delta will ever arrive, so waiting out the feedback
         # window is pure dead time. The classifier consumes the error.
@@ -177,10 +178,10 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
     target_name = bot._ai_state["last_shot_target_name"]
     if target_id == -1:
         return ""
-    got_hit = check_and_clear_combat_hit(get_world_service())
-    victim_id = check_and_clear_last_shot_victim_id(get_world_service())
-    got_response = check_and_clear_our_shot_response(get_world_service())
-    ammo_hit = check_and_clear_ammo_delta_hit(get_world_service())
+    got_hit = check_and_clear_combat_hit(bot.world)
+    victim_id = check_and_clear_last_shot_victim_id(bot.world)
+    got_response = check_and_clear_our_shot_response(bot.world)
+    ammo_hit = check_and_clear_ammo_delta_hit(bot.world)
 
     def _inc_hit() -> None:
         bot._ai_state = AIStateDict(
@@ -198,7 +199,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         # homing seeker landed on a closer enemy than commanded).
         on_intended = victim_id == target_id
         emit_shoot_hit(
-            get_world_service().ledger,
+            bot.world.ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,
@@ -206,12 +207,12 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             on_intended_target=on_intended,
             hit_signal="tile_occupied",
         )
-        resolve_dealt(get_world_service().damage_book, victim_id, target_name, target_id)
+        resolve_dealt(bot.world.damage_book, victim_id, target_name, target_id)
         _inc_hit()
         return "hit"
     if str(target_id) in bot._ai_state["killed_tank_ids"]:
         emit_shoot_hit(
-            get_world_service().ledger,
+            bot.world.ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,
@@ -219,7 +220,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             on_intended_target=True,
             hit_signal="kill_confirmed",
         )
-        resolve_dealt(get_world_service().damage_book, target_id, target_name, target_id)
+        resolve_dealt(bot.world.damage_book, target_id, target_name, target_id)
         _inc_hit()
         # Clear the shot-target fields directly: the trigger is
         # ``killed_tank_ids`` membership, which is not a consumable
@@ -242,7 +243,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         # snapshot. A debit is a landed shot regardless of which wire
         # channel reported it.
         emit_shoot_hit(
-            get_world_service().ledger,
+            bot.world.ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,
@@ -250,24 +251,24 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             on_intended_target=True,
             hit_signal="ammo_delta",
         )
-        resolve_dealt(get_world_service().damage_book, victim_id, target_name, target_id)
+        resolve_dealt(bot.world.damage_book, victim_id, target_name, target_id)
         _inc_hit()
         return "hit"
     if got_response:
         # No tile-occupied hit, no ammo debit, and a wire response did
         # arrive -- the shot genuinely missed.
         emit_shoot_miss(
-            get_world_service().ledger,
+            bot.world.ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,
         )
         _inc_miss()
         return "miss"
-    if peek_command_error(get_world_service()) in _SHOT_REJECTING_COMMAND_ERRORS:
-        error_code = check_and_clear_command_error(get_world_service())
+    if peek_command_error(bot.world) in _SHOT_REJECTING_COMMAND_ERRORS:
+        error_code = check_and_clear_command_error(bot.world)
         emit_shoot_command_rejected(
-            get_world_service().ledger,
+            bot.world.ledger,
             duration_ms=duration_ms,
             target_id=target_id,
             target_name=target_name,

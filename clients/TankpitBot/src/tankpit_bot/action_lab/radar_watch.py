@@ -37,7 +37,6 @@ from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.protocol.commands import build_toggle_equipment_command
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
 log = get_logger(__name__)
@@ -148,8 +147,8 @@ class RadarWatchProbe(ProbeBase):
         wait_page = self._require_page()
         self.request_inventory()
         wait_page.wait_for_timeout(float(_TOGGLE_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
-        state = get_inventory_state(get_world_service())
+        action_hooks.drain_buffered_messages(self, self.world)
+        state = get_inventory_state(self.world)
         radars = state["extra_radars"]
         return radars["count"], radars["enabled"]
 
@@ -220,7 +219,7 @@ class RadarWatchProbe(ProbeBase):
             self.use_radar()
             scans += 1
             page.wait_for_timeout(float(scan_interval_ms))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
         return scans, map_polls, walks
 
     def execute_probe(

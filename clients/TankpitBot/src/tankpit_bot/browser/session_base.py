@@ -17,7 +17,8 @@ from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import send_websocket_bytes
 from tankpit_bot.capture.xor import build_session_xor_table
-from tankpit_bot.sniffer.trackers import init_trackers_with_magic
+from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.types import CapturedMessage
 
 log = get_logger(__name__)
@@ -61,6 +62,14 @@ class SessionBase:
         )
         self._cdp: CDPSessionProtocol | None = None
         self._static_key: str | None = None
+        #: This session's world state. Bound to the process singleton
+        #: while step 8 is in flight -- the decoder still writes through
+        #: ``get_world_service()``, so a session holding a DIFFERENT
+        #: instance would read an empty world. The flip to
+        #: ``WorldService()`` and the deletion of the singleton are the
+        #: last two edits of the step, not the first
+        #: ([[session-state-deglobalisation]]).
+        self.world: WorldService = get_world_service()
         #: This session's XOR table, None until its magic is captured.
         #: Public because the decode path reads it through
         #: ``BufferedMessageSourceProtocol``.
@@ -180,7 +189,7 @@ class SessionBase:
             self._cdp_message_buffer.append(message["payload"])
 
     def _on_magic_captured(self, magic: str) -> None:
-        """Build this session's XOR table and init trackers.
+        """Build this session's XOR table.
 
         One table serves both directions: the command service encodes
         with it and the decode path decodes with it. It used to be built
@@ -188,6 +197,11 @@ class SessionBase:
         decode, once onto the command service for encode — which is what
         made two sessions in one process impossible
         ([[session-state-deglobalisation]] step 1).
+
+        It also used to arm twelve global capture trackers here. Eleven
+        were never fed a message and the twelfth is sniffer-only, so the
+        base session — which the BOT also runs — no longer arms any of
+        them (step 9). Subclasses that own a tracker override this.
 
         Args:
             magic: The session magic string.
@@ -199,7 +213,6 @@ class SessionBase:
         """
         self.xor_table = build_session_xor_table(magic)
         self._commands.xor_table = self.xor_table
-        init_trackers_with_magic(magic)
         log.info("Built session XOR table for command encoding and frame decoding")
 
 

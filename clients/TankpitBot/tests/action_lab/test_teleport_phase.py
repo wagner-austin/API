@@ -18,6 +18,7 @@ from tankpit_bot.action_lab.types import (
     TeleportPageSnapshotDict,
     TeleportTargetDict,
 )
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import WorldStateDict, make_empty_world_state
 from tankpit_bot.types import CapturedMessage
 
@@ -27,6 +28,7 @@ class _Probe:
 
     def __init__(self, *, dispatch_succeeds: bool) -> None:
         """Initialize the fake probe."""
+        self.world = get_world_service()
         self.dispatch_succeeds = dispatch_succeeds
         self.teleports: list[tuple[int, int]] = []
         self.end_cycles: list[ActionPhaseCycleDict] = []

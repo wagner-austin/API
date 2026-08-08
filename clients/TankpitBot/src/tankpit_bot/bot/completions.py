@@ -34,7 +34,6 @@ from tankpit_bot.ledger.outcome.teleport import emit_teleport_landed
 from tankpit_bot.runtime_logging import emit_state
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete,
-    get_world_service,
     get_world_state,
     mark_move_target_failed,
 )
@@ -185,7 +184,7 @@ class CompletionsMixin(SessionBase):
         if not check_and_clear_radar_scan_complete():
             return False
         emit_scan_radar_complete(
-            get_world_service().ledger,
+            self.world.ledger,
             duration_ms=self._action_duration_ms(action),
             target_x=action["target_x"],
             target_y=action["target_y"],
@@ -208,7 +207,7 @@ class CompletionsMixin(SessionBase):
         tx, ty = action["target_x"], action["target_y"]
         if self_state["x"] == tx and self_state["y"] == ty:
             emit_move_position_reached(
-                get_world_service().ledger,
+                self.world.ledger,
                 duration_ms=self._action_duration_ms(action),
                 target_x=tx,
                 target_y=ty,
@@ -231,7 +230,7 @@ class CompletionsMixin(SessionBase):
         if (
             self._state_data["state"] == "TELEPORTING"
             and self_state is not None
-            and check_and_clear_teleport_landed(get_world_service())
+            and check_and_clear_teleport_landed(self.world)
         ):
             action = self._state_data["in_flight_action"]
             tx, ty = action["target_x"], action["target_y"]
@@ -243,7 +242,7 @@ class CompletionsMixin(SessionBase):
                 # an aimed enemy as failures, blacklisting a live
                 # target's tile (orange-6, 20-kill run 2026-07-27).
                 dist = max(abs(self_state["x"] - tx), abs(self_state["y"] - ty))
-                world = get_world_service().world_state
+                world = self.world.world_state
                 enemy_on_tile = any(t["x"] == tx and t["y"] == ty for t in world["tanks"].values())
                 if dist > 1 or not enemy_on_tile:
                     # Consumer only: the tile veto. The single
@@ -257,7 +256,7 @@ class CompletionsMixin(SessionBase):
                     now = get_current_time_ms()
                     mark_move_target_failed(tx, ty, now)
             emit_teleport_landed(
-                get_world_service().ledger,
+                self.world.ledger,
                 duration_ms=self._action_duration_ms(action),
                 target_x=tx,
                 target_y=ty,
@@ -285,7 +284,7 @@ class CompletionsMixin(SessionBase):
         """
         if self._state_data["state"] != "COLLECTING" or self_state is None:
             return False
-        if get_world_service().last_command_error != -1:
+        if self.world.last_command_error != -1:
             # A 0x52 rejection is pending attribution. Completing by
             # position now would orphan it and strand the belief it
             # contradicts: a same-tile pickup at a consumed container
@@ -304,7 +303,7 @@ class CompletionsMixin(SessionBase):
         if position_reached or target_key not in world["containers"]:
             if position_reached:
                 emit_collect_position_reached(
-                    get_world_service().ledger,
+                    self.world.ledger,
                     duration_ms=self._action_duration_ms(action),
                     target_x=tx,
                     target_y=ty,
@@ -313,7 +312,7 @@ class CompletionsMixin(SessionBase):
                 )
             else:
                 emit_collect_container_consumed(
-                    get_world_service().ledger,
+                    self.world.ledger,
                     duration_ms=self._action_duration_ms(action),
                     target_x=tx,
                     target_y=ty,

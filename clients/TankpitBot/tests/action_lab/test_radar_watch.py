@@ -31,6 +31,7 @@ from tankpit_bot.action_lab.radar_watch import (
     run_radar_watch_probe,
 )
 from tankpit_bot.inventory import InventoryItem, InventoryState
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state
 from tankpit_bot.state.types import make_self_state, make_viewport_state
@@ -119,7 +120,7 @@ class _WatchHarness(RadarWatchProbe):
 
 
 def _install_noop_drain() -> None:
-    def _drain(provider: BufferedMessageSourceProtocol) -> int:
+    def _drain(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         del provider
         return 0
 

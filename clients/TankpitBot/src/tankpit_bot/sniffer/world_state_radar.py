@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot import _test_hooks
 from tankpit_bot.protocol import RadarContainerDict, RadarMineClearDict, RadarMineDict
 from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.world_service import WorldService
@@ -85,7 +85,7 @@ def update_world_state_from_radar(
         mines: List of mines from radar.
         mine_clears: Tiles the server declared mine-free.
     """
-    ts = get_current_time_ms()
+    ts = _test_hooks.get_current_time_ms()
     ws.pending_radar_empty_delta_ms = 0
     # mark_radar_scan_complete also answers any pending
     # container-desync latch -- every radar response shape counts.
@@ -157,7 +157,7 @@ def update_world_state_from_radar_cache(ws: WorldService) -> None:
     Args:
         ws: World service instance.
     """
-    ts = get_current_time_ms()
+    ts = _test_hooks.get_current_time_ms()
     envelope = _radar_envelope_containers(ws)
     ws.mark_radar_scan_complete()
     ws.clear_failed_move_targets()
@@ -188,7 +188,7 @@ def update_world_state_from_radar_known_resources(ws: WorldService) -> None:
     Args:
         ws: World service instance.
     """
-    ts = get_current_time_ms()
+    ts = _test_hooks.get_current_time_ms()
     envelope = _radar_envelope_containers(ws)
     ws.mark_radar_scan_complete()
     ws.clear_failed_move_targets()

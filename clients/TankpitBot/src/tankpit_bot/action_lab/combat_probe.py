@@ -40,7 +40,7 @@ from tankpit_bot.bot.ai.combat_landing import (
 from tankpit_bot.bot.ai.threat_primitives import find_closest_threat
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
-from tankpit_bot.sniffer.world_state import get_terrain_map, get_world_service
+from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_combat_hit,
     check_and_clear_our_shot_response,
@@ -112,10 +112,10 @@ def _wait_for_shot_feedback(
         (got_response, was_hit): whether any response came,
         and whether it was a confirmed hit.
     """
-    ws = get_world_service()
+    ws = probe.world
     started = action_hooks.get_current_time_ms()
     while action_hooks.get_current_time_ms() - started < _SHOT_FEEDBACK_TIMEOUT_MS:
-        action_hooks.drain_buffered_messages(probe)
+        action_hooks.drain_buffered_messages(probe, probe.world)
         if ws.got_our_shot_response:
             was_hit = check_and_clear_combat_hit(ws)
             check_and_clear_our_shot_response(ws)
@@ -156,7 +156,7 @@ class CombatProbe(ProbeBase):
         last_x, last_y = initial_x, initial_y
 
         for shot_num in range(1, max_shots + 1):
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             self_state = self._require_self_state()
             sx, sy = self_state["x"], self_state["y"]
 
@@ -204,7 +204,7 @@ class CombatProbe(ProbeBase):
             else:
                 result = "miss"
 
-            ws = get_world_service()
+            ws = self.world
             weapon_byte: int | None = 1 if was_hit else None
 
             shot_result = CombatShotResultDict(
@@ -228,7 +228,7 @@ class CombatProbe(ProbeBase):
 
             last_x, last_y = tx, ty
 
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             killed_ids = ws.killed_tank_ids
             if target_id in killed_ids:
                 kill_confirmed = True

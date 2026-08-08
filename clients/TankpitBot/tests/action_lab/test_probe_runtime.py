@@ -24,6 +24,7 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import probe_runtime
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.browser import PlaywrightNotInstalledError
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.types import CapturedMessage
 
@@ -38,6 +39,7 @@ _FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_s
 
 class _ProbeHarness:
     def __init__(self, clock: ReplayClock | None = None) -> None:
+        self.world = get_world_service()
         self._start_timestamp_ms = 0
         self._target_url = "https://tankpit.com/play"
         self._prefer_account = False

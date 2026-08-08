@@ -43,6 +43,7 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -216,6 +217,7 @@ class _ProbeHarness(CombatProbe):
 
     def __init__(self) -> None:
         """Seed a spawned tank at (100, 100) with a full tank of fuel."""
+        self.world = get_world_service()
         super().__init__(
             "https://tankpit.com/play",
             headless=True,

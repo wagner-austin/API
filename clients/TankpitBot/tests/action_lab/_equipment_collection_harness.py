@@ -33,6 +33,7 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
 )
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -145,6 +146,7 @@ class _Probe:
     """Minimal probe."""
 
     def __init__(self) -> None:
+        self.world = get_world_service()
         self._messages: list[CapturedMessage] = []
         self._w = _world()
         self._cid = 0

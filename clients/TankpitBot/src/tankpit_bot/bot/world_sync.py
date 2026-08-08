@@ -11,13 +11,13 @@ from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
 from tankpit_bot.sniffer.decoders import process_received_message
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 
 log = get_logger(__name__)
 
 
-def drain_messages(bot: BufferedMessageSourceProtocol) -> int:
-    """Drain CDP message buffer and decode to update world state.
+def drain_messages(bot: BufferedMessageSourceProtocol, ws: WorldService) -> int:
+    """Drain CDP message buffer and decode into ``ws``.
 
     Frames buffered before the session's magic arrives cannot be
     decoded at all — the XOR table is derived from that magic. They are
@@ -26,8 +26,15 @@ def drain_messages(bot: BufferedMessageSourceProtocol) -> int:
     UNDECODED and dispatched the garbage into world state as if it were
     real ([[session-state-deglobalisation]]).
 
+    The service is a parameter rather than an attribute of ``bot``
+    because ``BufferedMessageSourceProtocol`` lives in ``_test_hooks``,
+    which sits BELOW ``sniffer`` in the layering — naming
+    ``WorldService`` there closes an import cycle through ``state``
+    (measured 2026-08-07).
+
     Args:
-        bot: Bot instance with CDP message buffer and session XOR table.
+        bot: Message source with a CDP buffer and a session XOR table.
+        ws: The session's world service; decoded frames land here.
 
     Returns:
         Number of messages drained and decoded. Zero while the session
@@ -41,7 +48,6 @@ def drain_messages(bot: BufferedMessageSourceProtocol) -> int:
     msgs = bot._cdp_message_buffer
     bot._cdp_message_buffer = []
 
-    ws = get_world_service()
     for payload in msgs:
         process_received_message(ws, payload, xor_table)
 

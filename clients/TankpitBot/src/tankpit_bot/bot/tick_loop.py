@@ -45,9 +45,6 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     get_bot_runtime_artifacts,
 )
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-)
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
 log = get_logger(__name__)
@@ -265,7 +262,7 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
             handler, registered by the CLI entry point).
     """
     ai = bot._ai_state
-    ws = get_world_service()
+    ws = bot.world
     inv = get_inventory_state(ws)
     self_state = ws.world_state.get("self_state")
     fuel = self_state["fuel"] if self_state is not None else 0
@@ -279,9 +276,9 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
     blocked = len(ai["blocked_combat_targets"])
     mode = ai["mode"]
     mode_state = ai["mode_state"]
-    unresolved = verify_outcome_invariant(get_world_service().ledger)
+    unresolved = verify_outcome_invariant(bot.world.ledger)
     for kind in ACTION_KINDS:
-        counts = outcome_counts(get_world_service().ledger, kind)
+        counts = outcome_counts(bot.world.ledger, kind)
         if counts:
             emit_diagnostic(
                 diagnostic_kind="session_outcome_counts",
@@ -309,8 +306,8 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
         ai_mode_state=mode_state,
         exit_reason=exit_reason,
     )
-    damage_book = get_world_service().damage_book
-    fuel_totals = get_world_service().fuel_book["totals"]
+    damage_book = bot.world.damage_book
+    fuel_totals = bot.world.fuel_book["totals"]
     emit_diagnostic(
         diagnostic_kind="damage_ledger",
         dealt=summarize_side(damage_book["dealt"]),

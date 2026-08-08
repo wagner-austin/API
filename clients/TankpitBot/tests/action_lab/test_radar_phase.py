@@ -14,6 +14,8 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import radar_phase
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -37,6 +39,7 @@ class _Probe:
 
     def __init__(self, *, radar_result: bool = True) -> None:
         """Initialize the probe."""
+        self.world = get_world_service()
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
         self._messages: list[CapturedMessage] = []
@@ -127,7 +130,7 @@ def test_run_tracked_radar_phase_waits_for_sync() -> None:
     drain_calls: list[str] = []
     wait_attr = "wait_for_radar_sync"
 
-    def _drain(source: BufferedMessageSourceProtocol) -> int:
+    def _drain(source: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         assert source is probe
         drain_calls.append("drain")
         return 0
@@ -182,7 +185,7 @@ def test_run_tracked_radar_phase_raises_on_dispatch_failure() -> None:
         return 0
 
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
     action_hooks.check_and_clear_radar_scan_complete = lambda: False
     setattr(action_hooks, wait_attr, _wait_for_radar_sync)
 

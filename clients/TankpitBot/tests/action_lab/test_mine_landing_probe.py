@@ -32,6 +32,7 @@ from tankpit_bot.action_lab.mine_landing_probe import (
     run_mine_landing_probe,
 )
 from tankpit_bot.action_lab.probe_base import ProbeError
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state
 from tankpit_bot.state.types import (
     MineStateDict,
@@ -70,7 +71,7 @@ def _enemy_mine(x: int, y: int, *, team: int = 3) -> MineStateDict:
 
 
 def _install_noop_drain() -> None:
-    def _drain(provider: BufferedMessageSourceProtocol) -> int:
+    def _drain(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         del provider
         return 0
 

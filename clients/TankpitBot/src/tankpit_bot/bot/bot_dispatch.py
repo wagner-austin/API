@@ -22,7 +22,6 @@ from tankpit_bot.bot.states import (
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.diagnostics.combat_screenshot import save_screenshot
 from tankpit_bot.runtime_logging import emit_diagnostic
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_combat import check_and_clear_teleport_landed
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
@@ -137,7 +136,7 @@ class DispatchMixin(CompletionsMixin):
         if self._cdp is None:
             return False
 
-        check_and_clear_teleport_landed(get_world_service())
+        check_and_clear_teleport_landed(self.world)
 
         from tankpit_bot.bot.commands import encode_teleport_command
         from tankpit_bot.bot.types import make_teleport_command
@@ -204,9 +203,9 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if command was sent.
         """
-        inventory = get_inventory_state(get_world_service())
+        inventory = get_inventory_state(self.world)
         uses_extra = inventory["extra_radars"]["enabled"] and inventory["extra_radars"]["count"] > 0
-        get_world_service().record_radar_command(use_extra_radar=uses_extra)
+        self.world.record_radar_command(use_extra_radar=uses_extra)
         emit_diagnostic(
             diagnostic_kind="radar_dispatch",
             uses_extra=uses_extra,
@@ -366,7 +365,7 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if equipment is available to use.
         """
-        inventory = get_inventory_state(get_world_service())
+        inventory = get_inventory_state(self.world)
         if slot == 1:
             item = inventory["armor_shields"]
         elif slot == 2:
@@ -390,7 +389,7 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if enabled.
         """
-        inventory = get_inventory_state(get_world_service())
+        inventory = get_inventory_state(self.world)
         if slot == 1:
             return inventory["armor_shields"]["enabled"]
         if slot == 2:

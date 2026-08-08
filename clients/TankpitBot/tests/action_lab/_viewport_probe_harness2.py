@@ -23,6 +23,7 @@ from tankpit_bot.action_lab.viewport_probe import (
     ViewportProbe,
     ViewportProbeSessionDict,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -225,7 +226,7 @@ class _ViewportHarness(ViewportProbe):
 
 
 def _install_noop_drain() -> None:
-    def _drain(provider: BufferedMessageSourceProtocol) -> int:
+    def _drain(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         del provider
         return 0
 

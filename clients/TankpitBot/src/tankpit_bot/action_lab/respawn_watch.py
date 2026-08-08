@@ -91,7 +91,7 @@ class RespawnWatchProbe(EnemyTeleportProbe):
         """
         started_ms = action_hooks.get_current_time_ms()
         while action_hooks.get_current_time_ms() - started_ms < self.engage_ms:
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             current = _enemy_by_id(self, enemy["tank_id"])
             if current is None:
                 return True
@@ -109,7 +109,7 @@ class RespawnWatchProbe(EnemyTeleportProbe):
         while action_hooks.get_current_time_ms() - started_ms < self.poll_ms:
             self.open_map()
             page.wait_for_timeout(float(self.poll_interval_ms))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
 
 
 def _create_respawn_watch_probe(

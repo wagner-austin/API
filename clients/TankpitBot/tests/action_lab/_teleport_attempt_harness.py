@@ -18,6 +18,7 @@ from tankpit_bot.action_lab.types import (
     TeleportPageSnapshotDict,
     TeleportTargetDict,
 )
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     WorldStateDict,
     make_empty_world_state,
@@ -30,6 +31,7 @@ class _Probe:
 
     def __init__(self) -> None:
         """Initialize the fake probe."""
+        self.world = get_world_service()
         self._messages = [
             CapturedMessage(
                 direction="sent",

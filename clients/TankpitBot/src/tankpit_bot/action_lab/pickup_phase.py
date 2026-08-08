@@ -127,7 +127,7 @@ def wait_for_pickup_outcome(
         PickupPhaseError: If self state disappears while waiting or after timeout.
     """
     while action_hooks.get_current_time_ms() - pickup_started_ms < timeout_ms:
-        action_hooks.drain_buffered_messages(probe)
+        action_hooks.drain_buffered_messages(probe, probe.world)
         pickup_outcome = get_completed_pickup_outcome(
             probe,
             target_x=target_x,
@@ -250,7 +250,7 @@ def run_tracked_pickup_phase(
         target_y=target_y,
         base_timeout_ms=pickup_timeout_ms,
     )
-    action_hooks.drain_buffered_messages(probe)
+    action_hooks.drain_buffered_messages(probe, probe.world)
     immediate_pickup_outcome = get_completed_outcome(
         probe,
         target_x=target_x,

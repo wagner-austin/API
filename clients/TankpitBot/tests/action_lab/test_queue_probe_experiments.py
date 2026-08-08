@@ -182,7 +182,7 @@ class TestShootThenPickupErrorBranches:
         probe = _FailingCommandProbe(worlds, clock, fail_shoot=True)
         probe._page = ClockAdvancingPage(clock, on_wait=worlds.advance)
         action_hooks.get_current_time_ms = clock
-        action_hooks.drain_buffered_messages = lambda source: 0
+        action_hooks.drain_buffered_messages = lambda source, ws: 0
         with pytest.raises(QueueProbeError, match="shoot command dispatch failed"):
             run_shoot_then_pickup_experiment(probe, timeout_ms=5000)
 
@@ -192,7 +192,7 @@ class TestShootThenPickupErrorBranches:
         probe = _FailingCommandProbe(worlds, clock, fail_pickup=True)
         probe._page = ClockAdvancingPage(clock, on_wait=worlds.advance)
         action_hooks.get_current_time_ms = clock
-        action_hooks.drain_buffered_messages = lambda source: 0
+        action_hooks.drain_buffered_messages = lambda source, ws: 0
         with pytest.raises(QueueProbeError, match="pickup_fuel command dispatch failed"):
             run_shoot_then_pickup_experiment(probe, timeout_ms=5000)
 
@@ -204,7 +204,7 @@ class TestShootThenShootErrorBranches:
         probe = _FailingCommandProbe(worlds, clock, fail_shoot=True)
         probe._page = ClockAdvancingPage(clock, on_wait=worlds.advance)
         action_hooks.get_current_time_ms = clock
-        action_hooks.drain_buffered_messages = lambda source: 0
+        action_hooks.drain_buffered_messages = lambda source, ws: 0
         with pytest.raises(QueueProbeError, match="first shoot command dispatch failed"):
             run_shoot_then_shoot_experiment(probe, timeout_ms=5000)
 
@@ -214,7 +214,7 @@ class TestShootThenShootErrorBranches:
         probe = _SecondShootFailsProbe(worlds, clock)
         probe._page = ClockAdvancingPage(clock, on_wait=worlds.advance)
         action_hooks.get_current_time_ms = clock
-        action_hooks.drain_buffered_messages = lambda source: 0
+        action_hooks.drain_buffered_messages = lambda source, ws: 0
         with pytest.raises(QueueProbeError, match="second shoot command dispatch failed"):
             run_shoot_then_shoot_experiment(probe, timeout_ms=5000)
 
@@ -226,7 +226,7 @@ class TestMoveThenPickupErrorBranches:
         probe = _FailingCommandProbe(worlds, clock, fail_move=True)
         probe._page = ClockAdvancingPage(clock, on_wait=worlds.advance)
         action_hooks.get_current_time_ms = clock
-        action_hooks.drain_buffered_messages = lambda source: 0
+        action_hooks.drain_buffered_messages = lambda source, ws: 0
         with pytest.raises(QueueProbeError, match="move command dispatch failed"):
             run_move_then_pickup_experiment(probe, timeout_ms=5000)
 
@@ -236,6 +236,6 @@ class TestMoveThenPickupErrorBranches:
         probe = _FailingCommandProbe(worlds, clock, fail_pickup=True)
         probe._page = ClockAdvancingPage(clock, on_wait=worlds.advance)
         action_hooks.get_current_time_ms = clock
-        action_hooks.drain_buffered_messages = lambda source: 0
+        action_hooks.drain_buffered_messages = lambda source, ws: 0
         with pytest.raises(QueueProbeError, match="pickup_fuel command dispatch failed"):
             run_move_then_pickup_experiment(probe, timeout_ms=5000)

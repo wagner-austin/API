@@ -25,6 +25,7 @@ from tankpit_bot.bot.ai.world_types import (
 )
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state
 from tankpit_bot.state.types import make_self_state, make_tank_state, make_viewport_state
 
@@ -117,7 +118,7 @@ class _WatchHarness(RespawnWatchProbe):
 
 
 def _install_counting_drain(harness: _WatchHarness) -> None:
-    def _drain(provider: BufferedMessageSourceProtocol) -> int:
+    def _drain(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         del provider
         harness.drains += 1
         return 0

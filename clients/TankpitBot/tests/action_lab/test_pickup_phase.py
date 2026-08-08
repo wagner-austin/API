@@ -13,6 +13,8 @@ from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import pickup_phase
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
+from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.types import CapturedMessage
 
@@ -45,6 +47,7 @@ class _Probe:
 
     def __init__(self, world: WorldStateDict, *, move_result: bool = True) -> None:
         """Initialize the probe."""
+        self.world = get_world_service()
         self._world = world
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
@@ -191,7 +194,7 @@ def test_wait_for_pickup_outcome_returns_timeout_when_fuel_never_changes() -> No
     probe = _Probe(_make_world(100, 100, 700))
     page = _Page(clock)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     assert pickup_phase.wait_for_pickup_outcome(
         page,
@@ -211,7 +214,7 @@ def test_run_tracked_pickup_phase_returns_immediate_pickup_without_move() -> Non
     page = _Page(clock)
     action_hooks.get_current_time_ms = clock
 
-    def _drain(source: BufferedMessageSourceProtocol) -> int:
+    def _drain(source: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         _ = source
         self_state = _require_self_state(probe.get_world_state())
         self_state["fuel"] = 940
@@ -251,7 +254,7 @@ def test_run_tracked_pickup_phase_dispatches_move_and_waits_for_pickup() -> None
     probe = _Probe(_make_world(100, 100, 800))
     page = _Page(clock)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     def _on_wait() -> None:
         self_state = _require_self_state(probe.get_world_state())
@@ -291,7 +294,7 @@ def test_run_tracked_pickup_phase_raises_on_move_dispatch_failure() -> None:
     probe = _Probe(_make_world(100, 100, 800), move_result=False)
     page = _Page(clock)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     with pytest.raises(
         RuntimeError,

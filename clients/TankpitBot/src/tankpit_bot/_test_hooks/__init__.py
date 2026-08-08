@@ -18,7 +18,7 @@ exactly as before; the submodules group hooks by domain:
   ``sync_playwright`` factory hook.
 * :mod:`tankpit_bot._test_hooks.terrain` -- TerrainMap interface +
   loader hook.
-* :mod:`tankpit_bot._test_hooks.bot` -- ``BotProtocol`` command-dispatch
+* :mod:`tankpit_bot._test_hooks.bot` -- the buffered-message-source
   surface.
 * :mod:`tankpit_bot._test_hooks.runtime` -- argv, static-byte discovery,
   replay dispatch.
@@ -28,7 +28,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from tankpit_bot._test_hooks.bot import BotProtocol, BufferedMessageSourceProtocol
+from tankpit_bot._test_hooks.bot import BufferedMessageSourceProtocol
 from tankpit_bot._test_hooks.browser import (
     AutoscrollEnforcerProtocol,
     AutoscrollKeyProtocol,
@@ -116,7 +116,6 @@ __all__ = [
     "AutoscrollEnforcerProtocol",
     "AutoscrollKeyProtocol",
     "AutoscrollPageProtocol",
-    "BotProtocol",
     "BrowserContextProtocol",
     "BrowserProtocol",
     "BrowserTypeLaunchProtocol",

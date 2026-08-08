@@ -164,6 +164,38 @@ class TestRequireFieldAccessors:
 class TestRuntimeContext:
     """Tests for the per-tick context auto-attached to emit_* events."""
 
+    def test_context_does_not_leak_into_another_thread(self) -> None:
+        """A thread that never set the context reads an empty one.
+
+        This is the whole reason the three fields are
+        ``ContextVar`` slots rather than module globals
+        ([[session-state-deglobalisation]] step 10). With globals, any
+        thread emitting an event while a tick was in flight would stamp
+        that tick's ``tick_n`` and ``bot_state`` onto its own records.
+        """
+        import threading
+
+        from tankpit_bot.runtime_context import (
+            RuntimeContextDict,
+            get_runtime_context,
+            set_runtime_context,
+        )
+
+        set_runtime_context(tick_n=7, bot_state="HUNT/engaging", in_flight_action_kind="shoot")
+
+        seen: list[RuntimeContextDict] = []
+
+        def _read_in_other_thread() -> None:
+            seen.append(get_runtime_context())
+
+        worker = threading.Thread(target=_read_in_other_thread)
+        worker.start()
+        worker.join()
+
+        assert seen == [{}]
+        # The setting thread still sees its own context untouched.
+        assert get_runtime_context()["tick_n"] == 7
+
     def test_set_and_get_context_round_trips(self) -> None:
         """``set_runtime_context`` stores; ``get_runtime_context`` returns a copy."""
         from tankpit_bot.runtime_context import (

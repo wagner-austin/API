@@ -298,7 +298,7 @@ def _wait_for_teleport_outcome(
     next_scan_index = message_start_index
     map_data_snapshot_captured = False
     while action_hooks.get_current_time_ms() - teleport_started_ms < timeout_ms:
-        action_hooks.drain_buffered_messages(provider)
+        action_hooks.drain_buffered_messages(provider, provider.world)
         if not map_data_snapshot_captured:
             map_data_index = _find_map_data_message_index(
                 provider,

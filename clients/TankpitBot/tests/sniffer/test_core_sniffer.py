@@ -15,6 +15,7 @@ from tankpit_bot.sniffer.core import (
     SnifferError,
     WebSocketSniffer,
 )
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.types import CapturedMessage, decode_capture_session
 from tests.conftest import FakeFileSystem
 from tests.fakes import (
@@ -153,6 +154,7 @@ class TestWebSocketSnifferMethods:
         # Create sniffer with minimal init - we'll call methods directly
         # Using object.__new__ to avoid full __init__
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer.world = get_world_service()
         sniffer._cdp_service = CDPService()
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
@@ -183,6 +185,7 @@ class TestWebSocketSnifferMethods:
         from tankpit_bot.browser import GameLogEntry
 
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer.world = get_world_service()
         sniffer._cdp_service = CDPService()
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
@@ -212,6 +215,7 @@ class TestWebSocketSnifferMethods:
         from tankpit_bot.browser import GameLogEntry
 
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer.world = get_world_service()
         sniffer._cdp_service = CDPService()
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
@@ -241,6 +245,7 @@ class TestWebSocketSnifferMethods:
         from tankpit_bot.browser import GameLogEntry
 
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer.world = get_world_service()
         sniffer._cdp_service = CDPService()
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
@@ -265,29 +270,28 @@ class TestWebSocketSnifferMethods:
 
     def test_on_message_captured_sent_mine_status(self, fake_fs: FakeFileSystem) -> None:
         """Test _on_message_captured logs mine status for sent messages."""
+        from tankpit_bot.capture.trackers import MineTracker
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
-        from tankpit_bot.sniffer import trackers
         from tankpit_bot.types import CapturedMessage
 
         static_key = "ABCDEF" + "A" * 994
         fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
 
-        # Reset trackers
-        for tracker in trackers.ALL_TRACKERS:
-            tracker._xor_table = None
-
         # Create sniffer with minimal init
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer.world = get_world_service()
         sniffer._cdp_service = CDPService()
         sniffer._live_decode = True
         sniffer._magic = "testmagic"
         sniffer._autosave_paths = ()
         sniffer._game_log_scraper = None
 
-        # Initialize trackers with magic
-        trackers.init_trackers_with_magic("testmagic")
+        # The mine tracker is the sniffer's own, not a global
+        # ([[session-state-deglobalisation]] step 9).
+        sniffer._mine_tracker = MineTracker()
+        sniffer._mine_tracker.set_magic("testmagic")
 
-        xor_table = trackers.mine_tracker._xor_table
+        xor_table = sniffer._mine_tracker._xor_table
         assert xor_table is not None and len(xor_table) == 1000
 
         # Create a mine drop command message (type=4, id=98)
@@ -351,6 +355,7 @@ class TestWebSocketSnifferMethods:
         }
 
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer.world = get_world_service()
         sniffer._cdp_service = CDPService()
         sniffer._live_decode = True
         sniffer._magic = "testmagic"
@@ -400,6 +405,7 @@ class TestWebSocketSnifferMethods:
     def test_autosave_capture_no_paths_is_noop(self) -> None:
         """Returns immediately when autosave is not configured."""
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer.world = get_world_service()
         sniffer._cdp_service = CDPService()
         sniffer._autosave_paths = ()
         sniffer._target_url = "https://tankpit.com"
@@ -414,6 +420,7 @@ class TestWebSocketSnifferMethods:
     def test_on_message_captured_autosaves_capture(self, fake_fs: FakeFileSystem) -> None:
         """Autosaves the current capture snapshot after a message arrives."""
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer.world = get_world_service()
         sniffer._cdp_service = CDPService()
         sniffer._target_url = "https://tankpit.com"
         sniffer._headless = False
@@ -461,6 +468,7 @@ class TestWebSocketSnifferMethods:
         from tankpit_bot.browser import GameLogEntry
 
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer.world = get_world_service()
         sniffer._cdp_service = CDPService()
         sniffer._target_url = "https://tankpit.com"
         sniffer._headless = False
@@ -485,3 +493,71 @@ class TestWebSocketSnifferMethods:
 
         assert len(saved_session["game_log"]) == 1
         assert saved_session["game_log"][0]["text"] == "Zoom in"
+
+
+def test_capture_session_carries_the_live_registry_tank_names() -> None:
+    """``tank_names`` is populated from the world-state tank registry.
+
+    Regression guard for a reader with no writer: the field used to come
+    from a ``TankTracker`` that ``process_message`` was never called on,
+    so it answered ``{}`` forever and all 432 archived captures carried
+    an empty map. Nothing asserted the field had content, which is
+    exactly why it went unnoticed ([[session-state-deglobalisation]]).
+    """
+    from tankpit_bot.sniffer.world_state import get_world_service
+    from tankpit_bot.state.types import make_tank_state
+
+    service = get_world_service()
+    service.world_state["tanks"] = {
+        "1301": make_tank_state(
+            tank_id=1301,
+            x=10,
+            y=20,
+            team=1,
+            rank=1,
+            damage_state=0,
+            name="Artax",
+            is_bot=True,
+            is_self=True,
+        ),
+        "500": make_tank_state(
+            tank_id=500,
+            x=30,
+            y=40,
+            team=2,
+            rank=3,
+            damage_state=0,
+            name="red-1",
+            is_bot=False,
+            is_self=False,
+        ),
+        "501": make_tank_state(
+            tank_id=501,
+            x=50,
+            y=60,
+            team=2,
+            rank=3,
+            damage_state=0,
+            name="",
+            is_bot=False,
+            is_self=False,
+        ),
+    }
+
+    sniffer = object.__new__(WebSocketSniffer)
+    sniffer.world = get_world_service()
+    sniffer._cdp_service = CDPService()
+    sniffer._session_id = "names-test"
+    sniffer._start_timestamp_ms = 1000
+    sniffer._target_url = "https://tankpit.com"
+    sniffer._messages = []
+    sniffer._ws_urls = {}
+    sniffer._magic = None
+    sniffer._static_key = None
+    sniffer._game_log_entries = []
+
+    session = sniffer._build_capture_session()
+
+    # Named tanks travel with the capture; the unnamed one is omitted
+    # rather than carried as an empty string.
+    assert session["tank_names"] == {"1301": "Artax", "500": "red-1"}

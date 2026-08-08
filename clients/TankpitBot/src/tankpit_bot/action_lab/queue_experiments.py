@@ -18,6 +18,7 @@ from tankpit_bot.action_lab.queue_probe_types import (
     QueueExperimentKind,
     QueueExperimentResultDict,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -28,6 +29,9 @@ _SETTLE_MS = 500
 
 class QueueWaitProbeProtocol(BufferedMessageSourceProtocol, Protocol):
     """Minimal probe protocol for queue experiment wait loops."""
+
+    #: This session's world service; decoded frames land here.
+    world: WorldService
 
     def _update_state_from_world(self) -> None:
         """Advance internal state from the current world snapshot."""
@@ -85,7 +89,7 @@ def _wait_for_position_change(
     """
     page = probe._require_page()
     while action_hooks.get_current_time_ms() - started_ms < timeout_ms:
-        action_hooks.drain_buffered_messages(probe)
+        action_hooks.drain_buffered_messages(probe, probe.world)
         probe._update_state_from_world()
         self_state = probe.get_self_state()
         if self_state is not None and (
@@ -116,7 +120,7 @@ def _wait_for_fuel_change(
     """
     page = probe._require_page()
     while action_hooks.get_current_time_ms() - started_ms < timeout_ms:
-        action_hooks.drain_buffered_messages(probe)
+        action_hooks.drain_buffered_messages(probe, probe.world)
         probe._update_state_from_world()
         self_state = probe.get_self_state()
         if self_state is not None and self_state["fuel"] != baseline_fuel:
@@ -145,7 +149,7 @@ def _wait_for_world_timestamp_advance(
     """
     page = probe._require_page()
     while action_hooks.get_current_time_ms() - started_ms < timeout_ms:
-        action_hooks.drain_buffered_messages(probe)
+        action_hooks.drain_buffered_messages(probe, probe.world)
         probe._update_state_from_world()
         ws = probe.get_world_state()
         if ws["timestamp_ms"] > baseline_ms:
@@ -391,7 +395,7 @@ def run_single_experiment(
     """
     page = probe._require_page()
     page.wait_for_timeout(float(_SETTLE_MS))
-    action_hooks.drain_buffered_messages(probe)
+    action_hooks.drain_buffered_messages(probe, probe.world)
 
     if kind == "shoot_then_pickup":
         return run_shoot_then_pickup_experiment(probe, timeout_ms=timeout_ms)

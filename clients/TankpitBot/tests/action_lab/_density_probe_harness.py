@@ -24,6 +24,7 @@ from tankpit_bot.inventory import (
     InventoryItem,
     InventoryState,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
@@ -141,7 +142,7 @@ class _DensityHarness(DensityProbe):
 
 
 def _install_noop_drain() -> None:
-    def _drain(provider: BufferedMessageSourceProtocol) -> int:
+    def _drain(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         del provider
         return 0
 

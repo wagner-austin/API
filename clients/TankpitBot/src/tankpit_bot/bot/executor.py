@@ -6,8 +6,8 @@ equipment slot toggling and command sending.
 
 from __future__ import annotations
 
-from tankpit_bot._test_hooks import BotProtocol
 from tankpit_bot.bot.ai.scoring_types import render_reason
+from tankpit_bot.bot.bot_protocol import BotProtocol
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,
@@ -249,7 +249,7 @@ def dispatch_command(
         # the inventory so combat_feedback can confirm hits via ammo
         # delta when the wire's victim_id lookup misses (off-viewport
         # target).
-        ws = get_world_service()
+        ws = bot.world
         ws.last_shot_combat_target_id = command["target_id"]
         ws.pending_shot_inventory_snapshot = ws.inventory_state
         return bot.shoot_at(command["target_x"], command["target_y"], command["target_id"])
@@ -257,12 +257,12 @@ def dispatch_command(
         dispatched_radar = bot.use_radar()
         if dispatched_radar:
             record_fuel_entry(
-                book=get_world_service().fuel_book,
+                book=bot.world.fuel_book,
                 kind="radar",
                 lo=-RADAR_COST,
                 hi=-RADAR_COST,
             )
-            record_ammo_scan(book=get_world_service().ammo_book)
+            record_ammo_scan(book=bot.world.ammo_book)
         return dispatched_radar
     if command["cmd_type"] == "map_open":
         # CMD_MAP_OPEN is idempotent on the server: every dispatch
@@ -313,7 +313,7 @@ def _dispatch_teleport_command(
         )
         # This tick's product is the map open, not the teleport: the
         # recorded teleport decision resolves via the map_open outcome.
-        transfer_pending_decision(get_world_service().ledger, "teleport", "map_open")
+        transfer_pending_decision(bot.world.ledger, "teleport", "map_open")
         return bot.open_map()
     emit_diagnostic(
         diagnostic_kind="map_open_skipped_already_open",
@@ -322,7 +322,7 @@ def _dispatch_teleport_command(
         teleport_target_x=command["target_x"],
         teleport_target_y=command["target_y"],
     )
-    self_state = get_world_service().world_state["self_state"]
+    self_state = bot.world.world_state["self_state"]
     if self_state is not None:
         floor_cost = (
             teleport_cost(
@@ -338,7 +338,7 @@ def _dispatch_teleport_command(
     if dispatched:
         _record_teleport_fuel_entry(command["target_x"], command["target_y"])
         record_teleport_dispatch(
-            get_world_service().ledger,
+            bot.world.ledger,
             target_x=command["target_x"],
             target_y=command["target_y"],
             message_index=message_index,
@@ -425,7 +425,7 @@ def execute(
     ledger_kind = _LEDGER_KIND_BY_CMD_TYPE.get(command["cmd_type"])
     if ledger_kind is not None:
         record_decision(
-            get_world_service().ledger,
+            bot.world.ledger,
             action_kind=ledger_kind,
             cmd_type=command["cmd_type"],
             mode=behavior["mode"],

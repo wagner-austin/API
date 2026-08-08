@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot import _test_hooks
 from tankpit_bot.facts.source import FactSource
 from tankpit_bot.ledger.damage_book import confirm_incoming_damage
 from tankpit_bot.ledger.fuel_book import record_fuel_entry, record_fuel_reading
@@ -39,7 +39,7 @@ def update_world_state_from_fuel_total(
         fact_source: Wire channel the fuel total arrived on (0x2E sync,
             0x44 fuel gain, or 0x64 fuel total).
     """
-    ts = get_current_time_ms()
+    ts = _test_hooks.get_current_time_ms()
     old_fuel = (
         ws.world_state["self_state"]["fuel"] if ws.world_state["self_state"] is not None else 0
     )
@@ -88,7 +88,7 @@ def update_world_state_from_container_pickup(
             pickup. Default ``0`` preserves the "emptied" semantic for
             callers without the wire field.
     """
-    ts = get_current_time_ms()
+    ts = _test_hooks.get_current_time_ms()
     ws.world_state = pickup_container(ws.world_state, x, y, ts, remaining_volume)
     rank = ws.world_state["self_state"]["rank"] if ws.world_state["self_state"] is not None else 8
     record_fuel_entry(book=ws.fuel_book, kind="pickup", lo=0, hi=fuel_capacity(rank))

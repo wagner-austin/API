@@ -3,15 +3,26 @@
 The tick number, bot state, and in-flight action kind that
 :mod:`tankpit_bot.runtime_logging` merges into each record so a log
 line can be read without its surrounding lines.
+
+Held in :class:`contextvars.ContextVar` slots rather than module
+globals ([[session-state-deglobalisation]] step 10). This is the one
+place in the refactor where threading a parameter would have been the
+wrong answer: ``emit_ai`` and ``emit_diagnostic`` are called from 256
+sites inside pure planner logic, and giving every scoring function a
+logging argument to carry would cost far more than the globals did.
+A context variable is ambient by design and still isolates per
+thread and per async task, which a module global does not.
 """
 
 from __future__ import annotations
 
+from contextvars import ContextVar
+
 from typing_extensions import TypedDict
 
-# Internal storage for the active context, split into one typed slot per
-# field so each value is mypy-narrowed at its source. The public
-# :class:`RuntimeContextDict` view is assembled by :func:`get_runtime_context`.
+# One typed slot per field so each value is mypy-narrowed at its source.
+# The public :class:`RuntimeContextDict` view is assembled by
+# :func:`get_runtime_context`.
 RUNTIME_CONTEXT_KEYS: frozenset[str] = frozenset(
     {
         "tick_n",
@@ -22,11 +33,13 @@ RUNTIME_CONTEXT_KEYS: frozenset[str] = frozenset(
 """Every field :func:`set_runtime_context` can attach to an event."""
 
 
-_RUNTIME_CONTEXT_TICK_N: int | None = None
+_TICK_N: ContextVar[int | None] = ContextVar("tankpit_tick_n", default=None)
 
-_RUNTIME_CONTEXT_BOT_STATE: str | None = None
+_BOT_STATE: ContextVar[str | None] = ContextVar("tankpit_bot_state", default=None)
 
-_RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND: str | None = None
+_IN_FLIGHT_ACTION_KIND: ContextVar[str | None] = ContextVar(
+    "tankpit_in_flight_action_kind", default=None
+)
 
 
 class RuntimeContextDict(TypedDict, total=False):
@@ -74,30 +87,32 @@ def set_runtime_context(
         in_flight_action_kind: ``ActionKind`` string, or ``None`` to
             keep the previous value.
     """
-    global _RUNTIME_CONTEXT_TICK_N
-    global _RUNTIME_CONTEXT_BOT_STATE
-    global _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND
     if tick_n is not None:
-        _RUNTIME_CONTEXT_TICK_N = tick_n
+        _TICK_N.set(tick_n)
     if bot_state is not None:
-        _RUNTIME_CONTEXT_BOT_STATE = bot_state
+        _BOT_STATE.set(bot_state)
     if in_flight_action_kind is not None:
-        _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND = in_flight_action_kind
+        _IN_FLIGHT_ACTION_KIND.set(in_flight_action_kind)
 
 
 def clear_runtime_context() -> None:
     """Remove every field from the active runtime context.
 
     Subsequent ``emit_*`` calls emit without context until
-    :func:`set_runtime_context` is called again. The tick loop's
-    teardown path calls this so test/probe sessions start clean.
+    :func:`set_runtime_context` is called again.
+
+    This docstring used to claim "the tick loop's teardown path calls
+    this". It does not, and never did — measured 2026-08-07: the only
+    callers anywhere are ``tests/conftest.py`` and this function's own
+    test. In production the context is set once per tick
+    (``bot/tick_loop.py``) and never cleared, so the end-of-run
+    scorecard carries the final tick's ``tick_n`` and ``bot_state``.
+    That is defensible — the scorecard does belong to that tick — but
+    it was not what the docstring said.
     """
-    global _RUNTIME_CONTEXT_TICK_N
-    global _RUNTIME_CONTEXT_BOT_STATE
-    global _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND
-    _RUNTIME_CONTEXT_TICK_N = None
-    _RUNTIME_CONTEXT_BOT_STATE = None
-    _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND = None
+    _TICK_N.set(None)
+    _BOT_STATE.set(None)
+    _IN_FLIGHT_ACTION_KIND.set(None)
 
 
 def get_runtime_context() -> RuntimeContextDict:
@@ -108,12 +123,15 @@ def get_runtime_context() -> RuntimeContextDict:
         returned dict without affecting the module-level state.
     """
     snapshot: RuntimeContextDict = {}
-    if _RUNTIME_CONTEXT_TICK_N is not None:
-        snapshot["tick_n"] = _RUNTIME_CONTEXT_TICK_N
-    if _RUNTIME_CONTEXT_BOT_STATE is not None:
-        snapshot["bot_state"] = _RUNTIME_CONTEXT_BOT_STATE
-    if _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND is not None:
-        snapshot["in_flight_action_kind"] = _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND
+    tick_n = _TICK_N.get()
+    if tick_n is not None:
+        snapshot["tick_n"] = tick_n
+    bot_state = _BOT_STATE.get()
+    if bot_state is not None:
+        snapshot["bot_state"] = bot_state
+    in_flight_action_kind = _IN_FLIGHT_ACTION_KIND.get()
+    if in_flight_action_kind is not None:
+        snapshot["in_flight_action_kind"] = in_flight_action_kind
     return snapshot
 
 

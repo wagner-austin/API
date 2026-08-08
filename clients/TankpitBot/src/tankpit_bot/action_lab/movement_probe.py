@@ -27,6 +27,7 @@ from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.browser.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.runtime_logging import emit_diagnostic
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
@@ -43,6 +44,9 @@ class MovementProbeError(Exception):
 
 class MovementOutcomeProbeProtocol(BufferedMessageSourceProtocol, Protocol):
     """Minimal probe protocol needed for movement settlement waits."""
+
+    #: This session's world service; decoded frames land here.
+    world: WorldService
 
     def _update_state_from_world(self) -> None:
         """Advance internal state from the current world snapshot."""
@@ -90,7 +94,7 @@ def _wait_for_move_outcome(
 ) -> tuple[Literal["arrived_exact", "move_timeout"], int, int, int, int]:
     """Wait for an exact movement arrival or movement timeout."""
     while action_hooks.get_current_time_ms() - move_started_ms < timeout_ms:
-        action_hooks.drain_buffered_messages(probe)
+        action_hooks.drain_buffered_messages(probe, probe.world)
         probe._update_state_from_world()
         self_state = probe.get_self_state()
         if self_state is None:
@@ -235,7 +239,7 @@ class MovementProbe(ProbeBase):
         if queue_map_open_during_move:
             if map_open_delay_ms > 0:
                 page.wait_for_timeout(float(map_open_delay_ms))
-                action_hooks.drain_buffered_messages(self)
+                action_hooks.drain_buffered_messages(self, self.world)
             # The wire ``CMD_MAP_OPEN`` only opens the map; re-sending against an
             # already-open map is a server-side no-op (no fresh map sync). If the
             # live JS client already shows the overlay -- e.g. a prior attempt

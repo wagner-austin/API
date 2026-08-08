@@ -111,6 +111,7 @@ class _WorldOnlyBot:
 
     def __init__(self, world: WorldStateDict) -> None:
         """Store the provided world-state snapshot."""
+        self.world = get_world_service()
         self._world = world
         self._cdp = None
         self._cdp_message_buffer: list[str] = []

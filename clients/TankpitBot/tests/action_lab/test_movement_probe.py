@@ -32,6 +32,7 @@ from tankpit_bot.action_lab.movement_probe import (
     MovementProbeError,
 )
 from tankpit_bot.action_lab.types import TeleportTargetDict
+from tankpit_bot.sniffer.world_service import WorldService
 
 
 def test_probe_single_movement_target_records_queue_map_open() -> None:
@@ -43,7 +44,7 @@ def test_probe_single_movement_target_records_queue_map_open() -> None:
     probe = _SingleTargetHarness(page)
     after_world = _make_world(1700, 120, 121, 880)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     def _fake_wait_for_move_outcome(
         page: action_session.WaitPageProtocol,
@@ -118,7 +119,7 @@ def test_probe_single_movement_target_records_snapshots_before_and_after() -> No
     probe = _SingleTargetHarness(page)
     after_world = _make_world(1700, 120, 121, 880)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     def _fake_wait_for_move_outcome(
         page: action_session.WaitPageProtocol,
@@ -178,7 +179,7 @@ def test_probe_single_movement_target_raises_on_map_open_dispatch_failure() -> N
     probe = _SingleTargetHarness(page)
     probe.open_map_result = False
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
     with pytest.raises(MovementProbeError, match="map_open command dispatch failed"):
         probe._probe_single_movement_target(
             TeleportTargetDict(label="move_1", x=120, y=121),
@@ -207,7 +208,7 @@ def test_probe_single_movement_target_skips_queued_map_open_when_map_already_ope
     action_hooks.get_current_time_ms = clock
     drain_calls = {"count": 0}
 
-    def _count_drain(source: BufferedMessageSourceProtocol) -> int:
+    def _count_drain(source: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         _ = source
         drain_calls["count"] += 1
         return 0
@@ -253,7 +254,7 @@ def test_probe_single_movement_target_raises_when_self_state_missing_after_outco
     )
     probe = _SingleTargetHarness(page)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
 
     def _fake_wait_for_missing_self(
         page: action_session.WaitPageProtocol,

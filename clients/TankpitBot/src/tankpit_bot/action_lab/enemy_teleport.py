@@ -114,7 +114,7 @@ class EnemyTeleportProbe(ProbeBase):
         remaining = settle_delay_ms
         beat = 0
         while remaining > 0:
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             self._heartbeat_action(beat)
             beat += 1
             step = min(heartbeat_interval_ms, remaining)

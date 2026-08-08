@@ -165,7 +165,7 @@ class KeyProbe(ProbeBase):
             pressed_at_ms = action_hooks.get_current_time_ms()
             page.keyboard.press(key)
             page.wait_for_timeout(float(inter_key_delay_ms))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             presses.append(
                 KeyPressWindowDict(
                     key=key,

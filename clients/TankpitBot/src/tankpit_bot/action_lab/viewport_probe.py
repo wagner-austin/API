@@ -202,7 +202,7 @@ class ViewportProbe(ProbeBase):
         start_index = len(self.messages)
         page.keyboard.press("a")
         page.wait_for_timeout(float(_TOGGLE_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         enabled = self._read_autoscroll_ack(start_index)
         log.info("Viewport probe: autoscroll ack enabled=%s", enabled)
         return enabled
@@ -240,7 +240,7 @@ class ViewportProbe(ProbeBase):
         page = self._require_page()
         for _ in range(_STEP_POLLS):
             page.wait_for_timeout(float(_POLL_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             _, new_x, new_y = self._current_fuel()
             if (new_x, new_y) != (x, y):
                 return True
@@ -269,7 +269,7 @@ class ViewportProbe(ProbeBase):
             return False
         self.open_map()
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         self.teleport_to(x + _ANCHOR_HOP, y)
         if not self._await_position_change(x, y):
             log.info("Viewport probe: anchor teleport never echoed - skipping phase")
@@ -399,7 +399,7 @@ class ViewportProbe(ProbeBase):
             self.move_to(x + offset, y)
             sent += 1
             page.wait_for_timeout(float(_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
         return sent
 
     def _run_phase(self) -> tuple[int, int]:

@@ -22,7 +22,8 @@ from tankpit_bot.action_lab.equipment_targeting import (
 )
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
 from tankpit_bot.browser.cdp_service import CDPService
-from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.sniffer.world_state import get_world_service, get_world_state
 from tankpit_bot.state import SelfStateDict, make_container_state, make_self_state
 from tankpit_bot.state.types import make_viewport_state
 from tankpit_bot.types import CapturedMessage
@@ -99,11 +100,14 @@ def _make_probe() -> EquipmentProbe:
     """Create a minimal EquipmentProbe bypassing __init__.
 
     Sets ``_messages`` so the inherited ``messages`` property works, and
-    populates the global world state's ``self_state`` so that the real
-    ``_require_self_state`` (which reads the global world state via
-    ``get_self_state``) returns a valid value.
+    populates the world state's ``self_state`` so that the real
+    ``_require_self_state`` returns a valid value. ``world`` is bound
+    explicitly because ``__new__`` skips ``SessionBase.__init__``, which
+    is where a real probe gets its service
+    ([[session-state-deglobalisation]] step 8).
     """
     probe = EquipmentProbe.__new__(EquipmentProbe)
+    probe.world = get_world_service()
     probe._cdp_service = CDPService()
     probe._messages = [
         CapturedMessage(
@@ -333,7 +337,7 @@ def test_run_pickup_attempt_delegates_on_fast_path() -> None:
     probe._attempt_phase_overlaps = []
     container = make_container_state(101, 100, False, 0, timestamp_ms=2000)
 
-    def _growing_drain(source: BufferedMessageSourceProtocol) -> int:
+    def _growing_drain(source: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         _ = source
         set_inventory_total(1)
         return 1

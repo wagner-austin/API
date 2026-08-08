@@ -258,7 +258,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         action was cleared. False when there was no error, or when an
         orphan code was consumed but the action stays pending.
     """
-    error_code = check_and_clear_command_error(get_world_service())
+    error_code = check_and_clear_command_error(bot.world)
     if error_code == -1:
         return False
     kind: ActionKind = action["kind"]
@@ -311,7 +311,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
                 ty,
             )
         elif error_code == SUPERVISOR_ERROR_INVENTORY_FULL:
-            update_inventory_from_full_signal(get_world_service())
+            update_inventory_from_full_signal(bot.world)
             emit_sync(
                 "container at (%d,%d) rejected code=7 (inventory full) -- "
                 "reconciled all slots to capacity, container kept",
@@ -319,8 +319,8 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
                 ty,
             )
         elif error_code == SUPERVISOR_ERROR_EMPTY_CONTAINER:
-            remove_container_at(get_world_service(), tx, ty)
-            if was_recent_pickup_at(get_world_service(), tx, ty, get_current_time_ms()):
+            remove_container_at(bot.world, tx, ty)
+            if was_recent_pickup_at(bot.world, tx, ty, get_current_time_ms()):
                 # Drain receipt (flag s9-4): the code=4 rode our own
                 # successful pickup -- the ContainerPickup broadcast
                 # for this tile fired within the click. Nothing about
@@ -347,7 +347,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
                     ty,
                 )
         else:
-            increment_container_failed_pickups(get_world_service(), tx, ty)
+            increment_container_failed_pickups(bot.world, tx, ty)
             emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
     if kind in ("move", "teleport"):
         _mark_movement_failure(kind, error_code, tx, ty)
@@ -384,7 +384,7 @@ def _emit_command_rejected_outcome(
     """
     if kind == "move":
         emit_move_command_rejected(
-            get_world_service().ledger,
+            bot.world.ledger,
             duration_ms=elapsed_ms,
             target_x=tx,
             target_y=ty,
@@ -399,19 +399,19 @@ def _emit_command_rejected_outcome(
         # ``command_rejected``.
         if error_code == SUPERVISOR_ERROR_EMPTY_CONTAINER:
             emit_collect_pickup_empty(
-                get_world_service().ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
+                bot.world.ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
             )
         elif error_code == SUPERVISOR_ERROR_TANK_FULL:
             emit_collect_clamped_transfer(
-                get_world_service().ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
+                bot.world.ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
             )
         elif error_code == SUPERVISOR_ERROR_INVENTORY_FULL:
             emit_collect_inventory_full(
-                get_world_service().ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
+                bot.world.ledger, duration_ms=elapsed_ms, target_x=tx, target_y=ty
             )
         else:
             emit_collect_command_rejected(
-                get_world_service().ledger,
+                bot.world.ledger,
                 duration_ms=elapsed_ms,
                 target_x=tx,
                 target_y=ty,
@@ -419,7 +419,7 @@ def _emit_command_rejected_outcome(
             )
     elif kind == "teleport":
         emit_teleport_command_rejected(
-            get_world_service().ledger,
+            bot.world.ledger,
             duration_ms=elapsed_ms,
             target_x=tx,
             target_y=ty,
@@ -428,7 +428,7 @@ def _emit_command_rejected_outcome(
         )
     elif kind == "scan":
         emit_scan_command_rejected(
-            get_world_service().ledger,
+            bot.world.ledger,
             duration_ms=elapsed_ms,
             target_x=tx,
             target_y=ty,
@@ -436,7 +436,7 @@ def _emit_command_rejected_outcome(
         )
     elif kind == "map_open":
         emit_map_open_command_rejected(
-            get_world_service().ledger, duration_ms=elapsed_ms, error_code=error_code
+            bot.world.ledger, duration_ms=elapsed_ms, error_code=error_code
         )
 
 

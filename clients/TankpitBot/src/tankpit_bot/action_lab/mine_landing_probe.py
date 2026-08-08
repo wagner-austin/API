@@ -255,7 +255,7 @@ class MineLandingProbe(DensityProbe):
             self.use_radar()
             scans += 1
             page.wait_for_timeout(float(_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             found = self._nearest_enemy_mine(tried)
             if found is not None:
                 return found, scans, hops
@@ -289,10 +289,10 @@ class MineLandingProbe(DensityProbe):
         fuel_before, start_x, start_y = self._current_fuel()
         self.open_map()
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         self.teleport_to(mine_x, mine_y)
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         fuel_after, landed_x, landed_y = self._current_fuel()
         cost = teleport_cost(start_x, start_y, landed_x, landed_y)
         extra_loss = (fuel_before - fuel_after) - cost

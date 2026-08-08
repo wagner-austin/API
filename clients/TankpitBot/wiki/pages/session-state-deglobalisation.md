@@ -366,13 +366,99 @@ rather than the refactor.[^3]
    Here the opposite held: the test-side figure overcounted by ~150×,
    because it counted call sites without asking whether they did
    anything. Count what a call *does*, not that it appears.
-9. **`sniffer/trackers.py`** — `ALL_TRACKERS`.
-10. **`runtime_logging.py` + `runtime_context.py`** — per-session
-    artifacts and context. The three tick-context globals moved to
-    `runtime_context.py` when `runtime_logging.py` was split
-    (2026-08-07); `runtime_context.py` is their sole owner and the
-    emitter reads them through `get_runtime_context()`, so the split
-    did not duplicate them.
+9. ~~**`sniffer/trackers.py`** — `ALL_TRACKERS`.~~ **SHIPPED
+   2026-08-07 — mostly by DELETION.** Both `sniffer/trackers.py` and
+   `sniffer/player_tracking.py` are gone as modules.
+
+   `ALL_TRACKERS` held twelve tracker instances. **Eleven were never
+   fed a message.** Across all of `src/` and `scripts/`,
+   `process_message` is called exactly once —
+   `mine_tracker.process_message(payload, "sent")`, in the sniffer's
+   live-decode narration. `init_trackers_with_magic` armed all twelve
+   from `SessionBase`, which is what made them look alive: a loop
+   touched them every session and nothing ever asked them for output.
+
+   The consequence was a **reader with no writer**, and it had been
+   shipping wrong data. `core.py::_build_capture_session` filled the
+   capture's `tank_names` from `tank_tracker.get_all_names()`; since
+   `TankTracker.process_message` was never called, its map was always
+   empty. Checked against the archive: **432 of 432 captures carry the
+   key and every one is `{}`.** The live world-state tank registry has
+   the names all along — replaying `fuel_probe.capture_session.json`
+   gives 37 tanks, 37 named (`Artax`, `red-1`, …). So the field is now
+   populated from the registry rather than deleted, and a test asserts
+   it has content. Nothing asserted that before, which is exactly why
+   it went unnoticed.
+
+   `player_tracking.py` was a third parallel tank-name registry with
+   **no reader and no writer anywhere in `src/`** — only its own tests
+   kept it alive. `extract_magic_from_auth` in `trackers.py` was
+   likewise test-only; production uses
+   `protocol.codec.extract_magic_from_auth_payload`.
+
+   What survives is one instance: `MineTracker`, now owned by
+   `WebSocketSniffer` and armed in its `_on_magic_captured` override.
+   `SessionBase` no longer arms any tracker — the BOT was paying for
+   twelve of them too.
+
+   **Still standing, and worth a decision:** the eleven tracker
+   *classes* in `capture/trackers/` now have no production
+   instantiation at all — ~1,400 lines of source and ~2,900 lines of
+   tests whose only callers are those tests. `MineTracker` and
+   `CombatTracker` stay. Deleting the rest is a separate call from
+   this step's scope.
+10. **`runtime_logging.py` + `runtime_context.py`** — **PARTLY
+    SHIPPED 2026-08-07, and the rest deliberately not done.**
+
+    The three tick-context globals are now
+    `contextvars.ContextVar` slots. This is the one place in the
+    refactor where threading a parameter is the WRONG answer:
+    `emit_ai` and `emit_diagnostic` are called from **256 sites inside
+    pure planner logic**, and giving every scoring function a logging
+    argument to carry would cost far more than the globals did. A
+    context variable is ambient by design and still isolates per
+    thread and per async task, which a module global does not — a test
+    asserts a second thread reads an empty context while the setting
+    thread keeps its own.
+
+    Note what this did **not** buy: pytest runs each test in the same
+    thread, so the context persists between tests and
+    `clear_runtime_context` stays in the conftest. The gain is
+    thread/task isolation, not one fewer reset.
+
+    **The artifact globals stay, with a reason rather than an
+    exemption.** `_install_artifact_handlers` mounts on the ROOT
+    logger and removes any prior artifact handlers first, so a second
+    session in one process does not get its own artifacts — it
+    *steals* the first session's stream. De-globalising
+    `_BOT_ARTIFACTS` without changing that achieves nothing
+    measurable. Making it per-session means every one of those 256
+    emit sites must resolve WHICH session's logger it writes to.
+
+    That work buys something nothing currently asks for: the fleet
+    runs **one process per bot** — the manager spawns each bot as a
+    `subprocess.Popen` child ([[bot-service-architecture]]), so
+    process-scoped logging is correct for the only deployment that
+    exists.
+
+    **But read that page's reasoning carefully, because it points
+    straight back here.** It gives two justifications for
+    one-process-per-bot: harness background tasks dying at ~46
+    minutes, and *"in-process multi-bot is impossible (the world
+    service is a module singleton)"*. The second is precisely what
+    step 8 deletes. So the artifact-handler question is not
+    permanently moot — it is **blocked behind step 8, and becomes the
+    next real blocker the day step 8 lands**. The entry point is
+    `_install_artifact_handlers`; the shape is a per-session logger
+    namespace instead of root, with the emitters resolving their
+    logger the same ambient way the tick context now resolves.
+
+    Also corrected while measuring: `clear_runtime_context`'s
+    docstring claimed "the tick loop's teardown path calls this". It
+    does not and never did — the only callers are `tests/conftest.py`
+    and its own test. In production the context is set once per tick
+    and never cleared, so the end-of-run scorecard carries the final
+    tick's `tick_n`.
 11. **Delete the conftest reset list.** Its removal is the proof.
 
 ## Found while shipping step 1: the cipher is forked four ways

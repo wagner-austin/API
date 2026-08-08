@@ -35,6 +35,7 @@ from tankpit_bot.action_lab.probe_base import ProbeError
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state
 from tankpit_bot.state.types import make_self_state, make_viewport_state
 from tankpit_bot.types import CapturedMessage
@@ -153,7 +154,7 @@ def test_press_keys_records_ordered_windows_and_drains() -> None:
     action_hooks.get_current_time_ms = probe._clock
     drains = 0
 
-    def _drain(provider: BufferedMessageSourceProtocol) -> int:
+    def _drain(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         nonlocal drains
         del provider
         drains += 1

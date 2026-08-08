@@ -10,6 +10,7 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
 )
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -97,6 +98,7 @@ class _BuilderProbe:
         messages: list[CapturedMessage] | None = None,
         self_state: SelfStateDict | None = None,
     ) -> None:
+        self.world = get_world_service()
         self._messages = messages if messages is not None else []
         self._self_state = self_state if self_state is not None else _self_state()
 
@@ -117,6 +119,7 @@ class _PickupProbe:
         clock: _Clock,
         move_result: bool,
     ) -> None:
+        self.world = get_world_service()
         self._clock = clock
         self._messages: list[CapturedMessage] = []
         self._self_state = _self_state()

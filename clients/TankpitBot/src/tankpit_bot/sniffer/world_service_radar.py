@@ -7,7 +7,7 @@ which owns the state these annotate.
 
 from __future__ import annotations
 
-from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot import _test_hooks
 from tankpit_bot.state import WorldStateDict
 from tankpit_bot.state.viewport_geometry import (
     regular_radar_bounds,
@@ -86,13 +86,13 @@ class WorldServiceRadarMixin:
 
     def mark_pending_radar_empty_delta(self) -> None:
         """Record that a zero-delta tunneled radar result was observed."""
-        self.pending_radar_empty_delta_ms = get_current_time_ms()
+        self.pending_radar_empty_delta_ms = _test_hooks.get_current_time_ms()
 
     def consume_pending_radar_empty_delta(self) -> bool:
         """Return True if a recent zero-delta tunneled radar result is pending."""
         if self.pending_radar_empty_delta_ms <= 0:
             return False
-        now = get_current_time_ms()
+        now = _test_hooks.get_current_time_ms()
         recent = now - self.pending_radar_empty_delta_ms <= _RADAR_CACHE_REFRESH_WINDOW_MS
         self.pending_radar_empty_delta_ms = 0
         return recent

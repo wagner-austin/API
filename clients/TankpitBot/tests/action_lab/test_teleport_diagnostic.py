@@ -15,6 +15,7 @@ from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import WorldStateDict, make_empty_world_state
 from tankpit_bot.types import CapturedMessage
 
@@ -29,6 +30,7 @@ class _MinimalProvider:
 
     def __init__(self) -> None:
         """Initialize with empty state."""
+        self.world = get_world_service()
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
 

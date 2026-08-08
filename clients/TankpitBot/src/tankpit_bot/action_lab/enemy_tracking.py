@@ -64,7 +64,7 @@ class EnemyTrackingProbe(ProbeBase):
         cdp: CDPSessionProtocol,
     ) -> tuple[WorldStateDict, list[EnemyThreatDict], PageClientSnapshotDict, int]:
         """Snapshot world state, threats, JS client, and wall time."""
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         world = self.get_world_state()
         self_state = self._require_self_state()
         sample_ms = action_hooks.get_current_time_ms()

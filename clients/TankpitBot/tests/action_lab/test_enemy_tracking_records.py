@@ -34,6 +34,7 @@ from tankpit_bot.action_lab.enemy_tracking_types import TrackingObservationDict
 from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.state.types import make_tank_state
@@ -60,7 +61,7 @@ class _DrainProbe(ProbeBase):
 def _install_noop_drain() -> None:
     """Make message draining a no-op for the feedback wait."""
 
-    def _drain(source: BufferedMessageSourceProtocol, /) -> int:
+    def _drain(source: BufferedMessageSourceProtocol, ws: WorldService, /) -> int:
         _ = source
         return 0
 

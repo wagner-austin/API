@@ -45,6 +45,8 @@ from tankpit_bot.action_lab.types import (
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -94,6 +96,7 @@ class _ProbeHarness(EnemyTrackingProbe):
 
     def __init__(self) -> None:
         """Seed a spawned tank at (100, 100)."""
+        self.world = get_world_service()
         super().__init__("https://tankpit.com/play", headless=True, prefer_account=False)
         self._world_state = _world()
         self._self_state: SelfStateDict | None = self._world_state["self_state"]
@@ -153,7 +156,7 @@ def _restore_tracking_hooks() -> Generator[None, None, None]:
 def _install_common_stubs(threats: list[EnemyThreatDict]) -> None:
     """Stub draining, threat analysis and snapshot capture."""
 
-    def _drain(source: BufferedMessageSourceProtocol, /) -> int:
+    def _drain(source: BufferedMessageSourceProtocol, ws: WorldService, /) -> int:
         _ = source
         return 0
 

@@ -38,6 +38,7 @@ from tankpit_bot._test_hooks import (
     PageProtocol,
 )
 from tankpit_bot.capture.xor import build_session_xor_table
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import (
     SelfStateDict,
@@ -264,9 +265,10 @@ class DispatchCaptureMixin:
 
 def _drain_until_self_state(
     probe: BufferedMessageSourceProtocol,
+    ws: WorldService,
     frame_source: FrameBatchSource,
     initial_sync_batches: int,
-    drain_messages: Callable[[BufferedMessageSourceProtocol], int],
+    drain_messages: Callable[[BufferedMessageSourceProtocol, WorldService], int],
 ) -> int:
     """Drain frame batches until the world's ``self_state`` materializes.
 
@@ -290,7 +292,7 @@ def _drain_until_self_state(
         if not batch:
             break
         probe._cdp_message_buffer.extend(batch)
-        drain_messages(probe)
+        drain_messages(probe, ws)
         initial_frames += len(batch)
         if get_world_state()["self_state"] is not None:
             self_state_populated = True
@@ -317,6 +319,7 @@ class _ReplayProbeShape(Protocol):
     _cdp_message_buffer: list[str]
     _magic: str | None
     _page: PageProtocol | None
+    world: WorldService
     _cdp: CDPSessionProtocol | None
     xor_table: bytes | None
 
@@ -328,7 +331,7 @@ def prepare_probe_replay(
     initial_sync_batches: int,
     frames_per_wait: int,
     omit_cdp: bool,
-    drain_messages: Callable[[BufferedMessageSourceProtocol], int],
+    drain_messages: Callable[[BufferedMessageSourceProtocol, WorldService], int],
     update_state_from_world: Callable[[], None],
     reset_world_state: Callable[[], None],
 ) -> ReplayProbeContext:
@@ -387,6 +390,7 @@ def prepare_probe_replay(
 
     initial_frames = _drain_until_self_state(
         probe,
+        probe.world,
         frame_source,
         initial_sync_batches,
         drain_messages,

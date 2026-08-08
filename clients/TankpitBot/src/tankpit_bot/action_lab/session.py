@@ -8,6 +8,7 @@ from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, CDPSessionPro
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
 from tankpit_bot.browser.page_client_snapshot import capture_page_client_snapshot
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -31,7 +32,13 @@ class WaitPageProtocol(Protocol):
 
 
 class WorldStateProviderProtocol(Protocol):
-    """Minimal world-state provider for action-lab wait loops."""
+    """Minimal world-state provider for action-lab wait loops.
+
+    Attributes:
+        world: The session's world service.
+    """
+
+    world: WorldService
 
     def get_world_state(self) -> WorldStateDict:
         """Return the latest world-state snapshot.
@@ -146,7 +153,7 @@ def wait_for_world_sync(
         The fresh world-state timestamp, or None on timeout.
     """
     while action_hooks.get_current_time_ms() - started_ms < timeout_ms:
-        action_hooks.drain_buffered_messages(provider)
+        action_hooks.drain_buffered_messages(provider, provider.world)
         world = provider.get_world_state()
         if world["timestamp_ms"] > started_ms:
             return world["timestamp_ms"]
@@ -175,7 +182,7 @@ def wait_for_radar_sync(
     observed_post_start_activity = False
     radar_completion_seen = False
     while action_hooks.get_current_time_ms() - started_ms < timeout_ms:
-        drained_count = action_hooks.drain_buffered_messages(provider)
+        drained_count = action_hooks.drain_buffered_messages(provider, provider.world)
         if drained_count > 0 or provider.get_world_state()["timestamp_ms"] > started_ms:
             observed_post_start_activity = True
         if action_hooks.check_and_clear_radar_scan_complete():
@@ -207,7 +214,7 @@ def wait_for_initial_self_state(
         ActionLabSessionError: If a fresh self state does not arrive in time.
     """
     while action_hooks.get_current_time_ms() - started_ms < timeout_ms:
-        action_hooks.drain_buffered_messages(provider)
+        action_hooks.drain_buffered_messages(provider, provider.world)
         world = provider.get_world_state()
         self_state = world["self_state"]
         if world["timestamp_ms"] > started_ms and self_state is not None:

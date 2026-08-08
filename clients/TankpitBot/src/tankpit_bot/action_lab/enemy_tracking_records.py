@@ -24,9 +24,6 @@ from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.browser.page_client_snapshot import (
     PageClientSnapshotDict,
 )
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-)
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_combat_hit,
     check_and_clear_our_shot_response,
@@ -58,10 +55,10 @@ def _wait_for_shot_feedback(
         ``(got_response, was_hit)`` -- ``got_response`` is False when
         the wait timed out.
     """
-    ws = get_world_service()
+    ws = probe.world
     started = action_hooks.get_current_time_ms()
     while action_hooks.get_current_time_ms() - started < timeout_ms:
-        action_hooks.drain_buffered_messages(probe)
+        action_hooks.drain_buffered_messages(probe, probe.world)
         if ws.got_our_shot_response:
             was_hit = check_and_clear_combat_hit(ws)
             check_and_clear_our_shot_response(ws)

@@ -41,6 +41,7 @@ from tankpit_bot.browser.lifecycle import (
 from tankpit_bot.browser.lifecycle import (
     wait_for_game_ready as _real_wait_for_game_ready,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete as _real_check_and_clear_radar_scan_complete,
 )
@@ -97,11 +98,12 @@ check_and_clear_radar_scan_complete: CheckAndClearRadarScanCompleteProtocol = (
 class DrainBufferedMessagesProtocol(Protocol):
     """Protocol for draining buffered protocol payloads into world state."""
 
-    def __call__(self, source: BufferedMessageSourceProtocol, /) -> int:
-        """Drain buffered protocol messages.
+    def __call__(self, source: BufferedMessageSourceProtocol, ws: WorldService, /) -> int:
+        """Drain buffered protocol messages into ``ws``.
 
         Args:
             source: Source holding buffered protocol payloads.
+            ws: The session's world service; decoded frames land here.
 
         Returns:
             Number of drained payloads.

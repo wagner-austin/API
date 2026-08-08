@@ -360,7 +360,7 @@ class TestBotTickOnce:
             return decision
 
         import tankpit_bot.bot.executor as executor_mod
-        from tankpit_bot._test_hooks import BotProtocol
+        from tankpit_bot.bot.bot_protocol import BotProtocol
 
         def failing_execute(
             bot: BotProtocol,

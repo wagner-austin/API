@@ -19,6 +19,7 @@ from tankpit_bot.action_lab.queue_probe_types import (
     QueueExperimentResultDict,
     QueueProbeSessionDict,
 )
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -83,6 +84,7 @@ class _FakeExperimentProbe:
     """Satisfies QueueExperimentProbeProtocol structurally."""
 
     def __init__(self, worlds: _SequencedWorld, clock: ReplayClock) -> None:
+        self.world = get_world_service()
         self._worlds = worlds
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
@@ -126,7 +128,7 @@ def _setup_probe(
     probe = _FakeExperimentProbe(worlds, clock)
     probe._page = ClockAdvancingPage(clock, on_wait=worlds.advance)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda source: 0
+    action_hooks.drain_buffered_messages = lambda source, ws: 0
     return probe
 
 
@@ -142,6 +144,7 @@ class _FailingCommandProbe(_FakeExperimentProbe):
         fail_pickup: bool = False,
         fail_move: bool = False,
     ) -> None:
+        self.world = get_world_service()
         super().__init__(worlds, clock)
         self._fail_shoot = fail_shoot
         self._fail_pickup = fail_pickup
@@ -167,6 +170,7 @@ class _SecondShootFailsProbe(_FakeExperimentProbe):
     """Probe where only the second shoot call fails."""
 
     def __init__(self, worlds: _SequencedWorld, clock: ReplayClock) -> None:
+        self.world = get_world_service()
         super().__init__(worlds, clock)
         self._shoot_count = 0
 

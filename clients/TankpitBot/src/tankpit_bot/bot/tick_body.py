@@ -43,7 +43,6 @@ from tankpit_bot.runtime_logging import (
 )
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
-    get_world_service,
 )
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state import SelfStateDict
@@ -75,7 +74,7 @@ def _tick_once(bot: Bot) -> None:
         bot: Bot instance.
     """
     # 1. SYNC — drain CDP message buffer
-    world_sync.drain_messages(bot)
+    world_sync.drain_messages(bot, bot.world)
     _check_wire_silence(bot)
 
     # 1b. Record the in-game text log as a capture witness. The DOM log
@@ -106,7 +105,7 @@ def _tick_once(bot: Bot) -> None:
     # (run bot-20260730-004144, fuel read 65482 post-mortem) shows
     # the dead self_state is garbage, so it is dropped outright and
     # the loop's self-None early exit becomes the wait.
-    if get_world_service().self_deactivated:
+    if bot.world.self_deactivated:
         _handle_own_deactivation(bot, self_state)
         return
 
@@ -144,7 +143,7 @@ def _tick_once(bot: Bot) -> None:
     combat_feedback = _get_combat_feedback(bot)
 
     # 6. DECIDE
-    inventory = get_inventory_state(get_world_service())
+    inventory = get_inventory_state(bot.world)
     terrain = get_terrain_map()
 
     decision = ai_strategy.decide(
@@ -155,7 +154,7 @@ def _tick_once(bot: Bot) -> None:
         now,
         terrain,
         combat_feedback,
-        get_world_service().map_fuel_dots,
+        bot.world.map_fuel_dots,
     )
 
     bot._self_alignment.maybe_emit(self_state, snapshot)
@@ -181,14 +180,14 @@ def _tick_once(bot: Bot) -> None:
         bot._ai_state = decision["updated_ai_state"]
         if bot._ai_state["mode"] != previous_mode:
             emit_mode_transition(
-                get_world_service().ledger,
+                bot.world.ledger,
                 from_mode=previous_mode,
                 to_mode=bot._ai_state["mode"],
                 reason_kind=decision["behavior"]["reason_kind"],
                 caused_by=(
                     0
                     if decision["command"]["cmd_type"] == "hold"
-                    else latest_decision_event_id(get_world_service().ledger)
+                    else latest_decision_event_id(bot.world.ledger)
                 ),
             )
 
@@ -274,7 +273,7 @@ def _check_wire_silence(bot: Bot) -> None:
         SessionExitError: When the last dispatched game message is
             older than :data:`_WIRE_SILENCE_LIMIT_MS`.
     """
-    last_ms = get_world_service().last_game_message_ms
+    last_ms = bot.world.last_game_message_ms
     if last_ms <= 0:
         return
     silence_ms = get_current_time_ms() - last_ms
@@ -325,7 +324,7 @@ def _handle_own_deactivation(bot: Bot, self_state: SelfStateDict) -> None:
         bot: Bot instance.
         self_state: The corpse's final self record, for the receipt.
     """
-    service = get_world_service()
+    service = bot.world
     service.self_deactivated = False
     emit_diagnostic(
         diagnostic_kind="self_respawn_wait",

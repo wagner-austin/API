@@ -35,7 +35,7 @@ from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.physics.costs import teleport_cost
-from tankpit_bot.sniffer.world_state import get_terrain_map, get_world_service
+from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state.types import ContainerStateDict
 
@@ -195,8 +195,8 @@ class LarderProbe(DensityProbe):
         page = self._require_page()
         self.request_inventory()
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
-        return total_inventory_count(get_inventory_state(get_world_service()))
+        action_hooks.drain_buffered_messages(self, self.world)
+        return total_inventory_count(get_inventory_state(self.world))
 
     def _nearest_equipment(self, tried: set[tuple[int, int]]) -> ContainerStateDict | None:
         """Return the nearest untried believed equipment container on land.
@@ -270,7 +270,7 @@ class LarderProbe(DensityProbe):
             self.use_radar()
             scans += 1
             page.wait_for_timeout(float(_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             found = self._nearest_equipment(tried)
             if found is not None:
                 return found, scans, hops
@@ -296,7 +296,7 @@ class LarderProbe(DensityProbe):
             neighbor_x, neighbor_y = container_x + dx, container_y + dy
             self.move_to(neighbor_x, neighbor_y)
             page.wait_for_timeout(float(_PICKUP_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             _, x, y = self._current_fuel()
             if (x, y) == (neighbor_x, neighbor_y):
                 return True
@@ -323,21 +323,21 @@ class LarderProbe(DensityProbe):
         # radar to make the trials interpretable.
         self.use_radar()
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         inventory_before = self._inventory_total()
         self.open_map()
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         self.teleport_to(container_x, container_y)
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         _, landed_x, landed_y = self._current_fuel()
         landed_on = (landed_x, landed_y) == (container_x, container_y)
         walked_onto = False
         if not landed_on:
             self.move_to(container_x, container_y)
             page.wait_for_timeout(float(_PICKUP_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             _, walk_x, walk_y = self._current_fuel()
             walked_onto = (walk_x, walk_y) == (container_x, container_y)
         stood = landed_on or walked_onto
@@ -347,7 +347,7 @@ class LarderProbe(DensityProbe):
             own_sent = True
             self.pickup_equipment(container_x, container_y)
             page.wait_for_timeout(float(_PICKUP_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             own_picked = self._inventory_total() > inventory_before
         stepped_off = False
         adjacent_sent = False
@@ -359,7 +359,7 @@ class LarderProbe(DensityProbe):
                 control_before = self._inventory_total()
                 self.pickup_equipment(container_x, container_y)
                 page.wait_for_timeout(float(_PICKUP_SETTLE_MS))
-                action_hooks.drain_buffered_messages(self)
+                action_hooks.drain_buffered_messages(self, self.world)
                 adjacent_picked = self._inventory_total() > control_before
         inventory_after = self._inventory_total()
         if own_picked:

@@ -41,7 +41,6 @@ from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.protocol.commands import build_toggle_equipment_command
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
 log = get_logger(__name__)
@@ -173,8 +172,8 @@ class DensityProbe(ProbeBase):
         wait_page = self._require_page()
         self.request_inventory()
         wait_page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
-        state = get_inventory_state(get_world_service())
+        action_hooks.drain_buffered_messages(self, self.world)
+        state = get_inventory_state(self.world)
         radars = state["extra_radars"]
         return radars["count"], radars["enabled"]
 
@@ -229,7 +228,7 @@ class DensityProbe(ProbeBase):
         self.quit_to_lobby()
         page = self._require_page()
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         log.info("Density probe: quit to lobby sent")
 
     def _current_fuel(self) -> tuple[int, int, int]:
@@ -283,10 +282,10 @@ class DensityProbe(ProbeBase):
                 # the nearest untried dot and attempt the pickup there.
                 self.open_map()
                 page.wait_for_timeout(float(_SETTLE_MS))
-                action_hooks.drain_buffered_messages(self)
+                action_hooks.drain_buffered_messages(self, self.world)
                 dots = [
                     (abs(dot[0] - x) + abs(dot[1] - y), dot[0], dot[1])
-                    for dot in get_world_service().map_fuel_dots
+                    for dot in self.world.map_fuel_dots
                     if dot not in tried
                 ]
                 if not dots:
@@ -295,12 +294,12 @@ class DensityProbe(ProbeBase):
                 _, cx, cy = min(dots)
                 self.move_to(cx, cy)
                 page.wait_for_timeout(float(_PICKUP_SETTLE_MS))
-                action_hooks.drain_buffered_messages(self)
+                action_hooks.drain_buffered_messages(self, self.world)
             tried.add((cx, cy))
             self.pickup_fuel(cx, cy)
             attempts += 1
             page.wait_for_timeout(float(_PICKUP_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
         return attempts
 
     def _refuel_toward(self, site_x: int, site_y: int) -> int:
@@ -331,10 +330,10 @@ class DensityProbe(ProbeBase):
                 return hops
             self.open_map()
             page.wait_for_timeout(float(_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
             dots = [
                 dot
-                for dot in get_world_service().map_fuel_dots
+                for dot in self.world.map_fuel_dots
                 if dot not in visited
                 and dot != (x, y)
                 and teleport_cost(x, y, dot[0], dot[1]) <= fuel
@@ -352,7 +351,7 @@ class DensityProbe(ProbeBase):
             self.teleport_to(target[0], target[1])
             hops += 1
             page.wait_for_timeout(float(_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
         return hops
 
     def _reach_site(self, site_x: int, site_y: int) -> tuple[bool, int, int]:
@@ -384,10 +383,10 @@ class DensityProbe(ProbeBase):
         # hops because a funded probe never opened the map.
         self.open_map()
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         self.teleport_to(site_x, site_y)
         page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        action_hooks.drain_buffered_messages(self, self.world)
         _, landed_x, landed_y = self._current_fuel()
         landed = max(abs(landed_x - site_x), abs(landed_y - site_y)) <= _LANDING_TOLERANCE
         if not landed:
@@ -450,7 +449,7 @@ class DensityProbe(ProbeBase):
             self.use_radar()
             scanned += 1
             page.wait_for_timeout(float(_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            action_hooks.drain_buffered_messages(self, self.world)
         return scanned, refuels, pickups, skipped
 
     def execute_probe(

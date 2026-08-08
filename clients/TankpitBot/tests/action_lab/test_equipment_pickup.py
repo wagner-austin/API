@@ -63,6 +63,7 @@ class _FakeProbe:
     """Minimal buffered-world-state provider used by pickup helpers."""
 
     def __init__(self, world: WorldStateDict) -> None:
+        self.world = get_world_service()
         self._world = world
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
@@ -165,7 +166,7 @@ def test_wait_returns_immediately_when_inventory_already_grown() -> None:
     """The waiter returns the outcome without sleeping when already grown."""
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda provider: 0
+    action_hooks.drain_buffered_messages = lambda provider, ws: 0
     set_inventory_total(3)
     probe = _FakeProbe(_make_world(1000))
     page = _FakePage(clock, hook=lambda: None)
@@ -192,7 +193,7 @@ def test_wait_polls_until_inventory_grows() -> None:
     """
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda provider: 0
+    action_hooks.drain_buffered_messages = lambda provider, ws: 0
     set_inventory_total(2)
 
     wait_counter = {"count": 0}
@@ -223,7 +224,7 @@ def test_wait_returns_pickup_timeout_when_budget_exhausts() -> None:
     """The waiter reports a pickup timeout when the budget elapses."""
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda provider: 0
+    action_hooks.drain_buffered_messages = lambda provider, ws: 0
     set_inventory_total(2)
     probe = _FakeProbe(_make_world(1000))
     page = _FakePage(clock, hook=lambda: None)

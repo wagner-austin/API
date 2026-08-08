@@ -49,6 +49,7 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     coord_key,
     make_container_state,
@@ -236,7 +237,7 @@ def test_wait_for_pickup_outcome_detects_fuel_gain_and_disappearance() -> None:
 
     page.on_wait = _advance
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda provider: 0
+    action_hooks.drain_buffered_messages = lambda provider, ws: 0
 
     status, completed_ms, fuel_after = _wait_for_pickup_outcome(
         page,
@@ -259,7 +260,7 @@ def test_wait_for_pickup_outcome_detects_fuel_gain_and_disappearance() -> None:
         timestamp_ms=1000,
     )
 
-    def _remove_container(provider: BufferedMessageSourceProtocol) -> int:
+    def _remove_container(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         _ = provider
         probe.get_world_state()["containers"].pop(coord_key(101, 100), None)
         return 1
@@ -292,7 +293,7 @@ def test_wait_for_pickup_outcome_times_out_and_handles_missing_self_state() -> N
         timestamp_ms=1000,
     )
     action_hooks.get_current_time_ms = clock
-    action_hooks.drain_buffered_messages = lambda provider: 0
+    action_hooks.drain_buffered_messages = lambda provider, ws: 0
 
     timed_out = _wait_for_pickup_outcome(
         page,
@@ -306,7 +307,7 @@ def test_wait_for_pickup_outcome_times_out_and_handles_missing_self_state() -> N
 
     assert timed_out == ("pickup_timeout", 1200, 700)
 
-    def _clear_self(provider: BufferedMessageSourceProtocol) -> int:
+    def _clear_self(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         _ = provider
         probe.get_world_state()["self_state"] = None
         return 1
@@ -326,7 +327,7 @@ def test_wait_for_pickup_outcome_times_out_and_handles_missing_self_state() -> N
 
     probe = _ProbeHarness(clock)
     probe._world_state["self_state"] = None
-    action_hooks.drain_buffered_messages = lambda provider: 0
+    action_hooks.drain_buffered_messages = lambda provider, ws: 0
     with pytest.raises(FuelProbeError, match="self state disappeared after fuel pickup timeout"):
         _wait_for_pickup_outcome(
             page,

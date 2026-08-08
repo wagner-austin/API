@@ -13,6 +13,7 @@ from tankpit_bot._test_hooks import (
     BufferedMessageSourceProtocol,
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
+from tankpit_bot.sniffer.world_service import WorldService
 
 
 def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
@@ -51,7 +52,7 @@ def test_settle_dwell_heartbeat_walk_shuffles_in_place() -> None:
     probe = _ProbeHarness()
     drains = 0
 
-    def _counting_drain(provider: BufferedMessageSourceProtocol) -> int:
+    def _counting_drain(provider: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         nonlocal drains
         drains += 1
         return 0

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot import _test_hooks
 from tankpit_bot.facts.provenance import make_provenance
 from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.world_service import WorldService
@@ -71,7 +71,9 @@ def update_viewport_entities(
         containers=ws.world_state["containers"],
         mines=ws.world_state["mines"],
         terrain=ws.world_state["terrain"],
-        viewport=make_visible_viewport_state(viewport_left, viewport_top, get_current_time_ms()),
+        viewport=make_visible_viewport_state(
+            viewport_left, viewport_top, _test_hooks.get_current_time_ms()
+        ),
         scanned_tiles=ws.world_state["scanned_tiles"],
         timestamp_ms=ws.world_state["timestamp_ms"],
     )
@@ -184,7 +186,7 @@ def update_viewport_tiles(
         vp_left: Viewport left offset.
         vp_top: Viewport top offset.
     """
-    ts = get_current_time_ms()
+    ts = _test_hooks.get_current_time_ms()
     new_terrain = dict(ws.world_state["terrain"])
 
     for ent in entities:
@@ -245,7 +247,7 @@ def update_cache_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) ->
         ws: World service instance.
         updates: Absolute ``(x, y, cache_value)`` triples.
     """
-    timestamp_ms = get_current_time_ms()
+    timestamp_ms = _test_hooks.get_current_time_ms()
     for x, y, cache_value in updates:
         ws.world_state = apply_tile_cache_update(
             ws.world_state,
@@ -265,7 +267,7 @@ def update_overlay_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) 
         ws: World service instance.
         updates: Absolute ``(x, y, overlay_value)`` triples.
     """
-    timestamp_ms = get_current_time_ms()
+    timestamp_ms = _test_hooks.get_current_time_ms()
     for x, y, overlay_value in updates:
         ws.world_state = apply_tile_overlay_update(
             ws.world_state,
@@ -284,7 +286,7 @@ def update_terrain_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) 
         updates: Absolute ``(x, y, terrain_type)`` triples from protocol 0x4A.
     """
     new_terrain = dict(ws.world_state["terrain"])
-    timestamp_ms = get_current_time_ms()
+    timestamp_ms = _test_hooks.get_current_time_ms()
 
     for x, y, terrain_type in updates:
         key = coord_key(x, y)

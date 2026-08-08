@@ -3522,3 +3522,234 @@ entry: a `ledger` fixture returning `LedgerService()` replaces four
 reset calls per test. Tests that drive the real fabric through `Bot`
 read `get_world_service().ledger` instead — they must observe the
 ledger the bot actually wrote to, not a fresh one.
+
+## 2026-08-07 — Step 9: eleven trackers that never tracked, and an empty field in 432 captures
+
+`sniffer/trackers.py` and `sniffer/player_tracking.py` are deleted as
+modules. One tracker instance survives, owned by the sniffer.
+
+### The globals looked alive because a loop touched them
+
+`ALL_TRACKERS` held twelve instances and `init_trackers_with_magic`
+armed all twelve from `SessionBase` on every session — bot and sniffer
+alike. That is what made them look live. Across all of `src/` and
+`scripts/`, `process_message` is called **exactly once**:
+`mine_tracker.process_message(payload, "sent")`, in the sniffer's
+live-decode narration of outbound mine presses.
+
+So eleven of the twelve were armed with a session key every run and
+never asked to decode anything. Same shape as the container blacklist
+in step 7: machinery a loop keeps warm, with no consumer at the end.
+
+### It was not merely dead — it was shipping an empty field
+
+`core.py::_build_capture_session` filled the capture's `tank_names`
+from `tank_tracker.get_all_names()`. `TankTracker._tanks` is only
+written inside its `_parse_*` methods, all reachable only through
+`process_message`, which was never called on it. So the map answered
+`{}` forever.
+
+Checked against the archive rather than reasoned about: **432 capture
+files parsed, 432 carry a `tank_names` key, 0 are non-empty.**
+
+The names existed the whole time in the live world-state tank registry.
+Replaying `fuel_probe.capture_session.json` through the real decoder:
+37 tanks, **37 with names** — `Artax`, `red-1`, `red-2`, and so on.
+Two implementations of the same thing, and the capture was wired to the
+dead one.
+
+Fixed by pointing the field at the registry, not by deleting it —
+`capture/summary.py` consumes `session["tank_names"]`, so this is a
+capability that was silently broken rather than one nobody wanted.
+
+### The gap that let it hide
+
+Coverage was 100% on that line the entire time. The line **executed**;
+nothing **asserted it produced anything**. A test now asserts the field
+carries real names and omits the unnamed tank. That distinction —
+executed versus asserted — is the whole lesson: a coverage gate cannot
+tell you a reader has a writer.
+
+### Also deleted
+
+`sniffer/player_tracking.py` was a *third* tank-name registry, with no
+reader and no writer anywhere in `src/` — only its own tests kept it
+alive. `extract_magic_from_auth` in `trackers.py` was likewise
+test-only; production uses `protocol.codec.extract_magic_from_auth_payload`
+from `browser/cdp_service.py`.
+
+### What survives
+
+`MineTracker`, owned by `WebSocketSniffer` and armed in its
+`_on_magic_captured` override. `SessionBase` no longer arms any
+tracker; the bot had been paying for twelve.
+
+### Flagged, not done
+
+The eleven tracker *classes* in `capture/trackers/` now have zero
+production instantiation — roughly 1,400 lines of source and 2,900 of
+tests whose only callers are those tests. `MineTracker` and
+`CombatTracker` stay. That deletion is four thousand lines and a
+separate decision from step 9's scope, so it is recorded here rather
+than taken unilaterally.
+
+Gate: `make check` exit 0, 100.00% coverage, 6184 passed (eight tests
+deleted with the code they covered, one added for the `tank_names`
+regression).
+
+## 2026-08-07 — Step 10: the globals were not the blocker
+
+Partly shipped, and the rest deliberately not done with the reason
+measured rather than asserted.
+
+### Done: the tick context is now contextvars
+
+`_RUNTIME_CONTEXT_TICK_N` / `_BOT_STATE` /
+`_IN_FLIGHT_ACTION_KIND` are `contextvars.ContextVar` slots.
+
+This is the one place in the whole refactor where threading a
+parameter is the wrong answer. `emit_ai` and `emit_diagnostic` are
+called from **256 sites**, and they live inside pure planner logic —
+scoring functions, target selectors, hop planners. Giving every one of
+them a logging argument to carry would cost far more than the three
+globals ever did. A context variable is ambient by design, which is
+what an observability field actually is.
+
+A test asserts the gain: a second thread reads an empty context while
+the setting thread keeps its own. A module global cannot do that.
+
+**Correction to what I claimed while proposing this:** I said it would
+drop another conftest reset. It does not. pytest runs each test in the
+same thread, so the context persists between tests and
+`clear_runtime_context` stays in the conftest — verified by running two
+functions in sequence and watching the second read `{'tick_n': 42}`.
+The gain is thread/task isolation, narrower than I said.
+
+### Not done: the artifact handlers, and why
+
+The three context globals are the visible part of step 10. They are not
+the obstacle. `_install_artifact_handlers` mounts on the **root logger**
+and calls `_remove_artifact_handlers(root)` first, so a second session
+in one process does not get its own artifacts — it *steals* the first
+session's stream. De-globalising `_BOT_ARTIFACTS` without changing that
+achieves nothing measurable.
+
+Making it per-session means each of those 256 emit sites must resolve
+WHICH session's logger it writes to. Today that buys nothing: the fleet
+runs one process per bot.
+
+### The part worth flagging
+
+[[bot-service-architecture]] gives two reasons for one-process-per-bot:
+harness tasks dying at ~46 minutes, and *"in-process multi-bot is
+impossible (the world service is a module singleton)"*.
+
+The second reason is exactly what step 8 deletes. So this deferral has
+a shelf life — the artifact-handler problem is **blocked behind step 8
+and becomes the next real blocker the day step 8 lands.** Recorded with
+its entry point (`_install_artifact_handlers`) and its shape (a
+per-session logger namespace, emitters resolving ambiently the way the
+tick context now does) so the next person does not have to re-derive it.
+
+### Also corrected
+
+`clear_runtime_context`'s docstring claimed "the tick loop's teardown
+path calls this". It does not and never did — the only callers anywhere
+are `tests/conftest.py` and its own test. In production the context is
+set once per tick and never cleared, so the end-of-run scorecard carries
+the final tick's `tick_n` and `bot_state`. Defensible behaviour, but not
+what the docstring said.
+
+## 2026-08-07 — Step 8: sessions now hold their world; the singleton is down to 11 readers
+
+`get_world_service()` call sites in `src/`: **107 -> 11** (plus three
+prose mentions and the one transitional binding). `make check` exit 0,
+6185 passed, 100.00% coverage, mypy clean on 1101 files.
+
+### The count went UP before it went down, and that was my doing
+
+Last session I quoted step 8 as "74 sites". By the time I started it was
+107, because step 6 put the ledger on `WorldService` and added ~32
+`get_world_service().ledger` reads. That was the right trade — six
+impossible-to-duplicate globals for one lookup already scheduled for
+deletion — but I should have said the new number out loud when I made
+it rather than letting the old one stand.
+
+The full surface is also larger than `get_world_service()` alone: the
+`world_state.py` facade it backs carries ~200 more `src` references and
+**~1,509 in tests**. `update_world_state_from_position` alone has 228
+test references against 3 in `src` — it is mostly a test helper.
+
+### Shape: `SessionBase.world`
+
+`SessionBase` is the single root of the session hierarchy (`Bot`,
+`ProbeBase`, `BrowserSession` -> `WebSocketSniffer` all descend from
+it), so one attribute there reaches every session.
+
+It is bound to the process singleton **on purpose, for now**. The
+decoder still writes through `get_world_service()`, so a session holding
+a different instance would read an empty world. The flip to
+`WorldService()` and the deletion of the global are the LAST two edits
+of the step, not the first.
+
+95 of the 106 sites had a handle already in scope — `bot` (61), `self`
+(22), `probe` (12). Driven from the AST rather than by regex: each site
+needed whatever handle its enclosing function actually had, and a
+textual replace would have guessed.
+
+### Two import cycles, and mypy saw neither
+
+**First:** `session_base` importing `WorldService` closed a cycle
+because `sniffer/world_service.py` imported `get_current_time_ms` from
+the **`browser` package**. mypy reported "Success: no issues found in
+1100 source files" while `import tankpit_bot.bot.base` raised
+`ImportError`. Importing the defining submodule did not help — Python
+executes the parent package first.
+
+The real problem was a clock living in `browser/cdp_utils.py`. It is a
+three-line delegation to `_test_hooks.get_current_time_ms`, and the six
+lower-layer modules that used it now call the hook directly. That is
+both the cycle fix and the removal of a thin wrapper.
+
+**Second:** `BotProtocol` needed a `world` member, but it lived in
+`_test_hooks`, which sits BELOW `sniffer` — naming `WorldService` there
+closes a cycle through `state`. It moved to `bot/bot_protocol.py`, where
+it belongs anyway: it is a production interface with exactly one
+importer (`bot/executor.py`), not a test seam.
+`BufferedMessageSourceProtocol` stayed in `_test_hooks` and does NOT
+gain `world`; `drain_messages` takes the service as a parameter instead.
+
+Lesson, for the third time this refactor: **mypy cannot see import
+cycles.** Only running the import can, and only in the right order —
+`import state` first is what exposed the second one.
+
+### The trap I predicted, sprung on schedule
+
+`tests/bot/test_executor_dispatch.py::test_missing_self_state_stays_optimistic`
+failed. It called `_make_bot()` (which seeds a position) and then
+`reset_world_state()` to clear it.
+
+`reset_world_state()` **rebinds** the module global. The bot now holds
+its service as an attribute, so the reset left `bot.world` pointing at
+the pre-reset object with the seeded position still in it — and the test
+silently stopped exercising the missing-self-state path.
+
+This is exactly the failure mode recorded when the 496-reset analysis
+was done: "a half-migrated tree silently breaks test isolation because
+instance-holders keep the pre-reset object." It is the only test that
+tripped, because it is the only one that reset mid-test. Fixed by
+`bot.world = WorldService()` — the migrated form, and clearer about
+intent than a global reset was.
+
+### Remaining
+
+Eleven call sites, each a private helper whose CALLER has a handle:
+`_merge_protocol_kills(ai_state)`, `_drain_orphan_command_error(action)`,
+two `executor` helpers, `threat_primitives.human_combat_consented`,
+`diagnostics/registry_truth`, three in `replay/engine` (which should own
+a service outright — it is a standalone replay, not a session), the
+`action_lab` teleport-landed hook default, and
+`_test_hooks/runtime.py`'s replay hook (the known cycle case).
+
+Then the facade: ~1,509 test references to `get_world_state` and
+friends. Then the flip.

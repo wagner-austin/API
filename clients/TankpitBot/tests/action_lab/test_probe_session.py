@@ -9,11 +9,13 @@ from tests.action_lab._replay_page import ReplayClock
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.probe_runtime import ProbeCommandReadyContextDict
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import SelfStateDict, make_self_state
 
 
 class _ProbeHarness:
     def __init__(self) -> None:
+        self.world = get_world_service()
         self._start_timestamp_ms = 1000
         self._target_url = "https://tankpit.com/play"
 
