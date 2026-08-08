@@ -30,13 +30,13 @@ Routes, shared verbatim by the control page and the operating AI:
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.fleet import FleetError, FleetManager, FleetMatchRow, FleetStats
 from rw_bot.harness.fleet_page import FLEET_PAGE_HTML
-from rw_bot.wire.ndjson import NdjsonError, parse_object
+from rw_bot.wire.ndjson import NdjsonError, parse_object, render_json
 
 FLEET_PORT_DEFAULT = 27500
 
@@ -51,94 +51,6 @@ _BAD_FIELD = "RW-FLEET-008"
 #: can resolve); bad spawn input is 400; everything else is a 404.
 _CONFLICT_CODES = ("RW-FLEET-003", "RW-FLEET-005", "RW-FLEET-006")
 _INPUT_CODES = ("RW-FLEET-001", "RW-FLEET-002", _BAD_BODY, _BAD_FIELD)
-
-_STRING_ESCAPES = {
-    "\\": "\\\\",
-    '"': '\\"',
-    "\b": "\\b",
-    "\f": "\\f",
-    "\n": "\\n",
-    "\r": "\\r",
-    "\t": "\\t",
-}
-
-
-def _render_string(value: str) -> str:
-    """Render one JSON string literal.
-
-    Args:
-        value: The string to render.
-
-    Returns:
-        The quoted, escaped literal.
-    """
-    rendered: list[str] = ['"']
-    for character in value:
-        if character in _STRING_ESCAPES:
-            rendered.append(_STRING_ESCAPES[character])
-        elif ord(character) < 0x20:
-            rendered.append(f"\\u{ord(character):04x}")
-        else:
-            rendered.append(character)
-    rendered.append('"')
-    return "".join(rendered)
-
-
-def render_json(
-    payload: Mapping[
-        str,
-        str | int | bool | None | Sequence[str] | Sequence[Mapping[str, str | int | bool | None]],
-    ],
-) -> str:
-    """Render one response object as JSON.
-
-    The emit-side sibling of :func:`rw_bot.wire.ndjson.parse_object`:
-    the value grammar is exactly what the fleet's responses carry —
-    flat scalars, a list of strings (the report lines), or a list of
-    flat objects (the match rows). Anything else is a programming
-    error, not data.
-
-    Args:
-        payload: The response object.
-
-    Returns:
-        Its JSON text.
-    """
-    parts: list[str] = []
-    for key, value in payload.items():
-        parts.append(f"{_render_string(key)}: {_render_value(value)}")
-    return "{" + ", ".join(parts) + "}"
-
-
-def _render_value(
-    value: str
-    | int
-    | bool
-    | None
-    | Sequence[str]
-    | Sequence[Mapping[str, str | int | bool | None]],
-) -> str:
-    """Render one value of the shapes the fleet serves.
-
-    Args:
-        value: A flat scalar, a list of strings, or a list of flat
-            objects.
-
-    Returns:
-        Its JSON rendering.
-    """
-    if value is None:
-        return "null"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, str):
-        return _render_string(value)
-    items: list[str] = []
-    for item in value:
-        items.append(_render_string(item) if isinstance(item, str) else render_json(item))
-    return "[" + ", ".join(items) + "]"
 
 
 def _encode_row(row: FleetMatchRow) -> dict[str, str | int | bool | None]:

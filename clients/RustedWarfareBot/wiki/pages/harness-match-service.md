@@ -10,8 +10,8 @@ source_paths:
   - "../../libs/platform_workers/src/platform_workers/rq_harness.py"
   - "../../services/covenant-radar-api/docker-compose.yml"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-08-05"
-confidence: medium
+fact_checked: "2026-08-07"
+confidence: high
 hubs: [headless-harness]
 ---
 
@@ -133,8 +133,24 @@ files a refusal instead of a night of unusable results; a passing one
 timestamps which regime the batch belongs to — the cross-regime
 comparability trap is exactly what mltrace24's autopsy paid to learn.
 
-## What this page is not
+## Phase zero: built and live-verified (2026-08-07)
 
-Not built, not numbered in the task registry, and deliberately not started
-while two sessions were editing one tree -- the coordination failure it
-exists to remove.
+The queue and the allocator exist: ``rw_bot.service`` (queue.py's claim
+transaction with ``FOR UPDATE SKIP LOCKED`` on jobs and leases, worker.py's
+claim-lease-play-finish loop over the unchanged harness seams), submitted
+through ``scripts.submit_batch`` and drained by ``scripts.match_worker``,
+against ``platform-postgres`` on the covenant compose stack. Rows carry the
+harness's own encoded config/match/job payloads and decode back through the
+same codecs a sweep file does; artifacts file exactly where sweeps file
+them. Live smoke: two matches submitted, claimed under lease, played,
+verdicts filed, rows ``done``, leases empty (`runs/sweeps/service-smoke/`).
+The reaper requeues heartbeat-silent jobs, so a killed worker returns its
+job and its clone -- the exact failure tonight's panels hit twice by shell.
+
+## What phase one adds
+
+The dockerized control plane (submission and status over HTTP in the
+covenant service style), result blobs mirrored into the database beside the
+filed artifacts, freeze-verify-go smoke certification at batch start, and
+the worker-registration half of the multi-runner schema. The primitives it
+wraps are now measured code, not a page.

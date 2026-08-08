@@ -1,0 +1,2 @@
+svc1|424242|doctrines/flame-nocover.doctrine|200
+svc2|515151|doctrines/flame-nocover.doctrine|200

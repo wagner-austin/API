@@ -22,6 +22,8 @@ an error rather than a last-one-wins merge — the same discipline the
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 from rw_bot import RwBotError
 
 _NOT_OBJECT = "RW-NDJSON-001"
@@ -283,3 +285,92 @@ def _require_end(text: str, index: int) -> None:
 
 
 __all__ = ["NdjsonError", "parse_object"]
+
+
+_STRING_ESCAPES = {
+    "\\": "\\\\",
+    '"': '\\"',
+    "\b": "\\b",
+    "\f": "\\f",
+    "\n": "\\n",
+    "\r": "\\r",
+    "\t": "\\t",
+}
+
+
+def _render_string(value: str) -> str:
+    """Render one JSON string literal.
+
+    Args:
+        value: The string to render.
+
+    Returns:
+        The quoted, escaped literal.
+    """
+    rendered: list[str] = ['"']
+    for character in value:
+        if character in _STRING_ESCAPES:
+            rendered.append(_STRING_ESCAPES[character])
+        elif ord(character) < 0x20:
+            rendered.append(f"\\u{ord(character):04x}")
+        else:
+            rendered.append(character)
+    rendered.append('"')
+    return "".join(rendered)
+
+
+def render_json(
+    payload: Mapping[
+        str,
+        str | int | bool | None | Sequence[str] | Sequence[Mapping[str, str | int | bool | None]],
+    ],
+) -> str:
+    """Render one response object as JSON.
+
+    The emit-side sibling of :func:`rw_bot.wire.ndjson.parse_object`:
+    the value grammar is exactly what the fleet's responses carry —
+    flat scalars, a list of strings (the report lines), or a list of
+    flat objects (the match rows). Anything else is a programming
+    error, not data.
+
+    Args:
+        payload: The response object.
+
+    Returns:
+        Its JSON text.
+    """
+    parts: list[str] = []
+    for key, value in payload.items():
+        parts.append(f"{_render_string(key)}: {_render_value(value)}")
+    return "{" + ", ".join(parts) + "}"
+
+
+def _render_value(
+    value: str
+    | int
+    | bool
+    | None
+    | Sequence[str]
+    | Sequence[Mapping[str, str | int | bool | None]],
+) -> str:
+    """Render one value of the shapes the fleet serves.
+
+    Args:
+        value: A flat scalar, a list of strings, or a list of flat
+            objects.
+
+    Returns:
+        Its JSON rendering.
+    """
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        return _render_string(value)
+    items: list[str] = []
+    for item in value:
+        items.append(_render_string(item) if isinstance(item, str) else render_json(item))
+    return "[" + ", ".join(items) + "]"

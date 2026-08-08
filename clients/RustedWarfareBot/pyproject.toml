@@ -17,6 +17,7 @@ include = ["src/rw_bot/py.typed"]
 [tool.poetry.dependencies]
 python = "^3.11"
 monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
+psycopg = {version = "^3.3", extras = ["binary"]}
 
 [tool.poetry.scripts]
 rw-boot-log = "rw_bot.harness.boot_log_cli:main"
