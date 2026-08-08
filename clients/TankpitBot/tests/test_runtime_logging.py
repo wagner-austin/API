@@ -33,6 +33,7 @@ from tankpit_bot.runtime_records import (
     encode_runtime_event_record,
 )
 from tankpit_bot.sniffer.world_service import WorldService
+from tests._runtime_logging_support import run_child_logger
 from tests.conftest import FakeFileSystem
 
 
@@ -200,9 +201,7 @@ def test_runtime_logging_ignores_non_string_runtime_extras(
     """Structured event handler ignores malformed runtime extras."""
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
-    from platform_core.logging import stdlib_logging
-
-    logger = stdlib_logging.getLogger("tankpit_bot.runtime.invalid")
+    logger = run_child_logger("20260331-230405", "invalid")
     logger.info(
         "plain malformed event",
         extra={"runtime_channel": 1, "runtime_message": "bad"},
@@ -318,25 +317,23 @@ def test_event_handler_skips_record_without_runtime_channel_or_message(
     """
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
-    from platform_core.logging import stdlib_logging
-
-    logger = stdlib_logging.getLogger("tankpit_bot.runtime.no_runtime_extras")
+    logger = run_child_logger("20260331-230405", "no_runtime_extras")
     logger.info("plain log line with no runtime extras")
 
     files = fake_fs.get_written_files()
     assert files[artifacts["latest_events_path"]] == ""
 
 
-def test_emit_without_runtime_configured_uses_unconfigured_mode(
+def test_emit_without_a_configured_run_still_reaches_the_console(
     fake_fs: FakeFileSystem,
 ) -> None:
-    """``_runtime_mode_name`` returns ``"unconfigured"`` when no mode is set.
+    """An unconfigured process logs the event but writes no artifact.
 
-    The autouse runtime-logging-state fixture resets every artifact
-    holder to ``None`` at test start, so an emit_* before any
-    ``configure_*_runtime_logging`` call exercises the unconfigured
-    fallback. We assert against the LogRecord extra rather than the
-    artifact file because no handler is attached yet.
+    Before any ``configure_*_runtime_logging`` call there is no ambient
+    run, so ``emit_ai`` resolves the base emitter logger — which carries
+    no event handler. The record must still propagate to the root logger
+    (console and, once configured, the process text log); what it must
+    NOT do is invent an events.jsonl row for a run that does not exist.
     """
     from platform_core.logging import stdlib_logging
 
@@ -357,14 +354,19 @@ def test_emit_without_runtime_configured_uses_unconfigured_mode(
 
     from tankpit_bot.runtime_records import _RuntimeRecordMapping
 
-    matching: list[_RuntimeRecordMapping] = []
+    emitted: list[_RuntimeRecordMapping] = []
     for record in records:
         rec_dict: _RuntimeRecordMapping = record.__dict__
-        if "runtime_mode" in rec_dict:
-            matching.append(rec_dict)
-    if not matching:
-        raise AssertionError("expected at least one record with runtime_mode extra")
-    assert matching[0]["runtime_mode"] == "unconfigured"
+        if "runtime_channel" in rec_dict:
+            emitted.append(rec_dict)
+    if not emitted:
+        raise AssertionError("expected the emit to reach the root logger")
+    assert emitted[0]["runtime_channel"] == "AI"
+    assert emitted[0]["runtime_message"] == "emitted before configure_bot_runtime_logging"
+    event_artifacts = [
+        path for path in fake_fs.get_written_files() if path.endswith(".events.jsonl")
+    ]
+    assert event_artifacts == []
 
 
 def test_event_handler_skips_record_with_missing_runtime_fields_extra(
@@ -379,9 +381,7 @@ def test_event_handler_skips_record_with_missing_runtime_fields_extra(
     """
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
-    from platform_core.logging import stdlib_logging
-
-    logger = stdlib_logging.getLogger("tankpit_bot.runtime.invalid_fields")
+    logger = run_child_logger("20260331-230405", "invalid_fields")
     logger.info(
         "missing runtime_fields",
         extra={"runtime_channel": "AI", "runtime_message": "no fields"},
@@ -389,3 +389,111 @@ def test_event_handler_skips_record_with_missing_runtime_fields_extra(
 
     files = fake_fs.get_written_files()
     assert files[artifacts["latest_events_path"]] == ""
+
+
+def test_two_concurrent_runs_keep_their_own_event_streams(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """A second session must not steal the first session's event stream.
+
+    This is the defect [[session-state-deglobalisation]] step 10 names:
+    ``_install_artifact_handlers`` used to mount on the ROOT logger and
+    remove any prior artifact handlers first, so configuring a second run
+    in one process silently detached the first run's event handler and
+    its ``events.jsonl`` stopped growing mid-session.
+
+    The threads are stepped through a barrier so the ordering is the one
+    that used to break: run A configures, run B configures, and only THEN
+    does run A emit. Each thread gets its own context, which is what
+    makes the ambient run per-session rather than per-process.
+    """
+    import threading
+
+    a_configured = threading.Event()
+    b_configured = threading.Event()
+    a_emitted = threading.Event()
+    paths: dict[str, str] = {}
+    failures: list[str] = []
+
+    def run_a() -> None:
+        artifacts = configure_bot_runtime_logging("20260331-100000")
+        paths["a"] = artifacts["latest_events_path"]
+        a_configured.set()
+        if not b_configured.wait(timeout=5):
+            failures.append("run B never configured")
+            return
+        emit_ai("from run A")
+        a_emitted.set()
+
+    def run_b() -> None:
+        if not a_configured.wait(timeout=5):
+            failures.append("run A never configured")
+            return
+        artifacts = configure_probe_runtime_logging("fuel", "20260331-200000")
+        paths["b"] = artifacts["latest_events_path"]
+        b_configured.set()
+        if not a_emitted.wait(timeout=5):
+            failures.append("run A never emitted")
+            return
+        emit_ai("from run B")
+
+    thread_a = threading.Thread(target=run_a)
+    thread_b = threading.Thread(target=run_b)
+    thread_a.start()
+    thread_b.start()
+    thread_a.join(timeout=10)
+    thread_b.join(timeout=10)
+
+    assert failures == []
+    files = fake_fs.get_written_files()
+    a_events = files[paths["a"]]
+    b_events = files[paths["b"]]
+    assert "from run A" in a_events
+    assert "from run B" not in a_events
+    assert "from run B" in b_events
+    assert "from run A" not in b_events
+    # Each stream carries its own mode, taken from its own handler.
+    assert '"mode":"bot"' in a_events
+    assert '"mode":"probe:fuel"' in b_events
+
+
+def test_reconfiguring_the_same_run_does_not_double_its_events(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """Two configures on one stamp leave one event handler, not two.
+
+    The run's logger is keyed by mode and stamp, so a deterministic
+    stamp -- every test in this file, and a service session restarting
+    within the same second -- resolves the same logger twice. Without
+    clearing that logger's handlers first, the second configure would
+    stack a second handler and write every subsequent event twice.
+    """
+    configure_bot_runtime_logging("20260331-230405")
+    artifacts = configure_bot_runtime_logging("20260331-230405")
+
+    emit_ai("emitted once")
+
+    files = fake_fs.get_written_files()
+    lines = files[artifacts["latest_events_path"]].strip().splitlines()
+    assert len(lines) == 1
+
+
+def test_clearing_runtime_logging_state_forgets_a_probe_run(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """Clearing forgets the probe run, which the old reset silently skipped.
+
+    Until step 10 the autouse fixture reset the bot and sniff globals and
+    never touched ``_PROBE_ARTIFACTS``, so a probe test leaked its
+    artifacts into every test that followed it on the same xdist worker.
+    """
+    from tankpit_bot.runtime_logging import clear_runtime_logging_state
+
+    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
+    assert get_probe_runtime_artifacts() == artifacts
+
+    clear_runtime_logging_state()
+
+    assert get_probe_runtime_artifacts() is None
+    assert get_bot_runtime_artifacts() is None
+    assert get_sniff_runtime_artifacts() is None

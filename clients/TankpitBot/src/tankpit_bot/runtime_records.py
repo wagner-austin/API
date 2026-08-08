@@ -45,11 +45,16 @@ class RuntimeEventRecordDict(TypedDict):
 
 
 class RuntimeLogExtraDict(TypedDict):
-    """Structured extra fields carried on high-signal runtime log records."""
+    """Structured extra fields carried on high-signal runtime log records.
+
+    There is deliberately no ``runtime_mode`` here. The mode is captured
+    by :class:`_HookEventArtifactHandler` when the run is configured and
+    written from there, so a per-record copy had no reader
+    ([[session-state-deglobalisation]] step 10).
+    """
 
     runtime_channel: str
     runtime_message: str
-    runtime_mode: str
     runtime_fields: dict[str, str | int | float | bool]
 
 

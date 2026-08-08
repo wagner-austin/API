@@ -8,14 +8,17 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot.runtime_logging import (
-    _ARTIFACT_HANDLER_NAME_PREFIX,
-    _remove_artifact_handlers,
     configure_bot_runtime_logging,
     emit_ai,
     emit_diagnostic,
     emit_state,
 )
+from tankpit_bot.runtime_logging_handlers import (
+    ARTIFACT_HANDLER_NAME_PREFIX,
+    remove_artifact_handlers,
+)
 from tankpit_bot.sniffer.world_service import WorldService
+from tests._runtime_logging_support import run_child_logger
 from tests.conftest import FakeFileSystem
 
 
@@ -29,9 +32,7 @@ def test_event_handler_skips_record_with_malformed_runtime_fields_value(
     """
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
-    from platform_core.logging import stdlib_logging
-
-    logger = stdlib_logging.getLogger("tankpit_bot.runtime.invalid_fields_value")
+    logger = run_child_logger("20260331-230405", "invalid_fields_value")
     logger.info(
         "bad value",
         extra={
@@ -51,9 +52,7 @@ def test_event_handler_skips_record_with_non_string_key_in_runtime_fields(
     """A non-string field key (e.g. int) is rejected at the handler boundary."""
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
-    from platform_core.logging import stdlib_logging
-
-    logger = stdlib_logging.getLogger("tankpit_bot.runtime.invalid_fields_key")
+    logger = run_child_logger("20260331-230405", "invalid_fields_key")
     logger.info(
         "bad key",
         extra={
@@ -350,12 +349,12 @@ def test_remove_artifact_handlers_keeps_non_artifact_handlers() -> None:
     root = stdlib_logging.getLogger()
     original_handlers = list(root.handlers)
     runtime_handler = stdlib_logging.NullHandler()
-    runtime_handler.set_name(_ARTIFACT_HANDLER_NAME_PREFIX + "test")
+    runtime_handler.set_name(ARTIFACT_HANDLER_NAME_PREFIX + "test")
     normal_handler = stdlib_logging.NullHandler()
     normal_handler.set_name("normal")
     root.handlers = [runtime_handler, normal_handler]
 
-    _remove_artifact_handlers(root)
+    remove_artifact_handlers(root)
 
     assert root.handlers == [normal_handler]
     root.handlers = original_handlers

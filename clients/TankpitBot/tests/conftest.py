@@ -191,22 +191,31 @@ def _restore_guard_hooks() -> Generator[None, None, None]:
 
 @pytest.fixture(autouse=True)
 def _restore_runtime_logging_state() -> Generator[None, None, None]:
-    """Reset runtime logging globals and artifact handlers for each test."""
-    from platform_core.logging import stdlib_logging
+    """Detach artifact handlers and clear the ambient run for each test.
 
+    Both the run and the tick context are :class:`contextvars.ContextVar`
+    slots, not module globals ([[session-state-deglobalisation]] step
+    10). That buys isolation per thread and per async task, which is what
+    lets two concurrent sessions keep their own artifacts — but pytest
+    runs every test on one thread in one context, so the values persist
+    between tests and this reset stays. The gain was never one fewer
+    reset.
+
+    Until step 10 this reset cleared the bot and sniff globals and
+    silently skipped the probe one, so a probe test leaked its artifacts
+    into every test that followed it on the same worker.
+    :func:`clear_runtime_logging_state` clears all of them, which is why
+    the reset now lives beside the state instead of reaching into it.
+    """
     from tankpit_bot import runtime_context, runtime_logging
 
-    runtime_logging._BOT_ARTIFACTS = None
-    runtime_logging._SNIFF_ARTIFACTS = None
+    runtime_logging.clear_runtime_logging_state()
     runtime_context.clear_runtime_context()
-    runtime_logging._remove_artifact_handlers(stdlib_logging.getLogger())
 
     yield
 
-    runtime_logging._BOT_ARTIFACTS = None
-    runtime_logging._SNIFF_ARTIFACTS = None
+    runtime_logging.clear_runtime_logging_state()
     runtime_context.clear_runtime_context()
-    runtime_logging._remove_artifact_handlers(stdlib_logging.getLogger())
 
 
 @pytest.fixture(autouse=True)

@@ -3876,3 +3876,104 @@ crash: check what else owns the machine.
 threaded arguments pushed it over. Split, not squeezed: the eight
 `handle_login_flow` auto-join tests moved to `test_join_login_flow.py`
 (145 lines), leaving the room-join primitives at 470.
+
+---
+
+## [2026-08-08] update | Step 10 closes the plan: seventeen module globals, zero left
+
+The artifact half of step 10 shipped, and with it
+[[session-state-deglobalisation]] is **complete — all eleven items**.
+`_BOT_ARTIFACTS` / `_SNIFF_ARTIFACTS` / `_PROBE_ARTIFACTS` are
+`ContextVar` slots, and the event handler now mounts on a per-run logger
+instead of root.
+
+Re-ran the two sweeps the page defined for itself. Sweep one, every
+`global` in `src/tankpit_bot`: four sites, all four already in the
+"Legitimately process-level" table (the DI seam, the Ctrl+C flag, the XOR
+static-key cache, the frame-logging switch). Sweep two, module-level
+containers mutated in place: **zero**. `make check` exits 0 — guard
+clean, mypy clean on 1105 files, **6188 passed, 100.00% coverage**.
+
+### The deferral expired with its own premise
+
+This half had been deliberately deferred, and the reason was written
+down: the fleet runs one process per bot, so process-scoped logging is
+correct for the only deployment that exists. But
+[[bot-service-architecture]] gives *two* justifications for
+one-process-per-bot, and the second is "in-process multi-bot is
+impossible (the world service is a module singleton)" — exactly what step
+8 deleted the day before. The page had already flagged that this would
+become the next blocker the day step 8 landed. It did.
+
+### The bug was real
+
+`_install_artifact_handlers` mounted on the ROOT logger and removed any
+prior artifact handlers first. Configure a second run in one process and
+the first run's event handler was silently detached — its
+`events.jsonl` just stopped growing mid-session. A regression test now
+steps two threads through that precise ordering: A configures, B
+configures, and only THEN does A emit. Each stream ends up with its own
+events and its own mode.
+
+Worth noting what *isn't* broken: `SessionRunner` runs many sessions
+**sequentially** in one process and refuses to start a second while the
+first runs, so the old overwrite-and-reinstall was correct for reuse.
+Only concurrent sessions lost data, which is why this sat latent.
+
+### The two artifacts are scoped differently, on purpose
+
+The event stream is a session artifact — per-run logger, resolved
+ambiently. The text log is a process artifact and stays on root, because
+**root is the only logger that sees library records**: a `world_service`
+warning belongs in the run log, and a per-run logger never receives it.
+Scoping both per-session would have meant stamping every record with a
+run id, filtering in the handler, and then duplicating unattributed
+library lines into every active session's text log to avoid losing them.
+The asymmetry is cheaper and more honest than the symmetry.
+
+### A writer with no reader
+
+`_emit_runtime_event` stamped `runtime_mode=_runtime_mode_name()` onto
+every record, and that function read all three artifact globals to
+compute it. But `_HookEventArtifactHandler` writes `self._mode`, captured
+when the run was configured, and never looked at the record's copy —
+nothing in production read the field, only a test asserting the mechanism
+existed. It was the sole consumer of those globals on the hot path, so
+deleting it shrank the step to the getters plus the handler mount. The
+`tank_names` finding inverted: not a reader with no writer, a **writer
+with no reader**.
+
+### The reset that skipped a slot
+
+`_restore_runtime_logging_state` cleared the bot and sniff globals and
+never touched `_PROBE_ARTIFACTS`. A probe test leaked its artifacts into
+every test that followed it on the same xdist worker — a live isolation
+hole nobody had noticed. The reset now calls
+`clear_runtime_logging_state()`, which lives beside the state instead of
+reaching into it and clears all four slots.
+
+To be straight about what the ContextVar did *not* buy: pytest runs every
+test on one thread in one context, so the values persist between tests
+and the reset stays. The gain is thread and task isolation — which is
+what makes concurrent sessions possible — not one fewer reset. The same
+caveat the tick-context half recorded.
+
+### Three tests that had quietly stopped testing anything
+
+Moving the event handler off root broke coverage of its own
+malformed-record guards, and coverage is what caught it. Three tests
+logged synthetic records to unrelated loggers and asserted "the artifact
+stayed empty" — an assertion that stayed true once the record could no
+longer reach the handler at all. They now log inside the run's logger
+subtree via `tests/_runtime_logging_support.py`, whose docstring records
+why. Third time this pair of days that a test passed while measuring
+nothing; the tell each time was a guard going uncovered, not a failure.
+
+### File size
+
+`runtime_logging.py` hit 622 lines. Split, not trimmed: handler classes,
+run-identity naming, and handler install/remove moved to
+`runtime_logging_handlers.py` (235), leaving the ambient run and the
+emitters at 424. The dependency is one-way — the handlers module knows
+nothing about which run is active — which keeps the pair from closing a
+cycle.

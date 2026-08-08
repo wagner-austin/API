@@ -1,20 +1,28 @@
-"""Runtime logging: artifact handlers and the per-channel emitters.
+"""Runtime logging: which run is active, and the per-channel emitters.
 
-Owns the artifact files a session writes and the ``emit_*`` channels
-that write to them. The record shape and codec are
-:mod:`tankpit_bot.runtime_records`; the per-tick context merged into
-every record is :mod:`tankpit_bot.runtime_context`.
+Owns the ambient answer to "which run do my events belong to" and the
+``emit_*`` channels that write them. The handler plumbing those channels
+land on is :mod:`tankpit_bot.runtime_logging_handlers`; the record shape
+and codec are :mod:`tankpit_bot.runtime_records`; the per-tick context
+merged into every record is :mod:`tankpit_bot.runtime_context`.
+
+**The active run is ambient, not global** ([[session-state-deglobalisation]]
+step 10). The artifact slots are :class:`contextvars.ContextVar`s for the
+same reason the tick context is: the ``emit_*`` channels are called from
+hundreds of sites inside pure planner logic, so threading a parameter
+would cost far more than the globals did, and a context variable still
+isolates per thread and per async task -- which is what lets two
+concurrent sessions in one process keep their own ``events.jsonl``
+instead of the second silently detaching the first's handler.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from contextvars import ContextVar
 from pathlib import Path
 
-from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger, setup_rich_logging, stdlib_logging
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.runtime_artifacts import (
     BotRunArtifactsDict,
     ProbeRunArtifactsDict,
@@ -26,100 +34,63 @@ from tankpit_bot.runtime_artifacts import (
     resolve_bot_instance,
 )
 from tankpit_bot.runtime_context import get_runtime_context
-from tankpit_bot.runtime_records import (
-    RuntimeEventRecordDict,
-    RuntimeLogExtraDict,
-    _RuntimeRecordMapping,
-    encode_runtime_event_record,
+from tankpit_bot.runtime_logging_handlers import (
+    EMITTER_LOGGER_NAME,
+    install_artifact_handlers,
+    make_run_id,
+    remove_artifact_handlers,
+    reset_artifact_files,
+    session_logger_name,
+)
+from tankpit_bot.runtime_records import RuntimeLogExtraDict
+
+_EMITTER_LOGGER = get_logger(EMITTER_LOGGER_NAME)
+
+# One typed slot per run kind so each getter stays mypy-narrowed at its
+# source, matching the idiom in :mod:`tankpit_bot.runtime_context`.
+# Exactly one is ever set: ``_set_active_run`` clears the other two.
+_BOT_ARTIFACTS: ContextVar[BotRunArtifactsDict | None] = ContextVar(
+    "tankpit_bot_artifacts", default=None
 )
 
-_EMITTER_LOGGER = get_logger("tankpit_bot.runtime.events")
+_SNIFF_ARTIFACTS: ContextVar[SniffRunArtifactsDict | None] = ContextVar(
+    "tankpit_sniff_artifacts", default=None
+)
 
-_ARTIFACT_HANDLER_NAME_PREFIX = "tankpit_bot.runtime.artifacts."
+_PROBE_ARTIFACTS: ContextVar[ProbeRunArtifactsDict | None] = ContextVar(
+    "tankpit_probe_artifacts", default=None
+)
 
-_BOT_ARTIFACTS: BotRunArtifactsDict | None = None
-
-_SNIFF_ARTIFACTS: SniffRunArtifactsDict | None = None
-
-_PROBE_ARTIFACTS: ProbeRunArtifactsDict | None = None
-
-
-class _HookTextArtifactHandler(stdlib_logging.Handler):
-    """Logging handler that mirrors formatted log lines to artifact files."""
-
-    def __init__(self, paths: tuple[Path, Path]) -> None:
-        """Initialize the handler.
-
-        Args:
-            paths: ``(latest_path, archive_path)`` text log destinations.
-        """
-        super().__init__()
-        self._latest_path = paths[0]
-        self._archive_path = paths[1]
-
-    def emit(self, record: stdlib_logging.LogRecord) -> None:
-        """Append the formatted log line to both text log files.
-
-        Args:
-            record: Log record to persist.
-        """
-        line = self.format(record) + "\n"
-        _test_hooks.append_text(self._latest_path, line)
-        _test_hooks.append_text(self._archive_path, line)
+#: Identifies which per-run logger ``emit_*`` writes to. ``None`` before
+#: any ``configure_*`` call, which is the unconfigured mode: events go to
+#: the base emitter logger, where no event handler is mounted, so they
+#: reach the console and the process text log but no ``events.jsonl``.
+_ACTIVE_RUN_ID: ContextVar[str | None] = ContextVar("tankpit_active_run_id", default=None)
 
 
-class _HookEventArtifactHandler(stdlib_logging.Handler):
-    """Logging handler that writes structured high-signal runtime events."""
+def _set_active_run(
+    run_id: str,
+    *,
+    bot: BotRunArtifactsDict | None = None,
+    sniff: SniffRunArtifactsDict | None = None,
+    probe: ProbeRunArtifactsDict | None = None,
+) -> None:
+    """Make one run the ambient run for this thread or task.
 
-    def __init__(self, mode: str, paths: tuple[Path, Path]) -> None:
-        """Initialize the handler.
+    Exactly one artifacts argument is ever passed; the other two slots
+    are cleared so the getters cannot report a stale run from a previous
+    ``configure_*`` in the same context.
 
-        Args:
-            mode: Runtime mode, either ``bot`` or ``sniff``.
-            paths: ``(latest_path, archive_path)`` JSONL event destinations.
-        """
-        super().__init__()
-        self._mode = mode
-        self._latest_path = paths[0]
-        self._archive_path = paths[1]
-
-    def emit(self, record: stdlib_logging.LogRecord) -> None:
-        """Append a structured event when the record carries runtime metadata.
-
-        Args:
-            record: Log record to inspect and possibly persist.
-        """
-        record_dict: _RuntimeRecordMapping = record.__dict__
-        if "runtime_channel" not in record_dict or "runtime_message" not in record_dict:
-            return
-        channel_raw = record_dict["runtime_channel"]
-        message_raw = record_dict["runtime_message"]
-        if not isinstance(channel_raw, str) or not isinstance(message_raw, str):
-            return
-        fields_raw = record_dict.get("runtime_fields")
-        if not isinstance(fields_raw, dict):
-            return
-        fields: dict[str, str | int | float | bool] = {}
-        bad = False
-        for raw_key, raw_value in fields_raw.items():
-            if not isinstance(raw_key, str) or not isinstance(raw_value, (str, int, float, bool)):
-                bad = True
-                break
-            fields[raw_key] = raw_value
-        if bad:
-            return
-        event = RuntimeEventRecordDict(
-            timestamp=datetime.fromtimestamp(record.created).strftime("%Y-%m-%dT%H:%M:%S"),
-            level=record.levelname,
-            logger=record.name,
-            mode=self._mode,
-            channel=channel_raw,
-            message=message_raw,
-            fields=fields,
-        )
-        line = dump_json_str(encode_runtime_event_record(event), compact=True) + "\n"
-        _test_hooks.append_text(self._latest_path, line)
-        _test_hooks.append_text(self._archive_path, line)
+    Args:
+        run_id: Run identity from :func:`make_run_id`.
+        bot: Bot artifacts when configuring a bot run.
+        sniff: Sniffer artifacts when configuring a sniff run.
+        probe: Probe artifacts when configuring a probe run.
+    """
+    _BOT_ARTIFACTS.set(bot)
+    _SNIFF_ARTIFACTS.set(sniff)
+    _PROBE_ARTIFACTS.set(probe)
+    _ACTIVE_RUN_ID.set(run_id)
 
 
 def configure_bot_runtime_logging(stamp: str | None = None) -> BotRunArtifactsDict:
@@ -131,26 +102,25 @@ def configure_bot_runtime_logging(stamp: str | None = None) -> BotRunArtifactsDi
     Returns:
         Configured bot runtime artifacts.
     """
-    global _BOT_ARTIFACTS, _SNIFF_ARTIFACTS, _PROBE_ARTIFACTS
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
     artifacts = build_bot_run_artifacts(resolved_stamp, resolve_bot_instance())
     setup_rich_logging(level="INFO")
-    _reset_artifact_files(
+    reset_artifact_files(
         Path(artifacts["latest_log_path"]),
         Path(artifacts["archive_log_path"]),
         Path(artifacts["latest_events_path"]),
         Path(artifacts["archive_events_path"]),
     )
-    _install_artifact_handlers(
+    run_id = make_run_id("bot", resolved_stamp)
+    install_artifact_handlers(
+        run_id,
         "bot",
         Path(artifacts["latest_log_path"]),
         Path(artifacts["archive_log_path"]),
         Path(artifacts["latest_events_path"]),
         Path(artifacts["archive_events_path"]),
     )
-    _BOT_ARTIFACTS = artifacts
-    _SNIFF_ARTIFACTS = None
-    _PROBE_ARTIFACTS = None
+    _set_active_run(run_id, bot=artifacts)
     return artifacts
 
 
@@ -163,11 +133,10 @@ def configure_sniff_runtime_logging(stamp: str | None = None) -> SniffRunArtifac
     Returns:
         Configured sniffer runtime artifacts.
     """
-    global _BOT_ARTIFACTS, _SNIFF_ARTIFACTS, _PROBE_ARTIFACTS
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
     artifacts = build_sniff_run_artifacts(resolved_stamp)
     setup_rich_logging(level="INFO")
-    _reset_artifact_files(
+    reset_artifact_files(
         Path(artifacts["latest_log_path"]),
         Path(artifacts["archive_log_path"]),
         Path(artifacts["latest_events_path"]),
@@ -176,16 +145,16 @@ def configure_sniff_runtime_logging(stamp: str | None = None) -> SniffRunArtifac
         Path(artifacts["latest_raw_capture_path"]),
         Path(artifacts["latest_summary_path"]),
     )
-    _install_artifact_handlers(
+    run_id = make_run_id("sniff", resolved_stamp)
+    install_artifact_handlers(
+        run_id,
         "sniff",
         Path(artifacts["latest_log_path"]),
         Path(artifacts["archive_log_path"]),
         Path(artifacts["latest_events_path"]),
         Path(artifacts["archive_events_path"]),
     )
-    _BOT_ARTIFACTS = None
-    _SNIFF_ARTIFACTS = artifacts
-    _PROBE_ARTIFACTS = None
+    _set_active_run(run_id, sniff=artifacts)
     return artifacts
 
 
@@ -209,42 +178,66 @@ def configure_probe_runtime_logging(
         ValueError: When ``probe_name`` is empty (validated by
             :func:`tankpit_bot.runtime_artifacts.build_probe_run_artifacts`).
     """
-    global _BOT_ARTIFACTS, _SNIFF_ARTIFACTS, _PROBE_ARTIFACTS
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
     artifacts = build_probe_run_artifacts(probe_name, resolved_stamp)
     setup_rich_logging(level="INFO")
-    _reset_artifact_files(
+    reset_artifact_files(
         Path(artifacts["latest_log_path"]),
         Path(artifacts["archive_log_path"]),
         Path(artifacts["latest_events_path"]),
         Path(artifacts["archive_events_path"]),
     )
-    _install_artifact_handlers(
-        f"probe:{probe_name}",
+    mode = f"probe:{probe_name}"
+    run_id = make_run_id(mode, resolved_stamp)
+    install_artifact_handlers(
+        run_id,
+        mode,
         Path(artifacts["latest_log_path"]),
         Path(artifacts["archive_log_path"]),
         Path(artifacts["latest_events_path"]),
         Path(artifacts["archive_events_path"]),
     )
-    _BOT_ARTIFACTS = None
-    _SNIFF_ARTIFACTS = None
-    _PROBE_ARTIFACTS = artifacts
+    _set_active_run(run_id, probe=artifacts)
     return artifacts
 
 
 def get_bot_runtime_artifacts() -> BotRunArtifactsDict | None:
-    """Return the active bot runtime artifacts for this process, if configured."""
-    return _BOT_ARTIFACTS
+    """Return this thread or task's bot runtime artifacts, if configured."""
+    return _BOT_ARTIFACTS.get()
 
 
 def get_sniff_runtime_artifacts() -> SniffRunArtifactsDict | None:
-    """Return the active sniffer runtime artifacts for this process, if configured."""
-    return _SNIFF_ARTIFACTS
+    """Return this thread or task's sniffer runtime artifacts, if configured."""
+    return _SNIFF_ARTIFACTS.get()
 
 
 def get_probe_runtime_artifacts() -> ProbeRunArtifactsDict | None:
-    """Return the active probe runtime artifacts for this process, if configured."""
-    return _PROBE_ARTIFACTS
+    """Return this thread or task's probe runtime artifacts, if configured."""
+    return _PROBE_ARTIFACTS.get()
+
+
+def clear_runtime_logging_state() -> None:
+    """Detach every artifact handler and forget the ambient run.
+
+    The ambient run is a context variable, so it survives between tests
+    on the same thread exactly as the tick context does — which is why
+    the test suite still resets it explicitly. Production never calls
+    this: a process either configures a run or never had one.
+    """
+    root = stdlib_logging.getLogger()
+    remove_artifact_handlers(root)
+    run_id = _ACTIVE_RUN_ID.get()
+    if run_id is not None:
+        remove_artifact_handlers(stdlib_logging.getLogger(session_logger_name(run_id)))
+    _set_active_run_cleared()
+
+
+def _set_active_run_cleared() -> None:
+    """Clear all four ambient run slots."""
+    _BOT_ARTIFACTS.set(None)
+    _SNIFF_ARTIFACTS.set(None)
+    _PROBE_ARTIFACTS.set(None)
+    _ACTIVE_RUN_ID.set(None)
 
 
 def emit_ai(
@@ -335,62 +328,6 @@ def emit_diagnostic(
     )
 
 
-def _reset_artifact_files(*paths: Path) -> None:
-    """Clear artifact files at process startup.
-
-    Args:
-        paths: Artifact paths to reset to empty content.
-    """
-    for path in paths:
-        _test_hooks.write_text(path, "")
-
-
-def _install_artifact_handlers(
-    mode: str,
-    latest_log_path: Path,
-    archive_log_path: Path,
-    latest_events_path: Path,
-    archive_events_path: Path,
-) -> None:
-    """Attach artifact mirroring handlers to the root logger.
-
-    Args:
-        mode: Runtime mode, either ``bot`` or ``sniff``.
-        latest_log_path: Stable latest text log path.
-        archive_log_path: Timestamped archived text log path.
-        latest_events_path: Stable latest JSONL event path.
-        archive_events_path: Timestamped archived JSONL event path.
-    """
-    root = stdlib_logging.getLogger()
-    _remove_artifact_handlers(root)
-    text_handler = _HookTextArtifactHandler((latest_log_path, archive_log_path))
-    text_handler.set_name(_ARTIFACT_HANDLER_NAME_PREFIX + "text")
-    text_handler.setLevel(root.level)
-    text_handler.setFormatter(
-        stdlib_logging.Formatter("[%(asctime)s] %(levelname)-8s %(message)s", "%m/%d/%y %H:%M:%S")
-    )
-    root.addHandler(text_handler)
-
-    event_handler = _HookEventArtifactHandler(mode, (latest_events_path, archive_events_path))
-    event_handler.set_name(_ARTIFACT_HANDLER_NAME_PREFIX + "events")
-    event_handler.setLevel(root.level)
-    root.addHandler(event_handler)
-
-
-def _remove_artifact_handlers(root: stdlib_logging.Logger) -> None:
-    """Remove previously installed runtime artifact handlers from the root logger.
-
-    Args:
-        root: Root logger to clean before installing fresh handlers.
-    """
-    handlers_to_keep: list[stdlib_logging.Handler] = []
-    for handler in root.handlers:
-        name = handler.get_name() or ""
-        if not name.startswith(_ARTIFACT_HANDLER_NAME_PREFIX):
-            handlers_to_keep.append(handler)
-    root.handlers = handlers_to_keep
-
-
 def _merge_context_into_fields(
     fields: dict[str, str | int | float | bool],
 ) -> dict[str, str | int | float | bool]:
@@ -446,29 +383,32 @@ def _emit_runtime_event(
     extra = RuntimeLogExtraDict(
         runtime_channel=channel,
         runtime_message=formatted,
-        runtime_mode=_runtime_mode_name(),
         runtime_fields=_merge_context_into_fields(dict(fields)),
     )
-    _EMITTER_LOGGER.info("%s: %s", channel, formatted, extra=extra)
+    _active_emitter_logger().info("%s: %s", channel, formatted, extra=extra)
 
 
-def _runtime_mode_name() -> str:
-    """Return the active runtime mode name.
+def _active_emitter_logger() -> stdlib_logging.Logger:
+    """Return the logger this thread or task's events belong to.
+
+    With a run configured this is that run's own logger, which carries
+    its event handler; the record still propagates up to the root text
+    handler and the console. With no run configured it is the base
+    emitter logger, which has no event handler — so an unconfigured
+    process logs to console and text but writes no ``events.jsonl``,
+    which is what it did before the run became ambient.
 
     Returns:
-        ``bot``, ``sniff``, or ``probe:<name>`` when configured,
-        otherwise ``unconfigured``.
+        The logger to emit this record on.
     """
-    if _BOT_ARTIFACTS is not None:
-        return "bot"
-    if _SNIFF_ARTIFACTS is not None:
-        return "sniff"
-    if _PROBE_ARTIFACTS is not None:
-        return f"probe:{_PROBE_ARTIFACTS['probe_name']}"
-    return "unconfigured"
+    run_id = _ACTIVE_RUN_ID.get()
+    if run_id is None:
+        return _EMITTER_LOGGER
+    return stdlib_logging.getLogger(session_logger_name(run_id))
 
 
 __all__ = [
+    "clear_runtime_logging_state",
     "configure_bot_runtime_logging",
     "configure_probe_runtime_logging",
     "configure_sniff_runtime_logging",

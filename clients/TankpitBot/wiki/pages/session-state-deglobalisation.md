@@ -11,6 +11,9 @@ source_paths:
   - "src/tankpit_bot/ledger"
   - "src/tankpit_bot/capture/xor.py"
   - "src/tankpit_bot/protocol/codec.py"
+  - "src/tankpit_bot/runtime_context.py"
+  - "src/tankpit_bot/runtime_logging.py"
+  - "src/tankpit_bot/runtime_logging_handlers.py"
   - "tests/conftest.py"
 source_git_blobs:
   "src/tankpit_bot/sniffer": "9d5d8223ba026a595b4c5ff9fd9b0953cf6987ae"
@@ -18,18 +21,25 @@ source_git_blobs:
   "src/tankpit_bot/capture/xor.py": "43df3e756872949f3ebe0571afb7f4a3d53c6880"
   "src/tankpit_bot/protocol/codec.py": "76ba3790ab90e303383c2f7a66dd48c96e30467c"
   "tests/conftest.py": "a6d34fab76028fe59e8e24fc684c138211184262"
-fact_checked: "2026-08-07"
+fact_checked: "2026-08-08"
 confidence: high
 hubs: [architecture]
 ---
 
 # Session-State De-globalisation
 
-Seventeen modules hold **per-session** state at module scope. Each is a
+Seventeen modules held **per-session** state at module scope. Each was a
 place where two sessions in one process would overwrite each other, and
-each is a value that logically belongs to one game session and nothing
+each was a value that logically belongs to one game session and nothing
 else. This page is the inventory, the evidence, the archaeology of how
-it happened, and the ordered plan to finish it.[^3]
+it happened, and the ordered plan that finished it.[^3]
+
+**COMPLETE 2026-08-08.** All eleven plan items are shipped. Re-running
+the two sweeps this page defined finds nothing left: every surviving
+`global` declaration in `src/tankpit_bot` is one of the four entries in
+the "Legitimately process-level" table below, and **zero** module-level
+containers are mutated in place. Session state now lives on the session
+object, on the world service, or in a `ContextVar`.[^16]
 
 The plan is not conditional on multi-bot. `tankpit-fleet` already runs
 N bots as child processes, deliberately, so an orchestrator crash
@@ -95,11 +105,11 @@ counted.[^3]
 | ~~`diagnostics/entity_alignment.py`~~ | ~~`_last_emitted_signature`~~ | **instance state, step 3** |
 | ~~`browser/cdp_utils.py`~~ | ~~`_cdp_time_offset_ms`~~ | **instance state, step 4** |
 | ~~`browser/client_structure.py`~~ | ~~`_survey_emitted`~~ | **instance state, step 5** |
-| `runtime_logging.py` | `_BOT_ARTIFACTS`, `_SNIFF_ARTIFACTS`, `_PROBE_ARTIFACTS` | rebind — **the one item still open (step 10)** |
+| ~~`runtime_logging.py`~~ | ~~`_BOT_ARTIFACTS`, `_SNIFF_ARTIFACTS`, `_PROBE_ARTIFACTS`~~ | **`ContextVar`, step 10** |
 | ~~`runtime_context.py:25`~~ | ~~`_RUNTIME_CONTEXT_TICK_N`, `_..._BOT_STATE`, `_..._IN_FLIGHT_ACTION_KIND`~~ | **`ContextVar`, step 10** |
 
-Seventeen modules at the start; **one row is still live.** Everything
-else is instance state, a `ContextVar`, or a deleted module.
+Seventeen modules at the start; **every row is struck.** Each is now
+instance state, a `ContextVar`, or a deleted module.
 
 ### Legitimately process-level — NOT in scope
 
@@ -570,8 +580,8 @@ rather than the refactor.[^3]
    tests whose only callers are those tests. `MineTracker` and
    `CombatTracker` stay. Deleting the rest is a separate call from
    this step's scope.
-10. **`runtime_logging.py` + `runtime_context.py`** — **PARTLY
-    SHIPPED 2026-08-07, and the rest deliberately not done.**
+10. ~~**`runtime_logging.py` + `runtime_context.py`**~~ **SHIPPED —
+    context half 2026-08-07, artifact half 2026-08-08.**
 
     The three tick-context globals are now
     `contextvars.ContextVar` slots. This is the one place in the
@@ -589,32 +599,71 @@ rather than the refactor.[^3]
     `clear_runtime_context` stays in the conftest. The gain is
     thread/task isolation, not one fewer reset.
 
-    **The artifact globals stay, with a reason rather than an
-    exemption.** `_install_artifact_handlers` mounts on the ROOT
-    logger and removes any prior artifact handlers first, so a second
-    session in one process does not get its own artifacts — it
-    *steals* the first session's stream. De-globalising
-    `_BOT_ARTIFACTS` without changing that achieves nothing
-    measurable. Making it per-session means every one of those 256
-    emit sites must resolve WHICH session's logger it writes to.
-
-    That work buys something nothing currently asks for: the fleet
+    **The artifact half was blocked behind step 8, and shipped the day
+    after it landed.** The reasoning that had deferred it was: the fleet
     runs **one process per bot** — the manager spawns each bot as a
-    `subprocess.Popen` child ([[bot-service-architecture]]), so
+    `subprocess.Popen` child ([[bot-service-architecture]]) — so
     process-scoped logging is correct for the only deployment that
-    exists.
+    exists. But that page gives two justifications for
+    one-process-per-bot, and the second is *"in-process multi-bot is
+    impossible (the world service is a module singleton)"* — precisely
+    what step 8 deleted. The deferral expired with its own premise.
 
-    **But read that page's reasoning carefully, because it points
-    straight back here.** It gives two justifications for
-    one-process-per-bot: harness background tasks dying at ~46
-    minutes, and *"in-process multi-bot is impossible (the world
-    service is a module singleton)"*. The second is precisely what
-    step 8 deletes. So the artifact-handler question is not
-    permanently moot — it is **blocked behind step 8, and becomes the
-    next real blocker the day step 8 lands**. The entry point is
-    `_install_artifact_handlers`; the shape is a per-session logger
-    namespace instead of root, with the emitters resolving their
-    logger the same ambient way the tick context now resolves.
+    **The bug was real, not hypothetical.**
+    `_install_artifact_handlers` mounted on the ROOT logger and removed
+    any prior artifact handlers first, so configuring a second run in
+    one process silently detached the first run's event handler and its
+    `events.jsonl` stopped growing mid-session. A regression test now
+    steps two threads through that exact ordering — A configures, B
+    configures, and only THEN does A emit.
+
+    **The two artifacts are scoped differently, on purpose.** The event
+    stream is a *session* artifact: its handler mounts on a per-run
+    logger (`tankpit_bot.runtime.events.<run_id>`) that `emit_*` resolves
+    from the ambient run, so concurrent sessions each write their own
+    `events.jsonl` carrying their own mode. The text log is a *process*
+    artifact and its handler stays on root, because **root is the only
+    logger that sees library records** — a `world_service` warning
+    belongs in the run log, and a per-run logger would never receive it.
+    Moving both would have meant stamping every record with a run id and
+    filtering in the handler, then duplicating unattributed library lines
+    into every active session's text log to avoid losing them. The
+    asymmetry is the cheaper and more honest answer.
+
+    **A writer with no reader fell out of the measurement.**
+    `_emit_runtime_event` stamped `runtime_mode=_runtime_mode_name()`
+    onto every record, and `_runtime_mode_name()` read all three artifact
+    globals to compute it — but `_HookEventArtifactHandler` writes
+    `self._mode`, captured when the run was configured, and never looked
+    at the record's copy. Nothing in production read the field. It was
+    the only thing consulting those globals on the hot path, so deleting
+    it shrank the step to the getters plus the handler mount. Same shape
+    as the `tank_names` finding above, inverted: a writer nobody reads.
+
+    **The reset the old fixture skipped.**
+    `_restore_runtime_logging_state` cleared `_BOT_ARTIFACTS` and
+    `_SNIFF_ARTIFACTS` and never touched `_PROBE_ARTIFACTS`, so a probe
+    test leaked its artifacts into every test that followed it on the
+    same xdist worker. The reset now calls
+    `clear_runtime_logging_state()`, which lives beside the state instead
+    of reaching into it, and clears all four slots.
+
+    **`runtime_logging.py` crossed the 600-line ceiling** at 622 lines.
+    Split, not trimmed: the handler classes, the run-identity naming, and
+    handler install/remove are now
+    `runtime_logging_handlers.py` (235 lines), leaving the ambient run
+    and the emitters at 424. The dependency is one-way — the handlers
+    module knows nothing about which run is active — which is what keeps
+    the pair from closing a cycle.
+
+    **Three tests that had quietly stopped testing anything.** Moving the
+    event handler off root broke the coverage of its own malformed-record
+    guards: three tests logged synthetic records to unrelated loggers and
+    asserted "the artifact stayed empty", which stayed true once the
+    record could no longer reach the handler at all. They now log inside
+    the run's logger subtree through `tests/_runtime_logging_support.py`,
+    whose docstring records why. Coverage caught this — the guards went
+    uncovered the moment the tests stopped reaching them.
 
     Also corrected while measuring: `clear_runtime_context`'s
     docstring claimed "the tick loop's teardown path calls this". It
@@ -626,8 +675,8 @@ rather than the refactor.[^3]
     **DONE 2026-08-07, as a consequence of step 8 rather than a step of
     its own.** The list is one call, `reset_static_key_cache`, guarding
     a process-wide key cache. The fixture kept its name and its
-    docstring now records what it no longer has to do. Step 10 is the
-    only plan item still open.[^15]
+    docstring now records what it no longer has to do.[^15] Step 10
+    closed the following day, and with it the plan.[^16]
 
 ## Found while shipping step 1: the cipher is forked four ways
 
@@ -708,3 +757,4 @@ Two defects found while mapping this, both in scope:[^9]
 [^10]: Counted 2026-08-06 with `find src scripts tests -name '*.py' | xargs wc -l | awk '$1>600'`: 77 files. The 2026-07-31 backlog of 40 is enumerated at `wiki/log.md:2437`. At that count `bot/tick_loop.py` held 21 of the 73 `get_world_service()` call sites; after the split the total is 74 across 23 files, with no single file holding more than 14.
 [^11]: Read 2026-08-06 while shipping step 1, re-read 2026-08-07. `src/tankpit_bot/protocol/codec.py:83` `xor_bytes(table, data, offset=0)` raises `InvalidKeyError` on an empty table and `ValueError` when `offset + len(data) > len(table)` — the only one of the four that names the condition. `src/tankpit_bot/capture/xor.py:149` `xor_decode_body(body, xor_table, offset=0)` indexes `xor_table[i]` unguarded, so the same condition surfaces as a bare `IndexError`. `src/tankpit_bot/diagnostics/capture_audit.py:53` `_xor_with_table(body, table)` carries an explicit `else` branch copying the byte through unciphered, and is now the ONLY remaining pass-through site. **Two changes since the 2026-08-06 reading, both narrowing the fork:** `sim/transport.py` no longer defines its own `_xor_with_table` — it imports `xor_decode_body` (`:25`) and calls it at `:62` and `:165`, passing `offset=1` explicitly at the client-command site — and `capture/xor.py` no longer computes the static-key path or loads the key itself; it imports `build_xor_table`, `load_static_key` and `DEFAULT_STATIC_KEY_PATH` from `protocol.codec` (`:21-22`, used at `:80` and `:103`), so `DEFAULT_STATIC_KEY_PATH` at `protocol/codec.py:20` is the single definition. The 279,771-payload measurement covers only the received-decode path and was taken before step 1; it does not license deleting the pass-through arm from the audit reader.
 [^15]: Verified 2026-08-07 at the end of step 8. `make check` exits 0: guard reports no violations across every rule (31 from the monorepo orchestrator plus the local rules in `scripts/guard.py`, none allowlisted), `mypy src tests scripts` reports "Success: no issues found in 1104 source files", and `pytest` reports **6185 passed** with `Required test coverage of 100.0% reached. Total coverage: 100.00%` over 30,370 statements and 8,780 branches. The reset list is `tests/conftest.py::_isolate_protocol_singletons`, whose body is now two `reset_static_key_cache()` calls bracketing the yield; its docstring records that it "began as ten resets" and why the survivor is process-level. Import cycles were checked separately by importing `tankpit_bot.state`, `_test_hooks`, `sniffer.world_service`, `browser.session_base`, `bot.base`, `bot.bot_protocol`, `replay.engine`, `replay._test_hooks`, `browser._test_hooks`, `ledger.service`, `action_lab.session` and `runtime_context` in that order in one process — mypy reports success on files that raise `ImportError` at runtime, so the type checker cannot stand in for this. Deleted in the same step because the migration proved them dead: `tests/diagnostics/conftest.py` (a single autouse fixture whose only statements called an empty function) and `diagnostics/registry_truth.py::reset_registry_truth` (the empty function, whose docstring cited the already-deleted `reset_world_state` and `sniffer/world_state`).
+[^16]: Verified 2026-08-08 at the end of step 10, which closed the plan. `make check` exits 0: guard clean, `mypy src tests scripts` reports "Success: no issues found in 1105 source files", **6188 passed**, `Required test coverage of 100.0% reached. Total coverage: 100.00%` over 30,398 statements and 8,778 branches. Both sweeps this page defined were re-run against `src/tankpit_bot`. Sweep one, every `global` declaration: four sites remain and all four are in the "Legitimately process-level" table — `analysis/_test_hooks.py:96,103` (the DI seam), `bot/tick_loop.py:407,418` (`_INTERRUPT_REQUESTED`, a process signal), `capture/xor.py:73,112` (`_static_key_cache`, the process-wide key cache) and `sniffer/decoders.py:63` (`_PROTOCOL_FRAME_LOGGING_ENABLED`, a logging switch). Sweep two, module-level mutable containers mutated in place via `append`/`add`/`clear`/`pop`/`update`/`extend`/`remove`/`setdefault`/`discard` or subscript assignment: **zero**. A naive sweep for module-level dict/list/set literals returns 486 hits, but every one is an `__all__` export list or a constant lookup table (`RANK_FUEL`, `MSG_TYPE_NAMES`, `_WEAPON_SLOTS`); mutation is what distinguishes state from a table, which is why sweep two tests for mutation rather than for shape. Import cycles were re-checked by importing the eleven layer roots including the new `runtime_logging_handlers` in boot order in one process.
