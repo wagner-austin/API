@@ -1,0 +1,25 @@
+# imp-scout24: the deferred scout arm at Impossible, in-batch control.
+base|12345|doctrines/flame-nocover.doctrine|10000
+base|1337|doctrines/flame-nocover.doctrine|10000
+base|141421|doctrines/flame-nocover.doctrine|10000
+base|16180|doctrines/flame-nocover.doctrine|10000
+base|173205|doctrines/flame-nocover.doctrine|10000
+base|223606|doctrines/flame-nocover.doctrine|10000
+base|244948|doctrines/flame-nocover.doctrine|10000
+base|24601|doctrines/flame-nocover.doctrine|10000
+base|264575|doctrines/flame-nocover.doctrine|10000
+base|2718|doctrines/flame-nocover.doctrine|10000
+base|271828|doctrines/flame-nocover.doctrine|10000
+base|282842|doctrines/flame-nocover.doctrine|10000
+scouted|12345|doctrines/flame-scouted.doctrine|10000
+scouted|1337|doctrines/flame-scouted.doctrine|10000
+scouted|141421|doctrines/flame-scouted.doctrine|10000
+scouted|16180|doctrines/flame-scouted.doctrine|10000
+scouted|173205|doctrines/flame-scouted.doctrine|10000
+scouted|223606|doctrines/flame-scouted.doctrine|10000
+scouted|244948|doctrines/flame-scouted.doctrine|10000
+scouted|24601|doctrines/flame-scouted.doctrine|10000
+scouted|264575|doctrines/flame-scouted.doctrine|10000
+scouted|2718|doctrines/flame-scouted.doctrine|10000
+scouted|271828|doctrines/flame-scouted.doctrine|10000
+scouted|282842|doctrines/flame-scouted.doctrine|10000
