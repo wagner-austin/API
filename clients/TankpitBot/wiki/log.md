@@ -3977,3 +3977,72 @@ run-identity naming, and handler install/remove moved to
 emitters at 424. The dependency is one-way — the handlers module knows
 nothing about which run is active — which keeps the pair from closing a
 cycle.
+
+---
+
+## [2026-08-08] audit | Mutation-tested a sample of guards: 100% coverage does not mean pinned
+
+Austin asked why the step-8/10 work fixed source but not the tests, after
+I'd noted three separate times in two days that a test had "quietly
+stopped testing anything". Fair hit: **every vacuous test I found this
+week surfaced by accident** — one via a failure, one via a coverage drop
+when a handler moved, one because I happened to read the line. I never
+went looking. So this is the deliberate hunt.
+
+### Static detectors mostly found noise
+
+Two shapes, both cheap, both mostly false positives:
+
+- **All-negative-assertion tests** (every assert claims absence: `== ""`,
+  `== []`, `is None`, `not in`): **1001 of 6188**, 16%. Reading a sample
+  shows most are legitimate — `get_position` returns None with no
+  self-state, `move_to` returns False without CDP. The arrangement *is*
+  the precondition, so asserting the empty answer is the only way to test
+  it. The detector cannot separate those from the vacuous ones.
+- **Asserting a constructor default on an object the test never
+  exercises**: 36 hits, nearly all `test_init` tests where the
+  constructor's defaults are the actual subject. Two apparent finds
+  dissolved on reading — `assert bot._magic is None` is a *precondition*
+  before feeding an AUTH frame, and the session tests do exercise their
+  subject via `session._cdp_service._extract_magic_and_notify(msg)`,
+  which my "exercised" check missed (attribute-of-attribute blind spot).
+
+Lesson repeated from the step-8 detector: a static shape that cannot
+distinguish intent produces a list, not evidence.
+
+### Mutation is the detector that cannot be fooled
+
+Enumerated the 483 defensive early-return guards in `src/tankpit_bot`,
+sampled 14, turned each guard's `return` into `pass`, and ran the whole
+suite per mutation. **12 killed, 2 survived.**
+
+Survivor 1 — **a real test defect**, now fixed.
+`capture/trackers/mine.py` guards `if len(data) < 4: return None`, and
+`test_process_message_returns_none_for_short_data` fed
+`b"\x02\x00\x2e"`. Remove the guard and execution falls through to
+`msg_type not in (0x45, 0x4B)`, which returns None as well — so the test
+passed whether the guard existed or not. **The line was covered the whole
+time.** Coverage proves a line executed; it says nothing about whether
+any assertion depended on it. Fixed by making the third byte `0x45`, a
+tracked mine type, so only the length guard can produce None. Verified by
+re-running the same mutation: now killed.
+
+Survivor 2 — **not a test gap.**
+`validate/shadow_timeline.py:304` short-circuits `_ingest_combat_events`
+when `_ingest_tank_events` consumed the message. The two dispatch on
+disjoint `msg_type` sets (0x21/0x3D… versus 0x41/0x67…), so calling
+combat after a tank event is a guaranteed no-op. The mutant survives
+because the guard *cannot* be observed — a redundant short-circuit.
+Flagged for Austin rather than changed: it is arguably dead per the
+no-redundant-code standard, but it also documents that the families are
+disjoint, and `validate/` was outside this work.
+
+### The number worth carrying
+
+A 14-guard sample killed 12. Extrapolated across 483 guards that is
+roughly **60-70 guards no test distinguishes from absent** — bounded, not
+catastrophic, and invisible to both gates the project already runs.
+`make check` stays at 6188 passed / 100.00% coverage either way, which is
+the whole point: **a green suite and a full coverage gate together still
+cannot tell you a test verifies anything.** Only mutation can, and the
+project has no mutation gate.

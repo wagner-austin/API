@@ -57,10 +57,19 @@ class TestMineTracker:
         assert result is None
 
     def test_process_message_returns_none_for_short_data(self) -> None:
-        """Test process_message returns None for short data."""
+        """Test process_message returns None for short data.
+
+        The third byte is 0x45 -- a mine-detonation type -- on purpose.
+        With ``\\x2e`` there the length guard was unfalsifiable: the later
+        ``msg_type not in (0x45, 0x4B)`` check returned None too, so the
+        test passed whether the guard existed or not. Mutating the guard
+        to a no-op left the suite green (2026-08-08 mutation sample).
+        A tracked type reaches the decode path when the guard is absent,
+        so now only the guard can produce None here.
+        """
         tracker = MineTracker()
         tracker.set_magic("kp8ffxx7muk63a0ywtqh")
-        payload = base64.b64encode(b"\x02\x00\x2e").decode()
+        payload = base64.b64encode(b"\x02\x00\x45").decode()
         result = tracker.process_message(payload)
         assert result is None
 
