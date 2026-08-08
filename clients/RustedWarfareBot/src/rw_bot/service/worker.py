@@ -53,13 +53,22 @@ def run_worker(
             unreadable; the queue is poisoned and stopping loudly beats
             skipping quietly.
     """
-    conn = _test_hooks.connect(dsn)
-    bootstrap(conn)
+    startup = _test_hooks.connect(dsn)
+    bootstrap(startup)
+    startup.close()
     played = 0
     idle = False
     while True:
+        # One connection per queue interaction, never one across a match:
+        # a match blocks for tens of minutes, and a connection held idle
+        # that long is the door's 2026-08-08 lesson waiting to repeat --
+        # the server drops it, finish() dies on the corpse, and the job
+        # orphans until the reaper. Between claim and finish this worker
+        # holds a lease row, not a socket.
+        conn = _test_hooks.connect(dsn)
         reap(conn, STALE_SECONDS)
         held = claim(conn, worker, clone_pool)
+        conn.close()
         if held is None:
             if idle:
                 break
@@ -76,9 +85,10 @@ def run_worker(
         if ok:
             card_path = Path(held["config"]["out_dir"]) / f"{job_name(held['job'])}.txt"
             card = _test_hooks.read_card(str(card_path))
-        finish(conn, held["job_id"], ok, card)
+        closer = _test_hooks.connect(dsn)
+        finish(closer, held["job_id"], ok, card)
+        closer.close()
         played += 1
         if max_jobs and played >= max_jobs:
             break
-    conn.close()
     return played

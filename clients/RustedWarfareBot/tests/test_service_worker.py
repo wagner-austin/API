@@ -52,8 +52,12 @@ class _Rig:
         self.played: list[tuple[int, str]] = []
         self.cards_read: list[str] = []
         self.slept: list[float] = []
+        self.connects = 0
+        self.connection_open_during_play: list[bool] = []
 
     def connect(self, dsn: str) -> FakeConnection:
+        self.connects += 1
+        self.conn.closed = False
         return self.conn
 
     def prepare_tree(self, config: SweepConfig) -> None:
@@ -65,6 +69,7 @@ class _Rig:
 
     def play_job(self, job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
         self.played.append((job["seed"], game_dir))
+        self.connection_open_during_play.append(not self.conn.closed)
         return self.outcomes[job["seed"]]
 
     def read_card(self, path: str) -> str:
@@ -133,6 +138,20 @@ def test_a_failed_match_files_as_failed_and_the_worker_continues() -> None:
     assert played == 2
     states = [row.state for row in rig.conn.store.jobs]
     assert states == ["failed", "done"]
+
+
+def test_no_connection_is_held_while_a_match_plays() -> None:
+    """The lifecycle rule the door's dropped connection taught: a match
+    blocks for tens of minutes, and between claim and finish the worker
+    holds a lease row, not a socket. One connection per queue interaction
+    -- bootstrap, each poll, each finish -- every one closed before the
+    next long block."""
+    rig, _ = _with_rig({12345: True, 777: True}, 0)
+    assert rig.connection_open_during_play == [False, False]
+    # bootstrap + four polls (two claiming, two empty before the drain
+    # decision) + two finishes, each its own connection.
+    assert rig.connects == 1 + 4 + 2
+    assert rig.conn.closed is True
 
 
 def test_a_finished_match_mirrors_its_filed_card_onto_the_row() -> None:
