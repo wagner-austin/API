@@ -16,6 +16,7 @@ from rw_bot.harness.sweep import parse_job_line
 from rw_bot.service.queue import (
     ClaimedJob,
     MatchServiceError,
+    batch_status,
     bootstrap,
     claim,
     finish,
@@ -227,3 +228,20 @@ def test_an_unreadable_reaped_row_stops_loudly() -> None:
     with pytest.raises(MatchServiceError) as caught:
         reap(conn, 5400)
     assert caught.value.code == "RW-SERVICE-001"
+
+
+def test_an_unreadable_status_row_stops_loudly() -> None:
+    conn = _submitted()
+    conn.store.jobs[0].state = 7
+    with pytest.raises(MatchServiceError) as caught:
+        batch_status(conn, "demo")
+    assert caught.value.code == "RW-SERVICE-001"
+
+
+def test_a_state_the_service_never_writes_is_not_counted() -> None:
+    """A foreign state neither crashes the count nor inflates a bucket."""
+    conn = _submitted()
+    conn.store.jobs[0].state = "paused"
+    status = batch_status(conn, "demo")
+    assert status["queued"] == 1
+    assert status["running"] + status["done"] + status["failed"] == 0

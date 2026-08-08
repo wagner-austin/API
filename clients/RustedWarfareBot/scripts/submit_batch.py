@@ -18,17 +18,13 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from rw_bot.harness import _test_hooks
-from rw_bot.harness.match import decode_match_config, describe
-from rw_bot.harness.runner import TREE_DIR, SweepConfig, decode_sweep_config
+from rw_bot.harness.match import describe
 from rw_bot.harness.sweep import parse_jobs
 from rw_bot.service import _test_hooks as service_hooks
 from rw_bot.service.queue import bootstrap, submit
+from rw_bot.service.submit import batch_config
 from scripts.sweep import (
-    CLONE_PREFIX,
     DEFAULT_LOCKSTEP,
-    DUEL_OPPONENTS,
-    SOURCE_GAME_DIR,
-    SWEEP_ROOT,
 )
 
 EXIT_OK = 0
@@ -61,30 +57,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             "[map difficulty [pin-delta-ms [fast-forward]]]"
         )
         return EXIT_BAD_USAGE
-    match = (
-        decode_match_config(
-            {"map_path": args[4], "opponents": DUEL_OPPONENTS, "difficulty": int(args[5])}
-        )
-        if len(args) >= 6
-        else None
-    )
     jobs = parse_jobs(_test_hooks.read_text_lines(Path(args[1])))
-    out_dir = Path(SWEEP_ROOT) / args[2]
-    # Workers is 1 in the stored configuration: how many workers play a
-    # queued batch is decided by who polls, not by the submission.
-    config: SweepConfig = decode_sweep_config(
-        {
-            "out_dir": str(out_dir),
-            "workers": 1,
-            "lockstep": int(args[3]) if len(args) >= 4 else DEFAULT_LOCKSTEP,
-            "clone_prefix": CLONE_PREFIX,
-            "source_game_dir": SOURCE_GAME_DIR,
-            "tree": str(out_dir / TREE_DIR),
-            "pin_delta": int(args[6]) if len(args) >= 7 else 0,
-            "fast_forward": int(args[7]) if len(args) == 8 else 0,
-        },
-        match,
+    config = batch_config(
+        args[2],
+        int(args[3]) if len(args) >= 4 else DEFAULT_LOCKSTEP,
+        args[4] if len(args) >= 6 else "",
+        int(args[5]) if len(args) >= 6 else 0,
+        int(args[6]) if len(args) >= 7 else 0,
+        int(args[7]) if len(args) == 8 else 0,
     )
+    match = config["match"]
     if match is not None:
         _test_hooks.write_line(f"[submit] {describe(match)}")
     conn = service_hooks.connect(args[0])

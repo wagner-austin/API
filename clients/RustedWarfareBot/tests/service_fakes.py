@@ -31,7 +31,9 @@ class FakeJobRow:
         self.config = values[3]
         self.match = values[4]
         self.job = values[5]
-        self.state = "queued"
+        # The row-value union rather than str, so a test can plant a
+        # corrupt state and prove the service refuses it.
+        self.state: str | int = "queued"
         self.worker = ""
         self.clone_index = -1
         self.heartbeat_age = 0
@@ -67,6 +69,7 @@ class FakeCursor:
             ("INSERT INTO match_jobs", self._insert_job),
             ("SELECT id, batch, config, match, job FROM match_jobs", self._select_queued),
             ("SELECT clone_index FROM clone_leases", self._select_leases),
+            ("SELECT state, count(*) FROM match_jobs", self._count_states),
             ("INSERT INTO clone_leases", self._insert_lease),
             ("UPDATE match_jobs SET state = 'running'", self._claim_update),
             ("UPDATE match_jobs SET heartbeat_at = now()", self._heartbeat),
@@ -93,6 +96,17 @@ class FakeCursor:
 
     def _select_leases(self, params: tuple[str | int | bool, ...]) -> None:
         self._rows = [(index,) for index in self._store.leases]
+
+    def _count_states(self, params: tuple[str | int | bool, ...]) -> None:
+        batch = params[0]
+        counts: dict[str | int, int] = {}
+        for row in self._store.jobs:
+            if row.batch == batch:
+                counts[row.state] = counts.get(row.state, 0) + 1
+        rows: list[tuple[str | int, ...]] = []
+        for state, count in counts.items():
+            rows.append((state, count))
+        self._rows = rows
 
     def _insert_lease(self, params: tuple[str | int | bool, ...]) -> None:
         index, worker, job_id = params[0], params[1], params[2]

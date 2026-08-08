@@ -35,6 +35,24 @@ class MatchServiceError(RwBotError):
     """
 
 
+class BatchStatus(TypedDict):
+    """One batch's rows, counted by state.
+
+    Attributes:
+        batch: The batch asked about.
+        queued: Matches not yet claimed.
+        running: Matches a worker holds.
+        done: Matches that produced their scorecard.
+        failed: Matches that did not.
+    """
+
+    batch: str
+    queued: int
+    running: int
+    done: int
+    failed: int
+
+
 class ClaimedJob(TypedDict):
     """One match a worker holds, with everything needed to play it.
 
@@ -203,6 +221,40 @@ def claim(conn: Connection, worker: str, clone_pool: tuple[int, ...]) -> Claimed
     )
 
 
+def batch_status(conn: Connection, batch: str) -> BatchStatus:
+    """Count one batch's rows by state.
+
+    Args:
+        conn: An open connection; rolled back after the read.
+        batch: The batch name.
+
+    Returns:
+        The counts, zero for states the batch has none of.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` when a count row is
+            unreadable.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT state, count(*) FROM match_jobs WHERE batch = %s GROUP BY state",
+        (batch,),
+    )
+    counts = {"queued": 0, "running": 0, "done": 0, "failed": 0}
+    for row in cursor.fetchall():
+        state, count = _status_columns(row)
+        if state in counts:
+            counts[state] = count
+    conn.rollback()
+    return BatchStatus(
+        batch=batch,
+        queued=counts["queued"],
+        running=counts["running"],
+        done=counts["done"],
+        failed=counts["failed"],
+    )
+
+
 def heartbeat(conn: Connection, job_id: int) -> None:
     """Record that the worker holding a job is alive.
 
@@ -308,6 +360,23 @@ def _match_payload(parsed: dict[str, str | int | float | bool]) -> dict[str, str
             )
         narrowed[key] = value
     return narrowed
+
+
+def _status_columns(row: Sequence[str | int]) -> tuple[str, int]:
+    """Validate one state-count row.
+
+    Args:
+        row: One row of the status query.
+
+    Returns:
+        The state and its count.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` on any other shape.
+    """
+    if len(row) == 2 and isinstance(row[0], str) and isinstance(row[1], int):
+        return row[0], row[1]
+    raise MatchServiceError("RW-SERVICE-001", f"status row has an unreadable shape: {row!r}")
 
 
 def _lease_index(row: Sequence[str | int]) -> int:

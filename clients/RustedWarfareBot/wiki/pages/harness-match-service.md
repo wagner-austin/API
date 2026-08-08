@@ -147,10 +147,24 @@ verdicts filed, rows ``done``, leases empty (`runs/sweeps/service-smoke/`).
 The reaper requeues heartbeat-silent jobs, so a killed worker returns its
 job and its clone -- the exact failure tonight's panels hit twice by shell.
 
-## What phase one adds
+## Phase one: the HTTP door, in the fleet's idiom (2026-08-07)
 
-The dockerized control plane (submission and status over HTTP in the
-covenant service style), result blobs mirrored into the database beside the
-filed artifacts, freeze-verify-go smoke certification at batch start, and
-the worker-registration half of the multi-runner schema. The primitives it
-wraps are now measured code, not a page.
+Built the same day, with one deliberate deviation from this page's original
+sketch: not FastAPI-in-a-container but the fleet page's own stdlib pattern
+-- ``http.server``, one pure router (``rw_bot.service.http``), requests
+parsed by ``ndjson.parse_object`` and responses by ``render_json`` -- because
+the repo had already shipped and proven that shape, and consistency beats a
+sketch. ``scripts.match_service <dsn> [port]`` serves ``POST /batches``
+(name, job-file text, and the sweep knobs; resubmission is resume),
+``GET /batches/<name>`` (counts by state), and ``/healthz``, loopback-bound
+on 27501. Live-verified against a production panel in flight: the status
+endpoint reported navpair48 at 85 queued / 5 running / 6 done while eight
+leased workers drained it. Submission configs build in one place
+(``rw_bot.service.submit.batch_config``) for the CLI and the wire alike.
+
+## What later phases add
+
+Result blobs mirrored into the database beside the filed artifacts,
+freeze-verify-go smoke certification at batch start, the worker-registration
+half of the multi-runner schema, and -- if remote submission ever needs it
+-- the dockerized deployment this page originally sketched.
