@@ -96,6 +96,13 @@ class FakeCursor:
 
     def _select_leases(self, params: tuple[str | int | bool, ...]) -> None:
         self._rows = [(index,) for index in self._store.leases]
+        thief = self._store.thief
+        if thief is not None:
+            # The racing worker's commit lands just after this read -- the
+            # production interleaving navpair48 exposed on 2026-08-07.
+            index, worker, job_id = thief
+            self._store.leases[index] = (worker, job_id)
+            self._store.thief = None
 
     def _count_states(self, params: tuple[str | int | bool, ...]) -> None:
         batch = params[0]
@@ -111,10 +118,13 @@ class FakeCursor:
     def _insert_lease(self, params: tuple[str | int | bool, ...]) -> None:
         index, worker, job_id = params[0], params[1], params[2]
         assert isinstance(index, int)
-        assert index not in self._store.leases, "lease uniqueness violated"
         assert isinstance(worker, str) and isinstance(job_id, int)
+        if index in self._store.leases:
+            # ON CONFLICT DO NOTHING: the loser reads back no row.
+            self._rows = []
+            return
         self._store.leases[index] = (worker, job_id)
-        self._rows = []
+        self._rows = [(index,)]
 
     def _release(self, params: tuple[str | int | bool, ...]) -> None:
         job_id = params[0]
@@ -202,6 +212,9 @@ class FakeStore:
         # A corrupt RETURNING row the reap query will produce when set, so a
         # test can prove the service refuses it through the public path.
         self.poison_reap_row: tuple[str | int, ...] | None = None
+        # A racing worker's lease, committed between a claim's read of the
+        # lease table and its insert -- consumed by the next lease read.
+        self.thief: tuple[int, str, int] | None = None
 
 
 class FakeConnection:

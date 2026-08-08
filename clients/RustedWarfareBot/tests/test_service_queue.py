@@ -125,6 +125,31 @@ def test_an_exhausted_clone_pool_declines_without_claiming() -> None:
     assert conn.rollbacks == 1
 
 
+def test_a_lost_clone_race_takes_the_next_free_clone() -> None:
+    """The production race: a rival's lease lands between read and insert.
+
+    ``FOR UPDATE`` cannot lock a lease row that does not exist, so the
+    insert itself arbitrates -- the loser reads back no row and moves to
+    the next index instead of dying on the primary key, which is how
+    navpair48's first minutes lost workers (log 2026-08-07).
+    """
+    conn = _submitted()
+    conn.store.thief = (1, "rival", 99)
+    held = _claimed(conn, "w1", (1, 2))
+    assert held["clone_index"] == 2
+    assert conn.store.leases[1] == ("rival", 99)
+    assert conn.store.leases[2] == ("w1", held["job_id"])
+
+
+def test_a_race_that_exhausts_the_pool_declines() -> None:
+    """Losing the last free clone is a decline, never an exception."""
+    conn = _submitted()
+    conn.store.thief = (1, "rival", 99)
+    assert claim(conn, "w1", (1,)) is None
+    assert conn.store.jobs[0].state == "queued"
+    assert conn.rollbacks == 1
+
+
 def test_an_empty_queue_declines() -> None:
     conn = FakeConnection()
     bootstrap(conn)

@@ -162,9 +162,15 @@ def submit(conn: Connection, batch: str, config: SweepConfig, jobs: tuple[SweepJ
 def claim(conn: Connection, worker: str, clone_pool: tuple[int, ...]) -> ClaimedJob | None:
     """Claim the oldest queued job and lease a clone for it, atomically.
 
-    ``FOR UPDATE SKIP LOCKED`` on both tables is the whole trick: two
-    workers never claim one job or one clone, and neither ever blocks on
-    the other's transaction.
+    ``FOR UPDATE SKIP LOCKED`` keeps two workers off one job; the lease
+    insert's ``ON CONFLICT DO NOTHING RETURNING`` keeps two workers off one
+    clone. The clone side cannot be a row lock, and that was learned in
+    production: a free clone has no lease row, and ``FOR UPDATE`` cannot
+    lock a row that does not exist -- on navpair48's first minutes, two
+    workers read the same free set, both inserted the same index, and the
+    loser died on the primary key (log 2026-08-07). The insert itself is
+    the arbiter now: the loser reads back no row and simply tries the next
+    free index.
 
     Args:
         conn: An open connection; committed on a claim, rolled back when
@@ -174,7 +180,8 @@ def claim(conn: Connection, worker: str, clone_pool: tuple[int, ...]) -> Claimed
 
     Returns:
         The claimed match, or None when the queue is empty or every clone
-        in the pool is leased.
+        in the pool is leased -- including leased by a racing worker whose
+        insert landed between this claim's read and its own inserts.
 
     Raises:
         MatchServiceError: ``RW-SERVICE-001`` when a claimed row decodes to
@@ -192,17 +199,24 @@ def claim(conn: Connection, worker: str, clone_pool: tuple[int, ...]) -> Claimed
         conn.rollback()
         return None
     job_id, batch, config_text, match_text, job_text = _claim_columns(row)
-    cursor.execute("SELECT clone_index FROM clone_leases FOR UPDATE")
+    cursor.execute("SELECT clone_index FROM clone_leases")
     leased = {_lease_index(held) for held in cursor.fetchall()}
-    free = tuple(index for index in clone_pool if index not in leased)
-    if not free:
+    clone_index = -1
+    for candidate in clone_pool:
+        if candidate in leased:
+            continue
+        cursor.execute(
+            "INSERT INTO clone_leases (clone_index, worker, job_id) VALUES (%s, %s, %s)"
+            " ON CONFLICT (clone_index) DO NOTHING RETURNING clone_index",
+            (candidate, worker, job_id),
+        )
+        won = cursor.fetchone()
+        if won is not None:
+            clone_index = _lease_index(won)
+            break
+    if clone_index < 0:
         conn.rollback()
         return None
-    clone_index = free[0]
-    cursor.execute(
-        "INSERT INTO clone_leases (clone_index, worker, job_id) VALUES (%s, %s, %s)",
-        (clone_index, worker, job_id),
-    )
     cursor.execute(
         "UPDATE match_jobs SET state = 'running', worker = %s, clone_index = %s,"
         " heartbeat_at = now() WHERE id = %s",

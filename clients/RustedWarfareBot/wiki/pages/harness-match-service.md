@@ -136,7 +136,8 @@ comparability trap is exactly what mltrace24's autopsy paid to learn.
 ## Phase zero: built and live-verified (2026-08-07)
 
 The queue and the allocator exist: ``rw_bot.service`` (queue.py's claim
-transaction with ``FOR UPDATE SKIP LOCKED`` on jobs and leases, worker.py's
+transaction -- ``FOR UPDATE SKIP LOCKED`` on jobs, and on leases the
+insert itself arbitrates; see the race below -- worker.py's
 claim-lease-play-finish loop over the unchanged harness seams), submitted
 through ``scripts.submit_batch`` and drained by ``scripts.match_worker``,
 against ``platform-postgres`` on the covenant compose stack. Rows carry the
@@ -146,6 +147,27 @@ them. Live smoke: two matches submitted, claimed under lease, played,
 verdicts filed, rows ``done``, leases empty (`runs/sweeps/service-smoke/`).
 The reaper requeues heartbeat-silent jobs, so a killed worker returns its
 job and its clone -- the exact failure tonight's panels hit twice by shell.
+
+## The race the first production panel found (2026-08-07)
+
+navpair48's first minutes killed three of eight workers on
+``UniqueViolation: clone_leases_pkey``. The design error: the claim read
+the lease table with ``FOR UPDATE`` and then inserted -- but a **free**
+clone has no lease row, and a row lock cannot lock a row that does not
+exist. Under READ COMMITTED, eight workers polling an empty lease table
+all read the same free set, all picked the same lowest index, and every
+loser died on the primary key. The failure was contained by construction
+-- the transaction rolled back, the job stayed queued, nothing was
+orphaned -- but each race cost a worker process, and the panel sagged to
+five lanes.
+
+The fix makes the insert the arbiter: ``INSERT ... ON CONFLICT
+(clone_index) DO NOTHING RETURNING clone_index``, walking the pool until
+a row comes back or the pool is exhausted (a decline, exactly like an
+empty queue). The prior read is now only an optimization that skips
+known-held indices. Verified live mid-panel: three fixed-code workers
+joined five old-code workers on one lease table and filled clones 5-7
+without an incident, restoring the panel to eight lanes.
 
 ## Phase one: the HTTP door, in the fleet's idiom (2026-08-07)
 
