@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from rw_bot.harness.clone import CloneError
+from rw_bot.harness.clone import PLAY_PORT_BASE, CloneError
 from rw_bot.harness.match import MatchConfig
 from rw_bot.harness.runner import (
     SweepConfig,
@@ -281,3 +281,11 @@ def test_a_configuration_round_trips_through_its_payload() -> None:
 def test_an_outcome_round_trips_through_its_payload() -> None:
     outcome = SweepOutcome(total=6, already=2, played=4)
     assert decode_sweep_outcome(encode_sweep_outcome(outcome)) == outcome
+
+
+def test_a_cloned_match_plays_on_the_port_its_lease_owns() -> None:
+    """play_job derives the port from the clone ordinal, so two concurrent
+    matches can no more share a port than a directory."""
+    with FakeHost() as host:
+        assert play_job(_job(seed=42), ".game-w3", _config()) is True
+        assert f"PLAY_PORT={PLAY_PORT_BASE + 3}" in host.commands[0]

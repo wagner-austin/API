@@ -100,6 +100,41 @@ def clone_name(prefix: str, index: int) -> str:
     return f"{prefix}{index + 1}"
 
 
+#: First channel port of the leased band; clone ordinal N binds BASE + N.
+#: Above the fleet page's 27500 and the match service's 27501, below the
+#: recipe's own 27600-27999 random band so a leased port and a drawn one
+#: can never collide either.
+PLAY_PORT_BASE = 27510
+
+
+def leased_port(game_dir: str, prefix: str) -> int:
+    """Return the channel port a cloned game directory owns, or zero.
+
+    The play recipe draws a random port per invocation, and the first time
+    eight matches launched in one instant the draws collided -- two agents
+    bound the same port and both matches died (imp-creep12, 2026-08-08).
+    Random draws are not leases. A clone's ordinal IS a lease -- the
+    allocator guarantees no two concurrent matches share one -- so a port
+    derived from it inherits that exclusivity for free.
+
+    Args:
+        game_dir: The game directory the match plays in.
+        prefix: Shared leading part of every clone's name.
+
+    Returns:
+        ``PLAY_PORT_BASE`` plus the clone's ordinal, or zero when the
+        directory is not a numbered clone -- the single-match entry points
+        play in the pinned directory itself, and their recipe keeps its
+        random draw.
+    """
+    if not game_dir.startswith(prefix):
+        return 0
+    ordinal = game_dir[len(prefix) :]
+    if not ordinal.isdigit():
+        return 0
+    return PLAY_PORT_BASE + int(ordinal)
+
+
 def entries_to_copy(present: Sequence[str]) -> tuple[str, ...]:
     """Return the top-level entries a clone takes from the source directory.
 
@@ -154,6 +189,7 @@ def verify(name: str, present: Sequence[str]) -> None:
 
 
 __all__ = [
+    "PLAY_PORT_BASE",
     "REQUIRED_ENTRIES",
     "UNUSED_DIRS",
     "VOLATILE_DIRS",
@@ -161,6 +197,7 @@ __all__ = [
     "CloneError",
     "clone_name",
     "entries_to_copy",
+    "leased_port",
     "missing_requirements",
     "verify",
 ]

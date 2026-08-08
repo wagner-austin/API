@@ -263,3 +263,17 @@ def test_the_module_guard_runs_main() -> None:
             sys.argv = argv
             sys.modules["scripts.match_service"] = already_imported
         assert len(host.printed) == 1
+
+
+def test_a_posted_retry_requeues_the_failed_and_reports_the_count() -> None:
+    conn = FakeConnection()
+    route_service_request(conn, "POST", "/batches", _submission())
+    held = claim(conn, "w1", (1,))
+    if held is None:
+        raise AssertionError("expected a claim and the queue declined")
+    finish(conn, held["job_id"], False, "")
+    status, _kind, payload = route_service_request(conn, "POST", "/batches/demo/retries", b"")
+    assert status == 200
+    assert parse_object(payload.decode("utf-8")) == {"batch": "demo", "requeued": 1}
+    status, _kind, payload = route_service_request(conn, "GET", "/batches/demo", b"")
+    assert parse_object(payload.decode("utf-8"))["queued"] == 2

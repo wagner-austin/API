@@ -79,6 +79,12 @@ class FakeCursor:
             ("UPDATE match_jobs SET state = 'running'", self._claim_update),
             ("UPDATE match_jobs SET heartbeat_at = now()", self._heartbeat),
             ("UPDATE match_jobs SET state = %s", self._finish),
+            # The retry statement shares the reap statement's prefix; the
+            # longer match must sit first or the reap handler swallows it.
+            (
+                "UPDATE match_jobs SET state = 'queued', worker = '', clone_index = -1, ok = NULL",
+                self._retry,
+            ),
             ("UPDATE match_jobs SET state = 'queued'", self._reap),
             ("DELETE FROM clone_leases WHERE job_id", self._release),
         )
@@ -188,6 +194,20 @@ class FakeCursor:
                 row.ok = ok
                 row.card = card
         self._rows = []
+
+    def _retry(self, params: tuple[str | int | bool, ...]) -> None:
+        batch = params[0]
+        requeued: list[tuple[str | int, ...]] = []
+        for row in self._store.jobs:
+            if row.batch == batch and row.state == "failed":
+                row.state = "queued"
+                row.worker = ""
+                row.clone_index = -1
+                row.ok = None
+                row.card = ""
+                row.heartbeat_age = 0
+                requeued.append((row.job_id,))
+        self._rows = requeued
 
     def _reap(self, params: tuple[str | int | bool, ...]) -> None:
         stale_seconds = params[0]

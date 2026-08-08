@@ -303,6 +303,7 @@ def make_argv(
     tree: str = "",
     pin_delta: int = 0,
     fast_forward: int = 0,
+    port: int = 0,
 ) -> tuple[str, ...]:
     """Return the command that plays one match.
 
@@ -342,6 +343,11 @@ def make_argv(
             simulation N times as fast, certified bit-exact against realtime
             at 10 (log 2026-08-06). Zero for the same frozen-tree reason as
             the pin: an older agent rejects the unknown key.
+        port: The channel port this match's lease owns, or zero to let the
+            recipe draw one at random. Concurrent matches must pass their
+            leased port: two random draws collided the first time eight
+            matches launched in one instant, and both died on the bind
+            (imp-creep12, 2026-08-08; :func:`~rw_bot.harness.clone.leased_port`).
 
     Returns:
         The argument vector, program first.
@@ -362,6 +368,8 @@ def make_argv(
     ]
     if tree:
         argv.append(f"PLAY_TREE={tree}")
+    if port:
+        argv.append(f"PLAY_PORT={port}")
     if pin_delta:
         argv.append(f"PLAY_PINDELTA={pin_delta}")
     if fast_forward:

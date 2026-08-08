@@ -372,6 +372,38 @@ def finish(conn: Connection, job_id: int, ok: bool, card: str) -> None:
     conn.commit()
 
 
+def retry_failed(conn: Connection, batch: str) -> int:
+    """Requeue every failed job in one batch.
+
+    Submission's resume key skips rows that exist, so a failed row would
+    stay failed forever without this verb -- and failures happen for
+    reasons the match itself is innocent of (the port-draw collision that
+    forced this function killed two matches at their bind). The outcome
+    columns reset so the replay's finish writes a clean record.
+
+    Args:
+        conn: An open connection; committed.
+        batch: The batch whose failures should play again.
+
+    Returns:
+        How many jobs were requeued.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` when a returned id is
+            unreadable.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE match_jobs SET state = 'queued', worker = '', clone_index = -1,"
+        " ok = NULL, card = '', heartbeat_at = NULL, finished_at = NULL"
+        " WHERE batch = %s AND state = 'failed' RETURNING id",
+        (batch,),
+    )
+    requeued = tuple(_reaped_id(row) for row in cursor.fetchall())
+    conn.commit()
+    return len(requeued)
+
+
 def reap(conn: Connection, stale_seconds: int) -> int:
     """Requeue every running job whose heartbeat went silent.
 

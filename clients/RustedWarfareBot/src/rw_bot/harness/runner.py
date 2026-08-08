@@ -22,6 +22,7 @@ from rw_bot.harness.clone import (
     VOLATILE_FILES,
     clone_name,
     entries_to_copy,
+    leased_port,
     verify,
 )
 from rw_bot.harness.match import MatchConfig, describe
@@ -372,6 +373,9 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
             config["tree"],
             config["pin_delta"],
             config["fast_forward"],
+            # The lease owns the port: two concurrent random draws collided
+            # and both matches died on the bind (imp-creep12, 2026-08-08).
+            leased_port(game_dir, config["clone_prefix"]),
         )
     )
     card = scorecard(output)

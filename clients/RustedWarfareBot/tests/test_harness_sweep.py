@@ -352,3 +352,13 @@ def test_a_transcript_without_a_verdict_is_not_a_result() -> None:
     """
     assert not is_complete(scorecard(["goals: c_tank", "[play] game stopped"]))
     assert is_complete(scorecard(["verdict        survived (sample_limit)"]))
+
+
+def test_a_leased_batch_names_its_port_and_an_unleased_one_stays_silent() -> None:
+    """The port rides the same silence rule as the pin: absent, the recipe
+    draws its own -- present, the lease's exclusivity replaces the draw
+    (imp-creep12's bind collision, 2026-08-08)."""
+    leased = make_argv(_job(seed=777), ".game-w2", 75, "demo", port=27512)
+    assert "PLAY_PORT=27512" in leased
+    drawn = make_argv(_job(seed=777), ".game-w2", 75, "demo")
+    assert not [element for element in drawn if element.startswith("PLAY_PORT")]

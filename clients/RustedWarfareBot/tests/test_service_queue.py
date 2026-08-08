@@ -23,6 +23,7 @@ from rw_bot.service.queue import (
     finish,
     heartbeat,
     reap,
+    retry_failed,
     submit,
 )
 from tests.service_fakes import FakeConnection
@@ -300,3 +301,25 @@ def test_a_state_the_service_never_writes_is_not_counted() -> None:
     status = batch_status(conn, "demo")
     assert status["queued"] == 1
     assert status["running"] + status["done"] + status["failed"] == 0
+
+
+def test_retry_failed_requeues_only_the_failed() -> None:
+    """A failed row would stay failed forever under the resume key; the
+    retry verb is how a bind collision's casualties play again."""
+    conn = _submitted()
+    held = _claimed(conn, "w1", (1,))
+    finish(conn, held["job_id"], False, "")
+    assert retry_failed(conn, "demo") == 1
+    row = conn.store.jobs[0]
+    assert row.state == "queued"
+    assert row.ok is None
+    assert row.card == ""
+    _claimed(conn, "w1", (1,))
+
+
+def test_retry_failed_leaves_done_rows_alone() -> None:
+    conn = _submitted()
+    held = _claimed(conn, "w1", (1,))
+    finish(conn, held["job_id"], True, "### alpha-s12345\nverdict        won (won)")
+    assert retry_failed(conn, "demo") == 0
+    assert conn.store.jobs[0].state == "done"

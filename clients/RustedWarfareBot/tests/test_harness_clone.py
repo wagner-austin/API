@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from rw_bot.harness.clone import (
+    PLAY_PORT_BASE,
     REQUIRED_ENTRIES,
     UNUSED_DIRS,
     VOLATILE_DIRS,
@@ -12,6 +13,7 @@ from rw_bot.harness.clone import (
     CloneError,
     clone_name,
     entries_to_copy,
+    leased_port,
     missing_requirements,
     verify,
 )
@@ -81,3 +83,21 @@ def test_a_truncated_clone_names_every_missing_path_not_just_the_first() -> None
 
 def test_the_jvm_is_required_because_the_launcher_runs_it_from_the_clone() -> None:
     assert "jvm64/bin/java.exe" in REQUIRED_ENTRIES
+
+
+def test_a_numbered_clone_owns_the_port_its_ordinal_names() -> None:
+    """The lease owns the port: random draws collided the first time eight
+    matches launched in one instant, and both died on the bind
+    (imp-creep12, 2026-08-08)."""
+    assert leased_port(".game-w1", ".game-w") == PLAY_PORT_BASE + 1
+    assert leased_port(".game-w8", ".game-w") == PLAY_PORT_BASE + 8
+
+
+def test_the_pinned_directory_keeps_the_recipe_draw() -> None:
+    """Single-match entry points play in the pinned dir; zero says 'draw'."""
+    assert leased_port(".game", ".game-w") == 0
+
+
+def test_a_directory_outside_the_clone_scheme_keeps_the_recipe_draw() -> None:
+    assert leased_port("elsewhere", ".game-w") == 0
+    assert leased_port(".game-wx", ".game-w") == 0
