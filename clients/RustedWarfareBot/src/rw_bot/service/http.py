@@ -17,12 +17,19 @@ from __future__ import annotations
 from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.harness.sweep import SweepError, parse_jobs
 from rw_bot.service._test_hooks import Connection
-from rw_bot.service.queue import MatchServiceError, batch_status, bootstrap, submit
+from rw_bot.service.queue import (
+    MatchServiceError,
+    batch_results,
+    batch_status,
+    bootstrap,
+    submit,
+)
 from rw_bot.service.submit import batch_config
 from rw_bot.validation import DecodeError, require_int, require_non_empty_str, require_str
 from rw_bot.wire.ndjson import NdjsonError, parse_object, render_json
 
 _JSON = "application/json"
+_NDJSON = "application/x-ndjson"
 _TEXT = "text/plain; charset=utf-8"
 
 
@@ -83,6 +90,20 @@ def _decide(conn: Connection, method: str, path: str, body: bytes) -> tuple[int,
         payload: dict[str, str | int] = {"batch": name, "queued": queued, "total": len(jobs)}
         return 201, _JSON, render_json(payload).encode("utf-8")
     parts = path.strip("/").split("/")
+    if len(parts) == 3 and parts[0] == "batches" and parts[2] == "results" and method == "GET":
+        lines = tuple(
+            render_json(
+                {
+                    "label": result["label"],
+                    "seed": result["seed"],
+                    "state": result["state"],
+                    "verdict": result["verdict"],
+                }
+            )
+            for result in batch_results(conn, parts[1])
+        )
+        body_text = "\n".join(lines) + "\n" if lines else ""
+        return 200, _NDJSON, body_text.encode("utf-8")
     if len(parts) == 2 and parts[0] == "batches" and method == "GET":
         status = batch_status(conn, parts[1])
         return (

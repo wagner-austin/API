@@ -53,6 +53,24 @@ class BatchStatus(TypedDict):
     failed: int
 
 
+class JobResult(TypedDict):
+    """One job's outcome, as the results read reports it.
+
+    Attributes:
+        label: The job's arm label.
+        seed: The job's seed.
+        state: The row's state -- ``queued``, ``running``, ``done`` or
+            ``failed``.
+        verdict: The scorecard's verdict word (``won``, ``survived``,
+            ``defeated``, ``wiped``), or empty while the job has no card.
+    """
+
+    label: str
+    seed: int
+    state: str
+    verdict: str
+
+
 class ClaimedJob(TypedDict):
     """One match a worker holds, with everything needed to play it.
 
@@ -91,8 +109,12 @@ _DDL: tuple[str, ...] = (
         heartbeat_at TIMESTAMPTZ,
         finished_at TIMESTAMPTZ,
         ok BOOLEAN,
+        card TEXT NOT NULL DEFAULT '',
         UNIQUE (batch, label, seed)
     )
+    """,
+    """
+    ALTER TABLE match_jobs ADD COLUMN IF NOT EXISTS card TEXT NOT NULL DEFAULT ''
     """,
     """
     CREATE TABLE IF NOT EXISTS clone_leases (
@@ -269,6 +291,52 @@ def batch_status(conn: Connection, batch: str) -> BatchStatus:
     )
 
 
+def batch_results(conn: Connection, batch: str) -> tuple[JobResult, ...]:
+    """Read one batch's per-job outcomes from the mirrored cards.
+
+    Args:
+        conn: An open connection; rolled back after the read.
+        batch: The batch name.
+
+    Returns:
+        Every job's label, seed, state and verdict, ordered by label then
+        seed -- the paired-panel read, one row per match.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` when a result row is
+            unreadable.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT label, seed, state, card FROM match_jobs WHERE batch = %s ORDER BY label, seed",
+        (batch,),
+    )
+    results = tuple(
+        JobResult(label=label, seed=seed, state=state, verdict=_verdict_of(card))
+        for label, seed, state, card in (_result_columns(row) for row in cursor.fetchall())
+    )
+    conn.rollback()
+    return results
+
+
+def _verdict_of(card: str) -> str:
+    """Extract the verdict word from a filed scorecard's text.
+
+    Args:
+        card: The card text, possibly empty.
+
+    Returns:
+        The first word after the ``verdict`` label, or empty when the card
+        carries none -- which is exactly the unfinished-match case, since
+        :func:`finish` stores an empty card for a failed job.
+    """
+    for line in card.splitlines():
+        tokens = line.split()
+        if len(tokens) >= 2 and tokens[0] == "verdict":
+            return tokens[1]
+    return ""
+
+
 def heartbeat(conn: Connection, job_id: int) -> None:
     """Record that the worker holding a job is alive.
 
@@ -281,18 +349,24 @@ def heartbeat(conn: Connection, job_id: int) -> None:
     conn.commit()
 
 
-def finish(conn: Connection, job_id: int, ok: bool) -> None:
-    """Record a job's outcome and release its clone lease.
+def finish(conn: Connection, job_id: int, ok: bool, card: str) -> None:
+    """Record a job's outcome and its scorecard, and release its clone lease.
+
+    The card lands on the row so a batch's results are readable over the
+    door without the artifact tree -- the design page's "results land in
+    the same database", cards first. The ``runs/`` file stays the
+    canonical record; this is the queryable mirror.
 
     Args:
         conn: An open connection; committed.
         job_id: The finished job.
         ok: Whether the match produced its scorecard.
+        card: The filed scorecard's text, empty when the match failed.
     """
     cursor = conn.cursor()
     cursor.execute(
-        "UPDATE match_jobs SET state = %s, ok = %s, finished_at = now() WHERE id = %s",
-        ("done" if ok else "failed", ok, job_id),
+        "UPDATE match_jobs SET state = %s, ok = %s, card = %s, finished_at = now() WHERE id = %s",
+        ("done" if ok else "failed", ok, card, job_id),
     )
     cursor.execute("DELETE FROM clone_leases WHERE job_id = %s", (job_id,))
     conn.commit()
@@ -374,6 +448,29 @@ def _match_payload(parsed: dict[str, str | int | float | bool]) -> dict[str, str
             )
         narrowed[key] = value
     return narrowed
+
+
+def _result_columns(row: Sequence[str | int]) -> tuple[str, int, str, str]:
+    """Validate one result row's shape.
+
+    Args:
+        row: One row of the results query.
+
+    Returns:
+        The label, seed, state and card text.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` on any other shape.
+    """
+    if (
+        len(row) == 4
+        and isinstance(row[0], str)
+        and isinstance(row[1], int)
+        and isinstance(row[2], str)
+        and isinstance(row[3], str)
+    ):
+        return row[0], row[1], row[2], row[3]
+    raise MatchServiceError("RW-SERVICE-001", f"result row has an unreadable shape: {row!r}")
 
 
 def _status_columns(row: Sequence[str | int]) -> tuple[str, int]:

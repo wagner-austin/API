@@ -16,6 +16,7 @@ from rw_bot.harness.sweep import parse_job_line
 from rw_bot.service.queue import (
     ClaimedJob,
     MatchServiceError,
+    batch_results,
     batch_status,
     bootstrap,
     claim,
@@ -160,9 +161,10 @@ def test_an_empty_queue_declines() -> None:
 def test_a_finish_releases_the_lease_and_records_the_outcome() -> None:
     conn = _submitted()
     held = _claimed(conn, "w1", (1,))
-    finish(conn, held["job_id"], True)
+    finish(conn, held["job_id"], True, "### alpha-s12345\nverdict        won (won)")
     assert conn.store.jobs[0].state == "done"
     assert conn.store.jobs[0].ok is True
+    assert conn.store.jobs[0].card == "### alpha-s12345\nverdict        won (won)"
     assert conn.store.leases == {}
     _claimed(conn, "w1", (1,))
 
@@ -170,9 +172,37 @@ def test_a_finish_releases_the_lease_and_records_the_outcome() -> None:
 def test_a_failed_match_files_as_failed() -> None:
     conn = _submitted()
     held = _claimed(conn, "w1", (1,))
-    finish(conn, held["job_id"], False)
+    finish(conn, held["job_id"], False, "")
     assert conn.store.jobs[0].state == "failed"
     assert conn.store.jobs[0].ok is False
+    assert conn.store.jobs[0].card == ""
+
+
+def test_batch_results_read_the_mirrored_verdicts_in_order() -> None:
+    """The paired-panel read: label, seed, state and verdict per match."""
+    conn = _submitted()
+    held = _claimed(conn, "w1", (1,))
+    finish(conn, held["job_id"], True, "### alpha-s12345\nverdict        wiped (wiped)")
+    results = batch_results(conn, "demo")
+    assert [r["seed"] for r in results] == [777, 12345]
+    assert results[0] == {"label": "alpha", "seed": 777, "state": "queued", "verdict": ""}
+    assert results[1] == {"label": "alpha", "seed": 12345, "state": "done", "verdict": "wiped"}
+
+
+def test_a_card_without_a_verdict_line_reports_an_empty_verdict() -> None:
+    conn = _submitted()
+    held = _claimed(conn, "w1", (1,))
+    finish(conn, held["job_id"], True, "### alpha-s12345\nverdict")
+    results = batch_results(conn, "demo")
+    assert results[1]["verdict"] == ""
+
+
+def test_an_unreadable_result_row_stops_loudly() -> None:
+    conn = _submitted()
+    conn.store.jobs[0].card = 7
+    with pytest.raises(MatchServiceError) as caught:
+        batch_results(conn, "demo")
+    assert caught.value.code == "RW-SERVICE-001"
 
 
 def test_a_heartbeat_resets_the_staleness_clock() -> None:

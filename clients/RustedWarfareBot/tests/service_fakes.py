@@ -38,6 +38,9 @@ class FakeJobRow:
         self.clone_index = -1
         self.heartbeat_age = 0
         self.ok: bool | None = None
+        # The row-value union rather than str, so a test can plant a
+        # corrupt card and prove the service refuses it.
+        self.card: str | int = ""
 
 
 class FakeCursor:
@@ -66,10 +69,12 @@ class FakeCursor:
         text = " ".join(sql.split())
         handlers = (
             ("CREATE TABLE", self._create),
+            ("ALTER TABLE match_jobs ADD COLUMN IF NOT EXISTS card", self._add_card_column),
             ("INSERT INTO match_jobs", self._insert_job),
             ("SELECT id, batch, config, match, job FROM match_jobs", self._select_queued),
             ("SELECT clone_index FROM clone_leases", self._select_leases),
             ("SELECT state, count(*) FROM match_jobs", self._count_states),
+            ("SELECT label, seed, state, card FROM match_jobs", self._select_results),
             ("INSERT INTO clone_leases", self._insert_lease),
             ("UPDATE match_jobs SET state = 'running'", self._claim_update),
             ("UPDATE match_jobs SET heartbeat_at = now()", self._heartbeat),
@@ -84,6 +89,10 @@ class FakeCursor:
         raise AssertionError(f"the service issued an unexpected statement: {text}")
 
     def _create(self, params: tuple[str | int | bool, ...]) -> None:
+        self._rows = []
+
+    def _add_card_column(self, params: tuple[str | int | bool, ...]) -> None:
+        # Every fake row already carries card; the migration is a no-op here.
         self._rows = []
 
     def _select_queued(self, params: tuple[str | int | bool, ...]) -> None:
@@ -114,6 +123,12 @@ class FakeCursor:
         for state, count in counts.items():
             rows.append((state, count))
         self._rows = rows
+
+    def _select_results(self, params: tuple[str | int | bool, ...]) -> None:
+        batch = params[0]
+        matched = [row for row in self._store.jobs if row.batch == batch]
+        matched.sort(key=_result_order)
+        self._rows = [(row.label, row.seed, row.state, row.card) for row in matched]
 
     def _insert_lease(self, params: tuple[str | int | bool, ...]) -> None:
         index, worker, job_id = params[0], params[1], params[2]
@@ -163,13 +178,15 @@ class FakeCursor:
         self._rows = []
 
     def _finish(self, values: tuple[str | int | bool, ...]) -> None:
-        state, ok, job_id = values
+        state, ok, card, job_id = values
         for row in self._store.jobs:
             if row.job_id == job_id:
                 assert isinstance(state, str)
                 assert isinstance(ok, bool)
+                assert isinstance(card, str)
                 row.state = state
                 row.ok = ok
+                row.card = card
         self._rows = []
 
     def _reap(self, params: tuple[str | int | bool, ...]) -> None:
@@ -197,6 +214,19 @@ class FakeCursor:
         rows = list(self._rows)
         self._rows = []
         return rows
+
+
+def _result_order(row: FakeJobRow) -> tuple[str, int]:
+    """Order results by label then seed, tolerating a planted corrupt seed.
+
+    Args:
+        row: One job row.
+
+    Returns:
+        The sort key the real query's ORDER BY produces.
+    """
+    seed = row.seed
+    return str(row.label), seed if isinstance(seed, int) else -1
 
 
 class FakeStore:

@@ -41,6 +41,7 @@ class _Service:
             service_hooks.prepare_tree,
             service_hooks.prepare_clone,
             service_hooks.play_job,
+            service_hooks.read_card,
             service_hooks.sleep,
         )
 
@@ -58,11 +59,15 @@ class _Service:
         self.played.append(job["seed"])
         return True
 
+    def read_card(self, path: str) -> str:
+        return f"### {Path(path).stem}\nverdict        won (won)"
+
     def __enter__(self) -> _Service:
         service_hooks.connect = self.connect
         service_hooks.prepare_tree = self.prepare_tree
         service_hooks.prepare_clone = self.prepare_clone
         service_hooks.play_job = self.play_job
+        service_hooks.read_card = self.read_card
         service_hooks.sleep = lambda seconds: None
         return self
 
@@ -77,6 +82,7 @@ class _Service:
             service_hooks.prepare_tree,
             service_hooks.prepare_clone,
             service_hooks.play_job,
+            service_hooks.read_card,
             service_hooks.sleep,
         ) = self._saved
 

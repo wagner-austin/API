@@ -184,9 +184,25 @@ endpoint reported navpair48 at 85 queued / 5 running / 6 done while eight
 leased workers drained it. Submission configs build in one place
 (``rw_bot.service.submit.batch_config``) for the CLI and the wire alike.
 
+## Results mirrored, cards first (2026-08-07)
+
+The "results land in the same database" bullet began paying out the same
+night: :func:`finish` now stores the filed scorecard's text on the job row
+(``card TEXT``, migrated idempotently by bootstrap -- and the door
+bootstraps at startup now too, a gap the live probe found when its results
+route met a table an older writer shaped). The worker reads the card from
+exactly where ``play_job`` filed it, through a ``read_card`` hook; a failed
+match mirrors nothing, because it filed only a ``.partial``. The read side
+is ``GET /batches/<name>/results``: one NDJSON line per match -- label,
+seed, state, and the verdict word parsed from the card -- which turns a
+paired-panel verdict into a wire read instead of an artifact-tree walk.
+The ``runs/`` tree stays canonical; rows finished before the mirror
+existed carry an empty card, honestly (navpair48's early rows do).
+Traces-as-compressed-blobs remains a later step.
+
 ## What later phases add
 
-Result blobs mirrored into the database beside the filed artifacts,
+Trace and engine-log blobs (compressed) beside the mirrored cards,
 freeze-verify-go smoke certification at batch start, the worker-registration
 half of the multi-runner schema, and -- if remote submission ever needs it
 -- the dockerized deployment this page originally sketched.

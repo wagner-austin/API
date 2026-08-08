@@ -23,7 +23,7 @@ from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.service import _test_hooks
 from rw_bot.service._test_hooks import Connection
 from rw_bot.service.http import route_service_request
-from rw_bot.service.queue import MatchServiceError
+from rw_bot.service.queue import MatchServiceError, bootstrap
 
 EXIT_OK = 0
 EXIT_BAD_USAGE = 2
@@ -112,6 +112,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_BAD_USAGE
     port = int(args[1]) if len(args) == 2 else SERVICE_PORT_DEFAULT
     conn = _test_hooks.connect(args[0])
+    # The door migrates at startup like every worker does, so a read route
+    # never meets a table an older writer shaped.
+    bootstrap(conn)
     server = MatchServiceServer(("127.0.0.1", port), conn)
     host_hooks.write_line(f"[service] listening on http://127.0.0.1:{port}/")
     host_hooks.serve_forever(server)

@@ -8,6 +8,8 @@ A hook whose real half is never executed is a seam that can rot unseen.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from rw_bot.harness.match import decode_match_config
@@ -18,6 +20,7 @@ from rw_bot.service._test_hooks import (
     _play_job_impl,
     _prepare_clone_impl,
     _prepare_tree_impl,
+    _read_card_impl,
 )
 from tests.harness_fakes import FakeHost
 
@@ -50,6 +53,13 @@ def test_the_real_delegates_drive_the_harness() -> None:
         played = _play_job_impl(_JOB, game_dir, _CONFIG)
         assert played is True
         assert any("alpha-s12345" in key for key in host.files)
+
+
+def test_the_real_card_reader_reads_from_disk(tmp_path: Path) -> None:
+    """The read body runs against a real filed card, encoding stated."""
+    card = tmp_path / "alpha-s12345.txt"
+    card.write_text("### alpha-s12345\nverdict        won (won)\n", encoding="utf-8")
+    assert _read_card_impl(str(card)) == "### alpha-s12345\nverdict        won (won)\n"
 
 
 def test_the_real_connector_fails_honestly_when_nothing_listens() -> None:

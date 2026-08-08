@@ -15,6 +15,9 @@ duration. The reaper's threshold accounts for that; see
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from rw_bot.harness.sweep import job_name
 from rw_bot.service import _test_hooks
 from rw_bot.service.queue import bootstrap, claim, finish, reap
 
@@ -67,7 +70,13 @@ def run_worker(
         _test_hooks.prepare_tree(held["config"])
         game_dir = _test_hooks.prepare_clone(held["clone_index"], held["config"])
         ok = _test_hooks.play_job(held["job"], game_dir, held["config"])
-        finish(conn, held["job_id"], ok)
+        # A finished match's card mirrors onto its row; a failed one filed
+        # only a .partial transcript, so the mirror stays empty.
+        card = ""
+        if ok:
+            card_path = Path(held["config"]["out_dir"]) / f"{job_name(held['job'])}.txt"
+            card = _test_hooks.read_card(str(card_path))
+        finish(conn, held["job_id"], ok, card)
         played += 1
         if max_jobs and played >= max_jobs:
             break

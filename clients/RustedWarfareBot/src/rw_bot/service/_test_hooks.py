@@ -112,6 +112,13 @@ def _play_job_impl(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
     return play_job(job, game_dir, config)
 
 
+def _read_card_impl(path: str) -> str:
+    """Read one filed scorecard, exactly as the artifact tree stores it."""
+    from pathlib import Path
+
+    return Path(path).read_text(encoding="utf-8")
+
+
 #: Freezes the batch tree. Tests bind a recorder.
 prepare_tree: Callable[[SweepConfig], None] = _prepare_tree_impl
 
@@ -120,3 +127,6 @@ prepare_clone: Callable[[int, SweepConfig], str] = _prepare_clone_impl
 
 #: Plays one match. Tests bind a scripted outcome.
 play_job: Callable[[SweepJob, str, SweepConfig], bool] = _play_job_impl
+
+#: Reads a filed scorecard. Tests bind a scripted card.
+read_card: Callable[[str], str] = _read_card_impl

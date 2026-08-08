@@ -7,6 +7,8 @@ budget, and sleeps exactly once before deciding an empty queue is drained.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from rw_bot.harness.match import decode_match_config
 from rw_bot.harness.runner import SweepConfig, decode_sweep_config
 from rw_bot.harness.sweep import SweepJob, parse_job_line
@@ -48,6 +50,7 @@ class _Rig:
         self.trees: list[str] = []
         self.clones: list[int] = []
         self.played: list[tuple[int, str]] = []
+        self.cards_read: list[str] = []
         self.slept: list[float] = []
 
     def connect(self, dsn: str) -> FakeConnection:
@@ -64,6 +67,10 @@ class _Rig:
         self.played.append((job["seed"], game_dir))
         return self.outcomes[job["seed"]]
 
+    def read_card(self, path: str) -> str:
+        self.cards_read.append(path)
+        return f"scripted card from {path}\nverdict        won (won)"
+
     def sleep(self, seconds: float) -> None:
         self.slept.append(seconds)
 
@@ -75,12 +82,14 @@ def _with_rig(outcomes: dict[int, bool], max_jobs: int) -> tuple[_Rig, int]:
         _test_hooks.prepare_tree,
         _test_hooks.prepare_clone,
         _test_hooks.play_job,
+        _test_hooks.read_card,
         _test_hooks.sleep,
     )
     _test_hooks.connect = rig.connect
     _test_hooks.prepare_tree = rig.prepare_tree
     _test_hooks.prepare_clone = rig.prepare_clone
     _test_hooks.play_job = rig.play_job
+    _test_hooks.read_card = rig.read_card
     _test_hooks.sleep = rig.sleep
     try:
         played = run_worker("dsn://demo", "w1", (1, 2), max_jobs)
@@ -90,6 +99,7 @@ def _with_rig(outcomes: dict[int, bool], max_jobs: int) -> tuple[_Rig, int]:
             _test_hooks.prepare_tree,
             _test_hooks.prepare_clone,
             _test_hooks.play_job,
+            _test_hooks.read_card,
             _test_hooks.sleep,
         ) = saved
     return rig, played
@@ -123,6 +133,21 @@ def test_a_failed_match_files_as_failed_and_the_worker_continues() -> None:
     assert played == 2
     states = [row.state for row in rig.conn.store.jobs]
     assert states == ["failed", "done"]
+
+
+def test_a_finished_match_mirrors_its_filed_card_onto_the_row() -> None:
+    """The card is read from where play_job filed it and lands in the queue."""
+    rig, _ = _with_rig({12345: True, 777: True}, 0)
+    path = str(Path("runs/sweeps/demo") / "alpha-s12345.txt")
+    assert rig.cards_read[0] == path
+    assert rig.conn.store.jobs[0].card == f"scripted card from {path}\nverdict        won (won)"
+
+
+def test_a_failed_match_mirrors_no_card() -> None:
+    """A failed job filed only a .partial; the mirror must not invent one."""
+    rig, _ = _with_rig({12345: False, 777: True}, 0)
+    assert rig.cards_read == [str(Path("runs/sweeps/demo") / "alpha-s777.txt")]
+    assert rig.conn.store.jobs[0].card == ""
 
 
 def test_the_budget_stops_the_worker_before_the_queue_empties() -> None:

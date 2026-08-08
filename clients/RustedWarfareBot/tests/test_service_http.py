@@ -25,7 +25,7 @@ from scripts.match_service import (
 from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.service import _test_hooks as service_hooks
 from rw_bot.service.http import route_service_request
-from rw_bot.service.queue import MatchServiceError
+from rw_bot.service.queue import MatchServiceError, claim, finish
 from rw_bot.wire.ndjson import parse_object, render_json
 from tests.harness_fakes import FakeHost
 from tests.service_fakes import FakeConnection
@@ -102,6 +102,32 @@ def test_a_missing_field_is_a_400() -> None:
     assert b"RW-DECODE" in payload
 
 
+def test_batch_results_stream_as_ndjson_lines() -> None:
+    """One object per match, parseable by the same wire reader that wrote it."""
+    conn = FakeConnection()
+    route_service_request(conn, "POST", "/batches", _submission())
+    held = claim(conn, "w1", (1,))
+    if held is None:
+        raise AssertionError("expected a claim and the queue declined")
+    finish(conn, held["job_id"], True, "### alpha-s12345\nverdict        won (won)")
+    status, kind, payload = route_service_request(conn, "GET", "/batches/demo/results", b"")
+    assert status == 200
+    assert kind == "application/x-ndjson"
+    rows = [parse_object(line) for line in payload.decode("utf-8").splitlines()]
+    assert rows == [
+        {"label": "alpha", "seed": 777, "state": "queued", "verdict": ""},
+        {"label": "alpha", "seed": 12345, "state": "done", "verdict": "won"},
+    ]
+
+
+def test_an_unknown_batch_has_empty_results() -> None:
+    conn = FakeConnection()
+    route_service_request(conn, "POST", "/batches", _submission())
+    status, _kind, payload = route_service_request(conn, "GET", "/batches/ghost/results", b"")
+    assert status == 200
+    assert payload == b""
+
+
 def test_an_unknown_path_is_a_404() -> None:
     conn = FakeConnection()
     status, _kind, _payload = route_service_request(conn, "GET", "/nothing", b"")
@@ -176,6 +202,7 @@ def test_the_entry_point_binds_serves_and_closes() -> None:
         assert len(served) == 1
         assert any("listening on http://127.0.0.1" in line for line in host.printed)
         assert conn.closed is True
+        assert conn.commits == 1
 
 
 def test_a_bad_argument_count_prints_usage() -> None:
