@@ -91,6 +91,7 @@ def play(
     expand: bool = True,
     max_workers: int = DEFAULT_MAX_WORKERS,
     counter: bool = False,
+    navtilt: bool = False,
     cover: bool = True,
     intercept: bool = False,
     guard_cap: int = 0,
@@ -156,6 +157,8 @@ def play(
             where they can be usefully employed is credits standing still
             instead of fighting ([[policy-production]]).
         counter: Tilt production toward the layers the opponent fields.
+        navtilt: Whether the counter tilt's naval clause runs
+            ([[policy-exact-timing]], the naval wall).
         cover: Buy turrets beside bare structures at all.
         intercept: Turn the reserve on a raider inside our outpost radius.
         guard_cap: The most reserve units an interception commits; 0 is all.
@@ -339,7 +342,7 @@ def play(
             )
             if counter:
                 threats = mobile_threats(intel, catalogue) if scout else tuple(targets)
-                composition_now = counter_composition(composition_now, threats, profiles)
+                composition_now = counter_composition(composition_now, threats, profiles, navtilt)
             capable = wanted_producers(sample, composition_now)
             queues_open = sum(
                 1

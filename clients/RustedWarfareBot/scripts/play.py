@@ -436,6 +436,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         expand=doctrine["expand"],
         max_workers=doctrine["max_workers"],
         counter=doctrine["counter"],
+        navtilt=doctrine["navtilt"],
         cover=doctrine["cover"],
         intercept=doctrine["intercept"],
         guard_cap=doctrine["guard_cap"],

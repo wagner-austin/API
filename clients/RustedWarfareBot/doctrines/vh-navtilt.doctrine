@@ -3,7 +3,7 @@
 # (rival walls 126-303k, engagements zero). Which single posture change
 # buys the most survival is a doctrine question, asked cheaply here.
 
-name flame-med
+name vh-navtilt
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
 heavies heavyTank,heavyTank
 max_workers 8
@@ -11,8 +11,8 @@ mass 25
 reserve -1
 expand 1
 counter 1
-navtilt 0
-cover 1
+navtilt 1
+cover 0
 intercept 1
 guard_cap 0
 aa_cover 1
@@ -27,12 +27,12 @@ tech 1
 lurk 0
 allin 0
 strike 0
-medics 2
+medics 0
 decoys 0
-hp_floor 30
+hp_floor 0
 bunkers 0
 flame 2
-close 0
+close 3
 income_ladder 0
 guns 0
 nukes 0

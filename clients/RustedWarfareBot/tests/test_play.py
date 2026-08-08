@@ -364,6 +364,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     rush=False,
                     creep=0,
                     riposte=False,
+                    navtilt=False,
                     tech=0,
                     lurk=0,
                     allin=0,

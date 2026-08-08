@@ -165,6 +165,7 @@ def counter_composition(
     composition: Sequence[str],
     targets: Sequence[Threat],
     profiles: Mapping[str, CombatProfile],
+    naval: bool,
 ) -> tuple[str, ...]:
     """Return the mix, tilted until it answers the air and naval shares.
 
@@ -196,6 +197,9 @@ def counter_composition(
         composition: The army mix to hold, repeats meaningful as a ratio.
         targets: The hostile entities currently visible.
         profiles: Combat profiles by type name, for reach and layers.
+        naval: Whether the naval clause runs -- the doctrine's ``navtilt``
+            knob, so a control arm and a tilt arm are one frozen tree apart
+            by a job line rather than a code checkout.
 
     Returns:
         The mix to produce against, repeats meaningful as a ratio.
@@ -213,15 +217,17 @@ def counter_composition(
         return _hits_air(profiles, name)
 
     mix = _tilted(mix, flying, len(targets), hits_air, profiles)
-    naval = tuple(t for t in targets if t["movement"] == _NAVAL_LAYER)
     if not naval:
         return mix
-    reach = max(profile_of(profiles, t["type_name"])["attack_range"] for t in naval)
+    fleet = tuple(t for t in targets if t["movement"] == _NAVAL_LAYER)
+    if not fleet:
+        return mix
+    reach = max(profile_of(profiles, t["type_name"])["attack_range"] for t in fleet)
 
     def outguns(name: str) -> bool:
         return _outguns(profiles, name, reach)
 
-    return _tilted(mix, len(naval), len(targets), outguns, profiles)
+    return _tilted(mix, len(fleet), len(targets), outguns, profiles)
 
 
 def mobile_threats(intel: Intel, catalogue: Mapping[str, UnitStats]) -> tuple[Threat, ...]:

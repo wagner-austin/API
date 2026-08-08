@@ -9,6 +9,7 @@ mass 7
 reserve -1
 expand 0
 counter 0
+navtilt 0
 cover 1
 intercept 0
 guard_cap 0

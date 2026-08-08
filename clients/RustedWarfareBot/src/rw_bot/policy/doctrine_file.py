@@ -23,9 +23,8 @@ from rw_bot.policy.doctrine import (
     STR_FIELDS,
     Doctrine,
     DoctrineError,
-    decode_doctrine,
-    encode_doctrine,
 )
+from rw_bot.policy.doctrine_codecs import decode_doctrine, encode_doctrine
 
 _FIELD_SHAPE = "RW-DOCTRINE-001"
 _UNKNOWN_FIELD = "RW-DOCTRINE-002"

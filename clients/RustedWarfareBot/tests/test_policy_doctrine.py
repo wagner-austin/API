@@ -15,9 +15,8 @@ from rw_bot.policy.doctrine import (
     DERIVE_RESERVE,
     Doctrine,
     DoctrineError,
-    decode_doctrine,
-    encode_doctrine,
 )
+from rw_bot.policy.doctrine_codecs import decode_doctrine, encode_doctrine
 from rw_bot.policy.doctrine_file import format_doctrine, parse_doctrine_lines
 from rw_bot.validation import DecodeError
 
@@ -44,6 +43,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         rush=False,
         creep=0,
         riposte=False,
+        navtilt=False,
         tech=0,
         lurk=0,
         allin=0,

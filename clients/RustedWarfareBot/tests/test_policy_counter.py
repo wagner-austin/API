@@ -33,12 +33,12 @@ def _ground(unit_id: int) -> Entity:
 def test_nothing_visible_leaves_the_mix_alone() -> None:
     """Fog is not evidence, in either direction."""
     mix = ("c_tank", "c_tank", "c_aa")
-    assert counter_composition(mix, (), _PROFILES) == mix
+    assert counter_composition(mix, (), _PROFILES, False) == mix
 
 
 def test_a_ground_threat_leaves_the_mix_alone() -> None:
     mix = ("c_tank", "c_tank", "c_aa")
-    assert counter_composition(mix, (_ground(1), _ground(2)), _PROFILES) == mix
+    assert counter_composition(mix, (_ground(1), _ground(2)), _PROFILES, False) == mix
 
 
 def test_a_mix_without_anti_air_is_not_given_any() -> None:
@@ -48,7 +48,7 @@ def test_a_mix_without_anti_air_is_not_given_any() -> None:
     count ([[mechanics-combat-profile]]).
     """
     mix = ("c_tank", "c_tank")
-    assert counter_composition(mix, (_heli(1),), _PROFILES) == mix
+    assert counter_composition(mix, (_heli(1),), _PROFILES, False) == mix
 
 
 def test_anti_air_is_repeated_until_its_share_covers_the_air_share() -> None:
@@ -57,6 +57,7 @@ def test_anti_air_is_repeated_until_its_share_covers_the_air_share() -> None:
         ("c_tank", "c_tank", "c_tank", "c_aa"),
         (_heli(1), _heli(2), _ground(3), _ground(4)),
         _PROFILES,
+        False,
     )
     airworthy = sum(1 for name in tilted if _PROFILES[name]["hits_air"])
     assert tilted[:4] == ("c_tank", "c_tank", "c_tank", "c_aa")
@@ -65,7 +66,7 @@ def test_anti_air_is_repeated_until_its_share_covers_the_air_share() -> None:
 
 def test_a_mix_already_covering_the_share_is_left_alone() -> None:
     mix = ("c_aa", "c_aa", "c_tank")
-    assert counter_composition(mix, (_heli(1), _ground(2)), _PROFILES) == mix
+    assert counter_composition(mix, (_heli(1), _ground(2)), _PROFILES, False) == mix
 
 
 def test_an_all_air_threat_drops_the_armed_ground_only_types() -> None:
@@ -77,6 +78,7 @@ def test_an_all_air_threat_drops_the_armed_ground_only_types() -> None:
         ("builder", "c_tank", "c_tank", "c_aa"),
         (_heli(1), _heli(2)),
         _PROFILES,
+        False,
     )
     assert tilted == ("builder", "c_aa")
 
@@ -87,6 +89,7 @@ def test_two_anti_air_types_are_repeated_in_their_stated_ratio() -> None:
         ("c_tank", "c_tank", "c_tank", "c_tank", "c_aa", "c_missile"),
         (_heli(1), _heli(2), _heli(3), _ground(4)),
         _PROFILES,
+        False,
     )
     added = tilted[6:]
     assert set(added) <= {"c_aa", "c_missile"}
@@ -115,6 +118,7 @@ def test_a_fleet_repeats_the_type_that_outranges_it() -> None:
         ("c_tank", "c_tank", "c_tank", "c_artillery"),
         (_ship(1), _ship(2), _ground(3), _ground(4)),
         _NAVAL_PROFILES,
+        True,
     )
     assert tilted[:4] == ("c_tank", "c_tank", "c_tank", "c_artillery")
     outgunning = sum(1 for name in tilted if name == "c_artillery")
@@ -124,7 +128,7 @@ def test_a_fleet_repeats_the_type_that_outranges_it() -> None:
 def test_a_mix_nothing_in_which_outranges_the_fleet_is_left_alone() -> None:
     """Which unit outranges a fleet is the doctrine's question, not this one's."""
     mix = ("c_tank", "c_tank", "c_aa")
-    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES) == mix
+    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES, True) == mix
 
 
 def test_an_all_naval_picture_drops_the_outgunned() -> None:
@@ -136,13 +140,14 @@ def test_an_all_naval_picture_drops_the_outgunned() -> None:
         ("builder", "c_tank", "c_artillery"),
         (_ship(1), _ship(2)),
         _NAVAL_PROFILES,
+        True,
     )
     assert tilted == ("builder", "c_artillery")
 
 
 def test_a_mix_already_outgunning_the_naval_share_is_left_alone() -> None:
     mix = ("c_artillery", "c_artillery", "c_tank")
-    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES) == mix
+    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES, True) == mix
 
 
 def test_the_air_and_naval_tilts_compose_on_one_picture() -> None:
@@ -151,7 +156,20 @@ def test_the_air_and_naval_tilts_compose_on_one_picture() -> None:
         ("c_tank", "c_tank", "c_aa", "c_artillery"),
         (_heli(1), _ship(2), _ground(3), _ground(4)),
         _NAVAL_PROFILES,
+        True,
     )
     assert tilted[:4] == ("c_tank", "c_tank", "c_aa", "c_artillery")
     assert sum(1 for name in tilted if name == "c_aa") >= 1
     assert sum(1 for name in tilted if name == "c_artillery") >= 1
+
+
+def test_the_naval_clause_stays_silent_when_the_doctrine_says_off() -> None:
+    """The control arm's whole meaning: same code, same fleet, no tilt."""
+    mix = ("c_tank", "c_tank", "c_artillery")
+    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES, False) == mix
+
+
+def test_an_armed_naval_clause_with_no_fleet_in_sight_changes_nothing() -> None:
+    """The tilt spends nothing until a fleet is actually seen."""
+    mix = ("c_tank", "c_tank", "c_artillery")
+    assert counter_composition(mix, (_ground(1), _ground(2)), _NAVAL_PROFILES, True) == mix
