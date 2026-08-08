@@ -1,0 +1,39 @@
+# imp-combo36: the screen's survivors composed and deepened, in-batch control.
+# raid8 and kite were the only positive paired arms at the rung (hands84);
+# this asks whether they compose and whether the raid channel is monotone.
+base|12345|doctrines/flame-nocover.doctrine|10000
+base|1337|doctrines/flame-nocover.doctrine|10000
+base|141421|doctrines/flame-nocover.doctrine|10000
+base|16180|doctrines/flame-nocover.doctrine|10000
+base|173205|doctrines/flame-nocover.doctrine|10000
+base|223606|doctrines/flame-nocover.doctrine|10000
+base|244948|doctrines/flame-nocover.doctrine|10000
+base|24601|doctrines/flame-nocover.doctrine|10000
+base|264575|doctrines/flame-nocover.doctrine|10000
+base|2718|doctrines/flame-nocover.doctrine|10000
+base|271828|doctrines/flame-nocover.doctrine|10000
+base|282842|doctrines/flame-nocover.doctrine|10000
+raidkite|12345|doctrines/flame-raidkite.doctrine|10000
+raidkite|1337|doctrines/flame-raidkite.doctrine|10000
+raidkite|141421|doctrines/flame-raidkite.doctrine|10000
+raidkite|16180|doctrines/flame-raidkite.doctrine|10000
+raidkite|173205|doctrines/flame-raidkite.doctrine|10000
+raidkite|223606|doctrines/flame-raidkite.doctrine|10000
+raidkite|244948|doctrines/flame-raidkite.doctrine|10000
+raidkite|24601|doctrines/flame-raidkite.doctrine|10000
+raidkite|264575|doctrines/flame-raidkite.doctrine|10000
+raidkite|2718|doctrines/flame-raidkite.doctrine|10000
+raidkite|271828|doctrines/flame-raidkite.doctrine|10000
+raidkite|282842|doctrines/flame-raidkite.doctrine|10000
+raid12|12345|doctrines/flame-raid12.doctrine|10000
+raid12|1337|doctrines/flame-raid12.doctrine|10000
+raid12|141421|doctrines/flame-raid12.doctrine|10000
+raid12|16180|doctrines/flame-raid12.doctrine|10000
+raid12|173205|doctrines/flame-raid12.doctrine|10000
+raid12|223606|doctrines/flame-raid12.doctrine|10000
+raid12|244948|doctrines/flame-raid12.doctrine|10000
+raid12|24601|doctrines/flame-raid12.doctrine|10000
+raid12|264575|doctrines/flame-raid12.doctrine|10000
+raid12|2718|doctrines/flame-raid12.doctrine|10000
+raid12|271828|doctrines/flame-raid12.doctrine|10000
+raid12|282842|doctrines/flame-raid12.doctrine|10000
