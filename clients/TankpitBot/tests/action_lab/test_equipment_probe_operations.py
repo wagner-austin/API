@@ -123,9 +123,9 @@ def test_build_attempt_result_for_probe_uses_message_count() -> None:
 
 def test_build_map_sync_timeout_result_for_probe_uses_inventory_hook() -> None:
     """Map-sync-timeout reads the latest inventory total from the real tracker."""
-    set_inventory_total(4)
     action_hooks.get_current_time_ms = _Clock(2000)
     probe = _BuilderProbe()
+    set_inventory_total(probe.world, 4)
 
     result = build_map_sync_timeout_result_for_probe(
         probe,
@@ -143,8 +143,8 @@ def test_build_map_sync_timeout_result_for_probe_uses_inventory_hook() -> None:
 
 def test_build_teleport_timeout_result_for_probe_uses_inventory_hook() -> None:
     """Teleport-timeout reads the latest inventory total from the real tracker."""
-    set_inventory_total(2)
     probe = _BuilderProbe()
+    set_inventory_total(probe.world, 2)
 
     result = build_teleport_timeout_result_for_probe(
         probe,
@@ -164,9 +164,9 @@ def test_build_teleport_timeout_result_for_probe_uses_inventory_hook() -> None:
 
 def test_build_reposition_map_sync_timeout_result_for_probe_uses_inventory_hook() -> None:
     """Reposition map-sync-timeout reads the latest inventory total."""
-    set_inventory_total(1)
     action_hooks.get_current_time_ms = _Clock(2500)
     probe = _BuilderProbe()
+    set_inventory_total(probe.world, 1)
     container = make_container_state(11, 20, False, 0, timestamp_ms=2000)
 
     result = build_reposition_map_sync_timeout_result_for_probe(
@@ -193,8 +193,8 @@ def test_build_reposition_map_sync_timeout_result_for_probe_uses_inventory_hook(
 
 def test_build_reposition_teleport_timeout_result_for_probe_uses_inventory_hook() -> None:
     """Reposition teleport-timeout reads the latest inventory total."""
-    set_inventory_total(1)
     probe = _BuilderProbe()
+    set_inventory_total(probe.world, 1)
     container = make_container_state(11, 20, False, 0, timestamp_ms=2000)
 
     result = build_reposition_teleport_timeout_result_for_probe(
@@ -222,9 +222,9 @@ def test_build_reposition_teleport_timeout_result_for_probe_uses_inventory_hook(
 
 def test_build_radar_timeout_result_for_probe_uses_inventory_hook() -> None:
     """Radar-timeout reads the latest inventory total."""
-    set_inventory_total(2)
     action_hooks.get_current_time_ms = _Clock(2200)
     probe = _BuilderProbe()
+    set_inventory_total(probe.world, 2)
 
     result = build_radar_timeout_result_for_probe(
         probe,
@@ -247,9 +247,9 @@ def test_build_radar_timeout_result_for_probe_uses_inventory_hook() -> None:
 
 def test_build_no_equipment_visible_result_for_probe_uses_inventory_hook() -> None:
     """No-visible-equipment reads the latest inventory total."""
-    set_inventory_total(2)
     action_hooks.get_current_time_ms = _Clock(2500)
     probe = _BuilderProbe()
+    set_inventory_total(probe.world, 2)
 
     result = build_no_equipment_visible_result_for_probe(
         probe,

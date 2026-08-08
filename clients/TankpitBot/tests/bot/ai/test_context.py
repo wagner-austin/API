@@ -11,6 +11,7 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.inventory import InventoryItem, InventoryState
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     SelfStateDict,
     WorldStateDict,
@@ -58,6 +59,7 @@ class TestLockedResourceTarget:
         from tankpit_bot.bot.ai.context import DecideCtx
         from tankpit_bot.bot.ai.types import AIStateDict
 
+        ws = WorldService()
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
@@ -70,7 +72,16 @@ class TestLockedResourceTarget:
             }
         )
 
-        ctx = DecideCtx(world, self_state, ai_state, _dummy_inventory(), 100000, None, "")
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            _dummy_inventory(),
+            100000,
+            None,
+            "",
+            ws=ws,
+        )
 
         assert ctx.mode == "HUNT"
         assert ctx.mode_state == "ACQUIRE"
@@ -80,11 +91,12 @@ class TestLockedResourceTarget:
         """Locked target returns None when kind doesn't match."""
         from tankpit_bot.bot.ai.context import DecideCtx
 
+        ws = WorldService()
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
         _, target = locked_resource_target(ctx, "equipment")
         assert target is None
 
@@ -92,11 +104,12 @@ class TestLockedResourceTarget:
         """Locked target clears when container not in filtered world."""
         from tankpit_bot.bot.ai.context import DecideCtx
 
+        ws = WorldService()
         state = set_resource_target(make_initial_ai_state(), "fuel", 99, 99)
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
         base_state, target = locked_resource_target(ctx, "fuel")
         assert target is None
         assert base_state["resource_target_kind"] == ""
@@ -105,11 +118,12 @@ class TestLockedResourceTarget:
         """Locked fuel target clears when container is equipment."""
         from tankpit_bot.bot.ai.context import DecideCtx
 
+        ws = WorldService()
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, False, 0)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
         _, target = locked_resource_target(ctx, "fuel")
         assert target is None
 
@@ -117,11 +131,12 @@ class TestLockedResourceTarget:
         """Locked equipment target clears when container is fuel."""
         from tankpit_bot.bot.ai.context import DecideCtx
 
+        ws = WorldService()
         state = set_resource_target(make_initial_ai_state(), "equipment", 10, 20)
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
         _, target = locked_resource_target(ctx, "equipment")
         assert target is None
 
@@ -129,11 +144,12 @@ class TestLockedResourceTarget:
         """Locked target clears when container has failed pickups."""
         from tankpit_bot.bot.ai.context import DecideCtx
 
+        ws = WorldService()
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, True, 500, failed_pickups=2)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
         _, target = locked_resource_target(ctx, "fuel")
         assert target is None
 
@@ -153,11 +169,12 @@ class TestLockedResourceTargetMissingContainer:
 
         from tankpit_bot.bot.ai.context import DecideCtx
 
+        ws = WorldService()
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, True, 500)
         self_state = _self_state()
         world["self_state"] = self_state
-        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, state, _dummy_inventory(), 100000, None, "", ws=ws)
         assert ctx.base["resource_target_kind"] == "fuel"
         ctx.filtered = WorldStateDict(**{**ctx.filtered, "containers": {}})
         with pytest.raises(KeyError):
@@ -207,6 +224,7 @@ class TestTeleportFuelHelpers:
 
     def test_reports_exact_axis_aligned_teleport_cost(self) -> None:
         """Teleport helper returns the exact cost for an axis-aligned jump."""
+        ws = WorldService()
         world = _world_with_container(10, 20, True, 100)
         self_state = make_self_state(
             tank_id=1,
@@ -226,12 +244,14 @@ class TestTeleportFuelHelpers:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         assert teleport_fuel_cost_to(ctx, 3, 106) == 540
 
     def test_reports_exact_diagonal_teleport_cost(self) -> None:
         """Teleport helper matches the sniffed long diagonal sample."""
+        ws = WorldService()
         world = _world_with_container(10, 20, True, 100)
         self_state = make_self_state(
             tank_id=1,
@@ -251,12 +271,14 @@ class TestTeleportFuelHelpers:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         assert teleport_fuel_cost_to(ctx, 86, 90) == 687
 
     def test_can_afford_teleport_uses_exact_cost(self) -> None:
         """Exact affordability accepts only when current fuel covers the jump."""
+        ws = WorldService()
         world = _world_with_container(10, 20, True, 100)
         self_state = make_self_state(
             tank_id=1,
@@ -276,6 +298,7 @@ class TestTeleportFuelHelpers:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         assert can_afford_teleport(ctx, 96, 97) is True

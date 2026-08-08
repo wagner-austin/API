@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.collect_pickups import select_equipment_target
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -20,8 +21,8 @@ def test_select_equipment_target_returns_none_for_unreachable_off_viewport_targe
     the bot can't walk OR afford a teleport. The selector must
     surface that as "no executable target".
     """
-    from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
+    ws = WorldService()
     world, self_state = make_world(
         self_x=100,
         self_y=100,
@@ -40,7 +41,7 @@ def test_select_equipment_target_returns_none_for_unreachable_off_viewport_targe
     )
     # Recently-failed move target: walk_or_teleport short-circuits to
     # None when the target is on the recent-failure list.
-    mark_move_target_failed(103, 100, 99000)
+    ws.mark_move_target_failed(103, 100, 99000)
     terrain = InMemoryTerrainMap(terrain_data={})
     ctx = DecideCtx(
         world,
@@ -50,6 +51,7 @@ def test_select_equipment_target_returns_none_for_unreachable_off_viewport_targe
         100000,
         terrain,
         "",
+        ws=ws,
     )
 
     assert select_equipment_target(ctx) is None
@@ -64,6 +66,7 @@ def test_select_equipment_target_rejects_walk_unreachable_in_viewport() -> None:
     failed_pickup. Teleport-to-container was removed entirely
     2026-06-26; containers without a walk path are never selected.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=0,
         containers={
@@ -87,6 +90,7 @@ def test_select_equipment_target_rejects_walk_unreachable_in_viewport() -> None:
         100000,
         terrain,
         "",
+        ws=ws,
     )
 
     assert select_equipment_target(ctx) is None
@@ -107,6 +111,7 @@ def _make_blocked_equipment_setup(
     Returns:
         Decision context at timestamp 100000 with ample fuel.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=800,
         scanned=True,
@@ -136,7 +141,7 @@ def _make_blocked_equipment_setup(
             "attempted_equipment_targets": attempted_equipment_targets,
         }
     )
-    return DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+    return DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
 
 def test_rock_walled_equipment_is_skipped_for_forage() -> None:
@@ -167,8 +172,8 @@ def test_lock_steal_requires_an_executable_candidate() -> None:
     demands a command THIS TICK, the same bar execution applies.
     """
     from tankpit_bot.bot.ai.collect_locks import _superior_equipment_candidate
-    from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
+    ws = WorldService()
     containers = {
         "130,100": make_container_state(
             x=130,
@@ -188,8 +193,17 @@ def test_lock_steal_requires_an_executable_candidate() -> None:
         ),
     }
     world, self_state = make_world(self_x=100, self_y=100, fuel=900, containers=containers)
-    mark_move_target_failed(103, 100, 99000)
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), make_inventory(), 100000, None, "")
+    ws.mark_move_target_failed(103, 100, 99000)
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(),
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
 
     result = _superior_equipment_candidate(ctx, containers["130,100"])
 
@@ -200,6 +214,7 @@ def test_lock_steal_allows_an_executable_closer_candidate() -> None:
     """A genuinely executable markedly-closer candidate still steals."""
     from tankpit_bot.bot.ai.collect_locks import _superior_equipment_candidate
 
+    ws = WorldService()
     containers = {
         "130,100": make_container_state(
             x=130,
@@ -219,7 +234,16 @@ def test_lock_steal_allows_an_executable_closer_candidate() -> None:
         ),
     }
     world, self_state = make_world(self_x=100, self_y=100, fuel=900, containers=containers)
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), make_inventory(), 100000, None, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(),
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
 
     result = _superior_equipment_candidate(ctx, containers["130,100"])
 

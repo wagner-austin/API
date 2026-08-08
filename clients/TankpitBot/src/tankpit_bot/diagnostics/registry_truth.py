@@ -33,7 +33,7 @@ from typing_extensions import TypedDict
 
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.runtime_logging import emit_diagnostic
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
     clear_death_anchor,
     get_death_anchor,
@@ -116,6 +116,7 @@ def decode_registry_tank(
 
 
 def _ingest_one_registry_entry(
+    ws: WorldService,
     item: dict[str, int | float | bool | str | None],
     self_tank_id: int,
     viewport: ViewportStateDict,
@@ -141,7 +142,6 @@ def _ingest_one_registry_entry(
         return "skip"
     world_x = viewport["left"] + tank["drawn_col"] + _RENDER_ORIGIN_OFFSET
     world_y = viewport["top"] + tank["drawn_row"] + _RENDER_ORIGIN_OFFSET
-    ws = get_world_service()
     death_tile = get_death_anchor(ws, tank["tank_id"])
     if death_tile is not None:
         if (world_x, world_y) == death_tile:
@@ -168,6 +168,7 @@ def _ingest_one_registry_entry(
 
 
 def register_tank_truth_from_page_snapshot(
+    ws: WorldService,
     snapshot: PageClientSnapshotDict,
     world: WorldStateDict,
 ) -> int:
@@ -215,6 +216,7 @@ def register_tank_truth_from_page_snapshot(
     corpse_count = 0
     for item in items:
         result = _ingest_one_registry_entry(
+            ws,
             item,
             self_state["tank_id"],
             viewport,
@@ -232,20 +234,8 @@ def register_tank_truth_from_page_snapshot(
     return ingested
 
 
-def reset_registry_truth() -> None:
-    """Reset module state for test isolation.
-
-    No module-level state is held here -- death anchors live in
-    :mod:`tankpit_bot.sniffer.world_state` and are cleared by
-    ``reset_world_state``. This function exists so the diagnostics
-    conftest can call it uniformly without coupling to the reset
-    protocol.
-    """
-
-
 __all__ = [
     "RegistryTankDict",
     "decode_registry_tank",
     "register_tank_truth_from_page_snapshot",
-    "reset_registry_truth",
 ]

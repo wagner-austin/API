@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_pickup_fuel_command, make_teleport_command
+from tankpit_bot.sniffer.world_service import WorldService
 
 
 def _locked_state(*, attacker_x: int = 100, attacker_y: int = 100) -> AIStateDict:
@@ -120,12 +121,12 @@ def test_trapped_escape_takes_the_near_hop_over_standing_still() -> None:
     from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
     from tankpit_bot.bot.ai.context import DecideCtx
     from tankpit_bot.ledger.damage_book import confirm_incoming_damage, record_incoming_shot
-    from tankpit_bot.sniffer.world_state import get_world_service
     from tankpit_bot.state.types import make_container_state
     from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-    book = get_world_service().damage_book
+    ws = WorldService()
+    book = ws.damage_book
     for i in range(4):
         ts = 95000 + i * 1000
         record_incoming_shot(book, 60, "Yuppler", 1, ts)
@@ -163,6 +164,7 @@ def test_trapped_escape_takes_the_near_hop_over_standing_still() -> None:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
     decision = decide_collect_mode(ctx)
 
@@ -196,7 +198,8 @@ class TestEscapePlanContinuity:
         )
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-        seed_confirmed_incoming(3)
+        ws = WorldService()
+        seed_confirmed_incoming(ws, 3)
         world, self_state = make_world(
             fuel=668,
             containers={
@@ -228,6 +231,7 @@ class TestEscapePlanContinuity:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         decision = decide_collect_mode(ctx)
@@ -251,7 +255,8 @@ class TestEscapePlanContinuity:
         )
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-        seed_confirmed_incoming(3)
+        ws = WorldService()
+        seed_confirmed_incoming(ws, 3)
         world, self_state = make_world(
             fuel=668,
             containers={
@@ -282,6 +287,7 @@ class TestEscapePlanContinuity:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         decision = decide_collect_mode(ctx)
@@ -310,7 +316,8 @@ class TestEscapePlanContinuity:
         )
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-        seed_confirmed_incoming(3)
+        ws = WorldService()
+        seed_confirmed_incoming(ws, 3)
         world, self_state = make_world(
             fuel=668,
             containers={
@@ -349,6 +356,7 @@ class TestEscapePlanContinuity:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         decision = decide_collect_mode(ctx)
@@ -375,7 +383,6 @@ class TestMovementDeadEscape:
         from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
         from tankpit_bot.bot.ai.context import DecideCtx
         from tankpit_bot.bot.ai.types import AIStateDict
-        from tankpit_bot.sniffer.world_state import record_movement_rejection
         from tankpit_bot.state.types import make_container_state
         from tests.bot.ai._support import (
             make_inventory,
@@ -385,9 +392,10 @@ class TestMovementDeadEscape:
         )
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-        seed_confirmed_incoming(3)
-        record_movement_rejection(96000)
-        record_movement_rejection(98000)
+        ws = WorldService()
+        seed_confirmed_incoming(ws, 3)
+        ws.record_movement_rejection(96000)
+        ws.record_movement_rejection(98000)
         world, self_state = make_world(
             fuel=668,
             containers={
@@ -425,6 +433,7 @@ class TestMovementDeadEscape:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         decision = decide_collect_mode(ctx)
@@ -439,7 +448,6 @@ class TestMovementDeadEscape:
         from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
         from tankpit_bot.bot.ai.context import DecideCtx
         from tankpit_bot.bot.ai.types import AIStateDict
-        from tankpit_bot.sniffer.world_state import record_movement_rejection
         from tankpit_bot.state.types import make_container_state
         from tests.bot.ai._support import (
             make_inventory,
@@ -449,8 +457,9 @@ class TestMovementDeadEscape:
         )
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-        seed_confirmed_incoming(3)
-        record_movement_rejection(98000)
+        ws = WorldService()
+        seed_confirmed_incoming(ws, 3)
+        ws.record_movement_rejection(98000)
         world, self_state = make_world(
             fuel=668,
             containers={
@@ -480,6 +489,7 @@ class TestMovementDeadEscape:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         decision = decide_collect_mode(ctx)
@@ -508,7 +518,8 @@ def test_under_fire_with_nothing_available_falls_to_the_exhausted_outcome() -> N
         seed_confirmed_incoming,
     )
 
-    seed_confirmed_incoming(3)
+    ws = WorldService()
+    seed_confirmed_incoming(ws, 3)
     world, self_state = make_world(fuel=1200)
     ctx = DecideCtx(
         world,
@@ -519,6 +530,7 @@ def test_under_fire_with_nothing_available_falls_to_the_exhausted_outcome() -> N
         None,
         "",
         map_fuel_dots=((101, 101),),
+        ws=ws,
     )
 
     assert decide_collect_mode(ctx) is None

@@ -26,7 +26,6 @@ from tankpit_bot.protocol.types import TankStatusSyncDict
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 from tankpit_bot.sim.opponent import decide_opponent
 from tankpit_bot.sim.session import deliver_batch
-from tankpit_bot.sniffer.world_state import get_world_service
 from tests.conftest import FakeFileSystem
 from tests.sim.seam import (
     RICH_CONTAINERS,
@@ -87,7 +86,7 @@ def test_seam_soak_is_divergence_free(fake_fs: FakeFileSystem) -> None:
         _tick_once(bot)
     finally:
         _test_hooks.get_current_time_ms = original_clock
-    ws = get_world_service()
+    ws = bot.world
     assert len(link.sent_commands) >= 10
     assert ws.fuel_book["windows"] >= 1
     assert ws.ammo_book["snapshots"] >= 1
@@ -138,7 +137,7 @@ def test_fighting_soak_is_divergence_free(fake_fs: FakeFileSystem) -> None:
         _tick_once(bot)
     finally:
         _test_hooks.get_current_time_ms = original_clock
-    ws = get_world_service()
+    ws = bot.world
     truth = server.world["tanks"][SEAM_CLIENT_ID]
     enemy_truth = server.world["tanks"][SEAM_ENEMY_ID]
     assert enemy_truth["counts"][1] < 25
@@ -188,7 +187,7 @@ def test_detector_fires_on_corrupted_fuel_sync(fake_fs: FakeFileSystem) -> None:
         _tick_once(bot)
     finally:
         _test_hooks.get_current_time_ms = original_clock
-    ws = get_world_service()
+    ws = bot.world
     assert ws.fuel_book["divergences"] >= 1
     records = _captured_events(fake_fs, artifacts["latest_events_path"])
     assert _divergence_events(records) != []

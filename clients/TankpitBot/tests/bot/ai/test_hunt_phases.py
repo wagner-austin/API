@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import (
     make_enemy_tank,
@@ -27,6 +28,7 @@ def test_hunt_acquire_teleports_back_to_an_affordable_off_viewport_lock() -> Non
     locked tank (the recorded human behavior: purple-1 was resumed by
     map-teleporting onto it, session 2026-07-01).
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=115, y=115)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -41,7 +43,7 @@ def test_hunt_acquire_teleports_back_to_an_affordable_off_viewport_lock() -> Non
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -69,6 +71,7 @@ def test_hunt_acquire_refuels_with_lock_held_when_return_unaffordable() -> None:
     human pursuit), covered by
     ``test_locked_human_beyond_funds_relays_with_lock_held``.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150, name="red-4")}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -83,7 +86,7 @@ def test_hunt_acquire_refuels_with_lock_held_when_return_unaffordable() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -103,6 +106,7 @@ def test_hunt_acquire_returns_to_the_locked_target_after_a_mode_interrupt() -> N
     the 1200-fuel tank, so the decision is a teleport at the locked
     target with the lock retained.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=120, y=100)}
     world, self_state = make_world(fuel=1200, tanks=tanks)
     ai_state = AIStateDict(
@@ -117,7 +121,7 @@ def test_hunt_acquire_returns_to_the_locked_target_after_a_mode_interrupt() -> N
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -135,6 +139,7 @@ def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
     fuel to a tile the enemy may have left. The resume path refreshes
     via map_open first; the lock survives for the post-refresh tick.
     """
+    ws = WorldService()
     stale = make_tank_state(
         tank_id=50,
         x=120,
@@ -163,7 +168,7 @@ def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -173,6 +178,7 @@ def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
 
 def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
     """Refresh delegates to fuel recovery when combat teleport is unaffordable."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "50": make_enemy_tank(x=190, y=100, name="red-50"),
     }
@@ -189,7 +195,17 @@ def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ((140, 100),))
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        inventory,
+        100000,
+        None,
+        "",
+        ((140, 100),),
+        ws=ws,
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -199,6 +215,7 @@ def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
 
 def test_hunt_close_enters_confirm_kill_when_locked_target_disappears() -> None:
     """Close state explicitly transitions through confirm-kill when target vanishes."""
+    ws = WorldService()
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(
         **{
@@ -212,7 +229,7 @@ def test_hunt_close_enters_confirm_kill_when_locked_target_disappears() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -222,6 +239,7 @@ def test_hunt_close_enters_confirm_kill_when_locked_target_disappears() -> None:
 
 def test_hunt_close_returns_close_decision_for_visible_target() -> None:
     """Close state re-teleports to a non-adjacent target to close distance."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "50": make_enemy_tank(),
     }
@@ -238,7 +256,7 @@ def test_hunt_close_returns_close_decision_for_visible_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -248,6 +266,7 @@ def test_hunt_close_returns_close_decision_for_visible_target() -> None:
 
 def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
     """Close state delegates to fuel recovery when combat teleport is unaffordable."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "50": make_enemy_tank(x=190, y=100, name="red-50"),
     }
@@ -264,7 +283,17 @@ def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ((140, 100),))
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        inventory,
+        100000,
+        None,
+        "",
+        ((140, 100),),
+        ws=ws,
+    )
 
     decision = decide_hunt_mode(ctx)
 
@@ -274,6 +303,7 @@ def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
 
 def test_hunt_engage_enters_confirm_kill_when_locked_target_disappears() -> None:
     """Engage state explicitly transitions through confirm-kill when target vanishes."""
+    ws = WorldService()
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(
         **{
@@ -287,7 +317,7 @@ def test_hunt_engage_enters_confirm_kill_when_locked_target_disappears() -> None
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -298,6 +328,7 @@ def test_hunt_engage_enters_confirm_kill_when_locked_target_disappears() -> None
 
 def test_hunt_engage_shoots_visible_locked_target() -> None:
     """Engage state keeps shooting a visible locked target."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "50": make_enemy_tank(x=101, y=100),
     }
@@ -314,7 +345,7 @@ def test_hunt_engage_shoots_visible_locked_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -324,6 +355,7 @@ def test_hunt_engage_shoots_visible_locked_target() -> None:
 
 def test_hunt_engage_confirms_killed_target_with_explicit_reason() -> None:
     """Engage confirmation also handles targets already on the kill cooldown."""
+    ws = WorldService()
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(
         **{
@@ -338,7 +370,7 @@ def test_hunt_engage_confirms_killed_target_with_explicit_reason() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -349,6 +381,7 @@ def test_hunt_engage_confirms_killed_target_with_explicit_reason() -> None:
 
 def test_hunt_engage_without_locked_target_id_still_confirms_and_searches() -> None:
     """Engage handles a missing target id without crashing or reusing stale state."""
+    ws = WorldService()
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(
         **{
@@ -359,7 +392,7 @@ def test_hunt_engage_without_locked_target_id_still_confirms_and_searches() -> N
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -375,6 +408,7 @@ def test_hunt_confirm_kill_reacquires_after_target_state_clears() -> None:
     (``_enemy_tank`` defaults), so the reacquisition produces a direct
     teleport rather than a map_open refresh.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "50": make_enemy_tank(name="red-8"),
     }
@@ -388,7 +422,7 @@ def test_hunt_confirm_kill_reacquires_after_target_state_clears() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -399,6 +433,7 @@ def test_hunt_confirm_kill_reacquires_after_target_state_clears() -> None:
 
 def test_scan_on_landing_reacquires_when_target_gone() -> None:
     """SCAN_ON_LANDING falls back to acquire when the locked target despawned."""
+    ws = WorldService()
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(
         **{
@@ -412,7 +447,7 @@ def test_scan_on_landing_reacquires_when_target_gone() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -422,6 +457,7 @@ def test_scan_on_landing_reacquires_when_target_gone() -> None:
 
 def test_scan_on_landing_engages_when_target_present() -> None:
     """SCAN_ON_LANDING transitions to ENGAGE when target is still visible."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_enemy_tank(x=101, y=100)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -436,7 +472,7 @@ def test_scan_on_landing_engages_when_target_present() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -450,6 +486,7 @@ def test_scan_on_landing_shoots_when_target_in_range() -> None:
     current tile; the close teleport is reserved for beyond
     ``SHOT_RANGE_TILES``.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_enemy_tank(x=105, y=100)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -464,7 +501,7 @@ def test_scan_on_landing_shoots_when_target_in_range() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 

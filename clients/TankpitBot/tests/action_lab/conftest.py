@@ -1,10 +1,11 @@
 """Shared fixtures for action_lab tests.
 
 Centralizes the "stop mocking the inventory tracker" pattern: tests should
-mutate the real ``_get_world_service().inventory_state`` via the real ``update_inventory_*``
-codepaths (or replay real captured frames through ``process_received_message``)
-instead of patching ``get_inventory_state`` at one of the many module-level
-import bindings.
+mutate the real ``probe.world.inventory_state`` -- the probe's OWN service,
+not a fresh one -- via the real ``update_inventory_*`` codepaths (or replay
+real captured frames through ``process_received_message``) instead of
+patching ``get_inventory_state`` at one of the many module-level import
+bindings.
 
 The previous mock-everywhere pattern is the root cause of the hang in
 ``test_run_pickup_attempt_for_probe_completes_immediately_when_inventory_grew``
@@ -29,11 +30,8 @@ from tests.action_lab._enemy_teleport_harness import (
 )
 from tests.action_lab._fuel_probe_harness import (
     fuel_probe_module,
-    fuel_targeting_module,
     fuel_targets_module,
 )
-from tests.action_lab._viewport_probe_harness import viewport_module
-from tests.fakes.terrain import InMemoryTerrainMap
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import TerrainMapProtocol
@@ -42,7 +40,7 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import movement_probe as movement_probe_module
 from tankpit_bot.action_lab import queue_experiments as queue_experiments_module
 from tankpit_bot.capture.xor import build_session_xor_table
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_inventory import (
     update_inventory_from_protocol,
 )
@@ -56,7 +54,7 @@ INVENTORY_GROWTH_FRAME_INDEX = 51
 """First received frame in fuel_probe.capture_session.json whose decode
 causes the real inventory tracker total to grow (0 -> 112 via a 0x49 sync).
 Discovered by replaying the capture through process_received_message and
-watching get_inventory_state(get_world_service())."""
+watching get_inventory_state(ws)."""
 
 INVENTORY_TOTAL_AFTER_GROWTH = 112
 
@@ -136,6 +134,7 @@ def restore_action_hooks() -> Generator[None, None, None]:
     module the same worker runs next.
     """
     from tankpit_bot.action_lab._test_hooks import (
+        _default_check_and_clear_radar_scan_complete,
         _default_check_and_clear_teleport_landed,
     )
     from tankpit_bot.action_lab.session import (
@@ -146,15 +145,12 @@ def restore_action_hooks() -> Generator[None, None, None]:
     )
     from tankpit_bot.bot.world_sync import drain_messages as _real_drain
     from tankpit_bot.browser import get_current_time_ms as _real_clock
-    from tankpit_bot.sniffer.world_state import (
-        check_and_clear_radar_scan_complete as _real_clear_radar,
-    )
 
     yield
 
     action_hooks.drain_buffered_messages = _real_drain
     action_hooks.get_current_time_ms = _real_clock
-    action_hooks.check_and_clear_radar_scan_complete = _real_clear_radar
+    action_hooks.check_and_clear_radar_scan_complete = _default_check_and_clear_radar_scan_complete
     action_hooks.check_and_clear_teleport_landed = _default_check_and_clear_teleport_landed
     action_hooks.wait_for_world_sync = _real_wait_world
     action_hooks.wait_for_radar_sync = _real_wait_radar
@@ -235,17 +231,19 @@ def rock_wall(x: int, y_range: range) -> dict[tuple[int, int], str]:
     return {(x, y): Terrain.ROCK for y in y_range}
 
 
-def set_inventory_total(total: int) -> None:
-    """Set the real inventory tracker so its total equals ``total``.
+def set_inventory_total(ws: WorldService, total: int) -> None:
+    """Set ``ws``'s inventory belief so its total equals ``total``.
 
-    Uses the real ``update_inventory_from_protocol`` codepath, so every
-    module-level binding of ``get_inventory_state`` sees the same value.
+    Uses the real ``update_inventory_from_protocol`` codepath, so the
+    service under test reports the value through ``get_inventory_state``.
+    The world must be the one the probe reads -- pass ``probe.world``, not
+    a fresh service, or the seeded belief lands where nothing can see it.
     All counts are loaded into ``dual_shots`` for simplicity; callers that
     need a specific distribution should call ``update_inventory_from_protocol``
     directly.
     """
     update_inventory_from_protocol(
-        get_world_service(),
+        ws,
         counts=[0, total, 0, 0, 0],
         enabled=[True, True, True, True, True],
     )
@@ -268,9 +266,6 @@ def restore_fuel_probe_hooks() -> Generator[None, None, None]:
     original_drain = action_hooks.drain_buffered_messages
     original_wait_sync = action_hooks.wait_for_world_sync
     original_wait_radar_sync = action_hooks.wait_for_radar_sync
-    original_get_terrain_map = fuel_probe_module.get_terrain_map
-    original_targeting_terrain = fuel_targeting_module.get_terrain_map
-    original_targets_terrain = fuel_targets_module.get_terrain_map
     original_wait_outcome = fuel_probe_module._wait_for_teleport_outcome
     original_find_visible = fuel_targets_module._find_visible_fuel_target
     original_requires_reposition = fuel_targets_module._visible_fuel_requires_reposition
@@ -285,9 +280,6 @@ def restore_fuel_probe_hooks() -> Generator[None, None, None]:
     action_hooks.drain_buffered_messages = original_drain
     action_hooks.wait_for_world_sync = original_wait_sync
     action_hooks.wait_for_radar_sync = original_wait_radar_sync
-    fuel_probe_module.get_terrain_map = original_get_terrain_map
-    fuel_targeting_module.get_terrain_map = original_targeting_terrain
-    fuel_targets_module.get_terrain_map = original_targets_terrain
     fuel_probe_module._wait_for_teleport_outcome = original_wait_outcome
     fuel_targets_module._find_visible_fuel_target = original_find_visible
     fuel_targets_module._visible_fuel_requires_reposition = original_requires_reposition
@@ -383,11 +375,3 @@ def restore_queue_probe_hooks() -> Generator[None, None, None]:
     action_hooks.wait_for_initial_self_state = orig_wait
     action_hooks.advance_startup_state = orig_advance
     queue_experiments_module.run_single_experiment = orig_run_single
-
-
-@pytest.fixture()
-def _all_ground_terrain() -> Generator[None, None, None]:
-    original = viewport_module.get_terrain_map
-    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap()
-    yield
-    viewport_module.get_terrain_map = original

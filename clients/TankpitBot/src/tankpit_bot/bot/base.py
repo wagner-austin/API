@@ -59,6 +59,7 @@ from tankpit_bot.sniffer.chrome_launch import (
     _chrome_stream_no_viewport,
     _maximize_via_cdp,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import CapturedMessage, GameLogEntryWithTimestamp
 
 log = get_logger(__name__)
@@ -104,6 +105,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         mode_bridge: ModeBridgeProtocol | None = None,
         status_bus: StatusBusProtocol | None = None,
         frame_bus: FrameBusProtocol | None = None,
+        world: WorldService | None = None,
     ) -> None:
         """Initialize the bot.
 
@@ -113,6 +115,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
             prefer_account: Skip guest login and use account credentials.
             cdp_service: Injected CDPService. Created internally if None.
             command_service: Injected CommandService. Created internally if None.
+            world: Injected WorldService. Created internally if None.
             mode_bridge: Cross-thread channel the SPA writes mode
                 overrides into. When ``None``, a fresh :class:`ModeBridge`
                 is created — a standalone ``make bot`` session gets an
@@ -138,6 +141,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
             prefer_account=prefer_account,
             cdp_service=cdp_service,
             command_service=command_service,
+            world=world,
         )
         # Narrower than the full page: the only two things the bot does
         # with it are the autoscroll toggle dance and the account-stats
@@ -285,6 +289,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
             navigate_and_login(
                 page,
                 cdp,
+                self.world,
                 target_url=self._target_url,
                 prefer_account=self._prefer_account,
                 tank_name_prefix="Bot",

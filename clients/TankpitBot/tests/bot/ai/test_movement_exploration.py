@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import (
     walk_or_teleport,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._movement_fixtures import _NOW_MS
 from tests.bot.ai._support import (
     make_inventory,
@@ -57,6 +58,7 @@ class TestPickupSurfaceRouting:
         from tankpit_bot.state.types import make_terrain_tile
         from tankpit_bot.types.constants import TERRAIN_FERRY
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         static = self._channel_terrain((100, 101, 102, 103))
         world["terrain"]["100,100"] = make_terrain_tile(
@@ -69,7 +71,7 @@ class TestPickupSurfaceRouting:
         terrain = compose_decision_terrain(world, static, _NOW_MS)
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 105, 100, pickup_kind="equipment")
 
@@ -92,6 +94,7 @@ class TestPickupSurfaceRouting:
         from tankpit_bot.state.types import make_terrain_tile
         from tankpit_bot.types.constants import TERRAIN_FERRY
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         static = self._channel_terrain((100, 101, 102, 103))
         world["terrain"]["100,100"] = make_terrain_tile(
@@ -104,7 +107,7 @@ class TestPickupSurfaceRouting:
         terrain = compose_decision_terrain(world, static, _NOW_MS)
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 103, 100, pickup_kind="equipment")
 
@@ -126,6 +129,7 @@ class TestPickupSurfaceRouting:
         from tankpit_bot.state.types import make_terrain_tile
         from tankpit_bot.types.constants import TERRAIN_FERRY
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         static = self._channel_terrain((100, 101, 102, 103))
         world["terrain"]["100,100"] = make_terrain_tile(
@@ -138,7 +142,7 @@ class TestPickupSurfaceRouting:
         terrain = compose_decision_terrain(world, static, _NOW_MS)
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 100, 100, pickup_kind="equipment")
 
@@ -159,6 +163,7 @@ class TestPickupSurfaceRouting:
         from tankpit_bot.state.types import make_terrain_tile
         from tankpit_bot.types.constants import TERRAIN_FERRY
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         static = self._channel_terrain((102, 103))
         world["terrain"]["102,100"] = make_terrain_tile(
@@ -171,7 +176,7 @@ class TestPickupSurfaceRouting:
         terrain = compose_decision_terrain(world, static, _NOW_MS)
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 104, 100, pickup_kind="equipment")
 

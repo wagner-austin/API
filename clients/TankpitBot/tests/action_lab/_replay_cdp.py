@@ -13,22 +13,25 @@ from platform_core.json_utils import (
     JSONValue,
 )
 
-from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.sniffer.world_service import WorldService
 
 
-def build_world_derived_snapshot() -> JSONObject:
-    """Build a page-client snapshot from the current global world state.
+def build_world_derived_snapshot(ws: WorldService) -> JSONObject:
+    """Build a page-client snapshot from ``ws``'s world state.
 
     No browser is running during replay. The :class:`WorldStateDerivedCDP`
     therefore answers snapshot queries with a deterministic projection of
-    what :mod:`tankpit_bot.sniffer.world_state` already knows. Field
-    semantics mirror the live snapshot but every value here is reachable
-    from the production world-state singletons.
+    what the session's own world service already knows. Field semantics
+    mirror the live snapshot but every value here is reachable from that
+    one service.
+
+    Args:
+        ws: The session's world service -- the projection's only source.
 
     Returns:
         JSON-shaped page-client snapshot payload.
     """
-    world = get_world_state()
+    world = ws.get_world_state()
     self_state = world["self_state"]
     self_fields: dict[str, JSONValue] = {}
     if self_state is not None:
@@ -125,11 +128,19 @@ class WorldStateDerivedCDP:
     """CDP substitute that derives ``Runtime.evaluate`` results from world state.
 
     The harness routes every CDP call through this class. Snapshot
-    queries return a payload built from the *current* world-state
-    singletons (see :func:`build_world_derived_snapshot`); all other
-    CDP methods are no-ops. The CDP substitute carries no behavior of
-    its own -- it is a pure projection of world-state truth.
+    queries return a payload built from the session's world service
+    (see :func:`build_world_derived_snapshot`); all other CDP methods
+    are no-ops. The CDP substitute carries no behavior of its own --
+    it is a pure projection of that one service's truth.
     """
+
+    def __init__(self, ws: WorldService) -> None:
+        """Bind the world service this substitute projects.
+
+        Args:
+            ws: The session's world service.
+        """
+        self._ws = ws
 
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
         """Service a CDP command.
@@ -146,7 +157,7 @@ class WorldStateDerivedCDP:
             expression = params.get("expression", "")
             if isinstance(expression, str) and "ws.send" in expression:
                 return {"result": {"value": "SENT_REPLAY_BYTES"}}
-            return {"result": {"value": build_world_derived_snapshot()}}
+            return {"result": {"value": build_world_derived_snapshot(self._ws)}}
         return {"result": {"value": None}}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:

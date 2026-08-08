@@ -8,7 +8,7 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.threat_primitives import manhattan_distance
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
-from tankpit_bot.sniffer.world_state import is_move_target_failed
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.state.occupancy import is_tank_body_present
 
@@ -35,6 +35,7 @@ def combat_landing_candidates(
     target: EnemyThreatDict,
     terrain: TerrainMapProtocol | None,
     now_ms: int,
+    ws: WorldService,
 ) -> list[tuple[int, int]]:
     """Return usable adjacent landing tiles ordered by self distance.
 
@@ -52,6 +53,7 @@ def combat_landing_candidates(
         target: Enemy threat to approach.
         terrain: Composed decision terrain; ``None`` trusts the server.
         now_ms: Current timestamp for the failed-move TTL check.
+        ws: The session's world service, holding the failed-move marks.
 
     Returns:
         Ordered usable landing tiles adjacent to the target.
@@ -70,7 +72,7 @@ def combat_landing_candidates(
             continue
         if terrain is not None and not terrain.is_passable(candidate_x, candidate_y):
             continue
-        if is_move_target_failed(candidate_x, candidate_y, now_ms):
+        if ws.is_move_target_failed(candidate_x, candidate_y, now_ms):
             continue
         usable.append((candidate_x, candidate_y))
     usable.sort(key=_distance_key(self_state["x"], self_state["y"]))
@@ -83,6 +85,7 @@ def choose_combat_landing_tile(
     target: EnemyThreatDict,
     terrain: TerrainMapProtocol | None,
     now_ms: int,
+    ws: WorldService,
 ) -> tuple[int, int]:
     """Choose the tile to teleport to for combat.
 

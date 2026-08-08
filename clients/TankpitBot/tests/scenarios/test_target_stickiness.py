@@ -17,6 +17,7 @@ import pytest
 
 from tankpit_bot.bot.ai.threat_primitives import WIRE_PRESENCE_TTL_MS
 from tankpit_bot.bot.ai.threats import analyze_threats
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.scenarios._harness import BotScenario
 from tests.scenarios._wire_builders import movement_response
 
@@ -123,7 +124,7 @@ def test_bot_holds_lock_when_target_drops_off_threat_list() -> None:
     self_state = scenario.self_state
     if self_state is None:
         pytest.fail("place_self must populate self_state")
-    threats = analyze_threats(scenario.world, self_state, scenario.timestamp_ms)
+    threats = analyze_threats(WorldService(), scenario.world, self_state, scenario.timestamp_ms)
     threat_ids = sorted(threat["tank_id"] for threat in threats)
     assert threat_ids == [RIVAL_TANK_ID], (
         "precondition: locked target should have aged out of the threat list"

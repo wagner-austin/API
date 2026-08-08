@@ -17,7 +17,7 @@ from tankpit_bot.diagnostics.account_stats import (
     emit_account_stats_sample,
     parse_account_stats,
 )
-from tankpit_bot.sniffer.world_state import record_account_stats
+from tankpit_bot.sniffer.world_service import WorldService
 
 log = get_logger(__name__)
 
@@ -35,6 +35,7 @@ _ACCOUNT_STATS_PANEL_RENDER_MS = _ACCOUNT_STATS_POLL_INTERVAL_MS * _ACCOUNT_STAT
 
 
 def capture_account_stats(
+    ws: WorldService,
     cdp: CDPSessionProtocol | None,
     page: PageWaitProtocol | None,
     phase: str,
@@ -75,7 +76,7 @@ def capture_account_stats(
         # Canonical account model (state/types/self_account.py):
         # runtime features read this instead of re-fishing the
         # diagnostic stream.
-        record_account_stats(
+        ws.record_account_stats(
             rank_name=stats["rank_name"],
             rank_number=stats["rank_number"],
             promotion_points=stats["promotion_points"],

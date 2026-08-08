@@ -26,6 +26,7 @@ from tankpit_bot.bot.tick_combat_feedback import (
     _merge_protocol_kills,
 )
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
+from tankpit_bot.browser import _test_hooks as browser_hooks
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.overlay import OverlayStateDict, render_overlay_payload
 from tankpit_bot.browser.overlay_hud import update_bot_overlay
@@ -40,9 +41,6 @@ from tankpit_bot.runtime_artifacts import bot_run_dir, resolve_bot_instance
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     emit_sync,
-)
-from tankpit_bot.sniffer.world_state import (
-    get_terrain_map,
 )
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state import SelfStateDict
@@ -124,7 +122,7 @@ def _tick_once(bot: Bot) -> None:
         return
 
     # 3. Merge kills from protocol
-    bot._ai_state = _merge_protocol_kills(bot._ai_state)
+    bot._ai_state = _merge_protocol_kills(bot.world, bot._ai_state)
     now = get_current_time_ms()
     if _has_pending_shot_feedback(bot, now):
         return
@@ -144,7 +142,7 @@ def _tick_once(bot: Bot) -> None:
 
     # 6. DECIDE
     inventory = get_inventory_state(bot.world)
-    terrain = get_terrain_map()
+    terrain = bot.world.get_terrain_map()
 
     decision = ai_strategy.decide(
         world,
@@ -155,6 +153,7 @@ def _tick_once(bot: Bot) -> None:
         terrain,
         combat_feedback,
         bot.world.map_fuel_dots,
+        ws=bot.world,
     )
 
     bot._self_alignment.maybe_emit(self_state, snapshot)
@@ -302,7 +301,7 @@ def _enforce_autoscroll_once(bot: Bot) -> None:
     """
     if bot._autoscroll_enforced or bot._page is None:
         return
-    _test_hooks.ensure_autoscroll_off(bot._page, bot._messages)
+    browser_hooks.ensure_autoscroll_off(bot._page, bot._messages, bot.world)
     bot._autoscroll_enforced = True
 
 

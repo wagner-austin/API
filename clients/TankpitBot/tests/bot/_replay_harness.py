@@ -34,7 +34,6 @@ from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.inventory import InventoryState
-from tankpit_bot.sniffer.world_state import get_world_service, get_world_state
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.types import CaptureSession, decode_capture_session
 from tests.fakes import FakeCDPSession
@@ -170,9 +169,10 @@ def _record_tick(
     bot: ReplayBot, tick_num: int, *, drained: int, dispatched: list[str]
 ) -> TickRecord:
     """Snapshot the observable bot + world state at the end of one tick."""
-    world = get_world_state()
+    ws = bot.world
+    world = ws.get_world_state()
     self_state = world["self_state"]
-    inv = get_inventory_state(get_world_service())
+    inv = get_inventory_state(ws)
     state_data = bot.get_state_data()
     ai = bot._ai_state
     resource_target = (

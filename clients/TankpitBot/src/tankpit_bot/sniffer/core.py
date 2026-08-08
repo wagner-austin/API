@@ -244,7 +244,7 @@ class WebSocketSniffer(BrowserSession):
             mine_status = self._mine_tracker.process_message(payload, "sent")
             if mine_status:
                 log.info(mine_status)
-            decoded = decode_message(payload, direction, self._magic)
+            decoded = decode_message(self.world, payload, direction, self._magic)
             log.info(decoded)
 
         self._poll_game_log()
@@ -340,6 +340,7 @@ class WebSocketSniffer(BrowserSession):
             navigate_and_login(
                 page,
                 cdp,
+                self.world,
                 target_url=self._target_url,
                 prefer_account=self._prefer_account,
                 tank_name_prefix="B",

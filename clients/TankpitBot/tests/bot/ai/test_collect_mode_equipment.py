@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.physics.capacity import inventory_capacity
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -20,6 +21,7 @@ def test_full_inventory_skips_equipment_pickup() -> None:
     at full inventory is a guaranteed wasted tick (8 of them in the
     2026-07-18 5-minute run before this gate).
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=400,
         containers={
@@ -44,7 +46,7 @@ def test_full_inventory_skips_equipment_pickup() -> None:
     rank_cap = inventory_capacity(self_state["rank"])
     inventory = make_inventory(dual_count=rank_cap, default_count=rank_cap)
 
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
     decision = decide_collect_mode(ctx)
 
     assert ctx.inventory["dual_shots"]["count"] == rank_cap
@@ -61,6 +63,7 @@ def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
     exception. The viewport has unscanned ground so the forager fires
     the free radar instead of falling through to the unaffordable hop.
     """
+    ws = WorldService()
     world, self_state = make_world(fuel=800, scanned=False)
     base_state = make_scanned_ai_state(landing_scan_viewport="")
     ai_state = AIStateDict(
@@ -78,7 +81,7 @@ def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
     inventory["dual_shots"]["count"] = 15
     inventory["homing_shots"]["count"] = 15
     inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -98,6 +101,7 @@ def test_collect_mode_forages_radar_when_fully_boxed_in() -> None:
     process keeps running. Viewport not yet scanned so the forager
     has work to do.
     """
+    ws = WorldService()
     world, self_state = make_world(fuel=140, scanned=False)
     base_state = make_scanned_ai_state(landing_scan_viewport="")
     ai_state = AIStateDict(
@@ -120,7 +124,7 @@ def test_collect_mode_forages_radar_when_fully_boxed_in() -> None:
         for y in range(92, 108):
             terrain_data[(x, y)] = "W"
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -146,6 +150,7 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     # Fuel below the short-hop cost (8 tiles * 6 = 48). The
     # ``hunt_min_fuel`` reserve was dropped 2026-06-24, so genuine
     # stranding requires fuel below the raw short-hop cost.
+    ws = WorldService()
     world, self_state = make_world(fuel=30, scanned=True)
     base_state = make_scanned_ai_state()
     ai_state = AIStateDict(
@@ -166,7 +171,7 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     inventory["dual_shots"]["count"] = 15
     inventory["homing_shots"]["count"] = 15
     inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
         decide_collect_mode(ctx)
@@ -184,6 +189,7 @@ def test_collect_mode_raises_when_fully_boxed_in() -> None:
     import pytest
 
     # Fuel below the short-hop cost so no teleport is affordable.
+    ws = WorldService()
     world, self_state = make_world(fuel=30, scanned=True)
     base_state = make_scanned_ai_state()
     ai_state = AIStateDict(
@@ -209,7 +215,7 @@ def test_collect_mode_raises_when_fully_boxed_in() -> None:
         for y in range(92, 108):
             terrain_data[(x, y)] = "W"
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
     with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
         decide_collect_mode(ctx)
@@ -225,6 +231,7 @@ def test_collect_mode_picks_equipment_before_adjacent_fuel() -> None:
     rule that opportunistically grabbed adjacent fuel, are collapsed
     into this single ordering.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=800,
         scanned=True,
@@ -256,7 +263,7 @@ def test_collect_mode_picks_equipment_before_adjacent_fuel() -> None:
         }
     )
     inventory = make_inventory(default_count=15)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -285,6 +292,7 @@ def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None
     # corporal cap is 1200, fuel 800, walk 10 tiles, volume 300 -->
     # 800 + 10 + min(300, 400) = 1110 <= 1200. Overflow-refusal is
     # covered by ``pickup_not_worth_walk`` tests in test_collect_mode_fuel.py.
+    ws = WorldService()
     world, self_state = make_world(
         fuel=800,
         scanned=True,
@@ -308,7 +316,7 @@ def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None
         }
     )
     inventory = make_inventory(default_count=15)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -333,6 +341,7 @@ def test_collect_mode_skips_opportunistic_fuel_at_rank_capacity() -> None:
     returns ``None`` and the cascade falls through to the no-equipment
     search-hop path.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=1200,
         scanned=True,
@@ -356,7 +365,7 @@ def test_collect_mode_skips_opportunistic_fuel_at_rank_capacity() -> None:
         }
     )
     inventory = make_inventory(default_count=15)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -374,8 +383,8 @@ def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
     opportunistic fuel pickup, falling through to the no-equipment
     search-hop path.
     """
-    from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
+    ws = WorldService()
     world, self_state = make_world(
         fuel=800,
         scanned=True,
@@ -390,7 +399,7 @@ def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
             ),
         },
     )
-    mark_move_target_failed(105, 105, 99000)
+    ws.mark_move_target_failed(105, 105, 99000)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -400,7 +409,7 @@ def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
         }
     )
     inventory = make_inventory(default_count=15)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -415,6 +424,7 @@ def test_collect_mode_releases_lock_for_markedly_closer_equipment() -> None:
     Mirrors the fuel-mode rule; regression guard for live run
     20260610-011x lock stickiness.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=800,
         scanned=True,
@@ -449,7 +459,7 @@ def test_collect_mode_releases_lock_for_markedly_closer_equipment() -> None:
         }
     )
     inventory = make_inventory(default_count=15)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -462,6 +472,7 @@ def test_collect_mode_releases_lock_for_markedly_closer_equipment() -> None:
 
 def test_collect_mode_keeps_lock_against_marginally_closer_equipment() -> None:
     """A candidate inside the anti-churn threshold does not break the lock."""
+    ws = WorldService()
     world, self_state = make_world(
         fuel=800,
         scanned=True,
@@ -496,7 +507,7 @@ def test_collect_mode_keeps_lock_against_marginally_closer_equipment() -> None:
         }
     )
     inventory = make_inventory(default_count=15)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 

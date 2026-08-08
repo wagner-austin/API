@@ -6,6 +6,7 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.larder import select_fuel_larder_hop
 from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, TerrainTileDict
 from tests.bot.ai._support import (
     make_container,
@@ -24,6 +25,7 @@ def _ctx(
     containers: dict[str, ContainerStateDict],
     terrain: TerrainMapProtocol | None = None,
 ) -> DecideCtx:
+    ws = WorldService()
     world, self_state = make_world(self_x=100, self_y=100, fuel=fuel, containers=containers)
     return DecideCtx(
         world,
@@ -33,6 +35,7 @@ def _ctx(
         100000,
         terrain if terrain is not None else InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
 
@@ -209,6 +212,7 @@ def test_dreg_waiver_needs_hunt_ready_inventory() -> None:
     worth a 5-tile walk. Topping the last points only matters when
     fuel is the FINAL hunt requirement.
     """
+    ws = WorldService()
     containers = {
         "110,100": make_container(110, 100, 900, is_fuel=True),
     }
@@ -223,6 +227,7 @@ def test_dreg_waiver_needs_hunt_ready_inventory() -> None:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
     selection = select_fuel_larder_hop(ctx)

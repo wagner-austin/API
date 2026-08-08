@@ -15,9 +15,7 @@ from tankpit_bot.bot.ai.movement_exploration import (
     select_exploration_command,
     viewport_exploration_candidates,
 )
-from tankpit_bot.sniffer.world_state import (
-    mark_move_target_failed,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     make_mine_state,
@@ -37,11 +35,12 @@ class TestWalkOrTeleport:
 
     def test_uses_final_move_target_when_viewport_path_exists(self) -> None:
         """In-viewport detours still issue the final move target."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(102, 100): "#"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 104, 100, pickup_kind=None)
 
@@ -53,11 +52,12 @@ class TestWalkOrTeleport:
 
     def test_uses_final_pickup_target_when_viewport_collection_path_exists(self) -> None:
         """In-viewport detours still issue the final pickup target."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 103, 100, pickup_kind="equipment")
 
@@ -69,6 +69,7 @@ class TestWalkOrTeleport:
 
     def test_ignores_enemy_on_old_waypoint_tile(self) -> None:
         """Enemy occupancy off the final target does not block the move."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -87,7 +88,7 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(102, 100): "#"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 104, 100, pickup_kind=None)
 
@@ -99,12 +100,13 @@ class TestWalkOrTeleport:
 
     def test_ignores_mine_on_old_waypoint_tile(self) -> None:
         """Mine occupancy off the final target does not block the move."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"103,99": make_mine_state(x=103, y=99, mine_type=0, tank_id=-1, team=0)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(102, 100): "#"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 104, 100, pickup_kind=None)
 
@@ -116,19 +118,21 @@ class TestWalkOrTeleport:
 
     def test_rejects_recently_failed_move_target(self) -> None:
         """Recently failed move targets are skipped before planning."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
-        mark_move_target_failed(107, 100, 90000)
+        ws.mark_move_target_failed(107, 100, 90000)
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
         assert result is None
 
     def test_rejects_enemy_occupied_direct_move(self) -> None:
         """Enemy occupancy on the final move target blocks the move."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -150,7 +154,7 @@ class TestWalkOrTeleport:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -158,11 +162,12 @@ class TestWalkOrTeleport:
 
     def test_direct_move_command_rejects_off_viewport_target(self) -> None:
         """Direct move helper refuses targets outside the visible viewport."""
+        ws = WorldService()
         world, self_state = make_world(self_x=64, self_y=64, fuel=150)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = _direct_move_command(ctx, 72, 63)
 
@@ -170,12 +175,13 @@ class TestWalkOrTeleport:
 
     def test_direct_move_command_rejects_mined_target(self) -> None:
         """Direct move helper rejects final targets occupied by known mines."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = _direct_move_command(ctx, 107, 100)
 
@@ -183,6 +189,7 @@ class TestWalkOrTeleport:
 
     def test_rejects_enemy_occupied_move_without_terrain(self) -> None:
         """Without terrain, enemy occupancy on the target still blocks the move."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -203,7 +210,7 @@ class TestWalkOrTeleport:
         world, self_state = make_world(self_x=100, self_y=100, fuel=150, tanks=tanks)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -211,11 +218,12 @@ class TestWalkOrTeleport:
 
     def test_rejects_mined_move_without_terrain(self) -> None:
         """Without terrain, mine occupancy on the target blocks the move."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -223,12 +231,13 @@ class TestWalkOrTeleport:
 
     def test_moves_to_final_target_when_mine_blocks_straight_line(self) -> None:
         """Known mines on the straight line still allow an in-viewport detour."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"103,100": make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=0)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory(default_count=5)
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -240,12 +249,13 @@ class TestWalkOrTeleport:
 
     def test_rejects_terrain_blocked_teleport_when_exact_fuel_is_too_low(self) -> None:
         """Terrain fallback rejects teleports whose exact jump cost exceeds fuel."""
+        ws = WorldService()
         terrain_data = {(103, y): "#" for y in range(92, 108)}
         world, self_state = make_world(self_x=100, self_y=100, fuel=30)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap(terrain_data)
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
@@ -253,10 +263,11 @@ class TestWalkOrTeleport:
 
     def test_viewport_exploration_candidates_rotate_with_offset(self) -> None:
         """Exploration candidate order can rotate to avoid repeating one edge."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
         base_candidates = viewport_exploration_candidates(ctx)
         rotated_candidates = viewport_exploration_candidates(ctx, candidate_offset=1)
@@ -266,11 +277,12 @@ class TestWalkOrTeleport:
 
     def test_viewport_exploration_candidates_return_empty_for_single_tile_viewport(self) -> None:
         """Degenerate one-tile viewports yield no exploration candidates."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["viewport"] = make_viewport_state(left=100, top=100, width=1, height=1)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
         candidates = viewport_exploration_candidates(ctx)
 
@@ -278,6 +290,7 @@ class TestWalkOrTeleport:
 
     def test_select_exploration_prefers_unscanned_neighboring_viewport(self) -> None:
         """Exploration prefers edges that expose fresh unscanned space."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         current = world["viewport"]
         scanned_viewport_origins = [
@@ -300,6 +313,7 @@ class TestWalkOrTeleport:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = select_exploration_command(ctx)
@@ -314,11 +328,12 @@ class TestWalkOrTeleport:
 
     def test_surface_transition_clamps_move_target(self) -> None:
         """A ground-to-ferry transition clamps the move at the ferry tile."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(103, 100): "~"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 105, 100, pickup_kind=None)
 
@@ -336,19 +351,17 @@ class TestWalkOrTeleport:
         candidates and try the next one rather than giving up after the
         first None.
         """
-        from tankpit_bot.sniffer.world_state import (
-            mark_move_target_failed,
-        )
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         candidates = viewport_exploration_candidates(ctx)
         if not candidates:
             raise AssertionError("expected at least one exploration candidate")
         first_x, first_y = candidates[0]
-        mark_move_target_failed(first_x, first_y, 99000)
+        ws.mark_move_target_failed(first_x, first_y, 99000)
 
         result = select_exploration_command(ctx)
 

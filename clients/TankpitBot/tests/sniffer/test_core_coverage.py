@@ -7,7 +7,7 @@ import base64
 import pytest
 
 from tankpit_bot.capture.xor import build_session_xor_table, reset_static_key_cache
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.conftest import FakeFileSystem
 
 # =============================================================================
@@ -177,26 +177,26 @@ class TestSnifferCoverageBranches:
         """Test dispatch_world_state_update processes radar_response."""
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict, RadarScanResultDict
         from tankpit_bot.sniffer import world_state_dispatch
-        from tankpit_bot.sniffer.world_state import get_world_service
 
         # Reset world state
 
+        ws = WorldService()
         msg = RadarScanResultDict(
             msg_type=0x4F,
             containers=[RadarContainerDict(x=10, y=20, volume=100)],
             mines=[RadarMineDict(x=30, y=40, team=0)],
             mine_clears=[],
         )
-        world_state_dispatch.dispatch_world_state_update(get_world_service(), msg)
+        world_state_dispatch.dispatch_world_state_update(ws, msg)
 
     def test_dispatch_world_state_update_movement_response_valid(self) -> None:
         """Test dispatch_world_state_update with valid MovementResponse updates position."""
         from tankpit_bot.protocol import MovementResponseDict
         from tankpit_bot.sniffer import world_state_dispatch
-        from tankpit_bot.sniffer.world_state import get_world_service
 
         # Reset world state
 
+        ws = WorldService()
         msg = MovementResponseDict(
             msg_type=0x3D,
             team=0,
@@ -210,7 +210,7 @@ class TestSnifferCoverageBranches:
             carrying=0,
         )
         # This should update world state position
-        world_state_dispatch.dispatch_world_state_update(get_world_service(), msg)
+        world_state_dispatch.dispatch_world_state_update(ws, msg)
         # No crash means success - position update occurred
 
     def test_process_received_message_with_result(self, fake_fs: FakeFileSystem) -> None:
@@ -218,6 +218,7 @@ class TestSnifferCoverageBranches:
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
         from tankpit_bot.sniffer import decoders
 
+        ws = WorldService()
         fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
         reset_static_key_cache()
 
@@ -228,15 +229,14 @@ class TestSnifferCoverageBranches:
         payload = base64.b64encode(header + body).decode()
 
         # This should decode and log (we just verify no crash)
-        decoders.process_received_message(
-            get_world_service(), payload, build_session_xor_table("testmagic")
-        )
+        decoders.process_received_message(ws, payload, build_session_xor_table("testmagic"))
 
     def test_process_received_message_binary(self, fake_fs: FakeFileSystem) -> None:
         """Test process_received_message handles binary messages."""
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
         from tankpit_bot.sniffer import decoders
 
+        ws = WorldService()
         fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
         reset_static_key_cache()
         xor_table = build_session_xor_table("testmagic")
@@ -252,7 +252,7 @@ class TestSnifferCoverageBranches:
         payload = base64.b64encode(header + body).decode()
 
         # This should decode through the binary path
-        decoders.process_received_message(get_world_service(), payload, xor_table)
+        decoders.process_received_message(ws, payload, xor_table)
 
 
 # =============================================================================

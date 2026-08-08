@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tankpit_bot.state.viewport_geometry import (
     make_visible_viewport_state,
@@ -19,18 +16,20 @@ class TestViewportGeometry:
 
     def test_radar_bounds_extend_visible_viewport_by_one_tile(self) -> None:
         """Radar bounds extend one tile beyond the visible viewport."""
+        ws = WorldService()
         viewport = make_visible_viewport_state(140, 149)
-        get_world_service().world_state["viewport"] = viewport
+        ws.world_state["viewport"] = viewport
 
         assert viewport_visible_bounds(viewport) == (140, 149, 155, 164)
         assert viewport_radar_bounds(viewport) == (139, 148, 156, 165)
 
     def test_viewport_bounds_delegates_to_geometry(self) -> None:
         """WorldService.viewport_bounds() returns the visible viewport."""
+        ws = WorldService()
         viewport = make_visible_viewport_state(140, 149)
-        get_world_service().world_state["viewport"] = viewport
+        ws.world_state["viewport"] = viewport
 
-        assert get_world_service().viewport_bounds() == (140, 149, 155, 164)
+        assert ws.viewport_bounds() == (140, 149, 155, 164)
 
     def test_patch_coords_translate_from_radar_margin(self) -> None:
         """Patch col/row 0 is the radar margin; visible viewport starts at 1."""
@@ -49,7 +48,7 @@ class TestTextDecoding:
         from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # Length not multiple of 4
-        result = try_decode_received_text("abc")
+        result = try_decode_received_text(WorldService(), "abc")
         assert result is None
 
     def test_try_decode_received_text_invalid_chars(self) -> None:
@@ -57,7 +56,7 @@ class TestTextDecoding:
         from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # Invalid character !
-        result = try_decode_received_text("abc!")
+        result = try_decode_received_text(WorldService(), "abc!")
         assert result is None
 
     def test_try_decode_received_text_too_short(self) -> None:
@@ -67,7 +66,7 @@ class TestTextDecoding:
         from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # Only 1 byte of data (less than 2)
-        result = try_decode_received_text(base64.b64encode(b"x").decode())
+        result = try_decode_received_text(WorldService(), base64.b64encode(b"x").decode())
         assert result is None
 
     def test_try_decode_received_text_empty_body(self) -> None:
@@ -77,7 +76,7 @@ class TestTextDecoding:
         from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # 2 bytes header, no body
-        result = try_decode_received_text(base64.b64encode(b"\x00\x00").decode())
+        result = try_decode_received_text(WorldService(), base64.b64encode(b"\x00\x00").decode())
         assert result is None
 
     def test_try_decode_received_text_non_text_type(self) -> None:
@@ -87,7 +86,9 @@ class TestTextDecoding:
         from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # First byte 0x00 is not a text message type
-        result = try_decode_received_text(base64.b64encode(b"\x03\x00\x00data").decode())
+        result = try_decode_received_text(
+            WorldService(), base64.b64encode(b"\x03\x00\x00data").decode()
+        )
         assert result is None
 
     def test_try_decode_received_text_valid_join_confirm(self) -> None:
@@ -99,7 +100,7 @@ class TestTextDecoding:
         # '+' (0x2B) is a text message type for JOIN_CONFIRM
         body = b"+field=42\n"
         payload = base64.b64encode(len(body).to_bytes(2, "little") + body).decode()
-        result = try_decode_received_text(payload)
+        result = try_decode_received_text(WorldService(), payload)
         if result is None:
             raise AssertionError("expected non-None result")
         assert "JOIN_CONFIRM" in result or "field=42" in result
@@ -114,14 +115,14 @@ class TestTextDecoding:
         body = b"+field=42\n"
         payload = base64.b64encode(len(body).to_bytes(2, "little") + body).decode()
         # Should not raise, just logs
-        decode_received_text_message(payload)
+        decode_received_text_message(WorldService(), payload)
 
     def test_decode_received_text_message_no_log_for_none(self) -> None:
         """Test decode_received_text_message does not log when result is None."""
         from tankpit_bot.sniffer.decoders import decode_received_text_message
 
         # Invalid payload, result is None, should not log
-        decode_received_text_message("xxx")
+        decode_received_text_message(WorldService(), "xxx")
 
 
 class TestWorldStateGetter:
@@ -129,17 +130,17 @@ class TestWorldStateGetter:
 
     def test_get_world_state_returns_current_state(self) -> None:
         """Test get_world_state returns the current world state."""
-        from tankpit_bot.sniffer.world_state import get_world_state
 
         # After reset, state should have None self_state
-        state = get_world_state()
+        ws = WorldService()
+        state = ws.get_world_state()
         assert state["self_state"] is None
         assert state["containers"] == {}
         assert state["mines"] == {}
 
         # Update position and verify state is updated
-        update_world_state_from_position(50, 60)
-        state = get_world_state()
+        ws.update_world_state_from_position(50, 60)
+        state = ws.get_world_state()
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         assert state["self_state"]["x"] == 50
@@ -160,12 +161,13 @@ class TestFuelUpdate:
         from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
         # First set up a position to create self_state
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
 
         # Update fuel - sets to absolute value
-        update_world_state_from_fuel_total(get_world_service(), 50)
+        update_world_state_from_fuel_total(ws, 50)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         assert state["self_state"]["fuel"] == 50
@@ -177,13 +179,14 @@ class TestFuelUpdate:
         # Reset to ensure no self_state
 
         # Verify self_state is None
-        state = get_world_service().world_state
+        ws = WorldService()
+        state = ws.world_state
         assert state["self_state"] is None
 
         # Update fuel - should do nothing since no self_state
-        update_world_state_from_fuel_total(get_world_service(), 50)
+        update_world_state_from_fuel_total(ws, 50)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert state["self_state"] is None
 
 
@@ -198,20 +201,21 @@ class TestContainerPickup:
         )
 
         # First set up a position to create self_state
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
 
         # Add a container via radar
         containers: list[RadarContainerDict] = [RadarContainerDict(x=50, y=60, volume=100)]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(get_world_service(), containers, mines, [])
+        update_world_state_from_radar(ws, containers, mines, [])
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert "50,60" in state["containers"]
 
         # Pick up the container
-        update_world_state_from_container_pickup(get_world_service(), 50, 60)
+        update_world_state_from_container_pickup(ws, 50, 60)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         # Container should be removed
         assert "50,60" not in state["containers"]
 
@@ -223,7 +227,7 @@ class TestRadarViewportReconciliation:
         """Radar records authoritative coverage for the current viewport origin."""
         from tankpit_bot.protocol import RadarContainerDict
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.world_state["viewport"]["left"] = 100
         ws.world_state["viewport"]["top"] = 200
 
@@ -234,28 +238,24 @@ class TestRadarViewportReconciliation:
     def test_radar_clears_failed_scan_mark_for_current_viewport(self) -> None:
         """Successful radar clears the recent failed-scan quarantine."""
         from tankpit_bot.protocol import RadarContainerDict
-        from tankpit_bot.sniffer.world_state import (
-            is_scan_viewport_failed,
-            mark_scan_viewport_failed,
-        )
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.world_state["viewport"]["left"] = 100
         ws.world_state["viewport"]["top"] = 200
-        mark_scan_viewport_failed(100, 200, 1000)
+        ws.mark_scan_viewport_failed(100, 200, 1000)
 
-        assert is_scan_viewport_failed(100, 200, 1001) is True
+        assert ws.is_scan_viewport_failed(100, 200, 1001) is True
 
         update_world_state_from_radar(ws, [RadarContainerDict(x=101, y=201, volume=500)], [], [])
 
-        assert is_scan_viewport_failed(100, 200, 1001) is False
+        assert ws.is_scan_viewport_failed(100, 200, 1001) is False
 
     def test_radar_clears_missing_current_viewport_containers(self) -> None:
         """Radar removes stale current-viewport containers not returned by the scan."""
         from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.state.types import make_container_state
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.world_state["viewport"]["left"] = 100
         ws.world_state["viewport"]["top"] = 200
         ws.world_state["containers"]["101,201"] = make_container_state(
@@ -281,7 +281,7 @@ class TestRadarViewportReconciliation:
         """Radar removes each stale container after the first deletion snapshot."""
         from tankpit_bot.state.types import make_container_state
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.world_state["viewport"]["left"] = 100
         ws.world_state["viewport"]["top"] = 200
         ws.world_state["containers"]["101,201"] = make_container_state(
@@ -313,7 +313,7 @@ class TestRadarViewportReconciliation:
         from tankpit_bot.protocol import RadarMineDict
         from tankpit_bot.state.types import make_mine_state
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.world_state["viewport"]["left"] = 100
         ws.world_state["viewport"]["top"] = 200
         ws.world_state["mines"]["101,201"] = make_mine_state(
@@ -343,7 +343,7 @@ class TestRadarViewportReconciliation:
         """Radar removes each stale radar-sourced mine after the first deletion snapshot."""
         from tankpit_bot.state.types import make_mine_state
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.world_state["viewport"]["left"] = 100
         ws.world_state["viewport"]["top"] = 200
         ws.world_state["mines"]["101,201"] = make_mine_state(
@@ -373,7 +373,7 @@ class TestRadarViewportReconciliation:
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.state.types import make_container_state, make_mine_state
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.world_state["viewport"]["left"] = 100
         ws.world_state["viewport"]["top"] = 200
         ws.world_state["containers"]["101,201"] = make_container_state(

@@ -19,6 +19,7 @@ from tankpit_bot.inventory import (
     InventoryItem,
     InventoryState,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -37,11 +38,12 @@ def _make_ctx(*, fuel: int = 1200, dual_count: int = 30, radar_count: int = 30) 
     Returns:
         Decision context for testing mode predicates.
     """
+    ws = WorldService()
     world, self_state = make_world(fuel=fuel)
     ai_state = make_scanned_ai_state()
     inventory = make_inventory(default_count=30, dual_count=dual_count)
     inventory["extra_radars"]["count"] = radar_count
-    return DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    return DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
 
 def _make_hold_inventory(

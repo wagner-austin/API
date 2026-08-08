@@ -39,12 +39,6 @@ from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_radar_command
 from tankpit_bot.runtime_logging import emit_ai
-from tankpit_bot.sniffer.world_state import (
-    clear_container_desync,
-    container_desync_pending,
-    get_incoming_damage_window,
-    recent_movement_rejections,
-)
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 # Sustained-fire floor for the escape verb law: matches the break
@@ -179,7 +173,9 @@ def _escape_under_fire_decision(
         ``None`` when no sustained fire is measured and the normal
         cascade should run.
     """
-    fire_hits, _fire_fuel = get_incoming_damage_window(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
+    fire_hits, _fire_fuel = ctx.ws.get_incoming_damage_window(
+        ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS
+    )
     if fire_hits < _SUSTAINED_FIRE_HIT_FLOOR:
         return None
     # Movement law under fire (user, 2026-07-30, flag 4 of run
@@ -211,7 +207,7 @@ def _escape_under_fire_decision(
     # skipped and the hop (which needs no walk path and lands
     # displacement-safe) is the only escape verb left.
     movement_dead = (
-        recent_movement_rejections(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
+        ctx.ws.recent_movement_rejections(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
         >= _MOVEMENT_DEAD_REJECTION_FLOOR
     )
     if movement_dead:
@@ -268,14 +264,14 @@ def _desync_rescan_decision(
         The ``desync_rescan`` radar decision, or ``None`` when no
         disproof is pending.
     """
-    if not container_desync_pending():
+    if not ctx.ws.container_desync_pending():
         return None
     if not radar_spend_worthwhile(ctx):
         # Live coverage already tells the whole story (radar-spend
         # economics, flag s9-4: two rescans of ground radared seconds
         # earlier) -- the disproof is answered by the existing scan.
         emit_ai("container desync answered by live coverage - no rescan needed")
-        clear_container_desync()
+        ctx.ws.clear_container_desync()
         return None
     emit_ai(
         "remembered container disproved (code=4) - radar resync before "

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.scenarios._harness import (
     DEFAULT_SELF_FUEL,
     DEFAULT_SELF_TANK_ID,
@@ -77,7 +78,7 @@ def test_place_enemy_registers_threat_candidate(scenario: BotScenario) -> None:
     self_state = scenario.self_state
     if self_state is None:
         pytest.fail("place_self must populate self_state")
-    threats = analyze_threats(scenario.world, self_state, scenario.timestamp_ms)
+    threats = analyze_threats(WorldService(), scenario.world, self_state, scenario.timestamp_ms)
     threat_ids = [threat["tank_id"] for threat in threats]
     assert threat_ids == [5]
 

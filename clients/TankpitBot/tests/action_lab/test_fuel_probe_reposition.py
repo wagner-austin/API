@@ -17,7 +17,6 @@ import pytest
 from tests.action_lab._fuel_probe_harness import (
     _ProbeHarness,
     fuel_probe_module,
-    fuel_targeting_module,
     fuel_targets_module,
 )
 from tests.action_lab._replay_page import ReplayClock
@@ -293,9 +292,8 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
 
     fuel_target = make_container_state(101, 100, True, 300)
     probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
-    fuel_probe_module.get_terrain_map = ground_terrain
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
-    fuel_targeting_module.get_terrain_map = ground_terrain
+    probe.world.terrain_map = ground_terrain()
+    probe.world.terrain_map = ground_terrain()
     action_hooks.wait_for_world_sync = _wait_for_world_sync
     action_hooks.wait_for_radar_sync = _wait_for_world_sync
     fuel_probe_module._wait_for_teleport_outcome = _teleport_outcome
@@ -317,7 +315,6 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
 
 def test_probe_single_target_raises_when_dispatch_fails() -> None:
     """Single-target probe raises on command dispatch failures."""
-    from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
 
     original_path_exists = core_hooks.path_exists
     original_load_terrain_map = core_hooks.load_terrain_map
@@ -325,12 +322,17 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
     action_hooks.get_current_time_ms = clock
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     try:
-        register_room_image("1", "field01.gif")
-        set_selected_room("1")
         core_hooks.path_exists = lambda path: True
         core_hooks.load_terrain_map = lambda path: InMemoryTerrainMap()
 
-        probe = _ProbeHarness(clock)
+        def _room_ready_probe() -> _ProbeHarness:
+            """Build a probe whose own world can load the terrain map."""
+            fresh = _ProbeHarness(clock)
+            fresh.world.register_room_image("1", "field01.gif")
+            fresh.world.set_selected_room("1")
+            return fresh
+
+        probe = _room_ready_probe()
         probe.map_open_result = False
         with pytest.raises(FuelProbeError, match="map_open command dispatch failed"):
             probe._probe_single_fuel_target(
@@ -344,7 +346,7 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
 
         action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
         action_hooks.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
-        probe = _ProbeHarness(clock)
+        probe = _room_ready_probe()
         probe.teleport_result = False
         with pytest.raises(FuelProbeError, match="teleport command dispatch failed"):
             probe._probe_single_fuel_target(
@@ -356,7 +358,7 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
                 settle_delay_ms=0,
             )
 
-        probe = _ProbeHarness(clock)
+        probe = _room_ready_probe()
 
         def _landed_teleport_outcome(
             page: action_session.WaitPageProtocol,
@@ -427,7 +429,7 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
                 settle_delay_ms=0,
             )
 
-        probe = _ProbeHarness(clock)
+        probe = _room_ready_probe()
 
         def _find_target(
             current_probe: FuelProbe,

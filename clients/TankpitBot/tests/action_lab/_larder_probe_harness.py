@@ -31,7 +31,6 @@ from tankpit_bot.inventory import (
     InventoryState,
 )
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -118,8 +117,8 @@ class _LarderHarness(LarderProbe):
         self.pays_on_tile = False
         self.pays_adjacent = False
         self.move_script: list[bool] = []
-        get_world_service().inventory_state = _slots(self.slot_count)
-        get_world_service().terrain_map = InMemoryTerrainMap()
+        self.world.inventory_state = _slots(self.slot_count)
+        self.world.terrain_map = InMemoryTerrainMap()
 
     def open_map(self) -> bool:
         self.map_calls += 1
@@ -150,7 +149,7 @@ class _LarderHarness(LarderProbe):
         adjacent = abs(self.position[0] - x) + abs(self.position[1] - y) == 1
         if (on_tile and self.pays_on_tile) or (adjacent and self.pays_adjacent):
             self.slot_count += 1
-            get_world_service().inventory_state = _slots(self.slot_count)
+            self.world.inventory_state = _slots(self.slot_count)
         return True
 
     def get_world_state(self) -> WorldStateDict:

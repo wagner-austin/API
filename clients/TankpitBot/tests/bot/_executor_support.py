@@ -6,10 +6,7 @@ from typing import Literal
 
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 from tankpit_bot.state import (
     WorldStateDict,
@@ -50,9 +47,10 @@ def _make_snapshot(*, map_visible: bool = False) -> PageClientSnapshotDict:
 
 def _make_bot(fake_env: FakeEnv) -> tuple[Bot, FakeCDPSession]:
     """Create a Bot with FakeCDPSession in IDLE state."""
-    update_world_state_from_position(100, 100)
-    update_world_state_from_fuel_total(get_world_service(), 800)
-    bot = Bot("https://test.tankpit.com/", headless=True)
+    ws = WorldService()
+    ws.update_world_state_from_position(100, 100)
+    update_world_state_from_fuel_total(ws, 800)
+    bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
     fake_cdp = FakeCDPSession()
     bot._cdp = fake_cdp
     bot._state_data = bot._state_data.copy()
@@ -61,15 +59,16 @@ def _make_bot(fake_env: FakeEnv) -> tuple[Bot, FakeCDPSession]:
 
 
 def _store_tank(
+    ws: WorldService,
     tank_id: int,
     *,
     x: int,
     y: int,
     source: Literal["viewport", "radar", "world_state"],
 ) -> None:
-    """Store a tracked tank directly into world state for executor tests."""
+    """Store a tracked tank into ``ws``'s world state for executor tests."""
 
-    new_tanks = dict(get_world_service().world_state["tanks"])
+    new_tanks = dict(ws.world_state["tanks"])
     new_tanks[str(tank_id)] = make_tank_state(
         tank_id=tank_id,
         x=x,
@@ -83,7 +82,7 @@ def _store_tank(
         source=source,
         timestamp_ms=1000,
     )
-    get_world_service().world_state["tanks"] = new_tanks
+    ws.world_state["tanks"] = new_tanks
 
 
 def _make_world() -> WorldStateDict:
@@ -111,7 +110,8 @@ class _WorldOnlyBot:
 
     def __init__(self, world: WorldStateDict) -> None:
         """Store the provided world-state snapshot."""
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._world = world
         self._cdp = None
         self._cdp_message_buffer: list[str] = []

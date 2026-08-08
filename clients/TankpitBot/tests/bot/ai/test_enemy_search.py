@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -22,11 +23,12 @@ class TestDecideMapOpen:
 
     def test_map_open_when_no_enemies(self) -> None:
         """decide() triggers map open when no live enemies are visible."""
+        ws = WorldService()
         world, self_state = make_world(fuel=1200)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["behavior"]["reason_kind"] == "find_enemies"
@@ -39,6 +41,7 @@ class TestDecideMapOpen:
         teleport directly instead of dropping to the find_enemies
         search.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -60,7 +63,7 @@ class TestDecideMapOpen:
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_map_open_ms": 99000})
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["reason_kind"] != "find_enemies"
 
@@ -75,6 +78,7 @@ class TestDecideMapOpen:
         dispatches a refresh (see
         ``test_hunt_search_dispatches_map_open_not_radar_during_acquire``).
         """
+        ws = WorldService()
         world, self_state = make_world(fuel=1200, scanned=False)
         ai_state = AIStateDict(
             **{
@@ -86,7 +90,7 @@ class TestDecideMapOpen:
         inventory = make_inventory()
 
         with pytest.raises(SessionExitError, match="no_viable_targets"):
-            decide(world, self_state, ai_state, inventory, 100000, None)
+            decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
 
 class TestDecideBlockedEdgeSearch:
@@ -107,6 +111,7 @@ class TestDecideBlockedEdgeSearch:
             InMemoryTerrainMap with all exploration targets and their adjacent
             teleport landing tiles blocked.
         """
+        ws = WorldService()
         ctx = DecideCtx(
             world,
             self_state,
@@ -115,6 +120,7 @@ class TestDecideBlockedEdgeSearch:
             100000,
             None,
             "",
+            ws=ws,
         )
         terrain_data: dict[tuple[int, int], str] = {}
         for candidate_x, candidate_y in viewport_exploration_candidates(ctx):
@@ -135,11 +141,12 @@ class TestDecideBlockedEdgeSearch:
         rather than wandering or crashing when the viewport's
         exploration candidates are all blocked.
         """
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = make_inventory()
         terrain = self._blocked_exploration_terrain(world, self_state)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"

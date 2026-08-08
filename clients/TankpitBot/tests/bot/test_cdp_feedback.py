@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
     mark_combat_hit,
     mark_tank_killed,
@@ -25,10 +25,11 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _merge_protocol_kills
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        mark_tank_killed(get_world_service(), 50)
-        mark_tank_killed(get_world_service(), 60)
-        new_state = _merge_protocol_kills(bot._ai_state)
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        mark_tank_killed(ws, 50)
+        mark_tank_killed(ws, 60)
+        new_state = _merge_protocol_kills(bot.world, bot._ai_state)
         assert "50" in new_state["killed_tank_ids"]
         assert "60" in new_state["killed_tank_ids"]
 
@@ -48,15 +49,16 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _merge_protocol_kills
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "orange-8"
         bot._ai_state["combat_target_id"] = 50
         bot._ai_state["combat_target_x"] = 71
         bot._ai_state["combat_target_y"] = 53
 
-        mark_tank_killed(get_world_service(), 50)
-        new_state = _merge_protocol_kills(bot._ai_state)
+        mark_tank_killed(ws, 50)
+        new_state = _merge_protocol_kills(bot.world, bot._ai_state)
 
         assert new_state["last_shot_target_id"] == 50
         assert new_state["last_shot_target_name"] == "orange-8"
@@ -73,7 +75,7 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.tick_combat_feedback import _merge_protocol_kills
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        result = _merge_protocol_kills(bot._ai_state)
+        result = _merge_protocol_kills(bot.world, bot._ai_state)
         assert result is bot._ai_state
 
     def test_get_combat_feedback_empty_until_response(
@@ -89,10 +91,9 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
 
-        update_inventory_from_protocol(
-            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
-        )
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        update_inventory_from_protocol(ws, [0, 10, 0, 0, 0], [False, True, False, False, False])
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
         result = _get_combat_feedback(bot)
@@ -121,10 +122,11 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
         from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
+        mark_combat_hit(ws, weapon_byte=1, victim_id=999)
         result = _get_combat_feedback(bot)
         assert result == "hit"
 
@@ -180,10 +182,11 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        get_world_service().last_command_error = 0
+        ws.last_command_error = 0
 
         result = _get_combat_feedback(bot)
 
@@ -192,7 +195,7 @@ class TestBotCombatFeedback:
         assert bot._ai_state["session_hit_count"] == 0
         assert bot._ai_state["session_miss_count"] == 0
         # The error was consumed so nothing else double-handles it.
-        assert get_world_service().last_command_error == -1
+        assert ws.last_command_error == -1
         # Code 0 (aim geometry) carries no target semantics -- the
         # friendly-fire disproof must NOT fire for it.
         assert bot._ai_state["blocked_combat_targets"] == {}
@@ -212,13 +215,14 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 1229
         bot._ai_state["last_shot_target_name"] = "Yuppler"
         bot._ai_state["combat_target_id"] = 1229
         bot._ai_state["combat_target_x"] = 245
         bot._ai_state["combat_target_y"] = 76
-        get_world_service().last_command_error = 3
+        ws.last_command_error = 3
 
         result = _get_combat_feedback(bot)
 
@@ -240,16 +244,17 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        get_world_service().last_command_error = 7
+        ws.last_command_error = 7
 
         result = _get_combat_feedback(bot)
 
         assert result == ""
         assert bot._ai_state["session_reject_count"] == 0
-        assert get_world_service().last_command_error == 7
+        assert ws.last_command_error == 7
 
     def test_has_pending_shot_feedback_ends_wait_on_command_error(
         self,
@@ -263,14 +268,15 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
         bot._ai_state["last_shoot_ms"] = 100000
 
         assert _has_pending_shot_feedback(bot, 100500) is True
 
-        get_world_service().last_command_error = 0
+        ws.last_command_error = 0
         assert _has_pending_shot_feedback(bot, 100500) is False
 
     def test_get_combat_feedback_hit_via_ammo_delta(
@@ -293,7 +299,7 @@ class TestBotCombatFeedback:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "purple-9"
-        ws = get_world_service()
+        ws = bot.world
         update_inventory_from_protocol(ws, [25, 25, 25, 25, 25], [False] * 5)
         # Bot dispatched a shoot just now: snapshot pre-shot inventory.
         ws.pending_shot_inventory_snapshot = ws.inventory_state
@@ -343,11 +349,12 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
         from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
         bot._ai_state["last_shoot_ms"] = 1000
-        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
+        mark_combat_hit(ws, weapon_byte=1, victim_id=999)
 
         assert _has_pending_shot_feedback(bot, 2000) is False
 
@@ -376,11 +383,12 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
         from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
         bot._ai_state["last_shoot_ms"] = 1000
-        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
+        mark_combat_hit(ws, weapon_byte=0, victim_id=-1)
 
         assert _has_pending_shot_feedback(bot, 2000) is False
 
@@ -392,15 +400,16 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
 
+        ws = WorldService()
         update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             [0, 10, 0, 0, 0],
             [False, True, False, False, False],
         )
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
+        mark_combat_hit(ws, weapon_byte=0, victim_id=-1)
         result = _get_combat_feedback(bot)
         assert result == "miss"
 
@@ -417,15 +426,16 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
 
+        ws = WorldService()
         update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             [0, 0, 0, 0, 0],
             [False, False, False, False, False],
         )
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
+        mark_combat_hit(ws, weapon_byte=0, victim_id=-1)
         result = _get_combat_feedback(bot)
         assert result == "miss"
 
@@ -437,23 +447,24 @@ class TestBotCombatFeedback:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _get_combat_feedback
 
+        ws = WorldService()
         update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             [0, 1, 0, 0, 0],
             [False, True, False, False, False],
         )
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
 
         # First shot: hit with dual, depletes to 0
-        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
+        mark_combat_hit(ws, weapon_byte=1, victim_id=999)
         result = _get_combat_feedback(bot)
         assert result == "hit"
-        assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 0
+        assert get_inventory_state(ws)["dual_shots"]["count"] == 0
 
         # Second shot: empty tile -> miss via tile-occupancy
         bot._ai_state["last_shot_target_id"] = 50
-        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
+        mark_combat_hit(ws, weapon_byte=0, victim_id=-1)
         result = _get_combat_feedback(bot)
         assert result == "miss"

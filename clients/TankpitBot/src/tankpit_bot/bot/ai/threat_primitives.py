@@ -17,7 +17,7 @@ from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
     make_enemy_threat,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     WorldStateDict,
@@ -120,7 +120,7 @@ def make_enemy_threat_from_tank(tank: TankStateDict, distance: int) -> EnemyThre
     )
 
 
-def human_combat_consented(tank_id: int) -> bool:
+def human_combat_consented(ws: WorldService, tank_id: int) -> bool:
     """Return True when a human target has consented to combat.
 
     User ruling 2026-07-30 (session 8 killed over it: "i felt bad, we
@@ -137,12 +137,13 @@ def human_combat_consented(tank_id: int) -> bool:
     behind :func:`~tankpit_bot.bot.ai.humans.is_human_name`.
 
     Args:
+        ws: The session's world service, holding chat and damage books.
         tank_id: The human tank's id.
 
     Returns:
         True when the human has responded or struck first.
     """
-    service = get_world_service()
+    service = ws
     if tank_id in service.chat_seen_tank_ids:
         return True
     return str(tank_id) in service.damage_book["taken"]

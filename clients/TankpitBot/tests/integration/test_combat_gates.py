@@ -29,13 +29,13 @@ from tankpit_bot.bot.ai.threat_primitives import (
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.protocol import MovementResponseDict, TankInfoDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state
 
 
-def _seed_self_and_enemy() -> int:
-    """Push real wire messages into world state for self and an enemy.
+def _seed_self_and_enemy(ws: WorldService) -> int:
+    """Push real wire messages into ``ws`` for self and an enemy.
 
     Positions mirror the practice-vs-real 2026-06-20 capture: Artax
     (tank 1301, blue team) at (131, 122) and Yuppler (tank 1229,
@@ -47,8 +47,6 @@ def _seed_self_and_enemy() -> int:
     of a synthetic one. This keeps the test honest to the production
     dispatch path (which always uses the wall clock).
     """
-    ws = get_world_service()
-
     dispatch_world_state_update(
         ws,
         MovementResponseDict(
@@ -98,13 +96,13 @@ class TestCombatGates:
 
     def test_combat_fires_when_both_gates_pass(self) -> None:
         """Wire-fresh + position-fresh enemy at shot range -> shoot command."""
-        seed_ts = _seed_self_and_enemy()
-        ws = get_world_service()
+        ws = WorldService()
+        seed_ts = _seed_self_and_enemy(ws)
         self_state = ws.world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should exist after MovementResponse")
 
-        threats = analyze_threats(ws.world_state, self_state, now_ms=seed_ts)
+        threats = analyze_threats(ws, ws.world_state, self_state, now_ms=seed_ts)
         assert len(threats) == 1, "Wire-fresh enemy must surface as a threat"
         target = threats[0]
         assert target["tank_id"] == 1229
@@ -117,6 +115,7 @@ class TestCombatGates:
             seed_ts,
             None,
             "",
+            ws=ws,
         )
 
         decision = engage_target(ctx, target)
@@ -144,13 +143,13 @@ class TestCombatGates:
         authoritative deactivation signal arrives. This test guards
         against re-introduction.
         """
-        seed_ts = _seed_self_and_enemy()
-        ws = get_world_service()
+        ws = WorldService()
+        seed_ts = _seed_self_and_enemy(ws)
         self_state = ws.world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should exist after MovementResponse")
 
-        threats = analyze_threats(ws.world_state, self_state, now_ms=seed_ts)
+        threats = analyze_threats(ws, ws.world_state, self_state, now_ms=seed_ts)
         assert len(threats) == 1
         target = threats[0]
 
@@ -163,6 +162,7 @@ class TestCombatGates:
             stale_now_ms,
             None,
             "",
+            ws=ws,
         )
 
         decision = engage_target(ctx, target)
@@ -181,13 +181,13 @@ class TestCombatGates:
         is at the registry position right now -- the extra gate
         was over-restricting and blocking kills on stationary bots.
         """
-        seed_ts = _seed_self_and_enemy()
-        ws = get_world_service()
+        ws = WorldService()
+        seed_ts = _seed_self_and_enemy(ws)
         self_state = ws.world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should exist after MovementResponse")
 
-        threats = analyze_threats(ws.world_state, self_state, now_ms=seed_ts)
+        threats = analyze_threats(ws, ws.world_state, self_state, now_ms=seed_ts)
         target = threats[0]
 
         # Build a wire-fresh target whose position update went stale
@@ -220,6 +220,7 @@ class TestCombatGates:
             seed_ts,
             None,
             "",
+            ws=ws,
         )
 
         decision = engage_target(ctx, stationary_target)

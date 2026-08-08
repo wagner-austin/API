@@ -42,12 +42,6 @@ from tankpit_bot.browser.lifecycle import (
     wait_for_game_ready as _real_wait_for_game_ready,
 )
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import (
-    check_and_clear_radar_scan_complete as _real_check_and_clear_radar_scan_complete,
-)
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-)
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_teleport_landed as _real_check_and_clear_teleport_landed,
 )
@@ -68,13 +62,17 @@ get_current_time_ms: GetCurrentTimeMsProtocol = _real_get_current_time_ms
 class CheckAndClearTeleportLandedProtocol(Protocol):
     """Protocol for draining the teleport-landed confirmation flag."""
 
-    def __call__(self) -> bool:
-        """Return True when a teleport landed confirmation is pending."""
+    def __call__(self, ws: WorldService) -> bool:
+        """Return True when a teleport landed confirmation is pending.
+
+        Args:
+            ws: The session's world service holding the landing flag.
+        """
         ...
 
 
-def _default_check_and_clear_teleport_landed() -> bool:
-    return _real_check_and_clear_teleport_landed(get_world_service())
+def _default_check_and_clear_teleport_landed(ws: WorldService) -> bool:
+    return _real_check_and_clear_teleport_landed(ws)
 
 
 check_and_clear_teleport_landed: CheckAndClearTeleportLandedProtocol = (
@@ -85,13 +83,21 @@ check_and_clear_teleport_landed: CheckAndClearTeleportLandedProtocol = (
 class CheckAndClearRadarScanCompleteProtocol(Protocol):
     """Protocol for draining the radar-scan-complete confirmation flag."""
 
-    def __call__(self) -> bool:
-        """Return True when a radar completion confirmation is pending."""
+    def __call__(self, ws: WorldService) -> bool:
+        """Return True when a radar completion confirmation is pending.
+
+        Args:
+            ws: The session's world service holding the completion flag.
+        """
         ...
 
 
+def _default_check_and_clear_radar_scan_complete(ws: WorldService) -> bool:
+    return ws.check_and_clear_radar_scan_complete()
+
+
 check_and_clear_radar_scan_complete: CheckAndClearRadarScanCompleteProtocol = (
-    _real_check_and_clear_radar_scan_complete
+    _default_check_and_clear_radar_scan_complete
 )
 
 

@@ -33,6 +33,7 @@ from platform_core.logging import get_logger
 from tankpit_bot._test_hooks import AutoscrollPageProtocol
 from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.protocol.decoders.text import try_decode_plaintext_ack
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types.message import CapturedMessage
 
 log = get_logger(__name__)
@@ -49,23 +50,22 @@ _IN_GAME_WAIT_BUDGET_MS = 30_000
 after this long is a broken session, not a slow one."""
 
 
-def _wait_until_in_game(page: AutoscrollPageProtocol) -> None:
+def _wait_until_in_game(page: AutoscrollPageProtocol, ws: WorldService) -> None:
     """Block until the wire establishes ``self_state`` (tank spawned).
 
     Args:
         page: Live game page (its wait pumps the event loop so CDP
             handlers keep filling the world service while we wait).
+        ws: The session's world service; the spawn check reads it.
 
     Raises:
         RuntimeError: When no position broadcast arrives within the
             budget -- the toggle would silently ack nothing pre-spawn,
             and an unverified toggle must never be guessed at.
     """
-    from tankpit_bot.sniffer.world_state import get_world_state
-
     waited_ms = 0
     while waited_ms < _IN_GAME_WAIT_BUDGET_MS:
-        if get_world_state()["self_state"] is not None:
+        if ws.get_world_state()["self_state"] is not None:
             return
         page.wait_for_timeout(float(_IN_GAME_POLL_MS))
         waited_ms += _IN_GAME_POLL_MS
@@ -124,12 +124,15 @@ def _press_and_read(page: AutoscrollPageProtocol, messages: list[CapturedMessage
     return enabled
 
 
-def ensure_autoscroll_off(page: AutoscrollPageProtocol, messages: list[CapturedMessage]) -> None:
+def ensure_autoscroll_off(
+    page: AutoscrollPageProtocol, messages: list[CapturedMessage], ws: WorldService
+) -> None:
     """Leave the session with autoscroll wire-verified OFF.
 
     Args:
         page: Live game page.
         messages: Capture buffer shared with the CDP service.
+        ws: The session's world service; the spawn wait reads it.
 
     Raises:
         RuntimeError: When the tank never spawns, an ack is missing,
@@ -137,7 +140,7 @@ def ensure_autoscroll_off(page: AutoscrollPageProtocol, messages: list[CapturedM
             protocol drifted and the session must not run on a skewed
             viewport model.
     """
-    _wait_until_in_game(page)
+    _wait_until_in_game(page, ws)
     enabled = _press_and_read(page, messages)
     if enabled:
         # The setting WAS off; the probe press turned it on -- undo.

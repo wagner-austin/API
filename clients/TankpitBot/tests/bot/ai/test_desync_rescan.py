@@ -12,11 +12,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
-from tankpit_bot.sniffer.world_state import (
-    container_desync_pending,
-    get_world_service,
-    mark_container_desync,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -27,6 +23,7 @@ class TestDesyncRescan:
 
     def test_pending_desync_outranks_remembered_container_pursuit(self) -> None:
         """A pending disproof produces one radar before any pickup."""
+        ws = WorldService()
         world, self_state = make_world(
             scanned=False,
             fuel=150,
@@ -49,8 +46,8 @@ class TestDesyncRescan:
                 "mode_started_ms": 90000,
             }
         )
-        mark_container_desync(99000)
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ws.mark_container_desync(99000)
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         decision = decide_collect_mode(ctx)
 
@@ -61,6 +58,7 @@ class TestDesyncRescan:
 
     def test_no_desync_leaves_cascade_untouched(self) -> None:
         """Without a pending disproof the cascade picks up as usual."""
+        ws = WorldService()
         world, self_state = make_world(
             fuel=150,
             containers={
@@ -82,7 +80,7 @@ class TestDesyncRescan:
                 "mode_started_ms": 90000,
             }
         )
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         decision = decide_collect_mode(ctx)
 
@@ -92,12 +90,13 @@ class TestDesyncRescan:
 
     def test_radar_response_clears_the_latch(self) -> None:
         """The radar response is the resync -- it answers the disproof."""
-        mark_container_desync(99000)
-        assert container_desync_pending() is True
+        ws = WorldService()
+        ws.mark_container_desync(99000)
+        assert ws.container_desync_pending() is True
 
-        update_world_state_from_radar(get_world_service(), [], [], [])
+        update_world_state_from_radar(ws, [], [], [])
 
-        assert container_desync_pending() is False
+        assert ws.container_desync_pending() is False
 
     def test_radar_cache_refresh_clears_the_latch(self) -> None:
         """A cache-refresh radar answer also clears the latch.
@@ -112,12 +111,13 @@ class TestDesyncRescan:
             update_world_state_from_radar_cache,
         )
 
-        mark_container_desync(99000)
-        assert container_desync_pending() is True
+        ws = WorldService()
+        ws.mark_container_desync(99000)
+        assert ws.container_desync_pending() is True
 
-        update_world_state_from_radar_cache(get_world_service())
+        update_world_state_from_radar_cache(ws)
 
-        assert container_desync_pending() is False
+        assert ws.container_desync_pending() is False
 
 
 class TestRadarSpendEconomics:
@@ -129,6 +129,7 @@ class TestRadarSpendEconomics:
         Flag s9-4: two desync rescans of ground radared seconds
         earlier each consumed an extra and revealed nothing.
         """
+        ws = WorldService()
         world, self_state = make_world(
             fuel=150,
             containers={
@@ -150,29 +151,37 @@ class TestRadarSpendEconomics:
                 "mode_started_ms": 90000,
             }
         )
-        mark_container_desync(99000)
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ws.mark_container_desync(99000)
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         decision = decide_collect_mode(ctx)
 
         if decision is None:
             raise AssertionError("expected collect decision")
         assert decision["behavior"]["reason_kind"] != "desync_rescan"
-        assert container_desync_pending() is False
+        assert ws.container_desync_pending() is False
 
     def test_spend_floor_only_binds_with_extras_stocked(self) -> None:
         """A radar-broke tank scans any uncovered sliver for free."""
         from tankpit_bot.bot.ai.context import radar_spend_worthwhile
 
+        ws = WorldService()
         world, self_state = make_world(scanned=True)
         left = world["viewport"]["left"]
         top = world["viewport"]["top"]
         del world["scanned_tiles"][f"{left + 2},{top + 2}"]
         ai_state = make_scanned_ai_state()
 
-        stocked = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        stocked = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
         broke = DecideCtx(
-            world, self_state, ai_state, make_inventory(default_count=0), 100000, None, ""
+            world,
+            self_state,
+            ai_state,
+            make_inventory(default_count=0),
+            100000,
+            None,
+            "",
+            ws=ws,
         )
 
         assert radar_spend_worthwhile(stocked) is False
@@ -188,6 +197,7 @@ class TestRadarSpendEconomics:
         """
         from tankpit_bot.bot.ai.context import radar_spend_worthwhile
 
+        ws = WorldService()
         world, self_state = make_world(scanned=True)
         left = world["viewport"]["left"]
         top = world["viewport"]["top"]
@@ -204,6 +214,7 @@ class TestRadarSpendEconomics:
             100000,
             None,
             "",
+            ws=ws,
         )
         last_extra = DecideCtx(
             world,
@@ -213,6 +224,7 @@ class TestRadarSpendEconomics:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         assert radar_spend_worthwhile(two_left) is True
@@ -222,6 +234,7 @@ class TestRadarSpendEconomics:
         """A fully uncovered viewport is worth the final extra radar."""
         from tankpit_bot.bot.ai.context import radar_spend_worthwhile
 
+        ws = WorldService()
         world, self_state = make_world(scanned=False)
         ai_state = make_scanned_ai_state()
 
@@ -233,6 +246,7 @@ class TestRadarSpendEconomics:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         assert radar_spend_worthwhile(last_extra) is True
@@ -246,6 +260,7 @@ class TestDisplacedLandingScanEconomics:
         ground latched WITHOUT spending an extra."""
         from tankpit_bot.bot.ai.collect_mode_outcomes import _scan_on_landing_decision
 
+        ws = WorldService()
         world, self_state = make_world(
             fuel=900,
             containers={
@@ -271,7 +286,7 @@ class TestDisplacedLandingScanEconomics:
                 "resource_target_y": 100,
             }
         )
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         decision, updated = _scan_on_landing_decision(ctx, ctx.base)
 

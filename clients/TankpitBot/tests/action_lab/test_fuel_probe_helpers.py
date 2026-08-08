@@ -17,7 +17,6 @@ from tests.action_lab._fuel_probe_harness import (
     _snapshot,
     _terrain,
     fuel_probe_module,
-    fuel_targets_module,
 )
 from tests.action_lab._replay_page import (
     ClockAdvancingPage,
@@ -99,8 +98,7 @@ def test_find_visible_fuel_target_returns_best_visible_container() -> None:
         500,
         timestamp_ms=world["timestamp_ms"],
     )
-    fuel_probe_module.get_terrain_map = lambda: _terrain({(100, 100), (101, 100), (102, 100)})
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
+    probe.world.terrain_map = _terrain({(100, 100), (101, 100), (102, 100)})
 
     fuel_target = _find_visible_fuel_target(probe)
 
@@ -110,8 +108,7 @@ def test_find_visible_fuel_target_returns_best_visible_container() -> None:
 def test_format_visible_fuel_entries_returns_unavailable_without_terrain() -> None:
     """Visible-fuel diagnostics report unavailable without a terrain map."""
     probe = _ProbeHarness(ReplayClock(1000))
-    fuel_probe_module.get_terrain_map = lambda: None
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
+    probe.world.terrain_map = None
 
     summary = _format_visible_fuel_entries(probe, fuel_target=None)
 
@@ -122,8 +119,7 @@ def test_format_visible_fuel_entries_returns_unavailable_without_self_state() ->
     """Visible-fuel diagnostics report unavailable without self state."""
     probe = _ProbeHarness(ReplayClock(1000))
     probe._world_state["self_state"] = None
-    fuel_probe_module.get_terrain_map = lambda: _terrain({(100, 100)})
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
+    probe.world.terrain_map = _terrain({(100, 100)})
 
     summary = _format_visible_fuel_entries(probe, fuel_target=None)
 
@@ -148,8 +144,7 @@ def test_format_visible_fuel_entries_returns_none_when_no_visible_fuel_is_tracke
         300,
         timestamp_ms=world["timestamp_ms"],
     )
-    fuel_probe_module.get_terrain_map = lambda: _terrain({(100, 100), (101, 100), (200, 200)})
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
+    probe.world.terrain_map = _terrain({(100, 100), (101, 100), (200, 200)})
 
     summary = _format_visible_fuel_entries(probe, fuel_target=None)
 
@@ -190,8 +185,7 @@ def test_format_visible_fuel_entries_marks_selected_and_truncates() -> None:
             timestamp_ms=0,
         )
         passable_tiles.add((x, y))
-    fuel_probe_module.get_terrain_map = lambda: _terrain(passable_tiles)
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
+    probe.world.terrain_map = _terrain(passable_tiles)
 
     summary = _format_visible_fuel_entries(probe, fuel_target=selected_target)
 
@@ -202,13 +196,11 @@ def test_format_visible_fuel_entries_marks_selected_and_truncates() -> None:
 def test_find_visible_fuel_target_requires_terrain_and_self_state() -> None:
     """Fuel target selection raises when required state is missing."""
     probe = _ProbeHarness(ReplayClock(1000))
-    fuel_probe_module.get_terrain_map = lambda: None
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
+    probe.world.terrain_map = None
     with pytest.raises(FuelProbeError, match="terrain map is unavailable"):
         _find_visible_fuel_target(probe)
 
-    fuel_probe_module.get_terrain_map = lambda: _terrain({(100, 100)})
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
+    probe.world.terrain_map = _terrain({(100, 100)})
     probe._world_state["self_state"] = None
     with pytest.raises(FuelProbeError, match="self state is unavailable"):
         _find_visible_fuel_target(probe)

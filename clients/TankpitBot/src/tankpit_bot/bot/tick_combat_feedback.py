@@ -37,9 +37,7 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     emit_sync,
 )
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_ammo_delta_hit,
     check_and_clear_combat_hit,
@@ -69,16 +67,17 @@ _SHOT_REJECTING_COMMAND_ERRORS = frozenset(
 log = get_logger(__name__)
 
 
-def _merge_protocol_kills(ai_state: AIStateDict) -> AIStateDict:
+def _merge_protocol_kills(ws: WorldService, ai_state: AIStateDict) -> AIStateDict:
     """Merge Deactivation kills from protocol into AI killed_tank_ids.
 
     Args:
+        ws: The session's world service, holding the kill queue.
         ai_state: Current AI state.
 
     Returns:
         Updated AI state with new kills merged.
     """
-    new_kills = drain_killed_tank_ids(get_world_service())
+    new_kills = drain_killed_tank_ids(ws)
     if not new_kills:
         return ai_state
     now = get_current_time_ms()

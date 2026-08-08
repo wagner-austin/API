@@ -8,7 +8,7 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.bot.ai.equipment_search import find_best_fuel, find_teleport_landing_tile
 from tankpit_bot.bot.ai.ferry import compose_decision_terrain
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_in_viewport
-from tankpit_bot.sniffer.world_state import get_terrain_map
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
 
 
@@ -17,7 +17,13 @@ class FuelTargetingError(Exception):
 
 
 class VisibleFuelTargetingProbeProtocol(Protocol):
-    """Minimal probe interface required for visible-fuel targeting helpers."""
+    """Minimal probe interface required for visible-fuel targeting helpers.
+
+    Attributes:
+        world: The probe's world service, for terrain lookups.
+    """
+
+    world: WorldService
 
     def get_world_state(self) -> WorldStateDict:
         """Return the current world state."""
@@ -40,7 +46,7 @@ def find_visible_fuel_target(
     Raises:
         FuelTargetingError: If terrain or self state is unavailable.
     """
-    terrain = get_terrain_map()
+    terrain = probe.world.get_terrain_map()
     if terrain is None:
         raise FuelTargetingError("terrain map is unavailable")
     self_state = probe.get_self_state()
@@ -78,7 +84,7 @@ def visible_fuel_requires_reposition(
     world = probe.get_world_state()
     terrain = compose_decision_terrain(
         world,
-        get_terrain_map(),
+        probe.world.get_terrain_map(),
         action_hooks.get_current_time_ms(),
     )
     if terrain is None:
@@ -109,7 +115,7 @@ def find_visible_fuel_landing_tile(
     Raises:
         FuelTargetingError: If terrain or self state is unavailable.
     """
-    terrain = get_terrain_map()
+    terrain = probe.world.get_terrain_map()
     if terrain is None:
         raise FuelTargetingError("terrain map is unavailable")
     self_state = probe.get_self_state()

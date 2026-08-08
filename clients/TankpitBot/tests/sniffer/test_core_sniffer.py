@@ -15,7 +15,7 @@ from tankpit_bot.sniffer.core import (
     SnifferError,
     WebSocketSniffer,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import CapturedMessage, decode_capture_session
 from tests.conftest import FakeFileSystem
 from tests.fakes import (
@@ -153,8 +153,9 @@ class TestWebSocketSnifferMethods:
 
         # Create sniffer with minimal init - we'll call methods directly
         # Using object.__new__ to avoid full __init__
+        ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
-        sniffer.world = get_world_service()
+        sniffer.world = ws
         sniffer._cdp_service = CDPService()
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
@@ -184,8 +185,9 @@ class TestWebSocketSnifferMethods:
         """
         from tankpit_bot.browser import GameLogEntry
 
+        ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
-        sniffer.world = get_world_service()
+        sniffer.world = ws
         sniffer._cdp_service = CDPService()
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
@@ -214,8 +216,9 @@ class TestWebSocketSnifferMethods:
         """
         from tankpit_bot.browser import GameLogEntry
 
+        ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
-        sniffer.world = get_world_service()
+        sniffer.world = ws
         sniffer._cdp_service = CDPService()
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
@@ -244,8 +247,9 @@ class TestWebSocketSnifferMethods:
         """
         from tankpit_bot.browser import GameLogEntry
 
+        ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
-        sniffer.world = get_world_service()
+        sniffer.world = ws
         sniffer._cdp_service = CDPService()
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
@@ -274,12 +278,13 @@ class TestWebSocketSnifferMethods:
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
         from tankpit_bot.types import CapturedMessage
 
+        ws = WorldService()
         static_key = "ABCDEF" + "A" * 994
         fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
 
         # Create sniffer with minimal init
         sniffer = object.__new__(WebSocketSniffer)
-        sniffer.world = get_world_service()
+        sniffer.world = ws
         sniffer._cdp_service = CDPService()
         sniffer._live_decode = True
         sniffer._magic = "testmagic"
@@ -330,16 +335,16 @@ class TestWebSocketSnifferMethods:
         from tankpit_bot.protocol.encoders.movement import encode_movement
         from tankpit_bot.protocol.framing import encode_frame
         from tankpit_bot.protocol.types import MovementDict
-        from tankpit_bot.sniffer.world_state import get_world_service
         from tankpit_bot.state.types import make_tank_state
         from tankpit_bot.types import CapturedMessage
 
+        ws = WorldService()
         fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
         xor_table = build_session_xor_table("testmagic")
 
         # 0x47 for a non-self tank moves whichever registry tank is
         # standing on the start tile, so the registry has to know it.
-        get_world_service().world_state["tanks"] = {
+        ws.world_state["tanks"] = {
             "9": make_tank_state(
                 tank_id=9,
                 x=50,
@@ -355,7 +360,7 @@ class TestWebSocketSnifferMethods:
         }
 
         sniffer = object.__new__(WebSocketSniffer)
-        sniffer.world = get_world_service()
+        sniffer.world = ws
         sniffer._cdp_service = CDPService()
         sniffer._live_decode = True
         sniffer._magic = "testmagic"
@@ -399,13 +404,14 @@ class TestWebSocketSnifferMethods:
         )
 
         # The decode is the point: the walking tank reaches the registry.
-        tanks = get_world_service().get_world_state()["tanks"]
+        tanks = ws.get_world_state()["tanks"]
         assert [(t["tank_id"], t["x"], t["y"]) for t in tanks.values()] == [(9, 51, 60)]
 
     def test_autosave_capture_no_paths_is_noop(self) -> None:
         """Returns immediately when autosave is not configured."""
+        ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
-        sniffer.world = get_world_service()
+        sniffer.world = ws
         sniffer._cdp_service = CDPService()
         sniffer._autosave_paths = ()
         sniffer._target_url = "https://tankpit.com"
@@ -419,8 +425,9 @@ class TestWebSocketSnifferMethods:
 
     def test_on_message_captured_autosaves_capture(self, fake_fs: FakeFileSystem) -> None:
         """Autosaves the current capture snapshot after a message arrives."""
+        ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
-        sniffer.world = get_world_service()
+        sniffer.world = ws
         sniffer._cdp_service = CDPService()
         sniffer._target_url = "https://tankpit.com"
         sniffer._headless = False
@@ -467,8 +474,9 @@ class TestWebSocketSnifferMethods:
         """Autosaves updated game log entries during capture."""
         from tankpit_bot.browser import GameLogEntry
 
+        ws = WorldService()
         sniffer = object.__new__(WebSocketSniffer)
-        sniffer.world = get_world_service()
+        sniffer.world = ws
         sniffer._cdp_service = CDPService()
         sniffer._target_url = "https://tankpit.com"
         sniffer._headless = False
@@ -504,10 +512,10 @@ def test_capture_session_carries_the_live_registry_tank_names() -> None:
     an empty map. Nothing asserted the field had content, which is
     exactly why it went unnoticed ([[session-state-deglobalisation]]).
     """
-    from tankpit_bot.sniffer.world_state import get_world_service
     from tankpit_bot.state.types import make_tank_state
 
-    service = get_world_service()
+    ws = WorldService()
+    service = ws
     service.world_state["tanks"] = {
         "1301": make_tank_state(
             tank_id=1301,
@@ -545,7 +553,7 @@ def test_capture_session_carries_the_live_registry_tank_names() -> None:
     }
 
     sniffer = object.__new__(WebSocketSniffer)
-    sniffer.world = get_world_service()
+    sniffer.world = ws
     sniffer._cdp_service = CDPService()
     sniffer._session_id = "names-test"
     sniffer._start_timestamp_ms = 1000

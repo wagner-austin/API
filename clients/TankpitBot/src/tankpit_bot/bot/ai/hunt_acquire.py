@@ -280,7 +280,7 @@ def _unvisited_unconsented_human(
             continue
         if str(tank["tank_id"]) in ai_state["visited_tank_ids"]:
             continue
-        if human_combat_consented(tank["tank_id"]):
+        if human_combat_consented(ctx.ws, tank["tank_id"]):
             continue
         if ctx.timestamp_ms - tank["timestamp_ms"] > ctx.config["map_open_cooldown_ms"]:
             continue
@@ -414,6 +414,7 @@ def _decide_hunt_acquire_fresh(
         return open_map_for_target(ctx, target)
 
     map_target = find_acquisition_target(
+        ctx.ws,
         ctx.filtered,
         ctx.self_state,
         ctx.blocked_targets,

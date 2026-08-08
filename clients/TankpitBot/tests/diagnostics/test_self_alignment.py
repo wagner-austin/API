@@ -23,6 +23,7 @@ from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.diagnostics.self_alignment import SelfAlignmentEmitter
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, make_self_state
 
 _SELF_FIELDS: dict[str, int | float | bool | str | None] = {
@@ -235,17 +236,17 @@ def test_tick_once_emits_sample_from_live_world_state(
         SelfMapReportDict,
     )
     from tankpit_bot.diagnostics.self_map import build_self_map_report
-    from tankpit_bot.sniffer.world_state import get_world_service, update_world_state_from_position
     from tankpit_bot.sniffer.world_state_containers import (
         update_world_state_from_fuel_total,
     )
     from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
 
+    ws = WorldService()
     artifacts = configure_bot_runtime_logging("20260609-120000")
-    update_world_state_from_position(100, 100)
-    update_world_state_from_fuel_total(get_world_service(), 800)
-    update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
-    bot = Bot("https://test.tankpit.com/", headless=True)
+    ws.update_world_state_from_position(100, 100)
+    update_world_state_from_fuel_total(ws, 800)
+    update_inventory_from_protocol(ws, [30, 30, 30, 30, 30], [True] * 5)
+    bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
     bot._cdp = _SelfFieldsCDPSession()
     bot._state_data = bot._state_data.copy()
     bot._state_data["state"] = "IDLE"

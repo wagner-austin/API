@@ -8,10 +8,6 @@ from __future__ import annotations
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
 from tankpit_bot.sniffer.world_state_inventory import (
     get_inventory_state,
     update_inventory_from_gain,
@@ -30,8 +26,9 @@ class TestInventoryTracking:
             update_inventory_from_full_signal,
         )
 
-        assert update_inventory_from_full_signal(get_world_service()) == []
-        inv = get_inventory_state(get_world_service())
+        ws = WorldService()
+        assert update_inventory_from_full_signal(ws) == []
+        inv = get_inventory_state(ws)
         assert inv["dual_shots"]["count"] == 0
 
     def test_full_signal_reconciles_every_slot_to_capacity(self) -> None:
@@ -43,13 +40,12 @@ class TestInventoryTracking:
         the rank capacity.
         """
         from tankpit_bot.physics.capacity import inventory_capacity
-        from tankpit_bot.sniffer.world_state import update_world_state_from_position
         from tankpit_bot.sniffer.world_state_inventory import (
             update_inventory_from_full_signal,
         )
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         changes = update_inventory_from_full_signal(ws)
         self_state = ws.world_state["self_state"]
         if self_state is None:
@@ -65,7 +61,8 @@ class TestInventoryTracking:
 
     def test_initial_inventory_is_empty(self) -> None:
         """Test inventory starts at zero counts, all disabled."""
-        inv = get_inventory_state(get_world_service())
+        ws = WorldService()
+        inv = get_inventory_state(ws)
         assert inv["armor_shields"]["count"] == 0
         assert inv["armor_shields"]["enabled"] is False
         assert inv["dual_shots"]["count"] == 0
@@ -76,12 +73,13 @@ class TestInventoryTracking:
 
     def test_update_from_protocol_sets_absolute_counts(self) -> None:
         """Test 0x49 message sets absolute inventory counts."""
+        ws = WorldService()
         update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             counts=[10, 5, 3, 2, 1],
             enabled=[True, False, True, True, False],
         )
-        inv = get_inventory_state(get_world_service())
+        inv = get_inventory_state(ws)
         assert inv["armor_shields"]["count"] == 10
         assert inv["dual_shots"]["count"] == 5
         assert inv["dual_shots"]["enabled"] is False
@@ -97,8 +95,9 @@ class TestInventoryTracking:
         message sets enabled=True + armor count=10, so all 5 slots
         report enabled_changed and armor also reports a count delta.
         """
+        ws = WorldService()
         changes = update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             counts=[10, 0, 0, 0, 0],
             enabled=[True, True, True, True, True],
         )
@@ -110,13 +109,14 @@ class TestInventoryTracking:
 
     def test_update_from_protocol_no_changes_when_same(self) -> None:
         """Test 0x49 message returns empty when counts unchanged."""
+        ws = WorldService()
         update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             counts=[10, 5, 3, 2, 1],
             enabled=[True, True, True, True, True],
         )
         changes = update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             counts=[10, 5, 3, 2, 1],
             enabled=[True, True, True, True, True],
         )
@@ -124,14 +124,15 @@ class TestInventoryTracking:
 
     def test_update_from_gain_adds_deltas(self) -> None:
         """Test 0x67 message adds gained amounts to current counts."""
+        ws = WorldService()
         update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             counts=[10, 5, 3, 2, 1],
             enabled=[True, True, True, True, True],
         )
-        update_inventory_from_gain(get_world_service(), gained=[5, 0, 2, 0, 3])
+        update_inventory_from_gain(ws, gained=[5, 0, 2, 0, 3])
 
-        inv = get_inventory_state(get_world_service())
+        inv = get_inventory_state(ws)
         assert inv["armor_shields"]["count"] == 15
         assert inv["dual_shots"]["count"] == 5
         assert inv["missile_shots"]["count"] == 5
@@ -140,12 +141,13 @@ class TestInventoryTracking:
 
     def test_update_from_gain_returns_changes(self) -> None:
         """Test 0x67 message returns changes for non-zero gains."""
+        ws = WorldService()
         update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             counts=[10, 5, 3, 2, 1],
             enabled=[True, True, True, True, True],
         )
-        changes = update_inventory_from_gain(get_world_service(), gained=[5, 0, 0, 0, 0])
+        changes = update_inventory_from_gain(ws, gained=[5, 0, 0, 0, 0])
         assert len(changes) == 1
         assert changes[0]["item"] == "armor_shields"
         assert changes[0]["delta"] == 5
@@ -154,14 +156,15 @@ class TestInventoryTracking:
 
     def test_update_from_gain_preserves_enabled(self) -> None:
         """Test 0x67 message does not change enabled flags."""
+        ws = WorldService()
         update_inventory_from_protocol(
-            get_world_service(),
+            ws,
             counts=[10, 5, 3, 2, 1],
             enabled=[True, False, True, False, True],
         )
-        update_inventory_from_gain(get_world_service(), gained=[1, 1, 1, 1, 1])
+        update_inventory_from_gain(ws, gained=[1, 1, 1, 1, 1])
 
-        inv = get_inventory_state(get_world_service())
+        inv = get_inventory_state(ws)
         assert inv["armor_shields"]["enabled"] is True
         assert inv["dual_shots"]["enabled"] is False
         assert inv["homing_shots"]["enabled"] is False
@@ -195,33 +198,27 @@ class TestWorldStateCore:
 
     def test_load_terrain_map_returns_none_if_no_file(self) -> None:
         """Test returns None when no terrain file exists."""
-        from tankpit_bot.sniffer.world_state import (
-            register_room_image,
-            set_selected_room,
-        )
 
-        register_room_image("1", "field01.gif")
-        set_selected_room("1")
+        ws = WorldService()
+        ws.register_room_image("1", "field01.gif")
+        ws.set_selected_room("1")
         _test_hooks.path_exists = lambda path: False
 
-        result = get_world_service()._load_terrain_map_if_needed()
+        result = ws._load_terrain_map_if_needed()
         assert result is None
 
     def test_load_terrain_map_caches_result(self) -> None:
         """Test terrain map is cached after first load."""
-        from tankpit_bot.sniffer.world_state import (
-            register_room_image,
-            set_selected_room,
-        )
 
+        ws = WorldService()
         fake_terrain = InMemoryTerrainMap()
 
-        register_room_image("1", "field01.gif")
-        set_selected_room("1")
+        ws.register_room_image("1", "field01.gif")
+        ws.set_selected_room("1")
         _test_hooks.path_exists = lambda path: True
         _test_hooks.load_terrain_map = lambda path: fake_terrain
 
-        svc = get_world_service()
+        svc = ws
         result1 = svc._load_terrain_map_if_needed()
         assert result1 is fake_terrain
         assert svc.terrain_map is fake_terrain
@@ -231,9 +228,10 @@ class TestWorldStateCore:
 
     def test_update_world_state_from_position(self) -> None:
         """Test updates self position in world state."""
-        update_world_state_from_position(128, 64)
+        ws = WorldService()
+        ws.update_world_state_from_position(128, 64)
 
-        self_state = get_world_service().world_state["self_state"]
+        self_state = ws.world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None after position update")
         assert self_state["x"] == 128
@@ -242,11 +240,12 @@ class TestWorldStateCore:
     def test_update_world_state_from_position_updates_existing(self) -> None:
         """Test updates existing self position in world state."""
         # First call creates self_state
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         # Second call updates existing self_state
-        update_world_state_from_position(200, 150)
+        ws.update_world_state_from_position(200, 150)
 
-        self_state = get_world_service().world_state["self_state"]
+        self_state = ws.world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None after position update")
         assert self_state["x"] == 200
@@ -256,13 +255,14 @@ class TestWorldStateCore:
         """Test updates containers from radar."""
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 
+        ws = WorldService()
         containers: list[RadarContainerDict] = [
             RadarContainerDict(x=50, y=60, volume=100),  # fuel with 100 units
             RadarContainerDict(x=55, y=65, volume=-1),  # equipment (volume=-1)
         ]
         mines: list[RadarMineDict] = []
 
-        svc = get_world_service()
+        svc = ws
         update_world_state_from_radar(svc, containers, mines, [])
 
         assert "50,60" in svc.world_state["containers"]
@@ -274,13 +274,14 @@ class TestWorldStateCore:
         """Test updates mines from radar."""
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 
+        ws = WorldService()
         containers: list[RadarContainerDict] = []
         mines: list[RadarMineDict] = [
             RadarMineDict(x=70, y=80, team=1),
             RadarMineDict(x=75, y=85, team=2),
         ]
 
-        svc = get_world_service()
+        svc = ws
         update_world_state_from_radar(svc, containers, mines, [])
 
         assert "70,80" in svc.world_state["mines"]
@@ -298,30 +299,30 @@ class TestWorldStateRendering:
 
     def test_render_world_state_ascii_returns_none_without_terrain(self) -> None:
         """Test returns None when no terrain file exists."""
-        from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
         from tankpit_bot.sniffer.world_state_tiles import render_world_state_ascii
 
-        register_room_image("1", "field01.gif")
-        set_selected_room("1")
+        ws = WorldService()
+        ws.register_room_image("1", "field01.gif")
+        ws.set_selected_room("1")
         _test_hooks.path_exists = lambda path: False
 
-        result = render_world_state_ascii(get_world_service())
+        result = render_world_state_ascii(ws)
         assert result is None
 
     def test_render_world_state_ascii_with_terrain(self) -> None:
         """Test renders ASCII with terrain map."""
-        from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
         from tankpit_bot.sniffer.world_state_tiles import render_world_state_ascii
 
+        ws = WorldService()
         fake_terrain = InMemoryTerrainMap()
-        register_room_image("1", "field01.gif")
-        set_selected_room("1")
+        ws.register_room_image("1", "field01.gif")
+        ws.set_selected_room("1")
         _test_hooks.path_exists = lambda path: True
         _test_hooks.load_terrain_map = lambda path: fake_terrain
 
-        update_world_state_from_position(128, 128)
+        ws.update_world_state_from_position(128, 128)
 
-        result = render_world_state_ascii(get_world_service())
+        result = render_world_state_ascii(ws)
         if result is None:
             raise AssertionError("expected string, got None")
         assert "Viewport:" in result
@@ -338,39 +339,36 @@ class TestRoomTracking:
 
     def test_register_room_image_stores_mapping(self) -> None:
         """Test register_room_image stores room-to-image mapping."""
-        from tankpit_bot.sniffer.world_state import register_room_image
 
-        register_room_image("2", "field42.gif")
-        assert get_world_service().room_images["2"] == "field42.gif"
+        ws = WorldService()
+        ws.register_room_image("2", "field42.gif")
+        assert ws.room_images["2"] == "field42.gif"
 
     def test_set_selected_room_tracks_selection(self) -> None:
         """Test set_selected_room stores selected room and resets terrain."""
-        from tankpit_bot.sniffer.world_state import set_selected_room
 
         # Pre-load a terrain map so we can verify it gets reset
+        ws = WorldService()
         fake_terrain = InMemoryTerrainMap()
-        get_world_service().terrain_map = fake_terrain
+        ws.terrain_map = fake_terrain
 
-        set_selected_room("2")
-        assert get_world_service().selected_room == "2"
-        assert get_world_service().terrain_map is None
+        ws.set_selected_room("2")
+        assert ws.selected_room == "2"
+        assert ws.terrain_map is None
 
     def test_load_terrain_uses_selected_room_image(self) -> None:
         """Test terrain loader uses field image from selected room."""
-        from tankpit_bot.sniffer.world_state import (
-            register_room_image,
-            set_selected_room,
-        )
 
+        ws = WorldService()
         fake_terrain = InMemoryTerrainMap()
 
-        register_room_image("2", "field42.gif")
-        set_selected_room("2")
+        ws.register_room_image("2", "field42.gif")
+        ws.set_selected_room("2")
 
         _test_hooks.path_exists = lambda path: "field42" in str(path)
         _test_hooks.load_terrain_map = lambda path: fake_terrain
 
-        svc = get_world_service()
+        svc = ws
         result = svc._load_terrain_map_if_needed()
         assert result is fake_terrain
         assert svc.terrain_map is fake_terrain
@@ -378,57 +376,58 @@ class TestRoomTracking:
     def test_load_terrain_tries_underscore_and_hyphen_suffix(self) -> None:
         """Test _find_field_gif tries both _r and -r suffixes."""
         # Only the -r variant exists
+        ws = WorldService()
         _test_hooks.path_exists = lambda path: str(path) == "field42-r.gif"
 
-        result = get_world_service()._find_field_gif("field42.gif")
+        result = ws._find_field_gif("field42.gif")
         if result is None:
             raise AssertionError("expected Path, got None")
         assert str(result) == "field42-r.gif"
 
     def test_find_field_gif_underscore_variant(self) -> None:
         """Test _find_field_gif finds _r variant."""
+        ws = WorldService()
         _test_hooks.path_exists = lambda path: str(path) == "field01_r.gif"
 
-        result = get_world_service()._find_field_gif("field01.gif")
+        result = ws._find_field_gif("field01.gif")
         if result is None:
             raise AssertionError("expected Path, got None")
         assert str(result) == "field01_r.gif"
 
     def test_find_field_gif_returns_none_when_missing(self) -> None:
         """Test _find_field_gif returns None when no file found."""
+        ws = WorldService()
         _test_hooks.path_exists = lambda path: False
 
-        result = get_world_service()._find_field_gif("field99.gif")
+        result = ws._find_field_gif("field99.gif")
         assert result is None
 
     def test_load_terrain_returns_none_without_selected_room(self) -> None:
         """Test terrain loader requires an explicit selected room."""
-        result = get_world_service()._load_terrain_map_if_needed()
+        ws = WorldService()
+        result = ws._load_terrain_map_if_needed()
         assert result is None
 
     def test_load_terrain_warns_when_gif_missing_for_room(self) -> None:
         """Test terrain loader returns none when selected room GIF is missing."""
-        from tankpit_bot.sniffer.world_state import (
-            register_room_image,
-            set_selected_room,
-        )
 
-        register_room_image("5", "field99.gif")
-        set_selected_room("5")
+        ws = WorldService()
+        ws.register_room_image("5", "field99.gif")
+        ws.set_selected_room("5")
 
         _test_hooks.path_exists = lambda path: False
 
-        result = get_world_service()._load_terrain_map_if_needed()
+        result = ws._load_terrain_map_if_needed()
         assert result is None
 
     def test_load_terrain_returns_none_when_room_has_no_image(self) -> None:
         """Test terrain loader requires a registered image for the selected room."""
-        from tankpit_bot.sniffer.world_state import set_selected_room
 
         # Select room "9" but never register an image for it
-        set_selected_room("9")
+        ws = WorldService()
+        ws.set_selected_room("9")
 
-        result = get_world_service()._load_terrain_map_if_needed()
+        result = ws._load_terrain_map_if_needed()
         assert result is None
 
     def test_a_fresh_service_carries_no_room_tracking(self) -> None:
@@ -449,52 +448,40 @@ class TestFailedMoveTargets:
 
     def test_mark_and_check_failed_move(self) -> None:
         """Marking a move target as failed makes it show as failed."""
-        from tankpit_bot.sniffer.world_state import (
-            is_move_target_failed,
-            mark_move_target_failed,
-        )
 
-        mark_move_target_failed(73, 158, 50000)
-        assert is_move_target_failed(73, 158, 60000) is True
+        ws = WorldService()
+        ws.mark_move_target_failed(73, 158, 50000)
+        assert ws.is_move_target_failed(73, 158, 60000) is True
 
     def test_failed_move_expires_after_ttl(self) -> None:
         """Failed move target expires after the TTL passes."""
-        from tankpit_bot.sniffer.world_state import (
-            is_move_target_failed,
-            mark_move_target_failed,
-        )
 
-        mark_move_target_failed(73, 158, 10000)
+        ws = WorldService()
+        ws.mark_move_target_failed(73, 158, 10000)
         # 50000 - 10000 = 40000 > 30000 TTL → expired
-        assert is_move_target_failed(73, 158, 50000) is False
+        assert ws.is_move_target_failed(73, 158, 50000) is False
 
     def test_unfailed_target_returns_false(self) -> None:
         """Coordinates never marked as failed return False."""
-        from tankpit_bot.sniffer.world_state import is_move_target_failed
 
-        assert is_move_target_failed(50, 50, 100000) is False
+        ws = WorldService()
+        assert ws.is_move_target_failed(50, 50, 100000) is False
 
     def test_clear_failed_move_targets_resets_all(self) -> None:
         """clear_failed_move_targets removes all recorded failures."""
-        from tankpit_bot.sniffer.world_state import (
-            is_move_target_failed,
-            mark_move_target_failed,
-        )
 
-        mark_move_target_failed(73, 158, 90000)
-        get_world_service().clear_failed_move_targets()
-        assert is_move_target_failed(73, 158, 100000) is False
+        ws = WorldService()
+        ws.mark_move_target_failed(73, 158, 90000)
+        ws.clear_failed_move_targets()
+        assert ws.is_move_target_failed(73, 158, 100000) is False
 
     def test_radar_refresh_clears_failed_moves(self) -> None:
         """Fresh radar data clears all failed move targets."""
-        from tankpit_bot.sniffer.world_state import (
-            is_move_target_failed,
-            mark_move_target_failed,
-        )
 
-        mark_move_target_failed(73, 158, 90000)
-        update_world_state_from_radar(get_world_service(), [], [], [])
-        assert is_move_target_failed(73, 158, 100000) is False
+        ws = WorldService()
+        ws.mark_move_target_failed(73, 158, 90000)
+        update_world_state_from_radar(ws, [], [], [])
+        assert ws.is_move_target_failed(73, 158, 100000) is False
 
 
 class TestMovementRejections:
@@ -502,31 +489,25 @@ class TestMovementRejections:
 
     def test_recorded_rejections_count_inside_the_window(self) -> None:
         """Rejections inside the trailing window are counted."""
-        from tankpit_bot.sniffer.world_state import (
-            recent_movement_rejections,
-            record_movement_rejection,
-        )
 
-        record_movement_rejection(95000)
-        record_movement_rejection(97000)
+        ws = WorldService()
+        ws.record_movement_rejection(95000)
+        ws.record_movement_rejection(97000)
 
-        assert recent_movement_rejections(100000, 10000) == 2
+        assert ws.recent_movement_rejections(100000, 10000) == 2
 
     def test_stale_rejections_fall_out_of_the_window(self) -> None:
         """Rejections older than the window are pruned and not counted."""
-        from tankpit_bot.sniffer.world_state import (
-            recent_movement_rejections,
-            record_movement_rejection,
-        )
 
-        record_movement_rejection(80000)
-        record_movement_rejection(97000)
+        ws = WorldService()
+        ws.record_movement_rejection(80000)
+        ws.record_movement_rejection(97000)
 
-        assert recent_movement_rejections(100000, 10000) == 1
-        assert recent_movement_rejections(120000, 10000) == 0
+        assert ws.recent_movement_rejections(100000, 10000) == 1
+        assert ws.recent_movement_rejections(120000, 10000) == 0
 
     def test_empty_record_counts_zero(self) -> None:
         """A fresh service has no rejections on record."""
-        from tankpit_bot.sniffer.world_state import recent_movement_rejections
 
-        assert recent_movement_rejections(100000, 10000) == 0
+        ws = WorldService()
+        assert ws.recent_movement_rejections(100000, 10000) == 0

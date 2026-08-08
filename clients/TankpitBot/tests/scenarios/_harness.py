@@ -54,9 +54,6 @@ from tankpit_bot.protocol import (
     ViewportUpdateDict,
 )
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-)
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
 
@@ -118,13 +115,13 @@ class BotScenario:
         combat_feedback: CombatFeedback = "",
         config: AIConfigDict | None = None,
     ) -> None:
-        """Reset the global world service and install the scenario clock.
+        """Build the scenario's world service and install its clock.
 
-        The world service is a singleton in production; the scenario
-        owns it for the duration of one test. Tests MUST construct
-        scenarios in isolated fixtures (see the ``isolate_world``
-        fixture in the scenarios test modules) so they don't leak
-        state between cases.
+        The scenario OWNS one :class:`WorldService` for its lifetime.
+        It used to reset a process singleton and share it, which is why
+        the scenario fixtures had to isolate carefully; a scenario that
+        owns its world cannot leak into another
+        ([[session-state-deglobalisation]] step 8).
 
         The scenario also installs itself as the :mod:`_test_hooks`
         clock so the bot's wire-stamping mutators see the scenario's
@@ -142,6 +139,8 @@ class BotScenario:
         self.combat_feedback: CombatFeedback = combat_feedback
         self.config: AIConfigDict | None = config
         self.ai_state: AIStateDict = make_initial_ai_state(config)
+        #: The one service this scenario writes into and reads back.
+        self._ws: WorldService = WorldService()
         self._restore_clock: Callable[[], int] | None = _test_hooks.get_current_time_ms
         _test_hooks.get_current_time_ms = self._clock
 
@@ -204,10 +203,10 @@ class BotScenario:
         """Return the live world service the dispatcher writes into.
 
         Returns:
-            The global :class:`WorldService` instance that the
+            This scenario's own :class:`WorldService`, which the
             production dispatcher mutates in place.
         """
-        return get_world_service()
+        return self._ws
 
     @property
     def world(self) -> WorldStateDict:
@@ -451,6 +450,7 @@ class BotScenario:
             timestamp_ms=self.timestamp_ms,
             terrain=None,
             combat_feedback=self.combat_feedback,
+            ws=self.ws,
         )
         # The production tick loop advances ``ai_state`` from the
         # decision; mirror that so consecutive ``decide()`` calls see

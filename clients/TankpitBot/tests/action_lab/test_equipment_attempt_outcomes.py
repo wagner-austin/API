@@ -43,7 +43,7 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
 from tankpit_bot.state.types import ContainerStateDict
 
@@ -52,9 +52,10 @@ class TestEquipmentAttemptOutcomes:
     """Tests for equipment-attempt terminal outcomes."""
 
     def setup_method(self) -> None:
-        get_world_service().world_state = _world()
+        self.ws = WorldService()
+        self.ws.world_state = _world()
         update_inventory_from_protocol(
-            get_world_service(),
+            self.ws,
             [0, 0, 0, 0, 0],
             [False] * 5,
         )

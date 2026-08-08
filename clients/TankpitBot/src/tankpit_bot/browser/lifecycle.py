@@ -16,6 +16,7 @@ from tankpit_bot._test_hooks import (
     PageProtocol,
 )
 from tankpit_bot.browser.types import GameNotJoinedError
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import CapturedMessage
 
 log = get_logger(__name__)
@@ -36,6 +37,7 @@ def _handle_teardown_hang() -> None:
 def navigate_and_login(
     page: PageProtocol,
     cdp: CDPSessionProtocol,
+    ws: WorldService,
     *,
     target_url: str,
     prefer_account: bool,
@@ -47,6 +49,7 @@ def navigate_and_login(
     Args:
         page: Playwright page.
         cdp: CDP session.
+        ws: The session's world service; the joined room lands here.
         target_url: URL to navigate to.
         prefer_account: Whether to prefer account login.
         tank_name_prefix: Prefix for tank name.
@@ -63,6 +66,7 @@ def navigate_and_login(
     success = handle_login_flow(
         page,
         cdp,
+        ws,
         tank_name_prefix=tank_name_prefix,
         prefer_account=prefer_account,
         auto_join_room=auto_join_room,

@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.mode_gates import (
 )
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.inventory import InventoryItem, InventoryState
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict
 from tankpit_bot.types.modes import AIMode
 from tests.bot.ai._support import make_enemy_tank, make_scanned_ai_state, make_world
@@ -36,6 +37,7 @@ def _locked_ctx(
     wind_down: bool = False,
     mode: AIMode = "COLLECT",
 ) -> DecideCtx:
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {}
     if target_present:
         tanks["50"] = make_enemy_tank(tank_id=50, x=150, y=150, name=target_name)
@@ -52,7 +54,7 @@ def _locked_ctx(
             "wind_down": wind_down,
         }
     )
-    return DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    return DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
 
 # The fixture self tank is rank 2: capacity 1200, inventory cap 30.
@@ -142,6 +144,7 @@ def test_hunt_reenters_at_the_partial_bar_with_a_held_human_lock() -> None:
 
 
 def test_hunt_entry_stays_full_bar_without_a_held_lock() -> None:
+    ws = WorldService()
     world, self_state = make_world(fuel=750)
     ai_state = make_scanned_ai_state()
     ctx = DecideCtx(
@@ -152,6 +155,7 @@ def test_hunt_entry_stays_full_bar_without_a_held_lock() -> None:
         100000,
         None,
         "",
+        ws=ws,
     )
 
     assert should_enter_hunt(ctx) is False

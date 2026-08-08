@@ -44,12 +44,7 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     emit_sync,
 )
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    mark_container_desync,
-    mark_move_target_failed,
-    record_movement_rejection,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import check_and_clear_command_error
 from tankpit_bot.sniffer.world_state_containers import (
     increment_container_failed_pickups,
@@ -117,7 +112,9 @@ _COMMAND_ERROR_APPLICABILITY: dict[ActionKind, frozenset[int]] = {
 log = get_logger(__name__)
 
 
-def _mark_movement_failure(kind: ActionKind, error_code: int, tx: int, ty: int) -> None:
+def _mark_movement_failure(
+    ws: WorldService, kind: ActionKind, error_code: int, tx: int, ty: int
+) -> None:
     """Record a rejected movement's failed-target mark, when deserved.
 
     Code 0 on a teleport is a PRECONDITION receipt, not a verdict on
@@ -141,7 +138,7 @@ def _mark_movement_failure(kind: ActionKind, error_code: int, tx: int, ty: int) 
             ty,
         )
         return
-    mark_move_target_failed(tx, ty, get_current_time_ms())
+    ws.mark_move_target_failed(tx, ty, get_current_time_ms())
     emit_sync("marked (%d,%d) as failed %s target", tx, ty, kind)
 
 
@@ -164,7 +161,7 @@ def _emit_orphan_command_error(kind: ActionKind, error_code: int) -> None:
     )
 
 
-def _drain_orphan_command_error(action: InFlightActionDict) -> None:
+def _drain_orphan_command_error(ws: WorldService, action: InFlightActionDict) -> None:
     """Drain a pending 0x52 code during a scan or map_open wait.
 
     Radar and map_open dispatch are not server-side rejectable, so
@@ -180,7 +177,7 @@ def _drain_orphan_command_error(action: InFlightActionDict) -> None:
     Args:
         action: The in-flight scan or map_open action.
     """
-    error_code = check_and_clear_command_error(get_world_service())
+    error_code = check_and_clear_command_error(ws)
     if error_code == -1:
         return
     _emit_orphan_command_error(action["kind"], error_code)
@@ -339,7 +336,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
                 # item is stale or out of sync then its worth a radar.
                 # not, 3 items") -- the collect cascade answers the
                 # latch, subject to the radar-spend economics.
-                mark_container_desync(get_current_time_ms())
+                bot.world.mark_container_desync(get_current_time_ms())
                 emit_sync(
                     "container at (%d,%d) rejected code=4 (empty) -- belief "
                     "removed, container memory marked desynced",
@@ -350,7 +347,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
             increment_container_failed_pickups(bot.world, tx, ty)
             emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
     if kind in ("move", "teleport"):
-        _mark_movement_failure(kind, error_code, tx, ty)
+        _mark_movement_failure(bot.world, kind, error_code, tx, ty)
     if error_code == SUPERVISOR_ERROR_CANT_GO and kind in ("move", "collect", "teleport"):
         # The shared fact behind a cant_go on ANY movement-bearing
         # command is "the tank tried to move and the server said no"
@@ -359,7 +356,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         # consecutive rejected walk-pickups under fire, invisible to
         # the per-tile marks because collect rejections only fed
         # failed_pickups.
-        record_movement_rejection(get_current_time_ms())
+        bot.world.record_movement_rejection(get_current_time_ms())
     bot._transition("IDLE", in_flight_action=make_no_action())
     return True
 

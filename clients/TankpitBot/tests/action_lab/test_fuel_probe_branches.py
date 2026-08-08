@@ -16,7 +16,6 @@ from tests.action_lab._fuel_branches_harness import (
     _session_with_statuses,
     _set_common_probe_hooks,
     _target,
-    fuel_probe_module,
 )
 from tests.action_lab._fuel_probe_harness import (
     _ProbeHarness,
@@ -188,8 +187,8 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
     action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
     action_hooks.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
     original_resolve_fuel_target_phase = fuel_collection_phase.resolve_fuel_target_phase
-    fuel_probe_module.get_terrain_map = lambda: _terrain({(124, 100), (101, 100), (102, 100)})
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
+    probe = _ProbeHarness(clock)
+    probe.world.terrain_map = _terrain({(124, 100), (101, 100), (102, 100)})
 
     def _teleport_outcome(
         page: action_session.WaitPageProtocol,
@@ -350,7 +349,7 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
     fuel_collection_phase.resolve_fuel_target_phase = _resolve_fuel_target_phase
     try:
         with pytest.raises(FuelProbeError, match="visible fuel target disappeared unexpectedly"):
-            _ProbeHarness(clock)._probe_single_fuel_target(
+            probe._probe_single_fuel_target(
                 target=_target(),
                 map_sync_timeout_ms=3000,
                 teleport_timeout_ms=10000,

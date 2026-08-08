@@ -30,7 +30,6 @@ from tankpit_bot.sim.world import (
     make_sim_tank,
     make_sim_world,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 from tests.sim.seam import RICH_CONTAINERS, boot_seam
 
@@ -263,6 +262,7 @@ def test_production_bot_restocks_ammo_over_the_seam() -> None:
         containers=RICH_CONTAINERS,
         equipment=((103, 103), (98, 98)),
     )
+    ws = bot.world
     start_extras = 8
     for _ in range(14):
         _tick_once(bot)
@@ -270,6 +270,6 @@ def test_production_bot_restocks_ammo_over_the_seam() -> None:
     _tick_once(bot)
     truth = server.world["tanks"][9]["counts"]
     assert truth[SLOT_RADAR] > start_extras - 3
-    inventory = get_world_service().inventory_state
+    inventory = ws.inventory_state
     assert inventory["extra_radars"]["count"] == truth[SLOT_RADAR]
     assert len(server.world["equipment"]) < 2

@@ -26,7 +26,6 @@ from tankpit_bot.action_lab.combat_probe_types import (
     CombatEngagementDict,
 )
 from tankpit_bot.bot.ai.world_types import make_enemy_threat
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     make_tank_state,
 )
@@ -209,7 +208,7 @@ def test_wait_for_shot_feedback_returns_hit() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness()
-    ws = get_world_service()
+    ws = probe.world
     ws.got_our_shot_response = True
     ws.got_confirmed_hit = True
 
@@ -224,7 +223,7 @@ def test_wait_for_shot_feedback_returns_miss() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness()
-    ws = get_world_service()
+    ws = probe.world
     ws.got_our_shot_response = True
     ws.got_confirmed_hit = False
 
@@ -252,7 +251,6 @@ def test_engage_single_target_records_shots() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness()
-    ws = get_world_service()
 
     probe._world_state["tanks"] = {
         "50": make_tank_state(
@@ -281,13 +279,13 @@ def test_engage_single_target_records_shots() -> None:
         timestamp_ms=1000,
     )
 
-    ws.got_our_shot_response = True
-    ws.got_confirmed_hit = True
+    probe.world.got_our_shot_response = True
+    probe.world.got_confirmed_hit = True
 
     def _on_wait() -> None:
-        ws.got_our_shot_response = True
-        ws.got_confirmed_hit = True
-        ws.killed_tank_ids.add(50)
+        probe.world.got_our_shot_response = True
+        probe.world.got_confirmed_hit = True
+        probe.world.killed_tank_ids.add(50)
 
     probe._fake_page = ClockAdvancingPage(clock, on_wait=_on_wait)
 
@@ -304,7 +302,6 @@ def test_engage_single_target_detects_flee() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness()
-    ws = get_world_service()
 
     probe._world_state["tanks"] = {
         "50": make_tank_state(
@@ -338,8 +335,8 @@ def test_engage_single_target_detects_flee() -> None:
     def _on_wait() -> None:
         nonlocal shot_count
         shot_count += 1
-        ws.got_our_shot_response = True
-        ws.got_confirmed_hit = True
+        probe.world.got_our_shot_response = True
+        probe.world.got_confirmed_hit = True
         if shot_count == 1:
             probe._world_state["tanks"]["50"] = make_tank_state(
                 tank_id=50,
@@ -354,11 +351,11 @@ def test_engage_single_target_detects_flee() -> None:
                 timestamp_ms=1000,
             )
         elif shot_count >= 2:
-            ws.killed_tank_ids.add(50)
+            probe.world.killed_tank_ids.add(50)
 
     probe._fake_page = ClockAdvancingPage(clock, on_wait=_on_wait)
-    ws.got_our_shot_response = True
-    ws.got_confirmed_hit = True
+    probe.world.got_our_shot_response = True
+    probe.world.got_confirmed_hit = True
 
     result = probe._engage_single_target(enemy, max_shots=5)
 

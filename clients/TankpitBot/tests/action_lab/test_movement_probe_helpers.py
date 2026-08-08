@@ -23,6 +23,7 @@ from tankpit_bot.action_lab.movement_probe import (
 from tankpit_bot.action_lab.movement_probe_types import (
     MovementProbeSessionDict,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import (
     CapturedMessage,
 )
@@ -76,7 +77,7 @@ def test_create_movement_probe_returns_concrete_probe() -> None:
 
 
 def test_get_probe_terrain_map_defaults_to_none_without_loaded_map() -> None:
-    assert _get_probe_terrain_map() is None
+    assert _get_probe_terrain_map(WorldService()) is None
 
 
 def test_build_probe_targets_uses_real_target_builder() -> None:

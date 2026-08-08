@@ -12,7 +12,6 @@ from tankpit_bot.bot.states import (
     make_in_flight_action,
     make_no_action,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_fuel_total as _sm_update_fuel,
 )
@@ -39,28 +38,22 @@ class TestBotStateUpdates:
     def test_update_state_waiting_to_idle(self, fake_env: FakeEnv) -> None:
         """Test transition from WAITING_FOR_POSITION to IDLE."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
-        update_world_state_from_position(50, 50)
+        bot.world.update_world_state_from_position(50, 50)
         bot._update_state_from_world()
         assert bot.get_state() == "IDLE"
 
     def test_update_state_low_fuel(self, fake_env: FakeEnv) -> None:
         """Test transition to LOW_FUEL when fuel below threshold."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
-        update_world_state_from_position(50, 50)
+        bot.world.update_world_state_from_position(50, 50)
         bot._update_state_from_world()
         assert bot.get_state() == "IDLE"
         bot._state_data = bot._state_data.copy()
@@ -71,21 +64,18 @@ class TestBotStateUpdates:
     def test_update_state_scanning_to_idle(self, fake_env: FakeEnv) -> None:
         """SCANNING completes when a radar response arrives."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
-        update_world_state_from_position(50, 50)
-        _sm_update_fuel(get_world_service(), 1400)
+        bot.world.update_world_state_from_position(50, 50)
+        _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
         from tankpit_bot.protocol import RadarContainerDict
 
         update_world_state_from_radar(
-            get_world_service(), [RadarContainerDict(x=100, y=100, volume=50)], [], []
+            bot.world, [RadarContainerDict(x=100, y=100, volume=50)], [], []
         )
         bot._update_state_from_world()
         assert bot.get_state() == "IDLE"
@@ -97,18 +87,15 @@ class TestBotStateUpdates:
     ) -> None:
         """SCANNING completes even when the radar finds zero containers."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
-        update_world_state_from_position(50, 50)
-        _sm_update_fuel(get_world_service(), 1400)
+        bot.world.update_world_state_from_position(50, 50)
+        _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
-        update_world_state_from_radar(get_world_service(), [], [], [])
+        update_world_state_from_radar(bot.world, [], [], [])
         bot._update_state_from_world()
         assert bot.get_state() == "IDLE"
         assert bot._state_data["in_flight_action"]["kind"] == "none"
@@ -119,15 +106,12 @@ class TestBotStateUpdates:
     ) -> None:
         """MOVING completes when reaching target position."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
-        update_world_state_from_position(50, 50)
-        _sm_update_fuel(get_world_service(), 1400)
+        bot.world.update_world_state_from_position(50, 50)
+        _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "MOVING", "move", 50, 50)
         bot._update_state_from_world()
@@ -139,15 +123,12 @@ class TestBotStateUpdates:
     ) -> None:
         """COLLECTING completes when reaching target position."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
-        update_world_state_from_position(100, 100)
-        _sm_update_fuel(get_world_service(), 1400)
+        bot.world.update_world_state_from_position(100, 100)
+        _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 100, 100)
         bot._update_state_from_world()
@@ -160,9 +141,6 @@ class TestBotStateUpdates:
         """COLLECTING completes when pickup removes the target container."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tankpit_bot.sniffer.world_state_containers import (
             update_world_state_from_container_pickup,
         )
@@ -170,16 +148,16 @@ class TestBotStateUpdates:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
-        update_world_state_from_position(206, 83)
-        _sm_update_fuel(get_world_service(), 1100)
+        bot.world.update_world_state_from_position(206, 83)
+        _sm_update_fuel(bot.world, 1100)
         bot._update_state_from_world()
         containers: list[RadarContainerDict] = [
             RadarContainerDict(x=205, y=82, volume=-1),
         ]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(get_world_service(), containers, mines, [])
+        update_world_state_from_radar(bot.world, containers, mines, [])
         bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 205, 82)
-        update_world_state_from_container_pickup(get_world_service(), 205, 82)
+        update_world_state_from_container_pickup(bot.world, 205, 82)
         bot._update_state_from_world()
         assert bot.get_state() == "IDLE"
 
@@ -384,15 +362,12 @@ class TestBotStateUpdateBranches:
     ) -> None:
         """MOVING stays MOVING when not at target."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
-        update_world_state_from_position(50, 50)
-        _sm_update_fuel(get_world_service(), 1400)
+        bot.world.update_world_state_from_position(50, 50)
+        _sm_update_fuel(bot.world, 1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "MOVING", "move", 100, 100)
         bot._update_state_from_world()
@@ -404,15 +379,12 @@ class TestBotStateUpdateBranches:
     ) -> None:
         """TELEPORTING stays until landing is confirmed."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
         bot._update_state_from_world()
-        update_world_state_from_position(196, 85)
-        _sm_update_fuel(get_world_service(), 582)
+        bot.world.update_world_state_from_position(196, 85)
+        _sm_update_fuel(bot.world, 582)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 196, 86)
         bot._update_state_from_world()

@@ -25,7 +25,7 @@ from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.transport import decode_client_payload, encode_tick_payload
 from tankpit_bot.sim.world import SimContainerDict, make_sim_tank, make_sim_world
 from tankpit_bot.sniffer.decoders import process_received_message
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -34,8 +34,11 @@ _CLIENT = 9
 _ENEMY = 11
 
 
-def _established_self() -> SelfStateDict:
+def _established_self(ws: WorldService) -> SelfStateDict:
     """Return the bot's self-state, failing the test when absent.
+
+    Args:
+        ws: The world service the sim wire fed.
 
     Returns:
         The established self-state.
@@ -43,14 +46,17 @@ def _established_self() -> SelfStateDict:
     Raises:
         AssertionError: If the wire never established self-state.
     """
-    self_state = get_world_service().world_state["self_state"]
+    self_state = ws.world_state["self_state"]
     if self_state is None:
         raise AssertionError("the sim wire never established self_state")
     return self_state
 
 
-def _boot() -> tuple[SimServer, bytes]:
-    """Reset globals, build the XOR table, and join a fresh sim world.
+def _boot(ws: WorldService) -> tuple[SimServer, bytes]:
+    """Build the XOR table and join a fresh sim world into ``ws``.
+
+    Args:
+        ws: The world service the handshake is ingested into.
 
     Returns:
         The sim server and the session XOR table, with the join
@@ -67,25 +73,27 @@ def _boot() -> tuple[SimServer, bytes]:
     world["tanks"][_ENEMY] = make_sim_tank(_ENEMY, 1, 1, 107, 100, 500)
     world["containers"].append(SimContainerDict(x=103, y=100, volume=300, dotted=True))
     server = SimServer(world, InMemoryTerrainMap(), client_id=_CLIENT)
-    _deliver(server.handshake(), table)
+    _deliver(ws, server.handshake(), table)
     return server, table
 
 
-def _deliver(messages: list[BinaryMessage], table: bytes) -> None:
+def _deliver(ws: WorldService, messages: list[BinaryMessage], table: bytes) -> None:
     """Push one message batch through the production ingestion path.
 
     Args:
+        ws: The world service the batch is ingested into.
         messages: The sim's decoded batch.
         table: Session XOR table.
     """
-    process_received_message(get_world_service(), encode_tick_payload(messages, table), table)
+    process_received_message(ws, encode_tick_payload(messages, table), table)
 
 
 def test_handshake_reaches_production_world_state() -> None:
     """The join burst establishes self-state and the enemy registry."""
-    server, _table = _boot()
-    world = get_world_service().world_state
-    self_state = _established_self()
+    ws = WorldService()
+    server, _table = _boot(ws)
+    world = ws.world_state
+    self_state = _established_self(ws)
     assert (self_state["x"], self_state["y"]) == (100, 100)
     assert self_state["fuel"] == 800
     enemy = world["tanks"][str(_ENEMY)]
@@ -102,7 +110,8 @@ def test_production_command_bytes_drive_the_sim_and_beliefs_track_truth() -> Non
     bot's believed position and fuel equal the sim's ground truth —
     including the container pickup at the destination.
     """
-    server, table = _boot()
+    ws = WorldService()
+    server, table = _boot(ws)
     framed = build_move_command(103, 100)
     wire = framed[:3] + bytes(
         byte ^ (table[i] if i < len(table) else 0) for i, byte in enumerate(framed[3:])
@@ -110,12 +119,12 @@ def test_production_command_bytes_drive_the_sim_and_beliefs_track_truth() -> Non
     commands = decode_client_payload(base64.b64encode(wire).decode("ascii"), table)
     assert [command["kind"] for command in commands] == ["move"]
     server.queue_command(_CLIENT, commands[0])
-    _deliver(server.advance_tick(), table)
+    _deliver(ws, server.advance_tick(), table)
 
     truth = server.world["tanks"][_CLIENT]
     assert (truth["x"], truth["y"]) == (103, 100)
     assert truth["fuel"] == 800 - 3 + 300
-    self_state = _established_self()
+    self_state = _established_self(ws)
     assert (self_state["x"], self_state["y"]) == (truth["x"], truth["y"])
     assert self_state["fuel"] == truth["fuel"]
 
@@ -127,26 +136,28 @@ def test_victim_fuel_sync_does_not_leak_into_self_belief() -> None:
     dual (90 damage) — and the victim's 0x2E sync must arrive
     short-form, leaving the bot's own fuel belief untouched.
     """
-    server, table = _boot()
+    ws = WorldService()
+    server, table = _boot(ws)
     server.queue_command(
         _CLIENT,
         ClientCommandDict(
             kind="shoot", command=115, x=107, y=100, target_id=0, slot=0, message_id=0, direction=0
         ),
     )
-    _deliver(server.advance_tick(), table)
+    _deliver(ws, server.advance_tick(), table)
     assert server.world["tanks"][_ENEMY]["fuel"] == 500 - 90
-    world = get_world_service().world_state
-    assert _established_self()["fuel"] == 800
+    world = ws.world_state
+    assert _established_self(ws)["fuel"] == 800
     assert world["tanks"][str(_ENEMY)]["damage_state"] == damage_tier(500 - 90, 1)
 
 
 def test_real_planner_decides_on_sim_fed_state() -> None:
     """The production planner produces a decision from sim-fed beliefs."""
-    server, _table = _boot()
+    ws = WorldService()
+    server, _table = _boot(ws)
     del server
-    service = get_world_service()
-    self_state = _established_self()
+    service = ws
+    self_state = _established_self(ws)
     decision = decide(
         world=service.world_state,
         self_state=self_state,
@@ -155,5 +166,6 @@ def test_real_planner_decides_on_sim_fed_state() -> None:
         timestamp_ms=get_current_time_ms(),
         terrain=None,
         combat_feedback="",
+        ws=ws,
     )
     assert decision["behavior"]["mode"] in ("HUNT", "COLLECT")

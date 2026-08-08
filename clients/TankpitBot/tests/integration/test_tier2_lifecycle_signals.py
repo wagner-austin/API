@@ -23,10 +23,7 @@ from tankpit_bot.protocol import (
     TankInfoDict,
     TankStatusSyncDict,
 )
-from tankpit_bot.sniffer.world_state import (
-    check_and_clear_radar_scan_complete,
-    get_world_service,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_teleport_landed,
     mark_teleport_landed,
@@ -92,7 +89,7 @@ class TestTeleportLandedClearsAction:
         """
         from tankpit_bot.container import TeleportLandedDict
 
-        ws = get_world_service()
+        ws = WorldService()
         assert check_and_clear_teleport_landed(ws) is False
 
         dispatch_world_state_update(
@@ -111,7 +108,7 @@ class TestTeleportLandedClearsAction:
         Documents the contract: the bot may mark the landing directly
         in response to a DOM event when the wire is silent.
         """
-        ws = get_world_service()
+        ws = WorldService()
         mark_teleport_landed(ws)
         assert check_and_clear_teleport_landed(ws) is True
 
@@ -132,10 +129,9 @@ class TestRadarScanReturnsToIdle:
             RadarMineDict,
             RadarScanResultDict,
         )
-        from tankpit_bot.sniffer.world_state import update_world_state_from_position
 
-        ws = get_world_service()
-        update_world_state_from_position(45, 55)
+        ws = WorldService()
+        ws.update_world_state_from_position(45, 55)
         # Seed a tracked mine that the scan will clear.
         dispatch_world_state_update(
             ws,
@@ -146,7 +142,7 @@ class TestRadarScanReturnsToIdle:
                 mine_clears=[],
             ),
         )
-        assert check_and_clear_radar_scan_complete() is True
+        assert ws.check_and_clear_radar_scan_complete() is True
         assert "41,51" in ws.world_state["mines"]
 
         dispatch_world_state_update(
@@ -158,7 +154,7 @@ class TestRadarScanReturnsToIdle:
                 mine_clears=[RadarMineClearDict(x=41, y=51)],
             ),
         )
-        assert check_and_clear_radar_scan_complete() is True
+        assert ws.check_and_clear_radar_scan_complete() is True
         assert "41,51" not in ws.world_state["mines"]
 
     def test_radar_response_with_containers_marks_scan_complete(self) -> None:
@@ -170,14 +166,14 @@ class TestRadarScanReturnsToIdle:
         """
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 
-        ws = get_world_service()
+        ws = WorldService()
         containers: list[RadarContainerDict] = [
             RadarContainerDict(x=132, y=125, volume=600),
         ]
         mines: list[RadarMineDict] = []
         update_world_state_from_radar(ws, containers, mines, [])
-        assert check_and_clear_radar_scan_complete() is True
-        assert check_and_clear_radar_scan_complete() is False
+        assert ws.check_and_clear_radar_scan_complete() is True
+        assert ws.check_and_clear_radar_scan_complete() is False
 
 
 class TestMinePlacementUpdatesWorld:
@@ -190,7 +186,7 @@ class TestMinePlacementUpdatesWorld:
 
     def test_seven_position_placement_adds_every_mine(self) -> None:
         """All 7 positions land in ``world_state["mines"]`` keyed by ``x,y``."""
-        ws = get_world_service()
+        ws = WorldService()
         # Seed the placer (Artax / tank 1301, blue team=2) so the
         # dispatch can attribute the mines.
         dispatch_world_state_update(
@@ -255,7 +251,7 @@ class TestCombatHitAdvancesDamageState:
         higher (healthier) tier and assert the dispatched status-sync
         applies.
         """
-        ws = get_world_service()
+        ws = WorldService()
         # Register the enemy (Yuppler, purple team=1, tank=1229).
         dispatch_world_state_update(
             ws,
@@ -316,7 +312,7 @@ class TestCombatHitAdvancesDamageState:
         from tankpit_bot.protocol import TankEntryDict
         from tankpit_bot.sniffer.world_state_combat import check_and_clear_combat_hit
 
-        ws = get_world_service()
+        ws = WorldService()
         # Self (Artax / blue=2, tank=1301).
         dispatch_world_state_update(
             ws,

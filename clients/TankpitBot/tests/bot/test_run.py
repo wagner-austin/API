@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from tankpit_bot._test_hooks import AutoscrollEnforcerProtocol
+from tankpit_bot.browser import _test_hooks as browser_hooks
+from tankpit_bot.browser._test_hooks import AutoscrollEnforcerProtocol
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.conftest import FakeEnv, FakeFileSystem
 
 _STOP = Path("__nonexistent_stop_file__")
@@ -75,18 +77,20 @@ def _stub_autoscroll_hook() -> tuple[AutoscrollEnforcerProtocol, list[int]]:
         Tuple of (original hook, recorded call count list) for
         save-and-restore in the caller's ``finally``.
     """
-    from tankpit_bot import _test_hooks
     from tankpit_bot._test_hooks import AutoscrollPageProtocol
+    from tankpit_bot.browser import _test_hooks as browser_hooks
     from tankpit_bot.types.message import CapturedMessage
 
     calls: list[int] = []
-    original = _test_hooks.ensure_autoscroll_off
+    original = browser_hooks.ensure_autoscroll_off
 
-    def _recorder(page: AutoscrollPageProtocol, messages: list[CapturedMessage]) -> None:
-        del page, messages
+    def _recorder(
+        page: AutoscrollPageProtocol, messages: list[CapturedMessage], ws: WorldService
+    ) -> None:
+        del page, messages, ws
         calls.append(1)
 
-    _test_hooks.ensure_autoscroll_off = _recorder
+    browser_hooks.ensure_autoscroll_off = _recorder
     return original, calls
 
 
@@ -138,7 +142,7 @@ class TestBotRunMethod:
             assert autoscroll_calls == []
         finally:
             _test_hooks.sync_playwright = original
-            _test_hooks.ensure_autoscroll_off = original_autoscroll
+            browser_hooks.ensure_autoscroll_off = original_autoscroll
 
     def test_run_maximises_via_cdp_on_streamed_display(
         self, fake_env: FakeEnv, fake_fs: FakeFileSystem
@@ -170,7 +174,7 @@ class TestBotRunMethod:
             assert bot._page is None
         finally:
             _test_hooks.sync_playwright = original
-            _test_hooks.ensure_autoscroll_off = original_autoscroll
+            browser_hooks.ensure_autoscroll_off = original_autoscroll
 
     def test_run_saves_capture_session(
         self,
@@ -203,7 +207,7 @@ class TestBotRunMethod:
             assert has_capture
         finally:
             _test_hooks.sync_playwright = original
-            _test_hooks.ensure_autoscroll_off = original_autoscroll
+            browser_hooks.ensure_autoscroll_off = original_autoscroll
 
     def test_send_graceful_quit_uses_current_cdp(self, fake_env: FakeEnv) -> None:
         """Teardown quit binds the live CDP session and sends quit_game."""
@@ -483,16 +487,13 @@ class TestBotGameLoopStates:
             fake_env: Installed fake environment fixture.
         """
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            get_world_service,
-            update_world_state_from_position,
-        )
         from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
         from tests.fakes import FakeCDPSession, FakePageInterrupting
 
-        update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(get_world_service(), 800)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(ws, 800)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._magic = "test_magic"

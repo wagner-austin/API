@@ -16,6 +16,7 @@ from tankpit_bot.bot.types import (
     make_teleport_command,
 )
 from tankpit_bot.protocol.chat import CHAT_HELLO
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
@@ -51,6 +52,7 @@ def _tank(
 
 def _ctx(tanks: dict[str, TankStateDict]) -> DecideCtx:
     """A decision context whose registry holds the given tanks."""
+    ws = WorldService()
     world, self_state = make_world(tanks=tanks)
     return DecideCtx(
         world,
@@ -60,6 +62,7 @@ def _ctx(tanks: dict[str, TankStateDict]) -> DecideCtx:
         100000,
         None,
         "",
+        ws=ws,
     )
 
 
@@ -197,6 +200,7 @@ class TestGreetingThroughDecide:
         """
         from tankpit_bot.bot.ai_strategy import decide
 
+        ws = WorldService()
         human = make_tank_state(
             tank_id=50,
             x=105,
@@ -216,7 +220,7 @@ class TestGreetingThroughDecide:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["updated_ai_state"]["combat_target_id"] == -1
         assert decision["secondary_command"] == make_chat_command(
@@ -227,9 +231,9 @@ class TestGreetingThroughDecide:
     def test_decide_locks_a_consented_human(self) -> None:
         """A chat response consents the human into a normal lock."""
         from tankpit_bot.bot.ai_strategy import decide
-        from tankpit_bot.sniffer.world_state import get_world_service
 
-        get_world_service().chat_seen_tank_ids.add(50)
+        ws = WorldService()
+        ws.chat_seen_tank_ids.add(50)
         human = make_tank_state(
             tank_id=50,
             x=105,
@@ -249,7 +253,7 @@ class TestGreetingThroughDecide:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "HUNT"
         assert decision["updated_ai_state"]["combat_target_id"] == 50
@@ -259,6 +263,7 @@ class TestGreetingThroughDecide:
         """The same acquisition against a practice bot attaches nothing."""
         from tankpit_bot.bot.ai_strategy import decide
 
+        ws = WorldService()
         bot_tank = make_tank_state(
             tank_id=51,
             x=105,
@@ -278,7 +283,7 @@ class TestGreetingThroughDecide:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "HUNT"
         assert decision["updated_ai_state"]["combat_target_id"] == 51

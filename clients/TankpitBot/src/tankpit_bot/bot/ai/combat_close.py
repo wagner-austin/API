@@ -39,7 +39,6 @@ from tankpit_bot.bot.types import (
 )
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.runtime_logging import emit_ai
-from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 WALK_CLOSE_TILES = 3
@@ -151,7 +150,7 @@ def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionD
                 reason_context={"target_name": target["name"]},
             )
     landing_x, landing_y = combat_landing_tile(ctx, target)
-    if is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
+    if ctx.ws.is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
         # The target is off-view here (in-view targets shot above), so
         # with no legal landing and no legal shot, blocking and
         # replanning is all that is left.

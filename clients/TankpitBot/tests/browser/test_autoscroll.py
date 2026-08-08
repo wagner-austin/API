@@ -17,14 +17,34 @@ from tankpit_bot.browser.autoscroll import (
     ensure_autoscroll_off,
 )
 from tankpit_bot.protocol.framing import FramingError
-from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types.message import CapturedMessage
 
 
-def _spawn() -> None:
-    """Seed the global world with a spawned self tank (in-game proof)."""
-    get_world_state()["self_state"] = make_self_state(
+def _spawned_world() -> WorldService:
+    """Return a service whose world holds a spawned self tank.
+
+    Returned rather than seeded into a global so the caller passes the
+    SAME instance the code under test reads; seeding one service and
+    handing over another tests nothing
+    ([[session-state-deglobalisation]] step 8).
+
+    Returns:
+        A service carrying an in-game self state.
+    """
+    ws = WorldService()
+    _seed_spawn(ws)
+    return ws
+
+
+def _seed_spawn(ws: WorldService) -> None:
+    """Put a spawned self tank into ``ws``.
+
+    Args:
+        ws: Service to seed.
+    """
+    ws.get_world_state()["self_state"] = make_self_state(
         tank_id=1301, x=100, y=100, fuel=800, team=2, rank=1, leaderboard_position=1
     )
 
@@ -75,14 +95,17 @@ class _FakePage:
 class _SpawningPage(_FakePage):
     """Page fake whose Nth settle wait "spawns" the tank on the wire."""
 
-    def __init__(self, keyboard: _FakeKeyboard, *, spawn_after_waits: int) -> None:
+    def __init__(
+        self, keyboard: _FakeKeyboard, ws: WorldService, *, spawn_after_waits: int
+    ) -> None:
         super().__init__(keyboard)
         self._spawn_after_waits = spawn_after_waits
+        self._ws = ws
 
     def wait_for_timeout(self, timeout_ms: float) -> None:
         super().wait_for_timeout(timeout_ms)
         if len(self.waits) == self._spawn_after_waits:
-            _spawn()
+            _seed_spawn(self._ws)
 
 
 class TestReadAutoscrollAck:
@@ -146,7 +169,7 @@ class TestEnsureAutoscrollOff:
 
     def setup_method(self) -> None:
         """Seed a spawned tank -- the toggle only works in-game."""
-        _spawn()
+        self.ws = _spawned_world()
 
     def test_setting_was_on_single_press_corrects(self) -> None:
         """Ack ``A0`` after the first press means the toggle is fixed."""
@@ -154,7 +177,7 @@ class TestEnsureAutoscrollOff:
         keyboard = _FakeKeyboard(messages, [b"A0"])
         page = _FakePage(keyboard)
 
-        ensure_autoscroll_off(page, messages)
+        ensure_autoscroll_off(page, messages, self.ws)
 
         assert keyboard.presses == ["a"]
         assert page.waits == [1500.0]
@@ -165,7 +188,7 @@ class TestEnsureAutoscrollOff:
         keyboard = _FakeKeyboard(messages, [b"A1", b"A0"])
         page = _FakePage(keyboard)
 
-        ensure_autoscroll_off(page, messages)
+        ensure_autoscroll_off(page, messages, self.ws)
 
         assert keyboard.presses == ["a", "a"]
 
@@ -176,7 +199,7 @@ class TestEnsureAutoscrollOff:
         page = _FakePage(keyboard)
 
         with pytest.raises(RuntimeError, match="toggle unverified"):
-            ensure_autoscroll_off(page, messages)
+            ensure_autoscroll_off(page, messages, self.ws)
 
     def test_stuck_on_raises(self) -> None:
         """Two consecutive ``A1`` acks mean the protocol drifted."""
@@ -185,19 +208,19 @@ class TestEnsureAutoscrollOff:
         page = _FakePage(keyboard)
 
         with pytest.raises(RuntimeError, match="stuck ON"):
-            ensure_autoscroll_off(page, messages)
+            ensure_autoscroll_off(page, messages, self.ws)
 
 
 def test_real_hook_delegates_to_the_module() -> None:
     """The ``_test_hooks`` seam's real implementation runs the dance."""
-    from tankpit_bot._test_hooks import _real_ensure_autoscroll_off
+    from tankpit_bot.browser._test_hooks import _real_ensure_autoscroll_off
 
-    _spawn()
+    ws = _spawned_world()
     messages: list[CapturedMessage] = []
     keyboard = _FakeKeyboard(messages, [b"A0"])
     page = _FakePage(keyboard)
 
-    _real_ensure_autoscroll_off(page, messages)
+    _real_ensure_autoscroll_off(page, messages, ws)
 
     assert keyboard.presses == ["a"]
 
@@ -213,22 +236,24 @@ class TestInGameGate:
         the entry screen and correctly failed loud. The wait pumps the
         page loop; here the third poll "spawns" the tank.
         """
+        ws = WorldService()
         messages: list[CapturedMessage] = []
         keyboard = _FakeKeyboard(messages, [b"A0"])
-        page = _SpawningPage(keyboard, spawn_after_waits=3)
+        page = _SpawningPage(keyboard, ws, spawn_after_waits=3)
 
-        ensure_autoscroll_off(page, messages)
+        ensure_autoscroll_off(page, messages, ws)
 
         assert keyboard.presses == ["a"]
         assert len(page.waits) >= 3
 
     def test_never_spawning_raises_within_budget(self) -> None:
         """A tank that never spawns fails loud instead of blind-pressing."""
+        ws = WorldService()
         messages: list[CapturedMessage] = []
         keyboard = _FakeKeyboard(messages, [b"A0"])
         page = _FakePage(keyboard)
 
         with pytest.raises(RuntimeError, match="never spawned"):
-            ensure_autoscroll_off(page, messages)
+            ensure_autoscroll_off(page, messages, ws)
 
         assert keyboard.presses == []

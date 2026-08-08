@@ -17,7 +17,6 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.probe_base import ProbeError
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state.types import (
     make_container_state,
 )
@@ -26,7 +25,7 @@ from tankpit_bot.state.types import (
 def test_inventory_total_reads_the_wire_state() -> None:
     """The total is the live sum of all five slot counts."""
     probe = _harness()
-    get_world_service().inventory_state = _slots(3)
+    probe.world.inventory_state = _slots(3)
     assert probe._inventory_total() == 15
 
 
@@ -51,7 +50,7 @@ def test_nearest_equipment_skips_water_sitting_containers() -> None:
     """The first live run's failure mode, pinned: shore containers ON
     water can never host the own-tile trial and are never candidates."""
     probe = _harness()
-    get_world_service().terrain_map = InMemoryTerrainMap({(101, 100): "W"})
+    probe.world.terrain_map = InMemoryTerrainMap({(101, 100): "W"})
     probe.visible_containers = {
         "101,100": _equipment(101, 100),
         "110,100": _equipment(110, 100),
@@ -66,8 +65,8 @@ def test_nearest_equipment_none_when_no_candidates() -> None:
 
 def test_nearest_equipment_requires_the_terrain_map() -> None:
     probe = _harness()
-    get_world_service().terrain_map = None
-    get_world_service().selected_room = None
+    probe.world.terrain_map = None
+    probe.world.selected_room = None
     with pytest.raises(ProbeError, match="terrain map is unavailable"):
         probe._nearest_equipment(set())
 
@@ -119,7 +118,7 @@ def test_search_equipment_skips_unlanded_sites_without_scanning() -> None:
     probe = _StuckHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().map_fuel_dots = ()
+    probe.world.map_fuel_dots = ()
     found, scans, hops = probe._search_equipment(set(), 2)
     # (96, 96) is within landing tolerance of the (100, 100) start, so
     # exactly one site scans; every other rejected teleport is skipped.

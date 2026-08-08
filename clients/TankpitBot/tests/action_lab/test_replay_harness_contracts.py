@@ -40,9 +40,7 @@ from tankpit_bot.browser.page_client_snapshot import (
     PageClientSnapshotDict,
     decode_page_client_snapshot,
 )
-from tankpit_bot.sniffer.world_state import (
-    get_world_state,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     WorldStateDict,
     make_empty_world_state,
@@ -50,13 +48,13 @@ from tankpit_bot.state import (
 )
 
 
-def _seed_self_state(x: int, y: int, fuel: int) -> WorldStateDict:
-    """Seed the world-state singleton with a known self_state.
+def _seed_self_state(ws: WorldService, x: int, y: int, fuel: int) -> WorldStateDict:
+    """Seed ``ws`` with a known self_state.
 
-    Mutates the live singleton by replacing its self_state entry so the
-    derived snapshot has something concrete to project.
+    Replaces the service's self_state entry so the derived snapshot has
+    something concrete to project.
     """
-    world = get_world_state()
+    world = ws.get_world_state()
     world["self_state"] = make_self_state(
         tank_id=1,
         x=x,
@@ -76,9 +74,10 @@ def test_world_derived_snapshot_decodes_through_production_decoder() -> None:
     to validate ``Runtime.evaluate`` responses; the replay harness must
     produce a JSON object that survives the same decoder unchanged.
     """
-    _seed_self_state(x=131, y=126, fuel=1100)
+    ws = WorldService()
+    _seed_self_state(ws, x=131, y=126, fuel=1100)
 
-    raw = build_world_derived_snapshot()
+    raw = build_world_derived_snapshot(ws)
     decoded: PageClientSnapshotDict = decode_page_client_snapshot(raw)
 
     assert decoded["client_present"] is True
@@ -87,10 +86,11 @@ def test_world_derived_snapshot_decodes_through_production_decoder() -> None:
 
 def test_world_derived_snapshot_handles_missing_self_state() -> None:
     """A pre-sync world state still produces a valid snapshot."""
-    world = get_world_state()
+    ws = WorldService()
+    world = ws.get_world_state()
     world["self_state"] = None
 
-    raw = build_world_derived_snapshot()
+    raw = build_world_derived_snapshot(ws)
     decoded = decode_page_client_snapshot(raw)
 
     assert decoded["client_present"] is True
@@ -99,8 +99,9 @@ def test_world_derived_snapshot_handles_missing_self_state() -> None:
 
 def test_world_state_derived_cdp_returns_snapshot_payload() -> None:
     """``WorldStateDerivedCDP.send`` returns the same payload shape live CDP returns."""
-    _seed_self_state(x=146, y=110, fuel=934)
-    cdp = WorldStateDerivedCDP()
+    ws = WorldService()
+    _seed_self_state(ws, x=146, y=110, fuel=934)
+    cdp = WorldStateDerivedCDP(ws)
 
     response = cdp.send("Runtime.evaluate", {"expression": "irrelevant"})
 
@@ -116,7 +117,7 @@ def test_world_state_derived_cdp_returns_snapshot_payload() -> None:
 
 def test_world_state_derived_cdp_ignores_non_runtime_evaluate_methods() -> None:
     """Non-evaluate CDP methods return an empty value (harness compat)."""
-    cdp = WorldStateDerivedCDP()
+    cdp = WorldStateDerivedCDP(WorldService())
 
     response = cdp.send("Network.enable", None)
 
@@ -125,7 +126,7 @@ def test_world_state_derived_cdp_ignores_non_runtime_evaluate_methods() -> None:
 
 def test_world_state_derived_cdp_on_and_detach_are_noops() -> None:
     """The harness CDP substitute records no handlers and never detaches."""
-    cdp = WorldStateDerivedCDP()
+    cdp = WorldStateDerivedCDP(WorldService())
     received: list[JSONObject] = []
 
     def _handler(payload: JSONObject) -> None:
@@ -263,23 +264,25 @@ def test_replay_clock_is_callable_for_hook_substitution() -> None:
 
 def test_world_derived_snapshot_reflects_world_state_timestamp() -> None:
     """Snapshot timestamp tracks the live world-state singleton."""
-    world = get_world_state()
+    ws = WorldService()
+    world = ws.get_world_state()
     world["timestamp_ms"] = 12_345
-    _seed_self_state(x=1, y=2, fuel=3)
+    _seed_self_state(ws, x=1, y=2, fuel=3)
 
-    raw = build_world_derived_snapshot()
+    raw = build_world_derived_snapshot(ws)
 
     assert raw["timestamp_ms"] == 12_345
 
 
 def test_world_derived_snapshot_round_trips_world_state() -> None:
     """A fresh empty world projects to a valid, deterministic snapshot."""
-    world = get_world_state()
+    ws = WorldService()
+    world = ws.get_world_state()
     fresh = make_empty_world_state()
     world.update(fresh)
 
-    raw_first = build_world_derived_snapshot()
-    raw_second = build_world_derived_snapshot()
+    raw_first = build_world_derived_snapshot(ws)
+    raw_second = build_world_derived_snapshot(ws)
 
     assert raw_first == raw_second
     assert decode_page_client_snapshot(raw_first)["client_present"] is True

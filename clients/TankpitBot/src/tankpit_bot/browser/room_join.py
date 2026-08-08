@@ -29,6 +29,7 @@ from tankpit_bot.protocol.lobby import (
     serialize_room_enter_request,
     serialize_room_select_request,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 
 log = get_logger(__name__)
 
@@ -59,16 +60,15 @@ def _collect_room_entries(cdp: CDPSessionProtocol) -> list[RoomInfo]:
     return entries
 
 
-def _register_room_entries(entries: list[RoomInfo]) -> None:
+def _register_room_entries(ws: WorldService, entries: list[RoomInfo]) -> None:
     """Register discovered room images for later terrain-map loading.
 
     Args:
         entries: Room entries decoded from ROOM_LIST messages.
     """
-    from tankpit_bot.sniffer.world_state import register_room_image
 
     for entry in entries:
-        register_room_image(entry["room_id"], entry["image"])
+        ws.register_room_image(entry["room_id"], entry["image"])
 
 
 def _resolve_room_entry(
@@ -119,6 +119,7 @@ def _resolve_room_id(
 def _wait_for_room_entry(
     page: RoomJoinPageProtocol,
     cdp: CDPSessionProtocol,
+    ws: WorldService,
     room_name: str,
 ) -> RoomInfo | None:
     """Wait for the desired room entry to appear in captured ROOM_LIST traffic.
@@ -126,6 +127,7 @@ def _wait_for_room_entry(
     Args:
         page: Playwright page used for polling delays.
         cdp: Active CDP session.
+        ws: The session's world service; room beliefs land here.
         room_name: Desired room name from configuration.
 
     Returns:
@@ -134,7 +136,7 @@ def _wait_for_room_entry(
     waited_ms = 0
     while waited_ms < _ROOM_DISCOVERY_TIMEOUT_MS:
         entries = _collect_room_entries(cdp)
-        _register_room_entries(entries)
+        _register_room_entries(ws, entries)
         room_entry = _resolve_room_entry(entries, room_name)
         if room_entry is not None:
             return room_entry
@@ -146,6 +148,7 @@ def _wait_for_room_entry(
 def _wait_for_room_id(
     page: RoomJoinPageProtocol,
     cdp: CDPSessionProtocol,
+    ws: WorldService,
     room_name: str,
 ) -> str | None:
     """Wait for the desired room to appear in captured ROOM_LIST traffic.
@@ -153,12 +156,13 @@ def _wait_for_room_id(
     Args:
         page: Playwright page used for polling delays.
         cdp: Active CDP session.
+        ws: The session's world service; room images land here.
         room_name: Desired room name from configuration.
 
     Returns:
         Matching room ID, or ``None`` if the room never appears.
     """
-    room_entry = _wait_for_room_entry(page, cdp, room_name)
+    room_entry = _wait_for_room_entry(page, cdp, ws, room_name)
     if room_entry is None:
         return None
     return room_entry["room_id"]
@@ -265,6 +269,7 @@ def _wait_for_enter_response(
 def join_room(
     page: RoomJoinPageProtocol,
     cdp: CDPSessionProtocol,
+    ws: WorldService,
 ) -> bool:
     """Join the configured room through the lobby websocket protocol.
 
@@ -279,7 +284,7 @@ def join_room(
     """
     log.info("Joining game...")
     room_name = _test_hooks.get_env("TANKPIT_ROOM") or "Practice"
-    room_entry = _wait_for_room_entry(page, cdp, room_name)
+    room_entry = _wait_for_room_entry(page, cdp, ws, room_name)
     if room_entry is None:
         log.info("Room select failed: room list never exposed %s", room_name)
         return False
@@ -294,9 +299,7 @@ def join_room(
     if not _wait_for_join_confirm(page, cdp, room_id, start_index=join_confirm_start):
         log.info("Join confirm timeout: room=%s name=%s", room_id, room_name)
         return False
-    from tankpit_bot.sniffer.world_state import set_selected_room
-
-    set_selected_room(room_id)
+    ws.set_selected_room(room_id)
     magic = get_magic_key(cdp)
     if len(magic) == 0:
         log.info("Enter game failed: tankpit.magic was unavailable")

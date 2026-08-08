@@ -36,6 +36,7 @@ from tankpit_bot.action_lab.types import (
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 
 _SnapshotPhase = Literal[
@@ -47,12 +48,41 @@ _SnapshotPhase = Literal[
 ]
 
 LandingTileFn = Callable[
-    [WorldStateDict, SelfStateDict, EnemyThreatDict, TerrainMapProtocol | None, int],
+    [
+        WorldStateDict,
+        SelfStateDict,
+        EnemyThreatDict,
+        TerrainMapProtocol | None,
+        int,
+        WorldService,
+    ],
     tuple[int, int],
 ]
 TerrainMapFn = Callable[[], TerrainMapProtocol | None]
-AnalyzeThreatsFn = Callable[[WorldStateDict, SelfStateDict, int], list[EnemyThreatDict]]
 CaptureSnapshotFn = Callable[[CDPSessionProtocol], PageClientSnapshotDict]
+
+
+class AnalyzeThreatsFn(Protocol):
+    """The threat analysis call, spelled out so stubs are checked against it.
+
+    Spelled as a Protocol rather than a ``Callable`` alias because the
+    world service is the first parameter: a bare ``Callable`` cannot
+    express the keyword-only rank bounds, so a stub that dropped ``ws``
+    typechecked against it while silently reading a different world.
+    """
+
+    def __call__(
+        self,
+        ws: WorldService,
+        world: WorldStateDict,
+        self_state: SelfStateDict,
+        now_ms: int,
+        *,
+        human_min_rank: int = ...,
+        human_max_rank: int = ...,
+    ) -> list[EnemyThreatDict]:
+        """Return the sorted enemy threats visible in ``world``."""
+        ...
 
 
 class ShotFeedbackFn(Protocol):

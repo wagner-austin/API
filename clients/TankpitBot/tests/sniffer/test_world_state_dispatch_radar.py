@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.protocol import RadarContainerDict
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -24,6 +21,7 @@ class TestDispatchRadar:
         """Test dispatch handles 0x4F RadarScanResult message."""
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict, RadarScanResultDict
 
+        ws = WorldService()
         _test_hooks.path_exists = lambda path: False
 
         msg = RadarScanResultDict(
@@ -33,20 +31,21 @@ class TestDispatchRadar:
             mine_clears=[],
         )
 
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        assert "100,100" in get_world_service().world_state["containers"]
-        assert "110,110" in get_world_service().world_state["mines"]
+        assert "100,100" in ws.world_state["containers"]
+        assert "110,110" in ws.world_state["mines"]
 
     def test_dispatch_radar_response_renders_ascii(self) -> None:
         """Test dispatch renders ASCII after radar update when terrain available."""
         from tankpit_bot.protocol import RadarContainerDict, RadarScanResultDict
 
+        ws = WorldService()
         fake_terrain = InMemoryTerrainMap()
         _test_hooks.path_exists = lambda path: True
         _test_hooks.load_terrain_map = lambda path: fake_terrain
 
-        update_world_state_from_position(128, 128)
+        ws.update_world_state_from_position(128, 128)
 
         msg = RadarScanResultDict(
             msg_type=0x4F,
@@ -55,22 +54,22 @@ class TestDispatchRadar:
             mine_clears=[],
         )
 
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
     def test_dispatch_radar_ack_marks_scan_complete(self) -> None:
         """Test dispatch handles radar ack messages as scan completion."""
         from tankpit_bot.protocol import RadarResultDict
-        from tankpit_bot.sniffer.world_state import check_and_clear_radar_scan_complete
 
+        ws = WorldService()
         msg = RadarResultDict(
             msg_type=0x46,
             detection_type=0,
             found=True,
         )
 
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        assert check_and_clear_radar_scan_complete() is True
+        assert ws.check_and_clear_radar_scan_complete() is True
 
 
 class TestDispatchRadarEmptyDelta:
@@ -80,24 +79,26 @@ class TestDispatchRadarEmptyDelta:
         """Dispatching an empty tunneled 0x4F marks a pending radar empty delta."""
         from tankpit_bot.protocol.types import RadarScanResultDict
 
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         msg = RadarScanResultDict(msg_type=0x4F, containers=[], mines=[], mine_clears=[])
 
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
         # The empty delta is pending; a RadarAck(found=True) should preserve
-        assert get_world_service().consume_pending_radar_empty_delta() is True
+        assert ws.consume_pending_radar_empty_delta() is True
 
     def test_nonempty_tunneled_radar_processes_immediately(self) -> None:
         """Dispatching a non-empty tunneled 0x4F processes containers immediately."""
         from tankpit_bot.protocol.types import RadarScanResultDict
 
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         containers = [RadarContainerDict(x=98, y=98, volume=500)]
         msg = RadarScanResultDict(msg_type=0x4F, containers=containers, mines=[], mine_clears=[])
 
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        assert get_world_service().consume_pending_radar_empty_delta() is False
-        result = get_world_service().get_world_state()
+        assert ws.consume_pending_radar_empty_delta() is False
+        result = ws.get_world_state()
         assert "98,98" in result["containers"]

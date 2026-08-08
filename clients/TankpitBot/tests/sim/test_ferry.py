@@ -24,7 +24,6 @@ from tankpit_bot.sim.world import (
     make_sim_tank,
     make_sim_world,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 from tests.sim.seam import boot_seam
 
@@ -243,8 +242,9 @@ def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
 def test_production_world_learns_the_ferry_over_the_seam() -> None:
     """The real ingestion composes the sim's 0x5A ferry into terrain."""
     bot, _server, _link, _table = boot_seam(ferries=((104, 100),))
+    ws = bot.world
     _tick_once(bot)
-    terrain = get_world_service().world_state["terrain"]
+    terrain = ws.world_state["terrain"]
     tile = terrain.get("104,100")
     if tile is None:
         raise AssertionError("the seam never delivered the ferry tile")

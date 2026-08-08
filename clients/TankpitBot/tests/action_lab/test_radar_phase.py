@@ -15,7 +15,6 @@ from tankpit_bot.action_lab import radar_phase
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -39,7 +38,8 @@ class _Probe:
 
     def __init__(self, *, radar_result: bool = True) -> None:
         """Initialize the probe."""
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
         self._messages: list[CapturedMessage] = []
@@ -112,12 +112,12 @@ def test_clear_stale_radar_completion_drains_all_pending_flags() -> None:
     """Radar helper drains every stale completion flag before a new scan."""
     values = [True, True, False]
 
-    def _check_complete() -> bool:
+    def _check_complete(ws: WorldService) -> bool:
         return values.pop(0)
 
     action_hooks.check_and_clear_radar_scan_complete = _check_complete
 
-    radar_phase.clear_stale_radar_completion()
+    radar_phase.clear_stale_radar_completion(WorldService())
 
     assert values == []
 
@@ -149,7 +149,7 @@ def test_run_tracked_radar_phase_waits_for_sync() -> None:
 
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = _drain
-    action_hooks.check_and_clear_radar_scan_complete = lambda: False
+    action_hooks.check_and_clear_radar_scan_complete = lambda ws: False
     setattr(action_hooks, wait_attr, _wait_for_radar_sync)
 
     radar_cycle, radar_started_ms, radar_sync_timestamp_ms = radar_phase.run_tracked_radar_phase(
@@ -186,7 +186,7 @@ def test_run_tracked_radar_phase_raises_on_dispatch_failure() -> None:
 
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source, ws: 0
-    action_hooks.check_and_clear_radar_scan_complete = lambda: False
+    action_hooks.check_and_clear_radar_scan_complete = lambda ws: False
     setattr(action_hooks, wait_attr, _wait_for_radar_sync)
 
     with pytest.raises(RuntimeError, match="radar command dispatch failed"):

@@ -20,7 +20,7 @@ from tankpit_bot.bot.base import Bot
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
-from tankpit_bot.sniffer.world_state import get_self_account
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.conftest import FakeCDPSessionSimple, FakeEnv, FakeFileSystem
 
 
@@ -116,8 +116,9 @@ def test_capture_emits_single_c_press_and_scrapes(
     would just duplicate the block in the log without ``closing``
     anything, so the capture stops at one keyDown / keyUp pair.
     """
+    ws = WorldService()
     artifacts = configure_bot_runtime_logging("20260610-120000")
-    bot = Bot("https://test.tankpit.com/", headless=True)
+    bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
     cdp = FakeCDPSessionSimple()
     cdp.add_response({})
     cdp.add_response({})
@@ -125,7 +126,7 @@ def test_capture_emits_single_c_press_and_scrapes(
     bot._cdp = cdp
     bot._page = _MinimalPage()
 
-    capture_account_stats(bot._cdp, bot._page, "startup")
+    capture_account_stats(bot.world, bot._cdp, bot._page, "startup")
 
     methods = [method for method, _ in cdp.get_calls()]
     assert methods == [
@@ -141,7 +142,7 @@ def test_capture_emits_single_c_press_and_scrapes(
     assert records[0]["fields"]["phase"] == "startup"
     # The canonical account model is populated by the same capture --
     # runtime features read THIS, not the diagnostic stream.
-    account = get_self_account()
+    account = ws.self_account
     assert account["rank_name"] == "private"
     assert account["rank_number"] == 160
     assert account["promotion_points"] == 121314
@@ -164,7 +165,7 @@ def test_capture_emits_absence_when_panel_not_rendered(
     bot._cdp = cdp
     bot._page = _MinimalPage()
 
-    capture_account_stats(bot._cdp, bot._page, "startup")
+    capture_account_stats(bot.world, bot._cdp, bot._page, "startup")
 
     records = _sample_records(artifacts["latest_events_path"])
     assert len(records) == 1
@@ -184,7 +185,7 @@ def test_capture_without_cdp_is_a_no_op(fake_env: FakeEnv, fake_fs: FakeFileSyst
     bot._cdp = None
     bot._page = None
 
-    capture_account_stats(bot._cdp, bot._page, "startup")
+    capture_account_stats(bot.world, bot._cdp, bot._page, "startup")
 
     assert _sample_records(artifacts["latest_events_path"]) == []
 
@@ -196,6 +197,6 @@ def test_capture_without_page_is_a_no_op(fake_env: FakeEnv, fake_fs: FakeFileSys
     bot._cdp = FakeCDPSessionSimple()
     bot._page = None
 
-    capture_account_stats(bot._cdp, bot._page, "startup")
+    capture_account_stats(bot.world, bot._cdp, bot._page, "startup")
 
     assert _sample_records(artifacts["latest_events_path"]) == []

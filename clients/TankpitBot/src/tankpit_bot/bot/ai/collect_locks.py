@@ -33,7 +33,6 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.runtime_logging import emit_ai
-from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state.types import ContainerStateDict
 
 
@@ -134,7 +133,7 @@ def _continue_or_release_equipment_lock(
         # flight, and each target was re-locked and served 2-3 ticks
         # later — the plan was never invalid, the executor was busy).
         # Only the server-confirmed move-failed mark is structural.
-        if is_move_target_failed(target_x, target_y, ctx.timestamp_ms):
+        if ctx.ws.is_move_target_failed(target_x, target_y, ctx.timestamp_ms):
             emit_ai(
                 "locked equipment target at (%d,%d) marked move-failed - releasing",
                 target_x,
@@ -203,7 +202,7 @@ def continue_or_release_fuel_lock(
     if locked_command is None:
         # Same transient-vs-structural law as the equipment lock,
         # including the out-of-window hold (see the note there).
-        if is_move_target_failed(target_x, target_y, ctx.timestamp_ms):
+        if ctx.ws.is_move_target_failed(target_x, target_y, ctx.timestamp_ms):
             emit_ai(
                 "locked fuel target at (%d,%d) marked move-failed - releasing",
                 target_x,

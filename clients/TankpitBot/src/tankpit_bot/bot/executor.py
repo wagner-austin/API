@@ -36,7 +36,7 @@ from tankpit_bot.runtime_logging import (
     emit_ai,
     emit_diagnostic,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types.coord import coord_key
 
 # Combat equipment slots that get toggled based on behavior mode.
@@ -102,6 +102,7 @@ def apply_equipment(bot: BotProtocol, desired: list[int]) -> None:
 
 
 def _predicted_pickup_refusal(
+    ws: WorldService,
     command: PickupEquipmentCommandDict | PickupFuelCommandDict,
 ) -> int | None:
     """Predict the server's 0x52 answer to a pickup, when belief proves it.
@@ -116,12 +117,12 @@ def _predicted_pickup_refusal(
     invisible) — those dispatch optimistically, which is correct.
 
     Args:
+        ws: The session's world service, holding the live belief.
         command: A ``pickup_fuel`` or ``pickup_equipment`` command.
 
     Returns:
         The predicted 0x52 error code, or None to dispatch.
     """
-    ws = get_world_service()
     self_state = ws.world_state["self_state"]
     if self_state is None:
         return None
@@ -187,12 +188,12 @@ def _dispatch_tracked_target_command(bot: BotProtocol, command: BotCommand) -> b
     if command["cmd_type"] == "move":
         return bot.move_to(command["target_x"], command["target_y"])
     if command["cmd_type"] == "pickup_fuel":
-        predicted = _predicted_pickup_refusal(command)
+        predicted = _predicted_pickup_refusal(bot.world, command)
         if predicted is not None:
             return _suppress_dispatch(command, predicted)
         return bot.pickup_fuel_to(command["target_x"], command["target_y"])
     if command["cmd_type"] == "pickup_equipment":
-        predicted = _predicted_pickup_refusal(command)
+        predicted = _predicted_pickup_refusal(bot.world, command)
         if predicted is not None:
             return _suppress_dispatch(command, predicted)
         return bot.pickup_equipment_to(command["target_x"], command["target_y"])
@@ -336,7 +337,7 @@ def _dispatch_teleport_command(
     message_index = bot.captured_message_count()
     dispatched = bot.teleport_to(command["target_x"], command["target_y"])
     if dispatched:
-        _record_teleport_fuel_entry(command["target_x"], command["target_y"])
+        _record_teleport_fuel_entry(bot.world, command["target_x"], command["target_y"])
         record_teleport_dispatch(
             bot.world.ledger,
             target_x=command["target_x"],
@@ -363,14 +364,14 @@ bound, so the book prices a dispatched teleport as target cost +/-
 6 tiles * 6 fuel."""
 
 
-def _record_teleport_fuel_entry(target_x: int, target_y: int) -> None:
+def _record_teleport_fuel_entry(ws: WorldService, target_x: int, target_y: int) -> None:
     """Record a dispatched teleport's fuel effect into the live book.
 
     Args:
+        ws: The session's world service, holding the fuel book.
         target_x: Requested landing X.
         target_y: Requested landing Y.
     """
-    ws = get_world_service()
     self_state = ws.world_state["self_state"]
     if self_state is None:
         return

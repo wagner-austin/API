@@ -19,10 +19,7 @@ from tankpit_bot.bot.types import (
     make_radar_command,
     make_shoot_command,
 )
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 from tankpit_bot.state import (
@@ -49,9 +46,9 @@ class TestApplyEquipment:
 
         bot, fake_cdp = _make_bot(fake_env)
         # Give slot 2 (dual) stock so _has_equipment_stock returns True
-        update_inventory_from_gain(get_world_service(), [0, 5, 0, 0, 0])
+        update_inventory_from_gain(bot.world, [0, 5, 0, 0, 0])
         # Disable slot 2 via toggle so enable triggers a toggle command
-        update_inventory_from_toggle(get_world_service(), [True, False, True, True, True])
+        update_inventory_from_toggle(bot.world, [True, False, True, True, True])
         apply_equipment(bot, [2, 5])
         # slot 1: not desired, enabled -> disable -> toggle (1 CDP)
         # slot 2: desired, disabled, has stock -> enable -> toggle (1 CDP)
@@ -62,7 +59,7 @@ class TestApplyEquipment:
         """Disables combat slots not in desired list."""
         bot, fake_cdp = _make_bot(fake_env)
         # Set all slots to enabled so we can test disabling
-        update_inventory_from_toggle(get_world_service(), [True, True, True, True, True])
+        update_inventory_from_toggle(bot.world, [True, True, True, True, True])
         apply_equipment(bot, [5])
         # Should disable slots 1, 2, 4 (3 CDP calls)
         assert fake_cdp._sent_methods.count("Runtime.evaluate") == 3
@@ -71,7 +68,7 @@ class TestApplyEquipment:
         """No toggles when equipment already matches desired state."""
         bot, fake_cdp = _make_bot(fake_env)
         # Set inventory to match: 1=off, 2=on, 4=off, 5=on
-        update_inventory_from_toggle(get_world_service(), [False, True, True, False, True])
+        update_inventory_from_toggle(bot.world, [False, True, True, False, True])
         apply_equipment(bot, [2, 5])
         # slot 1: not in desired, already disabled -> no toggle
         # slot 2: in desired, already enabled -> no toggle
@@ -106,7 +103,7 @@ class TestExecute:
         """Execute applies equipment changes before dispatching command."""
         bot, fake_cdp = _make_bot(fake_env)
         # Set all slots to enabled so execute needs to disable 1, 2, 4
-        update_inventory_from_toggle(get_world_service(), [True, True, True, True, True])
+        update_inventory_from_toggle(bot.world, [True, True, True, True, True])
         behavior = make_behavior_score("HUNT", 50, 100, 200, "search_collect_local")
         decision = make_tick_decision(
             command=make_move_command(100, 200),
@@ -130,7 +127,7 @@ class TestExecute:
             desired_equipment=[],
         )
         assert execute(bot, decision, _make_snapshot()) is True
-        assert latest_decision_event_id(get_world_service().ledger) == 0
+        assert latest_decision_event_id(bot.world.ledger) == 0
 
     def test_execute_records_decision_for_dispatchable_command(self, fake_env: FakeEnv) -> None:
         """A dispatchable decision is recorded before validation."""
@@ -144,8 +141,8 @@ class TestExecute:
             desired_equipment=[],
         )
         execute(bot, decision, _make_snapshot())
-        recorded_id = latest_decision_event_id(get_world_service().ledger)
-        assert decision_record(get_world_service().ledger, recorded_id) == {
+        recorded_id = latest_decision_event_id(bot.world.ledger)
+        assert decision_record(bot.world.ledger, recorded_id) == {
             "event_id": recorded_id,
             "action_kind": "move",
             "cmd_type": "move",
@@ -167,7 +164,7 @@ class TestExecute:
         so ``source`` no longer affects dispatch.
         """
         bot, fake_cdp = _make_bot(fake_env)
-        _store_tank(10, x=105, y=103, source="world_state")
+        _store_tank(bot.world, 10, x=105, y=103, source="world_state")
         behavior = make_behavior_score("HUNT", 800, 105, 103, "shoot_target", target_id=10)
         decision = make_tick_decision(
             command=make_shoot_command(105, 103, 10),
@@ -187,9 +184,8 @@ class TestSecondaryCommandDispatch:
     def test_secondary_dispatched_after_primary(self, fake_env: FakeEnv) -> None:
         """When primary succeeds, secondary is also dispatched."""
         bot, _cdp = _make_bot(fake_env)
-        ws = get_world_service()
-        ws.world_state = WorldStateDict(
-            self_state=ws.world_state["self_state"],
+        bot.world.world_state = WorldStateDict(
+            self_state=bot.world.world_state["self_state"],
             tanks={
                 "50": make_tank_state(
                     tank_id=50,
@@ -217,10 +213,10 @@ class TestSecondaryCommandDispatch:
                     timestamp_ms=1000,
                 ),
             },
-            mines=ws.world_state["mines"],
-            terrain=ws.world_state["terrain"],
-            viewport=ws.world_state["viewport"],
-            scanned_tiles=ws.world_state["scanned_tiles"],
+            mines=bot.world.world_state["mines"],
+            terrain=bot.world.world_state["terrain"],
+            viewport=bot.world.world_state["viewport"],
+            scanned_tiles=bot.world.world_state["scanned_tiles"],
             timestamp_ms=1000,
         )
 
@@ -238,10 +234,11 @@ class TestSecondaryCommandDispatch:
 
     def test_no_secondary_when_primary_fails_validation(self) -> None:
         """When primary fails validation, secondary is not dispatched."""
-        update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(get_world_service(), 800)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(ws, 800)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         behavior = make_behavior_score("HUNT", 900, 101, 100, "shoot_target")
         decision = make_tick_decision(
             command=make_shoot_command(101, 100, 999),
@@ -306,11 +303,12 @@ class TestFuelBookEntries:
         bot = _WorldOnlyBot(make_empty_world_state())
         result = dispatch_command(bot, make_radar_command(), _make_snapshot())
         assert result is False
-        assert get_world_service().fuel_book["entries"] == []
+        assert bot.world.fuel_book["entries"] == []
 
     def test_teleport_entry_needs_a_self_position(self) -> None:
         """Without a self fix the teleport cost cannot be priced."""
         from tankpit_bot.bot.executor import _record_teleport_fuel_entry
 
-        _record_teleport_fuel_entry(10, 20)
-        assert get_world_service().fuel_book["entries"] == []
+        ws = WorldService()
+        _record_teleport_fuel_entry(ws, 10, 20)
+        assert ws.fuel_book["entries"] == []

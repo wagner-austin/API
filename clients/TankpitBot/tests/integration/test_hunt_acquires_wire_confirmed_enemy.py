@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.protocol import MovementResponseDict, TankInfoDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
@@ -27,7 +27,7 @@ class TestHuntAcquiresWireConfirmedEnemy:
     def test_enemy_visible_in_threat_list_after_wire_confirmation(self) -> None:
         """Wire-confirmed enemy MUST surface in analyze_threats."""
         now_ms = 100_000
-        ws = get_world_service()
+        ws = WorldService()
 
         # Self (Artax / blue team) at (131, 122)
         dispatch_world_state_update(
@@ -80,7 +80,7 @@ class TestHuntAcquiresWireConfirmedEnemy:
             ),
         )
 
-        threats = analyze_threats(ws.world_state, self_state, now_ms=now_ms)
+        threats = analyze_threats(ws, ws.world_state, self_state, now_ms=now_ms)
 
         assert len(threats) == 1, "Wire-confirmed enemy must appear in threat list"
         threat = threats[0]
@@ -99,7 +99,7 @@ class TestHuntAcquiresWireConfirmedEnemy:
         or other wire message arrives.
         """
         now_ms = 100_000
-        ws = get_world_service()
+        ws = WorldService()
 
         # Self at (131, 122)
         dispatch_world_state_update(
@@ -134,5 +134,5 @@ class TestHuntAcquiresWireConfirmedEnemy:
             ),
         )
 
-        threats = analyze_threats(ws.world_state, self_state, now_ms=now_ms)
+        threats = analyze_threats(ws, ws.world_state, self_state, now_ms=now_ms)
         assert threats == []

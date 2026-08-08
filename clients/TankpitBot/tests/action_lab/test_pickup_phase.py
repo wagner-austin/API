@@ -14,7 +14,6 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import pickup_phase
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.types import CapturedMessage
 
@@ -47,7 +46,8 @@ class _Probe:
 
     def __init__(self, world: WorldStateDict, *, move_result: bool = True) -> None:
         """Initialize the probe."""
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._world = world
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None

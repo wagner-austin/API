@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import (
     walk_or_teleport,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     make_tank_state,
     make_viewport_state,
@@ -31,15 +32,16 @@ class TestApproachTarget:
         """
         from tankpit_bot.bot.ai.context import local_actionable_bounds
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         _left, _top, right, _bottom = local_actionable_bounds(probe_ctx)
         # Target due east, beyond the right edge; its clamp tile is rock.
         target_x, target_y = right + 10, 100
         terrain = InMemoryTerrainMap({(right, 100): "#"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
 
@@ -59,15 +61,16 @@ class TestApproachTarget:
         """
         from tankpit_bot.bot.ai.context import local_actionable_bounds
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         _left, top, right, bottom = local_actionable_bounds(probe_ctx)
         target_x, target_y = right + 10, 100
         terrain_data: dict[tuple[int, int], str] = {(right, y): "#" for y in range(top, bottom + 1)}
         terrain = InMemoryTerrainMap(terrain_data)
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
 
@@ -81,14 +84,15 @@ class TestApproachTarget:
         """A target beyond the bottom edge scans the facing row for ground."""
         from tankpit_bot.bot.ai.context import local_actionable_bounds
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         _left, _top, _right, bottom = local_actionable_bounds(probe_ctx)
         target_x, target_y = 100, bottom + 10
         terrain = InMemoryTerrainMap({(100, bottom): "#"})
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
 
@@ -100,13 +104,14 @@ class TestApproachTarget:
 
     def test_approach_skips_own_tile_when_already_on_the_edge(self) -> None:
         """Standing on the clamp tile selects the next nearest edge tile."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         # Re-frame the viewport so self sits exactly on its right edge.
         world["viewport"] = make_viewport_state(left=85, top=92, width=16, height=16)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, 110, 100, pickup_kind=None)
 
@@ -120,10 +125,11 @@ class TestApproachTarget:
         """Without terrain, an enemy on the clamp tile leaves no approach."""
         from tankpit_bot.bot.ai.context import local_actionable_bounds
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         _left, _top, right, _bottom = local_actionable_bounds(probe_ctx)
         world["tanks"] = {
             "50": make_tank_state(
@@ -142,7 +148,7 @@ class TestApproachTarget:
                 last_viewport_observation_ms=100000,
             ),
         }
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
         result = walk_or_teleport(ctx, right + 10, 100, pickup_kind="equipment")
 
@@ -157,15 +163,16 @@ class TestApproachTarget:
         """
         from tankpit_bot.bot.ai.context import local_actionable_bounds
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         _left, top, right, bottom = local_actionable_bounds(probe_ctx)
         target_x, target_y = right + 10, 100
         wall = {(right - 1, y): "W" for y in range(top, bottom + 1)}
         terrain = InMemoryTerrainMap(wall)
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
 
@@ -185,10 +192,11 @@ class TestApproachTarget:
         """
         from tankpit_bot.bot.ai.context import local_actionable_bounds
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         _left, _top, right, _bottom = local_actionable_bounds(probe_ctx)
         target_x, target_y = right + 10, 100
         world["tanks"] = {
@@ -209,7 +217,7 @@ class TestApproachTarget:
             ),
         }
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
 
@@ -228,10 +236,11 @@ class TestApproachTarget:
         """
         from tankpit_bot.bot.ai.context import local_actionable_bounds
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         _left, _top, right, _bottom = local_actionable_bounds(probe_ctx)
         world["tanks"] = {
             "50": make_tank_state(
@@ -250,7 +259,7 @@ class TestApproachTarget:
                 last_viewport_observation_ms=100000,
             ),
         }
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
         result = walk_or_teleport(ctx, right + 10, 100, pickup_kind=None)
 

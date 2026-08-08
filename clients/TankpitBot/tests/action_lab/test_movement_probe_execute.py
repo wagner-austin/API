@@ -83,7 +83,7 @@ def test_execute_probe_raises_when_playwright_is_missing() -> None:
 
 def test_build_default_targets_raises_when_terrain_is_missing() -> None:
     probe = _TerrainHarness(make_self_state(1, 100, 104, 2, 1, 900, 5))
-    movement_probe_module._get_probe_terrain_map = lambda: None
+    probe.world.terrain_map = None
     with pytest.raises(MovementProbeError, match="terrain map is unavailable"):
         probe._build_default_targets(max_targets=1)
 
@@ -92,7 +92,7 @@ def test_build_default_targets_uses_spawn_position_and_limits() -> None:
     probe = _TerrainHarness(make_self_state(1, 100, 104, 2, 1, 900, 5))
     expected = [TeleportTargetDict(label="move_1", x=104, y=108)]
     captured: dict[str, int] = {}
-    movement_probe_module._get_probe_terrain_map = lambda: _TerrainMapStub()
+    probe.world.terrain_map = _TerrainMapStub()
 
     def _fake_build_targets(
         origin_x: int,

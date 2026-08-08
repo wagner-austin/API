@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict
 from tests.bot.ai._support import (
     consent_human,
@@ -29,6 +30,7 @@ def test_greeting_approach_lands_a_few_tiles_off_an_unconsented_human() -> None:
     """
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": make_map_known_enemy(tank_id=90, x=140, y=100, name="Yuppler"),
@@ -51,6 +53,7 @@ def test_greeting_approach_lands_a_few_tiles_off_an_unconsented_human() -> None:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -72,6 +75,7 @@ def test_visited_unconsented_human_is_left_alone() -> None:
     """
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": make_map_known_enemy(tank_id=90, x=140, y=100, name="Yuppler"),
@@ -95,6 +99,7 @@ def test_visited_unconsented_human_is_left_alone() -> None:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -107,6 +112,7 @@ def test_greeting_approach_declines_when_teleport_unaffordable() -> None:
     """A greet visit the tank cannot pay for is skipped, not forced."""
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=101, y=100, name="red-5"),
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
@@ -129,6 +135,7 @@ def test_greeting_approach_declines_when_teleport_unaffordable() -> None:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
     # At fuel 60 nothing is affordable: the greet visit is skipped
@@ -147,6 +154,7 @@ def test_greeting_scan_ignores_map_stale_humans() -> None:
     """
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": make_map_known_enemy(tank_id=90, x=140, y=100, name="Yuppler", timestamp_ms=10),
@@ -171,6 +179,7 @@ def test_greeting_scan_ignores_map_stale_humans() -> None:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -183,7 +192,8 @@ def test_consented_human_map_winner_is_teleport_acquired() -> None:
     """A consented human as the map winner takes the normal acquire path."""
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-    consent_human(90)
+    ws = WorldService()
+    consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=140, y=100, name="Yuppler"),
     }
@@ -205,6 +215,7 @@ def test_consented_human_map_winner_is_teleport_acquired() -> None:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)

@@ -238,9 +238,8 @@ def test_search_skips_unlanded_sites_without_scanning() -> None:
     probe = _StuckHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    from tankpit_bot.sniffer.world_state import get_world_service
 
-    get_world_service().map_fuel_dots = ()
+    probe.world.map_fuel_dots = ()
     found, scans, hops = probe._search_enemy_mine(set(), 2)
     # (96, 96) is within landing tolerance of the (100, 100) start, so
     # exactly one site scans; every other rejected teleport is skipped.

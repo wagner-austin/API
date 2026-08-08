@@ -19,7 +19,7 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.browser import PlaywrightNotInstalledError
-from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -32,6 +32,7 @@ class ProbeRuntimeStateProtocol(BufferedMessageSourceProtocol, Protocol):
     drainable source is.
     """
 
+    world: WorldService
     _start_timestamp_ms: int
     _target_url: str
     _prefer_account: bool
@@ -147,12 +148,13 @@ def prepare_live_probe_runtime(
     """
     probe._cdp = cdp
     probe._page = page
-    reset_world_state()
+    probe.world = WorldService()
     probe._setup_console_listener(cdp)
     probe._setup_cdp_handlers(cdp)
     action_hooks.navigate_and_login(
         page,
         cdp,
+        probe.world,
         target_url=probe._target_url,
         prefer_account=probe._prefer_account,
         tank_name_prefix=tank_name_prefix,

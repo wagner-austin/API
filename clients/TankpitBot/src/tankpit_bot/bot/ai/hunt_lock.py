@@ -44,7 +44,6 @@ from tankpit_bot.runtime_logging import (
     emit_ai,
     emit_diagnostic,
 )
-from tankpit_bot.sniffer.world_state import get_incoming_damage_window
 
 
 def visible_threats(ctx: DecideCtx) -> list[EnemyThreatDict]:
@@ -57,6 +56,7 @@ def visible_threats(ctx: DecideCtx) -> list[EnemyThreatDict]:
         Visible enemy threats ordered by the threat analyzer.
     """
     return analyze_threats(
+        ctx.ws,
         ctx.filtered,
         ctx.self_state,
         ctx.timestamp_ms,
@@ -207,6 +207,7 @@ def pursuit_fire(ctx: DecideCtx, pursuit: EnemyThreatDict) -> TickDecisionDict:
         ctx.terrain,
         ctx.combat_feedback,
         ctx.map_fuel_dots,
+        ws=ctx.ws,
     )
     return engage_target(stamped_ctx, pursuit)
 
@@ -233,6 +234,7 @@ def release_break_latch(ctx: DecideCtx) -> DecideCtx:
         ctx.terrain,
         ctx.combat_feedback,
         ctx.map_fuel_dots,
+        ws=ctx.ws,
     )
 
 
@@ -323,7 +325,7 @@ def _break_losing_engagement(
     Returns:
         The lock-held refuel delegation, or ``None`` to keep fighting.
     """
-    hits, fuel_lost = get_incoming_damage_window(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
+    hits, fuel_lost = ctx.ws.get_incoming_damage_window(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
     assessment = assess_engagement_break(ctx, target, hits, fuel_lost)
     if not assessment["break_engagement"]:
         return None
@@ -398,6 +400,7 @@ def _break_losing_engagement(
                 ctx.terrain,
                 ctx.combat_feedback,
                 ctx.map_fuel_dots,
+                ws=ctx.ws,
             )
             return refuel_for_hunt(human_latched_ctx, target)
         # Even a full tank cannot fund this fight -- the projection
@@ -426,6 +429,7 @@ def _break_losing_engagement(
         ctx.terrain,
         ctx.combat_feedback,
         ctx.map_fuel_dots,
+        ws=ctx.ws,
     )
     return refuel_for_hunt(latched_ctx, target)
 

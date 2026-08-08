@@ -11,6 +11,7 @@ from platform_core.json_utils import JSONObject
 from tankpit_bot import _hooks_guard, _test_hooks
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.analysis import _test_hooks as analysis_test_hooks
+from tankpit_bot.replay import _test_hooks as replay_test_hooks
 
 
 class FakeCDPSessionSimple:
@@ -140,7 +141,6 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
     _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
     _test_hooks.get_argv = _test_hooks._real_get_argv
-    _test_hooks.process_received_message_hook = _test_hooks._real_process_received_message
     # Watchdog hooks default to inert fakes in tests: a real daemon
     # timer armed by one test would os._exit the xdist worker seconds
     # later, killing unrelated tests. Tests that assert watchdog
@@ -153,6 +153,12 @@ def _restore_hooks() -> Generator[None, None, None]:
     # per-file fixture keeps the single reset point this fixture's
     # docstring describes.
     analysis_test_hooks.reset_analysis_hooks()
+    # The replay decode hook lives in the replay package, not the
+    # process-wide one: it names WorldService, which _test_hooks cannot
+    # ([[session-state-deglobalisation]] step 8).
+    replay_test_hooks.process_received_message_hook = (
+        replay_test_hooks._real_process_received_message
+    )
 
     yield
 
@@ -170,7 +176,9 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
     _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
     _test_hooks.get_argv = _test_hooks._real_get_argv
-    _test_hooks.process_received_message_hook = _test_hooks._real_process_received_message
+    replay_test_hooks.process_received_message_hook = (
+        replay_test_hooks._real_process_received_message
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -203,39 +211,27 @@ def _restore_runtime_logging_state() -> Generator[None, None, None]:
 
 @pytest.fixture(autouse=True)
 def _isolate_protocol_singletons() -> Generator[None, None, None]:
-    """Reset world-state and XOR singletons around every test.
+    """Reset the one remaining PROCESS-wide cache around every test.
 
-    Several test paths (replay harnesses, sniffer/world_state tests,
-    bot tick-loop tests) mutate module-level singletons -- the global
-    world-state dict, the global XOR table built from the session
-    magic key, etc. Without a consistent reset, tests that run later
-    on the same xdist worker can decode bytes with a stale XOR key or
-    read containers seeded by a prior run, producing failures that
-    look like flakes.
+    **This list is down to a single call, and that call is not session
+    state.** It began as ten resets covering the world-state dict, the
+    XOR table, the event counter, the outcome rings, the decision
+    store, the mode-transition log, the outcome-pairing trackers, the
+    teleport dispatch, the container blacklist, and the
+    client-structure survey. Every one of those is now an instance
+    attribute owned by the session that uses it, so constructing a
+    session IS the reset ([[session-state-deglobalisation]]).
 
-    Centralising the reset here (top-level autouse) means every test
-    inherits the same clean baseline regardless of which directory it
-    lives in -- no duplicated per-file fixtures, no missed resets.
-
-    Down to TWO calls. The six ledger resets that used to run here
-    (event ids, outcome rings, decision records, mode transitions,
-    outcome-pairing trackers, teleport dispatch) are gone: that state
-    now lives on ``WorldService.ledger``, so resetting the world
-    resets the ledger with it ([[session-state-deglobalisation]] step
-    6). ``reset_world_state`` is the last session reset standing, and
-    step 8 removes it.
+    What remains is ``reset_static_key_cache``: the XOR *static key* is
+    a process-wide constant read from disk, not per-session state, and
+    a test with a faked filesystem can poison it for later tests on the
+    same xdist worker. It stays because it is genuinely process-scoped
+    -- the exception that proves the rule rather than a leftover.
     """
     from tankpit_bot.capture.xor import reset_static_key_cache
-    from tankpit_bot.sniffer.world_state import reset_world_state
 
-    reset_world_state()
-    # The SESSION XOR table is no longer global — it is a value the
-    # caller owns ([[session-state-deglobalisation]] step 1). What
-    # remains is the process-wide static-KEY cache, which a test with a
-    # faked filesystem can poison for later tests.
     reset_static_key_cache()
     yield
-    reset_world_state()
     reset_static_key_cache()
 
 

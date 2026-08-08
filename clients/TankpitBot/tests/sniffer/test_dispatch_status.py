@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.protocol import TankStatusSyncDict
 from tankpit_bot.protocol.types import MovementResponseDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.types.constants import DIRECTION_DEAD_THRESHOLD
 
@@ -14,6 +14,7 @@ class TestDispatchTankPositionStatus:
 
     def test_dispatch_creates_tank(self) -> None:
         """Dispatching creates a new tank in world state."""
+        ws = WorldService()
         msg = MovementResponseDict(
             msg_type=0x3D,
             team=1,
@@ -26,9 +27,9 @@ class TestDispatchTankPositionStatus:
             lb_score=15362,
             carrying=0,
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert "511" in state["tanks"]
         tank = state["tanks"]["511"]
         assert tank["x"] == 253
@@ -39,7 +40,7 @@ class TestDispatchTankPositionStatus:
 
     def test_dispatch_updates_position(self) -> None:
         """Dispatching updates position of existing tank."""
-        ws = get_world_service()
+        ws = WorldService()
         msg1 = MovementResponseDict(
             msg_type=0x3D,
             team=0,
@@ -73,6 +74,7 @@ class TestDispatchTankPositionStatus:
 
     def test_dispatch_sets_direction(self) -> None:
         """Direction field is stored on the tank state."""
+        ws = WorldService()
         msg = MovementResponseDict(
             msg_type=0x3D,
             team=2,
@@ -85,13 +87,14 @@ class TestDispatchTankPositionStatus:
             lb_score=100,
             carrying=0,
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        tank = get_world_service().world_state["tanks"]["1301"]
+        tank = ws.world_state["tanks"]["1301"]
         assert tank["direction"] == 12
 
     def test_dispatch_dead_tank_direction_32(self) -> None:
         """Dead tank (direction=32) is stored correctly."""
+        ws = WorldService()
         msg = MovementResponseDict(
             msg_type=0x3D,
             team=0,
@@ -104,15 +107,15 @@ class TestDispatchTankPositionStatus:
             lb_score=400,
             carrying=0,
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        tank = get_world_service().world_state["tanks"]["502"]
+        tank = ws.world_state["tanks"]["502"]
         assert tank["direction"] == 32
         assert tank["direction"] >= DIRECTION_DEAD_THRESHOLD
 
     def test_dispatch_updates_damage(self) -> None:
         """Damage state is updated from 0x3D message."""
-        ws = get_world_service()
+        ws = WorldService()
         msg1 = MovementResponseDict(
             msg_type=0x3D,
             team=1,
@@ -155,7 +158,7 @@ class TestDispatchSelfStatus:
 
     def test_dispatch_updates_fuel(self) -> None:
         """TankStatusSync with fuel updates self_state.fuel."""
-        ws = get_world_service()
+        ws = WorldService()
 
         from tankpit_bot.sniffer.world_state_tanks import (
             update_world_state_from_move_response_full,
@@ -194,7 +197,7 @@ class TestDispatchSelfStatus:
             update_world_state_from_move_response_full,
         )
 
-        ws = get_world_service()
+        ws = WorldService()
         update_world_state_from_move_response_full(ws, 1301, 100, 100, 2, 1)
 
         msg = _Sync(
@@ -228,7 +231,7 @@ class TestDispatchSelfStatus:
             update_world_state_from_move_response_full,
         )
 
-        ws = get_world_service()
+        ws = WorldService()
         update_world_state_from_move_response_full(ws, 1301, 100, 100, 2, 0)
 
         msg = _Sync(
@@ -256,7 +259,7 @@ class TestDispatchSelfStatus:
             update_world_state_from_move_response_full,
         )
 
-        ws = get_world_service()
+        ws = WorldService()
         update_world_state_from_move_response_full(ws, 1301, 100, 100, 2, 0)
 
         msg = _Sync(
@@ -286,7 +289,7 @@ class TestDispatchSupervisor:
         from tankpit_bot.protocol import SupervisorDict
 
         msg = SupervisorDict(msg_type=0x52, reset_action=1, close_map=0, error_code=8)
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(ws, msg)
 
         assert ws.last_command_error == 8
@@ -296,7 +299,7 @@ class TestDispatchSupervisor:
         from tankpit_bot.protocol import SupervisorDict
 
         msg = SupervisorDict(msg_type=0x52, reset_action=1, close_map=0, error_code=4)
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(ws, msg)
 
         assert ws.last_command_error == 4
@@ -309,7 +312,7 @@ class TestDispatchSupervisor:
         )
 
         msg = SupervisorDict(msg_type=0x52, reset_action=0, close_map=1, error_code=5)
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(ws, msg)
 
         assert check_and_clear_command_error(ws) == 5
@@ -321,4 +324,5 @@ class TestDispatchSupervisor:
             check_and_clear_command_error,
         )
 
-        assert check_and_clear_command_error(get_world_service()) == -1
+        ws = WorldService()
+        assert check_and_clear_command_error(ws) == -1

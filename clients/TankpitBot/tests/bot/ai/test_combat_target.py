@@ -14,6 +14,7 @@ from tankpit_bot.bot.ai.combat_target import (
     select_new_combat_target,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
@@ -31,6 +32,7 @@ class TestCombatTargetSelection:
 
     def test_select_new_combat_target_allows_non_emergency_reserve_band(self) -> None:
         """Combat still acquires targets above the break threshold."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         inventory = make_inventory()
         inventory["dual_shots"]["count"] = 10
@@ -42,6 +44,7 @@ class TestCombatTargetSelection:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = select_new_combat_target(ctx, [_enemy_threat()])
@@ -52,6 +55,7 @@ class TestCombatTargetSelection:
 
     def test_select_new_combat_target_skips_blocked_and_killed_targets(self) -> None:
         """Combat target selection ignores blocked and killed enemies."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = make_scanned_ai_state()
         ai_state["blocked_combat_targets"] = {"50": 99000}
@@ -64,6 +68,7 @@ class TestCombatTargetSelection:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = select_new_combat_target(
@@ -82,6 +87,7 @@ class TestCombatTargetSelection:
 
     def test_select_new_combat_target_returns_none_when_no_viable_targets(self) -> None:
         """Combat target selection returns None when every threat is excluded."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = make_scanned_ai_state()
         ai_state["blocked_combat_targets"] = {"50": 99000}
@@ -94,6 +100,7 @@ class TestCombatTargetSelection:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = select_new_combat_target(
@@ -108,6 +115,7 @@ class TestCombatTargetSelection:
 
     def test_select_new_combat_target_picks_closest(self) -> None:
         """Target selection picks the closest viable enemy."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ctx = DecideCtx(
             world,
@@ -117,6 +125,7 @@ class TestCombatTargetSelection:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = select_new_combat_target(
@@ -135,6 +144,7 @@ class TestCombatTargetSelection:
 
     def test_select_new_combat_target_skips_blocked(self) -> None:
         """Target selection skips blocked and killed targets, takes next closest."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ctx = DecideCtx(
             world,
@@ -144,6 +154,7 @@ class TestCombatTargetSelection:
             100000,
             None,
             "",
+            ws=ws,
         )
         ctx.blocked_targets["50"] = 100000
 
@@ -163,6 +174,7 @@ class TestCombatTargetSelection:
 
     def test_select_new_combat_target_keeps_nearest_among_isolated(self) -> None:
         """Equal cluster counts fall back to the distance ordering."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ctx = DecideCtx(
             world,
@@ -172,6 +184,7 @@ class TestCombatTargetSelection:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = select_new_combat_target(
@@ -190,6 +203,7 @@ class TestCombatTargetSelection:
         """Targets with no passable tile inside the shot-range diamond are skipped."""
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = WorldService()
         terrain = InMemoryTerrainMap.from_passable_set(set())
 
         world, self_state = make_world(fuel=800)
@@ -201,6 +215,7 @@ class TestCombatTargetSelection:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = select_new_combat_target(
@@ -219,6 +234,7 @@ class TestCombatTargetSelection:
         """
         from tests.action_lab.conftest import Terrain
 
+        ws = WorldService()
         rocks = {
             (111, 100): Terrain.ROCK,
             (109, 100): Terrain.ROCK,
@@ -236,6 +252,7 @@ class TestCombatTargetSelection:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = select_new_combat_target(
@@ -252,10 +269,11 @@ class TestGetLockedTargetWorldStateFallback:
 
     def test_returns_threat_when_in_threat_list(self) -> None:
         """Threat-list match takes priority over world-state fallback."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
         threats = [_enemy_threat(tank_id=50, x=101, y=100)]
 
         result = get_locked_target(ctx, threats)
@@ -278,6 +296,7 @@ class TestGetLockedTargetWorldStateFallback:
         list, letting ``_decide_hunt_engage`` enter confirm_kill
         and re-acquire from fresh viewport intel.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -298,15 +317,16 @@ class TestGetLockedTargetWorldStateFallback:
         world, self_state = make_world(fuel=800, tanks=tanks)
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         assert get_locked_target(ctx, []) is None
 
     def test_returns_none_when_no_combat_target(self) -> None:
         """No locked target (combat_target_id == -1) returns None."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = make_scanned_ai_state()
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         assert get_locked_target(ctx, []) is None
 
@@ -316,21 +336,23 @@ class TestIsAlreadyEngaged:
 
     def test_true_when_last_shot_target_matches_combat_target(self) -> None:
         """A dispatched shoot at the current lock proves the bot is engaged."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
         ai_state["last_shot_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         assert is_already_engaged(ctx) is True
 
     def test_false_when_last_shot_target_differs(self) -> None:
         """A fresh lock with no shot dispatched at this id is not engaged."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
         ai_state["last_shot_target_id"] = -1
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         assert is_already_engaged(ctx) is False
 
@@ -342,17 +364,19 @@ class TestIsAlreadyEngaged:
         until the next shoot dispatches. The mismatch correctly says
         "fresh acquire" for the new target.
         """
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 60
         ai_state["last_shot_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         assert is_already_engaged(ctx) is False
 
 
 def test_combat_landing_candidates_delegate_to_shared_helper() -> None:
     """Combat landing candidates expose shared adjacent-tile ordering."""
+    ws = WorldService()
     world, self_state = make_world(fuel=800)
     ctx = DecideCtx(
         world,
@@ -362,6 +386,7 @@ def test_combat_landing_candidates_delegate_to_shared_helper() -> None:
         100000,
         None,
         "",
+        ws=ws,
     )
 
     assert _combat_landing_candidates(ctx, _enemy_threat()) == [

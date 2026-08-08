@@ -49,7 +49,6 @@ from tankpit_bot.sim.world_seed_mines import (
     seed_ferries,
     seed_minefield,
 )
-from tankpit_bot.sniffer.world_state import reset_world_state
 
 log = get_logger(__name__)
 
@@ -198,7 +197,6 @@ def _boot(
             scenario seed sits on impassable ground — a sim run needs
             both right, loudly.
     """
-    reset_world_state()
     gif_path = Path(world["field"])
     if not _test_hooks.path_exists(gif_path):
         raise RuntimeError(f"terrain GIF {gif_path} not found — run `make download-fields` first")
@@ -287,7 +285,7 @@ def _boot(
     # (2026-07-31 human-opponent soak) — was hand-installed instead. Now
     # it comes from the room list the way it does live, and 1,571
     # archived lobby frames per session finally have a sim counterpart.
-    if not join_room(link, link):
+    if not join_room(link, link, bot.world):
         raise RuntimeError("sim lobby: the production join flow did not reach a room")
     deliver_batch(bot._cdp_message_buffer, server.handshake(), link)
     return bot, server, link, driver

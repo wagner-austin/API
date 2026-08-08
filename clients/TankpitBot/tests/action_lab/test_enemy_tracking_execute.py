@@ -55,7 +55,6 @@ from tankpit_bot.action_lab.types import (
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -105,8 +104,13 @@ class _ProbeHarness(EnemyTrackingProbe):
 
     def __init__(self) -> None:
         """Seed a spawned tank at (100, 100)."""
-        self.world = get_world_service()
-        super().__init__("https://tankpit.com/play", headless=True, prefer_account=False)
+        ws = WorldService()
+        super().__init__(
+            "https://tankpit.com/play",
+            headless=True,
+            prefer_account=False,
+            world=ws,
+        )
         self._world_state = _world()
         self._self_state: SelfStateDict | None = self._world_state["self_state"]
         self._fake_page = ClockAdvancingPage(ReplayClock(1000))
@@ -142,7 +146,6 @@ def _restore_tracking_hooks() -> Generator[None, None, None]:
     original_acquisition = tracking_module.run_tracked_acquisition_phase
     original_teleport = tracking_module.run_tracked_teleport_command
     original_landing = tracking_module.choose_combat_landing_tile
-    original_terrain = tracking_module.get_terrain_map
     original_threats = tracking_module.analyze_threats
     original_capture = tracking_module.capture_page_client_snapshot
     original_feedback = tracking_module._wait_for_shot_feedback
@@ -155,7 +158,6 @@ def _restore_tracking_hooks() -> Generator[None, None, None]:
     tracking_module.run_tracked_acquisition_phase = original_acquisition
     tracking_module.run_tracked_teleport_command = original_teleport
     tracking_module.choose_combat_landing_tile = original_landing
-    tracking_module.get_terrain_map = original_terrain
     tracking_module.analyze_threats = original_threats
     tracking_module.capture_page_client_snapshot = original_capture
     tracking_module._wait_for_shot_feedback = original_feedback
@@ -170,6 +172,7 @@ def _install_common_stubs(threats: list[EnemyThreatDict]) -> None:
         return 0
 
     def _analyze(
+        ws: WorldService,
         world: WorldStateDict,
         self_state: SelfStateDict,
         now_ms: int,
@@ -177,7 +180,7 @@ def _install_common_stubs(threats: list[EnemyThreatDict]) -> None:
         human_min_rank: int = 0,
         human_max_rank: int = 8,
     ) -> list[EnemyThreatDict]:
-        _ = (world, self_state, now_ms, human_min_rank, human_max_rank)
+        _ = (ws, world, self_state, now_ms, human_min_rank, human_max_rank)
         return threats
 
     def _capture(cdp: CDPSessionProtocol) -> PageClientSnapshotDict:
@@ -288,15 +291,12 @@ def _stub_landing(x: int, y: int) -> None:
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
         now_ms: int,
+        ws: WorldService,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain, now_ms)
+        _ = (world, self_state, target, terrain, now_ms, ws)
         return (x, y)
 
-    def _terrain() -> TerrainMapProtocol | None:
-        return None
-
     tracking_module.choose_combat_landing_tile = _landing
-    tracking_module.get_terrain_map = _terrain
 
 
 def _stub_feedback(got_response: bool, was_hit: bool) -> None:

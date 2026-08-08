@@ -22,6 +22,7 @@ from tankpit_bot.protocol.commands import (
     SCOPE_SOUTHWEST,
     SCOPE_WEST,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, make_container_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -46,6 +47,7 @@ def _sweep_ctx(
     self_x: int = 100,
     self_y: int = 100,
 ) -> DecideCtx:
+    ws = WorldService()
     world, self_state = make_world(
         self_x=self_x,
         self_y=self_y,
@@ -65,6 +67,7 @@ def _sweep_ctx(
         _NOW,
         terrain if terrain is not None else InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
 
@@ -221,6 +224,7 @@ def test_frame_direction_compass_and_no_op() -> None:
 
 def test_harvest_declines_without_terrain_and_at_low_fuel() -> None:
     """No terrain view or fuel at the break: harvest never fires."""
+    ws = WorldService()
     equipment = make_container_state(
         x=120, y=100, is_fuel=False, volume=0, timestamp_ms=_NOW, failed_pickups=0
     )
@@ -232,6 +236,7 @@ def test_harvest_declines_without_terrain_and_at_low_fuel() -> None:
         _NOW,
         None,
         "",
+        ws=ws,
     )
     assert plan_block_harvest_leg(no_terrain, make_scanned_ai_state()) is None
 
@@ -377,9 +382,6 @@ def test_anchor_math_direct_edges() -> None:
 
 def test_harvest_leg_skips_a_failed_move_target() -> None:
     """A leg whose walk plan fails moves on instead of stalling."""
-    from tankpit_bot.sniffer.world_state import (
-        mark_move_target_failed,
-    )
 
     equipment = make_container_state(
         x=125, y=100, is_fuel=False, volume=0, timestamp_ms=_NOW, failed_pickups=0
@@ -393,8 +395,8 @@ def test_harvest_leg_skips_a_failed_move_target() -> None:
     # The approach edge tile the leg would walk to is the window's
     # east column clamp (115,100); fail it AND the real target so the
     # movement layer's approach planner yields nothing.
-    mark_move_target_failed(125, 100, _NOW)
-    mark_move_target_failed(115, 100, _NOW)
+    ctx.ws.mark_move_target_failed(125, 100, _NOW)
+    ctx.ws.mark_move_target_failed(115, 100, _NOW)
     decision = plan_block_harvest_leg(ctx, make_scanned_ai_state())
 
     assert decision is None

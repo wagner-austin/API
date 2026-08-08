@@ -33,13 +33,14 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     emit_wire,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 
 _RUNS_DIR = Path("runs") / "bot"
 
 
 def _emit_first_run_activity() -> None:
     """Produce one run's worth of events through the real producers."""
+    ws = WorldService()
     emit_diagnostic(
         diagnostic_kind="tank_deactivated",
         origin="protocol_0x41",
@@ -58,11 +59,9 @@ def _emit_first_run_activity() -> None:
         page_snapshots="(none)",
         page_snapshot_count=0,
     )
-    record_teleport_dispatch(
-        get_world_service().ledger, target_x=10, target_y=20, message_index=0, sent_window="w"
-    )
+    record_teleport_dispatch(ws.ledger, target_x=10, target_y=20, message_index=0, sent_window="w")
     emit_teleport_landed(
-        get_world_service().ledger,
+        ws.ledger,
         duration_ms=300,
         target_x=10,
         target_y=20,
@@ -70,11 +69,9 @@ def _emit_first_run_activity() -> None:
         landed_y=20,
         messages=[],
     )
-    record_teleport_dispatch(
-        get_world_service().ledger, target_x=30, target_y=40, message_index=0, sent_window="w"
-    )
+    record_teleport_dispatch(ws.ledger, target_x=30, target_y=40, message_index=0, sent_window="w")
     emit_teleport_stall_timeout(
-        get_world_service().ledger,
+        ws.ledger,
         duration_ms=10000,
         target_x=30,
         target_y=40,

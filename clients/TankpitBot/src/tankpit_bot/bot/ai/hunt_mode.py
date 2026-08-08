@@ -171,6 +171,7 @@ def _decide_hunt_confirm_kill(ctx: DecideCtx) -> TickDecisionDict:
         ctx.terrain,
         ctx.combat_feedback,
         ctx.map_fuel_dots,
+        ws=ctx.ws,
     )
     return decide_hunt_acquire(cleared_ctx)
 

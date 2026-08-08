@@ -3753,3 +3753,126 @@ a service outright — it is a standalone replay, not a session), the
 
 Then the facade: ~1,509 test references to `get_world_state` and
 friends. Then the flip.
+
+---
+
+## [2026-08-07] update | Step 8 lands: the last session global is gone, and it cost one bug class 138 times
+
+`sniffer/world_state.py` is deleted. `_service`, `get_world_service()`
+and `reset_world_state()` no longer exist. Every session owns its
+`WorldService` through `SessionBase.world`; standalone tools
+(`replay/engine.py`, `scripts/decode.py`) each build their own.
+[[session-state-deglobalisation]] steps 8 and 11 are struck; **step 10
+(`runtime_logging.py`) is the only plan item still open.**
+
+**The completion criterion this page set for itself is met.**
+`tests/conftest.py` went from ten resets to **one**, and that one
+(`reset_static_key_cache`) guards a process-wide key read off disk, not
+session state. Constructing a session is now the reset.
+
+`make check` exits 0: guard clean, ruff clean, mypy clean on 1104 files,
+**6185 passed, 100.00% coverage** (30,370 statements, 8,780 branches).
+
+### The whole cost was one defect wearing six disguises
+
+Deleting the facade left **138 failing tests**. Nearly all of them were
+the same thing: a test mints a `WorldService()`, seeds it, and hands the
+code under test an object that owns a *different* service. Under the
+facade both names resolved to `_service`, so the seeding worked by
+accident. The six shapes — each invisible to the detector that caught
+the previous one:
+
+1. **Dead write** — the local is only ever written, never read. 31 sites.
+2. **Two-world scope** — the local *is* read, but a probe/bot/ctx in the
+   same scope owns its own. 73 scopes, 63 in `tests/bot`.
+3. **Seed helper with no world parameter** — `set_inventory_total` (19
+   call sites), `seed_confirmed_incoming` (13), `consent_human` (7), and
+   eleven more.
+4. **Parameter shadowing** — `def _drain(source, ws): ws = WorldService()`.
+   The seam hands over the right world; line one throws it away.
+5. **Assign-before-super clobber** — `self.world = ws` written *before*
+   `super().__init__()`, which assigns `self.world` itself. 7 harnesses,
+   where the assignment had never once had an effect.
+6. **Mid-test world replacement** — a wait hook doing
+   `probe.world = WorldService()` to model "the wire delivered a kill",
+   orphaning it from the engagement that captured the world at entry.
+
+**100% coverage never saw any of it.** Every one of those lines
+executes. `set_inventory_total(2)` runs, mutates a real service through
+the real codepath, returns — covered. Nothing asserts the service it
+mutated is the one the probe reads. Same lesson as the `tank_names`
+finding: a coverage gate cannot tell you a writer has a reader.
+
+### Process note: the detector, and where scripting stopped helping
+
+The user's correction mid-step — *"so youre jist running that over and
+voer and not like even looking at the code?"* — was the turn. Counting
+failures and re-running the suite found nothing; reading one failing
+test (`assert 0 == 15`, a probe reading its own empty inventory) found
+the whole class in one look.
+
+What worked after that: state the defect as a property the AST can
+decide, verify the detector on a case already understood, review the
+generated diff, then apply. What did not: broadening the detector's name
+regex to chase the tail. Loosening `OWNER_CALL` to a substring match
+took it from 73 real findings to 264 mostly-false ones —
+`configure_bot_runtime_logging` matches "bot", `build_session_xor_table`
+matches "session". **The detector earned the bulk sweep and then had to
+be put down**; the last dozen failures were read individually. A tool
+that stops discriminating is worse than no tool, because its output
+still looks like evidence.
+
+Also corrected: an earlier scripted pass had injected `world=ws` into
+test-local classes that take no such argument, and left two
+`probe.world = probe.world` self-assignments. Both were found by running
+the tests, not by reading the script.
+
+### A `Callable` alias was hiding a drifted stub
+
+`analyze_threats` gained `ws` as its first parameter, but the tracking
+harness typed the patchable attribute as
+`AnalyzeThreatsFn = Callable[[WorldStateDict, SelfStateDict, int], ...]`
+— too weak to express the keyword-only rank bounds, so a stub that had
+dropped `ws` still typechecked and silently read a different world.
+Respelling it as a `Protocol` — the idiom the same file already used for
+`ShotFeedbackFn`, *"spelled out so stubs are checked against it"* —
+immediately failed a **second** drifted stub in
+`test_enemy_tracking_execute.py`. The alias was not shorthand; it was a
+hole in the type surface.
+
+### Dead ritual the step exposed
+
+- `tests/diagnostics/conftest.py` — deleted. One autouse fixture whose
+  entire body called `reset_registry_truth()`, whose body was empty and
+  whose docstring cited `reset_world_state` and `sniffer/world_state`,
+  both already deleted. The file's own docstring claimed "every
+  diagnostic emitter holds module-level gate/counter state" — the exact
+  premise this refactor removed.
+- `diagnostics/registry_truth.py::reset_registry_truth` — deleted with it.
+- Two empty `setup_method`/`teardown_method` pairs in
+  `test_world_state_dispatch_teleport.py` whose docstrings still claimed
+  to "reset world state and dispatch tracking". A no-op documenting work
+  it does not do is worse than no code.
+
+### Not a migration bug: the xdist worker crash
+
+`tests/bot` was killing an xdist worker with `INTERNALERROR> KeyError:
+<WorkerController gw18>`, and a `--timeout=15` made it look like
+`test_shot_screenshot.py` hanging. It was neither. A **RustedWarfareBot**
+`runs\sweeps\navpair48` sweep was running on the same box — six live
+`scripts.play` sessions, seven JVMs, plus seven orphaned
+`match_worker`/`match_service` processes leaked since 17:48 — leaving
+**4.6 GB free of 31.8 GB**. `make check` runs xdist at `-n auto` = 24
+workers, each importing the full package, and `tests/bot` launches real
+headless Chromium on top. The worker was being reaped, and the timeout
+flag converted a slow real-browser teardown into a killed worker. Fixed
+by dropping to `-n 4` while the sweep ran; nothing in this repo was
+wrong. Worth remembering before diagnosing the next "flaky" worker
+crash: check what else owns the machine.
+
+### File size
+
+`tests/login/test_join.py` crossed the 600-line ceiling at 603 — the
+threaded arguments pushed it over. Split, not squeezed: the eight
+`handle_login_flow` auto-join tests moved to `test_join_login_flow.py`
+(145 lines), leaving the room-join primitives at 470.

@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.collect_pickups import mine_clearance_decision
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state, make_mine_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -19,6 +20,7 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 def _ctx_with_covered_container(ai_state: AIStateDict) -> DecideCtx:
     """World with one hostile-mine-covered container in view."""
+    ws = WorldService()
     world, self_state = make_world(self_x=100, self_y=100, fuel=1050)
     world["containers"]["104,100"] = make_container_state(
         x=104,
@@ -36,6 +38,7 @@ def _ctx_with_covered_container(ai_state: AIStateDict) -> DecideCtx:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
 

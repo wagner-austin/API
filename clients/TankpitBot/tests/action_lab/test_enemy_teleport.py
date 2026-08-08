@@ -38,6 +38,7 @@ from tankpit_bot.action_lab.types import (
 from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -110,8 +111,9 @@ def test_probe_single_enemy_attempt_returns_no_landing_tile() -> None:
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
         now_ms: int,
+        ws: WorldService,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain, now_ms)
+        _ = (world, self_state, target, terrain, now_ms, ws)
         return (-1, -1)
 
     enemy_targeting_module._require_fresh_enemy_threat = _enemy_found
@@ -150,8 +152,9 @@ def test_probe_single_enemy_attempt_raises_when_teleport_dispatch_fails() -> Non
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
         now_ms: int,
+        ws: WorldService,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain, now_ms)
+        _ = (world, self_state, target, terrain, now_ms, ws)
         return (119, 130)
 
     enemy_targeting_module._require_fresh_enemy_threat = _enemy_found
@@ -187,8 +190,9 @@ def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
         now_ms: int,
+        ws: WorldService,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain, now_ms)
+        _ = (world, self_state, target, terrain, now_ms, ws)
         return (119, 130)
 
     def _timeout_result(
@@ -295,8 +299,9 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
         now_ms: int,
+        ws: WorldService,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain, now_ms)
+        _ = (world, self_state, target, terrain, now_ms, ws)
         return (119, 130)
 
     def _landed_result(
@@ -430,8 +435,9 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
         now_ms: int,
+        ws: WorldService,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain, now_ms)
+        _ = (world, self_state, target, terrain, now_ms, ws)
         return (119, 130)
 
     def _landed_result(

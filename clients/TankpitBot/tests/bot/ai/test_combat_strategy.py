@@ -13,6 +13,7 @@ from tankpit_bot.bot.ai.combat_strategy import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     WorldStateDict,
@@ -48,6 +49,7 @@ class TestKillShotWireGate:
             A decision context (tick clock 100000) and the matching
             adjacent enemy threat.
         """
+        ws = WorldService()
         position_stamp = (
             last_position_update_ms if last_position_update_ms is not None else last_wire_seen_ms
         )
@@ -77,6 +79,7 @@ class TestKillShotWireGate:
             100000,
             None,
             "",
+            ws=ws,
         )
         target = _enemy_threat(
             x=101,
@@ -138,6 +141,7 @@ class TestMissOnMovedTarget:
         stepped off the tile as the shot resolved), so abandoning a live
         mover is premature.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -168,6 +172,7 @@ class TestMissOnMovedTarget:
             100000,
             None,
             "miss",
+            ws=ws,
         )
         target = _enemy_threat(x=102, y=100, name="Mover", last_wire_seen_ms=100000)
 
@@ -185,6 +190,7 @@ class TestHasCombatShot:
 
     def test_has_combat_shot_returns_true_within_range(self) -> None:
         """A target at SHOT_RANGE_TILES distance is within shot range."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ctx = DecideCtx(
             world,
@@ -194,6 +200,7 @@ class TestHasCombatShot:
             100000,
             None,
             "",
+            ws=ws,
         )
         target = _enemy_threat(x=108, y=100)  # distance=8
 
@@ -202,6 +209,7 @@ class TestHasCombatShot:
 
     def test_has_combat_shot_returns_false_beyond_range(self) -> None:
         """A target beyond SHOT_RANGE_TILES distance is out of shot range."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ctx = DecideCtx(
             world,
@@ -211,6 +219,7 @@ class TestHasCombatShot:
             100000,
             None,
             "",
+            ws=ws,
         )
         target = _enemy_threat(x=109, y=100)  # distance=9
 
@@ -225,6 +234,7 @@ class TestFindCombatPickup:
         from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
         from tankpit_bot.state import make_container_state
 
+        ws = WorldService()
         world, self_state = make_world(
             self_x=100,
             self_y=100,
@@ -247,6 +257,7 @@ class TestFindCombatPickup:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = _find_combat_pickup(ctx)
@@ -259,6 +270,7 @@ class TestFindCombatPickup:
         from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
         from tankpit_bot.state import make_container_state
 
+        ws = WorldService()
         world, self_state = make_world(
             self_x=100,
             self_y=100,
@@ -281,6 +293,7 @@ class TestFindCombatPickup:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = _find_combat_pickup(ctx)
@@ -299,6 +312,7 @@ class TestFindCombatPickup:
         from tankpit_bot.state import make_container_state
 
         def scan(fuel: int) -> BotCommand | None:
+            ws = WorldService()
             world, self_state = make_world(
                 self_x=100,
                 self_y=100,
@@ -317,6 +331,7 @@ class TestFindCombatPickup:
                 100000,
                 None,
                 "",
+                ws=ws,
             )
             return _find_combat_pickup(ctx)
 
@@ -335,6 +350,7 @@ class TestFindCombatPickup:
         from tankpit_bot.physics.capacity import inventory_capacity
         from tankpit_bot.state import make_container_state
 
+        ws = WorldService()
         world, self_state = make_world(
             self_x=100,
             self_y=100,
@@ -354,6 +370,7 @@ class TestFindCombatPickup:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         assert _find_combat_pickup(ctx) is None
@@ -362,6 +379,7 @@ class TestFindCombatPickup:
         """Returns None when nothing is adjacent."""
         from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ctx = DecideCtx(
             world,
@@ -371,6 +389,7 @@ class TestFindCombatPickup:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         assert _find_combat_pickup(ctx) is None
@@ -380,6 +399,7 @@ class TestFindCombatPickup:
         from tankpit_bot.bot.ai.combat_strategy import engage_target
         from tankpit_bot.state import make_container_state
 
+        ws = WorldService()
         world, self_state = make_world(
             self_x=100,
             self_y=100,
@@ -420,6 +440,7 @@ class TestFindCombatPickup:
             100000,
             None,
             "",
+            ws=ws,
         )
         target = _enemy_threat(tank_id=50, x=101, y=100, last_wire_seen_ms=100000)
 
@@ -434,6 +455,7 @@ class TestFindCombatPickup:
         """Line 429: self_state is None guard."""
         from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
 
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         world_no_self = WorldStateDict(
             self_state=None,
@@ -453,6 +475,7 @@ class TestFindCombatPickup:
             100000,
             None,
             "",
+            ws=ws,
         )
         ctx.world = world_no_self
         assert _find_combat_pickup(ctx) is None

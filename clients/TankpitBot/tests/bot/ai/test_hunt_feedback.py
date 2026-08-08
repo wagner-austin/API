@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
@@ -24,6 +25,7 @@ class TestDecideKillCooldown:
 
     def test_killed_tanks_filtered_from_world(self) -> None:
         """Killed tanks do not remain eligible HUNT targets."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -50,7 +52,7 @@ class TestDecideKillCooldown:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         if decision["behavior"]["mode"] == "HUNT":
             assert (
@@ -73,6 +75,7 @@ class TestDecideKillCooldown:
         Repeat-shot loops stay impossible because the decision is a
         map open, not a shot (the 2026-07-02 01:23 loop re-fired).
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -104,7 +107,7 @@ class TestDecideKillCooldown:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss", ws=ws)
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["updated_ai_state"]["combat_target_id"] == 50
@@ -119,6 +122,7 @@ class TestDecideKillCooldown:
         ruling 2026-07-26), so the loop stays impossible while the
         departed tank is followed up instead of abandoned.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -153,7 +157,7 @@ class TestDecideKillCooldown:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss", ws=ws)
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["updated_ai_state"]["combat_target_id"] == 50
@@ -166,6 +170,7 @@ class TestDecideKillCooldown:
         the tile as the shot resolved. The registry shows the new
         position, so the bot re-aims there and keeps the lock.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -197,7 +202,7 @@ class TestDecideKillCooldown:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss", ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 103
@@ -212,6 +217,7 @@ class TestDecideKillCooldown:
         (distance 2) on an engaged target dispatches another shoot
         rather than spending fuel on a re-close teleport.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -246,13 +252,14 @@ class TestDecideKillCooldown:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "")
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["behavior"]["reason_kind"] == "shoot_target"
 
     def test_closing_shoots_when_cardinally_adjacent(self) -> None:
         """Closing combat engages once the landed position is cardinally usable."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -282,7 +289,7 @@ class TestDecideKillCooldown:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "")
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["updated_ai_state"]["last_shot_target_id"] == 50
@@ -300,6 +307,7 @@ class TestDecideCombatFeedback:
         this test used ``x=0, y=0`` as the dead-sentinel; that hack is
         replaced by the explicit liveness state machine.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -329,7 +337,16 @@ class TestDecideCombatFeedback:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state_with_shot, inventory, 100000, None, "hit")
+        decision = decide(
+            world,
+            self_state,
+            ai_state_with_shot,
+            inventory,
+            100000,
+            None,
+            "hit",
+            ws=ws,
+        )
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["behavior"]["reason_kind"] == "find_enemies"
@@ -337,6 +354,7 @@ class TestDecideCombatFeedback:
 
     def test_miss_with_no_target_in_world_opens_map(self) -> None:
         """Miss feedback with no target state falls through to reacquisition."""
+        ws = WorldService()
         world, self_state = make_world(fuel=1200)
         ai_state = make_scanned_ai_state()
         ai_state_with_shot = AIStateDict(
@@ -348,7 +366,16 @@ class TestDecideCombatFeedback:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state_with_shot, inventory, 100000, None, "miss")
+        decision = decide(
+            world,
+            self_state,
+            ai_state_with_shot,
+            inventory,
+            100000,
+            None,
+            "miss",
+            ws=ws,
+        )
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["behavior"]["reason_kind"] == "find_enemies"
@@ -361,6 +388,7 @@ class TestDecideCombatFeedback:
         tile (in-view law) -- neither ``kill_confirmed`` nor
         ``miss_relocate`` short-circuits the decision.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -390,7 +418,16 @@ class TestDecideCombatFeedback:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state_with_shot, inventory, 100000, None, "hit")
+        decision = decide(
+            world,
+            self_state,
+            ai_state_with_shot,
+            inventory,
+            100000,
+            None,
+            "hit",
+            ws=ws,
+        )
 
         assert decision["behavior"]["reason_kind"] != "confirm_kill"
         assert decision["behavior"]["reason_kind"] != "find_enemies"
@@ -398,11 +435,12 @@ class TestDecideCombatFeedback:
 
     def test_no_feedback_when_no_shot_pending(self) -> None:
         """Empty combat feedback leaves normal planning unchanged."""
+        ws = WorldService()
         world, self_state = make_world(fuel=1200)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "")
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["behavior"]["reason_kind"] == "find_enemies"
@@ -413,6 +451,7 @@ class TestDecideShotTracking:
 
     def test_shoot_command_records_target(self) -> None:
         """Shoot decisions record the target for next-tick feedback handling."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -442,7 +481,7 @@ class TestDecideShotTracking:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         if decision["command"]["cmd_type"] == "shoot":
             assert decision["updated_ai_state"]["last_shot_target_id"] == 50

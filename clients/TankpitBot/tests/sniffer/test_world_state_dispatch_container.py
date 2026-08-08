@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.protocol import RadarContainerDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
@@ -15,7 +15,7 @@ class TestDispatchTilePatchUpdates:
         """Top-level 0x40 lifts overlay bytes into world.mines and leaves terrain alone."""
         from tankpit_bot.protocol import OverlayUpdateDict, TerrainUpdateDict
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(ws, TerrainUpdateDict(msg_type=0x4A, updates=[(70, 80, 6)]))
         dispatch_world_state_update(ws, OverlayUpdateDict(msg_type=0x40, updates=[(70, 80, 1)]))
 
@@ -30,7 +30,7 @@ class TestDispatchTilePatchUpdates:
         """0x40 with overlay byte >= 8 explicitly empties the mine layer."""
         from tankpit_bot.protocol import OverlayUpdateDict
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(ws, OverlayUpdateDict(msg_type=0x40, updates=[(70, 80, 2)]))
         assert "70,80" in ws.world_state["mines"]
 
@@ -41,7 +41,7 @@ class TestDispatchTilePatchUpdates:
         """Top-level 0x43 lifts cache bytes directly into world.containers."""
         from tankpit_bot.protocol import CacheUpdateDict
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(ws, CacheUpdateDict(msg_type=0x43, updates=[(33, 44, 600)]))
 
         container = ws.world_state["containers"]["33,44"]
@@ -65,7 +65,7 @@ class TestDispatchTilePatchUpdates:
         from tankpit_bot.protocol import CacheUpdateDict, MovementResponseDict, RadarContainerDict
         from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(
             ws,
             MovementResponseDict(
@@ -106,7 +106,7 @@ class TestDispatchTilePatchUpdates:
             TerrainUpdateDict,
         )
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(ws, TerrainUpdateDict(msg_type=0x4A, updates=[(90, 91, 4)]))
         dispatch_world_state_update(
             ws,
@@ -137,7 +137,7 @@ class TestDispatchShootEvent:
         from tankpit_bot.sniffer.world_state_combat import check_and_clear_combat_hit
         from tankpit_bot.state.types import make_tank_state
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(
             ws,
             MovementResponseDict(
@@ -195,7 +195,7 @@ class TestDispatchShootEvent:
             check_and_clear_our_shot_response,
         )
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(
             ws,
             MovementResponseDict(
@@ -236,7 +236,7 @@ class TestDispatchShootEvent:
             check_and_clear_our_shot_response,
         )
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(
             ws,
             MovementResponseDict(
@@ -275,7 +275,7 @@ class TestDispatchShootEvent:
         from tankpit_bot.protocol import MovementResponseDict, ShootEventDict
         from tankpit_bot.state.types import make_tank_state
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(
             ws,
             MovementResponseDict(
@@ -338,7 +338,7 @@ class TestDispatchShootEvent:
         from tankpit_bot.protocol import MovementResponseDict, ShootEventDict
         from tankpit_bot.state.types import make_tank_state
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(
             ws,
             MovementResponseDict(
@@ -402,7 +402,7 @@ class TestDispatchProtocolDeactivation:
         """
         from tankpit_bot.protocol import DeactivationDict, TankEntryDict
 
-        ws = get_world_service()
+        ws = WorldService()
         entry = TankEntryDict(
             msg_type=0x28, team=0, tank_id=900, rank=0, damage_state=0, score=0, x=100, y=100
         )
@@ -435,7 +435,7 @@ class TestIncrementContainerFailedPickups:
         """Incrementing raises the failed_pickups counter by 1."""
         from tankpit_bot.sniffer.world_state_containers import increment_container_failed_pickups
 
-        ws = get_world_service()
+        ws = WorldService()
         update_world_state_from_radar(ws, [RadarContainerDict(x=50, y=60, volume=100)], [], [])
         assert ws.world_state["containers"]["50,60"]["failed_pickups"] == 0
         increment_container_failed_pickups(ws, 50, 60)
@@ -447,7 +447,7 @@ class TestIncrementContainerFailedPickups:
         """Incrementing a missing container is a no-op."""
         from tankpit_bot.sniffer.world_state_containers import increment_container_failed_pickups
 
-        ws = get_world_service()
+        ws = WorldService()
         increment_container_failed_pickups(ws, 99, 99)
         assert len(ws.world_state["containers"]) == 0
 
@@ -459,7 +459,7 @@ class TestRemoveContainerAt:
         """remove_container_at removes a container at the given coordinates."""
         from tankpit_bot.sniffer.world_state_containers import remove_container_at
 
-        ws = get_world_service()
+        ws = WorldService()
         update_world_state_from_radar(ws, [RadarContainerDict(x=50, y=60, volume=100)], [], [])
         assert "50,60" in ws.world_state["containers"]
         remove_container_at(ws, 50, 60)
@@ -469,6 +469,6 @@ class TestRemoveContainerAt:
         """remove_container_at is a no-op when container doesn't exist."""
         from tankpit_bot.sniffer.world_state_containers import remove_container_at
 
-        ws = get_world_service()
+        ws = WorldService()
         remove_container_at(ws, 99, 99)
         assert len(ws.world_state["containers"]) == 0

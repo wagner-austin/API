@@ -6,9 +6,7 @@ Mine dispatch is :mod:`tests.sniffer.test_world_state_dispatch_mines`.
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state.types import WorldStateDict
 from tests.conftest import FakeFileSystem
@@ -21,12 +19,13 @@ class TestDispatchTankMessages:
         """Test dispatch handles TankEntry (0x28) message."""
         from tankpit_bot.protocol import TankEntryDict
 
+        ws = WorldService()
         msg = TankEntryDict(
             msg_type=0x28, team=0, tank_id=42, rank=0, damage_state=0, score=0, x=100, y=150
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert "42" in state["tanks"]
         assert state["tanks"]["42"]["name"] == ""
         assert state["tanks"]["42"]["x"] == 100
@@ -36,6 +35,7 @@ class TestDispatchTankMessages:
         """Test dispatch handles TankStatus (0x3E) message."""
         from tankpit_bot.protocol import TankStatusDict
 
+        ws = WorldService()
         msg = TankStatusDict(
             msg_type=0x3E,
             team=2,
@@ -47,9 +47,9 @@ class TestDispatchTankMessages:
             leaderboard_position=3,
             name="TopPlayer",
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert "99" in state["tanks"]
         assert state["tanks"]["99"]["name"] == "TopPlayer"
         assert state["tanks"]["99"]["team"] == 2
@@ -70,11 +70,12 @@ class TestDispatchTankMessages:
         """
         from tankpit_bot.protocol import TankEntryDict, TankRemoveDict
 
+        ws = WorldService()
         entry_msg = TankEntryDict(
             msg_type=0x28, team=0, tank_id=42, rank=0, damage_state=0, score=0, x=100, y=150
         )
-        dispatch_world_state_update(get_world_service(), entry_msg)
-        tanks = get_world_service().world_state["tanks"]
+        dispatch_world_state_update(ws, entry_msg)
+        tanks = ws.world_state["tanks"]
         assert "42" in tanks
         assert tanks["42"]["liveness"] == "alive"
 
@@ -93,11 +94,11 @@ class TestDispatchTankMessages:
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
         try:
-            dispatch_world_state_update(get_world_service(), remove_msg)
+            dispatch_world_state_update(ws, remove_msg)
         finally:
             logger.removeHandler(handler)
             logger.setLevel(original_level)
-        tanks = get_world_service().world_state["tanks"]
+        tanks = ws.world_state["tanks"]
         assert "42" in tanks
         assert tanks["42"]["liveness"] == "alive"
         # The removal is timestamped as a diagnostic: the 0x58 starts
@@ -123,11 +124,12 @@ class TestDispatchTankMessages:
         """
         from tankpit_bot.protocol import TankEntryDict, TankExitDict
 
+        ws = WorldService()
         entry_msg = TankEntryDict(
             msg_type=0x28, team=1, tank_id=77, rank=0, damage_state=0, score=0, x=10, y=20
         )
-        dispatch_world_state_update(get_world_service(), entry_msg)
-        assert "77" in get_world_service().world_state["tanks"]
+        dispatch_world_state_update(ws, entry_msg)
+        assert "77" in ws.world_state["tanks"]
 
         exit_msg = TankExitDict(
             msg_type=0x29,
@@ -136,17 +138,18 @@ class TestDispatchTankMessages:
             was_silent=False,
             was_eliminated=True,
         )
-        dispatch_world_state_update(get_world_service(), exit_msg)
-        assert "77" in get_world_service().world_state["tanks"]
+        dispatch_world_state_update(ws, exit_msg)
+        assert "77" in ws.world_state["tanks"]
 
     def test_dispatch_tunneled_terrain_update_sets_terrain_tile(self) -> None:
         """Test 0x4A terrain updates modify world terrain state."""
         from tankpit_bot.protocol import TerrainUpdateDict
 
+        ws = WorldService()
         msg = TerrainUpdateDict(msg_type=0x4A, updates=[(8, 166, 2)])
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         tile = state["terrain"]["8,166"]
         assert tile["x"] == 8
         assert tile["y"] == 166
@@ -163,10 +166,11 @@ class TestDispatchTankMessages:
         """
         from tankpit_bot.protocol import TankEntryDict, TankStatusSyncDict
 
+        ws = WorldService()
         entry = TankEntryDict(
             msg_type=0x28, team=0, tank_id=300, rank=0, damage_state=0, score=0, x=50, y=60
         )
-        dispatch_world_state_update(get_world_service(), entry)
+        dispatch_world_state_update(ws, entry)
 
         msg = TankStatusSyncDict(
             msg_type=0x2E,
@@ -179,9 +183,9 @@ class TestDispatchTankMessages:
             promo_bar_lit=None,
             fuel=None,
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert "300" in state["tanks"]
         assert state["tanks"]["300"]["damage_state"] == 3
 
@@ -198,11 +202,12 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import TankEntryDict, TankStatusSyncDict
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
+        ws = WorldService()
         artifacts = configure_bot_runtime_logging("20260610-230000")
         entry = TankEntryDict(
             msg_type=0x28, team=0, tank_id=300, rank=0, damage_state=0, score=0, x=50, y=60
         )
-        dispatch_world_state_update(get_world_service(), entry)
+        dispatch_world_state_update(ws, entry)
 
         for repeated_damage_state in (2, 2):
             msg = TankStatusSyncDict(
@@ -216,7 +221,7 @@ class TestDispatchTankMessages:
                 promo_bar_lit=None,
                 fuel=None,
             )
-            dispatch_world_state_update(get_world_service(), msg)
+            dispatch_world_state_update(ws, msg)
 
         records = [
             record
@@ -243,6 +248,7 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import TankStatusSyncDict
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
+        ws = WorldService()
         artifacts = configure_bot_runtime_logging("20260610-230000")
         msg = TankStatusSyncDict(
             msg_type=0x2E,
@@ -255,7 +261,7 @@ class TestDispatchTankMessages:
             promo_bar_lit=None,
             fuel=None,
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
         records = [
             record
@@ -273,7 +279,7 @@ class TestSelfIdentityRecording:
         from tankpit_bot.protocol import TankInfoDict
         from tankpit_bot.state.self_mutations import update_self_position
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.world_state = update_self_position(ws.world_state, 100, 100, 1000)
         self_state = ws.world_state["self_state"]
         if self_state is None:
@@ -311,7 +317,7 @@ class TestSelfIdentityRecording:
         """Roster 0x21s for other tanks never touch self_account."""
         from tankpit_bot.protocol import TankInfoDict
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(
             ws,
             TankInfoDict(

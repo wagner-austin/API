@@ -10,7 +10,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai.world_types import make_enemy_threat
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import mark_move_target_failed
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_tank_state
 from tests.bot.ai._support import make_container, make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -21,6 +21,7 @@ class TestDecideBlockedCombatTargets:
 
     def test_blocked_target_is_skipped_on_reacquire(self) -> None:
         """Blocked targets are not reacquired as new HUNT threats."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -45,7 +46,7 @@ class TestDecideBlockedCombatTargets:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "HUNT"
         assert decision["behavior"]["reason_kind"] == "find_enemies"
@@ -57,6 +58,7 @@ class TestDecideBlockedCombatTargets:
         target -- the dual fires from here. The old behavior teleported
         at the boxed tile and relied on server displacement.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -105,7 +107,7 @@ class TestDecideBlockedCombatTargets:
             }
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 105
@@ -114,6 +116,7 @@ class TestDecideBlockedCombatTargets:
 
     def test_failed_combat_landing_blocks_target_and_switches(self) -> None:
         """Failed combat landing at the target's coords blocks and switches to viable one."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -152,9 +155,9 @@ class TestDecideBlockedCombatTargets:
             }
         )
         inventory = make_inventory()
-        mark_move_target_failed(120, 100, 99000)
+        ws.mark_move_target_failed(120, 100, 99000)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["behavior"]["reason_kind"] == "find_target"
@@ -172,6 +175,7 @@ class TestDecideBlockedCombatTargets:
         target, clears the lock, and reopens the map to find new
         threats rather than firing or close-engaging.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -197,9 +201,9 @@ class TestDecideBlockedCombatTargets:
             }
         )
         inventory = make_inventory()
-        mark_move_target_failed(120, 100, 99000)
+        ws.mark_move_target_failed(120, 100, 99000)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["behavior"]["reason_kind"] == "find_enemies"
@@ -212,6 +216,7 @@ class TestDecideBlockedCombatTargets:
         User ruling 2026-07-29: an in-view, in-range target needs no
         landing at all -- the ring is irrelevant to the shot.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -247,7 +252,7 @@ class TestDecideBlockedCombatTargets:
             }
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 104
@@ -256,6 +261,7 @@ class TestDecideBlockedCombatTargets:
 
     def test_boxed_solo_target_is_shot_from_position(self) -> None:
         """A boxed solo target inside shot range is SHOT from the current tile."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -291,7 +297,7 @@ class TestDecideBlockedCombatTargets:
             }
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 105
@@ -300,6 +306,7 @@ class TestDecideBlockedCombatTargets:
 
     def test_combat_landing_skips_dynamic_occupiers(self) -> None:
         """Combat landing avoids adjacent tiles occupied by containers."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "104,100": make_container(104, 100, 0, False),
         }
@@ -307,7 +314,7 @@ class TestDecideBlockedCombatTargets:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -327,6 +334,7 @@ class TestDecideBlockedCombatTargets:
 
     def test_combat_landing_skips_adjacent_enemy_occupier(self) -> None:
         """Combat landing avoids adjacent tiles occupied by tanks."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "60": make_tank_state(
                 tank_id=60,
@@ -346,7 +354,7 @@ class TestDecideBlockedCombatTargets:
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -366,6 +374,7 @@ class TestDecideBlockedCombatTargets:
 
     def test_combat_landing_returns_target_coords_when_all_adjacent_impassable(self) -> None:
         """Combat landing returns target coords; server handles displacement."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
@@ -377,7 +386,7 @@ class TestDecideBlockedCombatTargets:
                 (105, 99): "W",
             }
         )
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -397,6 +406,7 @@ class TestDecideBlockedCombatTargets:
 
     def test_combat_landing_returns_target_coords_when_all_adjacent_occupied(self) -> None:
         """Combat landing returns target coords even when adjacent tiles occupied."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "106,100": make_container(106, 100, 0, False),
             "104,100": make_container(104, 100, 0, False),
@@ -406,7 +416,7 @@ class TestDecideBlockedCombatTargets:
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, containers=containers)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -426,6 +436,7 @@ class TestDecideBlockedCombatTargets:
 
     def test_blocked_target_expires_after_ttl(self) -> None:
         """Blocked combat targets expire after the cooldown window."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -451,7 +462,7 @@ class TestDecideBlockedCombatTargets:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "HUNT"
         # The re-acquired enemy sits 3 tiles away inside the viewport,

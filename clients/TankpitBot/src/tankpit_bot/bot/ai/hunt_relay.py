@@ -126,6 +126,7 @@ def relay_toward_unaffordable_enemy(
         there is no enemy worth relaying toward or no dot helps.
     """
     travel = find_relay_travel_target(
+        ctx.ws,
         ctx.filtered,
         ctx.self_state,
         ctx.blocked_targets,
@@ -214,6 +215,7 @@ def stale_human_needs_map_refresh(ctx: DecideCtx) -> bool:
     if map_age_ms <= ctx.config["map_open_cooldown_ms"]:
         return False
     return stale_human_exists(
+        ctx.ws,
         ctx.filtered,
         ctx.self_state,
         ctx.blocked_targets,
@@ -255,6 +257,7 @@ def human_pursuit_travel_target(ctx: DecideCtx) -> EnemyThreatDict | None:
         ``None`` when no such human is on the fresh map.
     """
     travel = find_relay_travel_target(
+        ctx.ws,
         ctx.filtered,
         ctx.self_state,
         ctx.blocked_targets,

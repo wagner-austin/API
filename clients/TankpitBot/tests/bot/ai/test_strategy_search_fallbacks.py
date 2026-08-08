@@ -11,9 +11,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.session_exit import SessionExitError
-from tankpit_bot.sniffer.world_state import (
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._strategy_fixtures import (
     _c,
     _make_inventory,
@@ -27,10 +25,12 @@ class TestEquipmentSearchHopFallback:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        update_world_state_from_position(100, 100)
+        self.ws = WorldService()
+        self.ws.update_world_state_from_position(100, 100)
 
     def test_equipment_search_hops_to_nearest_dot_when_viewport_scanned(self) -> None:
         """Equipment search dot-hops to fresh ground when viewport scanned and no radar."""
+        ws = self.ws
         world, self_state = _make_world(fuel=800, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -53,6 +53,7 @@ class TestEquipmentSearchHopFallback:
             100000,
             None,
             map_fuel_dots=((150, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
@@ -72,6 +73,7 @@ class TestEquipmentSearchHopFallback:
         """
         import pytest
 
+        ws = self.ws
         world, self_state = _make_world(fuel=150, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -93,6 +95,7 @@ class TestEquipmentSearchHopFallback:
                 100000,
                 None,
                 map_fuel_dots=((250, 100),),
+                ws=ws,
             )
         assert exc_info.value.reason == "out_of_fuel"
 
@@ -107,6 +110,7 @@ class TestEquipmentSearchHopFallback:
         exited at fuel 1100 this way) the tick falls through to the
         hunt owner.
         """
+        ws = self.ws
         world, self_state = _make_world(fuel=550, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -126,6 +130,7 @@ class TestEquipmentSearchHopFallback:
             100000,
             None,
             map_fuel_dots=((250, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "HUNT"
@@ -142,6 +147,7 @@ class TestEquipmentSearchHopFallback:
 
         from tankpit_bot.bot.session_exit import SessionExitError
 
+        ws = self.ws
         world, self_state = _make_world(fuel=1100, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -163,12 +169,14 @@ class TestEquipmentSearchHopFallback:
                 100000,
                 None,
                 map_fuel_dots=((250, 100),),
+                ws=ws,
             )
 
         assert exc_info.value.reason == "session_complete"
 
     def test_wind_down_breaks_a_held_hunt_and_collects(self) -> None:
         """Winding down below full bars disengages HUNT into COLLECT."""
+        ws = self.ws
         world, self_state = _make_world(fuel=550, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -189,6 +197,7 @@ class TestEquipmentSearchHopFallback:
             100000,
             None,
             map_fuel_dots=((150, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
@@ -203,6 +212,7 @@ class TestEquipmentSearchHopFallback:
         """
         from tankpit_bot.state.types import make_tank_state
 
+        ws = self.ws
         world, self_state = _make_world(fuel=900, scanned=True)
         world["tanks"]["511"] = make_tank_state(
             tank_id=511,
@@ -239,6 +249,7 @@ class TestEquipmentSearchHopFallback:
             100000,
             None,
             map_fuel_dots=((150, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "HUNT"
@@ -249,6 +260,7 @@ class TestEquipmentSearchHopFallback:
 
         from tankpit_bot.bot.session_exit import SessionExitError
 
+        ws = self.ws
         world, self_state = _make_world(fuel=550, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -270,6 +282,7 @@ class TestEquipmentSearchHopFallback:
                 100000,
                 None,
                 map_fuel_dots=((250, 100),),
+                ws=ws,
             )
 
         assert exc_info.value.reason == "session_complete"
@@ -285,6 +298,7 @@ class TestEquipmentSearchHopFallback:
         tick to HUNT and the session exits with
         ``no_productive_collect`` instead of engaging under-armed.
         """
+        ws = self.ws
         world, self_state = _make_world(fuel=550, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -307,6 +321,7 @@ class TestEquipmentSearchHopFallback:
                 100000,
                 None,
                 map_fuel_dots=((250, 100),),
+                ws=ws,
             )
 
 
@@ -315,7 +330,8 @@ class TestFuelSearchFallbacks:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        update_world_state_from_position(100, 100)
+        self.ws = WorldService()
+        self.ws.update_world_state_from_position(100, 100)
 
     def test_locked_fuel_on_water_releases_lock(self) -> None:
         """A water-locked fuel target is released by the lock-continuation.
@@ -326,6 +342,7 @@ class TestFuelSearchFallbacks:
         """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 700, True)}
         world, self_state = _make_world(fuel=150, containers=containers)
         terrain_data: dict[tuple[int, int], str] = {
@@ -346,13 +363,14 @@ class TestFuelSearchFallbacks:
         )
         inventory = _make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert "fuel=700" not in decision["behavior"]["reason_kind"]
         assert decision["command"]["cmd_type"] != "pickup_fuel"
 
     def test_fuel_search_hop_when_scanned_no_visible_fuel(self) -> None:
         """Fuel search hops to fresh sector when viewport tiles fully swept."""
+        ws = self.ws
         world, self_state = _make_world(fuel=150, scanned=True, block_scanned=False)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
@@ -365,6 +383,7 @@ class TestFuelSearchFallbacks:
             100000,
             None,
             map_fuel_dots=((120, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
@@ -385,6 +404,7 @@ class TestFuelSearchFallbacks:
         # Fuel below the short-hop cost (8 * 6 = 48). The
         # ``hunt_min_fuel`` reserve drop (2026-06-24) means stranding
         # now requires fuel < raw teleport cost.
+        ws = self.ws
         world, self_state = _make_world(fuel=30, scanned=True)
         # Recent map open: the dot atlas is empty and a re-open inside
         # the cooldown teaches nothing, so the hop declines.
@@ -392,7 +412,7 @@ class TestFuelSearchFallbacks:
         inventory = _make_inventory()
 
         with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
-            decide(world, self_state, ai_state, inventory, 100000, None)
+            decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
     def test_fuel_recovery_raises_when_all_paths_are_blocked(self) -> None:
         """Durable fuel recovery raises when boxed in.
@@ -407,6 +427,7 @@ class TestFuelSearchFallbacks:
 
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = self.ws
         terrain_data: dict[tuple[int, int], str] = {}
         for x in range(92, 108):
             for y in range(92, 108):
@@ -420,4 +441,4 @@ class TestFuelSearchFallbacks:
         inventory = _make_inventory()
 
         with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
-            decide(world, self_state, ai_state, inventory, 100000, terrain)
+            decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)

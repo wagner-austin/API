@@ -59,7 +59,6 @@ from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.protocol import try_decode_plaintext_ack
-from tankpit_bot.sniffer.world_state import get_terrain_map
 
 log = get_logger(__name__)
 
@@ -220,7 +219,7 @@ class ViewportProbe(ProbeBase):
                 cannot be routed blind (run 20260725-190352 walked
                 into water and never reached the edge).
         """
-        terrain = get_terrain_map()
+        terrain = self.world.get_terrain_map()
         if terrain is None:
             raise ProbeError("terrain map unavailable; cannot route the edge walk")
         return terrain

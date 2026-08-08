@@ -17,10 +17,7 @@ from tankpit_bot.runtime_records import (
     require_int_field,
     require_str_field,
 )
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import mark_teleport_landed
 from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_fuel_total as _update_fuel_total,
@@ -43,18 +40,20 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_clear_completed_map_open`` emits map_open completion via MAP_DATA."""
-        update_world_state_from_position(50, 50)
-        _update_fuel_total(get_world_service(), 800)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 800)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="IDLE",
             action_kind="map_open",
             target_x=0,
             target_y=0,
             started_ms=get_current_time_ms() - 1,
         )
-        get_world_service().mark_map_data_processed()
+        ws.mark_map_data_processed()
 
         cleared = has_in_flight_action(bot) is False
         assert cleared
@@ -76,10 +75,12 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_maybe_complete_walk`` emits move completion when tank is on target."""
-        update_world_state_from_position(50, 50)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="MOVING",
             action_kind="move",
             target_x=120,
@@ -117,10 +118,12 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_maybe_complete_teleport`` emits teleport completion via TeleportLanded."""
-        update_world_state_from_position(50, 50)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="TELEPORTING",
             action_kind="teleport",
             target_x=200,
@@ -136,7 +139,7 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
             fuel=900,
             leaderboard_position=1,
         )
-        mark_teleport_landed(get_world_service())
+        mark_teleport_landed(ws)
 
         completed = bot._maybe_complete_teleport(landed_state)
 
@@ -159,9 +162,9 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         fake_fs: FakeFileSystem,
     ) -> None:
         """Adjacent landing near an enemy is expected, not a failed target."""
-        update_world_state_from_position(50, 50)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
         configure_bot_runtime_logging("20260331-230405")
-        ws = get_world_service()
         ws.world_state["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=200,
@@ -176,6 +179,7 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         )
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="TELEPORTING",
             action_kind="teleport",
             target_x=200,
@@ -210,9 +214,9 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         exemption blacklisted the enemy's tile for it -- the orange-6
         blocked-target case from the 2026-07-27 20-kill run.
         """
-        update_world_state_from_position(50, 50)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
         configure_bot_runtime_logging("20260331-230405")
-        ws = get_world_service()
         ws.world_state["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=200,
@@ -227,6 +231,7 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         )
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="TELEPORTING",
             action_kind="teleport",
             target_x=200,
@@ -261,9 +266,9 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         30 s failed-move mark so the planner does not re-dispatch the
         same displaced teleport.
         """
-        update_world_state_from_position(50, 50)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
         configure_bot_runtime_logging("20260331-230405")
-        ws = get_world_service()
         ws.world_state["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=200,
@@ -278,6 +283,7 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         )
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="TELEPORTING",
             action_kind="teleport",
             target_x=200,
@@ -313,18 +319,18 @@ def test_artifact_jsonl_lines_round_trip_through_real_decoder(
     completion-site emit round-trips through the file system end to end
     without any intermediate fixture.
     """
+    ws = WorldService()
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
-    from tankpit_bot.sniffer.world_state import mark_radar_scan_complete
-
     bot = _make_bot_with_in_flight(
+        world=ws,
         state="SCANNING",
         action_kind="scan",
         target_x=0,
         target_y=0,
         started_ms=get_current_time_ms() - 1,
     )
-    mark_radar_scan_complete()
+    ws.mark_radar_scan_complete()
     assert bot._maybe_complete_scan(bot.get_world_state()) is True
 
     files = fake_fs.get_written_files()

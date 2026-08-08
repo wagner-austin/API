@@ -24,6 +24,7 @@ from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.physics.costs import teleport_cost
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.scan_coverage import viewport_uncovered_count
 from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
@@ -34,6 +35,10 @@ class DecideCtx:
 
     Holds all inputs plus pre-computed values (equipment, filtered world,
     base AI state) so individual decision steps don't repeat work.
+
+    Attributes:
+        ws: The session's world service, for the live bookkeeping the
+            ``world`` snapshot does not carry.
     """
 
     __slots__ = (
@@ -55,6 +60,7 @@ class DecideCtx:
         "terrain",
         "timestamp_ms",
         "world",
+        "ws",
     )
 
     def __init__(
@@ -67,6 +73,8 @@ class DecideCtx:
         terrain: TerrainMapProtocol | None,
         combat_feedback: CombatFeedback,
         map_fuel_dots: tuple[tuple[int, int], ...] = (),
+        *,
+        ws: WorldService,
     ) -> None:
         self.world = world
         self.self_state = self_state
@@ -78,6 +86,14 @@ class DecideCtx:
         # 0x4C fuel-dot atlas (session-constant like ``terrain``):
         # empty until the first map open of the session.
         self.map_fuel_dots = map_fuel_dots
+        # The session's world service. The planner is otherwise pure over
+        # the ``world`` snapshot, but several decision steps genuinely
+        # need live session bookkeeping the snapshot does not carry --
+        # failed move targets, the incoming-damage rate window, movement
+        # rejections. They used to reach a module global for it; carrying
+        # it here makes the dependency visible and lets two sessions plan
+        # independently ([[session-state-deglobalisation]] step 8).
+        self.ws = ws
 
         self.config: AIConfigDict = ai_state["config"]
         self.mode = ai_state["mode"]

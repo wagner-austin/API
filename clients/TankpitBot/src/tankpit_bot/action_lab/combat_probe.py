@@ -40,7 +40,6 @@ from tankpit_bot.bot.ai.combat_landing import (
 from tankpit_bot.bot.ai.threat_primitives import find_closest_threat
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
-from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_combat_hit,
     check_and_clear_our_shot_response,
@@ -63,6 +62,7 @@ def _find_fresh_enemy(
     if self_state is None:
         return None
     threats = analyze_threats(
+        probe.world,
         probe.get_world_state(),
         self_state,
         action_hooks.get_current_time_ms(),
@@ -82,6 +82,7 @@ def _current_enemy_by_id(
     if self_state is None:
         return None
     for t in analyze_threats(
+        probe.world,
         probe.get_world_state(),
         self_state,
         action_hooks.get_current_time_ms(),
@@ -327,8 +328,9 @@ class CombatProbe(ProbeBase):
             self.get_world_state(),
             self._require_self_state(),
             enemy,
-            get_terrain_map(),
+            self.world.get_terrain_map(),
             action_hooks.get_current_time_ms(),
+            self.world,
         )
         if landing_x == -1 and landing_y == -1:
             log.warning("COMBAT: no landing tile for %s", enemy["name"])

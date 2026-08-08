@@ -8,11 +8,7 @@ from tankpit_bot.bot.states import (
 )
 from tankpit_bot.bot.tick_loop_actions import _clear_rejected_movement
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    mark_move_target_failed,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 from tests.conftest import (
     FakeEnv,
@@ -91,8 +87,9 @@ class TestClearRejectedMovement:
     def test_move_without_failure_returns_false(self, fake_env: FakeEnv) -> None:
         """A move whose target is NOT failed returns False."""
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         action = InFlightActionDict(
             kind="move",
             target_x=150,
@@ -108,14 +105,15 @@ class TestClearRejectedMovement:
     def test_move_with_failed_target_clears_and_returns_true(self, fake_env: FakeEnv) -> None:
         """A move whose target was marked failed gets cleared (replan)."""
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
 
         tx, ty = 150, 150
         now_ms = get_current_time_ms()
-        mark_move_target_failed(tx, ty, now_ms)
+        ws.mark_move_target_failed(tx, ty, now_ms)
 
         action = InFlightActionDict(
             kind="move",
@@ -133,15 +131,16 @@ class TestClearRejectedMovement:
     def test_collect_with_failed_target_increments_failed_pickups(self, fake_env: FakeEnv) -> None:
         """A collect whose target was marked failed also marks the container."""
 
-        update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(get_world_service(), 800)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(ws, 800)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "COLLECTING"
 
         tx, ty = 120, 130
         now_ms = get_current_time_ms()
-        mark_move_target_failed(tx, ty, now_ms)
+        ws.mark_move_target_failed(tx, ty, now_ms)
 
         action = InFlightActionDict(
             kind="collect",
@@ -164,8 +163,9 @@ class TestWaitForMapOpenAction:
         """_wait_for_map_open_action returns True when map data hasn't arrived."""
         from tankpit_bot.bot.tick_loop_actions import _wait_for_map_open_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
 
         action = InFlightActionDict(
             kind="map_open",
@@ -189,14 +189,15 @@ class TestWaitForMovementActionRejected:
         """_wait_for_movement_action returns False when the target was rejected."""
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
 
         tx, ty = 150, 150
         now_ms = get_current_time_ms()
-        mark_move_target_failed(tx, ty, now_ms)
+        ws.mark_move_target_failed(tx, ty, now_ms)
 
         action = InFlightActionDict(
             kind="move",

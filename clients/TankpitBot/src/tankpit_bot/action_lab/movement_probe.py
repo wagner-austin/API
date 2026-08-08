@@ -28,7 +28,6 @@ from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.browser.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -164,9 +163,16 @@ def _create_movement_probe(
     return probe
 
 
-def _get_probe_terrain_map() -> TerrainMapProtocol | None:
-    """Return the active terrain map for movement target selection."""
-    return get_terrain_map()
+def _get_probe_terrain_map(ws: WorldService) -> TerrainMapProtocol | None:
+    """Return the active terrain map for movement target selection.
+
+    Args:
+        ws: The probe's world service.
+
+    Returns:
+        The session's terrain map, or None when none is loaded.
+    """
+    return ws.get_terrain_map()
 
 
 def _build_probe_targets(
@@ -192,7 +198,7 @@ class MovementProbe(ProbeBase):
 
     def _build_default_targets(self, *, max_targets: int) -> list[TeleportTargetDict]:
         """Return default local movement targets near spawn."""
-        terrain = _get_probe_terrain_map()
+        terrain = _get_probe_terrain_map(self.world)
         if terrain is None:
             raise MovementProbeError("terrain map is unavailable")
         self_state = self._require_self_state()

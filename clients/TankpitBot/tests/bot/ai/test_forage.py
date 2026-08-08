@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.mode_gates import (
     should_enter_collect,
     should_exit_collect,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.scan_coverage import tile_key
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -66,6 +67,7 @@ def _ctx(
     Returns:
         Decision context at timestamp 100000.
     """
+    ws = WorldService()
     world, self_state = make_world(self_x=self_x, self_y=self_y, fuel=fuel, scanned=False)
     if tanks is not None:
         world["tanks"].update(tanks)
@@ -75,7 +77,16 @@ def _ctx(
     inventory["dual_shots"]["count"] = dual
     inventory["homing_shots"]["count"] = homing
     inventory["extra_radars"]["count"] = radars
-    return DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+    return DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        terrain,
+        "",
+        ws=ws,
+    )
 
 
 def _enemy(tank_id: int, x: int, y: int) -> dict[str, TankStateDict]:

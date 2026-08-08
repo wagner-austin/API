@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.inventory import InventoryState
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, make_container_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -34,6 +35,7 @@ def _collect_ctx(
     scanned: bool = True,
     ai_state: AIStateDict | None = None,
 ) -> DecideCtx:
+    ws = WorldService()
     world, self_state = make_world(fuel=fuel, scanned=scanned, containers=containers)
     state = (
         ai_state
@@ -55,6 +57,7 @@ def _collect_ctx(
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
 

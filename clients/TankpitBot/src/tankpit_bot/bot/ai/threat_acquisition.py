@@ -23,6 +23,7 @@ from tankpit_bot.bot.ai.threat_primitives import (
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.protocol.naming import is_human_name
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     SelfStateDict,
     TankStateDict,
@@ -32,6 +33,7 @@ from tankpit_bot.state.types import (
 
 
 def _acquisition_rejection_reason(
+    ws: WorldService,
     tank: TankStateDict,
     self_state: SelfStateDict,
     blocked: dict[str, int],
@@ -77,7 +79,7 @@ def _acquisition_rejection_reason(
         # accepts only "unaffordable" rejections) can never travel
         # toward one.
         return "protected_human_rank"
-    if is_human_name(tank["name"]) and not human_combat_consented(tank["tank_id"]):
+    if is_human_name(tank["name"]) and not human_combat_consented(ws, tank["tank_id"]):
         # Human-consent contract (2026-07-30): no acquisition of a
         # human who has neither responded to the HELLO nor engaged
         # first. Placed before the affordability gate for the same
@@ -105,6 +107,7 @@ def _acquisition_rejection_reason(
 
 
 def find_acquisition_target(
+    ws: WorldService,
     world: WorldStateDict,
     self_state: SelfStateDict,
     blocked: dict[str, int],
@@ -177,6 +180,7 @@ def find_acquisition_target(
             continue
         dist = manhattan_distance(self_x, self_y, tank["x"], tank["y"])
         rejected_reason = _acquisition_rejection_reason(
+            ws,
             tank,
             self_state,
             blocked,
@@ -221,6 +225,7 @@ def find_acquisition_target(
 
 
 def stale_human_exists(
+    ws: WorldService,
     world: WorldStateDict,
     self_state: SelfStateDict,
     blocked: dict[str, int],
@@ -270,6 +275,7 @@ def stale_human_exists(
         if not is_human_name(tank["name"]):
             continue
         rejected_reason = _acquisition_rejection_reason(
+            ws,
             tank,
             self_state,
             blocked,
@@ -287,6 +293,7 @@ def stale_human_exists(
 
 
 def find_relay_travel_target(
+    ws: WorldService,
     world: WorldStateDict,
     self_state: SelfStateDict,
     blocked: dict[str, int],
@@ -337,6 +344,7 @@ def find_relay_travel_target(
         if not _is_enemy(tank, self_team):
             continue
         rejected_reason = _acquisition_rejection_reason(
+            ws,
             tank,
             self_state,
             blocked,

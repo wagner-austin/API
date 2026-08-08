@@ -26,7 +26,7 @@ from tankpit_bot.action_lab.fuel_probe import FuelProbe
 from tankpit_bot.action_lab.fuel_probe_types import FuelProbeAttemptResultDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.bot.world_sync import drain_messages
-from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.sniffer.world_service import WorldService
 
 FuelReplayResult = ReplayResult[FuelProbeAttemptResultDict]
 
@@ -51,14 +51,16 @@ class ReplayFuelProbe(DispatchCaptureMixin, FuelProbe):
         target_url: str = "https://tankpit.com/play",
         *,
         fail_command: Callable[[str], bool] | None = None,
+        world: WorldService | None = None,
     ) -> None:
         """Initialize the replay probe.
 
         Args:
             target_url: Game URL the probe records on its session.
             fail_command: Forwarded to :class:`DispatchCaptureMixin`.
+            world: Injected WorldService. Created internally if None.
         """
-        FuelProbe.__init__(self, target_url, headless=True, prefer_account=False)
+        FuelProbe.__init__(self, target_url, headless=True, prefer_account=False, world=world)
         self._init_dispatch_capture(fail_command)
 
 
@@ -113,7 +115,8 @@ def replay_fuel_attempt(
             the XOR table) or if no ``self_state`` materializes within
             the configured initial-sync budget.
     """
-    probe = ReplayFuelProbe(fail_command=fail_command)
+    ws = WorldService()
+    probe = ReplayFuelProbe(fail_command=fail_command, world=ws)
     context = prepare_probe_replay(
         capture_path,
         probe,
@@ -122,7 +125,6 @@ def replay_fuel_attempt(
         omit_cdp=omit_cdp,
         drain_messages=drain_messages,
         update_state_from_world=probe._update_state_from_world,
-        reset_world_state=reset_world_state,
     )
     try:
         attempt = probe._probe_single_fuel_target(

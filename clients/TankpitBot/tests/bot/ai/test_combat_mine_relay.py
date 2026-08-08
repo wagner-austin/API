@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.combat_close import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
@@ -33,6 +34,7 @@ class TestCombatCorridorMineGuard:
         from tankpit_bot.state.types import make_mine_state
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -59,6 +61,7 @@ class TestCombatCorridorMineGuard:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=103, y=100, name="NearEnemy"))
@@ -79,6 +82,7 @@ class TestCombatCorridorMineGuard:
         from tankpit_bot.state.types import make_mine_state
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -107,6 +111,7 @@ class TestCombatCorridorMineGuard:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=103, y=100, name="RingedNear"))
@@ -125,6 +130,7 @@ class TestBeyondRefuelReachRelay:
         cap-minus-reserve is a DISTANCE problem: the decision must be
         a dot_relay leg with the lock held.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -149,6 +155,7 @@ class TestBeyondRefuelReachRelay:
             None,
             "",
             ((60, 150),),
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=1, y=193, name="red-50", tank_id=50))
@@ -172,6 +179,7 @@ class TestBeyondRefuelReachRelay:
         the strict-progress dot even when a neighbor dot is
         thousands of times cheaper.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -196,6 +204,7 @@ class TestBeyondRefuelReachRelay:
             None,
             "",
             ((101, 100), (60, 150)),
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=1, y=193, name="red-50", tank_id=50))
@@ -212,6 +221,7 @@ class TestBeyondRefuelReachRelay:
         cannot help and refueling cannot help: the target is blocked
         so the next pass finds closer prey instead of treadmilling.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -236,6 +246,7 @@ class TestBeyondRefuelReachRelay:
             None,
             "",
             ((101, 100),),
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=1, y=193, name="red-50", tank_id=50))
@@ -251,6 +262,7 @@ class TestBeyondRefuelReachRelay:
         The only atlas dot is the bot's own tile (own_tile rejection)
         and the map was just opened, so the hop declines outright.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -281,6 +293,7 @@ class TestBeyondRefuelReachRelay:
             None,
             "",
             ((100, 100),),
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=1, y=193, name="red-50", tank_id=50))

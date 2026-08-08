@@ -8,7 +8,9 @@ import pytest
 from platform_core.json_utils import dump_json_str
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.replay import _test_hooks as replay_hooks
 from tankpit_bot.replay.types import ReplayTickTraceDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types import CaptureSession, encode_capture_session
 
@@ -354,17 +356,15 @@ class TestMainCLI:
         from scripts.replay_bot import main
 
         from tankpit_bot.sniffer.decoders import process_received_message as real_prm
-        from tankpit_bot.sniffer.world_state import get_world_service
         from tankpit_bot.state.types import WorldStateDict
 
         call_count = 0
 
-        def _injecting_hook(payload: str, xor_table: bytes) -> None:
+        def _injecting_hook(ws: WorldService, payload: str, xor_table: bytes) -> None:
             nonlocal call_count
-            real_prm(get_world_service(), payload, xor_table)
+            real_prm(ws, payload, xor_table)
             call_count += 1
             if call_count == 1:
-                svc = get_world_service()
                 self_state = make_self_state(
                     x=50,
                     y=60,
@@ -374,8 +374,8 @@ class TestMainCLI:
                     rank=3,
                     leaderboard_position=0,
                 )
-                svc.world_state = WorldStateDict(
-                    **{**svc.world_state, "self_state": self_state},
+                ws.world_state = WorldStateDict(
+                    **{**ws.world_state, "self_state": self_state},
                 )
 
         # Session with one message so final batch fires the planner
@@ -411,11 +411,11 @@ class TestMainCLI:
         _install_fake_fs(fs)
         _test_hooks.get_argv = lambda: ["replay_bot", "test_session.json"]
 
-        original_hook = _test_hooks.process_received_message_hook
-        _test_hooks.process_received_message_hook = _injecting_hook
+        original_hook = replay_hooks.process_received_message_hook
+        replay_hooks.process_received_message_hook = _injecting_hook
 
         result = main()
 
-        _test_hooks.process_received_message_hook = original_hook
+        replay_hooks.process_received_message_hook = original_hook
         _restore_hooks()
         assert result == 0

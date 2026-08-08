@@ -38,12 +38,6 @@ from tankpit_bot.ledger.outcome.teleport import (
     emit_teleport_stall_timeout,
 )
 from tankpit_bot.runtime_logging import emit_sync
-from tankpit_bot.sniffer.world_state import (
-    get_terrain_map,
-    is_move_target_failed,
-    mark_move_target_failed,
-    mark_scan_viewport_failed,
-)
 from tankpit_bot.sniffer.world_state_containers import (
     increment_container_failed_pickups,
 )
@@ -108,7 +102,7 @@ def _wait_for_scan_action(bot: Bot, action: InFlightActionDict) -> bool:
     it so it can't poison the NEXT action, but never transitions
     the scan out of pending.
     """
-    _drain_orphan_command_error(action)
+    _drain_orphan_command_error(bot.world, action)
     if _clear_stalled_action(bot, action):
         return False
     emit_sync("waiting for radar results")
@@ -125,7 +119,7 @@ def _wait_for_map_open_action(bot: Bot, action: InFlightActionDict) -> bool:
     was misattributed as a map_open rejection under the old
     universal blocking set.
     """
-    _drain_orphan_command_error(action)
+    _drain_orphan_command_error(bot.world, action)
     if _clear_stalled_action(bot, action):
         return False
     if _clear_completed_map_open(bot, action):
@@ -152,7 +146,7 @@ def _clear_rejected_movement(
         return False
     tx, ty = action["target_x"], action["target_y"]
     now = get_current_time_ms()
-    if not is_move_target_failed(tx, ty, now):
+    if not bot.world.is_move_target_failed(tx, ty, now):
         return False
     started_ms = action["started_ms"]
     elapsed_ms = now - started_ms if started_ms > 0 else -1
@@ -208,7 +202,7 @@ def _clear_stalled_action(
         _mark_current_viewport_scan_failed(bot, get_current_time_ms())
     if action["kind"] in ("move", "teleport"):
         now = get_current_time_ms()
-        mark_move_target_failed(tx, ty, now)
+        bot.world.mark_move_target_failed(tx, ty, now)
         emit_sync("marked (%d,%d) as failed %s target", tx, ty, action["kind"])
     bot._transition("IDLE", in_flight_action=make_no_action())
     return True
@@ -277,7 +271,7 @@ def _mark_current_viewport_scan_failed(bot: Bot, timestamp_ms: int) -> None:
         timestamp_ms: Failure timestamp in milliseconds.
     """
     viewport = bot.get_world_state()["viewport"]
-    mark_scan_viewport_failed(viewport["left"], viewport["top"], timestamp_ms)
+    bot.world.mark_scan_viewport_failed(viewport["left"], viewport["top"], timestamp_ms)
     emit_sync(
         "marked viewport (%d,%d) as failed scan target",
         viewport["left"],
@@ -328,7 +322,7 @@ def _clear_blocked_walk(
     self_state = world["self_state"]
     terrain = compose_decision_terrain(
         world,
-        get_terrain_map(),
+        bot.world.get_terrain_map(),
         get_current_time_ms(),
     )
     if self_state is None or terrain is None:
@@ -365,7 +359,7 @@ def _clear_blocked_collection(
     self_state = world["self_state"]
     terrain = compose_decision_terrain(
         world,
-        get_terrain_map(),
+        bot.world.get_terrain_map(),
         get_current_time_ms(),
     )
     if self_state is None or terrain is None:

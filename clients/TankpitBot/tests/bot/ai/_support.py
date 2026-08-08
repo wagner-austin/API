@@ -8,7 +8,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.ledger.damage_book import confirm_incoming_damage, record_incoming_shot
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     ContainerStateDict,
     SelfStateDict,
@@ -21,14 +21,19 @@ from tankpit_bot.state.types import (
 )
 
 
-def consent_human(tank_id: int) -> None:
+def consent_human(ws: WorldService, tank_id: int) -> None:
     """Mark a human as combat-consented for pursuit scenarios.
 
     The human-consent contract (2026-07-30) requires a chat response
     or a first strike before any human is targeted; pursuit tests use
     this to model a human who has already responded.
+
+    Args:
+        ws: The world service the decision under test reads -- pass the
+            context's own ``ws``, or the consent is invisible to it.
+        tank_id: The human's tank id.
     """
-    get_world_service().chat_seen_tank_ids.add(tank_id)
+    ws.chat_seen_tank_ids.add(tank_id)
 
 
 def make_enemy_tank(
@@ -147,20 +152,24 @@ def make_map_known_enemy(
     )
 
 
-def seed_confirmed_incoming(count: int, weapon: int = 1, damage: int = -90) -> None:
-    """Confirm ``count`` hits into the live world damage book.
+def seed_confirmed_incoming(
+    ws: WorldService, count: int, weapon: int = 1, damage: int = -90
+) -> None:
+    """Confirm ``count`` hits into ``ws``'s damage book.
 
     Defaults model dual fire (weapon 1, -90); pass ``weapon=0`` with
     ``damage=-45`` for the practice-room single-shot rate -- the
     confirm budget must cover the recorded weapon's cost or the book
-    confirms nothing. Callers own ``reset_world_state`` bracketing.
+    confirms nothing.
 
     Args:
+        ws: The world service the decision under test reads -- pass the
+            context's own ``ws``, or the damage is invisible to it.
         count: Number of hits to record and confirm.
         weapon: Wire weapon byte for each recorded shot.
         damage: Fuel delta covering each confirmation.
     """
-    book = get_world_service().damage_book
+    book = ws.damage_book
     for i in range(count):
         ts = 95000 + i * 1000
         record_incoming_shot(book, 60, "ganker", weapon, ts)

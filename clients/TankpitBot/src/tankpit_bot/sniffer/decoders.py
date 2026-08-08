@@ -19,10 +19,6 @@ from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.formatters import format_decoded_message
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import (
-    register_room_image,
-    set_selected_room,
-)
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 log = get_logger(__name__)
@@ -78,12 +74,13 @@ def _log_protocol_line(message: str) -> None:
         log.info(message)
 
 
-def try_decode_received_text(payload: str) -> str | None:
+def try_decode_received_text(ws: WorldService, payload: str) -> str | None:
     """Try to decode a received text message payload.
 
     Pure function that returns decoded string or None. Does not log.
 
     Args:
+        ws: The session's world service; room beliefs land here.
         payload: Base64-encoded message payload.
 
     Returns:
@@ -109,16 +106,16 @@ def try_decode_received_text(payload: str) -> str | None:
         return None
 
     text = body.decode("utf-8", errors="replace")
-    return decode_text_message(text, len(body), "RECEIVED", body)
+    return decode_text_message(ws, text, len(body), "RECEIVED", body)
 
 
-def decode_received_text_message(payload: str) -> None:
+def decode_received_text_message(ws: WorldService, payload: str) -> None:
     """Decode and log received text messages (JOIN_CONFIRM, ROOM_LIST, etc.).
 
     Args:
         payload: Base64-encoded message payload.
     """
-    result = try_decode_received_text(payload)
+    result = try_decode_received_text(ws, payload)
     if result is not None:
         _log_protocol_line(result)
 
@@ -157,7 +154,7 @@ def try_decode_received(ws: WorldService, payload: str, xor_table: bytes) -> str
     # Text messages (not XOR encoded)
     if _is_text_route(msg_type, body):
         text = body.decode("utf-8", errors="replace")
-        return decode_text_message(text, len(body), "RECEIVED", body)
+        return decode_text_message(ws, text, len(body), "RECEIVED", body)
 
     # Binary messages - XOR decode and use protocol module
     decoded_data = xor_decode_body(body, xor_table, offset=1)
@@ -219,7 +216,7 @@ def _process_single_message(ws: WorldService, body: bytes, xor_table: bytes) -> 
     # Text messages — log only.
     if _is_text_route(msg_type, body):
         text = body.decode("utf-8", errors="replace")
-        result = decode_text_message(text, len(body), "RECEIVED", body)
+        result = decode_text_message(ws, text, len(body), "RECEIVED", body)
         _log_protocol_line(result)
         return
 
@@ -343,7 +340,9 @@ def decode_state_message(body: bytes, tag: str) -> str:
     return f"[{tag}] UPDATE: len={length} hex={body[:20].hex()}..."
 
 
-def decode_text_message(text: str, body_len: int, tag: str, body: bytes | None = None) -> str:
+def decode_text_message(
+    ws: WorldService, text: str, body_len: int, tag: str, body: bytes | None = None
+) -> str:
     """Decode a text-based protocol message.
 
     Args:
@@ -360,11 +359,11 @@ def decode_text_message(text: str, body_len: int, tag: str, body: bytes | None =
     if text.startswith("%AUTH"):
         return f"[{tag}] AUTH: {text[:60]}..."
     if text.startswith("+") and "|" in text:
-        return decode_plus_message(text, tag)
+        return decode_plus_message(ws, text, tag)
     if text.startswith("*"):
         return f"[{tag}] SELECT: room={text[1:]}"
     if text.startswith("="):
-        return decode_join_confirm(text, tag)
+        return decode_join_confirm(ws, text, tag)
     if text.startswith("$"):
         return f"[{tag}] RESPONSE: {text}"
     if text.startswith(".") and body is not None:
@@ -376,10 +375,11 @@ def decode_text_message(text: str, body_len: int, tag: str, body: bytes | None =
     return f"[{tag}] ???: {preview}..."
 
 
-def decode_message(payload: str, direction: str, magic: str | None) -> str:
+def decode_message(ws: WorldService, payload: str, direction: str, magic: str | None) -> str:
     """Decode a WebSocket message payload for display.
 
     Args:
+        ws: The session's world service; room beliefs land here.
         payload: Base64-encoded message payload.
         direction: 'sent' or 'received'.
         magic: Captured XOR magic key.
@@ -403,10 +403,10 @@ def decode_message(payload: str, direction: str, magic: str | None) -> str:
         return decode_command(body, tag, magic)
 
     text = body.decode("utf-8", errors="replace")
-    return decode_text_message(text, len(body), tag, body)
+    return decode_text_message(ws, text, len(body), tag, body)
 
 
-def decode_plus_message(text: str, tag: str) -> str:
+def decode_plus_message(ws: WorldService, text: str, tag: str) -> str:
     """Decode a '+' prefixed message (ROOM_LIST or ACTION).
 
     Room list format: +room_id|name|field_id|modes|default_troop|mode_code|image|year
@@ -424,7 +424,7 @@ def decode_plus_message(text: str, tag: str) -> str:
     if is_room_info_text(room_text):
         room_id = parts[0]
         name = parts[1]
-        register_room_image(room_id, parts[6])
+        ws.register_room_image(room_id, parts[6])
         return f"[{tag}] ROOM_LIST: room={room_id} name={name}"
     # Action message with coords
     room_id = parts[0] if len(parts) > 0 else "?"
@@ -432,7 +432,7 @@ def decode_plus_message(text: str, tag: str) -> str:
     return f"[{tag}] ACTION: room={room_id} coords={coords}"
 
 
-def decode_join_confirm(text: str, tag: str) -> str:
+def decode_join_confirm(ws: WorldService, text: str, tag: str) -> str:
     """Decode a '=' prefixed JOIN_CONFIRM message.
 
     Format: =room|date|name|rank|eq1|eq2|eq3|eq4
@@ -451,7 +451,7 @@ def decode_join_confirm(text: str, tag: str) -> str:
     parts = text.split("|")
     room_id = parts[0][1:] if len(parts) > 0 else "?"
     if room_id:
-        set_selected_room(room_id)
+        ws.set_selected_room(room_id)
     tank_name = parts[2] if len(parts) > 2 else "?"
     rank_num = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else -1
     rank_str = RANK_NAMES[rank_num] if 0 <= rank_num < len(RANK_NAMES) else f"rank{rank_num}"

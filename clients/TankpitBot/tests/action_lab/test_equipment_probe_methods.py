@@ -23,7 +23,6 @@ from tankpit_bot.action_lab.equipment_targeting import (
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service, get_world_state
 from tankpit_bot.state import SelfStateDict, make_container_state, make_self_state
 from tankpit_bot.state.types import make_viewport_state
 from tankpit_bot.types import CapturedMessage
@@ -45,10 +44,8 @@ equipment_targeting_module: _EquipmentTargetingModuleProtocol = _equipment_targe
 @pytest.fixture(autouse=True)
 def _restore_targeting_hooks() -> Generator[None, None, None]:
     """Restore patched equipment-targeting hooks after each test."""
-    original_get_terrain_map = equipment_targeting_module.get_terrain_map
     original_drain = action_hooks.drain_buffered_messages
     yield
-    equipment_targeting_module.get_terrain_map = original_get_terrain_map
     action_hooks.drain_buffered_messages = original_drain
 
 
@@ -106,8 +103,9 @@ def _make_probe() -> EquipmentProbe:
     is where a real probe gets its service
     ([[session-state-deglobalisation]] step 8).
     """
+    ws = WorldService()
     probe = EquipmentProbe.__new__(EquipmentProbe)
-    probe.world = get_world_service()
+    probe.world = ws
     probe._cdp_service = CDPService()
     probe._messages = [
         CapturedMessage(
@@ -117,7 +115,7 @@ def _make_probe() -> EquipmentProbe:
             ws_url="wss://test",
         )
     ]
-    get_world_state()["self_state"] = _self_state()
+    ws.get_world_state()["self_state"] = _self_state()
     return probe
 
 
@@ -152,9 +150,9 @@ def test_build_attempt_result_delegates() -> None:
 
 def test_build_map_sync_timeout_result_delegates() -> None:
     """_build_map_sync_timeout_result delegates to the operations builder."""
-    set_inventory_total(4)
     action_hooks.get_current_time_ms = _Clock(2000)
     probe = _make_probe()
+    set_inventory_total(probe.world, 4)
 
     result = probe._build_map_sync_timeout_result(
         target=_target(),
@@ -170,8 +168,8 @@ def test_build_map_sync_timeout_result_delegates() -> None:
 
 def test_build_teleport_timeout_result_delegates() -> None:
     """_build_teleport_timeout_result delegates to the operations builder."""
-    set_inventory_total(2)
     probe = _make_probe()
+    set_inventory_total(probe.world, 2)
 
     result = probe._build_teleport_timeout_result(
         target=_target(),
@@ -189,9 +187,9 @@ def test_build_teleport_timeout_result_delegates() -> None:
 
 def test_build_reposition_map_sync_timeout_result_delegates() -> None:
     """_build_reposition_map_sync_timeout_result delegates correctly."""
-    set_inventory_total(1)
     action_hooks.get_current_time_ms = _Clock(2500)
     probe = _make_probe()
+    set_inventory_total(probe.world, 1)
     container = make_container_state(11, 20, False, 0, timestamp_ms=2000)
 
     result = probe._build_reposition_map_sync_timeout_result(
@@ -217,8 +215,8 @@ def test_build_reposition_map_sync_timeout_result_delegates() -> None:
 
 def test_build_reposition_teleport_timeout_result_delegates() -> None:
     """_build_reposition_teleport_timeout_result delegates correctly."""
-    set_inventory_total(1)
     probe = _make_probe()
+    set_inventory_total(probe.world, 1)
     container = make_container_state(11, 20, False, 0, timestamp_ms=2000)
 
     result = probe._build_reposition_teleport_timeout_result(
@@ -245,9 +243,9 @@ def test_build_reposition_teleport_timeout_result_delegates() -> None:
 
 def test_build_radar_timeout_result_delegates() -> None:
     """_build_radar_timeout_result delegates to the operations builder."""
-    set_inventory_total(2)
     action_hooks.get_current_time_ms = _Clock(2200)
     probe = _make_probe()
+    set_inventory_total(probe.world, 2)
 
     result = probe._build_radar_timeout_result(
         target=_target(),
@@ -269,9 +267,9 @@ def test_build_radar_timeout_result_delegates() -> None:
 
 def test_build_no_equipment_visible_result_delegates() -> None:
     """_build_no_equipment_visible_result delegates to the operations builder."""
-    set_inventory_total(2)
     action_hooks.get_current_time_ms = _Clock(2500)
     probe = _make_probe()
+    set_inventory_total(probe.world, 2)
 
     result = probe._build_no_equipment_visible_result(
         target=_target(),
@@ -296,9 +294,11 @@ def test_requires_reposition_phase_bridge_delegates_to_targeting() -> None:
     """The reposition phase bridge runs the shared walk-reachability check."""
 
     probe = _make_probe()
-    get_world_state()["viewport"] = make_viewport_state(left=92, top=92, width=16, height=16)
+    probe.world.get_world_state()["viewport"] = make_viewport_state(
+        left=92, top=92, width=16, height=16
+    )
     container = make_container_state(102, 100, False, 0, timestamp_ms=2000)
-    equipment_targeting_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set(
+    probe.world.terrain_map = InMemoryTerrainMap.from_passable_set(
         {(100, 100), (101, 100), (102, 100)}
     )
 
@@ -309,9 +309,7 @@ def test_landing_tile_phase_bridge_delegates_to_targeting() -> None:
     """The landing-tile phase bridge returns the shared landing computation."""
     probe = _make_probe()
     container = make_container_state(105, 105, False, 0, timestamp_ms=2000)
-    equipment_targeting_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set(
-        {(100, 100), (105, 105)}
-    )
+    probe.world.terrain_map = InMemoryTerrainMap.from_passable_set({(100, 100), (105, 105)})
 
     assert find_visible_equipment_landing_tile(probe, container) == (105, 105)
 
@@ -330,16 +328,16 @@ def test_run_pickup_attempt_delegates_on_fast_path() -> None:
     takes the fast path (no move dispatch, no waiting) and builds the
     picked-up result through the probe's builder plumbing.
     """
-    set_inventory_total(0)
     action_hooks.get_current_time_ms = _Clock(3000)
     probe = _make_probe()
+    set_inventory_total(probe.world, 0)
     probe._action_cycle_tracker = ActionCycleTracker()
     probe._attempt_phase_overlaps = []
     container = make_container_state(101, 100, False, 0, timestamp_ms=2000)
 
     def _growing_drain(source: BufferedMessageSourceProtocol, ws: WorldService) -> int:
         _ = source
-        set_inventory_total(1)
+        set_inventory_total(ws, 1)
         return 1
 
     action_hooks.drain_buffered_messages = _growing_drain

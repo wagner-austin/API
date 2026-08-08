@@ -24,6 +24,7 @@ from tankpit_bot.bot.ai.world_types import (
     make_enemy_threat,
 )
 from tankpit_bot.protocol.naming import is_human_name
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     VIEWPORT_PRESENCE_TTL_MS,
     SelfStateDict,
@@ -33,6 +34,7 @@ from tankpit_bot.state.types import (
 
 
 def analyze_threats(
+    ws: WorldService,
     world: WorldStateDict,
     self_state: SelfStateDict,
     now_ms: int,
@@ -111,7 +113,7 @@ def analyze_threats(
         # chatted nor shot us never enters the threat list -- no lock,
         # no fire. An attacker consents by attacking (their id lands
         # in the damage book), so defense is never blocked.
-        if is_human_name(tank["name"]) and not human_combat_consented(tank["tank_id"]):
+        if is_human_name(tank["name"]) and not human_combat_consented(ws, tank["tank_id"]):
             continue
         dist = manhattan_distance(self_x, self_y, tank["x"], tank["y"])
         threats.append(

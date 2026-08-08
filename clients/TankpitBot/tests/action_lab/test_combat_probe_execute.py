@@ -54,7 +54,7 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_self_state
 from tankpit_bot.state.types import make_tank_state
 
@@ -83,7 +83,6 @@ def _restore_combat_probe_hooks() -> Generator[None, None, None]:
     original_acquisition = combat_module.run_tracked_acquisition_phase
     original_teleport = combat_module.run_tracked_teleport_command
     original_landing = combat_module.choose_combat_landing_tile
-    original_terrain = combat_module.get_terrain_map
     original_find_fresh = combat_module._find_fresh_enemy
     original_current = combat_module._current_enemy_by_id
     original_probe_class = combat_module.CombatProbe
@@ -94,7 +93,6 @@ def _restore_combat_probe_hooks() -> Generator[None, None, None]:
     combat_module.run_tracked_acquisition_phase = original_acquisition
     combat_module.run_tracked_teleport_command = original_teleport
     combat_module.choose_combat_landing_tile = original_landing
-    combat_module.get_terrain_map = original_terrain
     combat_module._find_fresh_enemy = original_find_fresh
     combat_module._current_enemy_by_id = original_current
     combat_module.CombatProbe = original_probe_class
@@ -240,15 +238,12 @@ def _stub_landing(x: int, y: int) -> None:
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
         now_ms: int,
+        ws: WorldService,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain, now_ms)
+        _ = (world, self_state, target, terrain, now_ms, ws)
         return (x, y)
 
-    def _terrain() -> TerrainMapProtocol | None:
-        return None
-
     combat_module.choose_combat_landing_tile = _landing
-    combat_module.get_terrain_map = _terrain
 
 
 def _stub_initial_sync() -> None:
@@ -447,7 +442,7 @@ def test_engage_records_misses_until_the_shot_budget_runs_out() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness()
-    world_service = get_world_service()
+    world_service = probe.world
     probe._world_state["tanks"] = {
         "50": make_tank_state(
             tank_id=50,

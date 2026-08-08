@@ -15,7 +15,7 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab import teleport_acquisition
 from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -39,7 +39,8 @@ class _Provider:
 
     def __init__(self) -> None:
         """Initialize the provider."""
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
         self._messages: list[CapturedMessage] = []

@@ -63,7 +63,7 @@ from tankpit_bot.action_lab.types import (
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     ContainerStateDict,
     SelfStateDict,
@@ -425,8 +425,13 @@ class _ProbeHarness(FuelProbe):
     """Fuel probe subclass with controllable world state."""
 
     def __init__(self, clock: ReplayClock) -> None:
-        self.world = get_world_service()
-        super().__init__("https://tankpit.com/play", headless=True, prefer_account=False)
+        ws = WorldService()
+        super().__init__(
+            "https://tankpit.com/play",
+            headless=True,
+            prefer_account=False,
+            world=ws,
+        )
         self._world_state = _make_world(1000, 100, 100, 700)
         self._fake_page = ClockAdvancingPage(clock)
         self._cdp = StubSnapshotCDPSession()

@@ -11,10 +11,7 @@ from tankpit_bot.runtime_records import (
     require_int_field,
     require_str_field,
 )
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import make_self_state
 from tests.bot._completion_fixtures import (
     _decode_action_outcome_lines,
@@ -32,10 +29,12 @@ class TestCompletionEventActions:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_maybe_complete_collection`` emits when tank reaches the pickup tile."""
-        update_world_state_from_position(50, 50)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="COLLECTING",
             action_kind="collect",
             target_x=80,
@@ -78,10 +77,12 @@ class TestCompletionEventActions:
         orphans and the bot re-clicks the ghost forever. The
         completion must yield to the in-flight error handler.
         """
-        update_world_state_from_position(50, 50)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
         configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="COLLECTING",
             action_kind="collect",
             target_x=80,
@@ -97,7 +98,6 @@ class TestCompletionEventActions:
             fuel=750,
             leaderboard_position=1,
         )
-        ws = get_world_service()
         ws.last_command_error = 4
 
         assert bot._maybe_complete_collection(bot.get_world_state(), landed_state) is False
@@ -112,10 +112,12 @@ class TestCompletionEventActions:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_maybe_complete_collection`` emits container_consumed when target vanished."""
-        update_world_state_from_position(50, 50)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="COLLECTING",
             action_kind="collect",
             target_x=80,
@@ -153,18 +155,19 @@ class TestCompletionEventActions:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_maybe_complete_scan`` emits scan completion via radar_scan_complete."""
-        from tankpit_bot.sniffer.world_state import mark_radar_scan_complete
 
+        ws = WorldService()
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="SCANNING",
             action_kind="scan",
             target_x=0,
             target_y=0,
             started_ms=get_current_time_ms() - 1,
         )
-        mark_radar_scan_complete()
+        ws.mark_radar_scan_complete()
 
         completed = bot._maybe_complete_scan(bot.get_world_state())
 
@@ -183,10 +186,12 @@ class TestCompletionEventActions:
         fake_fs: FakeFileSystem,
     ) -> None:
         """``_clear_stalled_action`` emits with stall_timeout for forced clearance."""
-        update_world_state_from_position(50, 50)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
+            world=ws,
             state="MOVING",
             action_kind="move",
             target_x=180,

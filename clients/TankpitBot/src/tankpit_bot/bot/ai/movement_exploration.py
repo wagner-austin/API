@@ -16,9 +16,6 @@ from tankpit_bot.bot.types import (
     BotCommand,
 )
 from tankpit_bot.runtime_logging import emit_ai
-from tankpit_bot.sniffer.world_state import (
-    is_scan_viewport_failed,
-)
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.types import viewport_scan_key
 
@@ -132,7 +129,7 @@ def _exploration_priority(
     current_key = viewport_scan_key(current_viewport["left"], current_viewport["top"])
     next_key = viewport_scan_key(next_left, next_top)
     is_current = next_key == current_key
-    is_failed = is_scan_viewport_failed(next_left, next_top, ctx.timestamp_ms)
+    is_failed = ctx.ws.is_scan_viewport_failed(next_left, next_top, ctx.timestamp_ms)
     is_scanned = is_viewport_fully_covered(
         ctx.world["scanned_tiles"],
         next_left,

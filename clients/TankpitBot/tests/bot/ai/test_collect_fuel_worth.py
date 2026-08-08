@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.collect_pickups import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, make_container_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -27,12 +28,22 @@ def test_pickup_refused_when_clamped_gain_not_worth_the_walk() -> None:
     2026-08-06, not the falsified one-tick-per-tile premise.)
     """
 
+    ws = WorldService()
     base_world, base_self = make_world(fuel=1096)
     self_state = SelfStateDict(**{**base_self, "rank": 1})
     world = base_world
     world["self_state"] = self_state
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
     container = make_container_state(
         x=102,
         y=100,
@@ -54,12 +65,22 @@ def test_adjacent_clamped_sliver_is_worth_taking() -> None:
     pays, so the pickup is worth it.
     """
 
+    ws = WorldService()
     base_world, base_self = make_world(fuel=1054)
     self_state = SelfStateDict(**{**base_self, "rank": 1})
     world = base_world
     world["self_state"] = self_state
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
     container = make_container_state(
         x=101,
         y=100,
@@ -82,12 +103,22 @@ def test_big_clamped_container_is_worth_a_long_walk() -> None:
     to a 20-tile walk at 25/tile, so a 12-tile walk clears easily.
     """
 
+    ws = WorldService()
     base_world, base_self = make_world(fuel=600)
     self_state = SelfStateDict(**{**base_self, "rank": 1})
     world = base_world
     world["self_state"] = self_state
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
     container = make_container_state(
         x=106,
         y=106,
@@ -108,12 +139,22 @@ def test_unclamped_pickup_is_worth_it_at_the_exact_rate_boundary() -> None:
     strictly-below-rate pickups, so the boundary case dispatches.
     """
 
+    ws = WorldService()
     base_world, base_self = make_world(fuel=500)
     self_state = SelfStateDict(**{**base_self, "rank": 1})
     world = base_world
     world["self_state"] = self_state
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
     container = make_container_state(
         x=102,
         y=102,
@@ -136,6 +177,7 @@ def test_critical_fuel_takes_any_reachable_sliver() -> None:
     walk is ending the session, so any reachable fuel dispatches.
     """
 
+    ws = WorldService()
     base_world, base_self = make_world(
         fuel=98,
         scanned=True,
@@ -162,7 +204,7 @@ def test_critical_fuel_takes_any_reachable_sliver() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = select_and_pickup_fuel(ctx, ctx.base)
 
@@ -188,6 +230,7 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
     consume it.
     """
 
+    ws = WorldService()
     base_world, base_self = make_world(
         fuel=1092,
         scanned=True,
@@ -214,7 +257,7 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = select_and_pickup_fuel(ctx, ctx.base)
 
@@ -230,6 +273,7 @@ def test_walkworthy_iteration_takes_the_next_candidate_after_a_veto() -> None:
     logic sent the cascade into an in-viewport larder teleport while a
     walk-worthy container sat 3 tiles away.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=1076,
         containers={
@@ -259,6 +303,7 @@ def test_walkworthy_iteration_takes_the_next_candidate_after_a_veto() -> None:
         100000,
         None,
         "",
+        ws=ws,
     )
 
     selection = _first_walkworthy_fuel(ctx)
@@ -294,8 +339,8 @@ def test_low_volume_candidates_stay_out_of_the_ranked_list() -> None:
 def test_fuel_lock_steal_requires_an_executable_candidate() -> None:
     """The fuel steal applies the same executability bar (session-12)."""
     from tankpit_bot.bot.ai.collect_locks import _superior_fuel_candidate
-    from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
+    ws = WorldService()
     containers = {
         "130,100": make_container_state(
             x=130,
@@ -315,8 +360,17 @@ def test_fuel_lock_steal_requires_an_executable_candidate() -> None:
         ),
     }
     world, self_state = make_world(self_x=100, self_y=100, fuel=300, containers=containers)
-    mark_move_target_failed(103, 100, 99000)
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), make_inventory(), 100000, None, "")
+    ws.mark_move_target_failed(103, 100, 99000)
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(),
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
 
     result = _superior_fuel_candidate(ctx, containers["130,100"])
 

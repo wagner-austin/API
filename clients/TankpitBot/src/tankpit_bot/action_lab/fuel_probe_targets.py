@@ -41,7 +41,6 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.equipment_search import find_best_fuel
-from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state.types import ContainerStateDict
 
 
@@ -60,7 +59,7 @@ def _log_fuel_target_diagnostic(
         probe,
         radar_cycle_id=radar_cycle_id,
         fuel_target=fuel_target,
-        terrain_provider=get_terrain_map,
+        terrain_provider=probe.world.get_terrain_map,
     )
 
 
@@ -68,7 +67,7 @@ def _find_visible_fuel_target(
     probe: FuelTargetPhaseProbeProtocol,
 ) -> ContainerStateDict | None:
     """Return the best currently visible walk-reachable fuel container."""
-    terrain = get_terrain_map()
+    terrain = probe.world.get_terrain_map()
     if terrain is None:
         raise FuelProbeError("terrain map is unavailable")
     self_state = probe.get_self_state()
@@ -101,7 +100,7 @@ def _format_visible_fuel_entries(
     return _shared_format_visible_fuel_entries(
         probe,
         fuel_target=fuel_target,
-        terrain_provider=get_terrain_map,
+        terrain_provider=probe.world.get_terrain_map,
     )
 
 

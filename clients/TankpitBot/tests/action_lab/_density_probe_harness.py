@@ -25,7 +25,6 @@ from tankpit_bot.inventory import (
     InventoryState,
 )
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -91,7 +90,7 @@ class _DensityHarness(DensityProbe):
 
     def request_inventory(self) -> bool:
         if self.inventory_script:
-            get_world_service().inventory_state = self.inventory_script.pop(0)
+            self.world.inventory_state = self.inventory_script.pop(0)
         self.inventory_calls += 1
         return True
 

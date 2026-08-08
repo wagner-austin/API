@@ -84,12 +84,10 @@ fuel_targeting_module: _FuelTargetingModuleProtocol = _fuel_targeting_import
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
     """Restore patched fuel-targeting hooks after each test."""
-    original_get_terrain_map = fuel_targeting_module.get_terrain_map
     original_find_best_fuel = fuel_targeting_module.find_best_fuel
     original_is_collection_reachable = fuel_targeting_module.is_collection_reachable_in_viewport
     original_find_teleport_landing_tile = fuel_targeting_module.find_teleport_landing_tile
     yield
-    fuel_targeting_module.get_terrain_map = original_get_terrain_map
     fuel_targeting_module.find_best_fuel = original_find_best_fuel
     fuel_targeting_module.is_collection_reachable_in_viewport = original_is_collection_reachable
     fuel_targeting_module.find_teleport_landing_tile = original_find_teleport_landing_tile
@@ -100,7 +98,7 @@ def test_find_visible_fuel_target_uses_current_probe_state() -> None:
     probe = _ProbeHarness(ReplayClock(1000))
     probe.get_world_state()["timestamp_ms"] = 1500
     expected = make_container_state(101, 100, True, 350, timestamp_ms=1500)
-    fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (101, 100)})
+    probe.world.terrain_map = _terrain({(100, 100), (101, 100)})
     captured: dict[str, int | bool | WorldStateDict | SelfStateDict | TerrainMapProtocol] = {}
 
     def _find_best_fuel(
@@ -129,12 +127,12 @@ def test_find_visible_fuel_target_uses_current_probe_state() -> None:
 def test_find_visible_fuel_target_requires_terrain_and_self_state() -> None:
     """Visible fuel selection rejects missing terrain and self state."""
     probe = _ProbeHarness(ReplayClock(1000))
-    fuel_targeting_module.get_terrain_map = lambda: None
+    probe.world.terrain_map = None
 
     with pytest.raises(FuelTargetingError, match="terrain map is unavailable"):
         find_visible_fuel_target(probe)
 
-    fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100)})
+    probe.world.terrain_map = _terrain({(100, 100)})
     probe.get_world_state()["self_state"] = None
 
     with pytest.raises(FuelTargetingError, match="self state is unavailable"):
@@ -145,7 +143,7 @@ def test_visible_fuel_requires_reposition_uses_reachability_and_validates_state(
     """Reachability helper detects blocked visible fuel and validates prerequisites."""
     probe = _ProbeHarness(ReplayClock(1000))
     target = make_container_state(101, 100, True, 300, timestamp_ms=1000)
-    fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (101, 100)})
+    probe.world.terrain_map = _terrain({(100, 100), (101, 100)})
     captured: dict[str, int] = {}
 
     def _is_collection_reachable_in_viewport(
@@ -173,11 +171,11 @@ def test_visible_fuel_requires_reposition_uses_reachability_and_validates_state(
         "target_y": 100,
     }
 
-    fuel_targeting_module.get_terrain_map = lambda: None
+    probe.world.terrain_map = None
     with pytest.raises(FuelTargetingError, match="terrain map is unavailable"):
         visible_fuel_requires_reposition(probe, target)
 
-    fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (101, 100)})
+    probe.world.terrain_map = _terrain({(100, 100), (101, 100)})
     probe.get_world_state()["self_state"] = None
     with pytest.raises(FuelTargetingError, match="self state is unavailable"):
         visible_fuel_requires_reposition(probe, target)
@@ -187,7 +185,7 @@ def test_find_visible_fuel_landing_tile_uses_current_state_and_validates_state()
     """Landing-tile selection uses current probe state and validates prerequisites."""
     probe = _ProbeHarness(ReplayClock(1000))
     target = make_container_state(101, 100, True, 300, timestamp_ms=1000)
-    fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (102, 100)})
+    probe.world.terrain_map = _terrain({(100, 100), (102, 100)})
     captured: dict[str, int] = {}
 
     def _find_teleport_landing_tile(
@@ -208,11 +206,11 @@ def test_find_visible_fuel_landing_tile_uses_current_state_and_validates_state()
         "target_y": 100,
     }
 
-    fuel_targeting_module.get_terrain_map = lambda: None
+    probe.world.terrain_map = None
     with pytest.raises(FuelTargetingError, match="terrain map is unavailable"):
         find_visible_fuel_landing_tile(probe, target)
 
-    fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (102, 100)})
+    probe.world.terrain_map = _terrain({(100, 100), (102, 100)})
     probe.get_world_state()["self_state"] = None
     with pytest.raises(FuelTargetingError, match="self state is unavailable"):
         find_visible_fuel_landing_tile(probe, target)

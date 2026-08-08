@@ -43,7 +43,7 @@ from tankpit_bot.action_lab.types import (
     TeleportPageSnapshotDict,
     TeleportTargetDict,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -67,7 +67,8 @@ class _Page:
 
 class _Probe:
     def __init__(self) -> None:
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._messages: list[CapturedMessage] = []
         self._w = _world()
         self._cid = 0

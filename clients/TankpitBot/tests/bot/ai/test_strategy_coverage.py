@@ -11,9 +11,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
 )
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import (
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
 )
@@ -30,7 +28,8 @@ class TestRadarForEquipment:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        update_world_state_from_position(100, 100)
+        self.ws = WorldService()
+        self.ws.update_world_state_from_position(100, 100)
 
     def test_forage_radar_in_unscanned_viewport(self) -> None:
         """Equipment recovery forages with a radar in an unscanned viewport.
@@ -39,6 +38,7 @@ class TestRadarForEquipment:
         fires the radar when any viewport tile is unscanned and the
         radar fuel cost is payable.
         """
+        ws = self.ws
         world, self_state = _make_world(fuel=800, scanned=False)
         ai_state = AIStateDict(
             **{
@@ -53,7 +53,7 @@ class TestRadarForEquipment:
         # radar_count=15: above break (12) so _try_search_critical doesn't fire
         inventory = _make_inventory(default_count=15, radar_count=15)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason_kind"] == "scan_on_landing"
@@ -65,7 +65,8 @@ class TestExplorationSkipsTeleportLowFuel:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        update_world_state_from_position(100, 100)
+        self.ws = WorldService()
+        self.ws.update_world_state_from_position(100, 100)
 
     def test_exploration_skips_teleport_when_cant_afford(self) -> None:
         """Exploration skips teleport candidates when fuel reserve too low."""
@@ -74,6 +75,7 @@ class TestExplorationSkipsTeleportLowFuel:
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         # All edge tiles are water — only teleport is possible, but fuel is too low
+        ws = self.ws
         terrain_data: dict[tuple[int, int], str] = {}
         for x in range(92, 108):
             for y in range(92, 108):
@@ -93,7 +95,7 @@ class TestExplorationSkipsTeleportLowFuel:
             }
         )
         inventory = _make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
         result = select_exploration_command(ctx)
 
@@ -116,7 +118,8 @@ class TestHuntOnlyWhenFull:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        update_world_state_from_position(100, 100)
+        self.ws = WorldService()
+        self.ws.update_world_state_from_position(100, 100)
 
     def _make_cardinal_enemy(self) -> dict[str, TankStateDict]:
         """Return a viewport-fresh live enemy at (101,100), Manhattan 1 from (100,100)."""
@@ -173,6 +176,7 @@ class TestHuntOnlyWhenFull:
         and dispatches the fuel pickup. The adjacent bot is no danger:
         bots never initiate, they only return fire.
         """
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 400, True)}
         world, self_state = _make_world(
             fuel=800, containers=containers, tanks=self._make_cardinal_enemy()
@@ -190,7 +194,7 @@ class TestHuntOnlyWhenFull:
         )
         inventory = _make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "pickup_fuel"
@@ -199,17 +203,19 @@ class TestHuntOnlyWhenFull:
         """A fully stocked bot (fuel full, weapons at cap) hunts the
         adjacent enemy through the ordinary selector path -- no
         override needed once readiness is genuine."""
+        ws = self.ws
         world, self_state = _make_world(fuel=1100, tanks=self._make_cardinal_enemy())
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "HUNT"
 
     def test_understocked_weapons_never_hunt_even_at_full_fuel(self) -> None:
         """Full fuel with duals below cap stays COLLECT -- "never hunt
         if it is not full on everything except -5 max radar"."""
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(
             fuel=1100, containers=containers, tanks=self._make_cardinal_enemy()
@@ -217,6 +223,6 @@ class TestHuntOnlyWhenFull:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(dual_count=3)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"

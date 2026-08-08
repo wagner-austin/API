@@ -29,6 +29,7 @@ from tankpit_bot.browser.game_log import (
     poll_game_log,
     timestamp_game_log_entries,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import GameLogEntryWithTimestamp
 
 # The first-tick keypress itself can be swallowed by the client (run
@@ -44,6 +45,7 @@ class GameLogWitnessMixin:
     _game_log_witness: list[GameLogEntryWithTimestamp]
     _cdp: CDPSessionProtocol | None
     _page: AutoscrollPageProtocol | None
+    world: WorldService
     _account_stats_captured: bool
     _account_stats_attempts: int
 
@@ -83,7 +85,7 @@ class GameLogWitnessMixin:
         if self._account_stats_attempts >= _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS:
             return
         self._account_stats_attempts += 1
-        capture_account_stats(self._cdp, self._page, "startup")
+        capture_account_stats(self.world, self._cdp, self._page, "startup")
         self._account_stats_captured = True
 
 

@@ -17,7 +17,7 @@ progress.
 from __future__ import annotations
 
 from tankpit_bot.protocol import MapDataDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
@@ -31,7 +31,7 @@ class TestMapOpenClearsOnMapData:
         guaranteed by ``check_and_clear_map_data_processed``).
         Post-condition: True on first read, False on second.
         """
-        ws = get_world_service()
+        ws = WorldService()
         assert ws.check_and_clear_map_data_processed() is False
 
         dispatch_world_state_update(
@@ -53,7 +53,7 @@ class TestMapOpenClearsOnMapData:
         """
         from tankpit_bot.protocol import MapTankEntry
 
-        ws = get_world_service()
+        ws = WorldService()
         dispatch_world_state_update(
             ws,
             MapDataDict(

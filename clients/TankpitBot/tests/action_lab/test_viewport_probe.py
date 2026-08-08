@@ -7,7 +7,6 @@ are now a sibling.
 from __future__ import annotations
 
 import pytest
-from tests.action_lab._viewport_probe_harness import viewport_module
 from tests.action_lab._viewport_probe_harness2 import (
     _ack_message,
     _install_noop_drain,
@@ -120,8 +119,9 @@ def test_anchor_skips_when_the_teleport_never_echoes() -> None:
     assert probe.teleports == [(106, 100)]
 
 
-def test_walk_to_edge_steps_east_to_the_edge_column(_all_ground_terrain: None) -> None:
+def test_walk_to_edge_steps_east_to_the_edge_column() -> None:
     probe = _ViewportHarness()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
@@ -131,13 +131,14 @@ def test_walk_to_edge_steps_east_to_the_edge_column(_all_ground_terrain: None) -
     assert probe.moves[-1] == (110, 100)
 
 
-def test_walk_to_edge_stops_at_the_fuel_floor(_all_ground_terrain: None) -> None:
+def test_walk_to_edge_stops_at_the_fuel_floor() -> None:
     class _Draining(_ViewportHarness):
         def move_to(self, x: int, y: int) -> bool:
             self.fuel = 50
             return super().move_to(x, y)
 
     probe = _Draining()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
@@ -148,22 +149,19 @@ def test_walk_to_edge_stops_when_no_walkable_step_remains() -> None:
     probe = _ViewportHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    original = viewport_module.get_terrain_map
-    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set({(100, 100)})
-    try:
-        assert probe._walk_to_edge() == 0
-    finally:
-        viewport_module.get_terrain_map = original
+    probe.world.terrain_map = InMemoryTerrainMap.from_passable_set({(100, 100)})
+    assert probe._walk_to_edge() == 0
     assert probe.moves == []
 
 
-def test_walk_to_edge_stops_when_a_step_never_echoes(_all_ground_terrain: None) -> None:
+def test_walk_to_edge_stops_when_a_step_never_echoes() -> None:
     class _Frozen(_ViewportHarness):
         def move_to(self, x: int, y: int) -> bool:
             self.moves.append((x, y))
             return True
 
     probe = _Frozen()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
@@ -179,16 +177,10 @@ def test_terrain_map_raises_when_no_map_is_loaded() -> None:
 
 def test_pick_step_prefers_east_then_routes_around_water() -> None:
     probe = _ViewportHarness()
-    original = viewport_module.get_terrain_map
-    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set(
-        {(101, 99), (100, 101)}
-    )
-    try:
-        assert probe._pick_step(100, 100, 92, 16, set()) == (101, 99)
-        assert probe._pick_step(100, 100, 92, 16, {(101, 99)}) == (100, 101)
-        assert probe._pick_step(100, 100, 92, 16, {(101, 99), (100, 101)}) is None
-    finally:
-        viewport_module.get_terrain_map = original
+    probe.world.terrain_map = InMemoryTerrainMap.from_passable_set({(101, 99), (100, 101)})
+    assert probe._pick_step(100, 100, 92, 16, set()) == (101, 99)
+    assert probe._pick_step(100, 100, 92, 16, {(101, 99)}) == (100, 101)
+    assert probe._pick_step(100, 100, 92, 16, {(101, 99), (100, 101)}) is None
 
 
 def test_pick_step_skips_rows_outside_the_window() -> None:
@@ -196,18 +188,13 @@ def test_pick_step_skips_rows_outside_the_window() -> None:
     # Standing on the window's top row with everything east under
     # water: the north candidates fall outside the window and must be
     # skipped, leaving the south sidestep.
-    original = viewport_module.get_terrain_map
-    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set({(100, 93)})
-    try:
-        assert probe._pick_step(100, 92, 92, 16, set()) == (100, 93)
-    finally:
-        viewport_module.get_terrain_map = original
+    probe.world.terrain_map = InMemoryTerrainMap.from_passable_set({(100, 93)})
+    assert probe._pick_step(100, 92, 92, 16, set()) == (100, 93)
 
 
-def test_walk_to_edge_spends_all_steps_short_of_a_wide_window(
-    _all_ground_terrain: None,
-) -> None:
+def test_walk_to_edge_spends_all_steps_short_of_a_wide_window() -> None:
     probe = _ViewportHarness()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.window = (95, 92, 32, 16)
@@ -216,8 +203,9 @@ def test_walk_to_edge_spends_all_steps_short_of_a_wide_window(
     assert probe.moves[-1] == (116, 100)
 
 
-def test_cross_edge_skips_before_the_edge_column(_all_ground_terrain: None) -> None:
+def test_cross_edge_skips_before_the_edge_column() -> None:
     probe = _ViewportHarness()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
@@ -225,8 +213,9 @@ def test_cross_edge_skips_before_the_edge_column(_all_ground_terrain: None) -> N
     assert probe.moves == []
 
 
-def test_cross_edge_steps_past_the_edge(_all_ground_terrain: None) -> None:
+def test_cross_edge_steps_past_the_edge() -> None:
     probe = _ViewportHarness()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.position = (110, 100)

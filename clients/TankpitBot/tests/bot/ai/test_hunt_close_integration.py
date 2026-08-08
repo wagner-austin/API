@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.context import DecideCtx, filter_killed_tanks
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -23,6 +24,7 @@ class TestDecideTeleportToFarTarget:
         20260611-083908 chase a moving orange-3 through 30 teleport
         hops without firing.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -55,7 +57,7 @@ class TestDecideTeleportToFarTarget:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["behavior"]["target_x"] == 101
@@ -74,6 +76,7 @@ class TestDecideTeleportToFarTarget:
         may have left. The locked id is set so the next tick
         teleports to the refreshed coords.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -95,7 +98,7 @@ class TestDecideTeleportToFarTarget:
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_map_open_ms": 94000})
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["updated_ai_state"]["combat_target_id"] == 50
@@ -107,6 +110,7 @@ class TestDecideTeleportToFarTarget:
         when the wire is keeping the target's (x, y) current the bot
         does not need a map_open round-trip before teleport.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -128,7 +132,7 @@ class TestDecideTeleportToFarTarget:
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_map_open_ms": 99000})
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["behavior"]["target_x"] == 130
@@ -142,6 +146,7 @@ class TestDecideTeleportToFarTarget:
         so closing teleports instead of shooting; an in-range enemy is
         shot directly (see the in-range test below).
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "60": make_tank_state(
                 tank_id=60,
@@ -186,7 +191,7 @@ class TestDecideTeleportToFarTarget:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["behavior"]["target_x"] == 130
@@ -200,6 +205,7 @@ class TestDecideTeleportToFarTarget:
         Manhattan adjacency instead made run 20260611-083908 chase a
         moving orange-3 through 30 teleport hops without firing.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -232,7 +238,7 @@ class TestDecideTeleportToFarTarget:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["behavior"]["target_x"] == 101
@@ -241,6 +247,7 @@ class TestDecideTeleportToFarTarget:
 
     def test_locked_phase_one_target_teleports_directly_to_enemy(self) -> None:
         """Close teleport goes directly to the enemy's coordinates; server displaces."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -276,7 +283,7 @@ class TestDecideTeleportToFarTarget:
             }
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["command"]["target_x"] == 197
@@ -284,6 +291,7 @@ class TestDecideTeleportToFarTarget:
 
     def test_locked_phase_one_target_surrounded_by_terrain_is_still_teleported(self) -> None:
         """Even when all adjacent tiles are blocked, teleport goes to target directly."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -321,7 +329,7 @@ class TestDecideTeleportToFarTarget:
             }
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["command"]["target_x"] == 197
@@ -330,10 +338,11 @@ class TestDecideTeleportToFarTarget:
 
     def test_combat_landing_tile_returns_target_coords_at_map_edge(self) -> None:
         """Landing selection returns target coords directly; server handles edge placement."""
+        ws = WorldService()
         world, self_state = make_world(self_x=10, self_y=10, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         target = EnemyThreatDict(
             tank_id=50,
             x=0,
@@ -359,6 +368,7 @@ class TestDecideTeleportToFarTarget:
 
     def test_missing_locked_target_confirms_before_reacquiring_new_enemy(self) -> None:
         """Missing locked targets clear stale combat state before reacquiring."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "60": make_tank_state(
                 tank_id=60,
@@ -391,7 +401,7 @@ class TestDecideTeleportToFarTarget:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["behavior"]["reason_kind"] == "confirm_kill"
@@ -458,6 +468,7 @@ class TestDecideTeleportToFarTarget:
         so the planner must dispatch ``shoot`` rather than
         ``teleport`` even at distance 5.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -492,7 +503,7 @@ class TestDecideTeleportToFarTarget:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["behavior"]["target_x"] == 105
@@ -509,6 +520,7 @@ class TestDecideTeleportToFarTarget:
         reserved for targets beyond ``SHOT_RANGE_TILES``; at dist 5
         the dual fires from the current tile.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -542,7 +554,7 @@ class TestDecideTeleportToFarTarget:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 105
@@ -550,6 +562,7 @@ class TestDecideTeleportToFarTarget:
 
     def test_no_teleport_when_fuel_too_low(self) -> None:
         """Teleport close is skipped when fuel cannot satisfy the guard."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -568,6 +581,6 @@ class TestDecideTeleportToFarTarget:
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_map_open_ms": 99500})
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["command"]["cmd_type"] != "teleport"

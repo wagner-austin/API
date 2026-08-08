@@ -7,7 +7,7 @@ tick, in-flight, feedback, and health-gate suites are now siblings.
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_teleport_landed,
     mark_teleport_landed,
@@ -97,13 +97,11 @@ class TestBotWithCDP:
     def test_move_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.move_to succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(50, 50)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
@@ -115,13 +113,11 @@ class TestBotWithCDP:
     def test_pickup_fuel_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.pickup_fuel_to succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(50, 50)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
@@ -133,13 +129,11 @@ class TestBotWithCDP:
     def test_teleport_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.teleport_to succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession, FakePage
 
-        update_world_state_from_position(50, 50)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._page = FakePage(fake_cdp)
@@ -152,14 +146,12 @@ class TestBotWithCDP:
     def test_teleport_to_clears_stale_landed_flag(self, fake_env: FakeEnv) -> None:
         """A new teleport drains any stale TeleportLanded ack before sending."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession, FakePage
 
-        update_world_state_from_position(50, 50)
-        mark_teleport_landed(get_world_service())
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        mark_teleport_landed(ws)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._page = FakePage(fake_cdp)
@@ -169,18 +161,16 @@ class TestBotWithCDP:
         result = bot.teleport_to(200, 200)
 
         assert result is True
-        assert check_and_clear_teleport_landed(get_world_service()) is False
+        assert check_and_clear_teleport_landed(ws) is False
 
     def test_shoot_at_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.shoot_at succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(50, 50)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
@@ -192,13 +182,11 @@ class TestBotWithCDP:
     def test_shoot_at_already_combat(self, fake_env: FakeEnv) -> None:
         """Test Bot.shoot_at stays in COMBAT if already in COMBAT."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(50, 50)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
@@ -210,13 +198,11 @@ class TestBotWithCDP:
     def test_use_radar_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.use_radar succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(50, 50)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()

@@ -15,6 +15,7 @@ from tankpit_bot.bot.ai.types import (
     make_initial_ai_state,
 )
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
 
@@ -25,12 +26,13 @@ def test_manual_none_runs_auto_arbitration() -> None:
     The initial AI state has ``manual_mode = None`` — confirming the
     override never fires and the decision is derived from HUNT.
     """
+    ws = WorldService()
     world, self_state = make_world(fuel=1200)
     ai_state = make_scanned_ai_state()
     assert ai_state["manual_mode"] is None
     inventory = make_inventory()
 
-    decision = decide(world, self_state, ai_state, inventory, 100000, None)
+    decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
     assert decision["behavior"]["mode"] == "HUNT"
     assert decision["updated_ai_state"]["mode"] == "HUNT"
@@ -44,11 +46,12 @@ def test_manual_hunt_forces_hunt_even_when_auto_would_collect() -> None:
     would drop the tick to COLLECT. The manual pin forces HUNT anyway,
     so the returned decision carries the HUNT owner.
     """
+    ws = WorldService()
     world, self_state = make_world(fuel=150)
     ai_state = AIStateDict(**{**make_scanned_ai_state(), "manual_mode": "HUNT"})
     inventory = make_inventory()
 
-    decision = decide(world, self_state, ai_state, inventory, 100000, None)
+    decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
     assert decision["behavior"]["mode"] == "HUNT"
     assert decision["updated_ai_state"]["mode"] == "HUNT"
@@ -62,11 +65,12 @@ def test_manual_collect_forces_collect_even_when_auto_would_hunt() -> None:
     COLLECT owner (either as a real collect action or via the HUNT
     fall-through emitted when COLLECT yields).
     """
+    ws = WorldService()
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(**{**make_scanned_ai_state(), "manual_mode": "COLLECT"})
     inventory = make_inventory()
 
-    decision = decide(world, self_state, ai_state, inventory, 100000, None)
+    decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
     # With no valid COLLECT candidate the arbitrator falls through to
     # HUNT (see the ``collect owner yielded`` emit in decide()). The
@@ -77,11 +81,12 @@ def test_manual_collect_forces_collect_even_when_auto_would_hunt() -> None:
 
 def test_manual_unset_produces_hold_decision() -> None:
     """``manual_mode = "UNSET"`` short-circuits every planner path with a hold."""
+    ws = WorldService()
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": "UNSET"})
     inventory = make_inventory()
 
-    decision = decide(world, self_state, ai_state, inventory, 100000, None)
+    decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
     assert decision["command"]["cmd_type"] == "hold"
     assert decision["updated_ai_state"]["mode"] == "UNSET"

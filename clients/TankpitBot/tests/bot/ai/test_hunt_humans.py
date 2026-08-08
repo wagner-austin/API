@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import (
     consent_human,
@@ -25,7 +26,8 @@ def test_unaffordable_human_outranks_affordable_bot_at_acquisition() -> None:
     human on the fresh map, the decision must be a dot-relay leg
     toward the HUMAN, not a teleport at the bot.
     """
-    consent_human(90)
+    ws = WorldService()
+    consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
@@ -50,6 +52,7 @@ def test_unaffordable_human_outranks_affordable_bot_at_acquisition() -> None:
         "",
         # (150,100) closes distance to Yuppler and is affordable.
         ((150, 100),),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -68,7 +71,8 @@ def test_human_pursuit_falls_back_to_bot_when_no_leg_helps() -> None:
     at capacity), the affordable bot is engaged and the next map
     re-evaluates the pursuit.
     """
-    consent_human(90)
+    ws = WorldService()
+    consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
@@ -83,7 +87,7 @@ def test_human_pursuit_falls_back_to_bot_when_no_leg_helps() -> None:
             "last_map_open_ms": 99500,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -100,6 +104,7 @@ def test_recruit_human_is_not_pursued() -> None:
     pursuit helper can never travel toward one and the affordable bot
     is farmed normally.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": make_tank_state(
@@ -134,6 +139,7 @@ def test_recruit_human_is_not_pursued() -> None:
         None,
         "",
         ((150, 100),),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -152,6 +158,7 @@ def test_locked_human_beyond_funds_relays_with_lock_held() -> None:
     leg toward the human with ``combat_target_id`` retained
     (never-drop rides through every leg).
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
     }
@@ -177,6 +184,7 @@ def test_locked_human_beyond_funds_relays_with_lock_held() -> None:
         None,
         "",
         ((150, 100),),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -196,6 +204,7 @@ def test_locked_bot_beyond_funds_still_refuels_in_place() -> None:
     remains the right shape for them -- guards the ``is_human_name``
     gate on the new relay branch.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="red-9"),
     }
@@ -221,6 +230,7 @@ def test_locked_bot_beyond_funds_still_refuels_in_place() -> None:
         None,
         "",
         ((150, 100),),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -238,6 +248,7 @@ def test_locked_human_with_no_relay_leg_falls_back_to_refuel() -> None:
     whose collect cascade also declines at capacity and terminates
     via the blocked-target replan rather than deadlocking the tick.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
     }
@@ -254,7 +265,7 @@ def test_locked_human_with_no_relay_leg_falls_back_to_refuel() -> None:
             "combat_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -273,7 +284,8 @@ def test_relay_leg_cost_is_capped_at_the_engagement_budget() -> None:
     old floor-only rule at a full tank) and must lose to the cheaper
     progress dot at ~300.
     """
-    consent_human(90)
+    ws = WorldService()
+    consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
     }
@@ -298,6 +310,7 @@ def test_relay_leg_cost_is_capped_at_the_engagement_budget() -> None:
         # (230,100): most progress, cost ~780 -- beyond the 450 leg cap.
         # (150,100): cost 300 -- the correct capped leg.
         ((230, 100), (150, 100)),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -319,7 +332,8 @@ def test_stale_known_human_forces_a_map_refresh_over_bot_farming() -> None:
     out, and the map itself is older than the cooldown -- the
     decision must be a map refresh, not a teleport at red-5.
     """
-    consent_human(90)
+    ws = WorldService()
+    consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler", timestamp_ms=80000),
@@ -334,7 +348,7 @@ def test_stale_known_human_forces_a_map_refresh_over_bot_farming() -> None:
             "last_map_open_ms": 90000,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -347,6 +361,7 @@ def test_fresh_map_showing_stale_human_farms_normally() -> None:
     No refresh can cure a human absent from the latest snapshot, so
     the affordable bot is engaged -- the refresh rule cannot loop.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler", timestamp_ms=80000),
@@ -361,7 +376,7 @@ def test_fresh_map_showing_stale_human_farms_normally() -> None:
             "last_map_open_ms": 99500,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -378,7 +393,8 @@ def test_stale_human_exists_filters_and_reasons() -> None:
     refresh; only a human whose sole curable defect is stale map data
     returns True.
     """
-    consent_human(90)
+    ws = WorldService()
+    consent_human(ws, 90)
     from tankpit_bot.bot.ai.threat_acquisition import stale_human_exists
 
     ally_human = make_tank_state(
@@ -400,6 +416,7 @@ def test_stale_human_exists_filters_and_reasons() -> None:
     def check(tanks: dict[str, TankStateDict], blocked: dict[str, int]) -> bool:
         world, self_state = make_world(fuel=1100, tanks=tanks)
         return stale_human_exists(
+            ws,
             world,
             self_state,
             blocked,
@@ -421,7 +438,8 @@ def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
     At fuel 400, the 300-cost progress dot passes the 450 leg cap but
     would leave 100 < the 200 floor -- the cheaper dot wins instead.
     """
-    consent_human(90)
+    ws = WorldService()
+    consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
     }
@@ -444,6 +462,7 @@ def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
         None,
         "",
         ((150, 100), (110, 100)),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)

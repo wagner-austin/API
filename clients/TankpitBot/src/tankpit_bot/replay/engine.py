@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.bot import ai_strategy
 from tankpit_bot.bot.ai.scoring_types import render_reason
 from tankpit_bot.bot.ai.threats import analyze_threats
@@ -36,13 +35,9 @@ from tankpit_bot.bot.types import (
 )
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.protocol.commands import TICK_RATE_MS
+from tankpit_bot.replay import _test_hooks as replay_hooks
 from tankpit_bot.replay.types import ReplaySessionResultDict, ReplayTickTraceDict
-from tankpit_bot.sniffer.world_state import (
-    get_terrain_map,
-    get_world_service,
-    get_world_state,
-    reset_world_state,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import drain_killed_tank_ids
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
@@ -66,10 +61,14 @@ def _sort_by_timestamp(pair: tuple[int, str]) -> int:
 def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
     """Replay a captured session and return per-tick decision traces.
 
-    Resets the global world/viewport state, builds this session's XOR
-    table as a LOCAL, then processes received messages in tick-sized
-    batches. After each batch the planner runs and its decision is
-    recorded.
+    Builds this session's XOR table as a LOCAL, then processes received
+    messages in tick-sized batches. After each batch the planner runs
+    and its decision is recorded.
+
+    A replay is not a session: it has no browser, no CDP, no
+    ``SessionBase``. It OWNS its world service, so two replays in one
+    process cannot contaminate each other and a replay cannot clobber a
+    live bot's world ([[session-state-deglobalisation]] step 8).
 
     Args:
         session: Loaded and validated capture session.
@@ -85,8 +84,7 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
     if magic is None:
         raise ValueError("Cannot replay session without magic key")
 
-    # Reset the remaining global state for a clean replay
-    reset_world_state()
+    ws = WorldService()
     xor_table = build_session_xor_table(magic)
 
     # Filter to received messages only, sorted by timestamp
@@ -120,6 +118,7 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
             # Process this batch and run planner
             total_messages += len(batch)
             result = _process_tick_batch(
+                ws,
                 batch,
                 xor_table,
                 ai_state,
@@ -138,7 +137,7 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
     # appends at least one payload per iteration, and empty received_payloads
     # returns early before reaching this point.
     total_messages += len(batch)
-    result = _process_tick_batch(batch, xor_table, ai_state, tick_index, batch_start_ms)
+    result = _process_tick_batch(ws, batch, xor_table, ai_state, tick_index, batch_start_ms)
     if result[1] is not None:
         traces.append(result[1])
 
@@ -151,6 +150,7 @@ def replay_session(session: CaptureSession) -> ReplaySessionResultDict:
 
 
 def _process_tick_batch(
+    ws: WorldService,
     payloads: list[str],
     xor_table: bytes,
     ai_state: AIStateDict,
@@ -160,6 +160,7 @@ def _process_tick_batch(
     """Decode a batch of payloads and run the planner if ready.
 
     Args:
+        ws: The replay's world service; decoded frames land here.
         payloads: Base64-encoded received message payloads.
         xor_table: The replayed session's XOR table.
         ai_state: Current AI state carried forward from the previous tick.
@@ -170,23 +171,23 @@ def _process_tick_batch(
         Tuple of (updated AI state, trace or None if self_state unavailable).
     """
     for payload in payloads:
-        _test_hooks.process_received_message_hook(payload, xor_table)
+        replay_hooks.process_received_message_hook(ws, payload, xor_table)
 
     # Merge kills from protocol into AI state
-    new_kills = drain_killed_tank_ids(get_world_service())
+    new_kills = drain_killed_tank_ids(ws)
     if new_kills:
         merged_kills = dict(ai_state["killed_tank_ids"])
         for tank_id in new_kills:
             merged_kills[str(tank_id)] = timestamp_ms
         ai_state = AIStateDict(**{**ai_state, "killed_tank_ids": merged_kills})
 
-    world = get_world_state()
+    world = ws.get_world_state()
     self_state = world["self_state"]
     if self_state is None:
         return (ai_state, None)
 
-    inventory = get_inventory_state(get_world_service())
-    terrain = get_terrain_map()
+    inventory = get_inventory_state(ws)
+    terrain = ws.get_terrain_map()
 
     decision = ai_strategy.decide(
         world,
@@ -195,11 +196,13 @@ def _process_tick_batch(
         inventory,
         timestamp_ms,
         terrain,
-        map_fuel_dots=get_world_service().map_fuel_dots,
+        map_fuel_dots=ws.map_fuel_dots,
+        ws=ws,
     )
 
     updated_ai_state = decision["updated_ai_state"]
     trace = _build_trace(
+        ws,
         tick_index,
         timestamp_ms,
         decision,
@@ -243,6 +246,7 @@ def _extract_command_target(command: BotCommand) -> tuple[int, int]:
 
 
 def _build_trace(
+    ws: WorldService,
     tick_index: int,
     timestamp_ms: int,
     decision: TickDecisionDict,
@@ -253,6 +257,7 @@ def _build_trace(
     """Build a ReplayTickTraceDict from planner output.
 
     Args:
+        ws: The replay's world service, for the threat analysis.
         tick_index: Current tick counter.
         timestamp_ms: Timestamp for this tick.
         decision: Planner decision output.
@@ -266,7 +271,7 @@ def _build_trace(
     """
     behavior = decision["behavior"]
     command = decision["command"]
-    threats = analyze_threats(world, self_state, timestamp_ms)
+    threats = analyze_threats(ws, world, self_state, timestamp_ms)
     target_x, target_y = _extract_command_target(command)
 
     return ReplayTickTraceDict(

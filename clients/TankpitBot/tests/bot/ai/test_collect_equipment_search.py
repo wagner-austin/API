@@ -13,6 +13,7 @@ from tankpit_bot.bot.ai.types import (
     make_default_ai_config,
 )
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     ContainerStateDict,
     TankStateDict,
@@ -33,6 +34,7 @@ class TestRecoverEquipmentSearch:
 
     def test_critical_equipment_search_uses_radar_when_ready(self) -> None:
         """Critical equipment depletion scans before relocating when radar is ready."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800, scanned=False)
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
 
@@ -43,6 +45,7 @@ class TestRecoverEquipmentSearch:
             inventory,
             100000,
             None,
+            ws=ws,
         )
 
         assert decision["behavior"]["reason_kind"] == "scan_on_landing"
@@ -50,6 +53,7 @@ class TestRecoverEquipmentSearch:
 
     def test_critical_equipment_new_unscanned_viewport_ignores_scan_cooldown(self) -> None:
         """A new unscanned viewport bypasses the global radar cooldown."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800, scanned=False)
         ai_state = AIStateDict(
             **{
@@ -59,7 +63,7 @@ class TestRecoverEquipmentSearch:
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["reason_kind"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
@@ -71,6 +75,7 @@ class TestRecoverEquipmentSearch:
         tile-coverage map. A fully-covered viewport routes the bot to
         the search hop instead of re-firing the radar.
         """
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = AIStateDict(
             **{
@@ -89,6 +94,7 @@ class TestRecoverEquipmentSearch:
             100000,
             None,
             map_fuel_dots=((140, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["reason_kind"] == "search_collect_local"
@@ -103,6 +109,7 @@ class TestRecoverEquipmentSearch:
         map, the forager yields and the search-hop path runs -- exercising
         the failure-counter reset branch in ``_plan_equipment_search``.
         """
+        ws = WorldService()
         world, self_state = make_world(fuel=800)
         ai_state = AIStateDict(
             **{
@@ -113,7 +120,7 @@ class TestRecoverEquipmentSearch:
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
@@ -126,6 +133,7 @@ class TestRecoverEquipmentSearch:
         so an unscanned viewport with affordable radar always produces
         a free-radar decision instead of raising.
         """
+        ws = WorldService()
         world, self_state = make_world(fuel=550, scanned=False)
         config = AIConfigDict(
             **{
@@ -142,7 +150,7 @@ class TestRecoverEquipmentSearch:
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=0)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason_kind"] == "scan_on_landing"
@@ -150,6 +158,7 @@ class TestRecoverEquipmentSearch:
 
     def test_equipment_search_skips_when_fuel_too_low(self) -> None:
         """Equipment search defers to fuel recovery when fuel is already low."""
+        ws = WorldService()
         world, self_state = make_world(fuel=150)
         ai_state = AIStateDict(
             **{
@@ -169,12 +178,14 @@ class TestRecoverEquipmentSearch:
             100000,
             None,
             map_fuel_dots=((140, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_reachable_container_behind_wall_uses_final_pickup_target(self) -> None:
         """In-viewport terrain detours preserve the final pickup target."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "103,100": make_container(103, 100, 700, True),
         }
@@ -188,6 +199,7 @@ class TestRecoverEquipmentSearch:
             make_inventory(),
             100000,
             terrain,
+            ws=ws,
         )
 
         assert decision["command"]["cmd_type"] == "pickup_fuel"
@@ -196,6 +208,7 @@ class TestRecoverEquipmentSearch:
 
     def test_low_fuel_without_targets_uses_radar(self) -> None:
         """Low fuel scans when no actionable fuel target exists."""
+        ws = WorldService()
         world, self_state = make_world(fuel=150, scanned=False)
 
         decision = decide(
@@ -205,6 +218,7 @@ class TestRecoverEquipmentSearch:
             make_inventory(),
             100000,
             None,
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
@@ -221,6 +235,7 @@ class TestRecoverEquipmentSearch:
         0x5A-visible container and miss any extra containers radar
         would have surfaced.
         """
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "104,100": make_container(104, 100, 700, True),
         }
@@ -234,6 +249,7 @@ class TestRecoverEquipmentSearch:
             make_inventory(),
             100000,
             None,
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
@@ -242,6 +258,7 @@ class TestRecoverEquipmentSearch:
 
     def test_low_fuel_new_unscanned_viewport_ignores_global_scan_cooldown(self) -> None:
         """A newly entered unconfirmed viewport radars immediately."""
+        ws = WorldService()
         world, self_state = make_world(fuel=150, scanned=False)
         ai_state = AIStateDict(
             **{
@@ -250,7 +267,7 @@ class TestRecoverEquipmentSearch:
             }
         )
 
-        decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
+        decision = decide(world, self_state, ai_state, make_inventory(), 100000, None, ws=ws)
 
         assert decision["behavior"]["reason_kind"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
@@ -266,6 +283,7 @@ class TestRecoverEquipmentSearch:
         per-tile ``world.scanned_tiles`` map populated by the
         wire-side radar handler.
         """
+        ws = WorldService()
         world, self_state = make_world(fuel=150, scanned=False)
         viewport_left = world["viewport"]["left"]
         viewport_top = world["viewport"]["top"]
@@ -288,6 +306,7 @@ class TestRecoverEquipmentSearch:
             # In-block dot stays: at fuel 150 the sweep is gated off
             # (fuel-low), and a farther dot would be unaffordable.
             map_fuel_dots=((116, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["reason_kind"] == "search_collect_local"
@@ -295,6 +314,7 @@ class TestRecoverEquipmentSearch:
 
     def test_low_fuel_blocked_search_with_visible_threats_falls_back_to_map(self) -> None:
         """Blocked low-fuel exploration does not break recovery ownership."""
+        ws = WorldService()
         world, self_state = make_world(
             self_x=100,
             self_y=100,
@@ -303,7 +323,7 @@ class TestRecoverEquipmentSearch:
         )
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
         terrain_data: dict[tuple[int, int], str] = dict.fromkeys(
             viewport_exploration_candidates(ctx),
             "W",
@@ -315,12 +335,13 @@ class TestRecoverEquipmentSearch:
             terrain_data[(candidate_x, candidate_y + 1)] = "#"
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_exploration_candidates_omit_self_and_duplicates(self) -> None:
         """Exploration candidates omit the current tile and duplicate entries."""
+        ws = WorldService()
         world, self_state = make_world(self_x=107, self_y=100, fuel=800)
         world["viewport"] = make_viewport_state(left=92, top=92, width=16, height=16)
         ctx = DecideCtx(
@@ -331,6 +352,7 @@ class TestRecoverEquipmentSearch:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         candidates = viewport_exploration_candidates(ctx)
@@ -340,6 +362,7 @@ class TestRecoverEquipmentSearch:
 
     def test_exploration_skips_blocked_target_and_uses_next_candidate(self) -> None:
         """Exploration skips blocked edges and falls through to the next candidate."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=550)
         terrain = InMemoryTerrainMap(
             terrain_data={
@@ -358,6 +381,7 @@ class TestRecoverEquipmentSearch:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         exploration = select_exploration_command(ctx)
@@ -370,6 +394,7 @@ class TestRecoverEquipmentSearch:
 
     def test_locked_combat_with_zero_dual_releases_to_equipment(self) -> None:
         """Combat lock releases once dual shots are critically depleted."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800, tanks={"50": _enemy()})
         ai_state = AIStateDict(
             **{
@@ -392,12 +417,14 @@ class TestRecoverEquipmentSearch:
             100000,
             None,
             map_fuel_dots=((140, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_killed_target_releases_combat_lock_for_recovery(self) -> None:
         """Killed locked targets release combat so recovery can proceed."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "101,100": make_container(101, 100, 700, True),
         }
@@ -418,7 +445,7 @@ class TestRecoverEquipmentSearch:
             }
         )
 
-        decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
+        decision = decide(world, self_state, ai_state, make_inventory(), 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
@@ -431,6 +458,7 @@ class TestRecoverEquipmentSearch:
         not picked; the specific verb (teleport vs map-open-then-teleport)
         depends on per-target freshness, not on this test's intent.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": _enemy(name="red-24", timestamp_ms=100000),
             "60": _enemy(tank_id=60, x=104, y=103, name="red-25", timestamp_ms=100000),
@@ -443,7 +471,7 @@ class TestRecoverEquipmentSearch:
             }
         )
 
-        decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
+        decision = decide(world, self_state, ai_state, make_inventory(), 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "HUNT"
         # LiveEnemy sits 7 tiles away inside the viewport, so the

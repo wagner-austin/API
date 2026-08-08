@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
@@ -24,13 +21,14 @@ class TestDispatchOther:
         """Test dispatch ignores non-radar/movement messages."""
         from tankpit_bot.protocol import SyncDict
 
-        initial_self = get_world_service().world_state["self_state"]
+        ws = WorldService()
+        initial_self = ws.world_state["self_state"]
 
         msg = SyncDict(msg_type=0x3F)
 
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        assert get_world_service().world_state["self_state"] == initial_self
+        assert ws.world_state["self_state"] == initial_self
 
     # Container tank_registry dispatch test deleted 2026-06-20 after the
     # container TankRegistry decoder was removed. Container resource
@@ -42,12 +40,13 @@ class TestDispatchOther:
         from tankpit_bot.protocol import FuelGainDict
 
         # First set up a position to create self_state
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
 
         msg = FuelGainDict(msg_type=0x44, fuel_total=25, is_free=False, flag=1)
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         # fuel_total is an absolute value, not a delta
@@ -58,12 +57,13 @@ class TestDispatchOther:
         from tankpit_bot.protocol import FuelDepositDict
 
         # First set up a position to create self_state
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
 
         msg = FuelDepositDict(msg_type=0x64, fuel_total=30)
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         # fuel_total is an absolute value, not a delta
@@ -74,7 +74,8 @@ class TestDispatchOther:
         from tankpit_bot.protocol import TankStatusSyncDict
 
         # First set up a position to create self_state
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
 
         msg = TankStatusSyncDict(
             msg_type=0x2E,
@@ -87,9 +88,9 @@ class TestDispatchOther:
             promo_bar_lit=True,
             fuel=1400,
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         assert state["self_state"]["fuel"] == 1400
@@ -98,9 +99,10 @@ class TestDispatchOther:
         """Test dispatch ignores TankStatusSync (0x2E) without fuel (short format)."""
         from tankpit_bot.protocol import TankStatusSyncDict
 
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         # Set fuel to a known value first
-        update_world_state_from_fuel_total(get_world_service(), 500)
+        update_world_state_from_fuel_total(ws, 500)
 
         msg = TankStatusSyncDict(
             msg_type=0x2E,
@@ -113,9 +115,9 @@ class TestDispatchOther:
             promo_bar_lit=None,
             fuel=None,
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         # Fuel unchanged — short-format TankStatusSync has no fuel
@@ -132,21 +134,22 @@ class TestDispatchOther:
         from tankpit_bot.container import ContainerPickupDict, ContainerPickupRecordDict
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
 
         containers: list[RadarContainerDict] = [
             RadarContainerDict(x=80, y=90, volume=500),
         ]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(get_world_service(), containers, mines, [])
-        assert "80,90" in get_world_service().world_state["containers"]
+        update_world_state_from_radar(ws, containers, mines, [])
+        assert "80,90" in ws.world_state["containers"]
 
         msg = ContainerPickupDict(
             msg_type="container_pickup",
             pickups=(ContainerPickupRecordDict(x=80, y=90, remaining_volume=0),),
         )
-        dispatch_world_state_update(get_world_service(), msg)
-        assert "80,90" not in get_world_service().world_state["containers"]
+        dispatch_world_state_update(ws, msg)
+        assert "80,90" not in ws.world_state["containers"]
 
     def test_dispatch_container_pickup_partial_updates_volume(self) -> None:
         """Partial pickup (remaining_volume>0) keeps the container at the new volume.
@@ -170,15 +173,16 @@ class TestDispatchOther:
         from tankpit_bot.container import ContainerPickupDict, ContainerPickupRecordDict
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
 
         containers: list[RadarContainerDict] = [
             RadarContainerDict(x=80, y=90, volume=500),
         ]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(get_world_service(), containers, mines, [])
-        assert "80,90" in get_world_service().world_state["containers"]
-        initial_self_state = get_world_service().world_state["self_state"]
+        update_world_state_from_radar(ws, containers, mines, [])
+        assert "80,90" in ws.world_state["containers"]
+        initial_self_state = ws.world_state["self_state"]
         if initial_self_state is None:
             raise AssertionError("self_state should be populated")
         initial_fuel = initial_self_state["fuel"]
@@ -187,9 +191,9 @@ class TestDispatchOther:
             msg_type="container_pickup",
             pickups=(ContainerPickupRecordDict(x=80, y=90, remaining_volume=300),),
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert "80,90" in state["containers"]
         assert state["containers"]["80,90"]["volume"] == 300
         self_state = state["self_state"]
@@ -202,8 +206,8 @@ class TestDispatchOther:
         from tankpit_bot.protocol import ChatMessageDict
         from tankpit_bot.state import make_tank_state
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         new_tanks = dict(ws.world_state["tanks"])
         new_tanks["1229"] = make_tank_state(
             tank_id=1229,
@@ -234,8 +238,8 @@ class TestDispatchOther:
         """
         from tankpit_bot.protocol import ChatMessageDict
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         self_state = ws.world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should be populated")
@@ -255,8 +259,8 @@ class TestDispatchOther:
         """A chat from an untracked tank with no x/y still dispatches."""
         from tankpit_bot.protocol import ChatMessageDict
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
 
         msg = ChatMessageDict(msg_type=0x4D, sender_id=9999, message_type=99, x=None, y=None)
         dispatch_world_state_update(ws, msg)
@@ -277,11 +281,12 @@ class TestDispatchLivenessStamp:
         """
         from tankpit_bot.protocol import SyncDict
 
-        assert get_world_service().last_game_message_ms == 0
+        ws = WorldService()
+        assert ws.last_game_message_ms == 0
 
-        dispatch_world_state_update(get_world_service(), SyncDict(msg_type=0x3F))
+        dispatch_world_state_update(ws, SyncDict(msg_type=0x3F))
 
-        assert get_world_service().last_game_message_ms > 0
+        assert ws.last_game_message_ms > 0
 
 
 class TestChatConsentRecording:
@@ -291,19 +296,20 @@ class TestChatConsentRecording:
         """A non-self 0x4D sender lands in chat_seen_tank_ids."""
         from tankpit_bot.protocol import ChatMessageDict
 
-        update_world_state_from_position(100, 100)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         msg = ChatMessageDict(msg_type=0x4D, sender_id=1229, message_type=41, x=110, y=100)
 
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        assert 1229 in get_world_service().chat_seen_tank_ids
+        assert 1229 in ws.chat_seen_tank_ids
 
     def test_self_echo_is_not_consent(self) -> None:
         """The bot's own echoed chat never marks anyone consenting."""
         from tankpit_bot.protocol import ChatMessageDict
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         state = ws.world_state["self_state"]
         if state is None:
             raise AssertionError("self state must exist after position update")
@@ -327,7 +333,7 @@ class TestRecentPickupLedgerLookup:
         """Only a fresh signature covering the tile counts."""
         from tankpit_bot.sniffer.world_state_dispatch_containers import was_recent_pickup_at
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.recent_pickup_signatures[((150, 150, 0),)] = 90000
         ws.recent_pickup_signatures[((10, 10, 5),)] = 100000
 

@@ -6,9 +6,7 @@ regressions, and detonation removal.
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
@@ -19,8 +17,9 @@ class TestDispatchTunneledMines:
         """Test tunneled 0x4B mine placement updates world mine state."""
         from tankpit_bot.protocol import MovementResponseDict
 
+        ws = WorldService()
         dispatch_world_state_update(
-            get_world_service(),
+            ws,
             MovementResponseDict(
                 msg_type=0x3D,
                 team=2,
@@ -36,7 +35,7 @@ class TestDispatchTunneledMines:
         )
 
         dispatch_world_state_update(
-            get_world_service(),
+            ws,
             {
                 "msg_type": 0x4B,
                 "mine_type": 2,
@@ -51,7 +50,7 @@ class TestDispatchTunneledMines:
             },
         )
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert state["mines"]["131,126"]["team"] == 2
         assert state["mines"]["131,126"]["tank_id"] == 1301
         assert state["mines"]["131,126"]["mine_type"] == 2
@@ -62,8 +61,9 @@ class TestDispatchTunneledMines:
         """Test tunneled 0x4B uses tracked tank team when placer is not self."""
         from tankpit_bot.protocol import TankEntryDict, TankInfoDict
 
+        ws = WorldService()
         dispatch_world_state_update(
-            get_world_service(),
+            ws,
             TankInfoDict(
                 msg_type=0x21,
                 tank_id=777,
@@ -75,7 +75,7 @@ class TestDispatchTunneledMines:
         )
 
         dispatch_world_state_update(
-            get_world_service(),
+            ws,
             TankEntryDict(
                 msg_type=0x28,
                 team=3,
@@ -89,7 +89,7 @@ class TestDispatchTunneledMines:
         )
 
         dispatch_world_state_update(
-            get_world_service(),
+            ws,
             {
                 "msg_type": 0x4B,
                 "mine_type": 1,
@@ -98,15 +98,16 @@ class TestDispatchTunneledMines:
             },
         )
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert state["mines"]["40,41"]["team"] == 3
         assert state["mines"]["40,42"]["team"] == 3
         assert state["mines"]["40,41"]["tank_id"] == 777
 
     def test_dispatch_tunneled_mine_placement_skips_unknown_team(self) -> None:
         """Test tunneled 0x4B does nothing when placer team is unknown."""
+        ws = WorldService()
         dispatch_world_state_update(
-            get_world_service(),
+            ws,
             {
                 "msg_type": 0x4B,
                 "mine_type": 2,
@@ -115,7 +116,7 @@ class TestDispatchTunneledMines:
             },
         )
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert state["mines"] == {}
 
     def test_mine_on_mine_destruction_real_capture(self) -> None:
@@ -137,7 +138,7 @@ class TestDispatchTunneledMines:
         from tankpit_bot.protocol import MovementResponseDict
         from tankpit_bot.state import add_mine
 
-        ws = get_world_service()
+        ws = WorldService()
         # Establish self at the placement center.
         dispatch_world_state_update(
             ws,
@@ -221,7 +222,7 @@ class TestDispatchTunneledMines:
         """
         from tankpit_bot.state import add_mine
 
-        ws = get_world_service()
+        ws = WorldService()
         # Seed the 7 mines that the cascade is about to destroy --
         # mix of own (blue, team=2) and enemy (purple, team=1).
         seed = [
@@ -267,8 +268,9 @@ class TestDispatchTunneledMines:
         """Test tunneled 0x45 removes mines at decoded coordinates."""
         from tankpit_bot.protocol import MovementResponseDict
 
+        ws = WorldService()
         dispatch_world_state_update(
-            get_world_service(),
+            ws,
             MovementResponseDict(
                 msg_type=0x3D,
                 team=2,
@@ -284,7 +286,7 @@ class TestDispatchTunneledMines:
         )
 
         dispatch_world_state_update(
-            get_world_service(),
+            ws,
             {
                 "msg_type": 0x4B,
                 "mine_type": 2,
@@ -293,11 +295,9 @@ class TestDispatchTunneledMines:
             },
         )
 
-        dispatch_world_state_update(
-            get_world_service(), {"msg_type": 0x45, "positions": [(39, 53), (38, 54)]}
-        )
+        dispatch_world_state_update(ws, {"msg_type": 0x45, "positions": [(39, 53), (38, 54)]})
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert "38,52" in state["mines"]
         assert "39,53" not in state["mines"]
         assert "38,54" not in state["mines"]

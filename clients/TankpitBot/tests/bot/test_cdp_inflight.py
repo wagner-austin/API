@@ -10,7 +10,7 @@ from tankpit_bot.bot.states import (
     make_in_flight_action,
 )
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_fuel_total as _update_fuel_total,
 )
@@ -31,16 +31,14 @@ class TestBotInFlightGuards:
         """Blocked walking clears MOVING so the bot can replan."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_walk
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import InMemoryTerrainMap
 
-        update_world_state_from_position(10, 10)
-        _update_fuel_total(get_world_service(), 800)
-        get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
+        ws = WorldService()
+        ws.update_world_state_from_position(10, 10)
+        _update_fuel_total(ws, 800)
+        ws.terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -56,16 +54,14 @@ class TestBotInFlightGuards:
         """Blocked walking returns False from the in-flight gate after clearing state."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import InMemoryTerrainMap
 
-        update_world_state_from_position(10, 10)
-        _update_fuel_total(get_world_service(), 800)
-        get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
+        ws = WorldService()
+        ws.update_world_state_from_position(10, 10)
+        _update_fuel_total(ws, 800)
+        ws.terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -93,19 +89,17 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import InMemoryTerrainMap
 
-        update_world_state_from_position(10, 10)
-        _update_fuel_total(get_world_service(), 400)
+        ws = WorldService()
+        ws.update_world_state_from_position(10, 10)
+        _update_fuel_total(ws, 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines, [])
-        get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
+        _update_radar(ws, containers, mines, [])
+        ws.terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -125,19 +119,17 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import InMemoryTerrainMap
 
-        update_world_state_from_position(10, 10)
-        _update_fuel_total(get_world_service(), 580)
+        ws = WorldService()
+        ws.update_world_state_from_position(10, 10)
+        _update_fuel_total(ws, 580)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=12, y=10, volume=-1)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines, [])
-        get_world_service().terrain_map = InMemoryTerrainMap()
+        _update_radar(ws, containers, mines, [])
+        ws.terrain_map = InMemoryTerrainMap()
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -154,19 +146,17 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import InMemoryTerrainMap
 
-        update_world_state_from_position(10, 10)
-        _update_fuel_total(get_world_service(), 400)
+        ws = WorldService()
+        ws.update_world_state_from_position(10, 10)
+        _update_fuel_total(ws, 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines, [])
-        get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
+        _update_radar(ws, containers, mines, [])
+        ws.terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -181,14 +171,12 @@ class TestBotInFlightGuards:
         """Stalled movement times out so the bot can replan."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
-        update_world_state_from_position(10, 10)
-        _update_fuel_total(get_world_service(), 800)
+        ws = WorldService()
+        ws.update_world_state_from_position(10, 10)
+        _update_fuel_total(ws, 800)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -206,17 +194,15 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
-        update_world_state_from_position(64, 64)
-        _update_fuel_total(get_world_service(), 800)
+        ws = WorldService()
+        ws.update_world_state_from_position(64, 64)
+        _update_fuel_total(ws, 800)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=72, y=63, volume=-1)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines, [])
+        _update_radar(ws, containers, mines, [])
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -233,14 +219,12 @@ class TestBotInFlightGuards:
         """Stalled teleport times out so the bot can replan."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
-        update_world_state_from_position(64, 64)
-        _update_fuel_total(get_world_service(), 800)
+        ws = WorldService()
+        ws.update_world_state_from_position(64, 64)
+        _update_fuel_total(ws, 800)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -274,20 +258,16 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tankpit_bot.state.types import WorldStateDict
 
-        update_world_state_from_position(50, 50)
-        _update_fuel_total(get_world_service(), 800)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 800)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         started_ms = get_current_time_ms()
         bot._state_data = _sba(bot._state_data, "IDLE", "map_open", 0, 0, started_ms=started_ms)
-        get_world_service().world_state = WorldStateDict(
-            **{**get_world_service().world_state, "timestamp_ms": started_ms}
-        )
+        ws.world_state = WorldStateDict(**{**ws.world_state, "timestamp_ms": started_ms})
 
         assert has_in_flight_action(bot) is True
         assert bot._state_data["in_flight_action"]["kind"] == "map_open"
@@ -307,30 +287,26 @@ class TestBotInFlightGuards:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tankpit_bot.state.types import WorldStateDict
 
-        update_world_state_from_position(50, 50)
-        _update_fuel_total(get_world_service(), 800)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 800)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         started_ms = get_current_time_ms()
         bot._state_data = _sba(bot._state_data, "IDLE", "map_open", 0, 0, started_ms=started_ms)
         # Bump world_state timestamp the way an unrelated sync would --
         # this MUST NOT clear the action; the old proxy gate would have
         # fired here.
-        get_world_service().world_state = WorldStateDict(
-            **{**get_world_service().world_state, "timestamp_ms": started_ms + 1}
-        )
+        ws.world_state = WorldStateDict(**{**ws.world_state, "timestamp_ms": started_ms + 1})
 
         assert has_in_flight_action(bot) is True
         kind_before_signal = bot._state_data["in_flight_action"]["kind"]
         assert kind_before_signal == "map_open"
 
         # Now mark the authoritative MAP_DATA signal; the wait should clear.
-        get_world_service().mark_map_data_processed()
+        ws.mark_map_data_processed()
 
         assert has_in_flight_action(bot) is False
         kind_after_signal = bot._state_data["in_flight_action"]["kind"]
@@ -340,14 +316,12 @@ class TestBotInFlightGuards:
         """A map_open that stalls past timeout clears so the bot can replan."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
 
-        update_world_state_from_position(50, 50)
-        _update_fuel_total(get_world_service(), 1400)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 1400)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -397,15 +371,12 @@ class TestBotInFlightGuards:
         """A scan that stalls past timeout clears so the bot can replan."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
-        from tankpit_bot.sniffer.world_state import (
-            is_scan_viewport_failed,
-            update_world_state_from_position,
-        )
 
-        update_world_state_from_position(50, 50)
-        _update_fuel_total(get_world_service(), 1400)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 1400)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -417,22 +388,19 @@ class TestBotInFlightGuards:
 
         assert waiting is False
         assert bot.get_state() == "IDLE"
-        assert is_scan_viewport_failed(0, 0, get_current_time_ms()) is True
+        assert ws.is_scan_viewport_failed(0, 0, get_current_time_ms()) is True
 
     def test_stalled_move_marks_failed_move_target(self, fake_env: FakeEnv) -> None:
         """Stalled move records the destination as a failed move target."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
-        from tankpit_bot.sniffer.world_state import (
-            is_move_target_failed,
-            update_world_state_from_position,
-        )
 
-        update_world_state_from_position(50, 50)
-        _update_fuel_total(get_world_service(), 1400)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 1400)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -443,27 +411,25 @@ class TestBotInFlightGuards:
         has_in_flight_action(bot)
 
         now = get_current_time_ms()
-        assert is_move_target_failed(73, 158, now) is True
-        assert is_move_target_failed(74, 158, now) is False
+        assert ws.is_move_target_failed(73, 158, now) is True
+        assert ws.is_move_target_failed(74, 158, now) is False
 
     def test_clear_blocked_collection_returns_false_when_adjacent(self, fake_env: FakeEnv) -> None:
         """Adjacent collection remains viable even if the target tile itself is blocked."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import InMemoryTerrainMap
 
-        update_world_state_from_position(14, 10)
-        _update_fuel_total(get_world_service(), 400)
+        ws = WorldService()
+        ws.update_world_state_from_position(14, 10)
+        _update_fuel_total(ws, 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines, [])
-        get_world_service().terrain_map = InMemoryTerrainMap({(15, 10): "#"})
+        _update_radar(ws, containers, mines, [])
+        ws.terrain_map = InMemoryTerrainMap({(15, 10): "#"})
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -492,16 +458,14 @@ class TestBotInFlightGuards:
         """_tick_once does not fire new commands while radar results are pending."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(100, 100)
-        _update_fuel_total(get_world_service(), 300)
-        update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 5], [False] * 5)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        _update_fuel_total(ws, 300)
+        update_inventory_from_protocol(ws, [0, 0, 0, 0, 5], [False] * 5)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = _sba(bot._state_data, "SCANNING", "scan", 0, 0)

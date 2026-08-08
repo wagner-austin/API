@@ -18,7 +18,6 @@ from tankpit_bot.bot.types import (
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 from tankpit_bot.state.types import WorldStateDict, make_container_state
 from tankpit_bot.state.types.coord import coord_key
@@ -31,9 +30,8 @@ from tests.bot._executor_support import (
 from tests.conftest import FakeEnv
 
 
-def _believe_container(x: int, y: int, *, is_fuel: bool, volume: int) -> None:
-    """Install one believed container into the live world service."""
-    ws = get_world_service()
+def _believe_container(ws: WorldService, x: int, y: int, *, is_fuel: bool, volume: int) -> None:
+    """Install one believed container into the given world service."""
     ws.world_state = WorldStateDict(
         **{
             **ws.world_state,
@@ -46,10 +44,10 @@ def _believe_container(x: int, y: int, *, is_fuel: bool, volume: int) -> None:
     )
 
 
-def _fill_inventory_to(count: int) -> None:
+def _fill_inventory_to(ws: WorldService, count: int) -> None:
     """Set every believed inventory slot to one count."""
     item = InventoryItem(count=count, enabled=True)
-    get_world_service().inventory_state = InventoryState(
+    ws.inventory_state = InventoryState(
         armor_shields=item,
         dual_shots=item,
         missile_shots=item,
@@ -193,6 +191,7 @@ class TestDispatchCommand:
         """A failed teleport send leaves no pending attempt to mislabel later."""
         from tankpit_bot.ledger.outcome.teleport import emit_teleport_landed
 
+        ws = WorldService()
         world = _make_world()
         result = dispatch_command(
             _WorldOnlyBot(world),
@@ -202,7 +201,7 @@ class TestDispatchCommand:
 
         assert result is False
         landed = emit_teleport_landed(
-            get_world_service().ledger,
+            ws.ledger,
             duration_ms=0,
             target_x=200,
             target_y=200,
@@ -245,12 +244,11 @@ class TestDispatchRefusalPrediction:
     def test_fuel_pickup_at_capacity_is_suppressed(self, fake_env: FakeEnv) -> None:
         """Full tank + stocked believed container: no wire traffic."""
         bot, fake_cdp = _make_bot(fake_env)
-        ws = get_world_service()
-        self_state = ws.world_state["self_state"]
+        self_state = bot.world.world_state["self_state"]
         if self_state is None:
             raise AssertionError("fixture bot must have a self state")
-        update_world_state_from_fuel_total(ws, fuel_capacity(self_state["rank"]))
-        _believe_container(80, 90, is_fuel=True, volume=508)
+        update_world_state_from_fuel_total(bot.world, fuel_capacity(self_state["rank"]))
+        _believe_container(bot.world, 80, 90, is_fuel=True, volume=508)
         result = dispatch_command(bot, make_pickup_fuel_command(80, 90), _make_snapshot())
         assert result is False
         assert "Runtime.evaluate" not in fake_cdp._sent_methods
@@ -258,12 +256,11 @@ class TestDispatchRefusalPrediction:
     def test_fuel_pickup_on_equipment_belief_dispatches(self, fake_env: FakeEnv) -> None:
         """A non-fuel record at the target proves nothing about fuel."""
         bot, fake_cdp = _make_bot(fake_env)
-        ws = get_world_service()
-        self_state = ws.world_state["self_state"]
+        self_state = bot.world.world_state["self_state"]
         if self_state is None:
             raise AssertionError("fixture bot must have a self state")
-        update_world_state_from_fuel_total(ws, fuel_capacity(self_state["rank"]))
-        _believe_container(80, 90, is_fuel=False, volume=0)
+        update_world_state_from_fuel_total(bot.world, fuel_capacity(self_state["rank"]))
+        _believe_container(bot.world, 80, 90, is_fuel=False, volume=0)
         result = dispatch_command(bot, make_pickup_fuel_command(80, 90), _make_snapshot())
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
@@ -271,10 +268,10 @@ class TestDispatchRefusalPrediction:
     def test_equipment_pickup_all_slots_full_is_suppressed(self, fake_env: FakeEnv) -> None:
         """Every slot at the rank cap: code 7 predicted, nothing sent."""
         bot, fake_cdp = _make_bot(fake_env)
-        self_state = get_world_service().world_state["self_state"]
+        self_state = bot.world.world_state["self_state"]
         if self_state is None:
             raise AssertionError("fixture bot must have a self state")
-        _fill_inventory_to(inventory_capacity(self_state["rank"]))
+        _fill_inventory_to(bot.world, inventory_capacity(self_state["rank"]))
         result = dispatch_command(bot, make_pickup_equipment_command(80, 90), _make_snapshot())
         assert result is False
         assert "Runtime.evaluate" not in fake_cdp._sent_methods

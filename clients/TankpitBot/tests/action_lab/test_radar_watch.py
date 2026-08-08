@@ -32,7 +32,6 @@ from tankpit_bot.action_lab.radar_watch import (
 )
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state
 from tankpit_bot.state.types import make_self_state, make_viewport_state
 
@@ -95,7 +94,7 @@ class _WatchHarness(RadarWatchProbe):
 
     def request_inventory(self) -> bool:
         if self.inventory_script:
-            get_world_service().inventory_state = self.inventory_script.pop(0)
+            self.world.inventory_state = self.inventory_script.pop(0)
         self.inventory_calls += 1
         return True
 
@@ -145,7 +144,7 @@ def test_ensure_extras_disabled_skips_when_already_off() -> None:
     probe = _WatchHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=7, radar_enabled=False)
+    probe.world.inventory_state = _inventory(radar_count=7, radar_enabled=False)
 
     count, was_enabled, toggles = probe._ensure_extras_disabled()
     assert (count, was_enabled, toggles) == (7, False, 0)
@@ -156,7 +155,7 @@ def test_ensure_extras_disabled_raises_when_toggle_fails() -> None:
     probe = _WatchHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=22, radar_enabled=True)
+    probe.world.inventory_state = _inventory(radar_count=22, radar_enabled=True)
 
     with pytest.raises(ProbeError, match="still enabled after toggle"):
         probe._ensure_extras_disabled()

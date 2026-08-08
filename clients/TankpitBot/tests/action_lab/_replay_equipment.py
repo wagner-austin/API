@@ -25,7 +25,7 @@ from tankpit_bot.action_lab.equipment_probe import EquipmentProbe
 from tankpit_bot.action_lab.equipment_probe_types import EquipmentProbeAttemptResultDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.bot.world_sync import drain_messages
-from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.sniffer.world_service import WorldService
 
 EquipmentReplayResult = ReplayResult[EquipmentProbeAttemptResultDict]
 
@@ -45,13 +45,19 @@ class ReplayEquipmentProbe(DispatchCaptureMixin, EquipmentProbe):
     are inherited from :class:`DispatchCaptureMixin`.
     """
 
-    def __init__(self, target_url: str = "https://tankpit.com/play") -> None:
+    def __init__(
+        self,
+        target_url: str = "https://tankpit.com/play",
+        *,
+        world: WorldService | None = None,
+    ) -> None:
         """Initialize the replay probe.
 
         Args:
             target_url: Game URL the probe records on its session.
+            world: Injected WorldService. Created internally if None.
         """
-        EquipmentProbe.__init__(self, target_url, headless=True, prefer_account=False)
+        EquipmentProbe.__init__(self, target_url, headless=True, prefer_account=False, world=world)
         self._init_dispatch_capture(None)
 
 
@@ -114,7 +120,6 @@ def replay_equipment_attempt(
         omit_cdp=omit_cdp,
         drain_messages=drain_messages,
         update_state_from_world=probe._update_state_from_world,
-        reset_world_state=reset_world_state,
     )
     try:
         attempt = probe._probe_single_equipment_target(

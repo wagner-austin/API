@@ -36,34 +36,29 @@ from tankpit_bot.action_lab.viewport_probe import (
 
 def test_cross_edge_scans_rows_for_a_passable_landing() -> None:
     probe = _ViewportHarness()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.position = (110, 100)
-    original = viewport_module.get_terrain_map
-    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set({(111, 102)})
-    try:
-        probe._cross_edge()
-    finally:
-        viewport_module.get_terrain_map = original
+    probe.world.terrain_map = InMemoryTerrainMap.from_passable_set({(111, 102)})
+    probe._cross_edge()
     assert probe.moves == [(111, 102)]
 
 
 def test_cross_edge_skips_when_nothing_past_the_edge_is_passable() -> None:
     probe = _ViewportHarness()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.position = (110, 100)
-    original = viewport_module.get_terrain_map
-    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set(set())
-    try:
-        probe._cross_edge()
-    finally:
-        viewport_module.get_terrain_map = original
+    probe.world.terrain_map = InMemoryTerrainMap.from_passable_set(set())
+    probe._cross_edge()
     assert probe.moves == []
 
 
 def test_long_moves_fire_each_offset_from_the_current_tile() -> None:
     probe = _ViewportHarness()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
@@ -85,10 +80,9 @@ def test_long_moves_stop_at_the_fuel_floor() -> None:
     assert probe._long_moves() == 1
 
 
-def test_run_phase_walks_crosses_then_probes_after_a_good_anchor(
-    _all_ground_terrain: None,
-) -> None:
+def test_run_phase_walks_crosses_then_probes_after_a_good_anchor() -> None:
     probe = _ViewportHarness()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
@@ -101,6 +95,7 @@ def test_run_phase_walks_crosses_then_probes_after_a_good_anchor(
 
 def test_run_phase_returns_zeroes_when_the_anchor_fails() -> None:
     probe = _ViewportHarness()
+    probe.world.terrain_map = InMemoryTerrainMap()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.fuel = 50

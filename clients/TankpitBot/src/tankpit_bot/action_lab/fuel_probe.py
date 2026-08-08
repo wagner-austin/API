@@ -60,7 +60,6 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state.types import ContainerStateDict
 
 _FUEL_PROBE_TARGET_STEP = 16
@@ -455,7 +454,7 @@ class FuelProbe(ProbeBase):
             build_map_sync_timeout_result=self._build_map_sync_timeout_result,
             build_teleport_timeout_result=self._build_teleport_timeout_result,
             finalize_attempt_delay=self._finalize_attempt_delay,
-            terrain_provider=get_terrain_map,
+            terrain_provider=self.world.get_terrain_map,
             find_visible_target=fuel_probe_targets._find_visible_fuel_target,
             requires_reposition=fuel_probe_targets._visible_fuel_requires_reposition,
             find_landing_tile=fuel_probe_targets._find_visible_fuel_landing_tile,
@@ -524,7 +523,7 @@ class FuelProbe(ProbeBase):
             target_step=_FUEL_PROBE_TARGET_STEP,
             target_max_radius=_FUEL_PROBE_TARGET_MAX_RADIUS,
             teleport_strategy=_FUEL_PROBE_TELEPORT_STRATEGY,
-            terrain_provider=get_terrain_map,
+            terrain_provider=self.world.get_terrain_map,
             terrain_unavailable_error=FuelProbeError,
             terrain_unavailable_message="terrain map is unavailable",
         )

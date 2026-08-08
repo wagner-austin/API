@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.collect_pickups import (
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, make_container_state, make_mine_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -26,6 +27,7 @@ def test_collect_mode_releases_lock_for_markedly_closer_fuel() -> None:
     the map to a locked container while ignoring closer fuel the whole
     way.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=150,
         containers={
@@ -59,7 +61,7 @@ def test_collect_mode_releases_lock_for_markedly_closer_fuel() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -74,6 +76,7 @@ def test_collect_mode_releases_lock_for_markedly_closer_fuel() -> None:
 
 def test_collect_mode_keeps_lock_against_marginally_closer_fuel() -> None:
     """A candidate inside the anti-churn threshold does not break the lock."""
+    ws = WorldService()
     world, self_state = make_world(
         fuel=150,
         containers={
@@ -107,7 +110,7 @@ def test_collect_mode_keeps_lock_against_marginally_closer_fuel() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -130,6 +133,7 @@ def test_locked_fuel_holds_when_water_locked() -> None:
     the target stays SERVABLE (the ride lane exists) and the hold is
     genuinely transient.
     """
+    ws = WorldService()
     terrain_data: dict[tuple[int, int], str] = {}
     for x in range(92, 108):
         for y in range(92, 108):
@@ -174,7 +178,7 @@ def test_locked_fuel_holds_when_water_locked() -> None:
     terrain_data[(121, 101)] = "W"
     inventory = make_inventory()
     inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -193,6 +197,7 @@ def test_inexecutable_lock_without_terrain_holds() -> None:
     outside the visible viewport, so the pickup path yields no
     command this tick.
     """
+    ws = WorldService()
     world, self_state = make_world(
         self_x=100,
         self_y=100,
@@ -216,7 +221,7 @@ def test_inexecutable_lock_without_terrain_holds() -> None:
             "resource_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
     decision, held_state = continue_or_release_fuel_lock(
         ctx, ai_state, world["containers"]["130,100"]
@@ -236,6 +241,7 @@ def test_unservable_water_locked_fuel_releases_the_lock() -> None:
     because nothing was ever dispatched. The enumerated release law
     now carries the structural verdict the selectors already compute.
     """
+    ws = WorldService()
     terrain_data: dict[tuple[int, int], str] = {
         (120, 100): "W",
         (121, 100): "W",
@@ -270,7 +276,7 @@ def test_unservable_water_locked_fuel_releases_the_lock() -> None:
             "resource_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "", ws=ws)
 
     decision, released_state = continue_or_release_fuel_lock(
         ctx, ai_state, world["containers"]["120,100"]
@@ -289,6 +295,7 @@ def test_mine_denied_locked_fuel_releases_when_no_shot_exists() -> None:
     viewport so no clearance shot can be aimed, and no ferry floats
     on the pond. Nothing in the cascade can ever serve it — release.
     """
+    ws = WorldService()
     terrain_data: dict[tuple[int, int], str] = {
         (130, 100): "W",
         (129, 100): "W",
@@ -329,7 +336,7 @@ def test_mine_denied_locked_fuel_releases_when_no_shot_exists() -> None:
             "resource_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "", ws=ws)
 
     decision, released_state = continue_or_release_fuel_lock(
         ctx, ai_state, world["containers"]["130,100"]
@@ -348,6 +355,7 @@ def test_mine_denied_locked_fuel_holds_while_the_clearance_shot_exists() -> None
     serves normally. Releasing here would re-create the session-4
     churn one layer up.
     """
+    ws = WorldService()
     terrain_data: dict[tuple[int, int], str] = {
         (104, 100): "W",
         (103, 100): "W",
@@ -388,7 +396,7 @@ def test_mine_denied_locked_fuel_holds_while_the_clearance_shot_exists() -> None
             "resource_target_y": 100,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "", ws=ws)
 
     _decision, held_state = continue_or_release_fuel_lock(
         ctx, ai_state, world["containers"]["104,100"]
@@ -411,6 +419,7 @@ def test_out_of_window_locked_fuel_holds_so_the_hop_can_fire() -> None:
     cascade falls through to the hop lane, whose teleport recenters
     the window on the target.
     """
+    ws = WorldService()
     world, self_state = make_world(
         self_x=100,
         self_y=100,
@@ -445,6 +454,7 @@ def test_out_of_window_locked_fuel_holds_so_the_hop_can_fire() -> None:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
     decision, held_state = continue_or_release_fuel_lock(
@@ -466,6 +476,7 @@ def test_select_fuel_returns_none_at_rank_derived_capacity() -> None:
     server rejects with ``0x52`` code-5.
     """
 
+    ws = WorldService()
     base_world, base_self = make_world(
         fuel=1300,
         scanned=True,
@@ -492,7 +503,7 @@ def test_select_fuel_returns_none_at_rank_derived_capacity() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = select_and_pickup_fuel(ctx, ctx.base)
 
@@ -511,6 +522,7 @@ def test_locked_fuel_released_at_rank_derived_capacity() -> None:
     fresh pickup command.
     """
 
+    ws = WorldService()
     base_world, base_self = make_world(
         fuel=1600,
         scanned=True,
@@ -540,7 +552,7 @@ def test_locked_fuel_released_at_rank_derived_capacity() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
     locked_target = world["containers"]["105,105"]
 
     decision, updated_state = continue_or_release_fuel_lock(

@@ -8,6 +8,7 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
 from tankpit_bot.action_lab.teleport_phase import emit_command_dispatch_failure_diagnostic
+from tankpit_bot.sniffer.world_service import WorldService
 
 
 class RadarPhaseProbeProtocol(action_session.BufferedWorldStateProviderProtocol, Protocol):
@@ -31,9 +32,13 @@ class RadarPhaseProbeProtocol(action_session.BufferedWorldStateProviderProtocol,
         """Reset probe state to idle after the phase settles."""
 
 
-def clear_stale_radar_completion() -> None:
-    """Drain any leaked radar-complete confirmations before a new scan."""
-    while action_hooks.check_and_clear_radar_scan_complete():
+def clear_stale_radar_completion(ws: WorldService) -> None:
+    """Drain any leaked radar-complete confirmations before a new scan.
+
+    Args:
+        ws: The session's world service holding the completion flag.
+    """
+    while action_hooks.check_and_clear_radar_scan_complete(ws):
         continue
 
 
@@ -64,7 +69,7 @@ def run_tracked_radar_phase(
             fails to dispatch.
     """
     action_hooks.drain_buffered_messages(probe, probe.world)
-    clear_stale_radar_completion()
+    clear_stale_radar_completion(probe.world)
     radar_cycle = probe._start_action_phase("radar", attempt_label=attempt_label)
     radar_started_ms = action_hooks.get_current_time_ms()
     if not probe.use_radar():

@@ -32,7 +32,7 @@ from tankpit_bot.action_lab.movement_probe_types import (
 )
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -61,7 +61,8 @@ class _SequencedWorld:
 
 class _MoveWaitProbe:
     def __init__(self, worlds: _SequencedWorld) -> None:
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._worlds = worlds
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
@@ -146,7 +147,8 @@ def _make_attempt(
 
 class _MissingSelfWaitProbe:
     def __init__(self, states: list[SelfStateDict | None]) -> None:
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._states = states
         self._index = 0
         self._cdp_message_buffer: list[str] = []

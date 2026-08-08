@@ -24,7 +24,7 @@ from tankpit_bot.action_lab.action_trace_types import (
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.session_base import SessionBase
-from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -49,6 +49,7 @@ class ProbeBase(SessionBase):
         prefer_account: bool = False,
         cdp_service: CDPService | None = None,
         command_service: CommandService | None = None,
+        world: WorldService | None = None,
     ) -> None:
         """Initialize the probe base.
 
@@ -58,6 +59,7 @@ class ProbeBase(SessionBase):
             prefer_account: Whether to prefer account login.
             cdp_service: Injected CDPService. Created internally if None.
             command_service: Injected CommandService. Created internally if None.
+            world: Injected WorldService. Created internally if None.
         """
         super().__init__(
             target_url,
@@ -65,6 +67,7 @@ class ProbeBase(SessionBase):
             prefer_account=prefer_account,
             cdp_service=cdp_service,
             command_service=command_service,
+            world=world,
         )
         self._page: PageProtocol | None = None
         self._action_cycle_tracker = ActionCycleTracker()
@@ -239,7 +242,7 @@ class ProbeBase(SessionBase):
         Returns:
             Current WorldStateDict.
         """
-        return get_world_state()
+        return self.world.get_world_state()
 
     def get_state(self) -> str:
         """Get current probe state.
@@ -258,7 +261,7 @@ class ProbeBase(SessionBase):
         Returns:
             SelfStateDict if available, None if not yet tracked.
         """
-        return get_world_state()["self_state"]
+        return self.world.get_world_state()["self_state"]
 
     # -----------------------------------------------------------------
     # Action phase tracking

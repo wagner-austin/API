@@ -21,7 +21,8 @@ exactly as before; the submodules group hooks by domain:
 * :mod:`tankpit_bot._test_hooks.bot` -- the buffered-message-source
   surface.
 * :mod:`tankpit_bot._test_hooks.runtime` -- argv, static-byte discovery,
-  replay dispatch.
+  watchdog, signals. Replay decode moved to
+  :mod:`tankpit_bot.replay._test_hooks` (step 8).
 
 Strict typing only: no Any, no casts, no type: ignore, no stubs.
 """
@@ -30,7 +31,6 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks.bot import BufferedMessageSourceProtocol
 from tankpit_bot._test_hooks.browser import (
-    AutoscrollEnforcerProtocol,
     AutoscrollKeyProtocol,
     AutoscrollPageProtocol,
     BrowserContextProtocol,
@@ -42,8 +42,6 @@ from tankpit_bot._test_hooks.browser import (
     RoomJoinPageProtocol,
     SyncPlaywrightContextManagerProtocol,
     SyncPlaywrightFactoryProtocol,
-    _real_ensure_autoscroll_off,
-    ensure_autoscroll_off,
 )
 from tankpit_bot._test_hooks.cdp import (
     CDPSessionProtocol,
@@ -89,19 +87,16 @@ from tankpit_bot._test_hooks.playwright_loader import (
 from tankpit_bot._test_hooks.runtime import (
     FindBestStaticByteProtocol,
     InstallSignalHandlersProtocol,
-    ProcessReceivedMessageProtocol,
     StartWatchdogProtocol,
     _real_get_argv,
     _real_get_current_time_ms,
     _real_install_signal_handlers,
-    _real_process_received_message,
     _real_start_watchdog,
     find_best_static_byte,
     force_exit,
     get_argv,
     get_current_time_ms,
     install_signal_handlers,
-    process_received_message_hook,
     start_watchdog,
 )
 from tankpit_bot._test_hooks.terrain import (
@@ -113,7 +108,6 @@ from tankpit_bot._test_hooks.terrain import (
 
 __all__ = [
     "AppendTextProtocol",
-    "AutoscrollEnforcerProtocol",
     "AutoscrollKeyProtocol",
     "AutoscrollPageProtocol",
     "BrowserContextProtocol",
@@ -132,7 +126,6 @@ __all__ = [
     "PageWaitProtocol",
     "PathExistsProtocol",
     "PlaywrightProtocol",
-    "ProcessReceivedMessageProtocol",
     "ReadTextProtocol",
     "RemoveFileProtocol",
     "ResponseProtocol",
@@ -145,7 +138,6 @@ __all__ = [
     "WriteTextProtocol",
     "_default_get_env",
     "_real_append_text",
-    "_real_ensure_autoscroll_off",
     "_real_get_argv",
     "_real_get_current_time_ms",
     "_real_get_sync_playwright",
@@ -154,14 +146,12 @@ __all__ = [
     "_real_load_dotenv",
     "_real_load_terrain_map",
     "_real_path_exists",
-    "_real_process_received_message",
     "_real_read_text",
     "_real_remove_file",
     "_real_start_watchdog",
     "_real_write_bytes",
     "_real_write_text",
     "append_text",
-    "ensure_autoscroll_off",
     "find_best_static_byte",
     "force_exit",
     "get_argv",
@@ -173,7 +163,6 @@ __all__ = [
     "load_dotenv",
     "load_terrain_map",
     "path_exists",
-    "process_received_message_hook",
     "read_text",
     "remove_file",
     "start_watchdog",

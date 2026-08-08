@@ -43,7 +43,6 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
 )
-from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state.types import ContainerStateDict
 
 _EQUIPMENT_PROBE_TARGET_STEP = 16
@@ -407,7 +406,7 @@ class EquipmentProbe(ProbeBase):
             build_map_sync_timeout_result=self._build_map_sync_timeout_result,
             build_teleport_timeout_result=self._build_teleport_timeout_result,
             finalize_attempt_delay=self._finalize_attempt_delay,
-            terrain_provider=get_terrain_map,
+            terrain_provider=self.world.get_terrain_map,
             find_visible_target=find_visible_equipment_target,
             requires_reposition=visible_equipment_requires_reposition,
             find_landing_tile=find_visible_equipment_landing_tile,

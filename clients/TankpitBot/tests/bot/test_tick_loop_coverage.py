@@ -14,10 +14,7 @@ from tankpit_bot.bot.states import (
     InFlightActionDict,
 )
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
 from tests.bot._tick_loop_fakes import _FakePage
 from tests.conftest import (
@@ -114,7 +111,7 @@ class TestWireSilenceWatchdog:
         from tankpit_bot.bot.tick_body import _check_wire_silence
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        assert get_world_service().last_game_message_ms == 0
+        assert bot.world.last_game_message_ms == 0
 
         _check_wire_silence(bot)
 
@@ -123,7 +120,7 @@ class TestWireSilenceWatchdog:
         from tankpit_bot.bot.tick_body import _check_wire_silence
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        get_world_service().last_game_message_ms = get_current_time_ms() - 1_000
+        bot.world.last_game_message_ms = get_current_time_ms() - 1_000
 
         _check_wire_silence(bot)
 
@@ -144,9 +141,7 @@ class TestWireSilenceWatchdog:
         )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        get_world_service().last_game_message_ms = (
-            get_current_time_ms() - _WIRE_SILENCE_LIMIT_MS - 1
-        )
+        bot.world.last_game_message_ms = get_current_time_ms() - _WIRE_SILENCE_LIMIT_MS - 1
 
         with pytest.raises(SessionExitError) as exc_info:
             _check_wire_silence(bot)
@@ -215,11 +210,10 @@ class TestDrainReceipt:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
-        from tankpit_bot.sniffer.world_state import get_world_service
         from tankpit_bot.state.types import WorldStateDict, make_container_state
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         ws.world_state = WorldStateDict(
             **{
                 **ws.world_state,
@@ -246,7 +240,7 @@ class TestDrainReceipt:
         )
         # The pickup broadcast for the tile fired within the click.
         ws.recent_pickup_signatures[((150, 150, 0),)] = get_current_time_ms()
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
         action = InFlightActionDict(
@@ -273,11 +267,10 @@ class TestTeleportPreconditionReceipt:
         must stay teleportable for the deferred retry."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
-        from tankpit_bot.sniffer.world_state import get_world_service, is_move_target_failed
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "TELEPORTING"
         action = InFlightActionDict(
@@ -292,4 +285,4 @@ class TestTeleportPreconditionReceipt:
         result = _wait_for_movement_action(bot, action)
 
         assert result is False
-        assert is_move_target_failed(221, 209, get_current_time_ms()) is False
+        assert ws.is_move_target_failed(221, 209, get_current_time_ms()) is False

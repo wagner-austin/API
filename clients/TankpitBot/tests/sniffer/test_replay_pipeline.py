@@ -99,6 +99,7 @@ def test_fuel_probe_capture_replays_to_observed_terminal_state() -> None:
     changes how tanks, containers, mines, viewports, inventory, or self-state
     are mutated will fail this assertion.
     """
+    ws = WorldService()
     session = _load(REPO_ROOT / "fuel_probe.capture_session.json")
     ws, received = _replay_all_received(session)
 
@@ -156,6 +157,7 @@ def test_fuel_probe_inventory_zero_until_first_sync_frame() -> None:
     the inventory tracker is not credited by any earlier frame and is only
     populated by the explicit absolute-sync message.
     """
+    ws = WorldService()
     session = _load(REPO_ROOT / "fuel_probe.capture_session.json")
     ws, received = _replay_through(session, stop_at_index=51)
 
@@ -169,6 +171,7 @@ def test_fuel_probe_inventory_jumps_to_112_after_first_sync_frame() -> None:
     Replays through and including the first inventory-growing frame, asserts
     the real tracker now reports the recorded post-sync totals.
     """
+    ws = WorldService()
     session = _load(REPO_ROOT / "fuel_probe.capture_session.json")
     ws, _received = _replay_through(session, stop_at_index=52)
 
@@ -190,6 +193,7 @@ def test_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
     immediately, so the terminal count is 11 (previously 0 because the
     old per-tile cache_value path didn't promote anything).
     """
+    ws = WorldService()
     session = _load(REPO_ROOT / "teleport_probe.capture_session.json")
     ws, received = _replay_all_received(session)
 
@@ -210,6 +214,7 @@ def test_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
 
 def test_enemy_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
     """The enemy-teleport capture lands on an enemy and decrements radar slots."""
+    ws = WorldService()
     session = _load(REPO_ROOT / "enemy_teleport_probe.capture_session.json")
     ws, received = _replay_all_received(session)
 
@@ -238,6 +243,7 @@ def test_movement_probe_capture_replays_to_observed_terminal_state() -> None:
     the bot walks through visible terrain (was 0 in the pre-unified
     container-store world).
     """
+    ws = WorldService()
     session = _load(REPO_ROOT / "movement_probe.capture_session.json")
     ws, received = _replay_all_received(session)
 
@@ -266,6 +272,7 @@ def test_mixed_activity_sniff_capture_replays_to_observed_terminal_state() -> No
     and was overwritten by every sniff run. Terminal state: 228 received
     frames, self ends at (178, 54) with full fuel and full inventory.
     """
+    ws = WorldService()
     fixtures_dir = REPO_ROOT / "tests" / "replay" / "fixtures"
     session = _load(fixtures_dir / "mixed_activity_sniff.capture_session.json")
     ws, received = _replay_all_received(session)

@@ -9,9 +9,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
 )
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import (
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._strategy_fixtures import (
     _c,
     _make_inventory,
@@ -25,10 +23,12 @@ class TestLockedEquipmentTarget:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        update_world_state_from_position(100, 100)
+        self.ws = WorldService()
+        self.ws.update_world_state_from_position(100, 100)
 
     def test_continues_locked_equipment_target(self) -> None:
         """Locked equipment target is continued when still actionable."""
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(containers=containers)
         ai_state = AIStateDict(
@@ -45,7 +45,7 @@ class TestLockedEquipmentTarget:
         # default_count=15: below low (20) but above break (12) → _try_collect_equipment path
         inventory = _make_inventory(default_count=15)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason_kind"] == "equipment_locked"
@@ -67,6 +67,7 @@ class TestLockedEquipmentTarget:
         from tankpit_bot.types.constants import TERRAIN_FERRY
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(containers=containers, fuel=800)
         world["terrain"]["104,105"] = make_terrain_tile(104, 105, TERRAIN_FERRY, observed_ms=100000)
@@ -91,7 +92,7 @@ class TestLockedEquipmentTarget:
         )
         inventory = _make_inventory(default_count=15)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["behavior"]["reason_kind"] != "equipment_locked"
         assert decision["command"]["cmd_type"] != "pickup_equipment"
@@ -107,6 +108,7 @@ class TestLockedEquipmentTarget:
 
         # Far target outside viewport — all viewport tiles water so no walkable approach,
         # and the direct teleport is unaffordable.
+        ws = self.ws
         containers = {"200,200": _c(200, 200, 0, False)}
         world, self_state = _make_world(containers=containers, fuel=550)
         terrain_data: dict[tuple[int, int], str] = {
@@ -127,7 +129,7 @@ class TestLockedEquipmentTarget:
         # default_count=15: below low but above break
         inventory = _make_inventory(default_count=15)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         # Teleport to (200,200) costs 1200 fuel with only 550 held: the
         # tick goes elsewhere but the plan is kept.
@@ -141,9 +143,9 @@ class TestLockedEquipmentTarget:
         server truth, so the continuation releases the plan with the
         ``not_executable`` reason instead of holding it.
         """
-        from tankpit_bot.sniffer.world_state import mark_move_target_failed
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(containers=containers, fuel=800)
         terrain_data: dict[tuple[int, int], str] = {
@@ -154,7 +156,7 @@ class TestLockedEquipmentTarget:
             (105, 106): "W",
         }
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-        mark_move_target_failed(105, 105, 99000)
+        ws.mark_move_target_failed(105, 105, 99000)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
@@ -168,7 +170,7 @@ class TestLockedEquipmentTarget:
         )
         inventory = _make_inventory(default_count=15)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["behavior"]["reason_kind"] != "equipment_locked"
         assert decision["updated_ai_state"]["resource_target_kind"] == ""
@@ -179,10 +181,12 @@ class TestLockedFuelTarget:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        update_world_state_from_position(100, 100)
+        self.ws = WorldService()
+        self.ws.update_world_state_from_position(100, 100)
 
     def test_continues_locked_fuel_target(self) -> None:
         """Locked fuel target is continued when still actionable."""
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 700, True)}
         world, self_state = _make_world(fuel=150, containers=containers)
         ai_state = AIStateDict(
@@ -195,7 +199,7 @@ class TestLockedFuelTarget:
         )
         inventory = _make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason_kind"] == "fuel_locked"
@@ -214,6 +218,7 @@ class TestLockedFuelTarget:
         from tankpit_bot.types.constants import TERRAIN_FERRY
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 700, True)}
         world, self_state = _make_world(fuel=800, containers=containers)
         world["terrain"]["104,105"] = make_terrain_tile(104, 105, TERRAIN_FERRY, observed_ms=100000)
@@ -241,6 +246,7 @@ class TestLockedFuelTarget:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         decision, state = continue_or_release_fuel_lock(
@@ -254,9 +260,9 @@ class TestLockedFuelTarget:
         """The move-failed mark structurally releases the fuel plan."""
         from tankpit_bot.bot.ai.collect_locks import continue_or_release_fuel_lock
         from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.sniffer.world_state import mark_move_target_failed
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 700, True)}
         world, self_state = _make_world(fuel=800, containers=containers)
         terrain_data: dict[tuple[int, int], str] = {
@@ -267,7 +273,7 @@ class TestLockedFuelTarget:
             (105, 106): "W",
         }
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-        mark_move_target_failed(105, 105, 99000)
+        ws.mark_move_target_failed(105, 105, 99000)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
@@ -284,6 +290,7 @@ class TestLockedFuelTarget:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         decision, state = continue_or_release_fuel_lock(
@@ -299,10 +306,12 @@ class TestCriticalEquipmentLockedTarget:
 
     def setup_method(self) -> None:
         """Reset world state."""
-        update_world_state_from_position(100, 100)
+        self.ws = WorldService()
+        self.ws.update_world_state_from_position(100, 100)
 
     def test_continues_locked_critical_equipment_target(self) -> None:
         """Critical locked equipment target is continued when executable."""
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(containers=containers)
         ai_state = AIStateDict(
@@ -315,7 +324,7 @@ class TestCriticalEquipmentLockedTarget:
         )
         inventory = _make_inventory(default_count=3)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason_kind"] == "equipment_locked"
@@ -335,6 +344,7 @@ class TestCriticalEquipmentLockedTarget:
         """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = self.ws
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(containers=containers)
         terrain_data: dict[tuple[int, int], str] = {
@@ -356,6 +366,6 @@ class TestCriticalEquipmentLockedTarget:
         # default_count=5: every counter below resume → mode-entry triggers.
         inventory = _make_inventory(default_count=5)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"

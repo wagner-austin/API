@@ -10,7 +10,6 @@ from typing import (
 
 from tests.action_lab._fuel_probe_harness import (
     _ProbeHarness,
-    fuel_targeting_module,
     fuel_targets_module,
 )
 from tests.action_lab._replay_page import ReplayClock
@@ -268,9 +267,8 @@ def _set_real_targeting_with_reposition(
     """
     fuel_probe_module._wait_for_teleport_outcome = teleport_outcome
     terrain_provider = _make_rock_wall_terrain_provider()
-    fuel_probe_module.get_terrain_map = terrain_provider
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
-    fuel_targeting_module.get_terrain_map = terrain_provider
+    probe.world.terrain_map = terrain_provider()
+    probe.world.terrain_map = terrain_provider()
     fuel_container = make_container_state(105, 100, True, 300)
     probe._world_state["containers"][f"{fuel_container['x']},{fuel_container['y']}"] = (
         fuel_container

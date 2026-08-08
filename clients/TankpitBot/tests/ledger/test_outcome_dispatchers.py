@@ -11,7 +11,7 @@ from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.ledger.outcome.teleport import TeleportDispatchContract
 from tankpit_bot.ledger.ring import outcome_counts
 from tankpit_bot.ledger.service import LedgerService
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.conftest import FakeEnv
 
 
@@ -32,7 +32,8 @@ def test_command_rejected_dispatcher_routes_every_kind(fake_env: FakeEnv) -> Non
     ``pickup_empty`` / ``clamped_transfer`` / ``inventory_full``);
     collect code 0 and every other kind stay ``command_rejected``.
     """
-    bot = Bot("https://test.tankpit.com/", headless=True)
+    ws = WorldService()
+    bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
     _emit_command_rejected_outcome(bot, "move", 1, 2, 100, 0)
     _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 0)
     _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 4)
@@ -42,8 +43,8 @@ def test_command_rejected_dispatcher_routes_every_kind(fake_env: FakeEnv) -> Non
     _emit_command_rejected_outcome(bot, "scan", 1, 2, 100, 0)
     _emit_command_rejected_outcome(bot, "map_open", 1, 2, 100, 0)
     for kind in ("move", "teleport", "scan", "map_open"):
-        assert outcome_counts(get_world_service().ledger, kind) == {"command_rejected": 1}
-    assert outcome_counts(get_world_service().ledger, "collect") == {
+        assert outcome_counts(ws.ledger, kind) == {"command_rejected": 1}
+    assert outcome_counts(ws.ledger, "collect") == {
         "command_rejected": 1,
         "pickup_empty": 1,
         "clamped_transfer": 1,
@@ -53,14 +54,15 @@ def test_command_rejected_dispatcher_routes_every_kind(fake_env: FakeEnv) -> Non
 
 def test_stall_dispatcher_routes_every_kind(fake_env: FakeEnv) -> None:
     """Each action kind's stall timeout routes to its typed emitter."""
-    bot = Bot("https://test.tankpit.com/", headless=True)
+    ws = WorldService()
+    bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
     _emit_stall_outcome(bot, "move", 1, 2, 10000, 10000)
     _emit_stall_outcome(bot, "collect", 1, 2, 10000, 10000)
     _emit_stall_outcome(bot, "teleport", 1, 2, 10000, 10000)
     _emit_stall_outcome(bot, "scan", 1, 2, 10000, 10000)
     _emit_stall_outcome(bot, "map_open", 1, 2, 10000, 10000)
     for kind in ("move", "collect", "teleport", "scan", "map_open"):
-        assert outcome_counts(get_world_service().ledger, kind) == {"stall_timeout": 1}
+        assert outcome_counts(ws.ledger, kind) == {"stall_timeout": 1}
 
 
 def test_dispatchers_ignore_shoot_kind(fake_env: FakeEnv) -> None:
@@ -70,10 +72,11 @@ def test_dispatchers_ignore_shoot_kind(fake_env: FakeEnv) -> None:
     five HFSM-tracked kinds; a ``shoot`` (fire-and-forget) or ``none``
     kind falls through without emitting.
     """
-    bot = Bot("https://test.tankpit.com/", headless=True)
+    ws = WorldService()
+    bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
     _emit_command_rejected_outcome(bot, "shoot", 1, 2, 100, 0)
     _emit_stall_outcome(bot, "none", 1, 2, 100, 100)
-    assert outcome_counts(get_world_service().ledger, "shoot") == {}
+    assert outcome_counts(ws.ledger, "shoot") == {}
 
 
 def test_teleport_dispatch_contract_names_itself_and_rejects_bad_input(

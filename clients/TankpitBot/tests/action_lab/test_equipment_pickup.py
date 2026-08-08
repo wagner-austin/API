@@ -26,7 +26,7 @@ from tankpit_bot.action_lab.equipment_pickup import (
     wait_for_equipment_pickup_outcome,
 )
 from tankpit_bot.inventory import InventoryItem, InventoryState
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_gain
 from tankpit_bot.state import WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.state.types import make_viewport_state
@@ -63,7 +63,8 @@ class _FakeProbe:
     """Minimal buffered-world-state provider used by pickup helpers."""
 
     def __init__(self, world: WorldStateDict) -> None:
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._world = world
         self._cdp_message_buffer: list[str] = []
         self.xor_table: bytes | None = None
@@ -132,8 +133,8 @@ def test_total_inventory_count_sums_all_slots() -> None:
 
 def test_get_completed_outcome_returns_none_when_inventory_unchanged() -> None:
     """No completed outcome is reported while the inventory is unchanged."""
-    set_inventory_total(2)
     probe = _FakeProbe(_make_world(1000))
+    set_inventory_total(probe.world, 2)
 
     result = get_completed_equipment_pickup_outcome(
         probe,
@@ -149,8 +150,8 @@ def test_get_completed_outcome_returns_outcome_when_inventory_grows() -> None:
     """A completed outcome is reported once the real inventory total grows."""
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
-    set_inventory_total(3)
     probe = _FakeProbe(_make_world(1000))
+    set_inventory_total(probe.world, 3)
 
     result = get_completed_equipment_pickup_outcome(
         probe,
@@ -167,8 +168,8 @@ def test_wait_returns_immediately_when_inventory_already_grown() -> None:
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda provider, ws: 0
-    set_inventory_total(3)
     probe = _FakeProbe(_make_world(1000))
+    set_inventory_total(probe.world, 3)
     page = _FakePage(clock, hook=lambda: None)
 
     status, completed_ms, total = wait_for_equipment_pickup_outcome(
@@ -194,16 +195,16 @@ def test_wait_polls_until_inventory_grows() -> None:
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda provider, ws: 0
-    set_inventory_total(2)
+    probe = _FakeProbe(_make_world(1000))
+    set_inventory_total(probe.world, 2)
 
     wait_counter = {"count": 0}
 
     def _grow_inventory_on_second_wait() -> None:
         wait_counter["count"] += 1
         if wait_counter["count"] == 2:
-            update_inventory_from_gain(get_world_service(), [0, 1, 0, 0, 0])
+            update_inventory_from_gain(probe.world, [0, 1, 0, 0, 0])
 
-    probe = _FakeProbe(_make_world(1000))
     page = _FakePage(clock, hook=_grow_inventory_on_second_wait)
 
     status, completed_ms, total = wait_for_equipment_pickup_outcome(
@@ -225,8 +226,8 @@ def test_wait_returns_pickup_timeout_when_budget_exhausts() -> None:
     clock = _Clock(2000)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda provider, ws: 0
-    set_inventory_total(2)
     probe = _FakeProbe(_make_world(1000))
+    set_inventory_total(probe.world, 2)
     page = _FakePage(clock, hook=lambda: None)
 
     status, completed_ms, total = wait_for_equipment_pickup_outcome(

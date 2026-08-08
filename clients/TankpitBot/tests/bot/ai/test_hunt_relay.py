@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -26,6 +27,7 @@ def test_hunt_acquire_teleports_at_an_affordablemake_map_known_enemy() -> None:
     observation), close enough that teleport + kill budget + reserve
     fits inside the tank -- the acquisition path teleports at it.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(x=130, y=100),
     }
@@ -39,7 +41,7 @@ def test_hunt_acquire_teleports_at_an_affordablemake_map_known_enemy() -> None:
             "last_map_open_ms": 99500,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -58,6 +60,7 @@ def test_hunt_acquire_relays_via_dot_toward_unaffordable_enemy() -> None:
     progress) and the near-enemy dot that would dip below the
     fuel-low reserve are both skipped.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(),
         # Stale map entry: rejected for a non-affordability reason, so
@@ -87,6 +90,7 @@ def test_hunt_acquire_relays_via_dot_toward_unaffordable_enemy() -> None:
         # most progress but costs 780 + 200 reserve > 700 fuel;
         # (150,100) is the affordable progress dot.
         ((50, 100), (230, 100), (150, 100)),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -106,6 +110,7 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
     dot exercises the not-better-than-incumbent branch. An allied tank
     in the registry exercises the relay's non-enemy filter.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(),
         "80": make_tank_state(
@@ -141,6 +146,7 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
         None,
         "",
         ((170, 100), (130, 100)),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -152,6 +158,7 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
 
 def test_hunt_relay_tie_breaks_on_cheaper_hop() -> None:
     """Dots equidistant from the enemy keep the cheaper teleport."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"60": make_map_known_enemy()}
     world, self_state = make_world(fuel=1100, tanks=tanks)
     ai_state = AIStateDict(
@@ -175,6 +182,7 @@ def test_hunt_relay_tie_breaks_on_cheaper_hop() -> None:
         None,
         "",
         ((240, 120), (220, 100)),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -188,6 +196,7 @@ def test_hunt_relay_exits_when_only_dot_is_impassable() -> None:
     """A relay with no passable progress dot still exits the session."""
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"60": make_map_known_enemy()}
     world, self_state = make_world(fuel=700, tanks=tanks)
     ai_state = AIStateDict(
@@ -210,6 +219,7 @@ def test_hunt_relay_exits_when_only_dot_is_impassable() -> None:
         terrain,
         "",
         ((150, 100),),
+        ws=ws,
     )
 
     with pytest.raises(SessionExitError, match="no_viable_targets"):
@@ -228,6 +238,7 @@ def test_hunt_refuels_in_place_when_no_dot_makes_progress() -> None:
     BEHIND the bot relative to the enemy at (240,100), so the relay
     declines it but the refuel fallback takes it.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"60": make_map_known_enemy()}
     world, self_state = make_world(fuel=700, tanks=tanks)
     ai_state = AIStateDict(
@@ -249,6 +260,7 @@ def test_hunt_refuels_in_place_when_no_dot_makes_progress() -> None:
         None,
         "",
         ((50, 100),),
+        ws=ws,
     )
 
     decision = decide_hunt_mode(ctx)
@@ -268,6 +280,7 @@ def test_hunt_refuel_exits_at_fuel_capacity() -> None:
     correct: the enemy at 140 tiles needs 840 + 650 = 1490 fuel
     end-to-end, beyond what this rank can ever carry.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"60": make_map_known_enemy()}
     world, self_state = make_world(fuel=1200, tanks=tanks)
     ai_state = AIStateDict(
@@ -289,6 +302,7 @@ def test_hunt_refuel_exits_at_fuel_capacity() -> None:
         None,
         "",
         ((50, 100),),
+        ws=ws,
     )
 
     with pytest.raises(SessionExitError, match="no_viable_targets"):
@@ -306,6 +320,7 @@ def test_hunt_pursuit_aim_is_clamped_into_viewport() -> None:
     viewport bounds. Registry truth (combat_target_x/y) keeps the real
     position for the stationary-miss comparison.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -322,7 +337,7 @@ def test_hunt_pursuit_aim_is_clamped_into_viewport() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 

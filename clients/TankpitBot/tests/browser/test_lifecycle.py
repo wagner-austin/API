@@ -11,6 +11,7 @@ from tankpit_bot.browser.lifecycle import (
     wait_for_game_ready,
 )
 from tankpit_bot.browser.types import GameNotJoinedError
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import CapturedMessage
 from tests.action_lab._replay_page import (
     ClockAdvancingPage,
@@ -77,6 +78,7 @@ class TestNavigateAndLogin:
         navigate_and_login(
             page,
             cdp,
+            WorldService(),
             target_url="https://tankpit.com/play",
             prefer_account=False,
         )
@@ -89,6 +91,7 @@ class TestNavigateAndLogin:
             navigate_and_login(
                 page,
                 cdp,
+                WorldService(),
                 target_url="https://tankpit.com/play",
                 prefer_account=False,
             )

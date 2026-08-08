@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
@@ -28,6 +29,7 @@ class TestDepartedTargetFollowUp:
         acquisition, no distance lottery. (Run 194658 lost orange-9 at
         13 banked hits to the distance lottery under the old release.)
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -59,7 +61,7 @@ class TestDepartedTargetFollowUp:
         )
         inventory = make_inventory()
 
-        chase = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
+        chase = decide(world, self_state, ai_state, inventory, 100000, None, "miss", ws=ws)
         assert chase["command"]["cmd_type"] == "map_open"
         assert chase["updated_ai_state"]["combat_target_id"] == 50
         assert chase["updated_ai_state"]["blocked_combat_targets"] == {}
@@ -94,7 +96,7 @@ class TestDepartedTargetFollowUp:
             }
         )
 
-        decision = decide(world2, self_state2, chase_state, inventory, 102500, None, "")
+        decision = decide(world2, self_state2, chase_state, inventory, 102500, None, "", ws=ws)
 
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["updated_ai_state"]["combat_target_id"] == 50

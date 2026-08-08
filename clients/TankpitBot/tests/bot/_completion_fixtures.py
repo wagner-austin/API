@@ -21,6 +21,7 @@ from tankpit_bot.runtime_records import (
     RuntimeEventRecordDict,
     decode_runtime_event_record,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 
 
 def _decode_action_outcome_lines(jsonl: str) -> list[RuntimeEventRecordDict]:
@@ -47,6 +48,7 @@ def _decode_action_outcome_lines(jsonl: str) -> list[RuntimeEventRecordDict]:
 
 def _make_bot_with_in_flight(
     *,
+    world: WorldService,
     state: StateName,
     action_kind: ActionKind,
     target_x: int,
@@ -56,6 +58,8 @@ def _make_bot_with_in_flight(
     """Build a :class:`Bot` with a pre-configured in-flight action.
 
     Args:
+        world: The world service the bot reads its beliefs from -- the
+            caller seeds it, so the bot must be given that same service.
         state: HFSM state name to install.
         action_kind: Kind for the in-flight action record.
         target_x: Target X coordinate stamped on the action record.
@@ -66,7 +70,7 @@ def _make_bot_with_in_flight(
         Bot instance whose ``_state_data`` carries the configured
         in-flight action and HFSM state.
     """
-    bot = Bot("https://test.tankpit.com/", headless=True)
+    bot = Bot("https://test.tankpit.com/", headless=True, world=world)
     base_data: BotStateDataDict = make_initial_state_data()
     action: InFlightActionDict = make_in_flight_action(
         action_kind,

@@ -108,6 +108,7 @@ def refuel_for_hunt(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict
         ctx.terrain,
         ctx.combat_feedback,
         ctx.map_fuel_dots,
+        ws=ctx.ws,
     )
     decision = decide_collect_mode(locked_ctx)
     if decision is None:

@@ -35,7 +35,6 @@ from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.state.types import make_tank_state
 
@@ -105,13 +104,13 @@ def test_wait_for_shot_feedback_reports_a_hit() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     _install_noop_drain()
-    world_service = get_world_service()
-    world_service.got_our_shot_response = True
-    world_service.got_confirmed_hit = True
+    probe = _DrainProbe()
+    probe.world.got_our_shot_response = True
+    probe.world.got_confirmed_hit = True
 
     assert _wait_for_shot_feedback(
         ClockAdvancingPage(clock),
-        _DrainProbe(),
+        probe,
         timeout_ms=1000,
     ) == (True, True)
 
@@ -121,13 +120,13 @@ def test_wait_for_shot_feedback_reports_a_miss() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     _install_noop_drain()
-    world_service = get_world_service()
-    world_service.got_our_shot_response = True
-    world_service.got_confirmed_hit = False
+    probe = _DrainProbe()
+    probe.world.got_our_shot_response = True
+    probe.world.got_confirmed_hit = False
 
     assert _wait_for_shot_feedback(
         ClockAdvancingPage(clock),
-        _DrainProbe(),
+        probe,
         timeout_ms=1000,
     ) == (True, False)
 
@@ -142,11 +141,12 @@ def test_wait_for_shot_feedback_times_out_without_a_response() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     _install_noop_drain()
-    get_world_service().got_our_shot_response = False
+    probe = _DrainProbe()
+    probe.world.got_our_shot_response = False
 
     assert _wait_for_shot_feedback(
         ClockAdvancingPage(clock),
-        _DrainProbe(),
+        probe,
         timeout_ms=300,
     ) == (False, False)
 

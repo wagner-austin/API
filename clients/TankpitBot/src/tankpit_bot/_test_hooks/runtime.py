@@ -6,8 +6,6 @@ do not require their own modules:
 * ``get_argv`` -- ``sys.argv`` accessor (tests substitute a fixed list).
 * ``find_best_static_byte`` -- optional override that lets tests inject
   the XOR static-byte discovery without invoking the real algorithm.
-* ``process_received_message_hook`` -- replay-time entry point into the
-  sniffer decoder pipeline.
 """
 
 from __future__ import annotations
@@ -71,45 +69,6 @@ def _real_get_argv() -> list[str]:
 
 
 get_argv: Callable[[], list[str]] = _real_get_argv
-
-
-class ProcessReceivedMessageProtocol(Protocol):
-    """Protocol for processing a received WebSocket message payload."""
-
-    def __call__(self, payload: str, xor_table: bytes) -> None:
-        """Process a received message payload.
-
-        Args:
-            payload: Base64-encoded WebSocket frame payload.
-            xor_table: The owning session's XOR table.
-        """
-        ...
-
-
-def _real_process_received_message(payload: str, xor_table: bytes) -> None:
-    """Real implementation - delegates to sniffer decoders.
-
-    The world service is resolved HERE rather than taken as a
-    parameter: ``_test_hooks`` cannot import
-    :mod:`tankpit_bot.sniffer.world_service` at module scope without
-    closing an import cycle through ``state`` (measured 2026-08-07 —
-    the guard's physics-claim importer caught it, a plain
-    ``import _test_hooks.runtime`` did not, because the cycle only
-    shows when ``state`` is imported first). This is the last
-    singleton reach on the replay path and falls with step 8's final
-    flip ([[session-state-deglobalisation]]).
-
-    Args:
-        payload: Base64-encoded WebSocket frame payload.
-        xor_table: The owning session's XOR table.
-    """
-    from tankpit_bot.sniffer.decoders import process_received_message
-    from tankpit_bot.sniffer.world_state import get_world_service
-
-    process_received_message(get_world_service(), payload, xor_table)
-
-
-process_received_message_hook: ProcessReceivedMessageProtocol = _real_process_received_message
 
 
 class StartWatchdogProtocol(Protocol):
@@ -198,7 +157,6 @@ force_exit: Callable[[int], None] = os._exit
 __all__ = [
     "FindBestStaticByteProtocol",
     "InstallSignalHandlersProtocol",
-    "ProcessReceivedMessageProtocol",
     "StartWatchdogProtocol",
     "_real_get_current_time_ms",
     "find_best_static_byte",
@@ -206,6 +164,5 @@ __all__ = [
     "get_argv",
     "get_current_time_ms",
     "install_signal_handlers",
-    "process_received_message_hook",
     "start_watchdog",
 ]

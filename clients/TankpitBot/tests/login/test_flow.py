@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser.login import handle_login_flow
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.login.conftest import FakeCDPLogin, FakePageLogin
 
 
@@ -32,7 +33,7 @@ def test_handle_login_flow_not_on_before_playing() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin()
 
-    result = handle_login_flow(page, cdp)
+    result = handle_login_flow(page, cdp, WorldService())
 
     assert result is True
 
@@ -42,7 +43,7 @@ def test_handle_login_flow_guest_success() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/before-playing")
     cdp = FakeCDPLogin()
 
-    result = handle_login_flow(page, cdp)
+    result = handle_login_flow(page, cdp, WorldService())
 
     assert result is True
     assert "/play" in page.url
@@ -67,7 +68,7 @@ def test_handle_login_flow_rate_limited_no_credentials() -> None:
     _test_hooks.get_env = fake_get_env
     _test_hooks.path_exists = _fake_path_exists_deny_all
     try:
-        result = handle_login_flow(page, cdp)
+        result = handle_login_flow(page, cdp, WorldService())
     finally:
         _test_hooks.get_env = original_get_env
         _test_hooks.path_exists = original_path_exists
@@ -90,7 +91,7 @@ def test_handle_login_flow_rate_limited_with_credentials() -> None:
 
     _test_hooks.get_env = fake_get_env
     try:
-        result = handle_login_flow(page, cdp)
+        result = handle_login_flow(page, cdp, WorldService())
     finally:
         _test_hooks.get_env = original_get_env
 
@@ -113,7 +114,7 @@ def test_handle_login_flow_rate_limited_login_fails() -> None:
 
     _test_hooks.get_env = fake_get_env
     try:
-        result = handle_login_flow(page, cdp)
+        result = handle_login_flow(page, cdp, WorldService())
     finally:
         _test_hooks.get_env = original_get_env
 
@@ -128,7 +129,7 @@ def test_handle_login_flow_no_account_fallback() -> None:
     )
     cdp = FakeCDPLogin(rate_limited=True)
 
-    result = handle_login_flow(page, cdp, allow_account_fallback=False)
+    result = handle_login_flow(page, cdp, WorldService(), allow_account_fallback=False)
 
     # Returns True because it goes to ensure_on_play_page path
     assert result is True
@@ -139,7 +140,7 @@ def test_handle_login_flow_custom_prefix() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/before-playing")
     cdp = FakeCDPLogin()
 
-    result = handle_login_flow(page, cdp, tank_name_prefix="Z")
+    result = handle_login_flow(page, cdp, WorldService(), tank_name_prefix="Z")
 
     assert result is True
 
@@ -162,7 +163,7 @@ def test_handle_login_flow_prefer_account_success() -> None:
 
     _test_hooks.get_env = fake_get_env
     try:
-        result = handle_login_flow(page, cdp, prefer_account=True)
+        result = handle_login_flow(page, cdp, WorldService(), prefer_account=True)
     finally:
         _test_hooks.get_env = original_get_env
 
@@ -185,7 +186,7 @@ def test_handle_login_flow_prefer_account_no_credentials() -> None:
     _test_hooks.get_env = fake_get_env
     _test_hooks.path_exists = _fake_path_exists_deny_all
     try:
-        result = handle_login_flow(page, cdp, prefer_account=True)
+        result = handle_login_flow(page, cdp, WorldService(), prefer_account=True)
     finally:
         _test_hooks.get_env = original_get_env
         _test_hooks.path_exists = original_path_exists
@@ -206,7 +207,7 @@ def test_handle_login_flow_prefer_account_login_fails() -> None:
 
     _test_hooks.get_env = fake_get_env
     try:
-        result = handle_login_flow(page, cdp, prefer_account=True)
+        result = handle_login_flow(page, cdp, WorldService(), prefer_account=True)
     finally:
         _test_hooks.get_env = original_get_env
 

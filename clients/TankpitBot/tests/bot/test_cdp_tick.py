@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_fuel_total as _update_fuel_total,
 )
@@ -23,18 +23,17 @@ class TestBotTickOnce:
 
     def test_tick_once_low_fuel_radars_for_fuel(self, fake_env: FakeEnv) -> None:
         """_tick_once uses radar when fuel low and no containers visible."""
+
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(100, 100)
-        _update_fuel_total(get_world_service(), 300)
-        update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 5], [False] * 5)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        _update_fuel_total(ws, 300)
+        update_inventory_from_protocol(ws, [0, 0, 0, 0, 5], [False] * 5)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
@@ -46,19 +45,18 @@ class TestBotTickOnce:
 
     def test_tick_once_low_fuel_walks_to_edge(self, fake_env: FakeEnv) -> None:
         """_tick_once walks to viewport edge when fuel low and radar on cooldown."""
+
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.browser import get_current_time_ms
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(100, 100)
-        _update_fuel_total(get_world_service(), 300)
-        update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 5], [False] * 5)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        _update_fuel_total(ws, 300)
+        update_inventory_from_protocol(ws, [0, 0, 0, 0, 5], [False] * 5)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
@@ -74,19 +72,18 @@ class TestBotTickOnce:
 
     def test_tick_once_waits_for_in_flight_movement(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while a walk is still resolving."""
+
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession, InMemoryTerrainMap
 
-        update_world_state_from_position(10, 10)
-        _update_fuel_total(get_world_service(), 800)
-        update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
-        get_world_service().terrain_map = InMemoryTerrainMap()
+        ws = WorldService()
+        ws.update_world_state_from_position(10, 10)
+        _update_fuel_total(ws, 800)
+        update_inventory_from_protocol(ws, [5, 5, 5, 5, 5], [False] * 5)
+        ws.terrain_map = InMemoryTerrainMap()
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
@@ -98,18 +95,17 @@ class TestBotTickOnce:
 
     def test_tick_once_waits_for_in_flight_teleport(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while a teleport is still resolving."""
+
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(196, 85)
-        _update_fuel_total(get_world_service(), 582)
-        update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
+        ws = WorldService()
+        ws.update_world_state_from_position(196, 85)
+        _update_fuel_total(ws, 582)
+        update_inventory_from_protocol(ws, [5, 5, 5, 5, 5], [False] * 5)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = _sba(bot._state_data, "TELEPORTING", "teleport", 196, 86)
@@ -121,23 +117,22 @@ class TestBotTickOnce:
 
     def test_tick_once_waits_for_in_flight_collection(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while pickup movement is still resolving."""
+
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession, InMemoryTerrainMap
 
-        update_world_state_from_position(205, 79)
-        _update_fuel_total(get_world_service(), 580)
-        update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
+        ws = WorldService()
+        ws.update_world_state_from_position(205, 79)
+        _update_fuel_total(ws, 580)
+        update_inventory_from_protocol(ws, [5, 5, 5, 5, 5], [False] * 5)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=205, y=80, volume=-1)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines, [])
-        get_world_service().terrain_map = InMemoryTerrainMap()
+        _update_radar(ws, containers, mines, [])
+        ws.terrain_map = InMemoryTerrainMap()
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 205, 80)
@@ -149,21 +144,18 @@ class TestBotTickOnce:
 
     def test_tick_once_waits_for_pending_shot_feedback(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while the last shot outcome is still pending."""
+
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.browser import get_current_time_ms
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(50, 50)
-        _update_fuel_total(get_world_service(), 800)
-        update_inventory_from_protocol(
-            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
-        )
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 800)
+        update_inventory_from_protocol(ws, [0, 10, 0, 0, 0], [False, True, False, False, False])
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -190,6 +182,7 @@ class TestBotTickOnce:
         (The registry keeps departed tanks -- remove_tank is a no-op --
         so untracked ids only occur for genuinely unknown tanks.)
         """
+
         import tankpit_bot.bot.ai_strategy as ai_strategy_mod
         from tankpit_bot._test_hooks import TerrainMapProtocol
         from tankpit_bot.bot.ai.scoring_types import make_behavior_score
@@ -200,9 +193,6 @@ class TestBotTickOnce:
         from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
         from tankpit_bot.bot.types import make_shoot_command
         from tankpit_bot.inventory import InventoryState
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
         from tankpit_bot.state.types import (
             SelfStateDict,
@@ -210,13 +200,12 @@ class TestBotTickOnce:
         )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(100, 100)
-        _update_fuel_total(get_world_service(), 800)
-        update_inventory_from_protocol(
-            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
-        )
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        _update_fuel_total(ws, 800)
+        update_inventory_from_protocol(ws, [0, 10, 0, 0, 0], [False, True, False, False, False])
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._magic = "test_magic"
@@ -250,6 +239,8 @@ class TestBotTickOnce:
             terrain: TerrainMapProtocol | None,
             combat_feedback: CombatFeedback = "",
             map_fuel_dots: tuple[tuple[int, int], ...] = (),
+            *,
+            ws: WorldService,
         ) -> TickDecisionDict:
             _ = (
                 world,
@@ -260,6 +251,7 @@ class TestBotTickOnce:
                 terrain,
                 combat_feedback,
                 map_fuel_dots,
+                ws,
             )
             return decision
 
@@ -286,6 +278,7 @@ class TestBotTickOnce:
         ai_strategy.decide idiom: the only remaining non-dispatch path
         is a page/CDP send failure, which has no fake knob.
         """
+
         import tankpit_bot.bot.ai_strategy as ai_strategy_mod
         from tankpit_bot._test_hooks import TerrainMapProtocol
         from tankpit_bot.bot.ai.scoring_types import make_behavior_score
@@ -296,9 +289,6 @@ class TestBotTickOnce:
         from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
         from tankpit_bot.bot.types import make_shoot_command
         from tankpit_bot.inventory import InventoryState
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
         from tankpit_bot.state.types import (
             SelfStateDict,
@@ -306,13 +296,12 @@ class TestBotTickOnce:
         )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(100, 100)
-        _update_fuel_total(get_world_service(), 800)
-        update_inventory_from_protocol(
-            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
-        )
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        _update_fuel_total(ws, 800)
+        update_inventory_from_protocol(ws, [0, 10, 0, 0, 0], [False, True, False, False, False])
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._magic = "test_magic"
@@ -346,6 +335,8 @@ class TestBotTickOnce:
             terrain: TerrainMapProtocol | None,
             combat_feedback: CombatFeedback = "",
             map_fuel_dots: tuple[tuple[int, int], ...] = (),
+            *,
+            ws: WorldService,
         ) -> TickDecisionDict:
             _ = (
                 world,
@@ -356,6 +347,7 @@ class TestBotTickOnce:
                 terrain,
                 combat_feedback,
                 map_fuel_dots,
+                ws,
             )
             return decision
 
@@ -389,17 +381,16 @@ class TestBotTickOnce:
         fake_env: FakeEnv,
     ) -> None:
         """_tick_once scans first when regular radar is available at zero extra stock."""
+
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(50, 50)
-        _update_fuel_total(get_world_service(), 800)
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 800)
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()
@@ -421,23 +412,20 @@ class TestBotTickOnce:
         fake_env: FakeEnv,
     ) -> None:
         """_tick_once searches for equipment when dual is below break threshold."""
+
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tankpit_bot.state.tank_mutations import apply_tank_observation
         from tankpit_bot.state.types import make_tank_observation, make_tank_state
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(100, 100)
-        _update_fuel_total(get_world_service(), 800)
-        update_inventory_from_protocol(
-            get_world_service(), [0, 3, 0, 10, 10], [False, True, False, True, True]
-        )
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        _update_fuel_total(ws, 800)
+        update_inventory_from_protocol(ws, [0, 3, 0, 10, 10], [False, True, False, True, True])
 
-        get_world_service().world_state = apply_tank_observation(
-            get_world_service().world_state,
+        ws.world_state = apply_tank_observation(
+            ws.world_state,
             make_tank_observation(
                 tank_id=10,
                 timestamp_ms=get_current_time_ms(),
@@ -462,11 +450,11 @@ class TestBotTickOnce:
             is_self=False,
             timestamp_ms=get_current_time_ms(),
         )
-        new_tanks = dict(get_world_service().world_state["tanks"])
+        new_tanks = dict(ws.world_state["tanks"])
         new_tanks["10"] = enemy
-        get_world_service().world_state["tanks"] = new_tanks
+        ws.world_state["tanks"] = new_tanks
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
@@ -494,21 +482,18 @@ class TestBotTickOnce:
         fake_env: FakeEnv,
     ) -> None:
         """Killed-target replanning uses regular radar before broader search movement."""
+
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.browser import get_current_time_ms
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_position,
-        )
         from tests.fakes import FakeCDPSession
 
-        update_world_state_from_position(50, 50)
-        _update_fuel_total(get_world_service(), 800)
-        update_inventory_from_protocol(
-            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
-        )
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 800)
+        update_inventory_from_protocol(ws, [0, 10, 0, 0, 0], [False, True, False, False, False])
 
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._magic = "test_magic"
         bot._update_state_from_world()
         bot._update_state_from_world()

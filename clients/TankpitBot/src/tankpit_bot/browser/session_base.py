@@ -18,7 +18,6 @@ from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import send_websocket_bytes
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.types import CapturedMessage
 
 log = get_logger(__name__)
@@ -40,6 +39,7 @@ class SessionBase:
         prefer_account: bool = False,
         cdp_service: CDPService | None = None,
         command_service: CommandService | None = None,
+        world: WorldService | None = None,
     ) -> None:
         """Initialize session base with composed services.
 
@@ -49,6 +49,11 @@ class SessionBase:
             prefer_account: Whether to prefer account login.
             cdp_service: Injected CDPService. Created internally if None.
             command_service: Injected CommandService. Created internally if None.
+            world: Injected WorldService. Created internally if None. The
+                third member of the same injection list as the two
+                services above -- a caller that wants to observe or
+                pre-seed the session's world hands one in
+                ([[session-state-deglobalisation]] step 8).
         """
         self._target_url = target_url
         self._headless = headless
@@ -62,14 +67,11 @@ class SessionBase:
         )
         self._cdp: CDPSessionProtocol | None = None
         self._static_key: str | None = None
-        #: This session's world state. Bound to the process singleton
-        #: while step 8 is in flight -- the decoder still writes through
-        #: ``get_world_service()``, so a session holding a DIFFERENT
-        #: instance would read an empty world. The flip to
-        #: ``WorldService()`` and the deletion of the singleton are the
-        #: last two edits of the step, not the first
-        #: ([[session-state-deglobalisation]]).
-        self.world: WorldService = get_world_service()
+        #: This session's world state -- ITS OWN, not a process global.
+        #: Two sessions in one process now keep two independent worlds,
+        #: which the module singleton made impossible
+        #: ([[session-state-deglobalisation]] step 8).
+        self.world: WorldService = world if world is not None else WorldService()
         #: This session's XOR table, None until its magic is captured.
         #: Public because the decode path reads it through
         #: ``BufferedMessageSourceProtocol``.

@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
 )
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     ContainerStateDict,
 )
@@ -28,6 +29,7 @@ class TestRecoverEquipmentPriority:
 
     def test_equipment_before_combat(self) -> None:
         """Critical equipment recovery preempts combat when supplies are depleted."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "106,106": make_container(106, 106, 30, False),
         }
@@ -45,13 +47,14 @@ class TestRecoverEquipmentPriority:
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_no_equipment_when_none_visible(self) -> None:
         """Critical equipment depletion searches when no actionable target is visible."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800, tanks={"50": _enemy()})
         ai_state = AIStateDict(
             **{
@@ -74,6 +77,7 @@ class TestRecoverEquipmentPriority:
             100000,
             None,
             map_fuel_dots=((140, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["reason_kind"] == "search_collect_local"
@@ -83,6 +87,7 @@ class TestRecoverEquipmentPriority:
 
     def test_equipment_at_break_threshold_relocates_in_scanned_viewport(self) -> None:
         """Break-threshold equipment depletion still enters recovery."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800, tanks={"50": _enemy(x=120, y=100)})
         inventory = make_inventory(dual_count=3, dual_enabled=True, default_count=30)
         inventory["extra_radars"]["count"] = 30
@@ -100,6 +105,7 @@ class TestRecoverEquipmentPriority:
             100000,
             None,
             map_fuel_dots=((140, 100),),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
@@ -107,6 +113,7 @@ class TestRecoverEquipmentPriority:
 
     def test_critical_homing_shots_interrupts_for_equipment(self) -> None:
         """Critical homing depletion uses the same recovery path as dual/radar."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "106,106": make_container(106, 106, 30, False),
         }
@@ -118,23 +125,41 @@ class TestRecoverEquipmentPriority:
         inventory = make_inventory(default_count=30)
         inventory["homing_shots"]["count"] = 3
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            inventory,
+            100000,
+            None,
+            ws=ws,
+        )
 
         assert decision["behavior"]["reason_kind"] == "equipment_restock"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_homing_at_break_threshold_triggers_equipment_recovery(self) -> None:
         """Break-threshold homing count still enters equipment recovery."""
+        ws = WorldService()
         world, self_state = make_world(fuel=800, tanks={"50": _enemy(x=120, y=100)})
         inventory = make_inventory(default_count=30)
         inventory["homing_shots"]["count"] = 3
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            inventory,
+            100000,
+            None,
+            ws=ws,
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_active_combat_interrupted_by_critical_equipment(self) -> None:
         """Locked combat yields to critical equipment recovery."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "106,106": make_container(106, 106, 30, False),
         }
@@ -151,7 +176,7 @@ class TestRecoverEquipmentPriority:
         )
         inventory = make_inventory(default_count=3)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["reason_kind"] == "equipment_restock"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
@@ -166,6 +191,7 @@ class TestRecoverEquipmentPriority:
         ``shoot`` -- but the lock survives for the post-recovery
         cascade.
         """
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "104,104": make_container(104, 104, 900, True),
         }
@@ -182,7 +208,7 @@ class TestRecoverEquipmentPriority:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "pickup_fuel"
@@ -190,6 +216,7 @@ class TestRecoverEquipmentPriority:
 
     def test_blocked_equipment_uses_final_pickup_command(self) -> None:
         """Blocked equipment in view still uses the final pickup target."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "128,126": make_container(128, 126, 0, False),
         }
@@ -204,7 +231,7 @@ class TestRecoverEquipmentPriority:
             }
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain, ws=ws)
 
         assert decision["command"]["cmd_type"] == "pickup_equipment"
         assert decision["command"]["target_x"] == 128
@@ -212,6 +239,7 @@ class TestRecoverEquipmentPriority:
 
     def test_water_locked_equipment_is_skipped(self) -> None:
         """Water-locked equipment is skipped; bot searches elsewhere."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "128,126": make_container(128, 126, 0, False),
         }
@@ -233,12 +261,21 @@ class TestRecoverEquipmentPriority:
             }
         )
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
+        decision = decide(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            inventory,
+            100000,
+            terrain,
+            ws=ws,
+        )
 
         assert decision["behavior"]["reason_kind"] != "equipment_restock"
 
     def test_adjacent_blocked_equipment_uses_pickup_move(self) -> None:
         """Adjacent blocked equipment still produces a pickup command."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "128,126": make_container(128, 126, 0, False),
         }
@@ -253,12 +290,14 @@ class TestRecoverEquipmentPriority:
             inventory,
             100000,
             terrain,
+            ws=ws,
         )
 
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_locked_combat_with_critical_fuel_collects_fuel(self) -> None:
         """Critical fuel interrupts a locked combat phase."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "101,100": make_container(101, 100, 700, True),
         }
@@ -275,7 +314,7 @@ class TestRecoverEquipmentPriority:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "pickup_fuel"
@@ -289,6 +328,7 @@ class TestRecoverEquipmentPriority:
         for equipment costs 1 fuel/tile -- a rounding error against the
         viewport-fuel a few ticks later.
         """
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "101,100": make_container(101, 100, 700, True),
             "102,100": make_container(102, 100, 0, False),
@@ -297,7 +337,15 @@ class TestRecoverEquipmentPriority:
         inventory = make_inventory(dual_count=3, default_count=30)
         inventory["extra_radars"]["count"] = 4
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            inventory,
+            100000,
+            None,
+            ws=ws,
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason_kind"] == "equipment_restock"

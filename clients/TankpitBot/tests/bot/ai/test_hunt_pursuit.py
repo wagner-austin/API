@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tankpit_bot.types.modes import AIModeState
 from tests.bot.ai._support import (
@@ -25,6 +26,7 @@ def test_hunt_engage_fires_homing_when_locked_target_left_viewport() -> None:
     distant or in motion, and homing tracks. The lock holds until a
     deactivation signal arrives.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -40,7 +42,7 @@ def test_hunt_engage_fires_homing_when_locked_target_left_viewport() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -50,6 +52,7 @@ def test_hunt_engage_fires_homing_when_locked_target_left_viewport() -> None:
 
 def test_hunt_close_fires_homing_when_locked_target_left_viewport() -> None:
     """CLOSE state pursues via homing fire when target leaves viewport after engagement."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -65,7 +68,7 @@ def test_hunt_close_fires_homing_when_locked_target_left_viewport() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -74,6 +77,7 @@ def test_hunt_close_fires_homing_when_locked_target_left_viewport() -> None:
 
 def test_hunt_refresh_fires_homing_when_locked_target_left_viewport() -> None:
     """REFRESH state pursues via homing fire when target leaves viewport after engagement."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -89,7 +93,7 @@ def test_hunt_refresh_fires_homing_when_locked_target_left_viewport() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -115,6 +119,7 @@ class TestPursuitHomingCapVsHumans:
         pursuit_shot_target_id: int = -1,
         pursuit_shot_ms: int = 0,
     ) -> DecideCtx:
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150, name=name)}
         world, self_state = make_world(fuel=800, tanks=tanks)
         ai_state = AIStateDict(
@@ -131,7 +136,7 @@ class TestPursuitHomingCapVsHumans:
                 "pursuit_shot_ms": pursuit_shot_ms,
             }
         )
-        return DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        return DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
     def test_first_pursuit_shot_fires_and_stamps_the_window(self) -> None:
         decision = decide_hunt_mode(self._ctx())
@@ -196,6 +201,7 @@ def test_hunt_close_re_teleports_when_lock_was_never_engaged() -> None:
     the pre-engagement intent, not a mid-fight chase. Re-issue the
     teleport instead of firing into the void.
     """
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=1090, tanks=tanks)
     ai_state = AIStateDict(
@@ -210,7 +216,7 @@ def test_hunt_close_re_teleports_when_lock_was_never_engaged() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -219,6 +225,7 @@ def test_hunt_close_re_teleports_when_lock_was_never_engaged() -> None:
 
 def test_hunt_engage_re_teleports_when_lock_was_never_engaged() -> None:
     """ENGAGE substate re-teleports when lock was set but no shot ever fired."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=1090, tanks=tanks)
     ai_state = AIStateDict(
@@ -233,7 +240,7 @@ def test_hunt_engage_re_teleports_when_lock_was_never_engaged() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -242,6 +249,7 @@ def test_hunt_engage_re_teleports_when_lock_was_never_engaged() -> None:
 
 def test_hunt_refresh_re_teleports_when_lock_was_never_engaged() -> None:
     """REFRESH substate re-teleports when lock was set but no shot ever fired."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=1090, tanks=tanks)
     ai_state = AIStateDict(
@@ -256,7 +264,7 @@ def test_hunt_refresh_re_teleports_when_lock_was_never_engaged() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -273,6 +281,7 @@ def test_pursuit_fire_stops_when_the_homing_trace_expires() -> None:
     pursuit goes straight to the map refresh the miss would have
     bought anyway, with the lock held.
     """
+    ws = WorldService()
     stale_target = make_tank_state(
         tank_id=50,
         x=150,
@@ -301,7 +310,7 @@ def test_pursuit_fire_stops_when_the_homing_trace_expires() -> None:
             "last_shot_target_id": 50,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -311,6 +320,7 @@ def test_pursuit_fire_stops_when_the_homing_trace_expires() -> None:
 
 def test_scan_on_landing_fires_homing_when_locked_target_left_viewport() -> None:
     """SCAN_ON_LANDING state pursues via homing fire when target leaves viewport."""
+    ws = WorldService()
     tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -325,7 +335,7 @@ def test_scan_on_landing_fires_homing_when_locked_target_left_viewport() -> None
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 
@@ -340,6 +350,7 @@ def test_scan_on_landing_pursuit_past_the_trace_wall_chases_via_map() -> None:
     viewport more than PURSUIT_TRACE_TTL_MS ago gets the map chase
     instead of a guaranteed-miss shot.
     """
+    ws = WorldService()
     stale = make_pursuit_target(x=150, y=150)
     stale["last_viewport_observation_ms"] = 87000  # 13 s > the 12 s wall
     tanks: dict[str, TankStateDict] = {"50": stale}
@@ -356,7 +367,7 @@ def test_scan_on_landing_pursuit_past_the_trace_wall_chases_via_map() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_hunt_mode(ctx)
 

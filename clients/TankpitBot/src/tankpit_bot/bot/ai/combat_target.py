@@ -241,6 +241,7 @@ def combat_landing_tile(ctx: DecideCtx, target: EnemyThreatDict) -> tuple[int, i
         target,
         ctx.terrain,
         ctx.timestamp_ms,
+        ctx.ws,
     )
 
 
@@ -255,6 +256,7 @@ def _combat_landing_candidates(
         target,
         ctx.terrain,
         ctx.timestamp_ms,
+        ctx.ws,
     )
 
 
@@ -285,6 +287,7 @@ def block_combat_target_and_replan(
     )
 
     threats = analyze_threats(
+        ctx.ws,
         ctx.filtered,
         ctx.self_state,
         ctx.timestamp_ms,

@@ -32,6 +32,7 @@ from tankpit_bot.runtime_records import (
     decode_runtime_event_record,
     encode_runtime_event_record,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.conftest import FakeFileSystem
 
 
@@ -233,11 +234,11 @@ def test_action_outcome_emission_writes_structured_fields_to_jsonl(
     from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
     from tankpit_bot.ledger.outcome.map_open import emit_map_open_data_processed
-    from tankpit_bot.sniffer.world_state import get_world_service
 
+    ws = WorldService()
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
-    emit_map_open_data_processed(get_world_service().ledger, duration_ms=850)
+    emit_map_open_data_processed(ws.ledger, duration_ms=850)
 
     files = fake_fs.get_written_files()
     event_line = files[artifacts["latest_events_path"]].strip()

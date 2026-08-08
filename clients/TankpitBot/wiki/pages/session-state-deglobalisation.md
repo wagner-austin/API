@@ -48,7 +48,15 @@ problem all along, and the resets are the workaround.[^2]
 Deleting that reset list is the completion criterion for this work. If
 state is instance-scoped, no reset is possible to forget.[^2]
 
-**Progress: 10 calls → 8 (list length), of which 7 are session state.** Step 1 removed `reset_xor_state` and put
+**Progress: 10 calls → 1, and that one is not session state.** As of
+step 8 (2026-08-07) `_isolate_protocol_singletons` calls
+`reset_static_key_cache` and nothing else — the XOR *static key* is a
+process-wide constant read from disk, which the "Legitimately
+process-level" test below keeps. **Every session-state reset is gone:
+constructing a session IS the reset.** The criterion this page set for
+itself is met.[^15]
+
+The history below is kept because the arithmetic was the argument. Step 1 removed `reset_xor_state` and put
 `reset_static_key_cache` in its place, so the count is unchanged at
 first glance — but the two are not the same kind of thing. The old call
 reset a *session's* cipher; the new one resets a *process-wide key
@@ -73,22 +81,25 @@ counted.[^3]
 | module | state | mechanism |
 |---|---|---|
 | ~~`sniffer/xor.py`~~ | ~~`_global_xor_table`, `_global_static_key`~~ | **module deleted, step 1** |
-| `sniffer/world_state.py` | `_service` (a `WorldService`) | rebind |
+| ~~`sniffer/world_state.py`~~ | ~~`_service` (a `WorldService`)~~ | **module deleted, step 8** |
 | ~~`sniffer/viewport.py`~~ | ~~`_viewport_left`, `_viewport_top`~~ | **module deleted, step 2** |
-| `sniffer/trackers.py:41` | `ALL_TRACKERS` (tuple of tracker instances) | in-place |
-| `ledger/events.py` | `_event_counter` | rebind |
-| `ledger/outcome/teleport.py` | `_pending` | rebind |
-| `ledger/outcome/_emit.py:27-29` | `_attempt_counters`, `_pending_decisions`, `_resolved_decision_ids` | in-place |
-| `ledger/ring.py:51` | `_rings` | in-place |
-| `ledger/decision.py:60` | `_decisions` | in-place |
-| `ledger/mode_transition.py:38` | `_transitions` | in-place |
+| ~~`sniffer/trackers.py:41`~~ | ~~`ALL_TRACKERS` (tuple of tracker instances)~~ | **module deleted, step 9** |
+| ~~`ledger/events.py`~~ | ~~`_event_counter`~~ | **`ws.ledger`, step 6** |
+| ~~`ledger/outcome/teleport.py`~~ | ~~`_pending`~~ | **`ws.ledger`, step 6** |
+| ~~`ledger/outcome/_emit.py:27-29`~~ | ~~`_attempt_counters`, `_pending_decisions`, `_resolved_decision_ids`~~ | **`ws.ledger`, step 6** |
+| ~~`ledger/ring.py:51`~~ | ~~`_rings`~~ | **`ws.ledger`, step 6** |
+| ~~`ledger/decision.py:60`~~ | ~~`_decisions`~~ | **`ws.ledger`, step 6** |
+| ~~`ledger/mode_transition.py:38`~~ | ~~`_transitions`~~ | **`ws.ledger`, step 6** |
 | ~~`bot/ai/collect_common.py`~~ | ~~`_blacklisted_container_keys`~~ | **deleted, step 7 — never had a writer** |
 | ~~`diagnostics/self_alignment.py`~~ | ~~`_last_emitted_belief`~~ | **instance state, step 3** |
 | ~~`diagnostics/entity_alignment.py`~~ | ~~`_last_emitted_signature`~~ | **instance state, step 3** |
 | ~~`browser/cdp_utils.py`~~ | ~~`_cdp_time_offset_ms`~~ | **instance state, step 4** |
 | ~~`browser/client_structure.py`~~ | ~~`_survey_emitted`~~ | **instance state, step 5** |
-| `runtime_logging.py` | `_BOT_ARTIFACTS`, `_SNIFF_ARTIFACTS`, `_PROBE_ARTIFACTS` | rebind |
-| `runtime_context.py:25` | `_RUNTIME_CONTEXT_TICK_N`, `_..._BOT_STATE`, `_..._IN_FLIGHT_ACTION_KIND` | rebind |
+| `runtime_logging.py` | `_BOT_ARTIFACTS`, `_SNIFF_ARTIFACTS`, `_PROBE_ARTIFACTS` | rebind — **the one item still open (step 10)** |
+| ~~`runtime_context.py:25`~~ | ~~`_RUNTIME_CONTEXT_TICK_N`, `_..._BOT_STATE`, `_..._IN_FLIGHT_ACTION_KIND`~~ | **`ContextVar`, step 10** |
+
+Seventeen modules at the start; **one row is still live.** Everything
+else is instance state, a `ContextVar`, or a deleted module.
 
 ### Legitimately process-level — NOT in scope
 
@@ -313,8 +324,68 @@ rather than the refactor.[^3]
    `reset_container_blacklist` was in the conftest list, so the list
    is now EIGHT calls. If per-session blacklisting is wanted, it needs
    a writer first — a reader without one is a decision nobody makes.
-8. **`WorldService`** — delete `_service` and `get_world_service()`;
-   thread the instance through the 74 sites. The largest step.
+8. ~~**`WorldService`** — delete `_service` and `get_world_service()`;
+   thread the instance through every site.~~ **SHIPPED 2026-08-07.**
+   The largest step, and the
+   only one whose size estimate was wrong by an order of magnitude in
+   BOTH directions before it was measured properly.
+
+   **`SessionBase.world` is the shape.** `SessionBase` is the single
+   root of the session hierarchy (`Bot`, `ProbeBase`, and
+   `BrowserSession` → `WebSocketSniffer` all descend from it), so one
+   attribute there reaches every session. Standalone tools that are
+   NOT sessions own a service outright: `replay/engine.py` and
+   `scripts/decode.py` each build their own, which is what stops two
+   replays in one process contaminating each other.
+
+   **The estimate history, because it is the lesson.** Quoted as 74
+   sites. It was 107 by the time the work started — step 6's ledger
+   move added ~32 `get_world_service().ledger` reads. Then the
+   `world_state` facade behind it showed ~1,509 test references, which
+   looked like the real cost. Measured with an AST pass instead of
+   grep, the facade had **36 actual call sites in `src/`**: the rest
+   were imports, `__all__` entries, and method definitions on
+   `WorldService` itself that happen to share the names. Grep counts
+   symbols; only the AST counts calls.
+
+   **`DecideCtx.ws`, and why the planner was never pure.** Eight
+   planner modules read the facade for live bookkeeping the world
+   snapshot does not carry — failed move targets, the incoming-damage
+   rate window, movement rejections, the container-desync latch. They
+   did it through a module global, so the planner LOOKED pure over
+   `world: WorldStateDict` and was not. `DecideCtx` now carries the
+   session's service, which makes the dependency visible rather than
+   new.
+
+   **Two import cycles, and mypy saw neither.** `session_base`
+   importing `WorldService` closed one because
+   `sniffer/world_service.py` imported `get_current_time_ms` from the
+   **`browser` package**; mypy reported success on 1100 files while
+   `import tankpit_bot.bot.base` raised `ImportError`. Importing the
+   defining submodule did not help — Python executes the parent
+   package first. The real fault was a clock living in
+   `browser/cdp_utils.py`, a three-line delegation to the
+   `_test_hooks` seam; six lower-layer modules now call that seam
+   directly, which fixes the layering and removes a thin wrapper.
+
+   The second cycle set a rule worth stating plainly: **`_test_hooks`
+   sits BELOW `sniffer`** (because `world_service` depends on its
+   terrain and clock seams), so nothing in `_test_hooks` may name
+   `WorldService`. Three hooks that had to name it moved to
+   package-local hook modules — `bot/bot_protocol.py`,
+   `replay/_test_hooks.py`, `browser/_test_hooks.py` — following the
+   precedent `action_lab/_test_hooks.py` already set.
+   `BufferedMessageSourceProtocol` stayed put and does NOT gain
+   `world`; `drain_messages` takes the service as a parameter instead.
+
+   **The terrain seam improved on the way through.** ~80 test sites
+   monkey-patched a module-level `get_terrain_map` attribute to inject
+   terrain. Since the code now reads `probe.world.get_terrain_map()`
+   and `WorldService.get_terrain_map()` returns a preset
+   `terrain_map` when one is set, those tests assign
+   `probe.world.terrain_map = ...` instead. That deletes ~80
+   module-attribute patches — which the project's own rules
+   discourage — and replaces them with plain attribute injection.
 
    **Decode boundary cut 2026-08-07.** `process_received_message`,
    `_process_single_message`, `try_decode_binary` and
@@ -366,6 +437,98 @@ rather than the refactor.[^3]
    Here the opposite held: the test-side figure overcounted by ~150×,
    because it counted call sites without asking whether they did
    anything. Count what a call *does*, not that it appears.
+
+   ### The real cost was one bug class, repeated: two worlds in one scope
+
+   Deleting the facade left **138 failing tests**, and essentially all
+   of them were the same defect wearing six different disguises: a test
+   mints a `WorldService()`, seeds it, and hands the code under test an
+   object that owns a *different* service. Under the global facade both
+   names resolved to `_service`, so the seeding worked by accident. Once
+   the session owned its world, the seeded belief landed where no reader
+   could reach it.
+
+   The six shapes, in the order they were found — each one invisible to
+   the detector that caught the previous one:
+
+   1. **Dead write** — the local is only ever written, never read or
+      passed. 31 sites. Provable from the AST alone.
+   2. **Two-world scope** — the local *is* read or passed, but a
+      probe/bot/ctx in the same scope owns its own. 73 scopes, 63 of
+      them in `tests/bot`. Caught by looking for a `WorldService()`
+      binding beside an owner it was never handed to.
+   3. **Seed helper with no world parameter** — a shared helper mints
+      and seeds a world its caller can never see: `set_inventory_total`
+      (19 call sites), `seed_confirmed_incoming` (13), `consent_human`
+      (7), plus `_seed_self`, `_seed_self_at`, `_seed_self_and_enemy`,
+      `_announce_tank_via_wire`, `_established_self`, `_boot`,
+      `_deliver`, `_drain`, `_record_tick`, `get_world_terrain`,
+      `build_world_derived_snapshot`.
+   4. **Parameter shadowing** — `def _drain(source, ws): ws =
+      WorldService()`. The production seam hands over exactly the right
+      world and the first line throws it away. 2 sites.
+   5. **Assign-before-super clobber** — `self.world = ws` written
+      *before* `super().__init__()`, which assigns `self.world` itself.
+      7 harnesses. The assignment had never had any effect.
+   6. **Mid-test world replacement** — a page-wait hook doing
+      `probe.world = WorldService()` to model "the wire delivered a
+      kill". The engagement captured `probe.world` at entry, so the
+      confirmation landed on an orphan and `kill_confirmed` stayed
+      `False`.
+
+   **Why 100% coverage never caught any of it.** Every one of these
+   lines executes. `set_inventory_total(2)` runs, mutates a real
+   service through the real codepath, and returns; the line is covered.
+   Nothing asserts that the service it mutated is the one the probe
+   reads. This is the same lesson the `tank_names` finding recorded
+   earlier on this page — a coverage gate cannot tell you a writer has
+   a reader.
+
+   **The fix was never `bot.world = ws` after the fact.** Two shapes,
+   chosen by where the seeding happens. When the test seeds *after*
+   construction, the local is redundant: read `owner.world` and delete
+   it. When the test seeds *before* — the natural "arrange, then hand it
+   over" order — keep that order and pass the service through the
+   constructor's `world=` parameter, which is the DI seam `SessionBase`
+   already exposes. Post-construction rebinding survives in exactly one
+   place, `test_missing_self_state_stays_optimistic`, where wiping the
+   belief *is* the arrangement.
+
+   **A `Callable` type alias was hiding a drifted stub.** `analyze_threats`
+   gained `ws` as its first parameter, but the tracking harness declared
+   the patchable attribute as
+   `AnalyzeThreatsFn = Callable[[WorldStateDict, SelfStateDict, int], ...]`
+   — an alias too weak to express the keyword-only rank bounds, so a
+   stub that had silently dropped `ws` still typechecked. Respelling it
+   as a `Protocol` (the idiom the same file already used for
+   `ShotFeedbackFn`, "spelled out so stubs are checked against it")
+   immediately failed a **second** drifted stub in
+   `test_enemy_tracking_execute.py`. The alias was not a shorthand; it
+   was a hole in the type surface.
+
+   **Dead ritual the step exposed and removed.** `tests/diagnostics/
+   conftest.py` was one autouse fixture whose entire body called
+   `reset_registry_truth()` — a function whose body was empty and whose
+   docstring cited `reset_world_state` and `sniffer/world_state`, both
+   deleted. File and function both gone. Two
+   `setup_method`/`teardown_method` pairs in
+   `test_world_state_dispatch_teleport.py` were empty bodies whose
+   docstrings still claimed to "reset world state and dispatch
+   tracking". A no-op that documents work it does not do is worse than
+   no code.
+
+   **Verification.** `make check` exits 0: guard clean (31 monorepo
+   rules plus the local rules, no allowlist), ruff clean, mypy clean on
+   1104 files, **6185 tests passed, 100.00% coverage** on 30,370
+   statements and 8,780 branches. Import cycles were checked by actually
+   importing the twelve layer roots in boot order, because mypy is blind
+   to them.[^15]
+
+   **`tests/login/test_join.py` hit the 600-line ceiling** at 603 lines
+   — the threaded arguments pushed it over. Split, not squeezed: the
+   eight `handle_login_flow` auto-join tests became
+   `test_join_login_flow.py` (145 lines), leaving the room-join
+   primitives at 470.
 9. ~~**`sniffer/trackers.py`** — `ALL_TRACKERS`.~~ **SHIPPED
    2026-08-07 — mostly by DELETION.** Both `sniffer/trackers.py` and
    `sniffer/player_tracking.py` are gone as modules.
@@ -459,7 +622,12 @@ rather than the refactor.[^3]
     and its own test. In production the context is set once per tick
     and never cleared, so the end-of-run scorecard carries the final
     tick's `tick_n`.
-11. **Delete the conftest reset list.** Its removal is the proof.
+11. ~~**Delete the conftest reset list.** Its removal is the proof.~~
+    **DONE 2026-08-07, as a consequence of step 8 rather than a step of
+    its own.** The list is one call, `reset_static_key_cache`, guarding
+    a process-wide key cache. The fixture kept its name and its
+    docstring now records what it no longer has to do. Step 10 is the
+    only plan item still open.[^15]
 
 ## Found while shipping step 1: the cipher is forked four ways
 
@@ -539,3 +707,4 @@ Two defects found while mapping this, both in scope:[^9]
 [^9]: `src/tankpit_bot/sniffer/decoders.py::process_received_message` — the frame loop re-derives the 2-byte little-endian length prefix inline rather than calling `protocol/framing.py::split_frames`, which has owned that arithmetic since the protocol layer was written (`decode_frame_header`, `:37`).
 [^10]: Counted 2026-08-06 with `find src scripts tests -name '*.py' | xargs wc -l | awk '$1>600'`: 77 files. The 2026-07-31 backlog of 40 is enumerated at `wiki/log.md:2437`. At that count `bot/tick_loop.py` held 21 of the 73 `get_world_service()` call sites; after the split the total is 74 across 23 files, with no single file holding more than 14.
 [^11]: Read 2026-08-06 while shipping step 1, re-read 2026-08-07. `src/tankpit_bot/protocol/codec.py:83` `xor_bytes(table, data, offset=0)` raises `InvalidKeyError` on an empty table and `ValueError` when `offset + len(data) > len(table)` — the only one of the four that names the condition. `src/tankpit_bot/capture/xor.py:149` `xor_decode_body(body, xor_table, offset=0)` indexes `xor_table[i]` unguarded, so the same condition surfaces as a bare `IndexError`. `src/tankpit_bot/diagnostics/capture_audit.py:53` `_xor_with_table(body, table)` carries an explicit `else` branch copying the byte through unciphered, and is now the ONLY remaining pass-through site. **Two changes since the 2026-08-06 reading, both narrowing the fork:** `sim/transport.py` no longer defines its own `_xor_with_table` — it imports `xor_decode_body` (`:25`) and calls it at `:62` and `:165`, passing `offset=1` explicitly at the client-command site — and `capture/xor.py` no longer computes the static-key path or loads the key itself; it imports `build_xor_table`, `load_static_key` and `DEFAULT_STATIC_KEY_PATH` from `protocol.codec` (`:21-22`, used at `:80` and `:103`), so `DEFAULT_STATIC_KEY_PATH` at `protocol/codec.py:20` is the single definition. The 279,771-payload measurement covers only the received-decode path and was taken before step 1; it does not license deleting the pass-through arm from the audit reader.
+[^15]: Verified 2026-08-07 at the end of step 8. `make check` exits 0: guard reports no violations across every rule (31 from the monorepo orchestrator plus the local rules in `scripts/guard.py`, none allowlisted), `mypy src tests scripts` reports "Success: no issues found in 1104 source files", and `pytest` reports **6185 passed** with `Required test coverage of 100.0% reached. Total coverage: 100.00%` over 30,370 statements and 8,780 branches. The reset list is `tests/conftest.py::_isolate_protocol_singletons`, whose body is now two `reset_static_key_cache()` calls bracketing the yield; its docstring records that it "began as ten resets" and why the survivor is process-level. Import cycles were checked separately by importing `tankpit_bot.state`, `_test_hooks`, `sniffer.world_service`, `browser.session_base`, `bot.base`, `bot.bot_protocol`, `replay.engine`, `replay._test_hooks`, `browser._test_hooks`, `ledger.service`, `action_lab.session` and `runtime_context` in that order in one process — mypy reports success on files that raise `ImportError` at runtime, so the type checker cannot stand in for this. Deleted in the same step because the migration proved them dead: `tests/diagnostics/conftest.py` (a single autouse fixture whose only statements called an empty function) and `diagnostics/registry_truth.py::reset_registry_truth` (the empty function, whose docstring cited the already-deleted `reset_world_state` and `sniffer/world_state`).

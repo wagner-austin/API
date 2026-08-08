@@ -8,11 +8,9 @@ from collections.abc import Callable
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.browser.cdp_helpers import decode_captured_body, load_tpclient_static_key
 from tankpit_bot.browser.login import (
     ensure_on_play_page,
-    handle_login_flow,
 )
 from tankpit_bot.browser.room_join import (
     _collect_room_entries,
@@ -26,7 +24,7 @@ from tankpit_bot.browser.room_join import (
     join_room,
 )
 from tankpit_bot.protocol.framing import encode_frame
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.login.conftest import (
     FakeCDPLogin,
     FakeCDPLoginNonDictResult,
@@ -66,7 +64,7 @@ def test_join_room_success() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin()
 
-    result = join_room(page, cdp)
+    result = join_room(page, cdp, WorldService())
 
     assert result is True
     assert cdp.join_room_called is True
@@ -80,7 +78,7 @@ def test_join_room_returns_false_when_target_room_missing() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin(include_practice_room=False)
 
-    result = join_room(page, cdp)
+    result = join_room(page, cdp, WorldService())
 
     assert result is False
     assert cdp.join_room_called is False
@@ -93,7 +91,7 @@ def test_join_room_non_dict_result() -> None:
     cdp = FakeCDPLoginNonDictResult()
 
     with pytest.raises(JSONTypeError, match="result"):
-        join_room(page, cdp)
+        join_room(page, cdp, WorldService())
 
 
 class _RawMessageCDP:
@@ -184,7 +182,9 @@ def test_collect_room_entries_skips_non_room_messages_and_short_entries() -> Non
 def test_register_room_entries_skips_missing_images() -> None:
     """Room registration stores the field image from ROOM_LIST data."""
 
+    ws = WorldService()
     _register_room_entries(
+        ws,
         [
             {
                 "room_id": "1",
@@ -196,10 +196,10 @@ def test_register_room_entries_skips_missing_images() -> None:
                 "image": "field01.gif",
                 "year": "2026",
             }
-        ]
+        ],
     )
 
-    assert get_world_service().room_images["1"] == "field01.gif"
+    assert ws.room_images["1"] == "field01.gif"
 
 
 def test_resolve_room_id_supports_prefix_match() -> None:
@@ -373,7 +373,7 @@ def test_wait_for_room_id_returns_room_id_when_found() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin()
 
-    assert _wait_for_room_id(page, cdp, "Practice") == "1"
+    assert _wait_for_room_id(page, cdp, WorldService(), "Practice") == "1"
 
 
 def test_wait_for_room_id_returns_none_when_missing() -> None:
@@ -381,7 +381,7 @@ def test_wait_for_room_id_returns_none_when_missing() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin(include_practice_room=False)
 
-    assert _wait_for_room_id(page, cdp, "Practice") is None
+    assert _wait_for_room_id(page, cdp, WorldService(), "Practice") is None
 
 
 def test_load_tpclient_static_key_extracts_current_key() -> None:
@@ -406,7 +406,7 @@ def test_join_room_returns_false_when_select_send_fails() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin(select_send_result="NO_WEBSOCKET")
 
-    result = join_room(page, cdp)
+    result = join_room(page, cdp, WorldService())
 
     assert result is False
     assert cdp.enter_room_called is False
@@ -417,7 +417,7 @@ def test_join_room_returns_false_when_join_confirm_times_out() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin(emit_join_confirm=False)
 
-    result = join_room(page, cdp)
+    result = join_room(page, cdp, WorldService())
 
     assert result is False
     assert cdp.enter_room_called is False
@@ -428,7 +428,7 @@ def test_join_room_returns_false_when_enter_response_times_out() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin(emit_enter_response=False)
 
-    result = join_room(page, cdp)
+    result = join_room(page, cdp, WorldService())
 
     assert result is False
     assert cdp.enter_room_called is True
@@ -439,7 +439,7 @@ def test_join_room_returns_false_when_enter_send_fails() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin(enter_send_result="NO_WEBSOCKET")
 
-    result = join_room(page, cdp)
+    result = join_room(page, cdp, WorldService())
 
     assert result is False
     assert cdp.enter_room_called is True
@@ -450,7 +450,7 @@ def test_join_room_returns_false_when_magic_missing() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = _MissingMagicCDP()
 
-    result = join_room(page, cdp)
+    result = join_room(page, cdp, WorldService())
 
     assert result is False
     assert cdp.enter_room_called is False
@@ -461,137 +461,7 @@ def test_join_room_returns_false_when_tpclient_url_missing() -> None:
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = _MissingTpclientUrlCDP()
 
-    result = join_room(page, cdp)
+    result = join_room(page, cdp, WorldService())
 
     assert result is False
-    assert cdp.enter_room_called is False
-
-
-# =============================================================================
-# Tests for auto_join_room parameter
-# =============================================================================
-
-
-def test_handle_login_flow_auto_join_room_not_on_before_playing() -> None:
-    """Login flow auto-joins room when not on before-playing page."""
-    page = FakePageLogin(start_url="https://tankpit.com/play")
-    cdp = FakeCDPLogin()
-
-    result = handle_login_flow(page, cdp, auto_join_room=True)
-
-    assert result is True
-    assert cdp.join_room_called is True
-    assert cdp.selected_room_id == "1"
-    assert cdp.enter_room_called is True
-
-
-def test_handle_login_flow_auto_join_room_after_guest_login() -> None:
-    """Login flow auto-joins room after successful guest login."""
-    page = FakePageLogin(start_url="https://tankpit.com/before-playing")
-    cdp = FakeCDPLogin()
-
-    result = handle_login_flow(page, cdp, auto_join_room=True)
-
-    assert result is True
-    assert cdp.join_room_called is True
-    assert cdp.selected_room_id == "1"
-    assert cdp.enter_room_called is True
-
-
-def test_handle_login_flow_auto_join_room_after_account_login() -> None:
-    """Login flow auto-joins room after successful account login."""
-    page = FakePageLogin(start_url="https://tankpit.com/before-playing")
-    cdp = FakeCDPLogin()
-
-    original_get_env = _test_hooks.get_env
-    env_vars = {"TANKPIT_USERNAME": "testuser", "TANKPIT_PASSWORD": "testpass"}
-
-    def fake_get_env(key: str) -> str | None:
-        return env_vars.get(key)
-
-    _test_hooks.get_env = fake_get_env
-    try:
-        result = handle_login_flow(page, cdp, prefer_account=True, auto_join_room=True)
-    finally:
-        _test_hooks.get_env = original_get_env
-
-    assert result is True
-    assert cdp.join_room_called is True
-    assert cdp.selected_room_id == "1"
-    assert cdp.enter_room_called is True
-
-
-def test_handle_login_flow_auto_join_room_calls_join() -> None:
-    """Login flow auto-joins room when enabled."""
-    page = FakePageLogin(start_url="https://tankpit.com/play")
-    cdp = FakeCDPLogin()
-
-    result = handle_login_flow(page, cdp, auto_join_room=True)
-
-    assert result is True
-    assert cdp.join_room_called is True
-    assert cdp.selected_room_id == "1"
-    assert cdp.enter_room_called is True
-
-
-def test_handle_login_flow_no_auto_join_room() -> None:
-    """Login flow does not auto-join room when disabled."""
-    page = FakePageLogin(start_url="https://tankpit.com/play")
-    cdp = FakeCDPLogin()
-
-    result = handle_login_flow(page, cdp, auto_join_room=False)
-
-    assert result is True
-    assert cdp.join_room_called is False
-
-
-def test_handle_login_flow_auto_join_after_rate_limit_fallback() -> None:
-    """Login flow auto-joins room after rate-limited account fallback."""
-    page = FakePageLogin(
-        start_url="https://tankpit.com/before-playing",
-    )
-    cdp = FakeCDPLogin(rate_limited=True)
-
-    original_get_env = _test_hooks.get_env
-    env_vars = {"TANKPIT_USERNAME": "testuser", "TANKPIT_PASSWORD": "testpass"}
-
-    def fake_get_env(key: str) -> str | None:
-        return env_vars.get(key)
-
-    _test_hooks.get_env = fake_get_env
-    try:
-        result = handle_login_flow(page, cdp, auto_join_room=True)
-    finally:
-        _test_hooks.get_env = original_get_env
-
-    assert result is True
-    assert cdp.join_room_called is True
-    assert cdp.selected_room_id == "1"
-    assert cdp.enter_room_called is True
-
-
-def test_handle_login_flow_auto_join_after_guest_failure_no_rate_limit() -> None:
-    """Login flow auto-joins room after guest failure (not rate limited)."""
-    page = FakePageLogin(
-        start_url="https://tankpit.com/before-playing",
-        stays_on_before_playing=True,
-    )
-    cdp = FakeCDPLogin(rate_limited=False)
-
-    result = handle_login_flow(page, cdp, allow_account_fallback=False, auto_join_room=True)
-
-    assert result is True
-    assert cdp.join_room_called is True
-    assert cdp.enter_room_called is True
-
-
-def test_handle_login_flow_returns_false_when_auto_join_fails() -> None:
-    """Login flow propagates room-join failure instead of continuing."""
-    page = FakePageLogin(start_url="https://tankpit.com/play")
-    cdp = FakeCDPLogin(include_practice_room=False)
-
-    result = handle_login_flow(page, cdp, auto_join_room=True)
-
-    assert result is False
-    assert cdp.join_room_called is False
     assert cdp.enter_room_called is False

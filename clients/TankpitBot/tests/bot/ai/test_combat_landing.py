@@ -11,6 +11,7 @@ from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
     make_enemy_threat,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -77,7 +78,9 @@ def test_combat_landing_candidates_orders_by_distance_and_filters_dynamic_tiles(
         team=1,
     )
 
-    assert combat_landing_candidates(world, self_state, target, None, 100000) == [(103, 100)]
+    assert combat_landing_candidates(world, self_state, target, None, 100000, WorldService()) == [
+        (103, 100)
+    ]
 
 
 def test_combat_landing_candidates_skip_out_of_bounds_tiles() -> None:
@@ -104,7 +107,7 @@ def test_combat_landing_candidates_skip_out_of_bounds_tiles() -> None:
         timestamp_ms=1000,
     )
 
-    assert combat_landing_candidates(world, self_state, target, None, 100000) == [
+    assert combat_landing_candidates(world, self_state, target, None, 100000, WorldService()) == [
         (1, 0),
         (0, 1),
     ]
@@ -121,13 +124,18 @@ def test_choose_combat_landing_tile_returns_target_coords_with_terrain() -> None
         }
     )
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (104, 100)
+    assert choose_combat_landing_tile(
+        world, self_state, target, terrain, 100000, WorldService()
+    ) == (104, 100)
 
 
 def test_choose_combat_landing_tile_returns_target_coords_without_terrain() -> None:
     world, self_state, target = _world()
 
-    assert choose_combat_landing_tile(world, self_state, target, None, 100000) == (104, 100)
+    assert choose_combat_landing_tile(world, self_state, target, None, 100000, WorldService()) == (
+        104,
+        100,
+    )
 
 
 def test_choose_combat_landing_tile_returns_target_when_adjacent_impassable() -> None:
@@ -142,7 +150,9 @@ def test_choose_combat_landing_tile_returns_target_when_adjacent_impassable() ->
         }
     )
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (104, 100)
+    assert choose_combat_landing_tile(
+        world, self_state, target, terrain, 100000, WorldService()
+    ) == (104, 100)
 
 
 def test_choose_combat_landing_tile_standoff_when_target_tile_impassable() -> None:
@@ -157,7 +167,9 @@ def test_choose_combat_landing_tile_standoff_when_target_tile_impassable() -> No
     water = {(x, y): InMemoryTerrainMap.WATER for x in range(102, 108) for y in range(97, 104)}
     terrain = InMemoryTerrainMap(water)
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (101, 100)
+    assert choose_combat_landing_tile(
+        world, self_state, target, terrain, 100000, WorldService()
+    ) == (101, 100)
 
 
 def test_choose_combat_landing_tile_standoff_skips_occupied_and_prefers_self() -> None:
@@ -180,7 +192,9 @@ def test_choose_combat_landing_tile_standoff_skips_occupied_and_prefers_self() -
         last_viewport_observation_ms=100000,
     )
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (100, 100)
+    assert choose_combat_landing_tile(
+        world, self_state, target, terrain, 100000, WorldService()
+    ) == (100, 100)
 
 
 def test_choose_combat_landing_tile_returns_target_when_no_standoff_exists() -> None:
@@ -188,7 +202,9 @@ def test_choose_combat_landing_tile_returns_target_when_no_standoff_exists() -> 
     world, self_state, target = _world()
     terrain = InMemoryTerrainMap.from_passable_set(set())
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (104, 100)
+    assert choose_combat_landing_tile(
+        world, self_state, target, terrain, 100000, WorldService()
+    ) == (104, 100)
 
 
 def test_choose_combat_landing_tile_standoff_clips_map_bounds() -> None:
@@ -217,7 +233,9 @@ def test_choose_combat_landing_tile_standoff_clips_map_bounds() -> None:
     )
     terrain = InMemoryTerrainMap.from_passable_set({(2, 0)})
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (2, 0)
+    assert choose_combat_landing_tile(
+        world, self_state, target, terrain, 100000, WorldService()
+    ) == (2, 0)
 
 
 def test_has_cardinal_enemy_adjacency_matches_exact_distance_one() -> None:
@@ -266,7 +284,9 @@ def test_combat_landing_candidates_skip_terrain_blocked_tiles() -> None:
         }
     )
 
-    assert combat_landing_candidates(world, self_state, target, terrain, 100000) == [(105, 100)]
+    assert combat_landing_candidates(
+        world, self_state, target, terrain, 100000, WorldService()
+    ) == [(105, 100)]
 
 
 def test_combat_landing_candidates_skip_failed_move_marked_tiles() -> None:
@@ -275,13 +295,11 @@ def test_combat_landing_candidates_skip_failed_move_marked_tiles() -> None:
     The server already said "you can't go there" — re-selecting the
     tile inside the mark's TTL re-derives the identical rejected move.
     """
-    from tankpit_bot.sniffer.world_state import (
-        mark_move_target_failed,
-    )
 
+    ws = WorldService()
     world, self_state, target = _world()
-    mark_move_target_failed(103, 100, 99000)
+    ws.mark_move_target_failed(103, 100, 99000)
 
-    result = combat_landing_candidates(world, self_state, target, None, 100000)
+    result = combat_landing_candidates(world, self_state, target, None, 100000, ws)
 
     assert result == [(105, 100), (104, 101), (104, 99)]

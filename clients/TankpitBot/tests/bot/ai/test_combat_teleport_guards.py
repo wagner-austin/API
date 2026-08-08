@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.combat_close import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     make_tank_state,
@@ -38,6 +39,7 @@ class TestCombatTeleportGuards:
         entry rule but below every engagement's cost-plus-reserve --
         and spent its entire 240s on 115 map reopens without a shot.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -61,6 +63,7 @@ class TestCombatTeleportGuards:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=190, y=100, name="FarEnemy"))
@@ -91,6 +94,7 @@ class TestCombatTeleportGuards:
         Fuel 550 > 200, so collect returns ``None`` rather than raising
         ``out_of_fuel``.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -120,6 +124,7 @@ class TestCombatTeleportGuards:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=190, y=100, name="FarEnemy"))
@@ -143,8 +148,8 @@ class TestCombatTeleportGuards:
         never block a visible target -- this pins the viewport corner
         with a dead landing on record.
         """
-        from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "90": make_tank_state(
                 tank_id=90,
@@ -163,7 +168,7 @@ class TestCombatTeleportGuards:
             ),
         }
         world, self_state = make_world(fuel=1100, tanks=tanks)
-        mark_move_target_failed(107, 107, 99000)
+        ws.mark_move_target_failed(107, 107, 99000)
         ctx = DecideCtx(
             world,
             self_state,
@@ -172,6 +177,7 @@ class TestCombatTeleportGuards:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(tank_id=90, x=107, y=107, name="Yuppler"))
@@ -186,8 +192,8 @@ class TestCombatTeleportGuards:
         server rejects out-of-view aims); with no legal landing and no
         legal shot, blocking and replanning is still correct.
         """
-        from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "90": make_tank_state(
                 tank_id=90,
@@ -206,7 +212,7 @@ class TestCombatTeleportGuards:
             ),
         }
         world, self_state = make_world(fuel=1100, tanks=tanks)
-        mark_move_target_failed(120, 100, 99000)
+        ws.mark_move_target_failed(120, 100, 99000)
         ctx = DecideCtx(
             world,
             self_state,
@@ -215,6 +221,7 @@ class TestCombatTeleportGuards:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(tank_id=90, x=120, y=100, name="Yuppler"))
@@ -234,6 +241,7 @@ class TestCombatTeleportGuards:
         full ``engagement_fuel_budget`` (matching the acquisition
         gate), so this teleport delegates to lock-held refueling.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -257,6 +265,7 @@ class TestCombatTeleportGuards:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=127, y=100, name="red-7"))
@@ -270,6 +279,7 @@ class TestCombatTeleportGuards:
 
     def test_teleport_to_target_returns_teleport_for_affordable_close(self) -> None:
         """Combat teleport emits a teleport decision when the landing is affordable."""
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -293,6 +303,7 @@ class TestCombatTeleportGuards:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=120, y=100, name="CloseEnemy"))
@@ -312,6 +323,7 @@ class TestCombatTeleportGuards:
         The acquire teleport now short-circuits to the shot, and the
         shot latches the combat lock itself.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -335,6 +347,7 @@ class TestCombatTeleportGuards:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=104, y=100, name="InViewEnemy"))
@@ -355,6 +368,7 @@ class TestCombatTeleportGuards:
         """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -379,6 +393,7 @@ class TestCombatTeleportGuards:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=104, y=100, name="BehindRock"))
@@ -398,6 +413,7 @@ class TestCombatTeleportGuards:
         """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -431,6 +447,7 @@ class TestCombatTeleportGuards:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = close_target(ctx, _enemy_threat(x=104, y=100, name="BehindRock"))
@@ -450,6 +467,7 @@ class TestCombatTeleportGuards:
         """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -474,6 +492,7 @@ class TestCombatTeleportGuards:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=102, y=100, name="NearEnemy"))
@@ -488,6 +507,7 @@ class TestCombatTeleportGuards:
         """Beyond the walk break-even the blocked-line close pays the teleport."""
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -512,6 +532,7 @@ class TestCombatTeleportGuards:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=106, y=100, name="FarEnemy"))
@@ -529,6 +550,7 @@ class TestCombatTeleportGuards:
         User law: in-view is the firing criterion; the server serves
         any in-view range.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -552,6 +574,7 @@ class TestCombatTeleportGuards:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = teleport_to_target(ctx, _enemy_threat(x=107, y=107, name="FarCornerEnemy"))

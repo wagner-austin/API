@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -39,6 +40,7 @@ def _ctx(
     map_fuel_dots: tuple[tuple[int, int], ...] = (),
 ) -> DecideCtx:
     """Build a DecideCtx with a clean default world and optional overrides."""
+    ws = WorldService()
     world, self_state = make_world(self_x=self_x, self_y=self_y, fuel=fuel)
     if scanned_viewport_origins:
         world["scanned_tiles"].update(_fully_cover_viewport_origins(scanned_viewport_origins))
@@ -51,4 +53,5 @@ def _ctx(
         terrain,
         "",
         map_fuel_dots,
+        ws=ws,
     )

@@ -13,12 +13,18 @@ run loop).
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 
 
 class StateAccessMixin:
-    """World-state queries, free of session and dispatch concerns."""
+    """World-state queries, free of session and dispatch concerns.
+
+    ``world`` is a DECLARATION, not an assignment: ``SessionBase.__init__``
+    remains its single owner ([[session-state-deglobalisation]] step 8).
+    """
+
+    world: WorldService
 
     def get_world_state(self) -> WorldStateDict:
         """Get current world state.
@@ -26,7 +32,7 @@ class StateAccessMixin:
         Returns:
             Current WorldStateDict with all tracked entities.
         """
-        return get_world_state()
+        return self.world.get_world_state()
 
     def get_self_state(self) -> SelfStateDict | None:
         """Get self tank state (position, fuel, etc.).
@@ -34,7 +40,7 @@ class StateAccessMixin:
         Returns:
             SelfStateDict if available, None if not yet tracked.
         """
-        return get_world_state()["self_state"]
+        return self.world.get_world_state()["self_state"]
 
     def get_fuel(self) -> int:
         """Get current fuel (HP).
@@ -62,7 +68,7 @@ class StateAccessMixin:
         Returns:
             Dict of container key ("x,y") to ContainerStateDict.
         """
-        return get_world_state()["containers"]
+        return self.world.get_world_state()["containers"]
 
     def get_fuel_containers(self) -> list[ContainerStateDict]:
         """Get all known fuel containers (not equipment).

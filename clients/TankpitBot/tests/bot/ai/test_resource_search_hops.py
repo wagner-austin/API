@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
     record_attempt_mark,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -63,6 +64,7 @@ class TestHarvestMemoryVeto:
         now_ms: int,
     ) -> DecideCtx:
         """Build a ctx whose single dot lands on a viewport with one belief."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=1100)
         world["containers"]["152,101"] = make_container_state(
             x=152,
@@ -91,6 +93,7 @@ class TestHarvestMemoryVeto:
             None,
             "",
             ((150, 100),),
+            ws=ws,
         )
 
     def test_known_empty_viewport_is_vetoed(self) -> None:
@@ -139,6 +142,7 @@ class TestPreHuntTopOffBias:
         """Two-dot world: a far pair vs a lone dot next to the enemy."""
         from tankpit_bot.state.types import make_tank_state
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=fuel, block_scanned=False)
         world["tanks"]["50"] = make_tank_state(
             tank_id=50,
@@ -161,6 +165,7 @@ class TestPreHuntTopOffBias:
             None,
             "",
             ((120, 100), (121, 100), (100, 120)),
+            ws=ws,
         )
 
     def test_hunt_ready_stocks_bias_toward_the_prey(self) -> None:
@@ -222,6 +227,7 @@ class TestNearestAliveEnemy:
         from tankpit_bot.state.types import TankStateDict, make_tank_state
         from tankpit_bot.types.constants import TankLiveness
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=900)
 
         def _tank(tank_id: int, x: int, y: int, team: int, liveness: TankLiveness) -> TankStateDict:
@@ -246,7 +252,14 @@ class TestNearestAliveEnemy:
         world["tanks"]["14"] = _tank(14, 100, 110, 2, "alive")  # near enemy
         world["tanks"]["15"] = _tank(15, 100, 140, 2, "alive")  # farther after near
         ctx = DecideCtx(
-            world, self_state, make_scanned_ai_state(), make_inventory(), 100000, None, ""
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+            ws=ws,
         )
 
         assert _nearest_alive_enemy(ctx) == (100, 110)
@@ -255,9 +268,17 @@ class TestNearestAliveEnemy:
         """An empty registry produces no bias target."""
         from tankpit_bot.bot.ai.resource_search import _nearest_alive_enemy
 
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=900)
         ctx = DecideCtx(
-            world, self_state, make_scanned_ai_state(), make_inventory(), 100000, None, ""
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+            ws=ws,
         )
 
         assert _nearest_alive_enemy(ctx) is None
@@ -283,6 +304,7 @@ class TestBarrenScanVeto:
         """One dot at (150,100); its 16x16 landing viewport swept scan_age_ms ago."""
         from tankpit_bot.state.scan_coverage import FORAGE_COVERAGE_TTL_MS
 
+        ws = WorldService()
         now_ms = 1000000
         world, self_state = make_world(self_x=100, self_y=100, fuel=1100)
         # Sweep age must exceed the forage TTL in every test here, so the
@@ -312,6 +334,7 @@ class TestBarrenScanVeto:
             None,
             "",
             ((150, 100),),
+            ws=ws,
         )
 
     def test_barren_swept_viewport_is_vetoed(self) -> None:

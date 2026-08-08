@@ -27,6 +27,7 @@ from tankpit_bot.replay.engine import (
     replay_session,
 )
 from tankpit_bot.replay.types import ReplayTickTraceDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     WorldStateDict,
     make_container_state,
@@ -91,14 +92,6 @@ pass it explicitly instead of leaning on module state
 ([[session-state-deglobalisation]])."""
 
 
-def _cleanup() -> None:
-    """Reset global state between tests.
-
-    The XOR table is no longer among it — each replay builds its own
-    from the capture's magic ([[session-state-deglobalisation]]).
-    """
-
-
 def _require_trace(
     result: tuple[AIStateDict, ReplayTickTraceDict | None],
 ) -> ReplayTickTraceDict:
@@ -130,18 +123,15 @@ class TestReplaySessionValidation:
 
     def test_empty_messages_returns_zero_ticks(self) -> None:
         """replay_session returns zero ticks for session with no messages."""
-        _cleanup()
         session = _make_session([])
         result = replay_session(session)
         assert result["session_id"] == "replay-test"
         assert result["total_ticks"] == 0
         assert result["total_messages"] == 0
         assert result["traces"] == []
-        _cleanup()
 
     def test_sent_only_messages_returns_zero_ticks(self) -> None:
         """replay_session skips sent messages and returns zero ticks."""
-        _cleanup()
         session = _make_session(
             [
                 _make_text_message(1000, "+1|Room|5|1,1,1,0,1,0,0|3|n|field42.gif|2026", "sent"),
@@ -150,11 +140,9 @@ class TestReplaySessionValidation:
         result = replay_session(session)
         assert result["total_messages"] == 0
         assert result["total_ticks"] == 0
-        _cleanup()
 
     def test_text_messages_no_self_state_returns_zero_ticks(self) -> None:
         """replay_session processes text messages but returns no ticks."""
-        _cleanup()
         session = _make_session(
             [
                 _make_text_message(1000, "+1|Room|5|1,1,1,0,1,0,0|3|n|field42.gif|2026"),
@@ -164,7 +152,6 @@ class TestReplaySessionValidation:
         result = replay_session(session)
         assert result["total_messages"] == 2
         assert result["total_ticks"] == 0
-        _cleanup()
 
 
 class TestExtractCommandTarget:
@@ -220,7 +207,7 @@ class TestBuildTrace:
             desired_equipment=[1, 2, 4, 5],
         )
 
-        trace = _build_trace(0, 1000, decision, world, self_state, ai_state)
+        trace = _build_trace(WorldService(), 0, 1000, decision, world, self_state, ai_state)
 
         assert trace["tick_index"] == 0
         assert trace["timestamp_ms"] == 1000
@@ -267,7 +254,7 @@ class TestBuildTrace:
             desired_equipment=[],
         )
 
-        trace = _build_trace(1, 2000, decision, world, self_state, ai_state)
+        trace = _build_trace(WorldService(), 1, 2000, decision, world, self_state, ai_state)
 
         assert trace["container_count"] == 2
         assert trace["target_x"] == 52
@@ -302,7 +289,7 @@ class TestBuildTrace:
             desired_equipment=[1, 2, 4],
         )
 
-        trace = _build_trace(7, 8000, decision, world, self_state, ai_state)
+        trace = _build_trace(WorldService(), 7, 8000, decision, world, self_state, ai_state)
 
         assert trace["ai_mode"] == "HUNT"
         assert trace["ai_mode_state"] == "ENGAGE"
@@ -310,17 +297,23 @@ class TestBuildTrace:
         assert trace["resource_target_kind"] == ""
 
 
-def _inject_self_state(x: int, y: int, fuel: int) -> None:
-    """Inject a self_state into the module-level world state for testing.
+def _inject_self_state(x: int, y: int, fuel: int) -> WorldService:
+    """Build a world service carrying one seeded self_state.
+
+    Returns the service so the caller passes the SAME instance to
+    ``_process_tick_batch``. Seeding the process singleton and then
+    handing the batch a fresh service was silently testing nothing
+    ([[session-state-deglobalisation]] step 8).
 
     Args:
         x: X coordinate.
         y: Y coordinate.
         fuel: Fuel amount.
-    """
-    from tankpit_bot.sniffer.world_state import get_world_service
 
-    svc = get_world_service()
+    Returns:
+        A service whose world state carries the seeded self.
+    """
+    svc = WorldService()
     self_state = make_self_state(
         x=x,
         y=y,
@@ -331,6 +324,7 @@ def _inject_self_state(x: int, y: int, fuel: int) -> None:
         leaderboard_position=0,
     )
     svc.world_state = WorldStateDict(**{**svc.world_state, "self_state": self_state})
+    return svc
 
 
 class TestProcessTickBatch:
@@ -338,11 +332,9 @@ class TestProcessTickBatch:
 
     def test_returns_none_trace_when_no_self_state(self) -> None:
         """_process_tick_batch returns None trace when self_state is absent."""
-        _cleanup()
         ai_state = make_initial_ai_state()
-        result = _process_tick_batch([], _REPLAY_TABLE, ai_state, 0, 1000)
+        result = _process_tick_batch(WorldService(), [], _REPLAY_TABLE, ai_state, 0, 1000)
         assert result[1] is None
-        _cleanup()
 
     def test_returns_trace_when_self_state_present(self) -> None:
         """_process_tick_batch returns a trace when self_state is available.
@@ -354,10 +346,9 @@ class TestProcessTickBatch:
         the viewport), independent of whether the server-side extras
         count is empty (free 5x5) or stocked (full viewport).
         """
-        _cleanup()
-        _inject_self_state(100, 120, 500)
+        ws = _inject_self_state(100, 120, 500)
         ai_state = make_initial_ai_state()
-        trace = _require_trace(_process_tick_batch([], _REPLAY_TABLE, ai_state, 0, 1000))
+        trace = _require_trace(_process_tick_batch(ws, [], _REPLAY_TABLE, ai_state, 0, 1000))
         assert trace["self_x"] == 100
         assert trace["self_y"] == 120
         assert trace["fuel"] == 500
@@ -365,31 +356,24 @@ class TestProcessTickBatch:
         assert trace["ai_mode"] == "COLLECT"
         assert trace["ai_mode_state"] == "SENSE"
         assert trace["combat_target_id"] == -1
-        _cleanup()
 
     def test_carries_forward_updated_ai_state(self) -> None:
         """_process_tick_batch returns updated AI state."""
-        _cleanup()
-        _inject_self_state(100, 120, 500)
+        ws = _inject_self_state(100, 120, 500)
         ai_state = make_initial_ai_state()
-        result = _process_tick_batch([], _REPLAY_TABLE, ai_state, 0, 1000)
+        result = _process_tick_batch(ws, [], _REPLAY_TABLE, ai_state, 0, 1000)
         updated_ai = result[0]
         assert updated_ai["config"] == ai_state["config"]
-        _cleanup()
 
     def test_merges_kills_into_ai_state(self) -> None:
         """_process_tick_batch merges killed tank IDs from protocol."""
-        _cleanup()
-        from tankpit_bot.sniffer.world_state import get_world_service
-
-        get_world_service().killed_tank_ids.add(42)
-        _inject_self_state(100, 120, 500)
+        ws = _inject_self_state(100, 120, 500)
+        ws.killed_tank_ids.add(42)
         ai_state = make_initial_ai_state()
-        result = _process_tick_batch([], _REPLAY_TABLE, ai_state, 0, 5000)
+        result = _process_tick_batch(ws, [], _REPLAY_TABLE, ai_state, 0, 5000)
         updated_ai = result[0]
         assert "42" in updated_ai["killed_tank_ids"]
         assert updated_ai["killed_tank_ids"]["42"] == 5000
-        _cleanup()
 
 
 class TestReplaySessionMultiTick:
@@ -401,18 +385,15 @@ class TestReplaySessionMultiTick:
         Uses the process_received_message_hook to inject self_state
         during message processing so the planner runs.
         """
-        _cleanup()
         from tankpit_bot.sniffer.decoders import process_received_message as real_prm
-        from tankpit_bot.sniffer.world_state import get_world_service
 
         call_count = 0
 
-        def _injecting_hook(payload: str, xor_table: bytes) -> None:
+        def _injecting_hook(ws: WorldService, payload: str, xor_table: bytes) -> None:
             nonlocal call_count
-            real_prm(get_world_service(), payload, xor_table)
+            real_prm(ws, payload, xor_table)
             call_count += 1
             if call_count == 1:
-                svc = get_world_service()
                 self_state = make_self_state(
                     x=70,
                     y=80,
@@ -422,14 +403,14 @@ class TestReplaySessionMultiTick:
                     rank=3,
                     leaderboard_position=0,
                 )
-                svc.world_state = WorldStateDict(
-                    **{**svc.world_state, "self_state": self_state},
+                ws.world_state = WorldStateDict(
+                    **{**ws.world_state, "self_state": self_state},
                 )
 
-        from tankpit_bot import _test_hooks
+        from tankpit_bot.replay import _test_hooks as replay_hooks
 
-        original = _test_hooks.process_received_message_hook
-        _test_hooks.process_received_message_hook = _injecting_hook
+        original = replay_hooks.process_received_message_hook
+        replay_hooks.process_received_message_hook = _injecting_hook
 
         session = _make_session(
             [
@@ -440,14 +421,13 @@ class TestReplaySessionMultiTick:
         )
         result = replay_session(session)
 
-        _test_hooks.process_received_message_hook = original
+        replay_hooks.process_received_message_hook = original
 
         assert result["total_messages"] == 3
         assert result["total_ticks"] >= 2
         assert result["traces"][0]["self_x"] == 70
         assert result["traces"][0]["ai_mode"] == "COLLECT"
         assert result["traces"][0]["ai_mode_state"] in ("SENSE", "APPROACH", "")
-        _cleanup()
 
     def test_multi_tick_batching(self) -> None:
         """replay_session batches messages into ticks by timestamp gap.
@@ -455,7 +435,6 @@ class TestReplaySessionMultiTick:
         TICK_RATE_MS is 2000ms, so messages must be >2s apart to form
         separate tick batches.
         """
-        _cleanup()
         session = _make_session(
             [
                 _make_text_message(1000, "+1|Room|5|1,1,1,0,1,0,0|3|n|field42.gif|2026"),
@@ -466,21 +445,19 @@ class TestReplaySessionMultiTick:
         result = replay_session(session)
         assert result["total_messages"] == 3
         assert result["total_ticks"] == 0
-        _cleanup()
 
     def test_produces_traces_with_injected_self_state(self) -> None:
         """Multi-tick planner execution produces correct traces."""
-        _cleanup()
-        _inject_self_state(80, 90, 600)
+        ws = _inject_self_state(80, 90, 600)
         ai_state = make_initial_ai_state()
         traces: list[ReplayTickTraceDict] = []
 
-        result1 = _process_tick_batch([], _REPLAY_TABLE, ai_state, 0, 2000)
+        result1 = _process_tick_batch(ws, [], _REPLAY_TABLE, ai_state, 0, 2000)
         ai_state = result1[0]
         if result1[1] is not None:
             traces.append(result1[1])
 
-        result2 = _process_tick_batch([], _REPLAY_TABLE, ai_state, 1, 4100)
+        result2 = _process_tick_batch(ws, [], _REPLAY_TABLE, ai_state, 1, 4100)
         if result2[1] is not None:
             traces.append(result2[1])
 
@@ -488,20 +465,17 @@ class TestReplaySessionMultiTick:
         assert traces[0]["tick_index"] == 0
         assert traces[1]["tick_index"] == 1
         assert traces[0]["self_x"] == 80
-        _cleanup()
 
     def test_final_batch_produces_trace(self) -> None:
         """The final batch in replay produces a trace when self_state exists."""
-        _cleanup()
-        _inject_self_state(70, 80, 400)
+        ws = _inject_self_state(70, 80, 400)
         ai_state = make_initial_ai_state()
-        result1 = _process_tick_batch([], _REPLAY_TABLE, ai_state, 0, 2000)
+        result1 = _process_tick_batch(ws, [], _REPLAY_TABLE, ai_state, 0, 2000)
         trace1 = _require_trace(result1)
         assert trace1["tick_index"] == 0
 
-        result2 = _process_tick_batch([], _REPLAY_TABLE, result1[0], 1, 5000)
+        result2 = _process_tick_batch(ws, [], _REPLAY_TABLE, result1[0], 1, 5000)
         trace2 = _require_trace(result2)
         assert trace2["tick_index"] == 1
         assert trace2["self_x"] == 70
         assert trace2["self_y"] == 80
-        _cleanup()

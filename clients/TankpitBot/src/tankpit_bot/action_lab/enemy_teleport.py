@@ -54,7 +54,6 @@ from tankpit_bot.browser.page_client_snapshot import (
     PageClientSnapshotDict,
     capture_page_client_snapshot,
 )
-from tankpit_bot.sniffer.world_state import get_terrain_map
 
 log = get_logger(__name__)
 
@@ -273,8 +272,9 @@ class EnemyTeleportProbe(ProbeBase):
             self.get_world_state(),
             self._require_self_state(),
             enemy,
-            get_terrain_map(),
+            self.world.get_terrain_map(),
             action_hooks.get_current_time_ms(),
+            self.world,
         )
         if landing_x == -1 and landing_y == -1:
             return self._finish_non_teleport_attempt(

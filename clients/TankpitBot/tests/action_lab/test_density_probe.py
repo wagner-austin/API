@@ -20,7 +20,6 @@ from tankpit_bot.action_lab.density_probe import (
     DENSITY_SITES,
 )
 from tankpit_bot.action_lab.probe_base import ProbeError
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state.types import (
     make_container_state,
 )
@@ -51,7 +50,7 @@ def test_ensure_extras_enabled_skips_when_already_on() -> None:
     probe = _DensityHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=7, radar_enabled=True)
+    probe.world.inventory_state = _inventory(radar_count=7, radar_enabled=True)
 
     count, was_enabled, toggles = probe._ensure_extras_enabled()
     assert (count, was_enabled, toggles) == (7, True, 0)
@@ -62,7 +61,7 @@ def test_ensure_extras_enabled_refuses_empty_stock() -> None:
     probe = _DensityHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=0, radar_enabled=False)
+    probe.world.inventory_state = _inventory(radar_count=0, radar_enabled=False)
 
     with pytest.raises(ProbeError, match="no extra radars in stock"):
         probe._ensure_extras_enabled()
@@ -72,7 +71,7 @@ def test_ensure_extras_enabled_raises_when_toggle_fails() -> None:
     probe = _DensityHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=22, radar_enabled=False)
+    probe.world.inventory_state = _inventory(radar_count=22, radar_enabled=False)
 
     with pytest.raises(ProbeError, match="still disabled after toggle"):
         probe._ensure_extras_enabled()
@@ -83,7 +82,7 @@ def test_restore_extras_state_toggles_back_off_and_verifies() -> None:
     probe = _DensityHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=10, radar_enabled=False)
+    probe.world.inventory_state = _inventory(radar_count=10, radar_enabled=False)
 
     assert probe._restore_extras_state(True) == 0
     assert probe.sent_toggles == []
@@ -95,7 +94,7 @@ def test_restore_extras_state_raises_when_still_enabled() -> None:
     probe = _DensityHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=10, radar_enabled=True)
+    probe.world.inventory_state = _inventory(radar_count=10, radar_enabled=True)
 
     with pytest.raises(ProbeError, match="still enabled after restore"):
         probe._restore_extras_state(False)
@@ -107,7 +106,7 @@ def test_refuel_toward_hops_nearest_dots_until_funded() -> None:
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.fuel = 100
-    get_world_service().map_fuel_dots = ((105, 100), (200, 200))
+    probe.world.map_fuel_dots = ((105, 100), (200, 200))
 
     hops = probe._refuel_toward(40, 40)
     assert hops == 1
@@ -129,7 +128,7 @@ def test_refuel_toward_tolerates_a_dotless_map() -> None:
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.fuel = 50
-    get_world_service().map_fuel_dots = ()
+    probe.world.map_fuel_dots = ()
     assert probe._refuel_toward(40, 40) == 0
     assert probe.map_calls == 1
 
@@ -140,7 +139,7 @@ def test_refuel_toward_stops_after_a_dry_streak() -> None:
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.fuel = 50
-    get_world_service().map_fuel_dots = ((105, 100), (110, 100), (115, 100), (120, 100))
+    probe.world.map_fuel_dots = ((105, 100), (110, 100), (115, 100), (120, 100))
     hops = probe._refuel_toward(40, 40)
     assert hops == 3
     assert len(probe.teleports) == 3
@@ -152,7 +151,7 @@ def test_refuel_toward_picks_the_cheaper_later_dot() -> None:
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.fuel = 100
-    get_world_service().map_fuel_dots = ((115, 100), (105, 100), (116, 100))
+    probe.world.map_fuel_dots = ((115, 100), (105, 100), (116, 100))
 
     assert probe._refuel_toward(40, 40) == 1
     assert probe.teleports == [(105, 100)]
@@ -185,7 +184,7 @@ def test_bootstrap_fuel_returns_when_nothing_anywhere() -> None:
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.fuel = 0
-    get_world_service().map_fuel_dots = ()
+    probe.world.map_fuel_dots = ()
 
     assert probe._bootstrap_fuel(700) == 0
     assert probe.pickups == []
@@ -200,7 +199,7 @@ def test_bootstrap_fuel_blind_walks_to_the_nearest_map_dot() -> None:
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.fuel = 0
-    get_world_service().map_fuel_dots = ((180, 180), (110, 126))
+    probe.world.map_fuel_dots = ((180, 180), (110, 126))
 
     assert probe._bootstrap_fuel(500) == 1
     assert probe.pickups == [(110, 126)]

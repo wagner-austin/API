@@ -35,7 +35,6 @@ from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.physics.costs import teleport_cost
-from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state.types import ContainerStateDict
 
@@ -215,7 +214,7 @@ class LarderProbe(DensityProbe):
         Raises:
             ProbeError: If the terrain map is unavailable.
         """
-        terrain = get_terrain_map()
+        terrain = self.world.get_terrain_map()
         if terrain is None:
             raise ProbeError("terrain map is unavailable")
         _, x, y = self._current_fuel()

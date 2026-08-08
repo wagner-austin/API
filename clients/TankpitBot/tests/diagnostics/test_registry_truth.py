@@ -23,8 +23,7 @@ from tankpit_bot.diagnostics.registry_truth import (
 )
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
-from tankpit_bot.sniffer import world_state
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import mark_tank_killed
 from tankpit_bot.sniffer.world_state_tanks import (
     update_world_state_from_tank_damage,
@@ -116,9 +115,10 @@ def _world_with_self_and_viewport() -> WorldStateDict:
     return world
 
 
-def _announce_tank_via_wire(tank_id: int, x: int, y: int, name: str) -> None:
-    """Establish a tank as wire-known by simulating a TankEntry message."""
-    update_world_state_from_tank_entry(get_world_service(), tank_id, 0, 0, x, y)
+def _announce_tank_via_wire(ws: WorldService, tank_id: int, x: int, y: int, name: str) -> None:
+    """Establish a tank as wire-known in ``ws`` by simulating a TankEntry."""
+    del name  # call-site documentation only; TankEntry carries no name
+    update_world_state_from_tank_entry(ws, tank_id, 0, 0, x, y)
 
 
 def _ingest_records(latest_events_path: str) -> list[RuntimeEventRecordDict]:
@@ -178,17 +178,19 @@ def test_register_anchors_rendered_enemy(fake_fs: FakeFileSystem) -> None:
     Mapping verified live: viewport (123,118) + render (15,9) - 1 =
     world (137,126); 58/60 wire shot targets matched this formula.
     """
+    ws = WorldService()
     artifacts = configure_bot_runtime_logging("20260611-120000")
-    _announce_tank_via_wire(511, 135, 125, "purple-3")
+    _announce_tank_via_wire(ws, 511, 135, 125, "purple-3")
     snapshot = _make_snapshot({"P.j": [_PURPLE_3, _GHOST_RED_1, _SELF_ARTAX]})
 
     ingested = register_tank_truth_from_page_snapshot(
+        ws,
         snapshot,
         _world_with_self_and_viewport(),
     )
 
     assert ingested == 1
-    tanks = world_state.get_world_state()["tanks"]
+    tanks = ws.get_world_state()["tanks"]
     assert "511" in tanks
     assert tanks["511"]["x"] == 137
     assert tanks["511"]["y"] == 126
@@ -206,16 +208,18 @@ def test_register_anchors_rendered_enemy(fake_fs: FakeFileSystem) -> None:
 
 def test_register_skips_ghosts_and_self(fake_fs: FakeFileSystem) -> None:
     """Roster ghosts at (-8,-8) and the self entry are never ingested."""
+    ws = WorldService()
     artifacts = configure_bot_runtime_logging("20260611-120000")
     snapshot = _make_snapshot({"P.j": [_GHOST_RED_1, _SELF_ARTAX]})
 
     ingested = register_tank_truth_from_page_snapshot(
+        ws,
         snapshot,
         _world_with_self_and_viewport(),
     )
 
     assert ingested == 0
-    assert world_state.get_world_state()["tanks"] == {}
+    assert ws.get_world_state()["tanks"] == {}
     assert _ingest_records(artifacts["latest_events_path"]) == []
 
 
@@ -226,26 +230,28 @@ def test_register_zero_tier_never_downgrades_known_tier(fake_fs: FakeFileSystem)
     fight the wire tracked tier-by-tier; 0 means both "full" and
     "unsynced" so it is never authoritative.
     """
+    ws = WorldService()
     configure_bot_runtime_logging("20260611-120000")
     world = _world_with_self_and_viewport()
-    _announce_tank_via_wire(511, 135, 125, "purple-3")
-    register_tank_truth_from_page_snapshot(_make_snapshot({"P.j": [_PURPLE_3]}), world)
-    update_world_state_from_tank_damage(get_world_service(), 511, 1)
+    _announce_tank_via_wire(ws, 511, 135, 125, "purple-3")
+    register_tank_truth_from_page_snapshot(ws, _make_snapshot({"P.j": [_PURPLE_3]}), world)
+    update_world_state_from_tank_damage(ws, 511, 1)
     snapshot = _make_snapshot({"P.j": [{**_PURPLE_3, "u": 0}]})
 
-    ingested = register_tank_truth_from_page_snapshot(snapshot, world)
+    ingested = register_tank_truth_from_page_snapshot(ws, snapshot, world)
 
     assert ingested == 1
-    assert world_state.get_world_state()["tanks"]["511"]["damage_state"] == 1
+    assert ws.get_world_state()["tanks"]["511"]["damage_state"] == 1
 
 
 def test_register_without_self_state_is_a_no_op(fake_fs: FakeFileSystem) -> None:
     """No self identity means no viewport anchor and nothing ingested."""
+    ws = WorldService()
     configure_bot_runtime_logging("20260611-120000")
     snapshot = _make_snapshot({"P.j": [_PURPLE_3]})
 
-    assert register_tank_truth_from_page_snapshot(snapshot, make_empty_world_state()) == 0
-    assert world_state.get_world_state()["tanks"] == {}
+    assert register_tank_truth_from_page_snapshot(ws, snapshot, make_empty_world_state()) == 0
+    assert ws.get_world_state()["tanks"] == {}
 
 
 def test_register_without_registry_collection_is_a_no_op(fake_fs: FakeFileSystem) -> None:
@@ -253,7 +259,12 @@ def test_register_without_registry_collection_is_a_no_op(fake_fs: FakeFileSystem
     configure_bot_runtime_logging("20260611-120000")
     snapshot = _make_snapshot({"pa": []})
 
-    assert register_tank_truth_from_page_snapshot(snapshot, _world_with_self_and_viewport()) == 0
+    assert (
+        register_tank_truth_from_page_snapshot(
+            WorldService(), snapshot, _world_with_self_and_viewport()
+        )
+        == 0
+    )
 
 
 def test_register_skips_corpse_at_death_tile(fake_fs: FakeFileSystem) -> None:
@@ -264,14 +275,16 @@ def test_register_skips_corpse_at_death_tile(fake_fs: FakeFileSystem) -> None:
     cooldown expired and spent three minutes shooting it (28 shots,
     28 miss-driven map reopens).
     """
+    ws = WorldService()
     artifacts = configure_bot_runtime_logging("20260611-120000")
     world = _world_with_self_and_viewport()
     # The tank is wire-known, ingested live at (137,126), then killed there.
-    _announce_tank_via_wire(511, 135, 125, "purple-3")
-    register_tank_truth_from_page_snapshot(_make_snapshot({"P.j": [_PURPLE_3]}), world)
-    mark_tank_killed(get_world_service(), 511)
+    _announce_tank_via_wire(ws, 511, 135, 125, "purple-3")
+    register_tank_truth_from_page_snapshot(ws, _make_snapshot({"P.j": [_PURPLE_3]}), world)
+    mark_tank_killed(ws, 511)
 
     ingested = register_tank_truth_from_page_snapshot(
+        ws,
         _make_snapshot({"P.j": [_PURPLE_3]}),
         world,
     )
@@ -291,17 +304,22 @@ def test_register_respawn_at_new_tile_clears_death_anchor(fake_fs: FakeFileSyste
     The anchor clears permanently: the respawned tank is ingested even
     if it later wanders back across its old death tile.
     """
+    ws = WorldService()
     configure_bot_runtime_logging("20260611-120000")
     world = _world_with_self_and_viewport()
-    _announce_tank_via_wire(511, 135, 125, "purple-3")
-    register_tank_truth_from_page_snapshot(_make_snapshot({"P.j": [_PURPLE_3]}), world)
-    mark_tank_killed(get_world_service(), 511)
+    _announce_tank_via_wire(ws, 511, 135, 125, "purple-3")
+    register_tank_truth_from_page_snapshot(ws, _make_snapshot({"P.j": [_PURPLE_3]}), world)
+    mark_tank_killed(ws, 511)
 
     respawned = {**_PURPLE_3, "j": 5, "i": 4}
-    assert register_tank_truth_from_page_snapshot(_make_snapshot({"P.j": [respawned]}), world) == 1
+    assert (
+        register_tank_truth_from_page_snapshot(ws, _make_snapshot({"P.j": [respawned]}), world) == 1
+    )
     # Back across the old death tile: still ingested, anchor is gone.
-    assert register_tank_truth_from_page_snapshot(_make_snapshot({"P.j": [_PURPLE_3]}), world) == 1
-    tanks = world_state.get_world_state()["tanks"]
+    assert (
+        register_tank_truth_from_page_snapshot(ws, _make_snapshot({"P.j": [_PURPLE_3]}), world) == 1
+    )
+    tanks = ws.get_world_state()["tanks"]
     assert tanks["511"]["x"] == 137
     assert tanks["511"]["y"] == 126
 
@@ -315,34 +333,38 @@ def test_register_skips_tank_the_wire_never_announced(fake_fs: FakeFileSystem) -
     died and respawned elsewhere ~10s later; only its sprite state
     lingered).
     """
+    ws = WorldService()
     artifacts = configure_bot_runtime_logging("20260611-120000")
 
     ingested = register_tank_truth_from_page_snapshot(
+        ws,
         _make_snapshot({"P.j": [_PURPLE_3]}),
         _world_with_self_and_viewport(),
     )
 
     assert ingested == 0
-    assert world_state.get_world_state()["tanks"] == {}
+    assert ws.get_world_state()["tanks"] == {}
     assert _ingest_records(artifacts["latest_events_path"]) == []
 
 
 def test_register_skips_partial_entries(fake_fs: FakeFileSystem) -> None:
     """Field-capped partial entries are skipped, full ones ingested."""
+    ws = WorldService()
     configure_bot_runtime_logging("20260611-120000")
-    _announce_tank_via_wire(511, 135, 125, "purple-3")
-    _announce_tank_via_wire(513, 130, 120, "purple-5")
+    _announce_tank_via_wire(ws, 511, 135, 125, "purple-3")
+    _announce_tank_via_wire(ws, 513, 130, 120, "purple-5")
     partial = {k: v for k, v in _PURPLE_3.items() if k != "h"}
     other = {**_PURPLE_3, "id": 513, "name": "purple-5", "j": 14}
     snapshot = _make_snapshot({"P.j": [partial, other]})
 
     ingested = register_tank_truth_from_page_snapshot(
+        ws,
         snapshot,
         _world_with_self_and_viewport(),
     )
 
     assert ingested == 1
-    tanks = world_state.get_world_state()["tanks"]
+    tanks = ws.get_world_state()["tanks"]
     # 513's full entry refined to the mapped tile; 511's partial entry
     # left its wire-announced position untouched.
     assert tanks["513"]["x"] == 136
@@ -361,8 +383,8 @@ def test_register_skips_when_map_visible(tmp_path: Path) -> None:
         },
         map_visible=True,
     )
-    ws = get_world_service()
+    ws = WorldService()
 
-    count = register_tank_truth_from_page_snapshot(snapshot, ws.world_state)
+    count = register_tank_truth_from_page_snapshot(ws, snapshot, ws.world_state)
 
     assert count == 0

@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.collect_hops import hop_toward_equipment
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -25,6 +26,7 @@ def test_hop_toward_equipment_picks_nearest_of_multiple_external_candidates() ->
     the (150,100) candidate is considered and rejected as more
     expensive.
     """
+    ws = WorldService()
     containers = {
         "130,100": make_container_state(
             x=130,
@@ -46,7 +48,16 @@ def test_hop_toward_equipment_picks_nearest_of_multiple_external_candidates() ->
     world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
     inventory = make_inventory(default_count=15)
     terrain = InMemoryTerrainMap()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        terrain,
+        "",
+        ws=ws,
+    )
 
     decision = hop_toward_equipment(ctx, ctx.base)
 
@@ -67,6 +78,7 @@ def test_hop_toward_equipment_declines_during_a_held_lock_above_break() -> None:
     s7-3/4 receipts show an 85-tile round trip at duals 22/25 with
     Yuppler locked. Above the break thresholds the hop declines.
     """
+    ws = WorldService()
     containers = {
         "130,100": make_container_state(
             x=130,
@@ -81,13 +93,14 @@ def test_hop_toward_equipment_declines_during_a_held_lock_above_break() -> None:
     inventory = make_inventory(default_count=15)
     terrain = InMemoryTerrainMap()
     ai_state = AIStateDict(**{**make_scanned_ai_state(), "combat_target_id": 50})
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
     assert hop_toward_equipment(ctx, ctx.base) is None
 
 
 def test_hop_toward_equipment_fires_during_a_held_lock_at_weapon_break() -> None:
     """A genuine weapon break still tops up mid-fight (the resume floor)."""
+    ws = WorldService()
     containers = {
         "130,100": make_container_state(
             x=130,
@@ -102,7 +115,7 @@ def test_hop_toward_equipment_fires_during_a_held_lock_at_weapon_break() -> None
     inventory = make_inventory(default_count=3)
     terrain = InMemoryTerrainMap()
     ai_state = AIStateDict(**{**make_scanned_ai_state(), "combat_target_id": 50})
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
     decision = hop_toward_equipment(ctx, ctx.base)
 
@@ -123,6 +136,7 @@ def test_hop_toward_equipment_takes_in_viewport_walk_blocked_containers() -> Non
     dot-hopped away from three identified containers and paid a
     return trip later).
     """
+    ws = WorldService()
     containers = {
         "105,105": make_container_state(
             x=105,
@@ -136,7 +150,16 @@ def test_hop_toward_equipment_takes_in_viewport_walk_blocked_containers() -> Non
     world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
     inventory = make_inventory(default_count=15)
     terrain = InMemoryTerrainMap()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        terrain,
+        "",
+        ws=ws,
+    )
 
     decision = hop_toward_equipment(ctx, ctx.base)
 
@@ -157,6 +180,7 @@ def test_hop_toward_equipment_skips_when_teleport_unaffordable() -> None:
     400, which is below the 650 reserve. The step considers the
     candidate, rejects the affordability check, and returns None.
     """
+    ws = WorldService()
     containers = {
         "200,100": make_container_state(
             x=200,
@@ -170,7 +194,16 @@ def test_hop_toward_equipment_skips_when_teleport_unaffordable() -> None:
     world, self_state = make_world(self_x=100, self_y=100, fuel=1000, containers=containers)
     inventory = make_inventory(default_count=15)
     terrain = InMemoryTerrainMap()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        terrain,
+        "",
+        ws=ws,
+    )
 
     decision = hop_toward_equipment(ctx, ctx.base)
 
@@ -185,6 +218,7 @@ def test_hop_toward_equipment_skips_when_landing_tile_impassable() -> None:
     returns None for this container, the loop continues to the next
     candidate (of which there are none), and the step returns None.
     """
+    ws = WorldService()
     containers = {
         "150,100": make_container_state(
             x=150,
@@ -205,7 +239,16 @@ def test_hop_toward_equipment_skips_when_landing_tile_impassable() -> None:
         (150, 101): "W",
     }
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        terrain,
+        "",
+        ws=ws,
+    )
 
     decision = hop_toward_equipment(ctx, ctx.base)
 
@@ -222,6 +265,7 @@ def test_hop_toward_equipment_never_teleports_to_its_own_tile() -> None:
     belongs to the pickup steps, so the sole own-tile candidate
     declines the hop entirely.
     """
+    ws = WorldService()
     containers = {
         "100,100": make_container_state(
             x=100,
@@ -235,7 +279,16 @@ def test_hop_toward_equipment_never_teleports_to_its_own_tile() -> None:
     world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
     inventory = make_inventory(default_count=15)
     terrain = InMemoryTerrainMap()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        terrain,
+        "",
+        ws=ws,
+    )
 
     assert hop_toward_equipment(ctx, ctx.base) is None
 
@@ -247,6 +300,7 @@ def test_hop_toward_equipment_skips_own_tile_for_a_real_candidate() -> None:
     so without the own-ground gate the (100,100) container would win
     over the external (130,100) one and produce the s8-2 self-teleport.
     """
+    ws = WorldService()
     containers = {
         "100,100": make_container_state(
             x=100,
@@ -268,7 +322,16 @@ def test_hop_toward_equipment_skips_own_tile_for_a_real_candidate() -> None:
     world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
     inventory = make_inventory(default_count=15)
     terrain = InMemoryTerrainMap()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        terrain,
+        "",
+        ws=ws,
+    )
 
     decision = hop_toward_equipment(ctx, ctx.base)
 
@@ -292,6 +355,7 @@ def test_hop_toward_equipment_boards_a_ferry_for_water_locked_drop() -> None:
     from tankpit_bot.state.types import make_terrain_tile
     from tankpit_bot.types.constants import TERRAIN_FERRY
 
+    ws = WorldService()
     containers = {
         "150,100": make_container_state(
             x=150,
@@ -319,7 +383,16 @@ def test_hop_toward_equipment_boards_a_ferry_for_water_locked_drop() -> None:
         (148, 101): "W",
     }
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        terrain,
+        "",
+        ws=ws,
+    )
 
     decision = hop_toward_equipment(ctx, ctx.base)
 
@@ -341,6 +414,7 @@ def test_hop_skips_a_mine_denied_nearest_and_takes_the_next_candidate() -> None:
     """
     from tankpit_bot.state.types import make_mine_state
 
+    ws = WorldService()
     containers = {
         "130,100": make_container_state(
             x=130,
@@ -378,7 +452,16 @@ def test_hop_skips_a_mine_denied_nearest_and_takes_the_next_candidate() -> None:
         occupied_tank_keys=frozenset(),
     )
     inventory = make_inventory(default_count=15)
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        inventory,
+        100000,
+        terrain,
+        "",
+        ws=ws,
+    )
 
     decision = hop_toward_equipment(ctx, ctx.base)
 

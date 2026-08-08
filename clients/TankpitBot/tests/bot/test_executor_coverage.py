@@ -15,7 +15,7 @@ from tankpit_bot.bot.types import (
     make_pickup_fuel_command,
     make_shoot_command,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import WorldStateDict, make_empty_world_state
 
 
@@ -24,7 +24,8 @@ class _DispatchFailBot:
 
     def __init__(self) -> None:
         """Initialize with world state."""
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._world = make_empty_world_state()
         self._cdp = None
         self._cdp_message_buffer: list[str] = []

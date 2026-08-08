@@ -16,6 +16,7 @@ from tankpit_bot.bot.ai.equipment import (
     fuel_deliverable_score,
     is_fuel_lock_release_warranted,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     ContainerStateDict,
     SelfStateDict,
@@ -144,6 +145,7 @@ class TestLockContinuationIntegration:
 
     def test_dreg_lock_releases_when_high_volume_fuel_is_visible(self) -> None:
         """The flag-13 shape clears the lock in continue_or_release_fuel_lock."""
+        ws = WorldService()
         world, self_state = make_world(
             self_x=242,
             self_y=16,
@@ -154,7 +156,7 @@ class TestLockContinuationIntegration:
             },
         )
         ai_state = make_scanned_ai_state()
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         decision, updated = continue_or_release_fuel_lock(
             ctx, ctx.base, _fuel_container(249, 18, 84)
@@ -165,6 +167,7 @@ class TestLockContinuationIntegration:
 
     def test_comparable_lock_continues(self) -> None:
         """A lock on comparable-value fuel keeps dispatching."""
+        ws = WorldService()
         world, self_state = make_world(
             self_x=100,
             self_y=100,
@@ -175,7 +178,7 @@ class TestLockContinuationIntegration:
             },
         )
         ai_state = make_scanned_ai_state()
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
         decision, _updated = continue_or_release_fuel_lock(
             ctx, ctx.base, _fuel_container(105, 105, 300)

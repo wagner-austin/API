@@ -27,6 +27,7 @@ from tankpit_bot.ledger.damage_book import DamageBookDict, make_damage_book
 from tankpit_bot.ledger.fuel_book import FuelBookDict, make_fuel_book
 from tankpit_bot.ledger.service import LedgerService
 from tankpit_bot.runtime_logging import emit_diagnostic
+from tankpit_bot.sniffer.world_service_beliefs import WorldServiceBeliefsMixin
 from tankpit_bot.sniffer.world_service_movement import WorldServiceMovementMixin
 from tankpit_bot.sniffer.world_service_radar import WorldServiceRadarMixin
 from tankpit_bot.state import (
@@ -76,7 +77,7 @@ def _make_empty_inventory() -> InventoryState:
     )
 
 
-class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin):
+class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServiceBeliefsMixin):
     """Owns all mutable game state for one session.
 
     Instance attributes mirror the 16 module-level globals that were

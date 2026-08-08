@@ -34,7 +34,7 @@ def _require_fresh_enemy_threat(
     if self_state is None:
         return None
     threats = analyze_threats(
-        probe.get_world_state(), self_state, action_hooks.get_current_time_ms()
+        probe.world, probe.get_world_state(), self_state, action_hooks.get_current_time_ms()
     )
     fresh = [
         threat
@@ -50,7 +50,7 @@ def _enemy_by_id(probe: ProbeBase, tank_id: int) -> EnemyThreatDict | None:
     if self_state is None:
         return None
     for threat in analyze_threats(
-        probe.get_world_state(), self_state, action_hooks.get_current_time_ms()
+        probe.world, probe.get_world_state(), self_state, action_hooks.get_current_time_ms()
     ):
         if threat["tank_id"] == tank_id:
             return threat

@@ -32,11 +32,7 @@ from tankpit_bot.ledger.outcome.move import emit_move_position_reached
 from tankpit_bot.ledger.outcome.scan import emit_scan_radar_complete
 from tankpit_bot.ledger.outcome.teleport import emit_teleport_landed
 from tankpit_bot.runtime_logging import emit_state
-from tankpit_bot.sniffer.world_state import (
-    check_and_clear_radar_scan_complete,
-    get_world_state,
-    mark_move_target_failed,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import check_and_clear_teleport_landed
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 
@@ -59,6 +55,7 @@ class CompletionsMixin(SessionBase):
         prefer_account: bool = False,
         cdp_service: CDPService | None = None,
         command_service: CommandService | None = None,
+        world: WorldService | None = None,
     ) -> None:
         """Initialize state machine data and delegate to SessionBase.
 
@@ -68,6 +65,7 @@ class CompletionsMixin(SessionBase):
             prefer_account: Whether to prefer account login.
             cdp_service: Injected CDPService. Created internally if None.
             command_service: Injected CommandService. Created internally if None.
+            world: Injected WorldService. Created internally if None.
         """
         super().__init__(
             target_url,
@@ -75,6 +73,7 @@ class CompletionsMixin(SessionBase):
             prefer_account=prefer_account,
             cdp_service=cdp_service,
             command_service=command_service,
+            world=world,
         )
         self._state_data: BotStateDataDict = make_initial_state_data()
 
@@ -181,7 +180,7 @@ class CompletionsMixin(SessionBase):
         action = self._state_data["in_flight_action"]
         if action["kind"] != "scan" or action["outcome"] != "pending":
             return False
-        if not check_and_clear_radar_scan_complete():
+        if not self.world.check_and_clear_radar_scan_complete():
             return False
         emit_scan_radar_complete(
             self.world.ledger,
@@ -254,7 +253,7 @@ class CompletionsMixin(SessionBase):
                     # under a different field set (unified 2026-07-30,
                     # [[flag-triage-20260729]] F9).
                     now = get_current_time_ms()
-                    mark_move_target_failed(tx, ty, now)
+                    self.world.mark_move_target_failed(tx, ty, now)
             emit_teleport_landed(
                 self.world.ledger,
                 duration_ms=self._action_duration_ms(action),
@@ -344,7 +343,7 @@ class CompletionsMixin(SessionBase):
         Otherwise LOW_FUEL would stomp TELEPORTING/COLLECTING states
         and cause repeated command spam.
         """
-        world = get_world_state()
+        world = self.world.get_world_state()
         self_state = world["self_state"]
 
         if self._maybe_transition_from_initializing(self_state):

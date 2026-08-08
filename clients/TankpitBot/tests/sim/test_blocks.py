@@ -21,6 +21,7 @@ from tankpit_bot.sim.world import (
     make_sim_world,
     place_mine,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 from tests.sim.seam import boot_seam
 
@@ -269,17 +270,16 @@ def test_production_world_learns_blocks_over_the_seam() -> None:
     """The real ingestion composes sim blocks into wire terrain."""
     bot, _server, _link, _table = boot_seam(blocks=((104, 101),))
     _tick_once(bot)
-    tile = get_world_terrain().get("104,101")
+    tile = get_world_terrain(bot.world).get("104,101")
     if tile is None:
         raise AssertionError("the seam never delivered the block tile")
     assert tile["terrain_type"] == BLOCK_LAND
 
 
-def get_world_terrain() -> dict[str, dict[str, int]]:
-    """Return the production world's wire-terrain registry."""
-    from tankpit_bot.sniffer.world_state import get_world_service
+def get_world_terrain(ws: WorldService) -> dict[str, dict[str, int]]:
+    """Return ``ws``'s wire-terrain registry."""
 
     terrain: dict[str, dict[str, int]] = {}
-    for key, tile in get_world_service().world_state["terrain"].items():
+    for key, tile in ws.world_state["terrain"].items():
         terrain[key] = {"terrain_type": tile["terrain_type"]}
     return terrain

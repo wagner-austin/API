@@ -34,6 +34,7 @@ from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 from tankpit_bot.types.modes import AIMode, AIModeState, is_valid_ai_mode_state
@@ -48,6 +49,8 @@ def decide(
     terrain: TerrainMapProtocol | None,
     combat_feedback: CombatFeedback = "",
     map_fuel_dots: tuple[tuple[int, int], ...] = (),
+    *,
+    ws: WorldService,
 ) -> TickDecisionDict:
     """Run one AI decision cycle under durable owner routing.
 
@@ -61,6 +64,8 @@ def decide(
         combat_feedback: Protocol-level hit or miss feedback for the last shot.
         map_fuel_dots: 0x4C fuel-dot atlas positions (empty before the
             first map open of the session).
+        ws: The session's world service, for the live bookkeeping the
+            ``world`` snapshot does not carry.
 
     Returns:
         Tick decision produced by the selected durable owner.
@@ -84,6 +89,7 @@ def decide(
         compose_decision_terrain(world, terrain, timestamp_ms),
         combat_feedback,
         map_fuel_dots,
+        ws=ws,
     )
     mode = _resolve_owner_mode(ctx, manual)
     if mode == "COLLECT":

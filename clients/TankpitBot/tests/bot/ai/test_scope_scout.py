@@ -25,6 +25,7 @@ from tankpit_bot.protocol.commands import (
     SCOPE_SOUTHWEST,
     SCOPE_WEST,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, WorldStateDict
 from tankpit_bot.state.types.terrain import make_terrain_tile
 from tankpit_bot.types.constants import TERRAIN_FERRY
@@ -88,6 +89,7 @@ def _ctx(
     now_ms: int = 100000,
 ) -> DecideCtx:
     """Decision context at the standard (100,100) rest state."""
+    ws = WorldService()
     self_state = world["self_state"]
     assert self_state is not None
     return DecideCtx(
@@ -98,6 +100,7 @@ def _ctx(
         now_ms,
         terrain,
         "",
+        ws=ws,
     )
 
 

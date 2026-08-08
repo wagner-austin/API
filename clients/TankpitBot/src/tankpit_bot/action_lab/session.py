@@ -185,7 +185,7 @@ def wait_for_radar_sync(
         drained_count = action_hooks.drain_buffered_messages(provider, provider.world)
         if drained_count > 0 or provider.get_world_state()["timestamp_ms"] > started_ms:
             observed_post_start_activity = True
-        if action_hooks.check_and_clear_radar_scan_complete():
+        if action_hooks.check_and_clear_radar_scan_complete(provider.world):
             radar_completion_seen = True
         if observed_post_start_activity and radar_completion_seen:
             return action_hooks.get_current_time_ms()

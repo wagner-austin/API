@@ -35,10 +35,6 @@ from tankpit_bot.bot.types import (
     make_teleport_command,
 )
 from tankpit_bot.runtime_logging import emit_ai
-from tankpit_bot.sniffer.world_state import (
-    is_move_target_failed,
-    recent_own_mine_hit,
-)
 from tankpit_bot.state.occupancy import is_tank_body_present
 
 
@@ -70,11 +66,11 @@ def walk_or_teleport(
     """
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
 
-    if is_move_target_failed(tx, ty, ctx.timestamp_ms):
+    if ctx.ws.is_move_target_failed(tx, ty, ctx.timestamp_ms):
         emit_ai("skipping failed move target (%d,%d)", tx, ty)
         return None
 
-    if recent_own_mine_hit(ctx.timestamp_ms):
+    if ctx.ws.recent_own_mine_hit(ctx.timestamp_ms):
         # User movement doctrine (2026-07-30): "walk to targets or
         # containers in viewport but if we hit a mine teleport to
         # target or container. then resume walking within viewport."

@@ -41,7 +41,7 @@ def _format_attempt_window_entries(
     for index, message in enumerate(messages[message_start_index:], start=message_start_index):
         if message["direction"] != direction:
             continue
-        decoded = decode_message(message["payload"], direction, magic)
+        decoded = decode_message(provider.world, message["payload"], direction, magic)
         if direction == "sent":
             sent_origin = message.get("sent_origin")
             sent_label = message.get("sent_label")
@@ -128,7 +128,7 @@ def _find_map_data_message_index(
             continue
         if message["direction"] != "received":
             continue
-        decoded = decode_message(message["payload"], "received", magic)
+        decoded = decode_message(provider.world, message["payload"], "received", magic)
         if "MAP_DATA" in decoded:
             return index
     return None
@@ -310,7 +310,7 @@ def _wait_for_teleport_outcome(
                 _ = map_data_index
                 page_snapshots.append(capture_page_snapshot("after_map_data"))
                 map_data_snapshot_captured = True
-        if action_hooks.check_and_clear_teleport_landed():
+        if action_hooks.check_and_clear_teleport_landed(provider.world):
             completion_timestamp_ms = action_hooks.get_current_time_ms()
             world = provider.get_world_state()
             self_state = world["self_state"]

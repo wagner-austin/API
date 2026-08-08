@@ -10,6 +10,7 @@ from tankpit_bot.inventory import (
     InventoryItem,
     InventoryState,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     make_container_state,
@@ -40,6 +41,7 @@ class TestHuntDisengage:
         container at (100,101) gives the cascade a legal recovery
         action.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -94,7 +96,7 @@ class TestHuntDisengage:
             extra_radars=stocked_slot,
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss", ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] != "shoot"
@@ -110,6 +112,7 @@ class TestHuntDisengage:
         fire) and route to fuel recovery instead of blacklisting a
         live target.
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -162,7 +165,7 @@ class TestHuntDisengage:
             extra_radars=stocked_slot,
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss", ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] != "shoot"
@@ -179,6 +182,7 @@ class TestHuntDisengage:
         identical shot cannot change the answer (live run 2026-07-03
         20:34: five identical redispatches at 4 s of dead wait each).
         """
+        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -210,7 +214,7 @@ class TestHuntDisengage:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None, "rejected")
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "rejected", ws=ws)
 
         assert decision["command"]["cmd_type"] != "shoot"
         assert decision["updated_ai_state"]["combat_target_id"] == -1
@@ -218,6 +222,7 @@ class TestHuntDisengage:
 
     def test_expired_kills_removed(self) -> None:
         """Expired kill cooldown entries are removed from the updated AI state."""
+        ws = WorldService()
         world, self_state = make_world(fuel=1200)
         ai_state = AIStateDict(
             **{
@@ -227,6 +232,6 @@ class TestHuntDisengage:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert "50" not in decision["updated_ai_state"]["killed_tank_ids"]

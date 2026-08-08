@@ -7,7 +7,7 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import mark_move_target_failed
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, make_mine_state
 from tests.bot.ai._collect_helper_fixtures import _enemy
 from tests.bot.ai._support import (
@@ -24,6 +24,7 @@ class TestCollectModeMoves:
 
     def test_decide_picks_up_visible_edge_equipment(self) -> None:
         """Visible edge equipment is actionable without an approach step."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "66,63": make_container(66, 63, 0, False),
         }
@@ -39,6 +40,7 @@ class TestCollectModeMoves:
             inventory,
             100000,
             InMemoryTerrainMap(),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
@@ -56,6 +58,7 @@ class TestCollectModeMoves:
         are below their resume thresholds, so HUNT yields to
         equipment recovery.
         """
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "106,106": make_container(106, 106, 30, False),
         }
@@ -65,12 +68,21 @@ class TestCollectModeMoves:
         inventory["dual_shots"]["count"] = 20
         inventory["extra_radars"]["count"] = 20
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            inventory,
+            100000,
+            None,
+            ws=ws,
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_non_emergency_equipment_low_does_not_enter_recovery_search(self) -> None:
         """Non-emergency equipment depletion leaves HUNT in charge of the tick."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "107,107": make_container(107, 107, 0, False),
         }
@@ -93,7 +105,15 @@ class TestCollectModeMoves:
             }
         )
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
+        decision = decide(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            inventory,
+            100000,
+            terrain,
+            ws=ws,
+        )
 
         assert decision["behavior"]["mode"] == "HUNT"
 
@@ -105,6 +125,7 @@ class TestCollectModeMoves:
         the wire-sourced target position is fresh, map_open when stale)
         is incidental to the assertion.
         """
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "103,100": make_container(103, 100, 0, False),
             "106,100": make_container(106, 100, 0, False),
@@ -126,6 +147,7 @@ class TestCollectModeMoves:
             inventory,
             100000,
             InMemoryTerrainMap(),
+            ws=ws,
         )
 
         assert decision["behavior"]["mode"] == "HUNT"
@@ -140,6 +162,7 @@ class TestCollectModeMoves:
         incidental: the resulting decision still carries the HUNT
         durable owner via ``apply_mode_to_decision``.
         """
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "129,184": make_container(129, 184, 0, False),
         }
@@ -162,12 +185,21 @@ class TestCollectModeMoves:
             }
         )
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
+        decision = decide(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            inventory,
+            100000,
+            terrain,
+            ws=ws,
+        )
 
         assert decision["updated_ai_state"]["mode"] == "HUNT"
 
     def test_waypoint_clamped_to_viewport_bounds(self) -> None:
         """A* waypoints never produce moves outside the visible viewport."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         terrain = InMemoryTerrainMap(
             terrain_data={(row, col): "#" for row in range(92, 100) for col in range(92, 100)}
@@ -180,6 +212,7 @@ class TestCollectModeMoves:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 91, 91, pickup_kind=None)
@@ -195,6 +228,7 @@ class TestCollectModeMoves:
 
     def test_walk_or_teleport_rejects_failed_move_target(self) -> None:
         """Recently failed move targets are skipped."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ctx = DecideCtx(
             world,
@@ -204,13 +238,15 @@ class TestCollectModeMoves:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
-        mark_move_target_failed(107, 100, 90000)
+        ws.mark_move_target_failed(107, 100, 90000)
 
         assert walk_or_teleport(ctx, 107, 100, pickup_kind=None) is None
 
     def test_walk_or_teleport_rejects_enemy_occupied_direct_move(self) -> None:
         """Direct moves to occupied enemy tiles are rejected."""
+        ws = WorldService()
         world, self_state = make_world(
             self_x=100,
             self_y=100,
@@ -225,12 +261,14 @@ class TestCollectModeMoves:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         assert walk_or_teleport(ctx, 107, 100, pickup_kind=None) is None
 
     def test_walk_or_teleport_rejects_occupied_move_without_terrain(self) -> None:
         """Enemy occupancy still blocks direct moves without terrain."""
+        ws = WorldService()
         world, self_state = make_world(
             self_x=100,
             self_y=100,
@@ -245,12 +283,14 @@ class TestCollectModeMoves:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         assert walk_or_teleport(ctx, 107, 100, pickup_kind=None) is None
 
     def test_walk_or_teleport_returns_none_for_out_of_bounds_target(self) -> None:
         """Out-of-bounds target returns None via teleport fallback (landing=None)."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         terrain = InMemoryTerrainMap(
             terrain_data={
@@ -269,12 +309,14 @@ class TestCollectModeMoves:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         assert walk_or_teleport(ctx, 300, 300, pickup_kind="fuel") is None
 
     def test_walk_or_teleport_rejects_mined_move_without_terrain(self) -> None:
         """Mine occupancy blocks direct moves without terrain."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ctx = DecideCtx(
@@ -285,6 +327,7 @@ class TestCollectModeMoves:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         assert walk_or_teleport(ctx, 107, 100, pickup_kind=None) is None

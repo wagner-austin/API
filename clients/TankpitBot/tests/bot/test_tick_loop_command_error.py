@@ -13,10 +13,7 @@ from tankpit_bot.bot.states import (
     InFlightActionDict,
 )
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-    update_world_state_from_position,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
 from tests.conftest import (
     FakeEnv,
@@ -55,18 +52,19 @@ class TestClearCommandError:
         """
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
         action = self._make_pending_action("collect", target_x=150, target_y=150)
 
-        get_world_service().last_command_error = 0  # "You can't do this"
+        ws.last_command_error = 0  # "You can't do this"
         result = _wait_for_movement_action(bot, action)
 
         assert result is False
         assert bot.get_state() == "IDLE"
-        assert get_world_service().last_command_error == -1
+        assert ws.last_command_error == -1
 
     def test_cant_go_on_collect_records_a_movement_rejection(self, fake_env: FakeEnv) -> None:
         """A cant_go rejecting a walk-pickup lands in the movement record.
@@ -79,40 +77,36 @@ class TestClearCommandError:
         of the command kind.
         """
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
-        from tankpit_bot.sniffer.world_state import (
-            recent_movement_rejections,
-        )
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
         action = self._make_pending_action("collect", target_x=150, target_y=150)
 
-        get_world_service().last_command_error = 1  # "You can't go there!"
+        ws.last_command_error = 1  # "You can't go there!"
         result = _wait_for_movement_action(bot, action)
 
         assert result is False
-        assert recent_movement_rejections(get_current_time_ms(), 10000) == 1
+        assert ws.recent_movement_rejections(get_current_time_ms(), 10000) == 1
 
     def test_non_movement_rejection_is_not_recorded(self, fake_env: FakeEnv) -> None:
         """A code-0 collect rejection is not a movement refusal."""
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
-        from tankpit_bot.sniffer.world_state import (
-            recent_movement_rejections,
-        )
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
         action = self._make_pending_action("collect", target_x=150, target_y=150)
 
-        get_world_service().last_command_error = 0  # "You can't do this"
+        ws.last_command_error = 0  # "You can't do this"
         result = _wait_for_movement_action(bot, action)
 
         assert result is False
-        assert recent_movement_rejections(get_current_time_ms(), 10000) == 0
+        assert ws.recent_movement_rejections(get_current_time_ms(), 10000) == 0
 
     def test_command_error_clears_collect_on_inventory_full(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``Inventory full`` (code 7) aborts the pickup, keeps the container.
@@ -130,8 +124,8 @@ class TestClearCommandError:
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
         from tankpit_bot.state.types import WorldStateDict, make_container_state
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         ws.world_state = WorldStateDict(
             **{
                 **ws.world_state,
@@ -147,7 +141,7 @@ class TestClearCommandError:
                 },
             }
         )
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
         action = self._make_pending_action("collect", target_x=150, target_y=150)
@@ -174,7 +168,7 @@ class TestClearCommandError:
         assert inv["extra_radars"]["count"] >= cap
         from tankpit_bot.ledger.ring import outcome_counts
 
-        assert outcome_counts(get_world_service().ledger, "collect") == {"inventory_full": 1}
+        assert outcome_counts(ws.ledger, "collect") == {"inventory_full": 1}
 
     def test_command_error_tank_full_does_not_mark_failed_pickup(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``Tank full`` (code 5) clears the action WITHOUT blacklisting.
@@ -199,8 +193,8 @@ class TestClearCommandError:
             make_container_state,
         )
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         ws.world_state = WorldStateDict(
             **{
                 **ws.world_state,
@@ -225,7 +219,7 @@ class TestClearCommandError:
                 },
             }
         )
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
         action = self._make_pending_action("collect", target_x=150, target_y=150)
@@ -240,7 +234,7 @@ class TestClearCommandError:
         assert container["failed_pickups"] == 0
         from tankpit_bot.ledger.ring import outcome_counts
 
-        assert outcome_counts(get_world_service().ledger, "collect") == {"clamped_transfer": 1}
+        assert outcome_counts(ws.ledger, "collect") == {"clamped_transfer": 1}
 
     def test_command_error_empty_container_removes_belief(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``Empty container`` (code 4) deletes the container belief.
@@ -258,8 +252,8 @@ class TestClearCommandError:
             make_container_state,
         )
 
-        update_world_state_from_position(100, 100)
-        ws = get_world_service()
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
         ws.world_state = WorldStateDict(
             **{
                 **ws.world_state,
@@ -284,7 +278,7 @@ class TestClearCommandError:
                 },
             }
         )
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
         action = self._make_pending_action("collect", target_x=150, target_y=150)
@@ -302,19 +296,20 @@ class TestClearCommandError:
         assert ws.container_desync_ms > 0
         from tankpit_bot.ledger.ring import outcome_counts
 
-        assert outcome_counts(get_world_service().ledger, "collect") == {"pickup_empty": 1}
+        assert outcome_counts(ws.ledger, "collect") == {"pickup_empty": 1}
 
     def test_command_error_clears_teleport_action(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``You can't go there!`` aborts a pending teleport in < 1 s."""
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "TELEPORTING"
         action = self._make_pending_action("teleport", target_x=200, target_y=200)
 
-        get_world_service().last_command_error = 1  # "You can't go there!"
+        ws.last_command_error = 1  # "You can't go there!"
         result = _wait_for_movement_action(bot, action)
 
         assert result is False
@@ -333,18 +328,19 @@ class TestClearCommandError:
         """
         from tankpit_bot.bot.tick_loop_actions import _wait_for_scan_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "SCANNING"
         action = self._make_pending_action("scan")
 
-        get_world_service().last_command_error = 8  # "Insufficient fuel"
+        ws.last_command_error = 8  # "Insufficient fuel"
         result = _wait_for_scan_action(bot, action)
 
         assert result is True
         assert bot.get_state() == "SCANNING"
-        assert get_world_service().last_command_error == -1
+        assert ws.last_command_error == -1
 
     def test_map_open_wait_drops_orphan_error_and_stays_pending(self, fake_env: FakeEnv) -> None:
         """A 0x52 code arriving during a map_open wait is an orphan and is dropped.
@@ -360,18 +356,19 @@ class TestClearCommandError:
         """
         from tankpit_bot.bot.tick_loop_actions import _wait_for_map_open_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
         action = self._make_pending_action("map_open")
 
-        get_world_service().last_command_error = 4  # "Empty container"
+        ws.last_command_error = 4  # "Empty container"
         result = _wait_for_map_open_action(bot, action)
 
         assert result is True
         assert bot.get_state() == "IDLE"
-        assert get_world_service().last_command_error == -1
+        assert ws.last_command_error == -1
 
     def test_teleport_wait_drops_orphan_empty_container(self, fake_env: FakeEnv) -> None:
         """A code=4 during a teleport wait is an orphan; teleport stays pending.
@@ -382,18 +379,19 @@ class TestClearCommandError:
         """
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "TELEPORTING"
         action = self._make_pending_action("teleport", target_x=200, target_y=200)
 
-        get_world_service().last_command_error = 4  # "Empty container"
+        ws.last_command_error = 4  # "Empty container"
         result = _wait_for_movement_action(bot, action)
 
         assert result is True
         assert bot.get_state() == "TELEPORTING"
-        assert get_world_service().last_command_error == -1
+        assert ws.last_command_error == -1
 
     def test_move_wait_drops_orphan_tank_full(self, fake_env: FakeEnv) -> None:
         """A code=5 (tank full) during a move wait is orphaned.
@@ -403,18 +401,19 @@ class TestClearCommandError:
         """
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
         action = self._make_pending_action("move", target_x=150, target_y=150)
 
-        get_world_service().last_command_error = 5  # "Tank full"
+        ws.last_command_error = 5  # "Tank full"
         result = _wait_for_movement_action(bot, action)
 
         assert result is True
         assert bot.get_state() == "MOVING"
-        assert get_world_service().last_command_error == -1
+        assert ws.last_command_error == -1
 
     def test_orphan_command_error_emits_diagnostic(
         self, fake_fs: FakeFileSystem, fake_env: FakeEnv
@@ -430,14 +429,15 @@ class TestClearCommandError:
         from tankpit_bot.diagnostics.event_stream import load_event_records
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
+        ws = WorldService()
         artifacts = configure_bot_runtime_logging("20260706-202100")
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
         action = self._make_pending_action("map_open")
 
-        get_world_service().last_command_error = 4  # "Empty container"
+        ws.last_command_error = 4  # "Empty container"
         _wait_for_map_open_action(bot, action)
 
         records = [
@@ -456,8 +456,9 @@ class TestClearCommandError:
         """No 0x52 error pending -> normal wait machinery runs."""
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
         action = self._make_pending_action("move", target_x=150, target_y=150)
@@ -473,13 +474,14 @@ class TestClearCommandError:
         """The scan drain path is a no-op when no 0x52 code is pending."""
         from tankpit_bot.bot.tick_loop_actions import _wait_for_scan_action
 
-        update_world_state_from_position(100, 100)
-        bot = Bot("https://test.tankpit.com/", headless=True)
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "SCANNING"
         action = self._make_pending_action("scan")
 
-        assert get_world_service().last_command_error == -1
+        assert ws.last_command_error == -1
         result = _wait_for_scan_action(bot, action)
 
         assert result is True

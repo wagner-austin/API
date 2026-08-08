@@ -29,11 +29,12 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     emit_wire,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 
 
 def test_build_issue_report_summarizes_clean_probe_run(fake_fs: FakeFileSystem) -> None:
     """A clean run with all teleports landing produces zero failure counts."""
+    ws = WorldService()
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
     _emit_session_room("1", "field01.gif")
     _emit_teleport_attempt(target_x=131, target_y=110, cycle_id=1, status="landed_exact")
@@ -42,7 +43,7 @@ def test_build_issue_report_summarizes_clean_probe_run(fake_fs: FakeFileSystem) 
         cycle_id=2, target_present=True, target_x=151, target_y=109, summary="fuel: ok"
     )
     emit_wire("map_open")
-    emit_map_open_data_processed(get_world_service().ledger, duration_ms=850)
+    emit_map_open_data_processed(ws.ledger, duration_ms=850)
 
     report = build_issue_report(Path(artifacts["latest_events_path"]))
 
@@ -215,12 +216,13 @@ def test_render_issue_report_lists_failure_target_and_summary_line(
 
 def test_render_issue_report_lists_top_level_no_issues(fake_fs: FakeFileSystem) -> None:
     """A perfectly clean run renders the ``no top-level issues detected`` sentence."""
+    ws = WorldService()
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
     _emit_session_room("1", "field01.gif")
     _emit_teleport_attempt(target_x=131, target_y=110, cycle_id=1, status="landed_exact")
     _emit_fuel_target_selection(cycle_id=1, target_present=True, target_x=151, target_y=109)
     emit_wire("map_open")
-    emit_map_open_data_processed(get_world_service().ledger, duration_ms=850)
+    emit_map_open_data_processed(ws.ledger, duration_ms=850)
 
     rendered = render_issue_report(build_issue_report(Path(artifacts["latest_events_path"])))
 
@@ -240,11 +242,12 @@ def test_render_issue_report_calls_out_map_open_mismatch_only_for_bot_mode(
     """
     from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
+    ws = WorldService()
     bot_artifacts = configure_bot_runtime_logging("20260331-230405")
     _emit_session_room("1", "field01.gif")
     emit_wire("map_open")
     emit_wire("map_open")
-    emit_map_open_data_processed(get_world_service().ledger, duration_ms=850)
+    emit_map_open_data_processed(ws.ledger, duration_ms=850)
 
     bot_rendered = render_issue_report(
         build_issue_report(Path(bot_artifacts["latest_events_path"]))

@@ -24,7 +24,6 @@ from tests.action_lab._fuel_probe_harness import (
     _ProbeHarness,
     _snapshot,
     fuel_probe_module,
-    fuel_targeting_module,
     fuel_targets_module,
 )
 from tests.action_lab._replay_page import (
@@ -138,9 +137,8 @@ def _run_probe_single_target_scenario(
     terrain_provider: Callable[[], TerrainMapProtocol | None] = (
         _reposition_blocking_terrain if is_reposition_scenario else ground_terrain
     )
-    fuel_probe_module.get_terrain_map = terrain_provider
-    fuel_targets_module.get_terrain_map = fuel_probe_module.get_terrain_map
-    fuel_targeting_module.get_terrain_map = terrain_provider
+    probe.world.terrain_map = terrain_provider()
+    probe.world.terrain_map = terrain_provider()
 
     if fuel_target is not None:
         target_key = coord_key(fuel_target["x"], fuel_target["y"])

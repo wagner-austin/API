@@ -13,6 +13,7 @@ from tankpit_bot.ledger.fuel_book import (
     record_fuel_entry,
     record_fuel_reading,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 
 
 def test_first_reading_anchors_without_verdict() -> None:
@@ -158,10 +159,9 @@ def test_block_cap_forces_judgement_in_never_quiet_combat() -> None:
 
 def test_announced_gains_credit_the_live_book() -> None:
     """0x44 gains explain their own delta at the wire mutation point."""
-    from tankpit_bot.sniffer.world_state import get_world_service
     from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
-    ws = get_world_service()
+    ws = WorldService()
     update_world_state_from_fuel_total(ws, 1000, "wire_0x44_fuel_gain")
     assert ws.fuel_book["entries"] == []
     update_world_state_from_fuel_total(ws, 1200, "wire_0x44_fuel_gain")

@@ -23,7 +23,6 @@ from tankpit_bot.action_lab.session import (
     wait_for_world_sync,
 )
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     WorldStateDict,
     make_empty_world_state,
@@ -35,7 +34,8 @@ from tankpit_bot.types import CapturedMessage
 
 class _SequencedProvider:
     def __init__(self, worlds: list[WorldStateDict]) -> None:
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._worlds = worlds
         self._index = 0
         self._cdp_message_buffer: list[str] = []
@@ -167,7 +167,7 @@ def test_wait_for_radar_sync_returns_completion_timestamp() -> None:
     action_hooks.drain_buffered_messages = lambda source, ws: 0
     radar_results = [False, False, True]
 
-    def _check_radar_complete() -> bool:
+    def _check_radar_complete(ws: WorldService) -> bool:
         return radar_results.pop(0)
 
     action_hooks.check_and_clear_radar_scan_complete = _check_radar_complete
@@ -187,7 +187,7 @@ def test_wait_for_radar_sync_times_out() -> None:
     page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source, ws: 0
-    action_hooks.check_and_clear_radar_scan_complete = lambda: False
+    action_hooks.check_and_clear_radar_scan_complete = lambda ws: False
 
     assert wait_for_radar_sync(page, provider, 1000, 250) is None
 
@@ -213,7 +213,7 @@ def test_wait_for_radar_sync_ignores_stale_completion_without_new_activity() -> 
     action_hooks.drain_buffered_messages = _drain
     radar_results = [True, True]
 
-    def _check_radar_complete() -> bool:
+    def _check_radar_complete(ws: WorldService) -> bool:
         if len(radar_results) == 0:
             return False
         return radar_results.pop(0)

@@ -15,6 +15,7 @@ from tankpit_bot.action_lab.equipment_targeting import (
     find_visible_equipment_target,
     visible_equipment_requires_reposition,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -41,9 +42,7 @@ equipment_targeting_module: _EquipmentTargetingModuleProtocol = _equipment_targe
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
     """Restore patched equipment-targeting hooks after each test."""
-    original_get_terrain_map = equipment_targeting_module.get_terrain_map
     yield
-    equipment_targeting_module.get_terrain_map = original_get_terrain_map
 
 
 def _terrain(passable: set[tuple[int, int]]) -> TerrainMapProtocol:
@@ -77,7 +76,10 @@ class _SimpleProbe:
     """Minimal probe satisfying ``VisibleEquipmentTargetingProbeProtocol``."""
 
     def __init__(self, world: WorldStateDict) -> None:
+        ws = WorldService()
         self._world = world
+        # The helpers read terrain through the probe's own service.
+        self.world = ws
 
     def get_world_state(self) -> WorldStateDict:
         return self._world
@@ -95,7 +97,7 @@ def test_find_visible_equipment_target_raises_when_terrain_unavailable() -> None
     """find_visible_equipment_target raises when terrain map is None."""
     world = _make_world(1000, 100, 100, 700)
     probe = _SimpleProbe(world)
-    equipment_targeting_module.get_terrain_map = lambda: None
+    probe.world.terrain_map = None
 
     with pytest.raises(EquipmentTargetingError, match="terrain map is unavailable"):
         find_visible_equipment_target(probe)
@@ -105,7 +107,7 @@ def test_find_visible_equipment_target_raises_when_self_state_unavailable() -> N
     """find_visible_equipment_target raises when self state is None."""
     world = _make_world(1000, 100, 100, 700)
     probe = _SimpleProbe(world)
-    equipment_targeting_module.get_terrain_map = lambda: _terrain({(100, 100)})
+    probe.world.terrain_map = _terrain({(100, 100)})
     probe._world["self_state"] = None
 
     with pytest.raises(EquipmentTargetingError, match="self state is unavailable"):
@@ -122,7 +124,7 @@ def test_visible_equipment_requires_reposition_raises_when_terrain_unavailable()
     world = _make_world(1000, 100, 100, 700)
     probe = _SimpleProbe(world)
     container = make_container_state(105, 105, False, 100, timestamp_ms=1000)
-    equipment_targeting_module.get_terrain_map = lambda: None
+    probe.world.terrain_map = None
 
     with pytest.raises(EquipmentTargetingError, match="terrain map is unavailable"):
         visible_equipment_requires_reposition(probe, container)
@@ -133,7 +135,7 @@ def test_visible_equipment_requires_reposition_raises_when_self_state_unavailabl
     world = _make_world(1000, 100, 100, 700)
     probe = _SimpleProbe(world)
     container = make_container_state(105, 105, False, 100, timestamp_ms=1000)
-    equipment_targeting_module.get_terrain_map = lambda: _terrain({(100, 100)})
+    probe.world.terrain_map = _terrain({(100, 100)})
     probe._world["self_state"] = None
 
     with pytest.raises(EquipmentTargetingError, match="self state is unavailable"):
@@ -145,13 +147,11 @@ def test_visible_equipment_requires_reposition_checks_walk_reachability() -> Non
     world = _make_world(1000, 100, 100, 700)
     probe = _SimpleProbe(world)
     container = make_container_state(102, 100, False, 100, timestamp_ms=1000)
-    equipment_targeting_module.get_terrain_map = lambda: _terrain(
-        {(100, 100), (101, 100), (102, 100)}
-    )
+    probe.world.terrain_map = _terrain({(100, 100), (101, 100), (102, 100)})
 
     assert visible_equipment_requires_reposition(probe, container) is False
 
-    equipment_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (102, 100)})
+    probe.world.terrain_map = _terrain({(100, 100), (102, 100)})
 
     assert visible_equipment_requires_reposition(probe, container) is True
 
@@ -166,7 +166,7 @@ def test_find_visible_equipment_landing_tile_raises_when_terrain_unavailable() -
     world = _make_world(1000, 100, 100, 700)
     probe = _SimpleProbe(world)
     container = make_container_state(105, 105, False, 100, timestamp_ms=1000)
-    equipment_targeting_module.get_terrain_map = lambda: None
+    probe.world.terrain_map = None
 
     with pytest.raises(EquipmentTargetingError, match="terrain map is unavailable"):
         find_visible_equipment_landing_tile(probe, container)
@@ -177,7 +177,7 @@ def test_find_visible_equipment_landing_tile_raises_when_self_state_unavailable(
     world = _make_world(1000, 100, 100, 700)
     probe = _SimpleProbe(world)
     container = make_container_state(105, 105, False, 100, timestamp_ms=1000)
-    equipment_targeting_module.get_terrain_map = lambda: _terrain({(100, 100)})
+    probe.world.terrain_map = _terrain({(100, 100)})
     probe._world["self_state"] = None
 
     with pytest.raises(EquipmentTargetingError, match="self state is unavailable"):
@@ -189,6 +189,6 @@ def test_find_visible_equipment_landing_tile_returns_passable_goal() -> None:
     world = _make_world(1000, 100, 100, 700)
     probe = _SimpleProbe(world)
     container = make_container_state(105, 105, False, 100, timestamp_ms=1000)
-    equipment_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (105, 105)})
+    probe.world.terrain_map = _terrain({(100, 100), (105, 105)})
 
     assert find_visible_equipment_landing_tile(probe, container) == (105, 105)

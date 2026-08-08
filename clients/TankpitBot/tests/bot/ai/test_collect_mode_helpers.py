@@ -21,6 +21,7 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.types import make_move_command
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_mine_state
 from tests.bot.ai._collect_helper_fixtures import _enemy
 from tests.bot.ai._support import (
@@ -106,6 +107,7 @@ class TestRecoveryHelpers:
 
     def test_select_equipment_target_command_picks_up_mined_tile(self) -> None:
         """Equipment target selection allows pickup on mined tiles."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "103,100": make_container(103, 100, 0, False),
         }
@@ -121,6 +123,7 @@ class TestRecoveryHelpers:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         result = _select_equipment_target_command(ctx)
@@ -135,6 +138,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_skips_water_locked_target(self) -> None:
         """Water-locked targets return None (unreachable by teleport)."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "107,107": make_container(107, 107, 0, False),
         }
@@ -156,6 +160,7 @@ class TestRecoveryHelpers:
             100000,
             terrain,
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 107, 107, pickup_kind=None)
@@ -164,6 +169,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_direct_move_when_pickup_disabled(self) -> None:
         """Open-ground scouting uses a direct move when pickup mode is disabled."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ctx = DecideCtx(
             world,
@@ -173,6 +179,7 @@ class TestRecoveryHelpers:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
@@ -185,6 +192,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_direct_pickup_on_open_ground(self) -> None:
         """Open-ground collection keeps pickup mode when the route is clear."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ctx = DecideCtx(
             world,
@@ -194,6 +202,7 @@ class TestRecoveryHelpers:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 103, 100, pickup_kind="equipment")
@@ -206,6 +215,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_picks_up_mined_tile_with_terrain(self) -> None:
         """Terrain routing still produces a legal command for mined pickup tiles."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ctx = DecideCtx(
@@ -216,6 +226,7 @@ class TestRecoveryHelpers:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind="equipment")
@@ -226,6 +237,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_picks_up_mined_tile_without_terrain(self) -> None:
         """Occupancy-only routing still allows pickup on mined tiles."""
+        ws = WorldService()
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ctx = DecideCtx(
@@ -236,6 +248,7 @@ class TestRecoveryHelpers:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 107, 100, pickup_kind="equipment")
@@ -246,6 +259,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_picks_up_visible_edge_target(self) -> None:
         """Visible edge pickup targets are actionable without an approach step."""
+        ws = WorldService()
         containers: dict[str, ContainerStateDict] = {
             "66,63": make_container(66, 63, 0, False),
         }
@@ -258,6 +272,7 @@ class TestRecoveryHelpers:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 66, 63, pickup_kind="equipment")
@@ -270,6 +285,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_moves_to_visible_edge_target(self) -> None:
         """Visible edge movement targets are actionable without an approach step."""
+        ws = WorldService()
         world, self_state = make_world(self_x=64, self_y=64, fuel=150)
         ctx = DecideCtx(
             world,
@@ -279,6 +295,7 @@ class TestRecoveryHelpers:
             100000,
             InMemoryTerrainMap(),
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 71, 63, pickup_kind=None)
@@ -291,6 +308,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_without_terrain_moves_to_visible_edge_target(self) -> None:
         """Visible edge movement works even without a terrain map."""
+        ws = WorldService()
         world, self_state = make_world(self_x=64, self_y=64, fuel=150)
         ctx = DecideCtx(
             world,
@@ -300,6 +318,7 @@ class TestRecoveryHelpers:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 71, 63, pickup_kind=None)
@@ -312,6 +331,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_without_terrain_approaches_off_viewport_target(self) -> None:
         """Off-viewport movement clamps to the visible edge without terrain."""
+        ws = WorldService()
         world, self_state = make_world(self_x=64, self_y=64, fuel=150)
         ctx = DecideCtx(
             world,
@@ -321,6 +341,7 @@ class TestRecoveryHelpers:
             100000,
             None,
             "",
+            ws=ws,
         )
 
         result = walk_or_teleport(ctx, 72, 63, pickup_kind=None)

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot._test_hooks import ensure_autoscroll_off
+from tankpit_bot.browser._test_hooks import ensure_autoscroll_off
 from tankpit_bot.browser.room_join import join_room
 from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.sim.lobby import SIM_ACCOUNT, SimLobby
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.session import SimCDPSession, deliver_batch
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.wire.helpers import EncodeError
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -89,16 +89,17 @@ def test_each_lobby_reply_is_its_own_payload() -> None:
 
 def test_the_production_join_flow_reaches_a_room_over_the_seam() -> None:
     """The REAL ``join_room`` drives the sim lobby end to end."""
+    ws = WorldService()
     link = _link()
     link.open_lobby()
 
-    assert join_room(link, link) is True
+    assert join_room(link, link, ws) is True
 
     lobby = link.lobby
     if lobby is None:
         raise AssertionError("the link was built with a lobby")
     assert lobby.entered_room_id == "1"
-    assert get_world_service().selected_room == "1"
+    assert ws.selected_room == "1"
 
 
 def test_the_join_flow_registers_the_rooms_field_image() -> None:
@@ -108,11 +109,12 @@ def test_the_join_flow_registers_the_rooms_field_image() -> None:
     lobby was skipped; without a selected room the bot's decision
     terrain stays ``None`` for the whole session.
     """
+    ws = WorldService()
     link = _link()
     link.open_lobby()
-    join_room(link, link)
+    join_room(link, link, ws)
 
-    assert get_world_service().room_images["1"] == "field01.gif"
+    assert ws.room_images["1"] == "field01.gif"
 
 
 def test_command_frames_still_route_to_the_server() -> None:
@@ -189,9 +191,9 @@ def test_the_production_enforcer_verifies_autoscroll_off_over_the_seam() -> None
     link = _link()
     link.open_lobby()
     deliver_batch([], link.server.handshake(), link)
-    _drain(link)
+    ws = _drain(link)
 
-    ensure_autoscroll_off(link, link.wire_log)
+    ensure_autoscroll_off(link, link.wire_log, ws)
 
     assert link.autoscroll_enabled is False
 
@@ -270,14 +272,20 @@ def _b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-def _drain(link: SimCDPSession) -> None:
-    """Feed the handshake into the world service, as a tick would.
+def _drain(link: SimCDPSession) -> WorldService:
+    """Feed the handshake into a world service, as a tick would.
 
     ``ensure_autoscroll_off`` waits for ``self_state``, which only the
-    processed handshake provides.
+    processed handshake provides -- so the caller must hand that same
+    service to the enforcer.
+
+    Returns:
+        The world service the handshake established self-state in.
     """
     from tankpit_bot.sniffer.decoders import process_received_message
 
+    ws = WorldService()
     for captured in link.wire_log:
         if captured["direction"] == "received":
-            process_received_message(get_world_service(), captured["payload"], link.table)
+            process_received_message(ws, captured["payload"], link.table)
+    return ws

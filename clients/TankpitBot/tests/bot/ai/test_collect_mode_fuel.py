@@ -11,6 +11,7 @@ from tankpit_bot.bot.ai.collect_pickups import (
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -22,6 +23,7 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 def test_collect_mode_continues_locked_fuel_target() -> None:
     """The durable owner keeps an executable locked fuel target."""
+    ws = WorldService()
     world, self_state = make_world(
         fuel=150,
         containers={
@@ -47,7 +49,7 @@ def test_collect_mode_continues_locked_fuel_target() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -71,6 +73,7 @@ def test_collect_mode_preserves_combat_lock_across_recovery() -> None:
     ``combat_target_id`` and continues the engagement when the lock is
     still viable.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=150,
         containers={
@@ -96,7 +99,7 @@ def test_collect_mode_preserves_combat_lock_across_recovery() -> None:
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -115,6 +118,7 @@ def test_collect_mode_grabs_adjacent_equipment_before_fuel() -> None:
     equipment containers because the old fuel-recovery mode only looked
     for fuel. Under the unified cascade equipment ranks ahead of fuel.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=400,
         containers={
@@ -148,7 +152,7 @@ def test_collect_mode_grabs_adjacent_equipment_before_fuel() -> None:
     # (user mechanic 2026-07-18 -- at full inventory the pickup would
     # be a guaranteed code-7 rejection and is skipped).
     inventory = make_inventory(dual_count=20)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -162,6 +166,7 @@ def test_collect_mode_grabs_adjacent_equipment_before_fuel() -> None:
 
 def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> None:
     """The durable owner senses before repositioning in an unscanned viewport."""
+    ws = WorldService()
     world, self_state = make_world(fuel=150, scanned=False)
     ai_state = AIStateDict(
         **{
@@ -172,7 +177,7 @@ def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> Non
         }
     )
     inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -185,6 +190,7 @@ def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> Non
 
 def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
     """Fuel recovery still scans with free radar when extras are depleted."""
+    ws = WorldService()
     world, self_state = make_world(fuel=150, scanned=False)
     ai_state = AIStateDict(
         **{
@@ -196,7 +202,7 @@ def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
     )
     inventory = make_inventory()
     inventory["extra_radars"]["count"] = 1
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -216,6 +222,7 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     fuel, so the genuine-stranding threshold is fuel < short-hop
     cost rather than fuel < cost + reserve.
     """
+    ws = WorldService()
     world, self_state = make_world(fuel=30, scanned=True)
     ai_state = AIStateDict(
         **{
@@ -235,7 +242,7 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
         for y in range(92, 108):
             terrain_data[(x, y)] = "W"
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
 
     with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
         decide_collect_mode(ctx)
@@ -243,8 +250,8 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
 
 def test_select_fuel_target_returns_none_for_unreachable_off_viewport_target() -> None:
     """Out-of-viewport fuel with no walkable approach and no fuel returns None."""
-    from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
+    ws = WorldService()
     world, self_state = make_world(
         self_x=100,
         self_y=100,
@@ -261,7 +268,7 @@ def test_select_fuel_target_returns_none_for_unreachable_off_viewport_target() -
             )
         },
     )
-    mark_move_target_failed(103, 100, 99000)
+    ws.mark_move_target_failed(103, 100, 99000)
     terrain = InMemoryTerrainMap(terrain_data={})
     ctx = DecideCtx(
         world,
@@ -271,6 +278,7 @@ def test_select_fuel_target_returns_none_for_unreachable_off_viewport_target() -
         100000,
         terrain,
         "",
+        ws=ws,
     )
 
     assert _first_walkworthy_fuel(ctx) is None
@@ -285,6 +293,7 @@ def test_select_fuel_target_rejects_walk_unreachable_in_viewport() -> None:
     whole session. The fix shipped 2026-06-24 is to never select
     containers the bot cannot walk to in the first place.
     """
+    ws = WorldService()
     world, self_state = make_world(
         fuel=0,
         containers={
@@ -308,6 +317,7 @@ def test_select_fuel_target_rejects_walk_unreachable_in_viewport() -> None:
         100000,
         terrain,
         "",
+        ws=ws,
     )
 
     assert _first_walkworthy_fuel(ctx) is None
@@ -315,6 +325,7 @@ def test_select_fuel_target_rejects_walk_unreachable_in_viewport() -> None:
 
 def test_selects_low_volume_fuel_when_critically_low() -> None:
     """Critical fuel recovery accepts small visible fuel containers."""
+    ws = WorldService()
     world, self_state = make_world(
         fuel=40,
         containers={
@@ -337,7 +348,7 @@ def test_selects_low_volume_fuel_when_critically_low() -> None:
             "mode_started_ms": 90000,
         }
     )
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -359,6 +370,7 @@ def test_collect_mode_walks_when_no_extras_and_local_5x5_already_covered() -> No
     loops radaring from the same spot forever (post-unconditional-
     radar regression caught in design 2026-06-26).
     """
+    ws = WorldService()
     world, self_state = make_world(fuel=5, scanned=False)
     # Pre-mark the 5x5 around the tank (self at default (100,100)) so
     # the next free radar would reveal nothing more.
@@ -373,7 +385,7 @@ def test_collect_mode_walks_when_no_extras_and_local_5x5_already_covered() -> No
     )
     inventory = make_inventory()
     inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -386,6 +398,7 @@ def test_collect_mode_walks_when_no_extras_and_local_5x5_already_covered() -> No
 
 def test_collect_takes_visible_equipment_before_search_hop() -> None:
     """When equipment is in the viewport, COLLECT grabs it before hopping."""
+    ws = WorldService()
     containers = {
         "102,100": make_container_state(
             x=102,
@@ -408,7 +421,7 @@ def test_collect_takes_visible_equipment_before_search_hop() -> None:
     inventory = make_inventory()
     inventory["dual_shots"]["count"] = 3
     inventory["homing_shots"]["count"] = 3
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 
@@ -422,6 +435,7 @@ def test_collect_takes_visible_equipment_before_search_hop() -> None:
 
 def test_collect_takes_visible_equipment_at_critical_fuel() -> None:
     """Visible equipment is still grabbed at critical fuel (equipment ranks first)."""
+    ws = WorldService()
     containers = {
         "103,100": make_container_state(
             x=103,
@@ -444,7 +458,7 @@ def test_collect_takes_visible_equipment_at_critical_fuel() -> None:
     inventory = make_inventory()
     inventory["dual_shots"]["count"] = 3
     inventory["homing_shots"]["count"] = 3
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)
 

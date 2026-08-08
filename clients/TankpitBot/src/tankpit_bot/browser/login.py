@@ -15,6 +15,7 @@ from platform_core.logging import get_logger
 from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
 from tankpit_bot.browser.accounts import resolve_account
 from tankpit_bot.browser.room_join import join_room
+from tankpit_bot.sniffer.world_service import WorldService
 
 log = get_logger(__name__)
 _STATIC_KEY_PATTERN = re.compile(r'"([^"]{1000})"')
@@ -419,6 +420,7 @@ def _do_login(
 def handle_login_flow(
     page: PageProtocol,
     cdp: CDPSessionProtocol,
+    ws: WorldService,
     *,
     tank_name_prefix: str = "B",
     allow_account_fallback: bool = True,
@@ -451,7 +453,7 @@ def handle_login_flow(
     )
 
     if success and auto_join_room:
-        return join_room(page, cdp)
+        return join_room(page, cdp, ws)
 
     return success
 

@@ -43,7 +43,7 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -118,7 +118,14 @@ class TeleportCommandFn(Protocol):
 
 
 LandingTileFn = Callable[
-    [WorldStateDict, SelfStateDict, EnemyThreatDict, TerrainMapProtocol | None, int],
+    [
+        WorldStateDict,
+        SelfStateDict,
+        EnemyThreatDict,
+        TerrainMapProtocol | None,
+        int,
+        WorldService,
+    ],
     tuple[int, int],
 ]
 TerrainMapFn = Callable[[], TerrainMapProtocol | None]
@@ -217,11 +224,12 @@ class _ProbeHarness(CombatProbe):
 
     def __init__(self) -> None:
         """Seed a spawned tank at (100, 100) with a full tank of fuel."""
-        self.world = get_world_service()
+        ws = WorldService()
         super().__init__(
             "https://tankpit.com/play",
             headless=True,
             prefer_account=False,
+            world=ws,
         )
         self._self_state: SelfStateDict | None = make_self_state(
             tank_id=1,

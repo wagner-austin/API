@@ -19,7 +19,7 @@ from tankpit_bot.bot.ai.threat_primitives import (
 )
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.ledger.damage_book import record_incoming_shot
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     SelfStateDict,
     WorldStateDict,
@@ -63,17 +63,19 @@ class TestHumanCombatConsented:
 
     def test_unknown_human_is_not_consented(self) -> None:
         """No chat and no incoming damage means no consent."""
-        assert human_combat_consented(1229) is False
+        assert human_combat_consented(WorldService(), 1229) is False
 
     def test_chat_consents(self) -> None:
         """Any non-self-echo chat from their id consents them."""
-        get_world_service().chat_seen_tank_ids.add(1229)
-        assert human_combat_consented(1229) is True
+        ws = WorldService()
+        ws.chat_seen_tank_ids.add(1229)
+        assert human_combat_consented(ws, 1229) is True
 
     def test_first_strike_consents(self) -> None:
         """An incoming shot from their id consents them."""
-        record_incoming_shot(get_world_service().damage_book, 1229, "Yuppler", 1, 100000)
-        assert human_combat_consented(1229) is True
+        ws = WorldService()
+        record_incoming_shot(ws.damage_book, 1229, "Yuppler", 1, 100000)
+        assert human_combat_consented(ws, 1229) is True
 
 
 class TestConsentGates:
@@ -83,14 +85,15 @@ class TestConsentGates:
         """The viewport threat list drops an unconsented human."""
         world, self_state = _human_world()
 
-        assert analyze_threats(world, self_state, now_ms=100000) == []
+        assert analyze_threats(WorldService(), world, self_state, now_ms=100000) == []
 
     def test_consented_human_enters_threats(self) -> None:
         """A chat response admits the human to the threat list."""
+        ws = WorldService()
         world, self_state = _human_world()
-        get_world_service().chat_seen_tank_ids.add(1229)
+        ws.chat_seen_tank_ids.add(1229)
 
-        threats = analyze_threats(world, self_state, now_ms=100000)
+        threats = analyze_threats(ws, world, self_state, now_ms=100000)
 
         assert [t["tank_id"] for t in threats] == [1229]
 
@@ -99,6 +102,7 @@ class TestConsentGates:
         world, self_state = _human_world()
 
         result = find_acquisition_target(
+            WorldService(),
             world,
             self_state,
             blocked={},
@@ -113,10 +117,12 @@ class TestConsentGates:
 
     def test_attacked_bot_may_acquire_the_attacker(self) -> None:
         """A first strike consents the human into acquisition."""
+        ws = WorldService()
         world, self_state = _human_world()
-        record_incoming_shot(get_world_service().damage_book, 1229, "Yuppler", 1, 100000)
+        record_incoming_shot(ws.damage_book, 1229, "Yuppler", 1, 100000)
 
         result = find_acquisition_target(
+            ws,
             world,
             self_state,
             blocked={},
@@ -135,7 +141,7 @@ class TestConsentGates:
         """The consent contract never touches practice bots."""
         world, self_state = _human_world(name="red-6")
 
-        threats = analyze_threats(world, self_state, now_ms=100000)
+        threats = analyze_threats(WorldService(), world, self_state, now_ms=100000)
 
         assert [t["tank_id"] for t in threats] == [1229]
 
@@ -185,11 +191,12 @@ class TestConsentEdgeCoverage:
 
     def test_rank_protected_human_never_enters_threats_even_consented(self) -> None:
         """The rank window still outranks consent in the threat list."""
+        ws = WorldService()
         world, self_state = _human_world()
         world["tanks"]["1229"]["rank"] = 0
-        get_world_service().chat_seen_tank_ids.add(1229)
+        ws.chat_seen_tank_ids.add(1229)
 
-        assert analyze_threats(world, self_state, now_ms=100000) == []
+        assert analyze_threats(ws, world, self_state, now_ms=100000) == []
 
     def test_greeting_landing_clips_map_corner(self) -> None:
         """A human near the map corner only considers in-bounds band tiles."""

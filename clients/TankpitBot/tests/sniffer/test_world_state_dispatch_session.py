@@ -6,9 +6,7 @@ broadcasts, promotions, and enemy detections.
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer.world_state import (
-    get_world_service,
-)
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
@@ -19,7 +17,7 @@ class TestDispatchMapData:
         """0x4C advances every tank's authoritative position from the snapshot."""
         from tankpit_bot.protocol import MapDataDict, MapTankEntry, TankEntryDict
 
-        ws = get_world_service()
+        ws = WorldService()
         entry = TankEntryDict(
             msg_type=0x28, team=0, tank_id=7, rank=0, damage_state=0, score=0, x=0, y=0
         )
@@ -54,7 +52,7 @@ class TestDispatchMapData:
         """
         from tankpit_bot.protocol import MapDataDict
 
-        ws = get_world_service()
+        ws = WorldService()
         # Pre-condition: flag is initially unset.
         assert ws.check_and_clear_map_data_processed() is False
 
@@ -75,7 +73,7 @@ class TestDispatchBuildPickup:
         """0x42 advances the acting tank's position to its source x/y."""
         from tankpit_bot.protocol import BuildPickupDict, TankEntryDict
 
-        ws = get_world_service()
+        ws = WorldService()
         entry = TankEntryDict(
             msg_type=0x28, team=2, tank_id=12, rank=0, damage_state=0, score=0, x=0, y=0
         )
@@ -106,7 +104,7 @@ class TestDispatchDecoration:
         """0x4E Sf is an announcement: emits a diagnostic, does not mutate tanks."""
         from tankpit_bot.protocol import DecorationDict, TankEntryDict
 
-        ws = get_world_service()
+        ws = WorldService()
         entry = TankEntryDict(
             msg_type=0x28, team=2, tank_id=44, rank=0, damage_state=0, score=0, x=1, y=2
         )
@@ -133,7 +131,7 @@ class TestDispatchSupervisorText:
         """
         from tankpit_bot.protocol import SupervisorTextDict
 
-        ws = get_world_service()
+        ws = WorldService()
         before = ws.world_state
         msg = SupervisorTextDict(msg_type=0x3C, message="Test")
         dispatch_world_state_update(ws, msg)
@@ -155,7 +153,7 @@ class TestDispatchStatistics:
         """
         from tankpit_bot.protocol import StatisticsDict
 
-        ws = get_world_service()
+        ws = WorldService()
         before = ws.world_state
 
         # First production sample from the crack run:
@@ -181,7 +179,7 @@ class TestDispatchSessionBroadcasts:
         """0x2F ActivePlayers populates ``ws.active_players``."""
         from tankpit_bot.protocol import ActivePlayerEntry, ActivePlayersDict
 
-        ws = get_world_service()
+        ws = WorldService()
         msg = ActivePlayersDict(
             msg_type=0x2F,
             players=[
@@ -197,7 +195,7 @@ class TestDispatchSessionBroadcasts:
         """0x31 Top10 caches the viewer's score/position/team_filter."""
         from tankpit_bot.protocol import Top10Dict, Top10EntryDict
 
-        ws = get_world_service()
+        ws = WorldService()
         msg = Top10Dict(
             msg_type=0x31,
             team_filter=255,
@@ -224,7 +222,7 @@ class TestDispatchSessionBroadcasts:
         """An empty Top10 list updates viewer fields but emits zero-row event."""
         from tankpit_bot.protocol import Top10Dict
 
-        ws = get_world_service()
+        ws = WorldService()
         msg = Top10Dict(
             msg_type=0x31,
             team_filter=1,
@@ -242,7 +240,7 @@ class TestDispatchSessionBroadcasts:
         """0x60 PingResponse advances ``ws.last_ping_response_ms``."""
         from tankpit_bot.protocol import PingResponseDict
 
-        ws = get_world_service()
+        ws = WorldService()
         before = ws.last_ping_response_ms
 
         dispatch_world_state_update(ws, PingResponseDict(msg_type=0x60))
@@ -254,7 +252,7 @@ class TestDispatchSessionBroadcasts:
         """0x7E ConnectionLost does not mutate world state; diagnostic only."""
         from tankpit_bot.protocol import ConnectionLostDict
 
-        ws = get_world_service()
+        ws = WorldService()
         before = ws.world_state
 
         dispatch_world_state_update(ws, ConnectionLostDict(msg_type=0x7E))
@@ -270,7 +268,7 @@ class TestDispatchPromotion:
         from tankpit_bot.protocol import PromotionDict
         from tankpit_bot.state import update_self_from_movement_response
 
-        ws = get_world_service()
+        ws = WorldService()
         ws.world_state = update_self_from_movement_response(
             ws.world_state,
             tank_id=99,
@@ -294,7 +292,7 @@ class TestDispatchPromotion:
         """0x2B before self has joined leaves world state unchanged."""
         from tankpit_bot.protocol import PromotionDict
 
-        ws = get_world_service()
+        ws = WorldService()
         before = ws.world_state
         msg = PromotionDict(msg_type=0x2B, new_rank=3, was_promoted=False)
         dispatch_world_state_update(ws, msg)
@@ -310,6 +308,7 @@ class TestDispatchEnemyDetection:
         """Dispatch 0x48 creates enemy tank entry via _update_enemy_from_detection."""
         from tankpit_bot.protocol import EnemyDetectionDict
 
+        ws = WorldService()
         msg = EnemyDetectionDict(
             msg_type=0x48,
             tank_id=555,
@@ -318,9 +317,9 @@ class TestDispatchEnemyDetection:
             rank=3,
             team=2,
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert "555" in state["tanks"]
         assert state["tanks"]["555"]["x"] == 120
         assert state["tanks"]["555"]["y"] == 130
@@ -332,10 +331,11 @@ class TestDispatchEnemyDetection:
         from tankpit_bot.protocol import EnemyDetectionDict, TankEntryDict
 
         # First create a tank with an old position
+        ws = WorldService()
         entry = TankEntryDict(
             msg_type=0x28, team=0, tank_id=556, rank=0, damage_state=0, score=0, x=50, y=60
         )
-        dispatch_world_state_update(get_world_service(), entry)
+        dispatch_world_state_update(ws, entry)
 
         # Detection updates to new position
         msg = EnemyDetectionDict(
@@ -346,8 +346,8 @@ class TestDispatchEnemyDetection:
             rank=5,
             team=1,
         )
-        dispatch_world_state_update(get_world_service(), msg)
+        dispatch_world_state_update(ws, msg)
 
-        state = get_world_service().world_state
+        state = ws.world_state
         assert state["tanks"]["556"]["x"] == 200
         assert state["tanks"]["556"]["y"] == 210

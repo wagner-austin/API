@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state, make_viewport_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -29,6 +30,7 @@ def _marooned_ctx(
     viewport fully covered so forage declines, the map recently
     opened so the dot-hop path cannot learn anything new.
     """
+    ws = WorldService()
     containers = {}
     if with_blacklisted_sliver:
         sliver = make_container_state(
@@ -59,6 +61,7 @@ def _marooned_ctx(
         InMemoryTerrainMap(),
         "",
         map_fuel_dots,
+        ws=ws,
     )
 
 
@@ -81,6 +84,7 @@ def test_marooned_tank_walks_toward_a_known_dot_instead_of_exiting() -> None:
 
 def test_marooned_walk_targets_a_believed_container_too() -> None:
     """A remembered live container inside the cap also anchors the walk."""
+    ws = WorldService()
     containers = {
         "130,100": make_container_state(
             x=130,
@@ -108,6 +112,7 @@ def test_marooned_walk_targets_a_believed_container_too() -> None:
         100000,
         InMemoryTerrainMap(),
         "",
+        ws=ws,
     )
 
     decision = decide_collect_mode(ctx)
@@ -138,6 +143,7 @@ def test_marooned_walk_declines_when_the_leg_is_the_current_tile() -> None:
     dot clamps onto the tank's own tile, no leg exists, and the exit
     stands.
     """
+    ws = WorldService()
     world, self_state = make_world(self_x=100, self_y=100, fuel=88, scanned=True)
     world["viewport"] = make_viewport_state(left=85, top=92, width=16, height=16)
     world["scanned_tiles"] = {f"{x},{y}": 100000 for y in range(92, 108) for x in range(85, 101)}
@@ -159,6 +165,7 @@ def test_marooned_walk_declines_when_the_leg_is_the_current_tile() -> None:
         InMemoryTerrainMap(),
         "",
         ((130, 100),),
+        ws=ws,
     )
 
     with pytest.raises(SessionExitError, match="out_of_fuel"):
@@ -176,6 +183,7 @@ def test_desperation_hop_beats_a_long_walk_to_a_far_dot() -> None:
     containers even at desperation fuel; sub-floor dregs are the
     desperation hop's remaining niche.
     """
+    ws = WorldService()
     containers = {
         "110,100": make_container_state(
             x=110,
@@ -212,6 +220,7 @@ def test_desperation_hop_beats_a_long_walk_to_a_far_dot() -> None:
         terrain,
         "",
         ((120, 115),),
+        ws=ws,
     )
 
     decision = decide_collect_mode(ctx)
@@ -235,6 +244,7 @@ def test_desperation_hop_crosses_a_water_channel_to_shore_fuel() -> None:
     keeps this the desperation rung's case (rich containers now route
     through the larder at any fuel, F16).
     """
+    ws = WorldService()
     containers = {
         "108,100": make_container_state(
             x=108,
@@ -267,6 +277,7 @@ def test_desperation_hop_crosses_a_water_channel_to_shore_fuel() -> None:
         100000,
         InMemoryTerrainMap(terrain_data),
         "",
+        ws=ws,
     )
 
     decision = decide_collect_mode(ctx)
@@ -284,6 +295,7 @@ def test_desperation_hop_crosses_a_water_channel_to_shore_fuel() -> None:
 
 def test_desperation_hop_declines_when_unaffordable_and_walk_takes_over() -> None:
     """A landing costing more than the tank holds falls through to walk."""
+    ws = WorldService()
     containers = {
         "150,100": make_container_state(
             x=150,
@@ -312,6 +324,7 @@ def test_desperation_hop_declines_when_unaffordable_and_walk_takes_over() -> Non
         InMemoryTerrainMap(),
         "",
         ((130, 100),),
+        ws=ws,
     )
 
     decision = decide_collect_mode(ctx)
@@ -338,6 +351,7 @@ def test_desperation_hop_picks_the_cheaper_of_two_dregs() -> None:
     niche since F16), so the desperation rung scores them and the
     nearer shore landing outranks the farther one.
     """
+    ws = WorldService()
     containers = {
         "110,100": make_container_state(
             x=110,
@@ -378,6 +392,7 @@ def test_desperation_hop_picks_the_cheaper_of_two_dregs() -> None:
         100000,
         terrain,
         "",
+        ws=ws,
     )
 
     decision = decide_collect_mode(ctx)

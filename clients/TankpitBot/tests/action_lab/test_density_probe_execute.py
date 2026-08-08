@@ -36,7 +36,6 @@ from tankpit_bot.action_lab.density_probe import (
     run_density_probe,
 )
 from tankpit_bot.action_lab.probe_base import ProbeError
-from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import (
     SelfStateDict,
 )
@@ -57,8 +56,8 @@ def test_sweep_sites_skips_unreached_sites_without_spending_extras() -> None:
     probe = _Stuck()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=22, radar_enabled=True)
-    get_world_service().map_fuel_dots = ()
+    probe.world.inventory_state = _inventory(radar_count=22, radar_enabled=True)
+    probe.world.map_fuel_dots = ()
 
     scanned, _, _, skipped = probe._sweep_sites(12)
     # (96, 96) is within the landing tolerance of the (100, 100)
@@ -82,8 +81,8 @@ def test_sweep_aborts_when_marooned_and_broke() -> None:
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
     probe.fuel = 0
-    get_world_service().inventory_state = _inventory(radar_count=10, radar_enabled=True)
-    get_world_service().map_fuel_dots = ()
+    probe.world.inventory_state = _inventory(radar_count=10, radar_enabled=True)
+    probe.world.map_fuel_dots = ()
 
     scanned, _, _, skipped = probe._sweep_sites(8)
     assert scanned == 0
@@ -136,7 +135,7 @@ def test_sweep_sites_scans_within_budget_and_stock() -> None:
     probe = _DensityHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=22, radar_enabled=True)
+    probe.world.inventory_state = _inventory(radar_count=22, radar_enabled=True)
 
     scanned, refuels, _pickups, _skipped = probe._sweep_sites(3)
     assert scanned == 3
@@ -150,7 +149,7 @@ def test_sweep_sites_exhausts_the_whole_grid_under_a_big_budget() -> None:
     probe = _DensityHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
-    get_world_service().inventory_state = _inventory(radar_count=30, radar_enabled=True)
+    probe.world.inventory_state = _inventory(radar_count=30, radar_enabled=True)
 
     scanned, refuels, _pickups, _skipped = probe._sweep_sites(20)
     assert scanned == 16

@@ -37,7 +37,7 @@ from tankpit_bot.action_lab.types import (
 )
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -54,7 +54,8 @@ _FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_s
 
 class _SequencedProvider:
     def __init__(self, worlds: list[WorldStateDict]) -> None:
-        self.world = get_world_service()
+        ws = WorldService()
+        self.world = ws
         self._worlds = worlds
         self._index = 0
         self._cdp_message_buffer: list[str] = []
@@ -83,7 +84,8 @@ class _AckSequence:
         self._values = values
         self._index = 0
 
-    def __call__(self) -> bool:
+    def __call__(self, ws: WorldService) -> bool:
+        del ws
         if self._index >= len(self._values):
             return False
         value = self._values[self._index]
