@@ -1,0 +1,16 @@
+# imp-creep12: the community claim's last unmeasured half, post-certification.
+# The choke-walk cycle: fortress system + creep 50 (hold at the midpoint,
+# every third structure a repair bay). Static roof died faster (imp-fortress12);
+# this is the walking version the community actually describes.
+imp-creep|12345|doctrines/fortress-creep.doctrine|10000
+imp-creep|1337|doctrines/fortress-creep.doctrine|10000
+imp-creep|141421|doctrines/fortress-creep.doctrine|10000
+imp-creep|16180|doctrines/fortress-creep.doctrine|10000
+imp-creep|173205|doctrines/fortress-creep.doctrine|10000
+imp-creep|223606|doctrines/fortress-creep.doctrine|10000
+imp-creep|244948|doctrines/fortress-creep.doctrine|10000
+imp-creep|24601|doctrines/fortress-creep.doctrine|10000
+imp-creep|264575|doctrines/fortress-creep.doctrine|10000
+imp-creep|2718|doctrines/fortress-creep.doctrine|10000
+imp-creep|271828|doctrines/fortress-creep.doctrine|10000
+imp-creep|282842|doctrines/fortress-creep.doctrine|10000

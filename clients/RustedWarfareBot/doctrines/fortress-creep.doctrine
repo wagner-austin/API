@@ -1,0 +1,45 @@
+# The community fortress, walking: the choke-walk half of the turtle meta.
+#
+# imp-fortress12 measured the STATIC half of the community claim and it died
+# faster than mobile trades (0/12, survival 2812 vs the champion's 3380).
+# The half the community actually describes is the walk: creep the wall
+# toward the choke and hold it there, every third structure a repair bay,
+# riposte when a wave breaks (log 2026-08-07, the fortress screen; log
+# 2026-07-31, the creep verb's hold-point rebuild). fortress.doctrine one
+# field apart: creep 50 -- hold at the midpoint of the anchor-to-enemy
+# line. The pre-certification bastion probe on fire_bridge said the wall
+# starves the army at 3.7x; this arm re-asks that on the certified harness.
+
+name fortress-creep
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery,repairbay
+heavies none
+max_workers 8
+mass 40
+reserve -1
+expand 1
+counter 1
+navtilt 0
+cover 1
+intercept 1
+guard_cap 0
+aa_cover 1
+forward 0
+scout 0
+raid 3
+rush 0
+creep 50
+riposte 1
+kite 0
+tech 0
+lurk 0
+allin 0
+strike 0
+medics 0
+decoys 0
+hp_floor 0
+bunkers 0
+flame 0
+close 0
+income_ladder 0
+guns 0
+nukes 0
