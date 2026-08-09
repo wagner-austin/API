@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 
+from tankpit_bot import _test_hooks
+from tankpit_bot._test_hooks import BrowserProtocol, CDPSessionProtocol, PageProtocol
+from tankpit_bot._test_hooks.cdp import RouteFulfillTarget
 from tankpit_bot.browser.lifecycle import (
     _handle_teardown_hang,
     cleanup_browser,
@@ -18,6 +23,77 @@ from tests.action_lab._replay_page import (
     ReplayClock,
 )
 from tests.fakes import FakeBrowser, FakeCDPSession
+
+_PAGE_HTML = (
+    '<!DOCTYPE html><html><head><script src="/tpclient.js"></script></head><body></body></html>'
+)
+_TEST_PAGE_URL = "http://localhost:9999/test-page"
+
+
+@pytest.fixture(scope="module")
+def headless_browser() -> Generator[BrowserProtocol, None, None]:
+    """Launch one real headless Chromium shared by this module's browser tests.
+
+    ``launch()`` is the expensive call and its cost is paid per launch,
+    not per test: on hosts where a filesystem minifilter inspects the
+    browser's teardown, terminating one has been measured at tens of
+    seconds. The real-browser tests below therefore share one instance
+    and take their own context each, mirroring the ``live_cdp`` fixture
+    in ``tests/conftest.py``. ``--dist loadscope`` keeps a module's
+    tests on one xdist worker, so a module-scoped browser is never
+    shared across processes.
+
+    A context is the isolation these tests actually need -- cache,
+    cookies and routes are all per-context -- and none of them asserts
+    anything about launch or close semantics.
+
+    Yields:
+        A live headless Chromium browser.
+    """
+    factory = _test_hooks.sync_playwright
+    if factory is None:
+        factory = _test_hooks.get_sync_playwright()
+    if factory is None:
+        pytest.skip("Playwright not available")
+    with factory() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        try:
+            yield browser
+        finally:
+            browser.close()
+
+
+def _intel_page(
+    browser: BrowserProtocol,
+    js_content: str,
+) -> tuple[PageProtocol, CDPSessionProtocol]:
+    """Open a page in a fresh context serving ``js_content`` as ``tpclient.js``.
+
+    The page markup, both fulfilled routes and the navigation are
+    identical across the real-browser tests; only the script body
+    differs, so it is the only parameter.
+
+    Args:
+        browser: Browser to open a fresh context in.
+        js_content: Body served for ``tpclient.js``.
+
+    Returns:
+        The navigated page and a CDP session attached to it.
+    """
+
+    def _fulfill_page(route: RouteFulfillTarget) -> None:
+        route.fulfill(content_type="text/html", body=_PAGE_HTML)
+
+    def _fulfill_tpclient(route: RouteFulfillTarget) -> None:
+        route.fulfill(content_type="application/javascript", body=js_content)
+
+    context = browser.new_context()
+    page = context.new_page()
+    cdp = context.new_cdp_session(page)
+    page.route("**/test-page", _fulfill_page)
+    page.route("**/tpclient.js", _fulfill_tpclient)
+    page.goto(_TEST_PAGE_URL)
+    return page, cdp
 
 
 class TestWaitForGameReady:
@@ -151,143 +227,40 @@ class TestGatherIntel:
         result = _capture_static_key(page)
         assert result is None
 
-    def test_capture_static_key_with_real_headless_browser(self) -> None:
+    @pytest.mark.usefixtures("fake_fs")
+    def test_capture_static_key_with_real_headless_browser(
+        self,
+        headless_browser: BrowserProtocol,
+    ) -> None:
         """Real Playwright headless browser extracts a 1000-char static key."""
-        from tankpit_bot import _test_hooks
         from tankpit_bot.browser.lifecycle import _capture_static_key
-
-        sync_pw = _test_hooks.sync_playwright
-        if sync_pw is None:
-            sync_pw = _test_hooks.get_sync_playwright()
-        if sync_pw is None:
-            pytest.skip("Playwright not available")
-
-        from tests.conftest import FakeFileSystem
-
-        fake_fs = FakeFileSystem()
-        orig_write = _test_hooks.write_text
-        _test_hooks.write_text = fake_fs.write_text
 
         static_key = "K" * 1000
-        js_content = f'var config = "{static_key}";'
+        page, _ = _intel_page(headless_browser, f'var config = "{static_key}";')
+        assert _capture_static_key(page) == static_key
 
-        with sync_pw() as pw:
-            browser = pw.chromium.launch(headless=True)
-            page = browser.new_context().new_page()
-            from tankpit_bot._test_hooks.cdp import RouteFulfillTarget
-
-            def _fulfill_tpclient(route: RouteFulfillTarget) -> None:
-                route.fulfill(
-                    content_type="application/javascript",
-                    body=js_content,
-                )
-
-            page_html = (
-                "<!DOCTYPE html><html><head>"
-                '<script src="/tpclient.js"></script>'
-                "</head><body></body></html>"
-            )
-
-            def _fulfill_page(route: RouteFulfillTarget) -> None:
-                route.fulfill(content_type="text/html", body=page_html)
-
-            page.route("**/test-page", _fulfill_page)
-            page.route("**/tpclient.js", _fulfill_tpclient)
-            page.goto("http://localhost:9999/test-page")
-            result = _capture_static_key(page)
-            browser.close()
-
-        _test_hooks.write_text = orig_write
-        assert result == static_key
-
-    def test_gather_intel_with_real_headless_browser(self) -> None:
+    @pytest.mark.usefixtures("fake_fs")
+    def test_gather_intel_with_real_headless_browser(
+        self,
+        headless_browser: BrowserProtocol,
+    ) -> None:
         """Real Playwright headless browser runs gather_intel end to end."""
-        from tankpit_bot import _test_hooks
         from tankpit_bot.browser.lifecycle import gather_intel
 
-        sync_pw = _test_hooks.sync_playwright
-        if sync_pw is None:
-            sync_pw = _test_hooks.get_sync_playwright()
-        if sync_pw is None:
-            pytest.skip("Playwright not available")
-
-        from tests.conftest import FakeFileSystem
-
-        fake_fs = FakeFileSystem()
-        orig_write = _test_hooks.write_text
-        _test_hooks.write_text = fake_fs.write_text
-
         static_key = "J" * 1000
-        js_content = f'var config = "{static_key}";'
-        page_html = (
-            "<!DOCTYPE html><html><head>"
-            '<script src="/tpclient.js"></script>'
-            "</head><body></body></html>"
-        )
+        page, cdp = _intel_page(headless_browser, f'var config = "{static_key}";')
+        assert gather_intel(page, cdp) == static_key
 
-        from tankpit_bot._test_hooks.cdp import RouteFulfillTarget
-
-        def _fulfill_page(route: RouteFulfillTarget) -> None:
-            route.fulfill(content_type="text/html", body=page_html)
-
-        def _fulfill_tpclient(route: RouteFulfillTarget) -> None:
-            route.fulfill(content_type="application/javascript", body=js_content)
-
-        with sync_pw() as pw:
-            browser = pw.chromium.launch(headless=True)
-            ctx = browser.new_context()
-            page = ctx.new_page()
-            cdp = ctx.new_cdp_session(page)
-            page.route("**/test-page", _fulfill_page)
-            page.route("**/tpclient.js", _fulfill_tpclient)
-            page.goto("http://localhost:9999/test-page")
-            result = gather_intel(page, cdp)
-            browser.close()
-
-        _test_hooks.write_text = orig_write
-        assert result == static_key
-
-    def test_capture_static_key_no_key_in_content(self) -> None:
+    @pytest.mark.usefixtures("fake_fs")
+    def test_capture_static_key_no_key_in_content(
+        self,
+        headless_browser: BrowserProtocol,
+    ) -> None:
         """Real browser: tpclient.js exists but has no 1000-char string."""
-        from tankpit_bot import _test_hooks
         from tankpit_bot.browser.lifecycle import _capture_static_key
-        from tests.conftest import FakeFileSystem
 
-        sync_pw = _test_hooks.sync_playwright
-        if sync_pw is None:
-            sync_pw = _test_hooks.get_sync_playwright()
-        if sync_pw is None:
-            pytest.skip("Playwright not available")
-
-        fake_fs = FakeFileSystem()
-        orig_write = _test_hooks.write_text
-        _test_hooks.write_text = fake_fs.write_text
-
-        from tankpit_bot._test_hooks.cdp import RouteFulfillTarget
-
-        page_html = (
-            "<!DOCTYPE html><html><head>"
-            '<script src="/tpclient.js"></script>'
-            "</head><body></body></html>"
-        )
-
-        def _fulfill_page(route: RouteFulfillTarget) -> None:
-            route.fulfill(content_type="text/html", body=page_html)
-
-        def _fulfill_short_js(route: RouteFulfillTarget) -> None:
-            route.fulfill(content_type="application/javascript", body="var x = 1;")
-
-        with sync_pw() as pw:
-            browser = pw.chromium.launch(headless=True)
-            page = browser.new_context().new_page()
-            page.route("**/test-page", _fulfill_page)
-            page.route("**/tpclient.js", _fulfill_short_js)
-            page.goto("http://localhost:9999/test-page")
-            result = _capture_static_key(page)
-            browser.close()
-
-        _test_hooks.write_text = orig_write
-        assert result is None
+        page, _ = _intel_page(headless_browser, "var x = 1;")
+        assert _capture_static_key(page) is None
 
 
 class TestHandleTeardownHang:
