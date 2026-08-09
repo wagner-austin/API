@@ -91,6 +91,26 @@ def fleet_types(targets: Sequence[Threat]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(seen, True))
 
 
+def layer_counts(targets: Sequence[Threat]) -> tuple[int, int]:
+    """Count the WATER-movers and the fliers in one threat picture.
+
+    The trace's enemy-shape read: the fleet-doom ML pass found chance where
+    a signal was hoped for, because the trace recorded our economy and
+    nothing about the enemy -- these two counts, plus the death ledger's
+    naval column, are the fix (log 2026-08-09).
+
+    Args:
+        targets: The hostile entities currently visible.
+
+    Returns:
+        ``(navy, air)`` -- WATER-movers and fliers, counted separately; an
+        amphibious flier would appear in both, honestly.
+    """
+    navy = sum(1 for t in targets if t["movement"] == _NAVAL_LAYER)
+    air = sum(1 for t in targets if t["flying"])
+    return navy, air
+
+
 def _hits_air(profiles: Mapping[str, CombatProfile], type_name: str) -> bool:
     """Report whether a type's weapon reaches an airborne target.
 
@@ -301,4 +321,11 @@ def mobile_threats(intel: Intel, catalogue: Mapping[str, UnitStats]) -> tuple[Th
     return tuple(threats)
 
 
-__all__ = ["FLEET_BLOOD", "Threat", "counter_composition", "fleet_types", "mobile_threats"]
+__all__ = [
+    "FLEET_BLOOD",
+    "Threat",
+    "counter_composition",
+    "fleet_types",
+    "layer_counts",
+    "mobile_threats",
+]

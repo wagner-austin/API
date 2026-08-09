@@ -105,6 +105,9 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
                 rival=9000,
                 income=54,
                 rival_income=180,
+                navy_seen=2,
+                air_seen=1,
+                navy_blood=3,
                 world=123456789,
                 plan="building",
                 workers=4,
@@ -130,6 +133,9 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "world",
         "plan",
         "workers",
+        "navy_seen",
+        "air_seen",
+        "navy_blood",
     ]
     assert lines[1].split() == [
         "7",
@@ -149,6 +155,9 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "123456789",
         "building",
         "4",
+        "2",
+        "1",
+        "3",
     ]
     assert lines[2] == ""
     assert lines[3].split() == ["frame", "unit", "type", "x", "y", "killer"]
@@ -174,6 +183,9 @@ def test_a_run_that_lost_nothing_still_renders_both_headers() -> None:
                 rival=0,
                 income=0,
                 rival_income=0,
+                navy_seen=0,
+                air_seen=0,
+                navy_blood=0,
                 world=0,
                 plan="done",
                 workers=0,
@@ -193,3 +205,7 @@ def test_the_income_pair_sits_before_the_world_digest() -> None:
     assert header.index("world") == 14
     assert header.index("plan") == 15
     assert header.index("workers") == 16
+    # The enemy-shape trio appends past every positional reader's reach.
+    assert header.index("navy_seen") == 17
+    assert header.index("air_seen") == 18
+    assert header.index("navy_blood") == 19

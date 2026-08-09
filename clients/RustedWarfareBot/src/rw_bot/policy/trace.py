@@ -106,6 +106,18 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
             ledgers: every economy failure this project has recorded runs
             through the worker count, and "when did the workforce die" should
             be a column read, not an inference ([[policy-economy]]).
+        navy_seen: Hostile WATER-movers visible this sample, APPENDED after
+            ``workers`` so every positional reader's index survives
+            (autopsy at 4-13, the exporter's first fifteen). The enemy-shape
+            column the fleet-doom question demanded: the first ML pass on the
+            certified corpus read chance (AUC ~0.55) because the trace
+            recorded our economy's shape and nothing about the enemy's
+            (log 2026-08-09).
+        air_seen: Hostile fliers visible this sample, the air half of the
+            same record.
+        navy_blood: Cumulative kills on us by fleet types seen so far -- the
+            death ledger's answer for the WATER-movers, per sample, so the
+            moment the fleet first draws blood is a column read.
         world: A deterministic digest of every visible entity's identity,
             position and health -- CRC32 over a canonical rendering, never
             Python's randomised ``hash``. The divergence detector: two
@@ -128,6 +140,9 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
     worth: int
     rival: int
     income: int
+    navy_seen: int
+    air_seen: int
+    navy_blood: int
     rival_income: int
     world: int
     plan: str
@@ -208,6 +223,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{'lost':>6}{'producers':>11}{'idle':>6}{'orders':>8}{'refused':>9}"
         f"{'worth':>9}{'rival':>9}{'income':>8}{'rival_income':>14}{'world':>12}"
         f"{'plan':>10}{'workers':>9}"
+        f"{'navy_seen':>11}{'air_seen':>10}{'navy_blood':>12}"
     ]
     lines.extend(
         f"{t['frame']:>8}{t['army']:>6}{t['credits']:>9}"
@@ -215,6 +231,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{t['producers']:>11}{t['idle']:>6}{t['orders']:>8}{t['refused']:>9}"
         f"{t['worth']:>9}{t['rival']:>9}{t['income']:>8}{t['rival_income']:>14}"
         f"{t['world']:>12}{t['plan']:>10}{t['workers']:>9}"
+        f"{t['navy_seen']:>11}{t['air_seen']:>10}{t['navy_blood']:>12}"
         for t in ticks
     )
     lines.append("")

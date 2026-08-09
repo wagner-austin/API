@@ -61,6 +61,9 @@ class Recorder:
         rival: int,
         plan: str,
         workers: int,
+        navy_seen: int,
+        air_seen: int,
+        navy_blood: int,
     ) -> None:
         """Record one observation.
 
@@ -77,6 +80,9 @@ class Recorder:
             rival: The strongest hostile player's total.
             plan: The opening plan's outcome this observation.
             workers: Builders owned, as the workforce counts them.
+            navy_seen: Hostile WATER-movers visible this observation.
+            air_seen: Hostile fliers visible this observation.
+            navy_blood: Cumulative kills on us by fleet types seen so far.
         """
         if self._path is None:
             return
@@ -106,6 +112,9 @@ class Recorder:
                 rival=rival,
                 income=0 if local is None else local["income"],
                 rival_income=rival_income(sample),
+                navy_seen=navy_seen,
+                air_seen=air_seen,
+                navy_blood=navy_blood,
                 world=world_digest(sample),
                 plan=plan,
                 workers=workers,

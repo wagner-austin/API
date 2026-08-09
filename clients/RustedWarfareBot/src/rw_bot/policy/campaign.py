@@ -35,7 +35,13 @@ from rw_bot.policy.assess import AirWatch
 from rw_bot.policy.budget import Budget
 from rw_bot.policy.combat import WAVE_SIZES, find_army, find_targets
 from rw_bot.policy.convert import Converter, TurretLadder
-from rw_bot.policy.counter import FLEET_BLOOD, counter_composition, fleet_types, mobile_threats
+from rw_bot.policy.counter import (
+    FLEET_BLOOD,
+    counter_composition,
+    fleet_types,
+    layer_counts,
+    mobile_threats,
+)
 from rw_bot.policy.creep import Creeper
 from rw_bot.policy.decoy import Decoys, scout_shortfall
 from rw_bot.policy.dispatch import WaveController
@@ -427,6 +433,12 @@ def play(
             # number above -- about four thousand sentences a match, discarded
             # ([[policy-economy]]).
             outlays.add(budget.ledger())
+            # The enemy-shape columns read from live contact regardless of
+            # the counter knob: the trace records what was SEEN, and the
+            # fleet memory unions live contact with whatever the tilt path
+            # already remembered (log 2026-08-09).
+            fleet_seen.update(fleet_types(tuple(targets)))
+            navy_seen, air_seen = layer_counts(tuple(targets))
             recorder.step(
                 sample,
                 scores.army_end,
@@ -440,6 +452,9 @@ def play(
                 scores.rival_worth_end,
                 build_outcome,
                 workforce.size(sample),
+                navy_seen,
+                air_seen,
+                scores.deaths_to(fleet_seen),
             )
 
             # The engine's verdict is the only thing that ends a match early.
