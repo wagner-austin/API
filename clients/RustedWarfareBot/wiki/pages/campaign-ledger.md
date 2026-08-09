@@ -75,6 +75,13 @@ panel. Nothing on this list is a guess.
 7. **Erosion law** — verdicts track whether the economy was HELD; endpoints lie, peaks tell (2026-08-07, the xmap correction).
 8. **Blast radius matches trigger precision** — small reversible responses may gate on present signals; match-reshaping responses require prediction, which no present-tense scalar supplies (2026-08-08, the three-calibration arc).
 
+## The ML layer
+
+First used 2026-08-09 on the fleet-doom question: no signal (AUC ~0.55,
+chance) in the early trace window, because the trace records our economy's
+shape and nothing about the enemy's composition. Open follow-up: enemy-shape
+trace columns, after which every batch feeds the dataset for free.
+
 ## The instrument
 
 The match service ([[harness-match-service]]): Postgres queue + leased
