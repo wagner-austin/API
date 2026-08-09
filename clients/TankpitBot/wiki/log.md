@@ -4046,3 +4046,64 @@ catastrophic, and invisible to both gates the project already runs.
 the whole point: **a green suite and a full coverage gate together still
 cannot tell you a test verifies anything.** Only mutation can, and the
 project has no mutation gate.
+
+---
+
+## [2026-08-08] update | The sweep becomes a rule: one hook leak, seven fakes, and three detectors that lied
+
+Three commits: `16339076`, `57d90034`, `8e25e5bf`. `make check` green at each — **6,171 passed, 100.00% coverage** (30,428 statements / 8,806 branches).
+
+### One real leak in 391 sites
+
+`tests/bot/test_tick_loop_lifecycle.py:55` set `_test_hooks.remove_file` inline and never put it back. `path_exists`, assigned on the line above, was safe only because it sits in the autouse `_restore_hooks` list; `remove_file` did not. Every later test on that xdist worker inherited a `remove_file` that silently did not delete and appended to a dead closure list — the exact cross-test poison `_restore_hooks` exists to prevent, and the thing its own docstring cites the 2026-07-03 replay flake for.
+
+Fixed in the reset list (now 16 attrs), not with a sixteenth local teardown. The docstring there already calls itself the single reset point; a local fix would have contradicted it.
+
+### The rule, because a sweep only describes today
+
+`scripts/hook_restore_rules.py`, wired at `scripts/guard.py:139`. It fails the build when a test assigns a `_test_hooks` attribute that is neither centrally reset nor restored under a recognised guard. Restoration counts at three scopes — a `finally` body, a post-`yield` fixture, a `teardown_*` method, or an ancestor `conftest.py` — and that list is not generosity, it is the correction of a first draft that reported **24 violations of which 23 were legitimate**. The last two shapes put the save and the restore in *different functions*, which a per-function check structurally cannot see. A rule that flagged them would have been deleted within a day.
+
+It ships a paired negative control: it must fire on a planted unrestored swap **and** stay silent on all four legitimate shapes. 13 tests, 100% of 87 statements and 56 branches, no partials.
+
+### Seven fake filesystems became one
+
+`tests/conftest.py` already owned a `FakeFileSystem` that 84 files import. Six private copies existed anyway, each with its own installer. Consolidated to one class plus one shared installer for the four sites that need it from `setup_method`, where a fixture cannot be requested. `tests/_smoke_records.py` keeps an 8-line installer because it targets `scripts._test_hooks`, a genuinely different module — that part is irreducible, not missed.
+
+**Copies five and six were invisible to the search that found one through four.** `_FakeFS` in `tests/replay/test_script.py` named its methods `write`/`read`/`exists`/`append` instead of `write_text`/`read_text`/`path_exists`/`append_text`, so it survived a name grep *and* a method-name sweep, and surfaced only as an `AttributeError` when the tests ran.
+
+### Three detectors reported a clean zero while pointed at nothing
+
+This is the entry's real content, because it happened three times in one day:
+
+1. The first negative control returned **0 violations** and looked like a passing rule. It had been handed a POSIX path (`/c/Users/...`) on Windows, so `tests_root.is_dir()` was false and it scanned nothing.
+2. The behavioural sweep for remaining fake filesystems returned **0 classes** on a tree that certainly contained one. It required `str(path)` inline as a subscript slice; the canonical class writes `key = str(path)` on the previous line.
+3. Earlier the same day, the browser-leak probe read **0 processes while a browser was running**, because it filtered on `chrome` and headless launches `chrome-headless-shell.exe`.
+
+**"0 violations" and "0 files examined" are indistinguishable from the outside.** Every detector that reports a clean result needs a known-bad input before the clean result means anything. All three of these were caught by accident — by a failing test, by disbelief at the number — not by design.
+
+### Three browser launches became one
+
+`tests/browser/test_lifecycle.py` launched a fresh headless Chromium per test in three tests that, despite the filename, assert nothing about launch or close semantics. They share one module-scoped browser now and take their own context each, matching the `live_cdp` fixture that already did this. Real launches in the suite: **four to two**. This does not fix the ~48 s teardown — a browser here survives `taskkill /F /T` returning SUCCESS, reproduced with Firefox too, so it is not a Chromium bug — it stops paying for it three times.
+
+### Nine unreferenced functions deleted
+
+`pathfinding.path_length`, `equipment_search.find_nearest_deposit`, `tactics.should_map_open_for_enemies`, `tactics._is_visible_enemy_tank` (orphaned by the previous cut, found only by re-running the sweep after it), `resource_search.is_recently_attempted`, `resource_search.record_attempt_mark`, `decoders.try_decode_received`, `decoders.decode_received_text_message`, `decoders.try_decode_received_text` — plus their `bot/ai` re-exports and a dead `analyze_threats` protocol member in the enemy-teleport harness that declared two positional parameters against a real four-plus-two-keyword-only signature. **+22 / −623.**
+
+### Open: six mutation survivors, recorded here because the artifact is gone
+
+A larger mutation run than the 14-guard sample above got through **37 of 483 guards before being interrupted**, and named six survivors. Preserved here verbatim, since `mutation_results.txt` was deleted from the repo root:
+
+```
+SURVIVED  src/tankpit_bot/action_lab/enemy_teleport.py:109        return
+SURVIVED  src/tankpit_bot/action_lab/probe_base.py:131            return False
+SURVIVED  src/tankpit_bot/action_lab/tracking_observation.py:58   return None
+SURVIVED  src/tankpit_bot/bot/ai/collect_hops.py:156              return None
+SURVIVED  src/tankpit_bot/bot/ai/collect_hops.py:308              return None
+SURVIVED  src/tankpit_bot/bot/ai/collect_hops.py:396              return None
+```
+
+Six of 37 is a ~16% survival rate, consistent with the 2 of 14 recorded above, and it still extrapolates to roughly 60-80 guards across the tree that no test distinguishes from absent. `collect_hops.py:396` is `if terrain is None: return None`: branch coverage says both outcomes are taken, mutation says deleting the `return` changes no test result — so a test reaches the guard and never pins its effect. **None of the six are fixed.** They are the next piece of work, not a finding that was acted on.
+
+### Scope limit, stated plainly
+
+The new rule covers `_test_hooks` attribute swaps. The wider leaked-process-state class was swept by hand the same day and found clean — all three `addHandler` sites pair with `removeHandler` in a `finally`, both `sys.modules` mutations are restored, and the one `world.update(fresh)` hit is a per-instance `WorldService` rather than a module global, which is what [[session-state-deglobalisation]] bought. That half is **not** machine-enforced, so it is true as of today rather than guaranteed.
