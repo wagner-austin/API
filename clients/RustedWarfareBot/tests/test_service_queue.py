@@ -23,6 +23,7 @@ from rw_bot.service.queue import (
     finish,
     heartbeat,
     reap,
+    reprioritize,
     retry_failed,
     submit,
 )
@@ -323,3 +324,24 @@ def test_retry_failed_leaves_done_rows_alone() -> None:
     finish(conn, held["job_id"], True, "### alpha-s12345\nverdict        won (won)")
     assert retry_failed(conn, "demo") == 0
     assert conn.store.jobs[0].state == "done"
+
+
+def test_a_bumped_batch_claims_ahead_of_an_earlier_one() -> None:
+    """The queue is first-come until priority says otherwise: a background
+    data batch submitted an hour early must not make a strategic question
+    wait behind it (log 2026-08-09). Lower runs sooner."""
+    conn = _submitted()
+    submit(
+        conn, "urgent", _CONFIG, (parse_job_line("beta|999|doctrines/flame-nocover.doctrine|400"),)
+    )
+    assert reprioritize(conn, "urgent", 10) == 1
+    held = _claimed(conn, "w1", (1,))
+    assert held["batch"] == "urgent"
+
+
+def test_reprioritize_moves_only_the_queued() -> None:
+    conn = _submitted()
+    held = _claimed(conn, "w1", (1,))
+    assert reprioritize(conn, "demo", 10) == 1
+    running = next(r for r in conn.store.jobs if r.job_id == held["job_id"])
+    assert running.priority == 100

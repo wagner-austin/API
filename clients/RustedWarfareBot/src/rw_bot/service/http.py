@@ -22,6 +22,7 @@ from rw_bot.service.queue import (
     batch_results,
     batch_status,
     bootstrap,
+    reprioritize,
     retry_failed,
     submit,
 )
@@ -91,6 +92,11 @@ def _decide(conn: Connection, method: str, path: str, body: bytes) -> tuple[int,
         payload: dict[str, str | int] = {"batch": name, "queued": queued, "total": len(jobs)}
         return 201, _JSON, render_json(payload).encode("utf-8")
     parts = path.strip("/").split("/")
+    if len(parts) == 3 and parts[0] == "batches" and parts[2] == "priority" and method == "POST":
+        fields = parse_object(body.decode("utf-8"))
+        moved = reprioritize(conn, parts[1], require_int(fields, "priority"))
+        bumped: dict[str, str | int] = {"batch": parts[1], "moved": moved}
+        return 200, _JSON, render_json(bumped).encode("utf-8")
     if len(parts) == 3 and parts[0] == "batches" and parts[2] == "retries" and method == "POST":
         requeued = retry_failed(conn, parts[1])
         retried: dict[str, str | int] = {"batch": parts[1], "requeued": requeued}

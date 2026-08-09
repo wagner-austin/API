@@ -41,6 +41,7 @@ class FakeJobRow:
         # The row-value union rather than str, so a test can plant a
         # corrupt card and prove the service refuses it.
         self.card: str | int = ""
+        self.priority = 100
 
 
 class FakeCursor:
@@ -69,7 +70,7 @@ class FakeCursor:
         text = " ".join(sql.split())
         handlers = (
             ("CREATE TABLE", self._create),
-            ("ALTER TABLE match_jobs ADD COLUMN IF NOT EXISTS card", self._add_card_column),
+            ("ALTER TABLE match_jobs ADD COLUMN IF NOT EXISTS", self._add_column),
             ("INSERT INTO match_jobs", self._insert_job),
             ("SELECT id, batch, config, match, job FROM match_jobs", self._select_queued),
             ("SELECT clone_index FROM clone_leases", self._select_leases),
@@ -78,6 +79,7 @@ class FakeCursor:
             ("INSERT INTO clone_leases", self._insert_lease),
             ("UPDATE match_jobs SET state = 'running'", self._claim_update),
             ("UPDATE match_jobs SET heartbeat_at = now()", self._heartbeat),
+            ("UPDATE match_jobs SET priority = %s", self._reprioritize),
             ("UPDATE match_jobs SET state = %s", self._finish),
             # The retry statement shares the reap statement's prefix; the
             # longer match must sit first or the reap handler swallows it.
@@ -97,15 +99,17 @@ class FakeCursor:
     def _create(self, params: tuple[str | int | bool, ...]) -> None:
         self._rows = []
 
-    def _add_card_column(self, params: tuple[str | int | bool, ...]) -> None:
-        # Every fake row already carries card; the migration is a no-op here.
+    def _add_column(self, params: tuple[str | int | bool, ...]) -> None:
+        # Every fake row already carries every column; migrations are no-ops.
         self._rows = []
 
     def _select_queued(self, params: tuple[str | int | bool, ...]) -> None:
+        waiting = sorted(
+            (row for row in self._store.jobs if row.state == "queued"),
+            key=_claim_order,
+        )
         queued: list[tuple[str | int, ...]] = [
-            (row.job_id, row.batch, row.config, row.match, row.job)
-            for row in self._store.jobs
-            if row.state == "queued"
+            (row.job_id, row.batch, row.config, row.match, row.job) for row in waiting
         ]
         self._rows = queued[:1]
 
@@ -195,6 +199,16 @@ class FakeCursor:
                 row.card = card
         self._rows = []
 
+    def _reprioritize(self, params: tuple[str | int | bool, ...]) -> None:
+        priority, batch = params
+        assert isinstance(priority, int)
+        moved: list[tuple[str | int, ...]] = []
+        for row in self._store.jobs:
+            if row.batch == batch and row.state == "queued":
+                row.priority = priority
+                moved.append((row.job_id,))
+        self._rows = moved
+
     def _retry(self, params: tuple[str | int | bool, ...]) -> None:
         batch = params[0]
         requeued: list[tuple[str | int, ...]] = []
@@ -234,6 +248,18 @@ class FakeCursor:
         rows = list(self._rows)
         self._rows = []
         return rows
+
+
+def _claim_order(row: FakeJobRow) -> tuple[int, int]:
+    """Order queued rows the way the real claim query does.
+
+    Args:
+        row: One job row.
+
+    Returns:
+        Priority first (lower claims sooner), id breaking ties.
+    """
+    return row.priority, row.job_id
 
 
 def _result_order(row: FakeJobRow) -> tuple[str, int]:

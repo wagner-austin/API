@@ -110,11 +110,15 @@ _DDL: tuple[str, ...] = (
         finished_at TIMESTAMPTZ,
         ok BOOLEAN,
         card TEXT NOT NULL DEFAULT '',
+        priority INT NOT NULL DEFAULT 100,
         UNIQUE (batch, label, seed)
     )
     """,
     """
     ALTER TABLE match_jobs ADD COLUMN IF NOT EXISTS card TEXT NOT NULL DEFAULT ''
+    """,
+    """
+    ALTER TABLE match_jobs ADD COLUMN IF NOT EXISTS priority INT NOT NULL DEFAULT 100
     """,
     """
     CREATE TABLE IF NOT EXISTS clone_leases (
@@ -213,7 +217,7 @@ def claim(conn: Connection, worker: str, clone_pool: tuple[int, ...]) -> Claimed
     cursor = conn.cursor()
     cursor.execute(
         "SELECT id, batch, config, match, job FROM match_jobs"
-        " WHERE state = 'queued' ORDER BY id"
+        " WHERE state = 'queued' ORDER BY priority, id"
         " LIMIT 1 FOR UPDATE SKIP LOCKED"
     )
     row = cursor.fetchone()
@@ -370,6 +374,37 @@ def finish(conn: Connection, job_id: int, ok: bool, card: str) -> None:
     )
     cursor.execute("DELETE FROM clone_leases WHERE job_id = %s", (job_id,))
     conn.commit()
+
+
+def reprioritize(conn: Connection, batch: str, priority: int) -> int:
+    """Move one batch's unclaimed jobs to a new place in the claim order.
+
+    Lower runs sooner; the default is 100. Only queued rows move -- a
+    running match is already someone's and a finished one is history. The
+    verb exists because the queue is otherwise strictly first-come: a
+    background data batch submitted an hour early should not make a
+    strategic question wait behind it (log 2026-08-09).
+
+    Args:
+        conn: An open connection; committed.
+        batch: The batch whose queued jobs move.
+        priority: The new priority; lower claims sooner.
+
+    Returns:
+        How many jobs moved.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` when a returned id is
+            unreadable.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE match_jobs SET priority = %s WHERE batch = %s AND state = 'queued' RETURNING id",
+        (priority, batch),
+    )
+    moved = tuple(_reaped_id(row) for row in cursor.fetchall())
+    conn.commit()
+    return len(moved)
 
 
 def retry_failed(conn: Connection, batch: str) -> int:

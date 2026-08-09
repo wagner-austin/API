@@ -277,3 +277,13 @@ def test_a_posted_retry_requeues_the_failed_and_reports_the_count() -> None:
     assert parse_object(payload.decode("utf-8")) == {"batch": "demo", "requeued": 1}
     status, _kind, payload = route_service_request(conn, "GET", "/batches/demo", b"")
     assert parse_object(payload.decode("utf-8"))["queued"] == 2
+
+
+def test_a_posted_priority_bumps_the_queued_jobs() -> None:
+    conn = FakeConnection()
+    route_service_request(conn, "POST", "/batches", _submission())
+    status, _kind, payload = route_service_request(
+        conn, "POST", "/batches/demo/priority", b'{"priority": 10}'
+    )
+    assert status == 200
+    assert parse_object(payload.decode("utf-8")) == {"batch": "demo", "moved": 2}
