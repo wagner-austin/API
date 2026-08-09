@@ -14,7 +14,7 @@ from collections.abc import Mapping
 
 from rw_bot.policy.doctrine import (
     DERIVE_RESERVE,
-    NAVTILT_BEHIND,
+    NAVTILT_BLOODIED,
     NAVTILT_OFF,
     NO_HEAVIES,
     Doctrine,
@@ -134,7 +134,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             f"field 'hp_floor' is a percent of health, 0-100 with 0 for never, got {hp_floor}",
         )
     navtilt = require_int(payload, "navtilt")
-    if navtilt < NAVTILT_OFF or navtilt > NAVTILT_BEHIND:
+    if navtilt < NAVTILT_OFF or navtilt > NAVTILT_BLOODIED:
         raise DoctrineError(
             _BAD_NAVTILT,
             f"field 'navtilt' is 0 off, 1 always, or 2 only-when-behind, got {navtilt}",

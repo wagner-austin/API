@@ -9,8 +9,8 @@ to repeat, and everything visible flying.
 from __future__ import annotations
 
 from rw_bot.mechanics.combat_profile import CombatProfile
-from rw_bot.policy.counter import counter_composition
-from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BEHIND
+from rw_bot.policy.counter import counter_composition, fleet_types
+from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BLOODIED
 from rw_bot.wire.state import Entity
 from tests.wire_fixtures import entity, profile
 
@@ -182,28 +182,37 @@ def test_an_armed_naval_clause_with_no_fleet_in_sight_changes_nothing() -> None:
     assert counter_composition(mix, (_ground(1), _ground(2)), _NAVAL_PROFILES, 1, False) == mix
 
 
-def test_the_behind_gated_clause_fires_only_while_losing() -> None:
-    """navpair48's lesson as code: at 48 paired seeds every rescue fired
-    where the control was losing to the fleet, and every cost was a
-    re-rolled win -- so NAVTILT_BEHIND reads the scoreboard before the
-    fleet, and a winning trajectory is never perturbed."""
+def test_the_bloodied_clause_fires_only_after_the_fleet_kills() -> None:
+    """Two panels' calibration as code: the ungated tilt re-rolled winning
+    seeds and the deficit gate still fired inside winning games, so
+    NAVTILT_BLOODIED waits for the failure mode itself -- WATER-movers
+    killing units of ours -- and a game the fleet never touched can never
+    be perturbed."""
     mix = ("c_tank", "c_tank", "c_tank", "c_artillery")
     picture = (_ship(1), _ship(2), _ground(3), _ground(4))
-    winning = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_BEHIND, False)
-    assert winning == mix
-    losing = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_BEHIND, True)
-    assert len(losing) > len(mix)
-    assert set(losing[len(mix) :]) == {"c_artillery"}
+    unbloodied = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_BLOODIED, False)
+    assert unbloodied == mix
+    bloodied = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_BLOODIED, True)
+    assert len(bloodied) > len(mix)
+    assert set(bloodied[len(mix) :]) == {"c_artillery"}
     always = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_ALWAYS, False)
-    assert always == losing
+    assert always == bloodied
 
 
-def test_the_behind_gate_never_touches_the_air_clause() -> None:
+def test_the_bloodied_gate_never_touches_the_air_clause() -> None:
     """The air tilt predates the gate and stays unconditional: anti-air
     was never measured to re-roll wins, and the gate guards only the
-    clause whose panel convicted it."""
+    clause whose panels convicted it."""
     mix = ("c_tank", "c_tank", "c_tank", "c_aa")
     picture = (_heli(1), _heli(2), _ground(3), _ground(4))
-    tilted = counter_composition(mix, picture, _PROFILES, NAVTILT_BEHIND, False)
+    tilted = counter_composition(mix, picture, _PROFILES, NAVTILT_BLOODIED, False)
     airworthy = sum(1 for name in tilted if _PROFILES[name]["hits_air"])
     assert airworthy / len(tilted) >= 0.5
+
+
+def test_fleet_types_names_the_water_movers_once_each() -> None:
+    """The gate's memory feed: naval names in first-seen order, repeats
+    collapsed, everything else left out."""
+    picture = (_ship(1), _ground(2), _ship(3), _heli(4))
+    assert fleet_types(picture) == ("warship",)
+    assert fleet_types((_ground(1), _heli(2))) == ()

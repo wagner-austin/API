@@ -13,6 +13,7 @@ from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.campaign import play
 from rw_bot.policy.expander import economy_floor
 from rw_bot.policy.match_report import format_report
+from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.wire.state import Sample
 from tests.campaign_fixtures import (
     BUILDER,
@@ -420,3 +421,23 @@ def test_deaths_are_attributed_to_their_killers_in_the_report() -> None:
     printed = format_report(report)
     assert "units lost to  c_artillery x2, c_helicopter x1" in printed
     assert "works lost to  c_bomber x1" in printed
+
+
+def test_the_death_ledger_answers_the_bloodied_gates_read() -> None:
+    """deaths_to counts only the named killers' kills -- the bloodied
+    gate's read: the naval clause asks the ledger how much blood the
+    fleet types it has seen actually hold (log 2026-08-08)."""
+    before = sample(
+        CENTRE,
+        entity(1, "c_tank", x=500.0, damaged_by="battleShip"),
+        entity(2, "c_tank", x=520.0, damaged_by="battleShip"),
+        entity(3, "c_tank", x=540.0, damaged_by="c_artillery"),
+        credits=1000,
+    )
+    after = sample(CENTRE, credits=1000)
+    scores = Scorekeeper(CATALOGUE, PROFILES)
+    for observed in (before, after):
+        scores.observe(observed, (), (), 0)
+    assert scores.deaths_to({"battleShip"}) == 2
+    assert scores.deaths_to({"battleShip", "c_artillery"}) == 3
+    assert scores.deaths_to({"gunBoat"}) == 0

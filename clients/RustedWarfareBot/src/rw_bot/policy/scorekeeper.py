@@ -15,7 +15,7 @@ which stays the single home of that reasoning.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile
@@ -175,6 +175,24 @@ class Scorekeeper:
             self._army_value_start = self._army_value_end
             self._worth_start = self.worth_end
             self._rival_worth_start = self.rival_worth_end
+
+    def deaths_to(self, killers: Collection[str]) -> int:
+        """Count our mobile units killed so far by any of the named types.
+
+        The bloodied gate's read ([[policy-exact-timing]], the naval wall):
+        the adaptive naval clause arms only after the fleet has actually
+        drawn blood, and "the fleet" is whatever WATER-moving type names
+        the caller has seen this match. Reads the same tally the final
+        killer table ranks, so the gate and the scorecard can never
+        disagree about a death.
+
+        Args:
+            killers: Type names whose kills count.
+
+        Returns:
+            The kills those types hold on the running death ledger.
+        """
+        return sum(count for name, count in self._unit_deaths.items() if name in killers)
 
     def report(
         self,

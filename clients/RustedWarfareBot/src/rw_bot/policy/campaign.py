@@ -35,7 +35,7 @@ from rw_bot.policy.assess import AirWatch
 from rw_bot.policy.budget import Budget
 from rw_bot.policy.combat import WAVE_SIZES, find_army, find_targets
 from rw_bot.policy.convert import Converter, TurretLadder
-from rw_bot.policy.counter import counter_composition, mobile_threats
+from rw_bot.policy.counter import FLEET_BLOOD, counter_composition, fleet_types, mobile_threats
 from rw_bot.policy.creep import Creeper
 from rw_bot.policy.decoy import Decoys, scout_shortfall
 from rw_bot.policy.dispatch import WaveController
@@ -68,7 +68,7 @@ from rw_bot.policy.runner import AFFORD_STALL_SAMPLES, DEFAULT_STALL_SAMPLES, Or
 from rw_bot.policy.rush import Rusher
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.policy.scouting import SCOUT_TYPE, ScoutRunner
-from rw_bot.policy.situation import Closer, Momentum, read_situation, strike_window
+from rw_bot.policy.situation import Closer, Momentum, strike_window
 from rw_bot.policy.spending import (
     build_plan,
     replace_losses,
@@ -159,7 +159,7 @@ def play(
             instead of fighting ([[policy-production]]).
         counter: Tilt production toward the layers the opponent fields.
         navtilt: When the counter tilt's naval clause runs -- off, on any
-            seen fleet, or only while the scoreboard reads losing
+            seen fleet, or only after the fleet has drawn blood
             ([[policy-exact-timing]], the naval wall; log 2026-08-08).
         cover: Buy turrets beside bare structures at all.
         intercept: Turn the reserve on a raider inside our outpost radius.
@@ -223,6 +223,9 @@ def play(
     workforce = Workforce(EXPAND_RETRY_SAMPLES)
     recorder = Recorder(trace)
     scores = Scorekeeper(catalogue, profiles)
+    # Every WATER-moving type name seen this match, the bloodied gate's
+    # accumulating half ([[policy-exact-timing]], the naval wall).
+    fleet_seen: set[str] = set()
     waves = WaveController(
         ladder,
         intercept=intercept,
@@ -344,13 +347,14 @@ def play(
             )
             if counter:
                 threats = mobile_threats(intel, catalogue) if scout else tuple(targets)
-                # The behind-gate reads the engine's own unfogged broadcast:
-                # a fogged-out scoreboard reads as not-behind, which errs
-                # toward leaving the mix alone -- the navpair48 direction.
-                picture = read_situation(sample)
-                behind = picture is not None and picture["our_army"] < picture["rival_army"]
+                # The bloodied gate joins two existing records: the fleet
+                # types ever seen this match, and the death ledger's kills
+                # by those types. A game the fleet never touched can never
+                # read bloodied -- the two-panel calibration's whole point.
+                fleet_seen.update(fleet_types(threats))
+                bloodied = scores.deaths_to(fleet_seen) >= FLEET_BLOOD
                 composition_now = counter_composition(
-                    composition_now, threats, profiles, navtilt, behind
+                    composition_now, threats, profiles, navtilt, bloodied
                 )
             capable = wanted_producers(sample, composition_now)
             queues_open = sum(

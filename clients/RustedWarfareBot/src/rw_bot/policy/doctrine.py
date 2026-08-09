@@ -43,10 +43,13 @@ NAVTILT_OFF: Final = 0
 #: The naval clause runs whenever a fleet is in the remembered picture.
 NAVTILT_ALWAYS: Final = 1
 
-#: The naval clause runs only while the scoreboard reads losing -- the
-#: adaptive mode navpair48 designed: respond to the enemy AND the
-#: trajectory, and never touch a winning recipe (log 2026-08-08).
-NAVTILT_BEHIND: Final = 2
+#: The naval clause runs only after the fleet has drawn blood -- the
+#: adaptive mode two panels calibrated: the army-deficit gate halved the
+#: damage but still fired inside winning games, because a subsidized
+#: opponent's army is bigger even when losing the match. Blood cannot be
+#: misread: units of ours killed by WATER-movers is the failure mode
+#: itself, not a proxy for it (log 2026-08-08).
+NAVTILT_BLOODIED: Final = 2
 
 #: Fields carried as whole numbers in a doctrine file.
 INT_FIELDS: Final = (
@@ -175,13 +178,14 @@ class Doctrine(TypedDict):
         navtilt: When the counter tilt answers WATER-layer threats by
             repeating the mix's fleet-outranging types.
             :data:`NAVTILT_OFF` never, :data:`NAVTILT_ALWAYS` whenever a
-            fleet is seen, :data:`NAVTILT_BEHIND` only while the scoreboard
-            reads losing (our army value under the strongest rival's). The
-            third mode is navpair48's lesson made policy: at 48-seed scale
-            every rescue fired where the control was LOSING to the fleet
-            and every cost came from re-rolling a seed the control was
-            winning -- so the response gates on trajectory, and a winning
-            recipe is never touched (log 2026-08-08).
+            fleet is seen, :data:`NAVTILT_BLOODIED` only after the fleet
+            has killed units of ours. Two panels calibrated the third
+            mode: ungated, the tilt re-rolled winning seeds (navpair48,
+            net -2); gated on an army deficit it fired less but still
+            inside winning games, because a subsidized opponent's army is
+            bigger even while losing (navgate96, net -2). Blood is the
+            failure mode itself: a game the fleet never touched can never
+            be perturbed (log 2026-08-08).
         riposte: Whether the whole reserve releases the moment an intrusion
             ends -- the human counter-punch: let the attack burn itself on
             the defences, then push into the window before the opponent's
@@ -408,7 +412,7 @@ __all__ = [
     "FLAG_FIELDS",
     "INT_FIELDS",
     "NAVTILT_ALWAYS",
-    "NAVTILT_BEHIND",
+    "NAVTILT_BLOODIED",
     "NAVTILT_OFF",
     "NO_HEAVIES",
     "STR_FIELDS",

@@ -36,7 +36,7 @@ from typing import Final, TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile, profile_of
-from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BEHIND
+from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BLOODIED
 from rw_bot.policy.intel import Intel
 
 
@@ -65,6 +65,30 @@ class Threat(TypedDict):
 
 #: The engine's movement-layer name for surface ships, as the wire spells it.
 _NAVAL_LAYER: Final = "WATER"
+
+#: Kills by WATER-movers before the bloodied clause arms. Two, because one
+#: is a stray shot and two is a fleet that has found something to kill --
+#: the in-match spelling of navpair48's rescue signature, "the control
+#: DIED to the fleet" (log 2026-08-08).
+FLEET_BLOOD: Final = 2
+
+
+def fleet_types(targets: Sequence[Threat]) -> tuple[str, ...]:
+    """Name the WATER-moving types in one threat picture.
+
+    The bloodied gate's memory feed: the campaign accumulates these names
+    across the match and asks the death ledger how many kills they hold.
+    A pure read so the layer test lives here, beside the constant it
+    serves, not in the loop.
+
+    Args:
+        targets: The hostile entities currently visible or remembered.
+
+    Returns:
+        The naval type names, in first-seen order, repeats kept out.
+    """
+    seen = (t["type_name"] for t in targets if t["movement"] == _NAVAL_LAYER)
+    return tuple(dict.fromkeys(seen, True))
 
 
 def _hits_air(profiles: Mapping[str, CombatProfile], type_name: str) -> bool:
@@ -167,7 +191,7 @@ def counter_composition(
     targets: Sequence[Threat],
     profiles: Mapping[str, CombatProfile],
     naval: int,
-    behind: bool,
+    bloodied: bool,
 ) -> tuple[str, ...]:
     """Return the mix, tilted until it answers the air and naval shares.
 
@@ -196,12 +220,13 @@ def counter_composition(
     (log 2026-08-07, the arm ladder).
 
     The clause's arming is the doctrine's ``navtilt`` mode, and the
-    behind-gated mode is navpair48's finding made policy: at 48 paired
-    seeds every rescue fired where the control was LOSING to the fleet,
-    and every cost was a re-rolled win -- so under
-    :data:`~rw_bot.policy.doctrine.NAVTILT_BEHIND` the tilt reads the
-    scoreboard first and never perturbs a winning trajectory
-    (log 2026-08-08).
+    bloodied mode is two panels' calibration made policy: ungated, the
+    tilt re-rolled winning seeds (navpair48); gated on an army deficit it
+    fired less but still inside winning games, because a subsidized
+    opponent's army is bigger even while losing (navgate96). Under
+    :data:`~rw_bot.policy.doctrine.NAVTILT_BLOODIED` the clause waits for
+    the failure mode itself -- the fleet killing units of ours -- so a
+    game the fleet never touched can never be perturbed (log 2026-08-08).
 
     Args:
         composition: The army mix to hold, repeats meaningful as a ratio.
@@ -210,11 +235,12 @@ def counter_composition(
         naval: The doctrine's ``navtilt`` mode --
             :data:`~rw_bot.policy.doctrine.NAVTILT_OFF` never,
             :data:`~rw_bot.policy.doctrine.NAVTILT_ALWAYS` on any seen
-            fleet, :data:`~rw_bot.policy.doctrine.NAVTILT_BEHIND` only
-            while losing.
-        behind: Whether the scoreboard reads losing -- our army value
-            under the strongest rival's -- read by the caller from the
-            engine's own unfogged broadcast.
+            fleet, :data:`~rw_bot.policy.doctrine.NAVTILT_BLOODIED` only
+            after the fleet has drawn blood.
+        bloodied: Whether WATER-movers have killed at least
+            :data:`FLEET_BLOOD` of our units this match, read by the
+            caller from the death ledger against the fleet types it has
+            seen (:func:`fleet_types`).
 
     Returns:
         The mix to produce against, repeats meaningful as a ratio.
@@ -232,7 +258,7 @@ def counter_composition(
         return _hits_air(profiles, name)
 
     mix = _tilted(mix, flying, len(targets), hits_air, profiles)
-    armed = naval == NAVTILT_ALWAYS or (naval == NAVTILT_BEHIND and behind)
+    armed = naval == NAVTILT_ALWAYS or (naval == NAVTILT_BLOODIED and bloodied)
     if not armed:
         return mix
     fleet = tuple(t for t in targets if t["movement"] == _NAVAL_LAYER)
@@ -275,4 +301,4 @@ def mobile_threats(intel: Intel, catalogue: Mapping[str, UnitStats]) -> tuple[Th
     return tuple(threats)
 
 
-__all__ = ["Threat", "counter_composition", "mobile_threats"]
+__all__ = ["FLEET_BLOOD", "Threat", "counter_composition", "fleet_types", "mobile_threats"]
