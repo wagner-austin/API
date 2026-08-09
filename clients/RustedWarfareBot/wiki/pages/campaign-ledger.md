@@ -46,7 +46,8 @@ panel. Nothing on this list is a guess.
 
 ## Open questions (measurement running or queued)
 
-- **vhdoom96** — the sighted-era data batch (96 fresh seeds, enemy-shape + events columns) for the fleet-doom re-ask.
+- **vhdoom96** — the sighted-era data batch (96 fresh seeds, enemy-shape + events columns) for the fleet-doom re-ask; resumed behind the priority-claimed screens.
+- **The choke-holding verb** — the one evidence-backed build on the docket: bridge's death shape (structures outliving the army) argues for standing the army at the funnel the way creep held turrets there.
 
 ## Closed questions (measured, with the log entry that closed them)
 
@@ -58,6 +59,7 @@ panel. Nothing on this list is a guess.
 
 **Impossible:**
 - Terrain as a parameter: all three alternative maps worse than duel_lake, each by a named mechanism -- unmanned chokes, amplified navy, fog-off feeding the tilt (log 2026-08-09).
+- Cadence: the whole bot at lockstep 25 reads mildly negative-to-noise; the decisions, not their frequency, are the ceiling (log 2026-08-09).
 - Trades (champion): 0/11, overrun ~s3200 with economy intact (log 2026-08-07).
 - Masonry, both halves: static fortress 0/12 dies faster; choke-walk creep 0/12 dies fastest (logs 2026-08-07/08).
 - The income ladder: funds its T3s and loses anyway — a race is not a stalemate (log 2026-08-08).
