@@ -47,7 +47,7 @@ panel. Nothing on this list is a guess.
 ## Open questions (measurement running or queued)
 
 - **vhdoom96** — the sighted-era data batch (96 fresh seeds, enemy-shape + events columns) for the fleet-doom re-ask; resumed behind the priority-claimed screens.
-- **The fleet-doom re-ask** — fires when vhdoom96 completes; first classifier run on features that can see the enemy.
+- **vhdoom96b** — fresh-tree replication of the AUC-0.80 fleet-doom signal; deployment design waits on it.
 
 ## Closed questions (measured, with the log entry that closed them)
 
