@@ -1,0 +1,52 @@
+# imp-raid8x48: replication at double scale of the only adoptable behavioral gain.
+# raid 8 read +217 paired survival on 12 seeds once (imp-hands84); the
+# combo batch refuted its company and its deepening, so the lone knob
+# replicates before it becomes the rung's reference configuration.
+base|12345|doctrines/flame-nocover.doctrine|10000
+base|1337|doctrines/flame-nocover.doctrine|10000
+base|141421|doctrines/flame-nocover.doctrine|10000
+base|16180|doctrines/flame-nocover.doctrine|10000
+base|173205|doctrines/flame-nocover.doctrine|10000
+base|223606|doctrines/flame-nocover.doctrine|10000
+base|244948|doctrines/flame-nocover.doctrine|10000
+base|24601|doctrines/flame-nocover.doctrine|10000
+base|264575|doctrines/flame-nocover.doctrine|10000
+base|2718|doctrines/flame-nocover.doctrine|10000
+base|271828|doctrines/flame-nocover.doctrine|10000
+base|282842|doctrines/flame-nocover.doctrine|10000
+base|100003|doctrines/flame-nocover.doctrine|10000
+base|100019|doctrines/flame-nocover.doctrine|10000
+base|100043|doctrines/flame-nocover.doctrine|10000
+base|100057|doctrines/flame-nocover.doctrine|10000
+base|100069|doctrines/flame-nocover.doctrine|10000
+base|100103|doctrines/flame-nocover.doctrine|10000
+base|100109|doctrines/flame-nocover.doctrine|10000
+base|100129|doctrines/flame-nocover.doctrine|10000
+base|100151|doctrines/flame-nocover.doctrine|10000
+base|100153|doctrines/flame-nocover.doctrine|10000
+base|100169|doctrines/flame-nocover.doctrine|10000
+base|100183|doctrines/flame-nocover.doctrine|10000
+raid8|12345|doctrines/flame-raid8.doctrine|10000
+raid8|1337|doctrines/flame-raid8.doctrine|10000
+raid8|141421|doctrines/flame-raid8.doctrine|10000
+raid8|16180|doctrines/flame-raid8.doctrine|10000
+raid8|173205|doctrines/flame-raid8.doctrine|10000
+raid8|223606|doctrines/flame-raid8.doctrine|10000
+raid8|244948|doctrines/flame-raid8.doctrine|10000
+raid8|24601|doctrines/flame-raid8.doctrine|10000
+raid8|264575|doctrines/flame-raid8.doctrine|10000
+raid8|2718|doctrines/flame-raid8.doctrine|10000
+raid8|271828|doctrines/flame-raid8.doctrine|10000
+raid8|282842|doctrines/flame-raid8.doctrine|10000
+raid8|100003|doctrines/flame-raid8.doctrine|10000
+raid8|100019|doctrines/flame-raid8.doctrine|10000
+raid8|100043|doctrines/flame-raid8.doctrine|10000
+raid8|100057|doctrines/flame-raid8.doctrine|10000
+raid8|100069|doctrines/flame-raid8.doctrine|10000
+raid8|100103|doctrines/flame-raid8.doctrine|10000
+raid8|100109|doctrines/flame-raid8.doctrine|10000
+raid8|100129|doctrines/flame-raid8.doctrine|10000
+raid8|100151|doctrines/flame-raid8.doctrine|10000
+raid8|100153|doctrines/flame-raid8.doctrine|10000
+raid8|100169|doctrines/flame-raid8.doctrine|10000
+raid8|100183|doctrines/flame-raid8.doctrine|10000
