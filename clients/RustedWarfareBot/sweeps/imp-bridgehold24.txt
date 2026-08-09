@@ -1,0 +1,27 @@
+# imp-bridgehold24: the hold verb on the map that argued for it.
+# base|hold50 on fire_bridge, in-batch control; fresh-tree replication
+# bar applies before any adoption (laws eight and nine).
+base|12345|doctrines/flame-nocover.doctrine|10000
+base|1337|doctrines/flame-nocover.doctrine|10000
+base|141421|doctrines/flame-nocover.doctrine|10000
+base|16180|doctrines/flame-nocover.doctrine|10000
+base|173205|doctrines/flame-nocover.doctrine|10000
+base|223606|doctrines/flame-nocover.doctrine|10000
+base|244948|doctrines/flame-nocover.doctrine|10000
+base|24601|doctrines/flame-nocover.doctrine|10000
+base|264575|doctrines/flame-nocover.doctrine|10000
+base|2718|doctrines/flame-nocover.doctrine|10000
+base|271828|doctrines/flame-nocover.doctrine|10000
+base|282842|doctrines/flame-nocover.doctrine|10000
+hold50|12345|doctrines/flame-hold50.doctrine|10000
+hold50|1337|doctrines/flame-hold50.doctrine|10000
+hold50|141421|doctrines/flame-hold50.doctrine|10000
+hold50|16180|doctrines/flame-hold50.doctrine|10000
+hold50|173205|doctrines/flame-hold50.doctrine|10000
+hold50|223606|doctrines/flame-hold50.doctrine|10000
+hold50|244948|doctrines/flame-hold50.doctrine|10000
+hold50|24601|doctrines/flame-hold50.doctrine|10000
+hold50|264575|doctrines/flame-hold50.doctrine|10000
+hold50|2718|doctrines/flame-hold50.doctrine|10000
+hold50|271828|doctrines/flame-hold50.doctrine|10000
+hold50|282842|doctrines/flame-hold50.doctrine|10000
