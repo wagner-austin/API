@@ -32,7 +32,7 @@ any AI, any human, any 1vX seating, any map.
 |---|---|---|---|
 | Very Hard (duel_lake) | `flame-nocover` | 21/48 fresh seeds (44%) | Standing. Ten modification arms rejected at two scales; local optimum of the current vocabulary. |
 | Impossible (duel_lake) | `flame-nocover` | 0/~120 post-certification, survival floor ~3300 | No adoptable gain: raid 8's +217 REVERSED on a fresh tree (-198, same seeds) and is retracted; kite's +98 is downgraded to unreplicated. |
-| Other maps / seatings | — | — | Unmeasured post-certification. The xmap family ran pre-navtilt; re-baselining is an open thread. |
+| Other maps (Impossible) | `flame-nocover` | bridge 2811 / straits 2317 / hills 2281 vs duel 3325, 0/36 | Terrain-as-parameter closed: every alternative worse, duel_lake retained BECAUSE most favorable (log 2026-08-09). |
 
 ## Adoption history (post-certification)
 
@@ -57,6 +57,7 @@ panel. Nothing on this list is a guess.
 - The deficit-gated tilt: halves the damage, keeps the disease — army deficit is the normal shape of winning against a subsidized opponent (log 2026-08-08, navgate96).
 
 **Impossible:**
+- Terrain as a parameter: all three alternative maps worse than duel_lake, each by a named mechanism -- unmanned chokes, amplified navy, fog-off feeding the tilt (log 2026-08-09).
 - Trades (champion): 0/11, overrun ~s3200 with economy intact (log 2026-08-07).
 - Masonry, both halves: static fortress 0/12 dies faster; choke-walk creep 0/12 dies fastest (logs 2026-08-07/08).
 - The income ladder: funds its T3s and loses anyway — a race is not a stalemate (log 2026-08-08).
