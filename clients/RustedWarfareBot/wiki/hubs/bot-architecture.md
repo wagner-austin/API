@@ -22,6 +22,7 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [The Verdict — Asking the Engine Who Won](../pages/policy-verdict.md) -- the engine's own flags, and why they replaced every proxy for them
 [The Policy Loop](../pages/policy-loop.md) -- the bot plays: pure decisions from observed state, one order per plan slot, and a scorecard
 
+[Campaign Ledger — The Standing Scoreboard](../pages/campaign-ledger.md) -- the at-a-glance position: champion per rung, adoption history, open and closed questions, the laws
 [Doctrine — A Gameplay Style as One File](../pages/policy-doctrine.md) -- every knob in one required-field file; one-field arms, in-batch controls, the pinned default
 [Interception — Mobile Defence at the Engine's Own Radius](../pages/policy-interception.md) -- the reserve turns on intruders inside the AI's own outpost radius; measured at two rungs
 [Intel and Scouting — Remembering the Fog, Carefully](../pages/policy-intel-and-scouting.md) -- the sighting memory and the scout circuit, with v1's refutation and the two fixes it forced

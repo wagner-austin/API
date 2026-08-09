@@ -1,0 +1,84 @@
+---
+title: "Campaign Ledger — The Standing Scoreboard"
+tags: [policy, methodology, experiments, ledger]
+related:
+  - "[[policy-doctrine]]"
+  - "[[policy-determinism]]"
+  - "[[harness-match-service]]"
+  - "[[policy-exact-timing]]"
+source_paths:
+  - "wiki/log.md"
+  - "doctrines/flame-nocover.doctrine"
+  - "runs/sweeps/"
+game_version: "1.15 (code 176, build #28)"
+confidence: high
+fact_checked: 2026-08-08
+---
+
+# Campaign Ledger — The Standing Scoreboard
+
+The at-a-glance state of the campaign: what the bot currently is, what has
+been adopted and when, what is open, what is closed, and the laws every
+future arm inherits. `log.md` is the chronological record; this page is the
+current position. **Update this page with every adoption, closure, and law
+— it goes stale the day a verdict lands without touching it.**
+
+The goal, unchanged since 2026-08-05: 100% vs Impossible watchably, then
+any AI, any human, any 1vX seating, any map.
+
+## The champion, per rung
+
+| Rung | Configuration | Record | Status |
+|---|---|---|---|
+| Very Hard (duel_lake) | `flame-nocover` | 21/48 fresh seeds (44%) | Standing. Ten modification arms rejected at two scales; local optimum of the current vocabulary. |
+| Impossible (duel_lake) | `flame-nocover` | 0/47 post-certification, survival floor ~3300 | `raid 8` pending as reference config: +217 paired survival once, replication at 24 seeds running (imp-raid8x48). |
+| Other maps / seatings | — | — | Unmeasured post-certification. The xmap family ran pre-navtilt; re-baselining is an open thread. |
+
+## Adoption history (post-certification)
+
+Every behavior the bot actually runs was once an arm that cleared a paired
+panel. Nothing on this list is a guess.
+
+| Date | Change | Evidence |
+|---|---|---|
+| pre-2026-08-06 | The champion stack itself (cover-off, flame 2, close 3, aa-counter guard, raid 3, tech 1, counter tilt) | The VH arm ladder, pre-certification; carried forward as the baseline the certified harness re-measured at 12/24 and 21/48 |
+| 2026-08-08 | — (no adoption yet on the certified harness) | raid 8 is the first candidate; adoption awaits imp-raid8x48 |
+
+## Open questions (measurement running or queued)
+
+- **navblood96** — third calibration of the adaptive naval tilt (blood-gated). Trending net -3 at 18/48 pairs; if negative, the thread closes with the latch lesson rather than a fourth gate.
+- **imp-raid8x48** — replication of the rung's only positive arm at double scale. Clears ~+200 mean → `raid 8` becomes the Impossible reference configuration, the first certified adoption.
+
+## Closed questions (measured, with the log entry that closed them)
+
+**Very Hard:**
+- Composition surgery, all channels: eight one-knob arms negative; production is a ratio simplex (log 2026-08-07, the arm ladder).
+- The unconditional naval tilt: net -2 at 24 and 48 seeds, trades wins for survivals (log 2026-08-08, navpair48).
+- The deficit-gated tilt: halves the damage, keeps the disease — army deficit is the normal shape of winning against a subsidized opponent (log 2026-08-08, navgate96).
+
+**Impossible:**
+- Trades (champion): 0/11, overrun ~s3200 with economy intact (log 2026-08-07).
+- Masonry, both halves: static fortress 0/12 dies faster; choke-walk creep 0/12 dies fastest (logs 2026-08-07/08).
+- The income ladder: funds its T3s and loses anyway — a race is not a stalemate (log 2026-08-08).
+- The scout: -1008 mean survival, the worst paired arm ever; ungated input is perturbation (log 2026-08-08).
+- Riposte (-562), medics (-418), flee30 (-110), strike5 (-104): four hands closed by the screen (log 2026-08-08).
+- raid+kite composed (-204) and raid 12 (-214): the raid channel peaks at 8 and refuses company (log 2026-08-08).
+
+## The laws (what every future arm inherits)
+
+1. **The ratio simplex** — any permanent reshaping of a razor-tuned mix costs more than it pays; there is no such thing as pure addition (2026-08-07).
+2. **One knob, behavioral edition** — hands do not compose freely either; every combination is its own measurement (2026-08-08, combo36).
+3. **Adapt when losing, never touch what is winning** — and the gate must read the failure mode itself, not a proxy (2026-08-08, three tilt calibrations).
+4. **Latch gates saturate** — naval contact is nearly universal, naval doom is rare; a gate that can only turn on eventually fires in most wins (2026-08-08, navblood96).
+5. **Input without a gated response is perturbation** — richer intel fed to unconditional rules made the bot blinder, twice (2026-07-29 scouting v1; 2026-08-08 imp-scout24).
+6. **Conditional arms need paired panels at scale** — effects concentrate in seed subsets; 24 seeds measure re-roll noise (2026-08-07).
+7. **Erosion law** — verdicts track whether the economy was HELD; endpoints lie, peaks tell (2026-08-07, the xmap correction).
+
+## The instrument
+
+The match service ([[harness-match-service]]): Postgres queue + leased
+clones + leased ports + HTTP door + results mirror + retry verb. ~380
+matches served across its first two days, through two Docker outages, a
+worker crash, and three of its own concurrency bugs — each found by
+production load, fixed same-day, and regression-locked. Panels that were
+an evening of babysitting are now one submission.
