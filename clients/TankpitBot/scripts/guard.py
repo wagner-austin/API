@@ -12,6 +12,7 @@ from typing import Protocol
 
 from scripts.contract_rules import run_contract_rules
 from scripts.file_size_rules import run_file_size_rules
+from scripts.hook_restore_rules import run_hook_restore_rules
 from scripts.layer_rules import run_layer_rules
 from scripts.physics_claims import run_physics_claim_rules
 from scripts.protocol_constant_rules import run_protocol_constant_rules
@@ -135,6 +136,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         + run_protocol_constant_rules(target_root)
         + run_state_sentinel_rules(target_root)
         + run_mine_layer_rules(target_root)
+        + run_hook_restore_rules(target_root)
         + run_wiki_rules(target_root)
     )
     if local_violations > 0 and rc == 0:

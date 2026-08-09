@@ -25,39 +25,8 @@ from scripts import check_undecoded_fields as guard
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import (
     GlobPathsProtocol,
-    PathExistsProtocol,
-    ReadTextProtocol,
 )
-
-
-class _FakeFileSystem:
-    """Save-and-restore fake for the guard's file-read hooks."""
-
-    def __init__(self) -> None:
-        """Initialise with no virtual files registered."""
-        self._files: dict[str, str] = {}
-
-    def write(self, path: Path, content: str) -> None:
-        """Register a virtual file's contents."""
-        self._files[str(path)] = content
-
-    def path_exists(self, path: Path) -> bool:
-        """Return True when ``path`` was registered."""
-        return str(path) in self._files
-
-    def read_text(self, path: Path) -> str:
-        """Return the contents of ``path``."""
-        return self._files[str(path)]
-
-
-def _install_fake_filesystem() -> tuple[_FakeFileSystem, PathExistsProtocol, ReadTextProtocol]:
-    """Swap the script hooks for a fake; return originals for restore."""
-    fake = _FakeFileSystem()
-    original_path_exists: PathExistsProtocol = _test_hooks.path_exists
-    original_read_text: ReadTextProtocol = _test_hooks.read_text
-    _test_hooks.path_exists = fake.path_exists
-    _test_hooks.read_text = fake.read_text
-    return (fake, original_path_exists, original_read_text)
+from tests.conftest import install_fake_filesystem
 
 
 class TestFindViolationsInSource:
@@ -185,22 +154,24 @@ class TestFindViolations:
             self._fake,
             self._original_path_exists,
             self._original_read_text,
-        ) = _install_fake_filesystem()
+            self._original_append_text,
+        ) = install_fake_filesystem()
 
     def teardown_method(self) -> None:
         """Restore the real ``_test_hooks`` bindings."""
         _test_hooks.path_exists = self._original_path_exists
         _test_hooks.read_text = self._original_read_text
+        _test_hooks.append_text = self._original_append_text
 
     def test_aggregates_across_multiple_files(self) -> None:
         """Each path's violations are concatenated in scan order."""
         a = Path("a.py")
         b = Path("b.py")
-        self._fake.write(
+        self._fake.write_text(
             a,
             ("from typing import TypedDict\nclass A(TypedDict):\n    unk1: int\n"),
         )
-        self._fake.write(
+        self._fake.write_text(
             b,
             ("from typing import TypedDict\nclass B(TypedDict):\n    padding0: int\n"),
         )
@@ -223,7 +194,8 @@ class TestExpandTargets:
             self._fake,
             self._original_path_exists,
             self._original_read_text,
-        ) = _install_fake_filesystem()
+            self._original_append_text,
+        ) = install_fake_filesystem()
         self._original_glob_paths: GlobPathsProtocol = _test_hooks.glob_paths
         self._members: list[Path] = []
         _test_hooks.glob_paths = self._glob_paths
@@ -232,6 +204,7 @@ class TestExpandTargets:
         """Restore the real ``_test_hooks`` bindings."""
         _test_hooks.path_exists = self._original_path_exists
         _test_hooks.read_text = self._original_read_text
+        _test_hooks.append_text = self._original_append_text
         _test_hooks.glob_paths = self._original_glob_paths
 
     def _glob_paths(self, directory: Path, pattern: str) -> list[Path]:
@@ -261,7 +234,7 @@ class TestExpandTargets:
     def test_module_target_is_scanned_as_itself(self) -> None:
         """A ``.py`` target is returned unexpanded."""
         module = Path("pkg/types.py")
-        self._fake.write(module, "")
+        self._fake.write_text(module, "")
         assert expand_targets((module,)) == [module]
 
 
@@ -311,17 +284,19 @@ class TestRunEntrypoint:
             self._fake,
             self._original_path_exists,
             self._original_read_text,
-        ) = _install_fake_filesystem()
+            self._original_append_text,
+        ) = install_fake_filesystem()
 
     def teardown_method(self) -> None:
         """Restore the real ``_test_hooks`` bindings."""
         _test_hooks.path_exists = self._original_path_exists
         _test_hooks.read_text = self._original_read_text
+        _test_hooks.append_text = self._original_append_text
 
     def test_returns_zero_when_clean(self, capsys: pytest.CaptureFixture[str]) -> None:
         """A clean scan exits 0 with a friendly stdout summary."""
         a = Path("a.py")
-        self._fake.write(
+        self._fake.write_text(
             a,
             ("from typing import TypedDict\nclass A(TypedDict):\n    aim_x: int\n"),
         )
@@ -335,7 +310,7 @@ class TestRunEntrypoint:
     ) -> None:
         """A violation exits 1 and every line is printed to stderr."""
         a = Path("a.py")
-        self._fake.write(
+        self._fake.write_text(
             a,
             ("from typing import TypedDict\nclass A(TypedDict):\n    unk1: int\n"),
         )

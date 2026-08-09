@@ -9,7 +9,12 @@ import pytest
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot import _hooks_guard, _test_hooks
-from tankpit_bot._test_hooks import CDPSessionProtocol
+from tankpit_bot._test_hooks import (
+    AppendTextProtocol,
+    CDPSessionProtocol,
+    PathExistsProtocol,
+    ReadTextProtocol,
+)
 from tankpit_bot.analysis import _test_hooks as analysis_test_hooks
 from tankpit_bot.replay import _test_hooks as replay_test_hooks
 
@@ -136,6 +141,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.read_text = _test_hooks._real_read_text
     _test_hooks.append_text = _test_hooks._real_append_text
     _test_hooks.path_exists = _test_hooks._real_path_exists
+    _test_hooks.remove_file = _test_hooks._real_remove_file
     _test_hooks.find_best_static_byte = None
     _test_hooks.sync_playwright = None
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
@@ -171,6 +177,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.read_text = _test_hooks._real_read_text
     _test_hooks.append_text = _test_hooks._real_append_text
     _test_hooks.path_exists = _test_hooks._real_path_exists
+    _test_hooks.remove_file = _test_hooks._real_remove_file
     _test_hooks.find_best_static_byte = None
     _test_hooks.sync_playwright = None
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
@@ -390,6 +397,35 @@ class FakeFileSystem:
             Dict mapping path strings to contents.
         """
         return dict(self._files)
+
+
+def install_fake_filesystem() -> tuple[
+    FakeFileSystem, PathExistsProtocol, ReadTextProtocol, AppendTextProtocol
+]:
+    """Install a fake filesystem on the read hooks; return originals to restore.
+
+    The :func:`fake_fs` fixture is the preferred entry point, but a
+    ``setup_method``/``teardown_method`` class cannot request a fixture,
+    and four modules need exactly this swap from ``setup_method``. They
+    each grew a private ``_FakeFileSystem`` plus installer to get it --
+    five near-identical copies of a class this module already owned
+    (consolidated 2026-08-08). This is that installer, once.
+
+    Callers MUST restore the returned originals in teardown; the
+    ``hook_restore`` guard rule fails the build if they do not.
+
+    Returns:
+        Tuple of ``(fake, original_path_exists, original_read_text,
+        original_append_text)``.
+    """
+    fake = FakeFileSystem()
+    original_path_exists: PathExistsProtocol = _test_hooks.path_exists
+    original_read_text: ReadTextProtocol = _test_hooks.read_text
+    original_append_text: AppendTextProtocol = _test_hooks.append_text
+    _test_hooks.path_exists = fake.path_exists
+    _test_hooks.read_text = fake.read_text
+    _test_hooks.append_text = fake.append_text
+    return (fake, original_path_exists, original_read_text, original_append_text)
 
 
 @pytest.fixture()

@@ -8,16 +8,11 @@ from __future__ import annotations
 
 import runpy
 import sys
-from pathlib import Path
 
 import pytest
+from tests.conftest import install_fake_filesystem
 
 from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks import (
-    AppendTextProtocol,
-    PathExistsProtocol,
-    ReadTextProtocol,
-)
 from tankpit_bot.diagnostics import bot_runs_cli
 from tankpit_bot.diagnostics.runs_index import (
     DEFAULT_INDEX_PATH,
@@ -25,45 +20,6 @@ from tankpit_bot.diagnostics.runs_index import (
     BotRunIndexRowDict,
     encode_row,
 )
-
-
-class _FakeFileSystem:
-    """Save-and-restore fake mirroring the runs_index test helper."""
-
-    def __init__(self) -> None:
-        """Initialise with no virtual files registered."""
-        self._files: dict[str, str] = {}
-
-    def write(self, path: Path, content: str) -> None:
-        """Register a virtual file's contents."""
-        self._files[str(path)] = content
-
-    def path_exists(self, path: Path) -> bool:
-        """Return True when ``path`` was registered via :meth:`write`."""
-        return str(path) in self._files
-
-    def read_text(self, path: Path) -> str:
-        """Return the contents of ``path``."""
-        return self._files[str(path)]
-
-    def append_text(self, path: Path, content: str) -> None:
-        """Append ``content`` to the virtual file at ``path``."""
-        existing = self._files.get(str(path), "")
-        self._files[str(path)] = existing + content
-
-
-def _install_fake_filesystem() -> tuple[
-    _FakeFileSystem, PathExistsProtocol, ReadTextProtocol, AppendTextProtocol
-]:
-    """Swap the real script hooks for a fake; return originals for restore."""
-    fake = _FakeFileSystem()
-    original_path_exists: PathExistsProtocol = _test_hooks.path_exists
-    original_read_text: ReadTextProtocol = _test_hooks.read_text
-    original_append_text: AppendTextProtocol = _test_hooks.append_text
-    _test_hooks.path_exists = fake.path_exists
-    _test_hooks.read_text = fake.read_text
-    _test_hooks.append_text = fake.append_text
-    return (fake, original_path_exists, original_read_text, original_append_text)
 
 
 def _row(stamp: str, *, exit_reason: str = "completed") -> BotRunIndexRowDict:
@@ -90,7 +46,7 @@ class _CliTestBase:
             self._original_path_exists,
             self._original_read_text,
             self._original_append_text,
-        ) = _install_fake_filesystem()
+        ) = install_fake_filesystem()
 
     def teardown_method(self) -> None:
         """Restore the real ``_test_hooks`` bindings."""
@@ -101,7 +57,7 @@ class _CliTestBase:
     def _populate(self, rows: list[BotRunIndexRowDict]) -> None:
         """Seed the default index with ``rows`` and the canonical header."""
         text = HEADER_LINE + "".join(encode_row(row) for row in rows)
-        self._fake.write(DEFAULT_INDEX_PATH, text)
+        self._fake.write_text(DEFAULT_INDEX_PATH, text)
 
 
 class TestRunList(_CliTestBase):
@@ -131,7 +87,7 @@ class TestRunList(_CliTestBase):
     def test_prints_no_runs_recorded_when_empty(self, capsys: pytest.CaptureFixture[str]) -> None:
         """An empty index prints a friendly stub line and still exits 0."""
         # Header-only file (no data rows yet).
-        self._fake.write(DEFAULT_INDEX_PATH, HEADER_LINE)
+        self._fake.write_text(DEFAULT_INDEX_PATH, HEADER_LINE)
         assert bot_runs_cli.run_list() == 0
         out = capsys.readouterr().out
         assert "(no runs recorded)" in out

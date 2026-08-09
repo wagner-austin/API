@@ -12,13 +12,9 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
+from tests.conftest import install_fake_filesystem
 
 from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks import (
-    AppendTextProtocol,
-    PathExistsProtocol,
-    ReadTextProtocol,
-)
 from tankpit_bot.diagnostics import bot_query
 from tankpit_bot.diagnostics.bot_query import (
     DEFAULT_EVENTS_PATH,
@@ -31,45 +27,6 @@ from tankpit_bot.diagnostics.bot_query import (
     query_timeline,
     run,
 )
-
-
-class _FakeFileSystem:
-    """Save-and-restore fake for the bot_query file hooks."""
-
-    def __init__(self) -> None:
-        """Initialise with no virtual files registered."""
-        self._files: dict[str, str] = {}
-
-    def write(self, path: Path, content: str) -> None:
-        """Register a virtual file's contents."""
-        self._files[str(path)] = content
-
-    def path_exists(self, path: Path) -> bool:
-        """Return True when ``path`` was registered."""
-        return str(path) in self._files
-
-    def read_text(self, path: Path) -> str:
-        """Return the contents of ``path``."""
-        return self._files[str(path)]
-
-    def append_text(self, path: Path, content: str) -> None:
-        """Append ``content`` to the virtual file at ``path``."""
-        existing = self._files.get(str(path), "")
-        self._files[str(path)] = existing + content
-
-
-def _install_fake_filesystem() -> tuple[
-    _FakeFileSystem, PathExistsProtocol, ReadTextProtocol, AppendTextProtocol
-]:
-    """Swap the script hooks for a fake; return originals for restore."""
-    fake = _FakeFileSystem()
-    original_path_exists: PathExistsProtocol = _test_hooks.path_exists
-    original_read_text: ReadTextProtocol = _test_hooks.read_text
-    original_append_text: AppendTextProtocol = _test_hooks.append_text
-    _test_hooks.path_exists = fake.path_exists
-    _test_hooks.read_text = fake.read_text
-    _test_hooks.append_text = fake.append_text
-    return (fake, original_path_exists, original_read_text, original_append_text)
 
 
 def _event(
@@ -463,7 +420,7 @@ class _LoadRecordsBase:
             self._original_path_exists,
             self._original_read_text,
             self._original_append_text,
-        ) = _install_fake_filesystem()
+        ) = install_fake_filesystem()
 
     def teardown_method(self) -> None:
         """Restore the real ``_test_hooks`` bindings."""
@@ -488,7 +445,7 @@ class TestLoadRecords(_LoadRecordsBase):
         """Blank lines between records are skipped silently."""
         path = Path("runs/bot/latest.events.jsonl")
         body = _event("STATE", "alpha") + "\n" + _event("STATE", "beta")
-        self._fake.write(path, body)
+        self._fake.write_text(path, body)
         records = load_records(path)
         assert [r.message for r in records] == ["alpha", "beta"]
 
@@ -518,7 +475,7 @@ class TestRunDispatcher(_LoadRecordsBase):
 
     def test_timeline_against_default_path(self, capsys: pytest.CaptureFixture[str]) -> None:
         """``run(["timeline"])`` reads ``DEFAULT_EVENTS_PATH`` and writes to stdout."""
-        self._fake.write(
+        self._fake.write_text(
             DEFAULT_EVENTS_PATH,
             _event("STATE", "IDLE", tick_n=1),
         )
@@ -531,7 +488,7 @@ class TestRunDispatcher(_LoadRecordsBase):
     ) -> None:
         """The optional second argument overrides the default path."""
         explicit = tmp_path / "events.jsonl"
-        self._fake.write(
+        self._fake.write_text(
             explicit,
             _event(
                 "AI",
@@ -550,7 +507,7 @@ class TestMain(_LoadRecordsBase):
 
     def test_main_exits_with_run_code(self) -> None:
         """``main()`` propagates ``run()``'s exit code via ``SystemExit``."""
-        self._fake.write(DEFAULT_EVENTS_PATH, _event("STATE", "IDLE", tick_n=1))
+        self._fake.write_text(DEFAULT_EVENTS_PATH, _event("STATE", "IDLE", tick_n=1))
         old_argv = sys.argv
         sys.argv = ["bot-query", "timeline"]
         try:
@@ -562,7 +519,7 @@ class TestMain(_LoadRecordsBase):
 
     def test_module_entrypoint_runs_main(self, capsys: pytest.CaptureFixture[str]) -> None:
         """``python -m tankpit_bot.diagnostics.bot_query`` executes ``main``."""
-        self._fake.write(
+        self._fake.write_text(
             DEFAULT_EVENTS_PATH,
             _event("STATE", "IDLE", tick_n=1),
         )

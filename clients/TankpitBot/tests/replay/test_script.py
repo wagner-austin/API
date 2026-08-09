@@ -13,61 +13,7 @@ from tankpit_bot.replay.types import ReplayTickTraceDict
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types import CaptureSession, encode_capture_session
-
-
-class _FakeFS:
-    """Fake file system for replay script tests."""
-
-    def __init__(self) -> None:
-        """Initialize empty fake file system."""
-        self._files: dict[str, str] = {}
-
-    def write(self, path: Path, content: str) -> None:
-        """Write content to fake file.
-
-        Args:
-            path: File path.
-            content: Text content.
-        """
-        self._files[str(path)] = content
-
-    def read(self, path: Path) -> str:
-        """Read content from fake file.
-
-        Args:
-            path: File path.
-
-        Returns:
-            Text content.
-
-        Raises:
-            FileNotFoundError: If file not in fake FS.
-        """
-        key = str(path)
-        if key not in self._files:
-            raise FileNotFoundError(f"Fake FS: {path}")
-        return self._files[key]
-
-    def exists(self, path: Path) -> bool:
-        """Check if file exists in fake file system.
-
-        Args:
-            path: File path.
-
-        Returns:
-            True if file exists in fake FS.
-        """
-        return str(path) in self._files
-
-    def append(self, path: Path, content: str) -> None:
-        """Append to fake file.
-
-        Args:
-            path: File path.
-            content: Text content to append.
-        """
-        key = str(path)
-        self._files[key] = self._files.get(key, "") + content
+from tests.conftest import FakeFileSystem
 
 
 def _empty_session(magic: str | None = "testmagic") -> CaptureSession:
@@ -84,7 +30,7 @@ def _empty_session(magic: str | None = "testmagic") -> CaptureSession:
     )
 
 
-def _install_fake_fs(fs: _FakeFS) -> None:
+def _install_fake_fs(fs: FakeFileSystem) -> None:
     """Install fake FS hooks for testing.
 
     Seeds the static XOR key: a replay builds its session table from
@@ -98,12 +44,12 @@ def _install_fake_fs(fs: _FakeFS) -> None:
     from tankpit_bot.capture.xor import reset_static_key_cache
     from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 
-    fs.write(DEFAULT_STATIC_KEY_PATH, "Y" + "A" * 999)
+    fs.write_text(DEFAULT_STATIC_KEY_PATH, "Y" + "A" * 999)
     reset_static_key_cache()
-    _test_hooks.write_text = fs.write
-    _test_hooks.read_text = fs.read
-    _test_hooks.path_exists = fs.exists
-    _test_hooks.append_text = fs.append
+    _test_hooks.write_text = fs.write_text
+    _test_hooks.read_text = fs.read_text
+    _test_hooks.path_exists = fs.path_exists
+    _test_hooks.append_text = fs.append_text
 
 
 def _restore_hooks() -> None:
@@ -268,7 +214,7 @@ class TestMainCLI:
         """main() returns 1 when session file does not exist."""
         from scripts.replay_bot import main
 
-        fs = _FakeFS()
+        fs = FakeFileSystem()
         _install_fake_fs(fs)
         _test_hooks.get_argv = lambda: ["replay_bot", "nonexistent.json"]
         result = main()
@@ -279,11 +225,11 @@ class TestMainCLI:
         """main() returns 1 when session has no magic key."""
         from scripts.replay_bot import main
 
-        fs = _FakeFS()
+        fs = FakeFileSystem()
         session = _empty_session(magic=None)
         encoded = encode_capture_session(session)
         session_json = dump_json_str(encoded)
-        fs.write(Path("test_session.json"), session_json)
+        fs.write_text(Path("test_session.json"), session_json)
         _install_fake_fs(fs)
         _test_hooks.get_argv = lambda: ["replay_bot", "test_session.json"]
         result = main()
@@ -294,11 +240,11 @@ class TestMainCLI:
         """main() returns 0 for valid session with no messages."""
         from scripts.replay_bot import main
 
-        fs = _FakeFS()
+        fs = FakeFileSystem()
         session = _empty_session()
         encoded = encode_capture_session(session)
         session_json = dump_json_str(encoded)
-        fs.write(Path("test_session.json"), session_json)
+        fs.write_text(Path("test_session.json"), session_json)
         _install_fake_fs(fs)
         _test_hooks.get_argv = lambda: ["replay_bot", "test_session.json"]
         result = main()
@@ -309,7 +255,7 @@ class TestMainCLI:
         """main() uses capture_session.json as default path."""
         from scripts.replay_bot import main
 
-        fs = _FakeFS()
+        fs = FakeFileSystem()
         _install_fake_fs(fs)
         _test_hooks.get_argv = lambda: ["replay_bot"]
         # File does not exist → returns 1
@@ -321,11 +267,11 @@ class TestMainCLI:
         """main() accepts --json flag without error for valid session."""
         from scripts.replay_bot import main
 
-        fs = _FakeFS()
+        fs = FakeFileSystem()
         session = _empty_session()
         encoded = encode_capture_session(session)
         session_json = dump_json_str(encoded)
-        fs.write(Path("test_session.json"), session_json)
+        fs.write_text(Path("test_session.json"), session_json)
         _install_fake_fs(fs)
         _test_hooks.get_argv = lambda: ["replay_bot", "test_session.json", "--json"]
         result = main()
@@ -337,7 +283,7 @@ class TestMainCLI:
         import runpy
         import sys
 
-        fs = _FakeFS()
+        fs = FakeFileSystem()
         _install_fake_fs(fs)
         _test_hooks.get_argv = lambda: ["replay_bot", "nonexistent.json"]
         # Remove from sys.modules so runpy doesn't warn about prior import
@@ -404,10 +350,10 @@ class TestMainCLI:
             game_log=[],
             tank_names={},
         )
-        fs = _FakeFS()
+        fs = FakeFileSystem()
         encoded_session = encode_capture_session(session)
         session_json = dump_json_str(encoded_session)
-        fs.write(Path("test_session.json"), session_json)
+        fs.write_text(Path("test_session.json"), session_json)
         _install_fake_fs(fs)
         _test_hooks.get_argv = lambda: ["replay_bot", "test_session.json"]
 

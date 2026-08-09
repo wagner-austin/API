@@ -11,13 +11,9 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONTypeError
+from tests.conftest import install_fake_filesystem
 
 from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks import (
-    AppendTextProtocol,
-    PathExistsProtocol,
-    ReadTextProtocol,
-)
 from tankpit_bot.diagnostics import runs_index
 from tankpit_bot.diagnostics.runs_index import (
     DEFAULT_INDEX_PATH,
@@ -32,46 +28,6 @@ from tankpit_bot.diagnostics.runs_index import (
     load_index_rows,
     make_index_row,
 )
-
-
-class _FakeFileSystem:
-    """Save-and-restore fake for ``_test_hooks.path_exists`` / ``read_text``
-    / ``append_text``."""
-
-    def __init__(self) -> None:
-        """Initialise with no virtual files registered."""
-        self._files: dict[str, str] = {}
-
-    def write(self, path: Path, content: str) -> None:
-        """Register a virtual file's contents."""
-        self._files[str(path)] = content
-
-    def path_exists(self, path: Path) -> bool:
-        """Return True when ``path`` was registered via :meth:`write`."""
-        return str(path) in self._files
-
-    def read_text(self, path: Path) -> str:
-        """Return the contents of ``path``."""
-        return self._files[str(path)]
-
-    def append_text(self, path: Path, content: str) -> None:
-        """Append ``content`` to the virtual file at ``path``."""
-        existing = self._files.get(str(path), "")
-        self._files[str(path)] = existing + content
-
-
-def _install_fake_filesystem() -> tuple[
-    _FakeFileSystem, PathExistsProtocol, ReadTextProtocol, AppendTextProtocol
-]:
-    """Swap the real script hooks for a fake; return originals for restore."""
-    fake = _FakeFileSystem()
-    original_path_exists: PathExistsProtocol = _test_hooks.path_exists
-    original_read_text: ReadTextProtocol = _test_hooks.read_text
-    original_append_text: AppendTextProtocol = _test_hooks.append_text
-    _test_hooks.path_exists = fake.path_exists
-    _test_hooks.read_text = fake.read_text
-    _test_hooks.append_text = fake.append_text
-    return (fake, original_path_exists, original_read_text, original_append_text)
 
 
 def _sample_row() -> BotRunIndexRowDict:
@@ -287,7 +243,7 @@ class TestAppendIndexRow:
             self._original_path_exists,
             self._original_read_text,
             self._original_append_text,
-        ) = _install_fake_filesystem()
+        ) = install_fake_filesystem()
 
     def teardown_method(self) -> None:
         """Restore the real ``_test_hooks`` bindings."""
@@ -324,7 +280,7 @@ class TestLoadIndexRows:
             self._original_path_exists,
             self._original_read_text,
             self._original_append_text,
-        ) = _install_fake_filesystem()
+        ) = install_fake_filesystem()
 
     def teardown_method(self) -> None:
         """Restore the real ``_test_hooks`` bindings."""
@@ -339,7 +295,7 @@ class TestLoadIndexRows:
     def test_skips_header_and_blanks(self) -> None:
         """The header line is skipped; blank lines are skipped silently."""
         path = Path("runs/bot/_index.tsv")
-        self._fake.write(
+        self._fake.write_text(
             path,
             HEADER_LINE + "\n" + encode_row(_sample_row()) + "\n" + encode_row(_sample_row()),
         )
@@ -349,7 +305,7 @@ class TestLoadIndexRows:
     def test_handles_index_with_no_header(self) -> None:
         """Indices without a header (legacy file) still decode every line."""
         path = Path("runs/bot/_index.tsv")
-        self._fake.write(path, encode_row(_sample_row()))
+        self._fake.write_text(path, encode_row(_sample_row()))
         assert load_index_rows(path) == [_sample_row()]
 
 
@@ -363,7 +319,7 @@ class TestFindRow:
             self._original_path_exists,
             self._original_read_text,
             self._original_append_text,
-        ) = _install_fake_filesystem()
+        ) = install_fake_filesystem()
 
     def teardown_method(self) -> None:
         """Restore the real ``_test_hooks`` bindings."""
@@ -374,13 +330,13 @@ class TestFindRow:
     def test_returns_matching_row(self) -> None:
         """Exact stamp match returns the row."""
         path = Path("runs/bot/_index.tsv")
-        self._fake.write(path, HEADER_LINE + encode_row(_sample_row()))
+        self._fake.write_text(path, HEADER_LINE + encode_row(_sample_row()))
         assert find_row("20260620-150138", path) == _sample_row()
 
     def test_returns_none_when_stamp_missing(self) -> None:
         """No match returns ``None`` rather than raising."""
         path = Path("runs/bot/_index.tsv")
-        self._fake.write(path, HEADER_LINE + encode_row(_sample_row()))
+        self._fake.write_text(path, HEADER_LINE + encode_row(_sample_row()))
         assert find_row("20990101-000000", path) is None
 
 
@@ -394,7 +350,7 @@ class TestCountStallTimeouts:
             self._original_path_exists,
             self._original_read_text,
             self._original_append_text,
-        ) = _install_fake_filesystem()
+        ) = install_fake_filesystem()
 
     def teardown_method(self) -> None:
         """Restore the real ``_test_hooks`` bindings."""
@@ -469,7 +425,7 @@ class TestCountStallTimeouts:
             ),
         ]
         path = Path("runs/bot/events.jsonl")
-        self._fake.write(path, "\n".join(lines))
+        self._fake.write_text(path, "\n".join(lines))
         assert count_stall_timeouts(path) == 2
 
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from platform_core.json_utils import (
     JSONObject,
     JSONValue,
@@ -18,6 +16,7 @@ from scripts import (
     _test_hooks,
     smoke,
 )
+from tests.conftest import FakeFileSystem
 
 
 def _record_object(
@@ -147,62 +146,14 @@ def _full_success_jsonl(start: str = "2026-06-20T15:00:00") -> str:
     return "\n".join(raws) + "\n"
 
 
-class _FakeFileSystem:
-    """Save-and-restore stand-in for scripts._test_hooks file ops.
-
-    Tests instantiate this fake, assign its bound methods to
-    ``_test_hooks.path_exists`` and ``_test_hooks.read_text``, and
-    restore the originals on teardown. No monkeypatch, no module
-    constants overridden.
-    """
-
-    def __init__(self) -> None:
-        """Initialise with no virtual files registered."""
-        self._files: dict[str, str] = {}
-
-    def write(self, path: Path, content: str) -> None:
-        """Register a virtual file at ``path`` containing ``content``.
-
-        Args:
-            path: Virtual path used by the loader.
-            content: File contents to return on read.
-        """
-        self._files[str(path)] = content
-
-    def path_exists(self, path: Path) -> bool:
-        """Return True when the virtual filesystem knows ``path``.
-
-        Args:
-            path: Path to check.
-
-        Returns:
-            True if ``write`` previously registered the path.
-        """
-        return str(path) in self._files
-
-    def read_text(self, path: Path) -> str:
-        """Return the registered contents for ``path``.
-
-        Args:
-            path: Path to read.
-
-        Returns:
-            Contents previously registered via :meth:`write`.
-
-        Raises:
-            KeyError: If ``path`` was never registered.
-        """
-        return self._files[str(path)]
-
-
-def _install_fake_filesystem() -> tuple[_FakeFileSystem, PathExistsProtocol, ReadTextProtocol]:
+def _install_fake_filesystem() -> tuple[FakeFileSystem, PathExistsProtocol, ReadTextProtocol]:
     """Swap the real script hooks for a fake; return originals for restore.
 
     Returns:
         Tuple of ``(fake, original_path_exists, original_read_text)``.
         Callers MUST restore the originals in teardown.
     """
-    fake = _FakeFileSystem()
+    fake = FakeFileSystem()
     original_path_exists: PathExistsProtocol = _test_hooks.path_exists
     original_read_text: ReadTextProtocol = _test_hooks.read_text
     _test_hooks.path_exists = fake.path_exists

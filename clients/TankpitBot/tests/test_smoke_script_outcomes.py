@@ -173,7 +173,7 @@ class TestLoadRecords:
         text = "\n".join(
             _record_raw("STATE", f"step {i}", timestamp=f"2026-06-20T15:00:0{i}") for i in (1, 2, 3)
         )
-        self._fake.write(path, text)
+        self._fake.write_text(path, text)
         records = smoke.load_records(path)
         assert len(records) == 3
         assert records[0].message == "step 1"
@@ -183,14 +183,14 @@ class TestLoadRecords:
         """Blank lines between records are skipped silently."""
         path = tmp_path / "ok.jsonl"
         record_text = _record_raw("STATE", "alpha")
-        self._fake.write(path, f"{record_text}\n\n{record_text}\n")
+        self._fake.write_text(path, f"{record_text}\n\n{record_text}\n")
         records = smoke.load_records(path)
         assert len(records) == 2
 
     def test_raises_jsontypeerror_when_top_level_is_not_object(self, tmp_path: Path) -> None:
         """Non-object top-level values are rejected by ``narrow_json_to_dict``."""
         path = tmp_path / "bad.jsonl"
-        self._fake.write(path, '["not an object"]\n')
+        self._fake.write_text(path, '["not an object"]\n')
         with pytest.raises(JSONTypeError):
             smoke.load_records(path)
 
@@ -256,7 +256,7 @@ class TestRun:
     ) -> None:
         """A JSONL with every signal present returns exit code 0."""
         path = tmp_path / "latest.events.jsonl"
-        self._fake.write(path, _full_success_jsonl())
+        self._fake.write_text(path, _full_success_jsonl())
         assert smoke.run(path) == 0
         out = capsys.readouterr().out
         assert "SMOKE PASSED" in out
@@ -290,7 +290,7 @@ class TestRun:
                 action_kind="shoot",
             ),
         ]
-        self._fake.write(path, "\n".join(raws) + "\n")
+        self._fake.write_text(path, "\n".join(raws) + "\n")
         assert smoke.run(path) == 1
         err = capsys.readouterr().err
         assert "SMOKE FAILED" in err
@@ -306,12 +306,12 @@ class TestRun:
         We assert by registering the default path in the fake FS with
         a fully-passing payload; ``run()`` must read it and return 0.
         """
-        self._fake.write(smoke.LATEST_EVENTS_PATH, _full_success_jsonl())
+        self._fake.write_text(smoke.LATEST_EVENTS_PATH, _full_success_jsonl())
         assert smoke.run() == 0
 
     def test_main_exits_with_run_code(self, tmp_path: Path) -> None:
         """``main()`` propagates ``run()``'s exit code via SystemExit."""
-        self._fake.write(smoke.LATEST_EVENTS_PATH, _full_success_jsonl())
+        self._fake.write_text(smoke.LATEST_EVENTS_PATH, _full_success_jsonl())
         with pytest.raises(SystemExit) as exc:
             smoke.main()
         assert exc.value.code == 0
@@ -335,7 +335,7 @@ class TestRun:
         This guards against regressions where ``main()`` exists but
         ``runpy``-style execution falls back to library-only behavior.
         """
-        self._fake.write(smoke.LATEST_EVENTS_PATH, _full_success_jsonl())
+        self._fake.write_text(smoke.LATEST_EVENTS_PATH, _full_success_jsonl())
         old_argv = sys.argv
         sys.argv = ["scripts.smoke"]
         try:
