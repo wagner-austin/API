@@ -127,8 +127,6 @@ class ProbeBase(SessionBase):
         from tankpit_bot.bot.commands import encode_teleport_command
         from tankpit_bot.bot.types import make_teleport_command
 
-        if self._cdp is None:
-            return False
         cmd = make_teleport_command(x, y)
         return self._send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})")
 

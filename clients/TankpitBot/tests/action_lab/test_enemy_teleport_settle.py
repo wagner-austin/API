@@ -82,8 +82,20 @@ def test_settle_dwell_without_heartbeat_is_one_silent_wait() -> None:
 
 
 def test_settle_dwell_zero_settle_is_a_no_op() -> None:
+    """A non-positive settle dwells not at all, on either heartbeat path.
+
+    Both heartbeat branches are exercised because only the no-heartbeat
+    one can observe the guard: with a positive heartbeat the loop's own
+    ``remaining > 0`` test declines the dwell anyway, so that path passed
+    whether the guard existed or not (mutation survivor, 2026-08-08).
+    Drop the guard and the no-heartbeat branch waits for ``0.0`` -- and a
+    negative settle waits for a negative timeout.
+    """
     probe = _ProbeHarness()
     baseline_waits = len(probe._fake_page.waits)
     probe._settle_dwell(probe._fake_page, 0, 1500)
+    probe._settle_dwell(probe._fake_page, 0, 0)
+    probe._settle_dwell(probe._fake_page, -250, 0)
     assert probe.inventory_calls == 0
+    assert probe.move_calls == []
     assert len(probe._fake_page.waits) == baseline_waits

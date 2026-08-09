@@ -9,6 +9,7 @@ from __future__ import annotations
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state.types import WorldStateDict
+from tests._runtime_logging_support import capture_runtime_events
 from tests.conftest import FakeFileSystem
 
 
@@ -79,25 +80,9 @@ class TestDispatchTankMessages:
         assert "42" in tanks
         assert tanks["42"]["liveness"] == "alive"
 
-        import logging
-
         remove_msg = TankRemoveDict(msg_type=0x58, tank_id=42)
-        logger = logging.getLogger("tankpit_bot.runtime.events")
-        records: list[logging.LogRecord] = []
-
-        class _Capture(logging.Handler):
-            def emit(self, record: logging.LogRecord) -> None:
-                records.append(record)
-
-        handler = _Capture()
-        original_level = logger.level
-        logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
-        try:
+        with capture_runtime_events() as records:
             dispatch_world_state_update(ws, remove_msg)
-        finally:
-            logger.removeHandler(handler)
-            logger.setLevel(original_level)
         tanks = ws.world_state["tanks"]
         assert "42" in tanks
         assert tanks["42"]["liveness"] == "alive"

@@ -471,3 +471,39 @@ def test_hop_skips_a_mine_denied_nearest_and_takes_the_next_candidate() -> None:
     assert command["cmd_type"] == "teleport"
     assert command["target_x"] == 150
     assert command["target_y"] == 100
+
+
+def test_hop_toward_equipment_declines_when_terrain_unknown() -> None:
+    """Unknown terrain declines the equipment hop even with a live candidate.
+
+    The candidate list is deliberately non-empty and affordable, so the
+    terrain guard is the ONLY thing that can produce None here. Against
+    a world with no tracked equipment the ``not candidates`` branch
+    returns None anyway, and that is how this guard survived mutation
+    (2026-08-08). ``_equipment_hop_landing`` takes a caller-narrowed
+    non-None terrain, so dropping the guard raises instead of declining.
+    """
+    ws = WorldService()
+    containers = {
+        "130,100": make_container_state(
+            x=130,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(default_count=15),
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
+
+    assert hop_toward_equipment(ctx, ctx.base) is None

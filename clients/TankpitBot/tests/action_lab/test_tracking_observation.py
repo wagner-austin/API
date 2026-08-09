@@ -94,9 +94,17 @@ def test_find_js_tank_entry_returns_match() -> None:
 
 
 def test_find_js_tank_entry_returns_none_when_key_empty() -> None:
-    """find_js_tank_entry returns None when tracked_js_key is the empty sentinel."""
+    """find_js_tank_entry returns None when tracked_js_key is the empty sentinel.
+
+    The registry carries an entry whose own key is ``""`` and whose value
+    matches, so the sentinel check is the ONLY thing that can produce
+    None here. With a registry that merely lacks the key, the lookup
+    misses, the loop falls through and returns None anyway -- and this
+    test passed whether the sentinel check existed or not (mutation
+    survivor, 2026-08-08).
+    """
     collections: dict[str, list[dict[str, int | float | bool | str | None]]] = {
-        "P.j": [{"id": 511}],
+        "P.j": [{"": 511, "id": 511}],
     }
     assert find_js_tank_entry(collections, "", "511") is None
 

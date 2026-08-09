@@ -9,6 +9,7 @@ from tankpit_bot.ledger.outcome.teleport import record_teleport_dispatch
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state import make_self_state
+from tests._runtime_logging_support import capture_runtime_events
 
 _DIAGNOSTIC_LINE = "DIAGNOSTIC: diagnostic_kind=teleport_displacement"
 
@@ -22,25 +23,11 @@ def _dispatch_landed_and_capture(ws: WorldService) -> list[logging.LogRecord]:
     Returns:
         All runtime-event log records emitted by the dispatch.
     """
-    records: list[logging.LogRecord] = []
-
-    class _Capture(logging.Handler):
-        def emit(self, record: logging.LogRecord) -> None:
-            records.append(record)
-
-    logger = logging.getLogger("tankpit_bot.runtime.events")
-    handler = _Capture()
-    original_level = logger.level
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-    try:
+    with capture_runtime_events() as records:
         dispatch_world_state_update(
             ws,
             TeleportLandedDict(msg_type="teleport_landed", subtype=0x0C),
         )
-    finally:
-        logger.removeHandler(handler)
-        logger.setLevel(original_level)
     return records
 
 
