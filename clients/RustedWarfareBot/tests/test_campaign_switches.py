@@ -12,6 +12,8 @@ counter tilt in ``test_campaign_counter``.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from rw_bot.control.channel import AgentChannel
 from rw_bot.policy.campaign import play
 from rw_bot.policy.situation import CLOSE_HOLD
@@ -393,3 +395,24 @@ def test_the_posture_table_is_sent_once_before_the_first_observation() -> None:
     centre = next(line for line in rows if '"type":"commandCenter"' in line)
     assert '"kite":0' in centre
     assert '"hp_floor":0' in centre
+
+
+def test_an_open_strike_window_lands_in_the_trace_events(tmp_path: Path) -> None:
+    """The decision stream, end to end: the rival's army value falls past
+    the strike figure, the window opens in the fighting tail, and the NEXT
+    trace row carries ``S`` -- each row holds what was decided in the
+    window it closes, so the loop's order never bends for the record
+    (log 2026-08-09)."""
+    us = player(0, index=0, local=True, hostile=False, income=54, building_value=3000)
+
+    def world(their_army: int) -> Sample:
+        them = player(1, index=1, income=180, army_value=their_army, building_value=1500)
+        return sample(CENTRE, *WAVE, enemy(9, "c_tank", x=100.0), players=(us, them))
+
+    peer = ScriptedPeer(lines(world(4200), world(4000), world(4000)))
+    target = tmp_path / "trace.txt"
+    play(AgentChannel(peer), (), CATALOGUE, PLACEMENTS, PROFILES, 3, strike=100, trace=target)
+    rows = [ln.split() for ln in target.read_text(encoding="utf-8").splitlines()[1:4]]
+    events = [row[20] for row in rows]
+    assert events[0] == "-"
+    assert "S" in events[2]

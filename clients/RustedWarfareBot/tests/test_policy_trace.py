@@ -108,6 +108,7 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
                 navy_seen=2,
                 air_seen=1,
                 navy_blood=3,
+                events="RT",
                 world=123456789,
                 plan="building",
                 workers=4,
@@ -136,6 +137,7 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "navy_seen",
         "air_seen",
         "navy_blood",
+        "events",
     ]
     assert lines[1].split() == [
         "7",
@@ -158,6 +160,7 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "2",
         "1",
         "3",
+        "RT",
     ]
     assert lines[2] == ""
     assert lines[3].split() == ["frame", "unit", "type", "x", "y", "killer"]
@@ -186,6 +189,7 @@ def test_a_run_that_lost_nothing_still_renders_both_headers() -> None:
                 navy_seen=0,
                 air_seen=0,
                 navy_blood=0,
+                events="-",
                 world=0,
                 plan="done",
                 workers=0,
@@ -209,3 +213,4 @@ def test_the_income_pair_sits_before_the_world_digest() -> None:
     assert header.index("navy_seen") == 17
     assert header.index("air_seen") == 18
     assert header.index("navy_blood") == 19
+    assert header.index("events") == 20

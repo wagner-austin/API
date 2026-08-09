@@ -64,6 +64,7 @@ class Recorder:
         navy_seen: int,
         air_seen: int,
         navy_blood: int,
+        events: str,
     ) -> None:
         """Record one observation.
 
@@ -83,6 +84,8 @@ class Recorder:
             navy_seen: Hostile WATER-movers visible this observation.
             air_seen: Hostile fliers visible this observation.
             navy_blood: Cumulative kills on us by fleet types seen so far.
+            events: Decision codes issued since the previous row, ``-`` for
+                none.
         """
         if self._path is None:
             return
@@ -115,6 +118,7 @@ class Recorder:
                 navy_seen=navy_seen,
                 air_seen=air_seen,
                 navy_blood=navy_blood,
+                events=events,
                 world=world_digest(sample),
                 plan=plan,
                 workers=workers,

@@ -33,6 +33,7 @@ from rw_bot.policy.nuker import NukeOrders
 from rw_bot.policy.raid import Raider
 from rw_bot.policy.rush import Rusher
 from rw_bot.policy.scouting import ScoutRunner
+from rw_bot.policy.situation import Momentum, strike_window
 from rw_bot.policy.spending import PlanStep, unlock_tech
 from rw_bot.policy.workforce import Workforce
 from rw_bot.wire.command import (
@@ -61,7 +62,7 @@ def send_plan_step(channel: AgentChannel, step: PlanStep) -> None:
         channel.send_build(step["build"])
 
 
-def send_moves(channel: AgentChannel, moves: Sequence[MoveOrder]) -> int:
+def _send_moves(channel: AgentChannel, moves: Sequence[MoveOrder]) -> int:
     """Send every move order and report how many.
 
     Args:
@@ -79,7 +80,7 @@ def send_moves(channel: AgentChannel, moves: Sequence[MoveOrder]) -> int:
     return len(moves)
 
 
-def send_attacks(channel: AgentChannel, attacks: Sequence[AttackOrder]) -> int:
+def _send_attacks(channel: AgentChannel, attacks: Sequence[AttackOrder]) -> int:
     """Send every attack order and report how many.
 
     Args:
@@ -129,7 +130,7 @@ def send_builds(channel: AgentChannel, orders: Sequence[BuildOrder]) -> None:
         channel.send_build(order)
 
 
-def draft_raid(
+def _draft_raid(
     channel: AgentChannel,
     sample: Sample,
     catalogue: Mapping[str, UnitStats],
@@ -173,11 +174,11 @@ def send_recon(
     scatter last -- so the three verbs never fight over one unit.
     """
     if scout:
-        send_moves(channel, scouts.patrol(sample, catalogue))
+        _send_moves(channel, scouts.patrol(sample, catalogue))
     if lurk:
-        send_moves(channel, lurkers.orders(sample, catalogue, lurk, skip=int(scout)))
+        _send_moves(channel, lurkers.orders(sample, catalogue, lurk, skip=int(scout)))
     if decoys:
-        send_moves(channel, scatter.orders(sample, catalogue, decoys, skip=int(scout) + lurk))
+        _send_moves(channel, scatter.orders(sample, catalogue, decoys, skip=int(scout) + lurk))
 
 
 def send_postures(
@@ -269,7 +270,7 @@ def advance_creep(
     )
 
 
-def march_rush(
+def _march_rush(
     channel: AgentChannel,
     sample: Sample,
     catalogue: Mapping[str, UnitStats],
@@ -300,13 +301,94 @@ def march_rush(
         channel.send_attack_move(order)
 
 
+def fight(
+    channel: AgentChannel,
+    sample: Sample,
+    catalogue: Mapping[str, UnitStats],
+    profiles: Mapping[str, CombatProfile],
+    intel: Intel,
+    army: tuple[Entity, ...],
+    targets: tuple[Entity, ...],
+    waves: WaveController,
+    raiders: Raider,
+    rusher: Rusher,
+    momentum: Momentum,
+    *,
+    raid: int,
+    rush: bool,
+    allin: int,
+    strike: int,
+    committed_close: bool,
+    pending_events: set[str],
+) -> None:
+    """Run one tick's combat dispatch, noting each decision as it happens.
+
+    The loop's fighting tail, extracted whole: fill then commit, gather then
+    hold one target, march past the trigger. Attacking costs nothing and is
+    not arbitrated, which is why nothing here touches the budget
+    ([[policy-combat]]). Decision codes land in ``pending_events`` for the
+    next trace row (log 2026-08-09).
+
+    Args:
+        channel: An open connection to the agent.
+        sample: One observation of the world.
+        catalogue: Unit stats by type name.
+        profiles: Combat profiles by type name.
+        intel: The fog memory, already fed this observation.
+        army: Units able to fight.
+        targets: The hostile entities visible.
+        waves: The wave controller, carrying its own commitments.
+        raiders: The raid controller.
+        rusher: The forced-march controller.
+        momentum: The rival army-value window the strike release reads.
+        raid: The raid party's size, zero for no raiding.
+        rush: Whether released waves march at the estimated enemy start.
+        allin: The all-in release observation, zero for never.
+        strike: The momentum release window's size, zero for off.
+        committed_close: Whether the closer holds its latched commitment.
+        pending_events: Decision codes accumulating toward the next row.
+    """
+    fighting = army
+    if waves.committed():
+        # The strike force is withheld from the engagement like the
+        # raid party, or first contact re-tasks the whole dump onto
+        # the replaceable army and the income is never reached.
+        struck = rusher.ordered()
+        fighting = tuple(u for u in fighting if u["unit_id"] not in struck)
+    if raid:
+        raids_before = raiders.raids
+        fighting = _draft_raid(channel, sample, catalogue, intel, army, waves, raiders)
+        if raiders.raids > raids_before:
+            pending_events.add("R")
+    window_open = strike_window(momentum, strike)
+    if window_open:
+        pending_events.add("S")
+    if committed_close:
+        pending_events.add("C")
+    moves, attacks = waves.command(
+        sample,
+        catalogue,
+        profiles,
+        fighting,
+        strike=window_open or committed_close,
+    )
+    _send_moves(channel, moves)
+    _send_attacks(channel, attacks)
+    # Gated on the LATCHED commitment, not the knob: before the first
+    # open window a close doctrine holds exactly as it would without
+    # one -- gating on the knob made every ladder release march at
+    # the mirror, which is the rush verb wearing the closer's name.
+    if rush or allin or committed_close:
+        marches_before = raiders.marches + rusher.marches
+        _march_rush(channel, sample, catalogue, waves, rusher, fighting, targets, committed_close)
+        if raiders.marches + rusher.marches > marches_before:
+            pending_events.add("M")
+
+
 __all__ = [
     "advance_creep",
-    "draft_raid",
-    "march_rush",
-    "send_attacks",
+    "fight",
     "send_builds",
-    "send_moves",
     "send_nukes",
     "send_plan_step",
     "send_postures",

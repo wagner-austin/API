@@ -47,11 +47,8 @@ from rw_bot.policy.decoy import Decoys, scout_shortfall
 from rw_bot.policy.dispatch import WaveController
 from rw_bot.policy.dispatching import (
     advance_creep,
-    draft_raid,
-    march_rush,
-    send_attacks,
+    fight,
     send_builds,
-    send_moves,
     send_nukes,
     send_plan_step,
     send_postures,
@@ -74,7 +71,7 @@ from rw_bot.policy.runner import AFFORD_STALL_SAMPLES, DEFAULT_STALL_SAMPLES, Or
 from rw_bot.policy.rush import Rusher
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.policy.scouting import SCOUT_TYPE, ScoutRunner
-from rw_bot.policy.situation import Closer, Momentum, strike_window
+from rw_bot.policy.situation import Closer, Momentum
 from rw_bot.policy.spending import (
     build_plan,
     replace_losses,
@@ -232,6 +229,10 @@ def play(
     # Every WATER-moving type name seen this match, the bloodied gate's
     # accumulating half ([[policy-exact-timing]], the naval wall).
     fleet_seen: set[str] = set()
+    # Decision codes issued since the previous trace row was written --
+    # consumed by recorder.step, so each row carries what was decided in
+    # the window it closes (log 2026-08-09).
+    pending_events: set[str] = set()
     waves = WaveController(
         ladder,
         intercept=intercept,
@@ -359,9 +360,12 @@ def play(
                 # read bloodied -- the two-panel calibration's whole point.
                 fleet_seen.update(fleet_types(threats))
                 bloodied = scores.deaths_to(fleet_seen) >= FLEET_BLOOD
+                untilted = composition_now
                 composition_now = counter_composition(
                     composition_now, threats, profiles, navtilt, bloodied
                 )
+                if composition_now != untilted:
+                    pending_events.add("T")
             capable = wanted_producers(sample, composition_now)
             queues_open = sum(
                 1
@@ -455,7 +459,9 @@ def play(
                 navy_seen,
                 air_seen,
                 scores.deaths_to(fleet_seen),
+                "".join(sorted(pending_events)) or "-",
             )
+            pending_events.clear()
 
             # The engine's verdict is the only thing that ends a match early.
             #
@@ -483,32 +489,25 @@ def play(
             # that attacking runs last and costs nothing, which is why it is
             # not arbitrated at all ([[policy-combat]]).
             send_recon(channel, scout, lurk, decoys, scouts, lurkers, scatter, sample, catalogue)
-            fighting = army
-            if waves.committed():
-                # The strike force is withheld from the engagement like the
-                # raid party, or first contact re-tasks the whole dump onto
-                # the replaceable army and the income is never reached.
-                struck = rusher.ordered()
-                fighting = tuple(u for u in fighting if u["unit_id"] not in struck)
-            if raid:
-                fighting = draft_raid(channel, sample, catalogue, intel, army, waves, raiders)
-            moves, attacks = waves.command(
+            fight(
+                channel,
                 sample,
                 catalogue,
                 profiles,
-                fighting,
-                strike=strike_window(momentum, strike) or committed_close,
+                intel,
+                army,
+                targets,
+                waves,
+                raiders,
+                rusher,
+                momentum,
+                raid=raid,
+                rush=rush,
+                allin=allin,
+                strike=strike,
+                committed_close=committed_close,
+                pending_events=pending_events,
             )
-            send_moves(channel, moves)
-            send_attacks(channel, attacks)
-            # Gated on the LATCHED commitment, not the knob: before the first
-            # open window a close doctrine holds exactly as it would without
-            # one -- gating on the knob made every ladder release march at
-            # the mirror, which is the rush verb wearing the closer's name.
-            if rush or allin or committed_close:
-                march_rush(
-                    channel, sample, catalogue, waves, rusher, fighting, targets, committed_close
-                )
         finally:
             channel.send_ack()
 

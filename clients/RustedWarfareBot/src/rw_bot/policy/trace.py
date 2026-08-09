@@ -118,6 +118,14 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
         navy_blood: Cumulative kills on us by fleet types seen so far -- the
             death ledger's answer for the WATER-movers, per sample, so the
             moment the fleet first draws blood is a column read.
+        events: Decision codes issued since the previous row was written,
+            sorted, ``-`` for none: ``T`` the counter tilt changed the mix,
+            ``R`` a raid drafted, ``M`` a forced march moved, ``S`` the
+            strike window stood open, ``C`` the closer held its commitment.
+            Every tilt postmortem to date INFERRED firing from composition
+            side-effects; a decision is now a column read, cut at recording
+            boundaries so the loop's order never bends for the record
+            (log 2026-08-09).
         world: A deterministic digest of every visible entity's identity,
             position and health -- CRC32 over a canonical rendering, never
             Python's randomised ``hash``. The divergence detector: two
@@ -143,6 +151,7 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
     navy_seen: int
     air_seen: int
     navy_blood: int
+    events: str
     rival_income: int
     world: int
     plan: str
@@ -223,7 +232,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{'lost':>6}{'producers':>11}{'idle':>6}{'orders':>8}{'refused':>9}"
         f"{'worth':>9}{'rival':>9}{'income':>8}{'rival_income':>14}{'world':>12}"
         f"{'plan':>10}{'workers':>9}"
-        f"{'navy_seen':>11}{'air_seen':>10}{'navy_blood':>12}"
+        f"{'navy_seen':>11}{'air_seen':>10}{'navy_blood':>12}{'events':>8}"
     ]
     lines.extend(
         f"{t['frame']:>8}{t['army']:>6}{t['credits']:>9}"
@@ -231,7 +240,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{t['producers']:>11}{t['idle']:>6}{t['orders']:>8}{t['refused']:>9}"
         f"{t['worth']:>9}{t['rival']:>9}{t['income']:>8}{t['rival_income']:>14}"
         f"{t['world']:>12}{t['plan']:>10}{t['workers']:>9}"
-        f"{t['navy_seen']:>11}{t['air_seen']:>10}{t['navy_blood']:>12}"
+        f"{t['navy_seen']:>11}{t['air_seen']:>10}{t['navy_blood']:>12}{t['events']:>8}"
         for t in ticks
     )
     lines.append("")
