@@ -31,7 +31,7 @@ any AI, any human, any 1vX seating, any map.
 | Rung | Configuration | Record | Status |
 |---|---|---|---|
 | Very Hard (duel_lake) | `flame-nocover` | 21/48 fresh seeds (44%) | Standing. Ten modification arms rejected at two scales; local optimum of the current vocabulary. |
-| Impossible (duel_lake) | `flame-nocover` | 0/47 post-certification, survival floor ~3300 | `raid 8` pending as reference config: +217 paired survival once, replication at 24 seeds running (imp-raid8x48). |
+| Impossible (duel_lake) | `flame-nocover` | 0/~120 post-certification, survival floor ~3300 | No adoptable gain: raid 8's +217 REVERSED on a fresh tree (-198, same seeds) and is retracted; kite's +98 is downgraded to unreplicated. |
 | Other maps / seatings | — | — | Unmeasured post-certification. The xmap family ran pre-navtilt; re-baselining is an open thread. |
 
 ## Adoption history (post-certification)
@@ -46,7 +46,7 @@ panel. Nothing on this list is a guess.
 
 ## Open questions (measurement running or queued)
 
-- **imp-raid8x48** — replication of the rung's only positive arm at double scale. Clears ~+200 mean → `raid 8` becomes the Impossible reference configuration, the first certified adoption.
+- **vhdoom96** — the sighted-era data batch (96 fresh seeds, enemy-shape + events columns) for the fleet-doom re-ask.
 
 ## Closed questions (measured, with the log entry that closed them)
 
@@ -62,7 +62,7 @@ panel. Nothing on this list is a guess.
 - The income ladder: funds its T3s and loses anyway — a race is not a stalemate (log 2026-08-08).
 - The scout: -1008 mean survival, the worst paired arm ever; ungated input is perturbation (log 2026-08-08).
 - Riposte (-562), medics (-418), flee30 (-110), strike5 (-104): four hands closed by the screen (log 2026-08-08).
-- raid+kite composed (-204) and raid 12 (-214): the raid channel peaks at 8 and refuses company (log 2026-08-08).
+- raid+kite composed (-204) and raid 12 (-214) (log 2026-08-08); then raid 8 itself retracted on fresh-tree reversal, +217 to -198 on identical seeds (log 2026-08-09).
 
 ## The laws (what every future arm inherits)
 
@@ -74,6 +74,7 @@ panel. Nothing on this list is a guess.
 6. **Conditional arms need paired panels at scale** — effects concentrate in seed subsets; 24 seeds measure re-roll noise (2026-08-07).
 7. **Erosion law** — verdicts track whether the economy was HELD; endpoints lie, peaks tell (2026-08-07, the xmap correction).
 8. **Blast radius matches trigger precision** — small reversible responses may gate on present signals; match-reshaping responses require prediction, which no present-tense scalar supplies (2026-08-08, the three-calibration arc).
+9. **Effects must replicate across trees** — a paired panel controls within-tree noise, not tree-to-tree variance; the same seeds flipped +217 to -198 between trees. Fresh-tree replication is the adoption bar (2026-08-09, imp-raid8x48).
 
 ## The ML layer
 
