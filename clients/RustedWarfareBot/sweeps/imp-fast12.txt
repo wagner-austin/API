@@ -1,0 +1,17 @@
+# imp-fast12: the cadence probe -- the whole bot at triple reaction rate.
+# Lockstep 25 vs the imp-duel12b anchor at 75; samples budget 3x so the
+# game-time cap is equal, and every comparison reads FRAMES, not samples.
+# The one capability-class lever needing zero new code (log 2026-07-31:
+# cadence measured once, for one verb, pre-certification).
+fast|12345|doctrines/flame-nocover.doctrine|30000
+fast|1337|doctrines/flame-nocover.doctrine|30000
+fast|141421|doctrines/flame-nocover.doctrine|30000
+fast|16180|doctrines/flame-nocover.doctrine|30000
+fast|173205|doctrines/flame-nocover.doctrine|30000
+fast|223606|doctrines/flame-nocover.doctrine|30000
+fast|244948|doctrines/flame-nocover.doctrine|30000
+fast|24601|doctrines/flame-nocover.doctrine|30000
+fast|264575|doctrines/flame-nocover.doctrine|30000
+fast|2718|doctrines/flame-nocover.doctrine|30000
+fast|271828|doctrines/flame-nocover.doctrine|30000
+fast|282842|doctrines/flame-nocover.doctrine|30000
