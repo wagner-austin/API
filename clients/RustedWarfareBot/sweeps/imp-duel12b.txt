@@ -1,0 +1,14 @@
+# imp-duel12b: the terrain screen -- the champion at Impossible off duel_lake at last.
+# Map effects worth chasing must dwarf the ~200-sample tree noise (law nine).
+duel12|12345|doctrines/flame-nocover.doctrine|10000
+duel12|1337|doctrines/flame-nocover.doctrine|10000
+duel12|141421|doctrines/flame-nocover.doctrine|10000
+duel12|16180|doctrines/flame-nocover.doctrine|10000
+duel12|173205|doctrines/flame-nocover.doctrine|10000
+duel12|223606|doctrines/flame-nocover.doctrine|10000
+duel12|244948|doctrines/flame-nocover.doctrine|10000
+duel12|24601|doctrines/flame-nocover.doctrine|10000
+duel12|264575|doctrines/flame-nocover.doctrine|10000
+duel12|2718|doctrines/flame-nocover.doctrine|10000
+duel12|271828|doctrines/flame-nocover.doctrine|10000
+duel12|282842|doctrines/flame-nocover.doctrine|10000

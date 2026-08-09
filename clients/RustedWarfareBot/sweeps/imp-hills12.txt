@@ -1,0 +1,14 @@
+# imp-hills12: the terrain screen -- the champion at Impossible off duel_lake at last.
+# Map effects worth chasing must dwarf the ~200-sample tree noise (law nine).
+hills|12345|doctrines/flame-nocover.doctrine|10000
+hills|1337|doctrines/flame-nocover.doctrine|10000
+hills|141421|doctrines/flame-nocover.doctrine|10000
+hills|16180|doctrines/flame-nocover.doctrine|10000
+hills|173205|doctrines/flame-nocover.doctrine|10000
+hills|223606|doctrines/flame-nocover.doctrine|10000
+hills|244948|doctrines/flame-nocover.doctrine|10000
+hills|24601|doctrines/flame-nocover.doctrine|10000
+hills|264575|doctrines/flame-nocover.doctrine|10000
+hills|2718|doctrines/flame-nocover.doctrine|10000
+hills|271828|doctrines/flame-nocover.doctrine|10000
+hills|282842|doctrines/flame-nocover.doctrine|10000
