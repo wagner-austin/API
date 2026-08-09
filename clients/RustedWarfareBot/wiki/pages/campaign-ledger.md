@@ -46,12 +46,12 @@ panel. Nothing on this list is a guess.
 
 ## Open questions (measurement running or queued)
 
-- **navblood96** — third calibration of the adaptive naval tilt (blood-gated). Trending net -3 at 18/48 pairs; if negative, the thread closes with the latch lesson rather than a fourth gate.
 - **imp-raid8x48** — replication of the rung's only positive arm at double scale. Clears ~+200 mean → `raid 8` becomes the Impossible reference configuration, the first certified adoption.
 
 ## Closed questions (measured, with the log entry that closed them)
 
 **Very Hard:**
+- The blood-gated tilt, and with it the whole tilt thread: three calibrations, three net -2s -- the trigger populations overlap, and a match-reshaping response cannot be gated by any present-tense signal (log 2026-08-08, navblood96).
 - Composition surgery, all channels: eight one-knob arms negative; production is a ratio simplex (log 2026-08-07, the arm ladder).
 - The unconditional naval tilt: net -2 at 24 and 48 seeds, trades wins for survivals (log 2026-08-08, navpair48).
 - The deficit-gated tilt: halves the damage, keeps the disease — army deficit is the normal shape of winning against a subsidized opponent (log 2026-08-08, navgate96).
@@ -73,6 +73,7 @@ panel. Nothing on this list is a guess.
 5. **Input without a gated response is perturbation** — richer intel fed to unconditional rules made the bot blinder, twice (2026-07-29 scouting v1; 2026-08-08 imp-scout24).
 6. **Conditional arms need paired panels at scale** — effects concentrate in seed subsets; 24 seeds measure re-roll noise (2026-08-07).
 7. **Erosion law** — verdicts track whether the economy was HELD; endpoints lie, peaks tell (2026-08-07, the xmap correction).
+8. **Blast radius matches trigger precision** — small reversible responses may gate on present signals; match-reshaping responses require prediction, which no present-tense scalar supplies (2026-08-08, the three-calibration arc).
 
 ## The instrument
 
