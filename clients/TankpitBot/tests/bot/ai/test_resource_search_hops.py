@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.resource_search import (
-    is_recently_attempted,
     make_resource_search_hop,
-    record_attempt_mark,
 )
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state
@@ -15,42 +13,6 @@ from tests.bot.ai._support import (
     make_scanned_ai_state,
     make_world,
 )
-
-
-class TestAttemptMarks:
-    """Tests for the failed-pickup attempt-tracking helpers."""
-
-    def test_is_recently_attempted_returns_true_within_ttl(self) -> None:
-        """A coordinate marked inside the TTL is reported as attempted."""
-        marks = {"100,100": 95000}
-
-        assert is_recently_attempted(marks, 100, 100, 100000, ttl_ms=10000) is True
-
-    def test_is_recently_attempted_returns_false_outside_ttl(self) -> None:
-        """A coordinate marked outside the TTL is reported as not attempted."""
-        marks = {"100,100": 80000}
-
-        assert is_recently_attempted(marks, 100, 100, 100000, ttl_ms=10000) is False
-
-    def test_is_recently_attempted_returns_false_for_unknown_coord(self) -> None:
-        """An unmarked coordinate is reported as not attempted."""
-        assert is_recently_attempted({}, 100, 100, 100000, ttl_ms=10000) is False
-
-    def test_record_attempt_mark_adds_new_coordinate(self) -> None:
-        """A fresh attempt is recorded with the dispatch timestamp."""
-        result = record_attempt_mark({}, 100, 100, 100000, ttl_ms=10000)
-
-        assert result == {"100,100": 100000}
-
-    def test_record_attempt_mark_prunes_expired_entries(self) -> None:
-        """Expired marks are dropped while the new mark is added."""
-        marks = {"50,50": 80000, "60,60": 95000}
-
-        result = record_attempt_mark(marks, 100, 100, 100000, ttl_ms=10000)
-
-        assert "50,50" not in result
-        assert result["60,60"] == 95000
-        assert result["100,100"] == 100000
 
 
 class TestHarvestMemoryVeto:

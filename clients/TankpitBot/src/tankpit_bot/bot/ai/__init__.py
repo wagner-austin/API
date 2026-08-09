@@ -14,12 +14,11 @@ from tankpit_bot.bot.ai.combat_landing import (
 )
 from tankpit_bot.bot.ai.equipment_search import (
     find_best_fuel,
-    find_nearest_deposit,
     find_nearest_equipment,
     find_nearest_fuel,
     is_reachable,
 )
-from tankpit_bot.bot.ai.pathfinding import find_path, path_length
+from tankpit_bot.bot.ai.pathfinding import find_path
 from tankpit_bot.bot.ai.scoring_types import (
     BEHAVIOR_MODES,
     BehaviorMode,
@@ -85,7 +84,6 @@ __all__ = [
     "encode_path_step",
     "find_best_fuel",
     "find_closest_threat",
-    "find_nearest_deposit",
     "find_nearest_equipment",
     "find_nearest_fuel",
     "find_path",
@@ -97,7 +95,6 @@ __all__ = [
     "make_initial_ai_state",
     "make_path_step",
     "manhattan_distance",
-    "path_length",
     "should_proactive_radar",
     "threats_in_range",
 ]

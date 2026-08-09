@@ -51,7 +51,7 @@ from tankpit_bot.state.scan_coverage import (
     is_viewport_scanned_within,
     is_viewport_untouched,
 )
-from tankpit_bot.state.types import coord_key, has_known_position
+from tankpit_bot.state.types import has_known_position
 
 _HUNT_BIAS_HALF_SCORE_TILES = 16
 """Distance at which the pre-hunt top-off bias halves a dot's score.
@@ -412,57 +412,6 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
     return best_dot
 
 
-def is_recently_attempted(
-    attempted: dict[str, int],
-    x: int,
-    y: int,
-    now_ms: int,
-    *,
-    ttl_ms: int,
-) -> bool:
-    """Return True when a coordinate carries a live attempt mark.
-
-    Args:
-        attempted: Attempt marks keyed by "x,y" with dispatch timestamps.
-        x: Target X coordinate.
-        y: Target Y coordinate.
-        now_ms: Current timestamp for TTL evaluation.
-        ttl_ms: Mark lifetime in milliseconds.
-
-    Returns:
-        True if the coordinate was attempted within the TTL.
-    """
-    attempted_ms = attempted.get(coord_key(x, y))
-    return attempted_ms is not None and now_ms - attempted_ms <= ttl_ms
-
-
-def record_attempt_mark(
-    attempted: dict[str, int],
-    x: int,
-    y: int,
-    now_ms: int,
-    *,
-    ttl_ms: int,
-) -> dict[str, int]:
-    """Return attempt marks with expired entries pruned and (x, y) recorded.
-
-    Args:
-        attempted: Attempt marks keyed by "x,y" with dispatch timestamps.
-        x: Target X coordinate to record.
-        y: Target Y coordinate to record.
-        now_ms: Dispatch timestamp recorded for the new mark.
-        ttl_ms: Mark lifetime in milliseconds used for pruning.
-
-    Returns:
-        New attempt-mark mapping.
-    """
-    pruned = {
-        key: marked_ms for key, marked_ms in attempted.items() if now_ms - marked_ms <= ttl_ms
-    }
-    pruned[coord_key(x, y)] = now_ms
-    return pruned
-
-
 def _open_map_for_dots(
     ctx: DecideCtx,
     *,
@@ -564,7 +513,5 @@ def make_resource_search_hop(
 
 
 __all__ = [
-    "is_recently_attempted",
     "make_resource_search_hop",
-    "record_attempt_mark",
 ]

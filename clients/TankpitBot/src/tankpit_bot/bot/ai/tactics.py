@@ -9,10 +9,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.types import AIConfigDict
 from tankpit_bot.state.types import (
     ContainerStateDict,
-    SelfStateDict,
-    TankStateDict,
     WorldStateDict,
-    has_known_position,
 )
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -46,29 +43,6 @@ def _is_visible_fuel_container(world: WorldStateDict, container: ContainerStateD
         container["is_fuel"]
         and container["volume"] > 0
         and _is_within_observable_viewport(world, container["x"], container["y"])
-    )
-
-
-def _is_visible_enemy_tank(
-    world: WorldStateDict,
-    self_state: SelfStateDict,
-    tank: TankStateDict,
-) -> bool:
-    """Return True when an enemy tank is currently visible in the viewport.
-
-    Args:
-        world: Current world state.
-        self_state: Player state for team filtering.
-        tank: Tank candidate.
-
-    Returns:
-        True if the tank is a live enemy inside the observable viewport.
-    """
-    return (
-        not tank["is_self"]
-        and tank["team"] != self_state["team"]
-        and has_known_position(tank)
-        and _is_within_observable_viewport(world, tank["x"], tank["y"])
     )
 
 
@@ -109,42 +83,6 @@ def should_proactive_radar(
     return fuel <= config["fuel_low_threshold"]
 
 
-def should_map_open_for_enemies(
-    world: WorldStateDict,
-    self_state: SelfStateDict,
-    last_map_open_ms: int,
-    now: int,
-    config: AIConfigDict,
-) -> bool:
-    """Check if the bot should open the map to discover enemy positions.
-
-    Map open (CMD_MAP_OPEN, 'f' key) reveals global enemy tank positions.
-    This is the only way to find enemies outside the visible viewport.
-
-    Triggers when no enemy tanks are visible in the world state (excluding
-    dead tanks at 0,0) and the map open cooldown has elapsed.
-
-    Args:
-        world: Current world state.
-        self_state: Player's own state for team filtering.
-        last_map_open_ms: Timestamp of last map open command.
-        now: Current timestamp in milliseconds.
-        config: AI configuration with cooldown settings.
-
-    Returns:
-        True if a map open should be performed.
-    """
-    # Respect cooldown
-    if now - last_map_open_ms < config["map_open_cooldown_ms"]:
-        return False
-
-    for tank in world["tanks"].values():
-        if _is_visible_enemy_tank(world, self_state, tank):
-            return False
-
-    return True
-
-
 def compute_desired_equipment(
     mode: str,
     fuel: int,
@@ -179,6 +117,5 @@ def compute_desired_equipment(
 
 __all__ = [
     "compute_desired_equipment",
-    "should_map_open_for_enemies",
     "should_proactive_radar",
 ]

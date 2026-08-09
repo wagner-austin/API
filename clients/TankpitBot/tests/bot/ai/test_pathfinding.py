@@ -6,7 +6,6 @@ from tankpit_bot.bot.ai.pathfinding import (
     find_path,
     find_path_segment_target,
     is_direct_path_clear,
-    path_length,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -163,28 +162,29 @@ class TestFindPath:
 
 
 # =============================================================================
-# path_length
+# find_path step counts
 # =============================================================================
 
 
-class TestPathLength:
-    """Tests for path_length."""
+class TestFindPathStepCounts:
+    """Tests for the number of steps find_path returns.
 
-    def test_empty_path(self) -> None:
-        """Empty path has length 0."""
-        assert path_length([]) == 0
+    These asserted through ``path_length``, a zero-production-caller alias
+    for ``len()`` deleted 2026-08-08. The assertions are about ``find_path``
+    and are kept; only the wrapper is gone.
+    """
 
-    def test_single_step(self) -> None:
-        """Single step path has length 1."""
+    def test_same_tile_path_is_one_step(self) -> None:
+        """A path to the tile you already stand on is just that tile."""
         terrain = InMemoryTerrainMap()
         path = find_path(terrain, 10, 10, 10, 10)
-        assert path_length(path) == 1
+        assert len(path) == 1
 
-    def test_multi_step(self) -> None:
-        """Multi-step path returns correct count."""
+    def test_straight_run_includes_both_endpoints(self) -> None:
+        """Five tiles east is six steps: the origin plus each move."""
         terrain = InMemoryTerrainMap()
         path = find_path(terrain, 0, 0, 5, 0)
-        assert path_length(path) == 6
+        assert len(path) == 6
 
 
 class TestDirectPathHelpers:

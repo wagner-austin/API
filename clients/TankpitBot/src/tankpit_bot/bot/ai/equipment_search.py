@@ -359,28 +359,6 @@ def find_adjacent_container(
     return None
 
 
-def find_nearest_deposit(
-    world: WorldStateDict,
-    self_state: SelfStateDict,
-    terrain: TerrainMapProtocol | None = None,
-) -> ContainerStateDict | None:
-    """Find the nearest walk-reachable fuel container for depositing surplus fuel.
-
-    Args:
-        world: Current world state with container positions.
-        self_state: Player's own state for position.
-        terrain: Optional terrain map for reachability checks.
-
-    Returns:
-        Nearest walk-reachable fuel ContainerStateDict for depositing, or None.
-    """
-    return find_nearest_fuel(
-        world,
-        self_state,
-        terrain,
-    )
-
-
 def describe_container_search(
     world: WorldStateDict,
     self_state: SelfStateDict,
@@ -570,7 +548,6 @@ __all__ = [
     "find_best_fuel",
     "find_equipment_candidates",
     "find_fuel_candidates",
-    "find_nearest_deposit",
     "find_nearest_equipment",
     "find_nearest_fuel",
     "find_teleport_landing_tile",

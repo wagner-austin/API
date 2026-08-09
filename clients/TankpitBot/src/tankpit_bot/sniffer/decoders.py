@@ -6,8 +6,6 @@ into human-readable strings for logging and analysis.
 
 from __future__ import annotations
 
-import base64
-
 from platform_core.logging import get_logger
 
 from tankpit_bot import protocol
@@ -72,97 +70,6 @@ def _log_protocol_line(message: str) -> None:
     """
     if _PROTOCOL_FRAME_LOGGING_ENABLED:
         log.info(message)
-
-
-def try_decode_received_text(ws: WorldService, payload: str) -> str | None:
-    """Try to decode a received text message payload.
-
-    Pure function that returns decoded string or None. Does not log.
-
-    Args:
-        ws: The session's world service; room beliefs land here.
-        payload: Base64-encoded message payload.
-
-    Returns:
-        Decoded message string, or None if not a valid text message.
-    """
-    # Validate base64 - must be valid characters and proper length
-    if not payload or len(payload) % 4 != 0:
-        return None
-    valid_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
-    if not all(c in valid_chars for c in payload):
-        return None
-
-    data = base64.b64decode(payload)
-    if len(data) < 2:
-        return None
-
-    body = data[2:]
-    if len(body) == 0:
-        return None
-
-    # Only process text message types
-    if body[0] not in TEXT_MESSAGE_TYPES:
-        return None
-
-    text = body.decode("utf-8", errors="replace")
-    return decode_text_message(ws, text, len(body), "RECEIVED", body)
-
-
-def decode_received_text_message(ws: WorldService, payload: str) -> None:
-    """Decode and log received text messages (JOIN_CONFIRM, ROOM_LIST, etc.).
-
-    Args:
-        payload: Base64-encoded message payload.
-    """
-    result = try_decode_received_text(ws, payload)
-    if result is not None:
-        _log_protocol_line(result)
-
-
-def try_decode_received(ws: WorldService, payload: str, xor_table: bytes) -> str | None:
-    """Try to decode a received message and return formatted result.
-
-    Pure function that returns the decoded message string or None. Does not log.
-
-    Args:
-        ws: The SESSION's world service; the binary route dispatches
-            into it ([[session-state-deglobalisation]] step 8).
-        payload: Base64-encoded message payload.
-        xor_table: The SESSION's XOR table. Passed in rather than read
-            from a module global so two sessions cannot decode each
-            other's frames ([[session-state-deglobalisation]]).
-
-    Returns:
-        Decoded message string, or None if payload is invalid/empty.
-    """
-    data = decode_base64_safe(payload)
-    if data is None or len(data) < 3:
-        return None
-
-    # body is guaranteed non-empty since len(data) >= 3 means len(body) >= 1
-    body = data[2:]
-    msg_type = body[0]
-
-    # Plaintext toggle acks (un-XORed two-byte echoes) — discriminated
-    # before the XOR route because their letters are overloaded with
-    # binary frames.
-    ack = try_decode_plaintext_ack(body)
-    if ack is not None:
-        return "[RECEIVED] " + format_decoded_message(msg_type, ack)
-
-    # Text messages (not XOR encoded)
-    if _is_text_route(msg_type, body):
-        text = body.decode("utf-8", errors="replace")
-        return decode_text_message(ws, text, len(body), "RECEIVED", body)
-
-    # Binary messages - XOR decode and use protocol module
-    decoded_data = xor_decode_body(body, xor_table, offset=1)
-    if len(decoded_data) == 0:
-        return f"[RECEIVED] EMPTY: type=0x{msg_type:02X}"
-
-    # All messages go through protocol.decode_message (handles 0x2E routing internally)
-    return "[RECEIVED] " + try_decode_binary(ws, msg_type, decoded_data, body)
 
 
 def process_received_message(ws: WorldService, payload: str, xor_table: bytes) -> None:
@@ -510,11 +417,8 @@ __all__ = [
     "decode_join_confirm",
     "decode_message",
     "decode_plus_message",
-    "decode_received_text_message",
     "decode_state_message",
     "decode_text_message",
     "process_received_message",
     "try_decode_binary",
-    "try_decode_received",
-    "try_decode_received_text",
 ]

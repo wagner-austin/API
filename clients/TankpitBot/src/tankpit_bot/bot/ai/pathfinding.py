@@ -418,18 +418,6 @@ def _reconstruct_path(
     return path
 
 
-def path_length(path: list[PathStepDict]) -> int:
-    """Get the number of steps in a path.
-
-    Args:
-        path: Path from find_path.
-
-    Returns:
-        Number of steps (0 if empty).
-    """
-    return len(path)
-
-
 def _bresenham_line(
     start_x: int,
     start_y: int,
@@ -474,5 +462,4 @@ __all__ = [
     "find_path_segment_target",
     "is_direct_path_clear",
     "path_exists",
-    "path_length",
 ]

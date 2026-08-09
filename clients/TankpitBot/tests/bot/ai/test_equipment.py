@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.equipment_search import (
     find_adjacent_container,
-    find_nearest_deposit,
     find_nearest_equipment,
     find_teleport_landing_tile,
     is_reachable,
@@ -211,30 +210,6 @@ class TestFindNearestEquipment:
         )
         world["timestamp_ms"] = 100000
         assert find_nearest_equipment(world, state) == old
-
-
-class TestFindNearestDeposit:
-    """Tests for find_nearest_deposit."""
-
-    def test_no_containers(self) -> None:
-        """Returns None when no containers exist."""
-        world, state = _world_and_self()
-        assert find_nearest_deposit(world, state) is None
-
-    def test_finds_fuel_container(self) -> None:
-        """Returns nearest fuel container for depositing."""
-        world, state = _world_and_self()
-        expected = make_container_state(x=105, y=100, is_fuel=True, volume=50)
-        world["containers"]["105,100"] = expected
-        assert find_nearest_deposit(world, state) == expected
-
-    def test_with_terrain(self) -> None:
-        """Deposit search respects terrain reachability."""
-        world, state = _world_and_self(x=10, y=10)
-        terrain = InMemoryTerrainMap()
-        expected = make_container_state(x=15, y=10, is_fuel=True, volume=50)
-        world["containers"]["15,10"] = expected
-        assert find_nearest_deposit(world, state, terrain) == expected
 
 
 def test_find_adjacent_container_skips_diagonal_with_blocked_cardinals() -> None:

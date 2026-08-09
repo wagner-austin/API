@@ -64,7 +64,13 @@ _FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_s
 
 
 class _EnemyTeleportModuleProtocol(Protocol):
-    analyze_threats: Callable[[WorldStateDict, SelfStateDict], list[EnemyThreatDict]]
+    # No `analyze_threats` member: nothing reads or patches it through this
+    # module handle, and the declaration that used to sit here claimed two
+    # positional parameters against a real signature of four plus two
+    # keyword-only. A `Callable[...]` cannot express keyword-only
+    # parameters, so mypy accepted the fiction
+    # ([[session-state-deglobalisation]] step 10 found the same weakness
+    # hiding a genuinely drifted stub in the tracking harness).
     choose_combat_landing_tile: Callable[
         [
             WorldStateDict,
