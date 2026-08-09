@@ -446,6 +446,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         raid=doctrine["raid"],
         rush=doctrine["rush"],
         creep=doctrine["creep"],
+        hold=doctrine["hold"],
         riposte=doctrine["riposte"],
         tech=doctrine["tech"],
         lurk=doctrine["lurk"],

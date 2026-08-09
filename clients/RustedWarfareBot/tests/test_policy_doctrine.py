@@ -42,6 +42,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         raid=0,
         rush=False,
         creep=0,
+        hold=0,
         riposte=False,
         navtilt=0,
         tech=0,
@@ -329,3 +330,15 @@ def test_navtilt_accepts_its_three_modes_and_rejects_the_rest() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-025"
+
+
+def test_hold_is_a_percent_and_rejects_the_rest() -> None:
+    """The choke-holding verb's range: 0-100 of the anchor-to-mirror line
+    (log 2026-08-09, the terrain screen)."""
+    payload = dict(encode_doctrine(_doctrine()))
+    payload["hold"] = 100
+    assert decode_doctrine(payload)["hold"] == 100
+    payload["hold"] = 101
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-026"

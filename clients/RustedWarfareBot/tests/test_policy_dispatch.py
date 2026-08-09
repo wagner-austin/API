@@ -16,7 +16,7 @@ from rw_bot.policy.combat import FIRST_WAVE, Engagement
 from rw_bot.policy.dispatch import WaveController, dispatch_attacks, gather_reserve
 from rw_bot.wire.command import AttackOrder
 from rw_bot.wire.state import Entity, Sample
-from tests.wire_fixtures import entity, profile, sample
+from tests.wire_fixtures import entity, pool, profile, sample
 
 
 def _unit(type_name: str, *, speed: float = 1.0, armed: bool = True) -> UnitStats:
@@ -316,3 +316,28 @@ def test_the_allin_releases_everything_from_its_observation_onward() -> None:
     for _ in range(4):
         patient.command(quiet, _CATALOGUE, _PROFILES, army)
     assert patient.released() == frozenset()
+
+
+def test_a_held_reserve_gathers_at_the_line_point_not_the_anchor() -> None:
+    """The choke-holding verb: hold 50 posts the reserve at the midpoint of
+    the anchor-to-mirror line -- the funnel's mouth on a symmetric map --
+    instead of the base the terrain screen watched armies die defending
+    from (log 2026-08-09). The mirror is the anchor reflected through the
+    pool centroid, so with the anchor at the origin and one pool at
+    (400, 0) the mirror is (800, 0) and the midpoint (400, 0)."""
+    anchor = entity(1, "commandCenter", x=0.0, y=0.0)
+    world = sample(anchor, _tank(10), pools=(pool(x=400.0, y=0.0),))
+    rallying: set[int] = set()
+    moves = gather_reserve(world, _CATALOGUE, (_tank(10),), rallying, hold=50)
+    assert [(m["x"], m["y"]) for m in moves] == [(400.0, 0.0)]
+
+
+def test_hold_outranks_forward_and_a_poolless_map_falls_back_to_the_anchor() -> None:
+    """One field says where the army stands: hold wins over forward, and a
+    map with no pools has no mirror -- the reserve keeps the anchor rather
+    than inventing a point."""
+    anchor = entity(1, "commandCenter", x=0.0, y=0.0)
+    world = sample(anchor, _tank(10))
+    rallying: set[int] = set()
+    moves = gather_reserve(world, _CATALOGUE, (_tank(10),), rallying, forward=True, hold=50)
+    assert [(m["x"], m["y"]) for m in moves] == [(0.0, 0.0)]

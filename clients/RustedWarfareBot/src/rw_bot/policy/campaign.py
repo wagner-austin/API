@@ -105,6 +105,7 @@ def play(
     raid: int = 0,
     rush: bool = False,
     creep: int = 0,
+    hold: int = 0,
     riposte: bool = False,
     tech: int = 0,
     lurk: int = 0,
@@ -173,6 +174,8 @@ def play(
         rush: March released waves at the estimated enemy start.
         raid: The raid party's size, or zero for no raiding.
         creep: Walk turrets toward the enemy start, one covered step each.
+        hold: Percent of the anchor-to-mirror line the reserve stands at,
+            zero for the anchor -- the choke-holding verb (log 2026-08-09).
         riposte: Release the whole reserve the moment an intrusion ends.
         tech: Factories to unlock a tier on, zero for none. See Doctrine.
         lurk: Scouts kept alive at the enemy start, zero for none. See Doctrine.
@@ -238,6 +241,7 @@ def play(
         intercept=intercept,
         guard_cap=guard_cap,
         forward=forward,
+        hold=hold,
         riposte=riposte,
         allin_at=allin,
     )

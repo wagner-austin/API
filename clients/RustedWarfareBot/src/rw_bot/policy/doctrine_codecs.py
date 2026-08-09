@@ -46,6 +46,7 @@ _BAD_CLOSE_RATIO = "RW-DOCTRINE-022"
 _BAD_GUN_COUNT = "RW-DOCTRINE-023"
 _BAD_NUKE_COUNT = "RW-DOCTRINE-024"
 _BAD_NAVTILT = "RW-DOCTRINE-025"
+_BAD_HOLD = "RW-DOCTRINE-026"
 
 
 def _count(
@@ -139,6 +140,12 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             _BAD_NAVTILT,
             f"field 'navtilt' is 0 off, 1 always, or 2 only-when-behind, got {navtilt}",
         )
+    hold = require_int(payload, "hold")
+    if hold < 0 or hold > 100:
+        raise DoctrineError(
+            _BAD_HOLD,
+            f"field 'hold' is 0-100, the percent of the way to stand at, got {hold}",
+        )
     creep = require_int(payload, "creep")
     if creep < 0 or creep > 100:
         raise DoctrineError(
@@ -163,6 +170,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         raid=raid,
         rush=require_bool(payload, "rush"),
         creep=creep,
+        hold=hold,
         riposte=require_bool(payload, "riposte"),
         navtilt=navtilt,
         tech=tech,
@@ -211,6 +219,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "raid": doctrine["raid"],
         "rush": doctrine["rush"],
         "creep": doctrine["creep"],
+        "hold": doctrine["hold"],
         "riposte": doctrine["riposte"],
         "navtilt": doctrine["navtilt"],
         "tech": doctrine["tech"],

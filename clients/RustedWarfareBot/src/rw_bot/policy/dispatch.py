@@ -27,13 +27,19 @@ from rw_bot.policy.combat import (
     wave_size,
 )
 from rw_bot.policy.guard import deepest_intruder
+from rw_bot.policy.rush import mirror_point
 from rw_bot.policy.siting import find_anchor
 from rw_bot.wire.command import AttackOrder, MoveOrder, attack_order, move_order
 from rw_bot.wire.state import Entity, Sample
 
 
-def rally_post(sample: Sample, catalogue: Mapping[str, UnitStats], forward: bool) -> Entity | None:
-    """Return the structure the reserve gathers at.
+def rally_post(
+    sample: Sample,
+    catalogue: Mapping[str, UnitStats],
+    forward: bool,
+    hold: int = 0,
+) -> tuple[float, float] | None:
+    """Return the point the reserve gathers at.
 
     The anchor by default -- the behaviour every measurement so far was taken
     under. Forward, it is the owned extractor **farthest from the anchor**:
@@ -51,17 +57,41 @@ def rally_post(sample: Sample, catalogue: Mapping[str, UnitStats], forward: bool
     trusts. Farthest, with the id as tie-break, so two runs of one seed post
     the reserve identically.
 
+    Held, it is the point at ``hold`` percent of the anchor-to-mirror line
+    -- the choke-holding verb the terrain screen argued for: Fire Bridge
+    read 514 samples WORSE than open ground with the army gathered at home
+    while their waves crossed the funnel freely, and its death shape
+    (structures outliving the army) said the base was never the place the
+    fight was lost ([[policy-holding-ground]]; log 2026-08-09, the terrain
+    screen). The geometry is creep's own hold-point line, pure mirror
+    arithmetic, no fog consulted.
+
     Args:
         sample: One observation of the world.
         catalogue: Unit stats by type name, for the anchor.
         forward: Whether the reserve posts at the frontier.
+        hold: Percent of the anchor-to-mirror line to stand at, zero for
+            the anchor (or the frontier when ``forward``). Takes precedence
+            over ``forward`` -- a doctrine says where the army stands with
+            one field, not two composed ones.
 
     Returns:
-        The structure to gather at, or None when nothing immobile stands.
+        The point to gather at, or None when nothing immobile stands.
     """
     anchor = find_anchor(sample, catalogue)
-    if anchor is None or not forward:
-        return anchor
+    if anchor is None:
+        return None
+    if hold:
+        goal = mirror_point(sample, catalogue)
+        if goal is None:
+            return (anchor["x"], anchor["y"])
+        share = hold / 100.0
+        return (
+            anchor["x"] + (goal[0] - anchor["x"]) * share,
+            anchor["y"] + (goal[1] - anchor["y"]) * share,
+        )
+    if not forward:
+        return (anchor["x"], anchor["y"])
 
     def frontier(entity: Entity) -> tuple[float, int]:
         dx = entity["x"] - anchor["x"]
@@ -76,8 +106,9 @@ def rally_post(sample: Sample, catalogue: Mapping[str, UnitStats], forward: bool
         if entity["mine"] and entity["complete"] and satisfies(entity["type_name"], "extractorT1")
     ]
     if not extractors:
-        return anchor
-    return max(extractors, key=frontier)
+        return (anchor["x"], anchor["y"])
+    front = max(extractors, key=frontier)
+    return (front["x"], front["y"])
 
 
 def gather_reserve(
@@ -86,6 +117,7 @@ def gather_reserve(
     reserve: Sequence[Entity],
     rallying: set[int],
     forward: bool = False,
+    hold: int = 0,
 ) -> tuple[MoveOrder, ...]:
     """Send the units still gathering to the rally post, once each.
 
@@ -110,17 +142,19 @@ def gather_reserve(
             Extended in place.
         forward: Whether the reserve posts at the frontier extractor instead
             of the base (:func:`rally_post`).
+        hold: Percent of the anchor-to-mirror line to stand at, zero for
+            off (:func:`rally_post`).
 
     Returns:
         The move orders to send, in roster order.
     """
-    post = rally_post(sample, catalogue, forward)
+    post = rally_post(sample, catalogue, forward, hold)
     if post is None:
         # Nothing immobile left to gather at. A player who has lost every
         # structure has worse problems than formation.
         return ()
     orders: list[MoveOrder] = []
-    for move in rally(reserve, (post["x"], post["y"])):
+    for move in rally(reserve, post):
         if move["unit_id"] in rallying:
             continue
         rallying.add(move["unit_id"])
@@ -184,6 +218,7 @@ class WaveController:
         intercept: bool = False,
         guard_cap: int = 0,
         forward: bool = False,
+        hold: int = 0,
         riposte: bool = False,
         allin_at: int = 0,
     ) -> None:
@@ -205,6 +240,9 @@ class WaveController:
             forward: Whether the reserve posts at the frontier extractor
                 instead of the base (:func:`rally_post`). False is the
                 behaviour every measurement so far was taken under.
+            hold: Percent of the anchor-to-mirror line the reserve stands
+                at, zero for off -- the choke-holding verb
+                (:func:`rally_post`; log 2026-08-09, the terrain screen).
             riposte: Whether the whole reserve releases the moment an
                 intrusion ends -- the counter-punch a human plays: let the
                 attack burn itself on the defences, then push into the
@@ -225,6 +263,7 @@ class WaveController:
         self._intercept = intercept
         self._guard_cap = guard_cap
         self._forward = forward
+        self._hold = hold
         self._riposte = riposte
         self._allin_at = allin_at
         # Observations seen, counted here rather than passed in: the trigger
@@ -340,7 +379,9 @@ class WaveController:
         self._rallying -= self._released
 
         reserve = tuple(unit for unit in army if unit["unit_id"] not in self._released)
-        moves = gather_reserve(sample, catalogue, reserve, self._rallying, self._forward)
+        moves = gather_reserve(
+            sample, catalogue, reserve, self._rallying, self._forward, self._hold
+        )
         self.rallied += len(moves)
 
         guard_attacks = self._guard(sample, catalogue, profiles, reserve)

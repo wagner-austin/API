@@ -363,6 +363,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     raid=0,
                     rush=False,
                     creep=0,
+                    hold=0,
                     riposte=False,
                     navtilt=0,
                     tech=0,

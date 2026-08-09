@@ -62,6 +62,7 @@ INT_FIELDS: Final = (
     "lurk",
     "allin",
     "creep",
+    "hold",
     "decoys",
     "hp_floor",
     "strike",
@@ -148,6 +149,12 @@ class Doctrine(TypedDict):
             case. The cost case that makes it a question: one match logged
             870 intercepts and never massed an attack
             ([[policy-holding-ground]]).
+        hold: Percent of the anchor-to-mirror line the reserve gathers at,
+            zero for the anchor. The choke-holding verb the terrain screen
+            argued for: Fire Bridge read 514 samples worse than open ground
+            with the army at home while their waves crossed the funnel
+            freely -- a choke pays the defender who STANDS at it, and until
+            this field nothing could (log 2026-08-09).
         forward: Whether the reserve posts at the frontier extractor
             instead of the base. The one invariant six batches have not
             moved is that matches are decided by extractor drops far from
@@ -335,6 +342,7 @@ class Doctrine(TypedDict):
     raid: int
     rush: bool
     creep: int
+    hold: int
     riposte: bool
     navtilt: int
     tech: int
@@ -386,6 +394,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     raid=0,
     rush=False,
     creep=0,
+    hold=0,
     riposte=False,
     navtilt=NAVTILT_OFF,
     tech=0,
