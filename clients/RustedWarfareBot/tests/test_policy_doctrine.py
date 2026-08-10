@@ -320,13 +320,14 @@ def test_an_hp_floor_outside_the_percent_range_is_refused() -> None:
     assert caught.value.code == "RW-DOCTRINE-017"
 
 
-def test_navtilt_accepts_its_three_modes_and_rejects_the_rest() -> None:
-    """0 off, 1 always, 2 only-when-behind -- the adaptive mode navpair48
-    designed (log 2026-08-08). Anything else is a typo, loudly."""
+def test_navtilt_accepts_its_four_modes_and_rejects_the_rest() -> None:
+    """0 off, 1 always, 2 bloodied, 3 predicted -- the tilt's whole
+    calibration history as a range (logs 2026-08-08/09). Anything else is
+    a typo, loudly."""
     payload = dict(encode_doctrine(_doctrine()))
-    payload["navtilt"] = 2
-    assert decode_doctrine(payload)["navtilt"] == 2
     payload["navtilt"] = 3
+    assert decode_doctrine(payload)["navtilt"] == 3
+    payload["navtilt"] = 4
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-025"

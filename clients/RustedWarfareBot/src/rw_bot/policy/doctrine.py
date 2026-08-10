@@ -51,6 +51,13 @@ NAVTILT_ALWAYS: Final = 1
 #: itself, not a proxy for it (log 2026-08-08).
 NAVTILT_BLOODIED: Final = 2
 
+#: The naval clause runs only while the doom model predicts the fleet will
+#: doom this game -- the driver law eight demanded: the response reshapes
+#: the match, so its trigger must predict, not react. The model replicated
+#: cross-tree at AUC 0.75 with precision ~0.7 (log 2026-08-09); whether
+#: that is enough is the mode-3 panel's question.
+NAVTILT_PREDICTED: Final = 3
+
 #: Fields carried as whole numbers in a doctrine file.
 INT_FIELDS: Final = (
     "max_workers",
@@ -186,7 +193,8 @@ class Doctrine(TypedDict):
             repeating the mix's fleet-outranging types.
             :data:`NAVTILT_OFF` never, :data:`NAVTILT_ALWAYS` whenever a
             fleet is seen, :data:`NAVTILT_BLOODIED` only after the fleet
-            has killed units of ours. Two panels calibrated the third
+            has killed units of ours, :data:`NAVTILT_PREDICTED` only while
+            the doom model reads the early game as fleet-doomed. Two panels calibrated the third
             mode: ungated, the tilt re-rolled winning seeds (navpair48,
             net -2); gated on an army deficit it fired less but still
             inside winning games, because a subsidized opponent's army is
@@ -423,6 +431,7 @@ __all__ = [
     "NAVTILT_ALWAYS",
     "NAVTILT_BLOODIED",
     "NAVTILT_OFF",
+    "NAVTILT_PREDICTED",
     "NO_HEAVIES",
     "STR_FIELDS",
     "Doctrine",

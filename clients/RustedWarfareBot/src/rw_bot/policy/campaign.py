@@ -56,7 +56,8 @@ from rw_bot.policy.dispatching import (
     send_recon,
     send_tech,
 )
-from rw_bot.policy.doctrine import NAVTILT_OFF
+from rw_bot.policy.doctrine import NAVTILT_OFF, NAVTILT_PREDICTED
+from rw_bot.policy.doom import DoomLatch, DoomModel
 from rw_bot.policy.expander import Expander
 from rw_bot.policy.intel import Intel
 from rw_bot.policy.ledger import Outlays
@@ -69,6 +70,7 @@ from rw_bot.policy.raid import Raider
 from rw_bot.policy.recorder import Recorder
 from rw_bot.policy.runner import AFFORD_STALL_SAMPLES, DEFAULT_STALL_SAMPLES, OrderTracker
 from rw_bot.policy.rush import Rusher
+from rw_bot.policy.scoreboard import local_player, rival_income
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.policy.scouting import SCOUT_TYPE, ScoutRunner
 from rw_bot.policy.situation import Closer, Momentum
@@ -96,6 +98,7 @@ def play(
     max_workers: int = DEFAULT_MAX_WORKERS,
     counter: bool = False,
     navtilt: int = NAVTILT_OFF,
+    doom: DoomModel | None = None,
     cover: bool = True,
     intercept: bool = False,
     guard_cap: int = 0,
@@ -236,6 +239,10 @@ def play(
     # consumed by recorder.step, so each row carries what was decided in
     # the window it closes (log 2026-08-09).
     pending_events: set[str] = set()
+    # The doom latch: fed the recorder's own figures, scored once at the
+    # model's window, holding its answer for the match (law eight: one
+    # decision for a match-reshaping response). None when mode 3 is off.
+    doom_latch = DoomLatch(doom) if doom is not None and navtilt == NAVTILT_PREDICTED else None
     waves = WaveController(
         ladder,
         intercept=intercept,
@@ -364,9 +371,10 @@ def play(
                 # read bloodied -- the two-panel calibration's whole point.
                 fleet_seen.update(fleet_types(threats))
                 bloodied = scores.deaths_to(fleet_seen) >= FLEET_BLOOD
+                predicted = doom_latch is not None and doom_latch.armed
                 untilted = composition_now
                 composition_now = counter_composition(
-                    composition_now, threats, profiles, navtilt, bloodied
+                    composition_now, threats, profiles, navtilt, bloodied, predicted
                 )
                 if composition_now != untilted:
                     pending_events.add("T")
@@ -447,6 +455,33 @@ def play(
             # already remembered (log 2026-08-09).
             fleet_seen.update(fleet_types(tuple(targets)))
             navy_seen, air_seen = layer_counts(tuple(targets))
+            navy_blood = scores.deaths_to(fleet_seen)
+            if doom_latch is not None:
+                pilot = local_player(sample)
+                # The trace's numeric columns, in doom.COLUMNS order: what
+                # the model was fitted on is what the latch is fed, by the
+                # same figures the recorder writes.
+                doom_latch.feed(
+                    (
+                        scores.army_end,
+                        sample["credits"],
+                        scores.targets_end,
+                        scores.extractors_end,
+                        scores.losses_now,
+                        len(capable),
+                        queues_open,
+                        ordered_now,
+                        refused_now,
+                        scores.worth_end,
+                        scores.rival_worth_end,
+                        0 if pilot is None else pilot["income"],
+                        rival_income(sample),
+                        workforce.size(sample),
+                        navy_seen,
+                        air_seen,
+                        navy_blood,
+                    )
+                )
             recorder.step(
                 sample,
                 scores.army_end,
@@ -462,7 +497,7 @@ def play(
                 workforce.size(sample),
                 navy_seen,
                 air_seen,
-                scores.deaths_to(fleet_seen),
+                navy_blood,
                 "".join(sorted(pending_events)) or "-",
             )
             pending_events.clear()

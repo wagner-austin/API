@@ -23,10 +23,12 @@ from rw_bot.policy.combat import ladder_to
 from rw_bot.policy.doctrine import (
     DEFAULT_DOCTRINE,
     DERIVE_RESERVE,
+    NAVTILT_PREDICTED,
     Doctrine,
     DoctrineError,
 )
 from rw_bot.policy.doctrine_file import parse_doctrine_lines
+from rw_bot.policy.doom import DoomModel, decode_doom_model
 from rw_bot.policy.expand import expand
 from rw_bot.policy.match_report import format_report
 
@@ -300,6 +302,22 @@ def load_doctrine(path: Path) -> Doctrine:
     return parse_doctrine_lines(path.read_text(encoding="utf-8", errors="strict").splitlines())
 
 
+def load_doom_model(path: Path) -> DoomModel:
+    """Read the fitted doom model the predicted mode scores with.
+
+    Args:
+        path: The model file, e.g. ``models/fleetdoom.ndjson``.
+
+    Returns:
+        The validated model.
+
+    Raises:
+        DoomError: ``RW-DOOM-001`` when the file is malformed.
+        OSError: When the file cannot be read.
+    """
+    return decode_doom_model(path.read_text(encoding="utf-8", errors="strict").splitlines())
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Connect, play the doctrine, and report.
 
@@ -424,6 +442,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         *reinforcements(goals, catalogue),
         *heavy_reinforcements(doctrine["heavies"], catalogue),
     )
+    # The doom model rides its own file, loaded only when the doctrine asks
+    # for the predicted mode: a knob that is off must cost nothing, not
+    # even a read ([[policy-doctrine]]; log 2026-08-09).
+    doom: DoomModel | None = None
+    if doctrine["navtilt"] == NAVTILT_PREDICTED:
+        doom = load_doom_model(Path("models/fleetdoom.ndjson"))
     report = play(
         channel,
         plan,
@@ -437,6 +461,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_workers=doctrine["max_workers"],
         counter=doctrine["counter"],
         navtilt=doctrine["navtilt"],
+        doom=doom,
         cover=doctrine["cover"],
         intercept=doctrine["intercept"],
         guard_cap=doctrine["guard_cap"],

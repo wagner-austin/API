@@ -108,6 +108,10 @@ class Scorekeeper:
         self._previous_owned: Mapping[int, Entity] = {}
         self._unit_deaths: dict[str, int] = {}
         self._building_deaths: dict[str, int] = {}
+        #: Losses inferred on the last observation -- the doom watch's
+        #: ``lost`` column, matching the trace's by construction: both run
+        #: the same roster diff at the same cadence ([[policy-trace]]).
+        self.losses_now = 0
 
     def observe(
         self,
@@ -141,7 +145,9 @@ class Scorekeeper:
         self._engageable_end = len(engageable(self._profiles, army, targets))
         self.visible_now = {entity["unit_id"] for entity in targets}
         current_owned = owned_by_id(sample)
-        for loss in losses_between(self._previous_owned, current_owned, sample["frame"]):
+        ticked = losses_between(self._previous_owned, current_owned, sample["frame"])
+        self.losses_now = len(ticked)
+        for loss in ticked:
             if not loss["killer"]:
                 continue
             stats = self._catalogue.get(loss["type_name"])

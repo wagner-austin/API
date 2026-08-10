@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.policy.counter import counter_composition, fleet_types
-from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BLOODIED
+from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BLOODIED, NAVTILT_PREDICTED
 from rw_bot.wire.state import Entity
 from tests.wire_fixtures import entity, profile
 
@@ -34,12 +34,12 @@ def _ground(unit_id: int) -> Entity:
 def test_nothing_visible_leaves_the_mix_alone() -> None:
     """Fog is not evidence, in either direction."""
     mix = ("c_tank", "c_tank", "c_aa")
-    assert counter_composition(mix, (), _PROFILES, 0, False) == mix
+    assert counter_composition(mix, (), _PROFILES, 0, False, False) == mix
 
 
 def test_a_ground_threat_leaves_the_mix_alone() -> None:
     mix = ("c_tank", "c_tank", "c_aa")
-    assert counter_composition(mix, (_ground(1), _ground(2)), _PROFILES, 0, False) == mix
+    assert counter_composition(mix, (_ground(1), _ground(2)), _PROFILES, 0, False, False) == mix
 
 
 def test_a_mix_without_anti_air_is_not_given_any() -> None:
@@ -49,7 +49,7 @@ def test_a_mix_without_anti_air_is_not_given_any() -> None:
     count ([[mechanics-combat-profile]]).
     """
     mix = ("c_tank", "c_tank")
-    assert counter_composition(mix, (_heli(1),), _PROFILES, 0, False) == mix
+    assert counter_composition(mix, (_heli(1),), _PROFILES, 0, False, False) == mix
 
 
 def test_anti_air_is_repeated_until_its_share_covers_the_air_share() -> None:
@@ -60,6 +60,7 @@ def test_anti_air_is_repeated_until_its_share_covers_the_air_share() -> None:
         _PROFILES,
         0,
         False,
+        False,
     )
     airworthy = sum(1 for name in tilted if _PROFILES[name]["hits_air"])
     assert tilted[:4] == ("c_tank", "c_tank", "c_tank", "c_aa")
@@ -68,7 +69,7 @@ def test_anti_air_is_repeated_until_its_share_covers_the_air_share() -> None:
 
 def test_a_mix_already_covering_the_share_is_left_alone() -> None:
     mix = ("c_aa", "c_aa", "c_tank")
-    assert counter_composition(mix, (_heli(1), _ground(2)), _PROFILES, 0, False) == mix
+    assert counter_composition(mix, (_heli(1), _ground(2)), _PROFILES, 0, False, False) == mix
 
 
 def test_an_all_air_threat_drops_the_armed_ground_only_types() -> None:
@@ -82,6 +83,7 @@ def test_an_all_air_threat_drops_the_armed_ground_only_types() -> None:
         _PROFILES,
         0,
         False,
+        False,
     )
     assert tilted == ("builder", "c_aa")
 
@@ -93,6 +95,7 @@ def test_two_anti_air_types_are_repeated_in_their_stated_ratio() -> None:
         (_heli(1), _heli(2), _heli(3), _ground(4)),
         _PROFILES,
         0,
+        False,
         False,
     )
     added = tilted[6:]
@@ -124,6 +127,7 @@ def test_a_fleet_repeats_the_type_that_outranges_it() -> None:
         _NAVAL_PROFILES,
         1,
         False,
+        False,
     )
     assert tilted[:4] == ("c_tank", "c_tank", "c_tank", "c_artillery")
     outgunning = sum(1 for name in tilted if name == "c_artillery")
@@ -133,7 +137,8 @@ def test_a_fleet_repeats_the_type_that_outranges_it() -> None:
 def test_a_mix_nothing_in_which_outranges_the_fleet_is_left_alone() -> None:
     """Which unit outranges a fleet is the doctrine's question, not this one's."""
     mix = ("c_tank", "c_tank", "c_aa")
-    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES, 1, False) == mix
+    seen = (_ship(1), _ground(2))
+    assert counter_composition(mix, seen, _NAVAL_PROFILES, 1, False, False) == mix
 
 
 def test_an_all_naval_picture_drops_the_outgunned() -> None:
@@ -147,13 +152,14 @@ def test_an_all_naval_picture_drops_the_outgunned() -> None:
         _NAVAL_PROFILES,
         1,
         False,
+        False,
     )
     assert tilted == ("builder", "c_artillery")
 
 
 def test_a_mix_already_outgunning_the_naval_share_is_left_alone() -> None:
     mix = ("c_artillery", "c_artillery", "c_tank")
-    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES, 1, False) == mix
+    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES, 1, False, False) == mix
 
 
 def test_the_air_and_naval_tilts_compose_on_one_picture() -> None:
@@ -164,6 +170,7 @@ def test_the_air_and_naval_tilts_compose_on_one_picture() -> None:
         _NAVAL_PROFILES,
         1,
         False,
+        False,
     )
     assert tilted[:4] == ("c_tank", "c_tank", "c_aa", "c_artillery")
     assert sum(1 for name in tilted if name == "c_aa") >= 1
@@ -173,13 +180,14 @@ def test_the_air_and_naval_tilts_compose_on_one_picture() -> None:
 def test_the_naval_clause_stays_silent_when_the_doctrine_says_off() -> None:
     """The control arm's whole meaning: same code, same fleet, no tilt."""
     mix = ("c_tank", "c_tank", "c_artillery")
-    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES, 0, False) == mix
+    assert counter_composition(mix, (_ship(1), _ground(2)), _NAVAL_PROFILES, 0, False, False) == mix
 
 
 def test_an_armed_naval_clause_with_no_fleet_in_sight_changes_nothing() -> None:
     """The tilt spends nothing until a fleet is actually seen."""
     mix = ("c_tank", "c_tank", "c_artillery")
-    assert counter_composition(mix, (_ground(1), _ground(2)), _NAVAL_PROFILES, 1, False) == mix
+    ground_only = (_ground(1), _ground(2))
+    assert counter_composition(mix, ground_only, _NAVAL_PROFILES, 1, False, False) == mix
 
 
 def test_the_bloodied_clause_fires_only_after_the_fleet_kills() -> None:
@@ -190,12 +198,12 @@ def test_the_bloodied_clause_fires_only_after_the_fleet_kills() -> None:
     be perturbed."""
     mix = ("c_tank", "c_tank", "c_tank", "c_artillery")
     picture = (_ship(1), _ship(2), _ground(3), _ground(4))
-    unbloodied = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_BLOODIED, False)
+    unbloodied = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_BLOODIED, False, False)
     assert unbloodied == mix
-    bloodied = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_BLOODIED, True)
+    bloodied = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_BLOODIED, True, False)
     assert len(bloodied) > len(mix)
     assert set(bloodied[len(mix) :]) == {"c_artillery"}
-    always = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_ALWAYS, False)
+    always = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_ALWAYS, False, False)
     assert always == bloodied
 
 
@@ -205,7 +213,7 @@ def test_the_bloodied_gate_never_touches_the_air_clause() -> None:
     clause whose panels convicted it."""
     mix = ("c_tank", "c_tank", "c_tank", "c_aa")
     picture = (_heli(1), _heli(2), _ground(3), _ground(4))
-    tilted = counter_composition(mix, picture, _PROFILES, NAVTILT_BLOODIED, False)
+    tilted = counter_composition(mix, picture, _PROFILES, NAVTILT_BLOODIED, False, False)
     airworthy = sum(1 for name in tilted if _PROFILES[name]["hits_air"])
     assert airworthy / len(tilted) >= 0.5
 
@@ -216,3 +224,20 @@ def test_fleet_types_names_the_water_movers_once_each() -> None:
     picture = (_ship(1), _ground(2), _ship(3), _heli(4))
     assert fleet_types(picture) == ("warship",)
     assert fleet_types((_ground(1), _heli(2))) == ()
+
+
+def test_the_predicted_clause_fires_only_on_the_models_word() -> None:
+    """Mode 3, the driver law eight demanded: the clause arms on the doom
+    prediction alone -- blood may or may not have been drawn, because the
+    whole point is acting BEFORE the failure mode completes
+    (log 2026-08-09, the replication verdict)."""
+    mix = ("c_tank", "c_tank", "c_tank", "c_artillery")
+    picture = (_ship(1), _ship(2), _ground(3), _ground(4))
+    silent = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_PREDICTED, False, False)
+    assert silent == mix
+    armed = counter_composition(mix, picture, _NAVAL_PROFILES, NAVTILT_PREDICTED, False, True)
+    assert len(armed) > len(mix)
+    bloodied_only = counter_composition(
+        mix, picture, _NAVAL_PROFILES, NAVTILT_PREDICTED, True, False
+    )
+    assert bloodied_only == mix

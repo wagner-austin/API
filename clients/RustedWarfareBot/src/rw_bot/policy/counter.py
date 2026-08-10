@@ -36,7 +36,7 @@ from typing import Final, TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile, profile_of
-from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BLOODIED
+from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BLOODIED, NAVTILT_PREDICTED
 from rw_bot.policy.intel import Intel
 
 
@@ -212,6 +212,7 @@ def counter_composition(
     profiles: Mapping[str, CombatProfile],
     naval: int,
     bloodied: bool,
+    predicted: bool,
 ) -> tuple[str, ...]:
     """Return the mix, tilted until it answers the air and naval shares.
 
@@ -261,6 +262,9 @@ def counter_composition(
             :data:`FLEET_BLOOD` of our units this match, read by the
             caller from the death ledger against the fleet types it has
             seen (:func:`fleet_types`).
+        predicted: Whether the doom model reads this game as fleet-doomed
+            -- the mode-3 driver, latched at the model's own window
+            (:class:`~rw_bot.policy.doom.DoomLatch`; log 2026-08-09).
 
     Returns:
         The mix to produce against, repeats meaningful as a ratio.
@@ -278,7 +282,11 @@ def counter_composition(
         return _hits_air(profiles, name)
 
     mix = _tilted(mix, flying, len(targets), hits_air, profiles)
-    armed = naval == NAVTILT_ALWAYS or (naval == NAVTILT_BLOODIED and bloodied)
+    armed = (
+        naval == NAVTILT_ALWAYS
+        or (naval == NAVTILT_BLOODIED and bloodied)
+        or (naval == NAVTILT_PREDICTED and predicted)
+    )
     if not armed:
         return mix
     fleet = tuple(t for t in targets if t["movement"] == _NAVAL_LAYER)
