@@ -46,12 +46,13 @@ panel. Nothing on this list is a guess.
 
 ## Open questions (measurement running or queued)
 
-- **The mode-3 panel** — the doom model driving navtilt, measured blind on fresh seeds. The signal replicated cross-tree (AUC 0.75) with precision saturating at 0.68; the panel decides whether that is enough (log 2026-08-09).
+- (none -- the docket is between arcs; candidates: a different response for the doom model to drive, hold v2 designs, the exporter productionization)
 
 ## Closed questions (measured, with the log entry that closed them)
 
 **Very Hard:**
-- The blood-gated tilt, and with it the whole tilt thread: three calibrations, three net -2s -- the trigger populations overlap, and a match-reshaping response cannot be gated by any present-tense signal (log 2026-08-08, navblood96).
+- The naval tilt response, under EVERY driver -- ungated -2, deficit -2, blood -2, learned-oracle -5: even correctly targeted arming breaks even, so no trigger quality can rescue it. Closed with prejudice (log 2026-08-10, navdoom96).
+- The blood-gated tilt calibration (log 2026-08-08, navblood96).
 - Composition surgery, all channels: eight one-knob arms negative; production is a ratio simplex (log 2026-08-07, the arm ladder).
 - The unconditional naval tilt: net -2 at 24 and 48 seeds, trades wins for survivals (log 2026-08-08, navpair48).
 - The deficit-gated tilt: halves the damage, keeps the disease — army deficit is the normal shape of winning against a subsidized opponent (log 2026-08-08, navgate96).
@@ -78,6 +79,7 @@ panel. Nothing on this list is a guess.
 7. **Erosion law** — verdicts track whether the economy was HELD; endpoints lie, peaks tell (2026-08-07, the xmap correction).
 8. **Blast radius matches trigger precision** — small reversible responses may gate on present signals; match-reshaping responses require prediction, which no present-tense scalar supplies (2026-08-08, the three-calibration arc).
 9. **Effects must replicate across trees** — a paired panel controls within-tree noise, not tree-to-tree variance; the same seeds flipped +217 to -198 between trees. Fresh-tree replication is the adoption bar (2026-08-09, imp-raid8x48).
+10. **Measure the response before the trigger** — a response that breaks even when correctly armed is a dead end at any trigger precision; the tilt netted -2 on its own home subset under a replicated 0.75-AUC oracle (2026-08-10, navdoom96).
 
 ## The ML layer
 
@@ -86,10 +88,11 @@ precision 0.82 at sample 2000 (a deployable in-match moment, 600+ samples of
 lead time), on the 96-match sighted corpus with seed-grouped folds all above
 0.70. The first re-ask at sample 800 read chance because the fleet had not
 arrived yet -- the sighted columns diagnosed their own window. Fresh-tree
-replication PASSED 2026-08-09: train-A-test-B AUC 0.751 (tight), the first
-signal to survive law nine -- with precision saturating at 0.68 cross-tree,
-which calibrates the mode-3 panel as a real question rather than a
-formality.
+replication PASSED 2026-08-09: train-A-test-B AUC 0.751, the first signal
+to survive law nine. Deployed as the tilt's mode-3 driver and REJECTED at
+net -5 (2026-08-10) -- the response, not the trigger, was the flaw (law
+ten). The model, the mode-3 wiring and the watch/latch machinery remain
+banked for any future response worth driving.
 
 ## The instrument
 
