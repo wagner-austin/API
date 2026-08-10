@@ -4089,7 +4089,7 @@ This is the entry's real content, because it happened three times in one day:
 
 `pathfinding.path_length`, `equipment_search.find_nearest_deposit`, `tactics.should_map_open_for_enemies`, `tactics._is_visible_enemy_tank` (orphaned by the previous cut, found only by re-running the sweep after it), `resource_search.is_recently_attempted`, `resource_search.record_attempt_mark`, `decoders.try_decode_received`, `decoders.decode_received_text_message`, `decoders.try_decode_received_text` — plus their `bot/ai` re-exports and a dead `analyze_threats` protocol member in the enemy-teleport harness that declared two positional parameters against a real four-plus-two-keyword-only signature. **+22 / −623.**
 
-### Open: six mutation survivors, recorded here because the artifact is gone
+### ~~Open:~~ RESOLVED 2026-08-09: six mutation survivors, recorded here because the artifact is gone
 
 A larger mutation run than the 14-guard sample above got through **37 of 483 guards before being interrupted**, and named six survivors. Preserved here verbatim, since `mutation_results.txt` was deleted from the repo root:
 
@@ -4102,8 +4102,66 @@ SURVIVED  src/tankpit_bot/bot/ai/collect_hops.py:308              return None
 SURVIVED  src/tankpit_bot/bot/ai/collect_hops.py:396              return None
 ```
 
-Six of 37 is a ~16% survival rate, consistent with the 2 of 14 recorded above, and it still extrapolates to roughly 60-80 guards across the tree that no test distinguishes from absent. `collect_hops.py:396` is `if terrain is None: return None`: branch coverage says both outcomes are taken, mutation says deleting the `return` changes no test result — so a test reaches the guard and never pins its effect. **None of the six are fixed.** They are the next piece of work, not a finding that was acted on.
+Six of 37 is a ~16% survival rate, consistent with the 2 of 14 recorded above, and it still extrapolates to roughly 60-80 guards across the tree that no test distinguishes from absent. `collect_hops.py:396` is `if terrain is None: return None`: branch coverage says both outcomes are taken, mutation says deleting the `return` changes no test result — so a test reaches the guard and never pins its effect. ~~**None of the six are fixed.** They are the next piece of work, not a finding that was acted on.~~
+
+**Corrected 2026-08-09 (same day):** all six are now fixed and each verified by re-mutation — commit `13da274d`. Five were vacuous tests, one was a redundant guard that was deleted. One of the six is not the guard this paragraph implies: **`collect_hops.py:308` is the CAPACITY gate, not a terrain guard.** Full account in the entry at the bottom of this log; the sentence above is struck rather than deleted because a reader who lands here from a search must not act on it.
 
 ### Scope limit, stated plainly
 
 The new rule covers `_test_hooks` attribute swaps. The wider leaked-process-state class was swept by hand the same day and found clean — all three `addHandler` sites pair with `removeHandler` in a `finally`, both `sys.modules` mutations are restored, and the one `world.update(fresh)` hit is a per-instance `WorldService` rather than a module global, which is what [[session-state-deglobalisation]] bought. That half is **not** machine-enforced, so it is true as of today rather than guaranteed.
+
+---
+
+## [2026-08-09] update | Six survivors die, and the one that took three wrong theories was not the guard we thought
+
+Commit `13da274d`. `make check` green: **6,175 passed, 100.00% coverage** (30,426 statements / 8,804 branches). Statements and branches each fell by 2 — exactly the one guard deleted.
+
+Every fix verified by re-running the same mutation. None was accepted on argument.
+
+### Five vacuous tests, one shape
+
+Each was exercised against a world that ALSO failed a later gate, so the guard and its absence produced the same answer and no assertion could tell them apart:
+
+| guard | why the mutant survived | fix |
+|---|---|---|
+| `tracking_observation.py:58` | registry lacked the key, so the loop fell through to the same `None` | registry now carries an entry actually keyed `""` |
+| `enemy_teleport.py:109` | the zero-settle test passed a POSITIVE heartbeat, and on that path the loop's own `remaining > 0` declines anyway | extended to the no-heartbeat branch, the only one that can observe it |
+| `collect_hops.py:156` | empty candidate list returned `None` by itself | candidate is now live and affordable |
+| `collect_hops.py:396` | same shape in the marooned hop | qualifying fuel container present |
+| `collect_hops.py:308` | see below | pinned on the event stream |
+
+### One redundant guard, deleted — and it was hiding a diagnostic
+
+`probe_base.teleport` was the only one of ELEVEN sibling methods to pre-check `self._cdp is None`. `send_command_bytes` already does, at `command_sender.py:59`, with a `log.warning("Cannot send %s: CDP session not available")`. The redundant guard's silent `return False` suppressed that warning. So it was not merely unobservable — `teleport` was the single command in the class that failed *quietly* when CDP was gone. Deleted, which restores the diagnostic.
+
+### `collect_hops.py:308` is the capacity gate, not the terrain guard
+
+Three wrong theories, recorded because each was expensive:
+
+1. **"It's the terrain guard."** It is not. Line 307-308 is `if ctx.fuel >= fuel_capacity(rank): return None`; the terrain guard is 309-310. A test built around unknown terrain never exercised 308 at all.
+2. **"A full tank will expose it."** It will not. At capacity the deficit is zero, so `min(volume, deficit)` never clears the hop cost and `select_fuel_larder_hop` returns no container either way. **The return value cannot distinguish this guard from its absence.**
+3. **"Assert no `hop_declined` fires."** Right idea, wrong field — see the trap below. That fix was itself vacuous and the mutant survived a third time.
+
+What the gate actually does is suppress a diagnostic: without it, a full tank beside a live fuel container logs `hop_declined fuel_larder candidates=1 unprofitable=1 fuel=1200` **every tick**. Proven by mutating it and capturing 2 records instead of 1. So the test pins the event stream, not the return value.
+
+### The `runtime_fields` trap
+
+`emit_diagnostic` does NOT flatten fields onto the LogRecord. They nest:
+
+```
+{'runtime_channel': 'DIAGNOSTIC',
+ 'runtime_fields': {'diagnostic_kind': 'hop_declined', 'hop_kind': 'fuel_larder', ...},
+ 'runtime_message': 'diagnostic_kind=hop_declined'}
+```
+
+So `record.get("diagnostic_kind")` returns `None`, any filter built on it matches **zero** records, and the assertion passes while the mutant lives. `tests/_runtime_logging_support.py` now exposes `event_fields(record)` so this cannot be stepped in twice, and the test carries a PAIRED assertion — the equipment decline MUST be captured, or it proves nothing about the fuel one.
+
+### Lifted, not forked
+
+`capture_runtime_events()` + `event_fields()` replace two hand-rolled `addHandler` / `setLevel` / `finally`-remove blocks in the sniffer tests. Zero files still hand-roll the emitter logger.
+
+### The lesson worth carrying
+
+Every failure this session was one bug: **a stale or mis-aimed detector reporting clean.** The mutation harness read the wrong line number; the assertion read the wrong field; and outside this work the same day, a probe filtered on `chrome` while headless launches `chrome-headless-shell.exe`, a control was handed a POSIX path on Windows and scanned nothing, and a health probe compared `$null -eq 0` and called a working daemon broken. In every case the output was a confident zero.
+
+**A detector that has not been run against a known-bad input is not evidence.** That is why the fix for 308 carries a positive assertion alongside the negative one.
