@@ -75,6 +75,7 @@ INT_FIELDS: Final = (
     "strike",
     "navtilt",
     "medics",
+    "navy",
     "bunkers",
     "flame",
     "close",
@@ -362,6 +363,7 @@ class Doctrine(TypedDict):
     hp_floor: int
     strike: int
     medics: int
+    navy: int
     bunkers: int
     flame: int
     close: int
@@ -414,6 +416,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     hp_floor=0,
     strike=0,
     medics=0,
+    navy=0,
     bunkers=0,
     flame=0,
     close=0,

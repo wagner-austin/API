@@ -47,6 +47,7 @@ _BAD_GUN_COUNT = "RW-DOCTRINE-023"
 _BAD_NUKE_COUNT = "RW-DOCTRINE-024"
 _BAD_NAVTILT = "RW-DOCTRINE-025"
 _BAD_HOLD = "RW-DOCTRINE-026"
+_BAD_NAVY_COUNT = "RW-DOCTRINE-027"
 
 
 def _count(
@@ -123,6 +124,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     allin = _count(payload, "allin", _BAD_ALLIN_SAMPLE, "a release observation with 0 for never")
     strike = _count(payload, "strike", _BAD_STRIKE_RATIO, "a rival army-value drop with 0 for off")
     medics = _count(payload, "medics", _BAD_MEDIC_COUNT, "combat engineers to keep alive, 0 none")
+    navy = _count(payload, "navy", _BAD_NAVY_COUNT, "attack submarines to keep alive, 0 none")
     bunkers = _count(payload, "bunkers", _BAD_BUNKER_COUNT, "mobile turrets to keep alive, 0 none")
     flame = _count(payload, "flame", _BAD_FLAME_COUNT, "flame turrets to hold, 0 none")
     close = _count(payload, "close", _BAD_CLOSE_RATIO, "a dominance multiple with 0 for never")
@@ -182,6 +184,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         hp_floor=hp_floor,
         strike=strike,
         medics=medics,
+        navy=navy,
         bunkers=bunkers,
         flame=flame,
         close=close,
@@ -231,6 +234,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "hp_floor": doctrine["hp_floor"],
         "strike": doctrine["strike"],
         "medics": doctrine["medics"],
+        "navy": doctrine["navy"],
         "bunkers": doctrine["bunkers"],
         "flame": doctrine["flame"],
         "close": doctrine["close"],

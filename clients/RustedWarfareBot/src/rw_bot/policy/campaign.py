@@ -64,6 +64,7 @@ from rw_bot.policy.ledger import Outlays
 from rw_bot.policy.lurk import Lurker
 from rw_bot.policy.match_report import MatchReport
 from rw_bot.policy.medic import BUNKER_TYPE, Medic
+from rw_bot.policy.navy import Shipyard
 from rw_bot.policy.nuker import Nuker
 from rw_bot.policy.production import wanted_producers
 from rw_bot.policy.raid import Raider
@@ -118,6 +119,7 @@ def play(
     allin: int = 0,
     strike: int = 0,
     medics: int = 0,
+    navy: int = 0,
     bunkers: int = 0,
     flame: int = 0,
     close: int = 0,
@@ -188,6 +190,7 @@ def play(
         allin: Observation the whole reserve releases from, zero never. See Doctrine.
         strike: Rival army-value drop that opens the release window. See Doctrine.
         medics: Combat engineers kept alive via saving hires. See Doctrine.
+        navy: Attack submarines kept alive on the water. See Doctrine.
         bunkers: Mobile turrets kept alive the same way. See Doctrine.
         flame: Flame turrets held by converting ground turrets. See Doctrine.
         close: Dominance multiple that releases and marches everything. See
@@ -259,6 +262,8 @@ def play(
     momentum = Momentum()
     medic = Medic()
     bunker = Medic(BUNKER_TYPE)
+    submarines = Medic("attackSubmarine")
+    shipyard = Shipyard()
     flamer = Converter()
     gunner = TurretLadder()
     closer = Closer(close)
@@ -404,6 +409,8 @@ def play(
                 channel,
                 nuker.advance(sample, catalogue, budget, free, workforce, nukes, committed_close),
             )
+            send_builds(channel, shipyard.establish(sample, catalogue, budget, navy > 0))
+            send_produces(channel, submarines.hire(sample, budget, navy))
             send_produces(channel, medic.hire(sample, budget, medics))
             send_produces(channel, bunker.hire(sample, budget, bunkers))
             send_produces(channel, flamer.convert(sample, budget, flame))
