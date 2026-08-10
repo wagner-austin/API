@@ -46,7 +46,7 @@ panel. Nothing on this list is a guess.
 
 ## Open questions (measurement running or queued)
 
-- **vhdoom96b** — fresh-tree replication of the AUC-0.80 fleet-doom signal; deployment design waits on it.
+- **The mode-3 panel** — the doom model driving navtilt, measured blind on fresh seeds. The signal replicated cross-tree (AUC 0.75) with precision saturating at 0.68; the panel decides whether that is enough (log 2026-08-09).
 
 ## Closed questions (measured, with the log entry that closed them)
 
@@ -86,8 +86,10 @@ precision 0.82 at sample 2000 (a deployable in-match moment, 600+ samples of
 lead time), on the 96-match sighted corpus with seed-grouped folds all above
 0.70. The first re-ask at sample 800 read chance because the fleet had not
 arrived yet -- the sighted columns diagnosed their own window. Fresh-tree
-replication (vhdoom96b) running per law nine before any deployment; if it
-holds, the model becomes the tilt's mode-3 driver.
+replication PASSED 2026-08-09: train-A-test-B AUC 0.751 (tight), the first
+signal to survive law nine -- with precision saturating at 0.68 cross-tree,
+which calibrates the mode-3 panel as a real question rather than a
+formality.
 
 ## The instrument
 
