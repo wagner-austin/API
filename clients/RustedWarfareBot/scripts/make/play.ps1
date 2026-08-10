@@ -120,6 +120,20 @@ try {
     }
     $gameArgs += @("-width", "800", "-height", "600", "-log", $gameLog)
 
+    # A zombie engine from a killed worker can still hold this port -- its
+    # job was requeued but the process plays on, and the new agent dies at
+    # the bind (vhdoom96b, 2026-08-09). Only a java engine can legitimately
+    # hold a match port, so a java holder is always an orphan; anything
+    # else holding the port is left alone and the bind fails loudly.
+    $holder = (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue).OwningProcess
+    if ($holder) {
+        $holderProc = Get-Process -Id $holder -ErrorAction SilentlyContinue
+        if ($holderProc -and $holderProc.ProcessName -eq "java") {
+            Write-Host "[play] clearing orphaned engine (pid $holder) off port $Port" -ForegroundColor Yellow
+            Stop-Process -Id $holder -Force
+            Start-Sleep -Milliseconds 500
+        }
+    }
     $game = Start-Process -FilePath "$root\$GameDir\jvm64\bin\java.exe" `
         -ArgumentList $gameArgs -WorkingDirectory "$root\$GameDir" -PassThru `
         -RedirectStandardOutput "$root\$PlayLog.agent" -RedirectStandardError "$root\$PlayLog.err"
