@@ -60,7 +60,7 @@ class Shipyard:
         """Open the walk at the nearest candidate."""
         self._candidate = 0
         self._waited = 0
-        self._ordered = False
+        self._paid = False
 
     def establish(
         self,
@@ -82,12 +82,14 @@ class Shipyard:
             wanted: Whether the doctrine plays the water at all.
 
         Returns:
-            At most one build order. Each candidate is claimed and ordered
-            ONCE -- the engine holds an order until it is replaced, and the
-            first panel measured what per-tick claiming does: 369 grants,
-            369,000 credits, an economy that never existed (navy96,
-            log 2026-08-10). Patience then watches the roster; silence
-            advances the walk.
+            At most one build order -- the current candidate, re-sent every
+            tick once the price is claimed ONCE. Both halves were measured
+            separately: claiming per tick consumed 369,000 credits and the
+            economy never existed (navy96), and ordering once let the
+            expander re-task the builder a tick later and the factory never
+            stood (navy96b interim). The navy sends after the expander in
+            the tick, so the re-sent order lands last and wins the builder
+            (log 2026-08-10).
         """
         if not wanted or self._candidate >= len(FRACTIONS):
             return ()
@@ -101,14 +103,6 @@ class Shipyard:
             # A catalogue without the type cannot price the claim; the
             # doctrine asked for water the build simply cannot describe.
             return ()
-        if self._ordered:
-            # The order stands with the engine; the roster is the sensor.
-            self._waited += 1
-            if self._waited > PATIENCE:
-                self._candidate += 1
-                self._waited = 0
-                self._ordered = False
-            return ()
         anchor = find_anchor(sample, catalogue)
         goal = mirror_point(sample, catalogue)
         builders = [
@@ -118,13 +112,21 @@ class Shipyard:
         ]
         if anchor is None or goal is None or not builders:
             return ()
-        claim = budget.claim(f"navy:{FACTORY_TYPE}", stats["price"])
-        if not claim["granted"]:
-            budget.withhold(stats["price"])
-            return ()
+        if not self._paid:
+            claim = budget.claim(f"navy:{FACTORY_TYPE}", stats["price"])
+            if not claim["granted"]:
+                budget.withhold(stats["price"])
+                return ()
+            self._paid = True
+            self._waited = 0
         share = FRACTIONS[self._candidate]
-        self._ordered = True
-        self._waited = 0
+        self._waited += 1
+        if self._waited > PATIENCE:
+            self._candidate += 1
+            self._waited = 0
+            if self._candidate >= len(FRACTIONS):
+                return ()
+            share = FRACTIONS[self._candidate]
         return (
             build_order(
                 # The NEWEST builder, not the opening's: builders[-1] by

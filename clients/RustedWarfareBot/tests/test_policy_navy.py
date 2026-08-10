@@ -55,25 +55,29 @@ def test_the_walk_offers_the_nearest_fraction_first() -> None:
     ]
 
 
-def test_one_claim_one_order_then_patience_watches_the_roster() -> None:
-    """The first panel's lesson in a test: 369 per-tick grants consumed
-    369,000 credits and the economy never existed (navy96). A candidate
-    costs ONE claim and ONE order; silence for PATIENCE samples advances
-    the walk to the next fraction, which again costs exactly one of each."""
+def test_one_claim_then_the_order_resends_and_patience_advances() -> None:
+    """Both measured failures in one test: claiming per tick consumed
+    369,000 credits (navy96), and ordering once let the expander steal
+    the builder back (navy96b interim). The price is claimed exactly
+    once; the order re-sends every tick so it always lands last; silence
+    for PATIENCE samples advances the fraction."""
     yard = Shipyard()
     world = _world()
     ordered: list[float] = []
     claims = 0
-    for _ in range(2 * (PATIENCE + 2)):
+    for _ in range(2 * PATIENCE + 1):
         budget = Budget(4000, 0)
         orders = yard.establish(world, _CATALOGUE, budget, True)
         follow_up = budget.claim("produce:c_tank", 4000)
         claims += 0 if follow_up["granted"] else 1
         ordered.extend(o["x"] for o in orders)
-    assert ordered == [200.0, 250.0]
-    # The full 4000 stayed claimable on every silent tick: only the two
-    # ordering ticks consumed the factory's price from the pool.
-    assert claims == 2
+    # One claim total, an order every tick, and the fraction advanced
+    # exactly once across two patience windows.
+    assert claims == 1
+    assert len(ordered) == 2 * PATIENCE + 1
+    assert set(ordered) == {200.0, 250.0}
+    assert ordered[0] == 200.0
+    assert ordered[-1] == 250.0
 
 
 def test_a_standing_or_growing_factory_ends_the_walk() -> None:
