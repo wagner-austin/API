@@ -41,8 +41,9 @@ FACTORY_TYPE = "seaFactory"
 #: (log 2026-08-10, the sea probe).
 FRACTIONS: tuple[float, ...] = (0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6)
 
-#: Samples offered per candidate before the walk advances. Builders walk
-#: before they build, so patience is part of the sensor.
+#: Samples watched per candidate before the walk advances. Builders walk
+#: before they build, so patience is part of the sensor -- and each
+#: candidate costs ONE claim and ONE order, never a stream of either.
 PATIENCE = 40
 
 
@@ -59,6 +60,7 @@ class Shipyard:
         """Open the walk at the nearest candidate."""
         self._candidate = 0
         self._waited = 0
+        self._ordered = False
 
     def establish(
         self,
@@ -80,8 +82,12 @@ class Shipyard:
             wanted: Whether the doctrine plays the water at all.
 
         Returns:
-            At most one build order -- the current candidate, re-offered
-            each tick so the assigned builder keeps walking toward it.
+            At most one build order. Each candidate is claimed and ordered
+            ONCE -- the engine holds an order until it is replaced, and the
+            first panel measured what per-tick claiming does: 369 grants,
+            369,000 credits, an economy that never existed (navy96,
+            log 2026-08-10). Patience then watches the roster; silence
+            advances the walk.
         """
         if not wanted or self._candidate >= len(FRACTIONS):
             return ()
@@ -94,6 +100,14 @@ class Shipyard:
         if stats is None:
             # A catalogue without the type cannot price the claim; the
             # doctrine asked for water the build simply cannot describe.
+            return ()
+        if self._ordered:
+            # The order stands with the engine; the roster is the sensor.
+            self._waited += 1
+            if self._waited > PATIENCE:
+                self._candidate += 1
+                self._waited = 0
+                self._ordered = False
             return ()
         anchor = find_anchor(sample, catalogue)
         goal = mirror_point(sample, catalogue)
@@ -109,16 +123,14 @@ class Shipyard:
             budget.withhold(stats["price"])
             return ()
         share = FRACTIONS[self._candidate]
-        self._waited += 1
-        if self._waited > PATIENCE:
-            self._candidate += 1
-            self._waited = 0
-            if self._candidate >= len(FRACTIONS):
-                return ()
-            share = FRACTIONS[self._candidate]
+        self._ordered = True
+        self._waited = 0
         return (
             build_order(
-                unit_id=builders[0]["unit_id"],
+                # The NEWEST builder, not the opening's: builders[-1] by
+                # roster order is the latest hire, and dragging the first
+                # builder across the map is dragging the opening with it.
+                unit_id=builders[-1]["unit_id"],
                 type_name=FACTORY_TYPE,
                 x=anchor["x"] + (goal[0] - anchor["x"]) * share,
                 y=anchor["y"] + (goal[1] - anchor["y"]) * share,

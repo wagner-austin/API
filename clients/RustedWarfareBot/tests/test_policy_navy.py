@@ -55,18 +55,25 @@ def test_the_walk_offers_the_nearest_fraction_first() -> None:
     ]
 
 
-def test_patience_advances_the_candidate() -> None:
-    """PATIENCE silent offers at one fraction move the walk to the next --
-    dry land swallows orders without a trace, and the roster's silence is
-    the refusal."""
+def test_one_claim_one_order_then_patience_watches_the_roster() -> None:
+    """The first panel's lesson in a test: 369 per-tick grants consumed
+    369,000 credits and the economy never existed (navy96). A candidate
+    costs ONE claim and ONE order; silence for PATIENCE samples advances
+    the walk to the next fraction, which again costs exactly one of each."""
     yard = Shipyard()
     world = _world()
-    seen = []
-    for _ in range(PATIENCE + 1):
-        orders = yard.establish(world, _CATALOGUE, Budget(4000, 0), True)
-        seen.append(orders[0]["x"])
-    assert seen[0] == 200.0
-    assert seen[-1] == 250.0
+    ordered: list[float] = []
+    claims = 0
+    for _ in range(2 * (PATIENCE + 2)):
+        budget = Budget(4000, 0)
+        orders = yard.establish(world, _CATALOGUE, budget, True)
+        follow_up = budget.claim("produce:c_tank", 4000)
+        claims += 0 if follow_up["granted"] else 1
+        ordered.extend(o["x"] for o in orders)
+    assert ordered == [200.0, 250.0]
+    # The full 4000 stayed claimable on every silent tick: only the two
+    # ordering ticks consumed the factory's price from the pool.
+    assert claims == 2
 
 
 def test_a_standing_or_growing_factory_ends_the_walk() -> None:
@@ -94,9 +101,20 @@ def test_an_unfunded_walk_withholds_toward_the_factory() -> None:
 def test_the_walk_gives_up_after_the_last_fraction() -> None:
     yard = Shipyard()
     world = _world()
-    for _ in range(len(FRACTIONS) * (PATIENCE + 1) + 5):
+    for _ in range(len(FRACTIONS) * (PATIENCE + 2) + 5):
         yard.establish(world, _CATALOGUE, Budget(4000, 0), True)
     assert yard.establish(world, _CATALOGUE, Budget(4000, 0), True) == ()
+
+
+def test_the_walk_orders_with_the_newest_builder() -> None:
+    """Dragging the opening's builder across the map is dragging the
+    opening with it; the walk takes the latest hire instead."""
+    yard = Shipyard()
+    world = sample(
+        _ANCHOR, _BUILDER, entity(7, "builder", x=20.0, y=0.0), pools=(_POOL,), credits=4000
+    )
+    orders = yard.establish(world, _CATALOGUE, Budget(4000, 0), True)
+    assert [o["unit_id"] for o in orders] == [7]
 
 
 def test_the_knob_off_a_missing_type_or_a_lost_base_stay_silent() -> None:
