@@ -46,7 +46,6 @@ panel. Nothing on this list is a guess.
 
 ## Open questions (measurement running or queued)
 
-- **vhdoom96** — the sighted-era data batch (96 fresh seeds, enemy-shape + events columns) for the fleet-doom re-ask; resumed behind the priority-claimed screens.
 - **vhdoom96b** — fresh-tree replication of the AUC-0.80 fleet-doom signal; deployment design waits on it.
 
 ## Closed questions (measured, with the log entry that closed them)
@@ -82,10 +81,13 @@ panel. Nothing on this list is a guess.
 
 ## The ML layer
 
-First used 2026-08-09 on the fleet-doom question: no signal (AUC ~0.55,
-chance) in the early trace window, because the trace records our economy's
-shape and nothing about the enemy's composition. Open follow-up: enemy-shape
-trace columns, after which every batch feeds the dataset for free.
+First positive result 2026-08-09: **fleet doom is predictable** -- AUC 0.80,
+precision 0.82 at sample 2000 (a deployable in-match moment, 600+ samples of
+lead time), on the 96-match sighted corpus with seed-grouped folds all above
+0.70. The first re-ask at sample 800 read chance because the fleet had not
+arrived yet -- the sighted columns diagnosed their own window. Fresh-tree
+replication (vhdoom96b) running per law nine before any deployment; if it
+holds, the model becomes the tilt's mode-3 driver.
 
 ## The instrument
 
