@@ -212,6 +212,7 @@ def make_test_loaded_dataset(
         meta=meta,
         x=x,
         y=y,
+        groups=None,
     )
 
 

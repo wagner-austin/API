@@ -100,6 +100,11 @@ class TimeSeriesCSVLoader:
         """
         ts_spec = config["time_series"]
 
+        if config.get("group_column") is not None:
+            # Aggregation already collapses each entity to one row, so a
+            # group column has nothing to group; refuse rather than ignore.
+            raise ValueError("group_column is only supported by the CSV loader")
+
         if not ts_spec["labels_file"]:
             raise ValueError(
                 "Time-series datasets must have labels_file specified in time_series spec"
@@ -327,7 +332,7 @@ class TimeSeriesCSVLoader:
             categorical_encodings=tuple(encodings),
         )
 
-        return LoadedDataset(meta=meta, x=x_array, y=y_array)
+        return LoadedDataset(meta=meta, x=x_array, y=y_array, groups=None)
 
     def _read_csv(
         self,

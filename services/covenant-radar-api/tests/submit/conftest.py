@@ -189,6 +189,7 @@ class FakeBackend:
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train a classifier."""
         global _fake_backend_path

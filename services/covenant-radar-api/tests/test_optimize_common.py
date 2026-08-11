@@ -67,7 +67,7 @@ def _make_fake_standard_dataset(name: str = "taiwan") -> LoadedDataset:
         "feature_names": tuple(f"feature_{i}" for i in range(10)),
         "categorical_encodings": (),
     }
-    return {"meta": meta, "x": x, "y": y}
+    return {"meta": meta, "x": x, "y": y, "groups": None}
 
 
 def _make_fake_timeseries_dataset(name: str = "kaggle_amex_default") -> LoadedDataset:
@@ -94,7 +94,7 @@ def _make_fake_timeseries_dataset(name: str = "kaggle_amex_default") -> LoadedDa
         "feature_names": tuple(f"ts_feature_{i}" for i in range(188)),
         "categorical_encodings": (),
     }
-    return {"meta": meta, "x": x, "y": y}
+    return {"meta": meta, "x": x, "y": y, "groups": None}
 
 
 def _make_fake_standard_config(name: str) -> DatasetConfig:

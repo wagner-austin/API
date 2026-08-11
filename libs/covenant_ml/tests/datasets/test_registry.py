@@ -161,6 +161,25 @@ class TestMakeDefaultRegistry:
         assert config["display_name"] == "US Bankruptcy (Original)"
         assert config["encoding"] == "utf-8-sig"
 
+    def test_default_registry_has_rw_matches_as_a_grouped_dataset(self) -> None:
+        """rw_matches groups by match and never leaks the verdict as a feature."""
+        registry = make_default_registry()
+
+        assert "rw_matches" in registry
+        config = registry.get("rw_matches")
+        assert config.get("group_column") == "match"
+        assert config["target"]["column_name"] == "won"
+        assert "verdict" in config["exclude_columns"]
+        assert "arm" in config["exclude_columns"]
+        assert "seed" in config["exclude_columns"]
+        assert "difficulty" in config["exclude_columns"]
+
+    def test_default_registry_datasets_without_groups_omit_the_key(self) -> None:
+        """Row-independent datasets carry no group column."""
+        registry = make_default_registry()
+
+        assert registry.get("taiwan").get("group_column") is None
+
     def test_default_registry_has_polish(self) -> None:
         """Default registry includes Polish dataset."""
         registry = make_default_registry()
@@ -183,7 +202,15 @@ class TestMakeDefaultRegistry:
             assert len(config["file_name"]) >= 4, f"{name}: file_name too short"
             assert config["file_format"] in ("csv", "arff", "excel")
             assert config["encoding"] in ("utf-8", "utf-8-sig", "latin-1", "cp1252")
-            assert config["n_samples_expected"] > 0
+            # A fixed dataset declares its sample census; a grouped dataset
+            # that grows with every export (rw_matches) declares 0, meaning
+            # "shape contract only, no census".
+            if config["n_samples_expected"] == 0:
+                assert "group_column" in config, (
+                    f"{name}: only grouped, growing datasets may omit the sample census"
+                )
+            else:
+                assert config["n_samples_expected"] > 0
             assert config["n_features_expected"] > 0
             assert 0.0 <= config["positive_class_ratio_expected"] <= 1.0
 

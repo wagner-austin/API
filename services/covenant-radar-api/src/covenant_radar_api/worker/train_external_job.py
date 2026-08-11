@@ -525,6 +525,10 @@ def run_external_training(
         config=train_config,
         output_dir=output_dir,
         progress=None,
+        # Grouped datasets (rw_matches) carry which rows are one match;
+        # the split keeps whole matches together so correlated snapshots
+        # cannot straddle train and test.
+        groups=dataset["groups"],
     )
 
     # Copy to backend-specific active file

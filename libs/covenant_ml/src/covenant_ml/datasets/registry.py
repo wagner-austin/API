@@ -366,6 +366,34 @@ _VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         n_features_expected=10,
         positive_class_ratio_expected=0.067,
     ),
+    # RustedWarfare match snapshots (exported by the bot's harness)
+    # One row per recorded sample of a match; ~1,500 correlated rows per
+    # match, so the match id is the GROUP column and the split must be by
+    # match, never by row. Written by RustedWarfareBot's
+    # scripts/export_matches.py; the file grows with every exported batch,
+    # so the expected counts are the shape contract (16 feature columns),
+    # not a sample census.
+    DatasetConfig(
+        name="rw_matches",
+        display_name="RustedWarfare Match Snapshots",
+        folder="rw_matches",
+        file_name="data.csv",
+        file_format="csv",
+        encoding="utf-8",
+        target=TargetColumnSpec(
+            column_name="won",
+            label_type="binary_int",
+            positive_values=(1,),
+            negative_values=(0,),
+        ),
+        # verdict IS the label restated; arm, seed and difficulty are run
+        # identity and setup, not state the bot observes mid-match.
+        exclude_columns=("arm", "seed", "verdict", "difficulty"),
+        n_samples_expected=0,
+        n_features_expected=16,
+        positive_class_ratio_expected=0.7,
+        group_column="match",
+    ),
     # Loan Default Dataset
     DatasetConfig(
         name="kaggle_loan_default",

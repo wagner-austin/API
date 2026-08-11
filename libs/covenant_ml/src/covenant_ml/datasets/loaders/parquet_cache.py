@@ -31,6 +31,11 @@ CACHE_DIR_NAME: str = ".cache"
 # Metadata file name in cache
 METADATA_FILE_NAME: str = "meta.parquet"
 
+#: Group codes sidecar, written only for datasets whose config names a
+#: group_column. Its absence on load means "no groups", so ungrouped caches
+#: stay exactly as they were.
+GROUPS_FILE_NAME: str = "groups.parquet"
+
 # Features file name in cache
 FEATURES_FILE_NAME: str = "features.parquet"
 
@@ -433,6 +438,13 @@ def load_from_cache(
     labels_df = _read_parquet_typed(labels_path)
     y_array: NDArray[np.int64] = labels_df["y"].to_numpy().astype(np.int64)
 
+    # Load group codes when the sidecar exists (grouped datasets only)
+    groups_path = cache_dir / GROUPS_FILE_NAME
+    groups_array: NDArray[np.int64] | None = None
+    if groups_path.exists():
+        groups_df = _read_parquet_typed(groups_path)
+        groups_array = groups_df["g"].to_numpy().astype(np.int64)
+
     _report_progress(
         callback=progress_callback,
         progress=LoadProgress(
@@ -446,7 +458,7 @@ def load_from_cache(
         ),
     )
 
-    return LoadedDataset(meta=meta, x=x_array, y=y_array)
+    return LoadedDataset(meta=meta, x=x_array, y=y_array, groups=groups_array)
 
 
 class _PolarsDataFrameWriteProtocol(Protocol):
@@ -569,6 +581,17 @@ def save_to_cache(
     labels_data: dict[str, list[str] | list[int] | list[float]] = {"y": y_list}
     labels_df = _create_dataframe_typed(labels_data)
     labels_df.write_parquet(labels_path, compression="snappy")
+
+    # Save group codes sidecar for grouped datasets
+    groups_numpy = dataset["groups"]
+    if groups_numpy is not None:
+        g_list: list[int] = []
+        for i in range(len(groups_numpy)):
+            g_value: np.int64 = groups_numpy[i]
+            g_list.append(int(g_value))
+        groups_data: dict[str, list[str] | list[int] | list[float]] = {"g": g_list}
+        groups_df = _create_dataframe_typed(groups_data)
+        groups_df.write_parquet(cache_dir / GROUPS_FILE_NAME, compression="snappy")
 
     _report_progress(
         callback=progress_callback,

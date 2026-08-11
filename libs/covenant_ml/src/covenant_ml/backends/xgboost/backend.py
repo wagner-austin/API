@@ -86,6 +86,7 @@ class XGBoostBackend(ClassifierBackend):
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         # Delegate to existing trainer (expects TrainConfig)
         def _is_train_config(cfg: ClassifierTrainConfig) -> TypeGuard[TrainConfig]:
@@ -107,6 +108,7 @@ class XGBoostBackend(ClassifierBackend):
             output_dir=output_dir,
             feature_names=names,
             progress_callback=progress,
+            groups=groups,
         )
 
     def evaluate(

@@ -170,6 +170,7 @@ class FakeClassifierBackend:
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Return a fake training outcome without actual training.
 
@@ -398,6 +399,7 @@ def _make_fake_loaded_dataset(n_samples: int = 100, n_features: int = 10) -> Loa
         "meta": meta,
         "x": x,
         "y": y,
+        "groups": None,
     }
 
 

@@ -42,6 +42,7 @@ def _clear_csv_cache(config: DatasetConfig, fixtures_dir: Path) -> None:
         config["encoding"],
         str(config["target"]),
         str(config["exclude_columns"]),
+        str(config.get("group_column")),
     ]
     config_str = "|".join(config_parts)
     config_hash = _compute_config_hash(config_str)

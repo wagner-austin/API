@@ -6,7 +6,7 @@ All types are immutable (total=True) and strictly typed.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -165,6 +165,10 @@ class DatasetConfig(TypedDict, total=True):
         n_samples_expected: Expected sample count for validation.
         n_features_expected: Expected feature count for validation.
         positive_class_ratio_expected: Expected positive class ratio.
+        group_column: Column identifying which rows belong to one entity
+            (e.g., one match) whose rows are correlated and must land in the
+            same train/val/test split. Never a feature. Absent for datasets
+            whose rows are independent.
     """
 
     name: str
@@ -178,6 +182,7 @@ class DatasetConfig(TypedDict, total=True):
     n_samples_expected: int
     n_features_expected: int
     positive_class_ratio_expected: float
+    group_column: NotRequired[str]
 
 
 class TimeSeriesSpec(TypedDict, total=True):
@@ -289,11 +294,15 @@ class LoadedDataset(TypedDict, total=True):
         meta: Dataset metadata with statistics.
         x: Feature matrix of shape (n_samples, n_features).
         y: Binary labels of shape (n_samples,).
+        groups: Integer group codes of shape (n_samples,) when the dataset's
+            config names a group_column — rows sharing a code are one entity
+            and must share a split — or None for row-independent datasets.
     """
 
     meta: DatasetMeta
     x: NDArray[np.float64]
     y: NDArray[np.int64]
+    groups: NDArray[np.int64] | None
 
 
 class RegressionLoadedDataset(TypedDict, total=True):

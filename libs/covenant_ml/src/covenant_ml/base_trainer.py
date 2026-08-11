@@ -31,6 +31,7 @@ class BaseTabularTrainer:
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         impl = self._registry.get(backend)
         return impl.train(
@@ -40,6 +41,7 @@ class BaseTabularTrainer:
             config=config,
             output_dir=output_dir,
             progress=progress,
+            groups=groups,
         )
 
 

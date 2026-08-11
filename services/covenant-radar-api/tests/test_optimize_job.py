@@ -112,7 +112,7 @@ def _make_fake_dataset(name: str = "taiwan") -> LoadedDataset:
         "feature_names": tuple(f"feature_{i}" for i in range(10)),
         "categorical_encodings": (),
     }
-    return {"meta": meta, "x": x, "y": y}
+    return {"meta": meta, "x": x, "y": y, "groups": None}
 
 
 def _make_fake_standard_config(name: str) -> DatasetConfig:
@@ -378,6 +378,7 @@ class _FakeBackend:
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Not used in optimize tests."""
         raise NotImplementedError

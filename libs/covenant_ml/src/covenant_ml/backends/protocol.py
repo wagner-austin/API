@@ -70,6 +70,7 @@ class ClassifierBackend(Protocol):
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome: ...
 
     def evaluate(

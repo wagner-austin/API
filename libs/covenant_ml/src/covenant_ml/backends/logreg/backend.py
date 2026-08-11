@@ -332,6 +332,7 @@ class LogRegBackend(ClassifierBackend):
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train Logistic Regression model on tabular data.
 
@@ -363,6 +364,7 @@ class LogRegBackend(ClassifierBackend):
             val_ratio=cfg["val_ratio"],
             test_ratio=cfg["test_ratio"],
             random_state=cfg["random_state"],
+            groups=groups,
         )
 
         scale_pos_weight = _compute_class_weight(splits.y_train)

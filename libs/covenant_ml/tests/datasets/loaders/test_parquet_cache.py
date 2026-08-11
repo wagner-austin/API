@@ -82,7 +82,7 @@ def _make_test_dataset(
         categorical_encodings=(),
     )
 
-    return LoadedDataset(meta=meta, x=x_array, y=y_array)
+    return LoadedDataset(meta=meta, x=x_array, y=y_array, groups=None)
 
 
 def _make_dataset_with_categoricals() -> LoadedDataset:
@@ -121,7 +121,7 @@ def _make_dataset_with_categoricals() -> LoadedDataset:
         categorical_encodings=encodings,
     )
 
-    return LoadedDataset(meta=meta, x=x_array, y=y_array)
+    return LoadedDataset(meta=meta, x=x_array, y=y_array, groups=None)
 
 
 class TestGetCacheDir:

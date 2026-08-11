@@ -267,6 +267,7 @@ class LightGBMBackend(ClassifierBackend):
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train LightGBM model on tabular data."""
         if not _is_lightgbm_config(config):
@@ -283,6 +284,7 @@ class LightGBMBackend(ClassifierBackend):
             val_ratio=cfg["val_ratio"],
             test_ratio=cfg["test_ratio"],
             random_state=cfg["random_state"],
+            groups=groups,
         )
 
         # Compute class weights for imbalanced data

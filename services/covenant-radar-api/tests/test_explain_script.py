@@ -174,7 +174,7 @@ def _make_fake_dataset() -> LoadedDataset:
         "feature_names": tuple(f"feature_{i}" for i in range(10)),
         "categorical_encodings": (),
     }
-    return {"x": x, "y": y, "meta": meta}
+    return {"x": x, "y": y, "meta": meta, "groups": None}
 
 
 def _make_fake_dataset_config(name: str) -> DatasetConfig:

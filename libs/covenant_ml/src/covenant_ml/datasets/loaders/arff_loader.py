@@ -57,6 +57,11 @@ class ARFFLoader:
             raise FileNotFoundError(f"Dataset file not found: {file_path}")
 
         # Parse ARFF
+        if config.get("group_column") is not None:
+            # Silently dropping groups would let a grouped dataset row-split
+            # and leak; refuse until this loader learns to carry them.
+            raise ValueError("group_column is only supported by the CSV loader")
+
         attributes, data_rows = self._parse_arff(file_path, config["encoding"])
 
         # Find target column
@@ -110,7 +115,7 @@ class ARFFLoader:
             categorical_encodings=(),  # ARFF numeric attributes only
         )
 
-        return LoadedDataset(meta=meta, x=x_array, y=y_array)
+        return LoadedDataset(meta=meta, x=x_array, y=y_array, groups=None)
 
     def _parse_arff(
         self,

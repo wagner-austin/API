@@ -95,7 +95,7 @@ class FakeDatasetLoader:
             categorical_encodings=(),  # Fake loader generates numeric data only
         )
 
-        return LoadedDataset(meta=meta, x=x_array, y=y_array)
+        return LoadedDataset(meta=meta, x=x_array, y=y_array, groups=None)
 
 
 def create_fake_dataset_loader(

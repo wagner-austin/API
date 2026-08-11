@@ -125,6 +125,7 @@ def make_fake_dataset(
     feature_names: tuple[str, ...] = tuple(f"feature_{i}" for i in range(n_features))
 
     return LoadedDataset(
+        groups=None,
         meta=DatasetMeta(
             name=name,
             n_samples=n_samples,
@@ -283,6 +284,7 @@ class FakeBackend:
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Fake training.
 

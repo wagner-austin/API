@@ -892,6 +892,7 @@ class LSTMBackend(ClassifierBackend):
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train LSTM model on tabular data."""
         if not _is_lstm_config(config):
@@ -908,6 +909,7 @@ class LSTMBackend(ClassifierBackend):
             val_ratio=cfg["val_ratio"],
             test_ratio=cfg["test_ratio"],
             random_state=cfg["random_state"],
+            groups=groups,
         )
 
         # Preprocess features (outlier capping, imputation, normalization)

@@ -217,7 +217,7 @@ Train on external CSV datasets with pluggable ML backends. Supports all seven cl
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `dataset` | string | Yes | - | Dataset to use — `taiwan`, `us`, `polish`, `kaggle_company_bankruptcy`, `kaggle_credit_default`, `kaggle_credit_risk`, `kaggle_heloc`, `kaggle_give_me_credit`, `kaggle_loan_default`, or the time-series `kaggle_amex_default` |
+| `dataset` | string | Yes | - | Dataset to use — `taiwan`, `us`, `polish`, `kaggle_company_bankruptcy`, `kaggle_credit_default`, `kaggle_credit_risk`, `kaggle_heloc`, `kaggle_give_me_credit`, `kaggle_loan_default`, the grouped `rw_matches`, or the time-series `kaggle_amex_default` |
 | `backend` | string | No | `xgboost` | Backend: `xgboost`, `lightgbm`, `cleargbm`, `logreg`, `random_forest`, `mlp`, or `lstm` |
 | `learning_rate` | float | Yes | - | Learning rate |
 | `random_state` | int | Yes | - | Random seed |
@@ -283,6 +283,10 @@ Train on external CSV datasets with pluggable ML backends. Supports all seven cl
 - `taiwan`: 6,819 samples, 95 financial ratio features
 - `us`: 78,682 samples, 18 features
 - `polish`: 7,027 samples, 64 financial ratio features
+- `rw_matches`: RustedWarfare match snapshots, 16 per-sample features, grows
+  with every exported batch. Grouped by `match`: the train/val/test split
+  keeps whole matches together, because ~1,500 snapshots of one match are
+  correlated and a row split would score memorization as skill.
 
 **Device Options:**
 - `"cpu"` - Force CPU training (slower but always available)

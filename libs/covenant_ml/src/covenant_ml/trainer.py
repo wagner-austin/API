@@ -430,10 +430,16 @@ def stratified_split(
     val_ratio: float,
     test_ratio: float,
     random_state: int,
+    groups: NDArray[np.int64] | None = None,
 ) -> DataSplits:
     """Split data into train/val/test with stratification.
 
-    Maintains class proportions across all splits.
+    Maintains class proportions across all splits. When ``groups`` is given,
+    the units being split are the groups, not the rows: every row of a group
+    lands in the same split, and stratification is by each group's label.
+    Rows within one group are correlated (e.g., 1,500 snapshots of one
+    match), so a row-level split would place near-duplicates of training
+    rows in the test set and score memorization as skill.
 
     Args:
         x_features: Feature matrix (n_samples, n_features)
@@ -442,6 +448,10 @@ def stratified_split(
         val_ratio: Fraction for validation (e.g., 0.15)
         test_ratio: Fraction for test holdout (e.g., 0.15)
         random_state: Random seed for reproducibility
+        groups: Optional group codes (n_samples,); rows sharing a code are
+            one entity and are never separated across splits. A group's
+            stratification label is its first row's label (constant per
+            group for any honest grouped dataset).
 
     Returns:
         DataSplits container with train/val/test arrays
@@ -458,6 +468,9 @@ def stratified_split(
         )
 
     rng = np.random.default_rng(random_state)
+
+    if groups is not None:
+        return _grouped_split(x_features, y_labels, groups, train_ratio, val_ratio, test_ratio, rng)
 
     # Get indices for each class (np.where returns tuple, take first element)
     pos_mask: NDArray[np.bool_] = y_labels == 1
@@ -510,6 +523,94 @@ def stratified_split(
             "train_ratio": train_ratio,
             "val_ratio": val_ratio,
             "test_ratio": test_ratio,
+            "n_train": len(train_idx),
+            "n_val": len(val_idx),
+            "n_test": len(test_idx),
+        },
+    )
+
+    return DataSplits(
+        x_train=x_features[train_idx],
+        y_train=y_labels[train_idx],
+        x_val=x_features[val_idx],
+        y_val=y_labels[val_idx],
+        x_test=x_features[test_idx],
+        y_test=y_labels[test_idx],
+    )
+
+
+def _grouped_split(
+    x_features: NDArray[np.float64],
+    y_labels: NDArray[np.int64],
+    groups: NDArray[np.int64],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+    rng: np.random.Generator,
+) -> DataSplits:
+    """Split whole groups into train/val/test, stratified by group label.
+
+    The same ratio arithmetic as the row split, applied to unique groups: a
+    group's label is its first row's, positive and negative groups are
+    shuffled and cut by the ratios, and every row follows its group. Row
+    order within each final split is shuffled so downstream batch-wise
+    consumers do not see one group as one contiguous block.
+
+    Args:
+        x_features: Feature matrix (n_samples, n_features)
+        y_labels: Binary labels (n_samples,)
+        groups: Group codes (n_samples,)
+        train_ratio: Fraction of groups for training
+        val_ratio: Fraction of groups for validation
+        test_ratio: Fraction of groups for test (remainder)
+        rng: Seeded generator shared with the caller
+
+    Returns:
+        DataSplits container with train/val/test arrays
+    """
+    unique_groups: NDArray[np.int64]
+    first_row: NDArray[np.intp]
+    unique_groups, first_row = np.unique(groups, return_index=True)
+    group_labels: NDArray[np.int64] = y_labels[first_row]
+
+    positive_mask: NDArray[np.bool_] = group_labels == 1
+    pos_groups: NDArray[np.int64] = unique_groups[positive_mask]
+    neg_groups: NDArray[np.int64] = unique_groups[~positive_mask]
+    rng.shuffle(pos_groups)
+    rng.shuffle(neg_groups)
+
+    def cut(pool: NDArray[np.int64]) -> tuple[set[int], set[int], set[int]]:
+        train_end = int(len(pool) * train_ratio)
+        val_end = int(len(pool) * (train_ratio + val_ratio))
+        as_ints: list[int] = []
+        for i in range(len(pool)):
+            code: np.int64 = pool[i]
+            as_ints.append(int(code))
+        return set(as_ints[:train_end]), set(as_ints[train_end:val_end]), set(as_ints[val_end:])
+
+    pos_train, pos_val, pos_test = cut(pos_groups)
+    neg_train, neg_val, neg_test = cut(neg_groups)
+
+    def rows_of(members: set[int]) -> NDArray[np.intp]:
+        keep: NDArray[np.bool_] = np.zeros(len(groups), dtype=np.bool_)
+        for row_idx in range(len(groups)):
+            row_code: np.int64 = groups[row_idx]
+            keep[row_idx] = int(row_code) in members
+        rows: NDArray[np.intp] = np.flatnonzero(keep)
+        rng.shuffle(rows)
+        return rows
+
+    train_idx = rows_of(pos_train | neg_train)
+    val_idx = rows_of(pos_val | neg_val)
+    test_idx = rows_of(pos_test | neg_test)
+
+    _log.info(
+        "Grouped data split complete",
+        extra={
+            "n_groups": len(unique_groups),
+            "n_train_groups": len(pos_train) + len(neg_train),
+            "n_val_groups": len(pos_val) + len(neg_val),
+            "n_test_groups": len(pos_test) + len(neg_test),
             "n_train": len(train_idx),
             "n_val": len(val_idx),
             "n_test": len(test_idx),
@@ -727,6 +828,7 @@ def train_model_with_validation(
     output_dir: Path,
     feature_names: list[str],
     progress_callback: ProgressCallback | None = None,
+    groups: NDArray[np.int64] | None = None,
 ) -> TrainOutcome:
     """Train XGBoost classifier with validation and early stopping.
 
@@ -743,6 +845,7 @@ def train_model_with_validation(
         output_dir: Directory to save model artifacts
         feature_names: List of feature names for importance reporting
         progress_callback: Optional callback for progress updates
+        groups: Optional group codes; whole groups share a split
 
     Returns:
         TrainOutcome with complete training results, metrics, and feature importances
@@ -761,6 +864,7 @@ def train_model_with_validation(
         val_ratio=config["val_ratio"],
         test_ratio=config["test_ratio"],
         random_state=config["random_state"],
+        groups=groups,
     )
 
     # Calculate scale_pos_weight from training set if not provided

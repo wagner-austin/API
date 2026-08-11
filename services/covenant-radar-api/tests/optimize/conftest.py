@@ -334,6 +334,7 @@ class FakeSaveModelBackend:
         config: ClassifierTrainConfig,
         output_dir: Path,
         progress: ProgressCallback | None,
+        groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Return fake train outcome."""
         model_path = output_dir / "model_1.ubj"
@@ -470,7 +471,7 @@ def make_fake_loaded_dataset() -> LoadedDataset:
         "feature_names": tuple(f"f_{i}" for i in range(10)),
         "categorical_encodings": (),
     }
-    return {"meta": meta, "x": x, "y": y}
+    return {"meta": meta, "x": x, "y": y, "groups": None}
 
 
 __all__ = [
