@@ -73,6 +73,11 @@ class FakeCursor:
             ("ALTER TABLE match_jobs ADD COLUMN IF NOT EXISTS", self._add_column),
             ("INSERT INTO match_jobs", self._insert_job),
             ("SELECT id, batch, config, match, job FROM match_jobs", self._select_queued),
+            ("SELECT batch FROM match_jobs", self._select_batches),
+            (
+                "SELECT batch, label, seed, worker, clone_index FROM match_jobs",
+                self._select_running,
+            ),
             ("SELECT clone_index FROM clone_leases", self._select_leases),
             ("SELECT state, count(*) FROM match_jobs", self._count_states),
             ("SELECT label, seed, state, card FROM match_jobs", self._select_results),
@@ -112,6 +117,20 @@ class FakeCursor:
             (row.job_id, row.batch, row.config, row.match, row.job) for row in waiting
         ]
         self._rows = queued[:1]
+
+    def _select_batches(self, params: tuple[str | int | bool, ...]) -> None:
+        newest: dict[str | int, int] = {}
+        for row in self._store.jobs:
+            newest[row.batch] = row.job_id
+        ordered = sorted(newest.items(), key=_newest_row, reverse=True)
+        self._rows = [(batch,) for batch, _ in ordered]
+
+    def _select_running(self, params: tuple[str | int | bool, ...]) -> None:
+        busy = sorted(
+            (row for row in self._store.jobs if row.state == "running"),
+            key=_lane_order,
+        )
+        self._rows = [(row.batch, row.label, row.seed, row.worker, row.clone_index) for row in busy]
 
     def _select_leases(self, params: tuple[str | int | bool, ...]) -> None:
         self._rows = [(index,) for index in self._store.leases]
@@ -253,6 +272,30 @@ class FakeCursor:
         rows = list(self._rows)
         self._rows = []
         return rows
+
+
+def _lane_order(row: FakeJobRow) -> int:
+    """Order running rows the way the real lanes query does.
+
+    Args:
+        row: One job row.
+
+    Returns:
+        The clone index.
+    """
+    return row.clone_index
+
+
+def _newest_row(item: tuple[str | int, int]) -> int:
+    """Order batches by their newest row id, for the batch listing.
+
+    Args:
+        item: One ``(batch, newest job id)`` pair.
+
+    Returns:
+        The newest job id.
+    """
+    return item[1]
 
 
 def _claim_order(row: FakeJobRow) -> tuple[int, int]:

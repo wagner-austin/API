@@ -22,11 +22,13 @@ from rw_bot.harness.runner import SweepConfig, decode_sweep_config, encode_sweep
 from rw_bot.harness.sweep import SweepJob, decode_sweep_job, encode_sweep_job
 from rw_bot.service._test_hooks import Connection
 from rw_bot.service.queue_rows import (
+    _batch_name,
     _claim_columns,
     _lease_index,
     _match_payload,
     _reaped_id,
     _result_columns,
+    _running_columns,
     _status_columns,
 )
 from rw_bot.wire.ndjson import parse_object, render_json
@@ -256,6 +258,73 @@ def claim(conn: Connection, worker: str, clone_pool: tuple[int, ...]) -> Claimed
         config=decode_sweep_config(parse_object(config_text), match),
         job=decode_sweep_job(parse_object(job_text)),
     )
+
+
+class RunningMatch(TypedDict):
+    """One match a lane is playing right now.
+
+    Attributes:
+        batch: The batch the match belongs to.
+        label: The match's arm label.
+        seed: The match's seed.
+        worker: The worker holding it.
+        clone_index: The leased engine slot.
+    """
+
+    batch: str
+    label: str
+    seed: int
+    worker: str
+    clone_index: int
+
+
+def running_matches(conn: Connection) -> tuple[RunningMatch, ...]:
+    """Read what every busy lane is playing, ordered by engine slot.
+
+    Args:
+        conn: An open connection; rolled back after the read.
+
+    Returns:
+        One row per running match.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` when a running row is
+            unreadable.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT batch, label, seed, worker, clone_index FROM match_jobs"
+        " WHERE state = 'running' ORDER BY clone_index"
+    )
+    rows = tuple(
+        RunningMatch(batch=batch, label=label, seed=seed, worker=worker, clone_index=clone)
+        for batch, label, seed, worker, clone in (
+            _running_columns(row) for row in cursor.fetchall()
+        )
+    )
+    conn.rollback()
+    return rows
+
+
+def fleet_batches(conn: Connection) -> tuple[str, ...]:
+    """List every batch the queue knows, newest submission first.
+
+    Args:
+        conn: An open connection; rolled back after the read.
+
+    Returns:
+        Batch names, ordered by their newest row -- the dashboard leads
+        with what was submitted last.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` when a batch row is
+            unreadable.
+    """
+    cursor = conn.cursor()
+    cursor.execute("SELECT batch FROM match_jobs GROUP BY batch ORDER BY max(id) DESC")
+    names = tuple(_batch_name(row) for row in cursor.fetchall())
+    conn.rollback()
+    return names
 
 
 def batch_status(conn: Connection, batch: str) -> BatchStatus:

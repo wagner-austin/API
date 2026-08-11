@@ -17,6 +17,7 @@ from __future__ import annotations
 from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.harness.sweep import SweepError, parse_jobs
 from rw_bot.service._test_hooks import Connection
+from rw_bot.service.dashboard import render_dashboard
 from rw_bot.service.queue import (
     batch_results,
     batch_status,
@@ -33,6 +34,7 @@ from rw_bot.wire.ndjson import NdjsonError, parse_object, render_json
 _JSON = "application/json"
 _NDJSON = "application/x-ndjson"
 _TEXT = "text/plain; charset=utf-8"
+_HTML = "text/html; charset=utf-8"
 
 
 def route_service_request(
@@ -75,6 +77,8 @@ def _decide(conn: Connection, method: str, path: str, body: bytes) -> tuple[int,
     """
     if method == "GET" and path == "/healthz":
         return 200, _JSON, render_json({"ok": True}).encode("utf-8")
+    if method == "GET" and path == "/":
+        return 200, _HTML, render_dashboard(conn).encode("utf-8")
     if method == "POST" and path == "/batches":
         fields = parse_object(body.decode("utf-8"))
         name = require_non_empty_str(fields, "name")

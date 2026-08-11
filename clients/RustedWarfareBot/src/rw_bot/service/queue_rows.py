@@ -22,6 +22,47 @@ class MatchServiceError(RwBotError):
     """
 
 
+def _batch_name(row: Sequence[str | int]) -> str:
+    """Validate one batch-name row.
+
+    Args:
+        row: One row of the batch listing query.
+
+    Returns:
+        The batch name.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` on any other shape.
+    """
+    if len(row) == 1 and isinstance(row[0], str):
+        return row[0]
+    raise MatchServiceError("RW-SERVICE-001", f"batch row has an unreadable shape: {row!r}")
+
+
+def _running_columns(row: Sequence[str | int]) -> tuple[str, str, int, str, int]:
+    """Validate one running-match row.
+
+    Args:
+        row: One row of the running-matches query.
+
+    Returns:
+        The batch, label, seed, worker and clone index.
+
+    Raises:
+        MatchServiceError: ``RW-SERVICE-001`` on any other shape.
+    """
+    if (
+        len(row) == 5
+        and isinstance(row[0], str)
+        and isinstance(row[1], str)
+        and isinstance(row[2], int)
+        and isinstance(row[3], str)
+        and isinstance(row[4], int)
+    ):
+        return row[0], row[1], row[2], row[3], row[4]
+    raise MatchServiceError("RW-SERVICE-001", f"running row has an unreadable shape: {row!r}")
+
+
 def _claim_columns(row: Sequence[str | int]) -> tuple[int, str, str, str, str]:
     """Validate the claim query's row shape.
 
