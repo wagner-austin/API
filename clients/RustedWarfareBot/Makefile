@@ -6,7 +6,7 @@ SHELL := powershell.exe
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet door income sweep
+.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet door fleet-up income sweep
 
 help:
 	@Write-Host ""
@@ -40,6 +40,7 @@ help:
 	@Write-Host "                                   WATCH_DIFFICULTY=3 WATCH_DOCTRINE=doctrines/aa-counter-guard.doctrine"
 	@Write-Host "  make host                        bot-hosted LAN game a human can join"
 	@Write-Host "  make door                        match-service HTTP door, detached (port 27501)"
+	@Write-Host "  make fleet-up                    start any missing match workers, detached"
 	@Write-Host "                                   HOST_MAP=maps/skirmish/[p2]duel_lake.tmx"
 	@Write-Host ""
 	@Write-Host "Java agent:" -ForegroundColor Yellow
@@ -404,6 +405,15 @@ door:
 	@Write-Host ""
 	@Write-Host "==> door (match service on http://127.0.0.1:27501/)" -ForegroundColor Cyan
 	& scripts/make/door.ps1
+
+# The worker fleet, detached: starts any of the 8 workers not already
+# running. The whole Docker-crash recovery is `make door` (if the door
+# also died) + `make fleet-up` -- the queue rows survive Postgres
+# restarts and the startup reap requeues what dead owners held.
+fleet-up:
+	@Write-Host ""
+	@Write-Host "==> fleet-up (8 detached match workers)" -ForegroundColor Cyan
+	& scripts/make/fleet-up.ps1
 
 # The match fleet: one user-owned manager process with a control page,
 # spawning `make play` children (seed, map, opponents, difficulty,
