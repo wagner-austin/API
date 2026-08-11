@@ -51,6 +51,7 @@ panel. Nothing on this list is a guess.
 ## Closed questions (measured, with the log entry that closed them)
 
 **Very Hard:**
+- The naval theater itself: submarines behind a guarded sea factory, REJECTED at -8 against the +4 bar (navy96f, 48 pairs, control 21 wins vs navy 13) with the mechanism proven in all 48 arm matches -- 6 genuine rescues against 14 thrown-away control wins, and the arm wiped 24 times to control's 15. The stat-sheet hard counter is real and insufficient: tempo, not the fleet, decides these games, and the ~3-5k diversion loses the land war faster than the submarine wins the water. Capability banked (walk, pinned builder, guard, headcount -- regression-locked, reusable on any water map); economics closed at Very Hard on duel_lake (log 2026-08-11).
 - The naval tilt response, under EVERY driver -- ungated -2, deficit -2, blood -2, learned-oracle -5: even correctly targeted arming breaks even, so no trigger quality can rescue it. Closed with prejudice (log 2026-08-10, navdoom96).
 - The blood-gated tilt calibration (log 2026-08-08, navblood96).
 - Composition surgery, all channels: eight one-knob arms negative; production is a ratio simplex (log 2026-08-07, the arm ladder).
