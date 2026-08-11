@@ -25,7 +25,7 @@ from tankpit_bot.browser.lifecycle import (
     navigate_and_login,
 )
 from tankpit_bot.capture.summary import build_session_summary
-from tankpit_bot.capture.trackers import MineTracker
+from tankpit_bot.capture.trackers.mine import MineTracker
 from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.runtime_artifacts import SniffRunArtifactsDict
 from tankpit_bot.runtime_logging import configure_sniff_runtime_logging

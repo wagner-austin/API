@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 
-from tankpit_bot.capture.trackers import MineTracker
+from tankpit_bot.capture.trackers.mine import MineTracker
 from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol.codec import build_xor_table
 from tests.conftest import FakeFileSystem

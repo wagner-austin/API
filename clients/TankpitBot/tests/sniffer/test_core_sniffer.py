@@ -274,7 +274,7 @@ class TestWebSocketSnifferMethods:
 
     def test_on_message_captured_sent_mine_status(self, fake_fs: FakeFileSystem) -> None:
         """Test _on_message_captured logs mine status for sent messages."""
-        from tankpit_bot.capture.trackers import MineTracker
+        from tankpit_bot.capture.trackers.mine import MineTracker
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
         from tankpit_bot.types import CapturedMessage
 
