@@ -4165,3 +4165,86 @@ So `record.get("diagnostic_kind")` returns `None`, any filter built on it matche
 Every failure this session was one bug: **a stale or mis-aimed detector reporting clean.** The mutation harness read the wrong line number; the assertion read the wrong field; and outside this work the same day, a probe filtered on `chrome` while headless launches `chrome-headless-shell.exe`, a control was handed a POSIX path on Windows and scanned nothing, and a health probe compared `$null -eq 0` and called a working daemon broken. In every case the output was a confident zero.
 
 **A detector that has not been run against a known-bad input is not evidence.** That is why the fix for 308 carries a positive assertion alongside the negative one.
+
+---
+
+## [2026-08-10] audit | The trackers are a pretty-printer, not a decoder; and thin wrappers cannot be machine-checked
+
+Three questions closed, two of my own analyses thrown away getting there. Commit `f8b4afcf` (pytest 9.0.2 -> 9.1.1, verified: 6,175 passed, 100.00% coverage).
+
+### `capture/trackers/` is a capture pretty-printer
+
+Every tracker has one shape:
+
+```python
+def process_message(self, payload: str) -> str | None
+```
+
+Base64 payload in, a **human-readable line** out (`[TANK:STATUS] id=42 'name' red private`) or `None` when it does not apply. There is no `msg_type` dispatch because that is not the design -- each tracker attempts its own decode and declines.
+
+So these are NOT a redundant second implementation of the live decode path. `sniffer/world_state_dispatch` produces structured `WorldStateDict` updates; the trackers produce display strings for reading a capture by eye. That is why the bot consumes none of them -- it has no use for formatted strings -- and they are the only `process_message` implementations in `src/`.
+
+Import graph, by AST:
+
+* **`MineTracker` is live** -- instantiated at `sniffer/core.py:116`, armed from `_on_magic_captured`.
+* **The other 11 are reachable only through `capture/trackers/__init__.py`**, the package re-export. No consumer in `src/` or `scripts/`; their only real callers are their own test files.
+
+Sizes if they go: **1,696 src + 3,154 test = 4,850 lines**.
+
+**The decision this enables:** deleting them removes a debugging tool, not protocol knowledge. That is a far lower-stakes call than the one my first analysis implied, and it is the user's to make.
+
+### Two analyses binned on the way, both the same bug
+
+**First:** grepped hex literals out of the tracker files and treated every match as a protocol discriminator. It produced "7 orphan message types, 3 of them undocumented". All three were artifacts:
+
+| claimed | actually |
+|---|---|
+| `0x0F` undocumented type | `rank = (info_byte >> 4) & 0x0F` -- a nibble mask |
+| `0x75` undocumented type | a docstring saying "subtype varies per session (0x75, 0x76, etc.)" |
+| `0x80` undocumented type | matched inside `if val_unsigned >= 0x8000` -- a sign-bit threshold |
+
+The companion figure, "27 of 34 types overlap with the live path", is garbage for the same reason: it compared bitmasks and thresholds, not message types.
+
+**Second:** the corrected AST scan, keyed on `msg_type == 0xNN` comparisons, found only **2 of 9** tracker files dispatch that way at all (`mine.py` on 0x04/0x45/0x4B, `tank.py` on 0x2E) -- and every one of those IS handled by the live path, so zero orphans. Right method, but it could not see the other seven files, so it could not answer the question either. Only reading `process_message` did.
+
+### Thin wrappers cannot be machine-checked here
+
+An AST sweep finds **60 pure pass-throughs** in `src/` (a body of exactly `return other(<own params>)`). The instinct is that these violate "no thin wrappers". They do not:
+
+```
+SurfaceRouteTerrain.get_terrain -> get_terrain        # required by TerrainMapProtocol
+CommandService.send_bytes       -> send_command_bytes # the object seam
+ProtocolCodec.encode / .decode  -> xor_bytes          # naming the domain operation
+TerrainMap.is_landing_legal     -> is_passable        # naming the domain operation
+```
+
+`SurfaceRouteTerrain.get_terrain` MUST exist to satisfy its Protocol. `ProtocolCodec.encode` naming `xor_bytes` as an encode step IS the abstraction. Separating those from a pointless alias needs intent, not syntax -- and `scripts/shim_rules.py` states the governing principle in its own docstring: *"A rule that needs a human to adjudicate would need an allowlist, and an allowlist is the thing this project refuses."*
+
+**So the rule is deliberately NOT extended to thin wrappers.** Recorded here so a later pass does not "fix" these 60 sites, and does not add the allowlist that would be required to.
+
+`equipment_probe.py`'s nine `_x() -> x_for_probe()` methods look mechanical but bind `self`-derived arguments, so they are not pure aliases either.
+
+### Compliance audit against the standing rule
+
+"No back-compat shims, no thin wrappers, no fallbacks, no legacy code, no type alias", checked:
+
+| rule | result |
+|---|---|
+| no type alias | **0** `TypeAlias`, **0** `Any`, **0** `cast`, **0** `noqa` |
+| no fallbacks | **0** -- no `except ImportError`, no `getattr(_,_,default)` anywhere in `src/` |
+| no legacy code / shims | enforced by `scripts/shim_rules.py` (legacy vocabulary, `X = X`, renamed re-exports) |
+| no thin wrappers | not enforceable without an allowlist -- see above |
+
+Every apparent violation is docstring prose stating the ban, or `tests/test_guard_checks.py:270-273`, the guard's own negative-control fixture.
+
+### Mutation sweep, in progress
+
+**28 of 474 guards** done, **0 survivors**, paused for machine load. Harness rewritten with the failure from 2026-08-08 fixed: an inflight marker plus a byte-for-byte backup outside the repo, so a hard kill is recoverable instead of silently leaving `src/` mutated. **The recovery path was tested by simulating a kill** -- it printed `RECOVERED ...` and restored the file byte-for-byte -- and then earned it for real when the run was killed mid-mutation. Results land outside the repo; the previous run left `mutation_results.txt` in the repo root.
+
+### Infrastructure: mirrored mode removes Docker Desktop's recovery path
+
+Docker Desktop's backend IPC hung at 21:25 on 2026-08-09 with **nothing logged** -- both the stats ping and the backend's own 30 s `/time` heartbeat went silent between two ordinary log lines. The proxy then fell back to dialing `192.168.65.7:2376`, which **cannot succeed** under `networkingMode=mirrored`: verified from inside the VM, its only addresses are `192.168.10.108` and `100.77.206.124`, and nothing listens on 2376. So a momentary hang became a **33-minute outage** of both public endpoints, ending only when Docker Desktop's supervisor relaunched the backend at 21:57.
+
+Ruled out with evidence: container crashes (`restarts=0`, `exit=0`, `oom=false` on every container), memory (32 GB free, zero OOM events), the match fleet (its code contains no docker/wsl/netsh call; its only kills are `taskkill /T` on its own match-tree pids and a port holder that must be named exactly `java`).
+
+**Why it wedged is not knowable from what exists:** dockerd's stdout is a pipe into Docker Desktop's `memlogd` ring buffer, reachable only through the IPC that hung, and `/var/log` inside the VM holds one stale `apk.log`. The diagnostic channel and the failed channel are the same channel. A watchdog was built to close that gap and then **deleted**: the evidence actually needed was already in `com.docker.backend.exe.log` and the container logs, so the gap was analytical, not instrumental.
