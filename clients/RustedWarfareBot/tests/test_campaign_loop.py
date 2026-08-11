@@ -441,3 +441,35 @@ def test_the_death_ledger_answers_the_bloodied_gates_read() -> None:
     assert scores.deaths_to({"battleShip"}) == 2
     assert scores.deaths_to({"battleShip", "c_artillery"}) == 3
     assert scores.deaths_to({"gunBoat"}) == 0
+
+
+def test_the_shipyards_order_lands_after_the_expanders() -> None:
+    """The engine holds one order per unit and whoever sends last holds the
+    builder -- learned on navy96b, forgotten in v4, and photographed on
+    navy96d: all 48 walks exhausted with the builder re-tasked every tick
+    while navy96c's factories stood 24/26 (log 2026-08-10). The shipyard's
+    build must be the tick's LAST builder order or the factory never
+    stands."""
+    catalogue = {**CATALOGUE, "seaFactory": unit_stats("seaFactory", speed=0.0, price=1000)}
+    placements = {
+        name: TypePlacement(index=i, type_name=name, needs_pool=name == "extractorT1")
+        for i, name in enumerate(catalogue)
+    }
+    profiles = profiles_for(catalogue)
+    world = sample(
+        CENTRE,
+        entity(214, "builder", x=0.0, y=0.0),
+        credits=8000,
+        pools=(pool(x=60.0, y=0.0),),
+        options=(option(214, "extractorT1"), option(214, "seaFactory")),
+    )
+    peer = ScriptedPeer(lines(world))
+    play(AgentChannel(peer), (), catalogue, placements, profiles, 1, expand=True, navy=1)
+    built = verb(peer, "build")
+    assert built, "the tick produced no build orders at all"
+    assert '"type":"seaFactory"' in built[-1], (
+        f"the shipyard's order must be sent last, got {built}"
+    )
+    assert any('"type":"extractorT1"' in line for line in built), (
+        "the expander never ordered, so the test proves nothing about ordering"
+    )

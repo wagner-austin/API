@@ -410,7 +410,6 @@ def play(
                 channel,
                 nuker.advance(sample, catalogue, budget, free, workforce, nukes, committed_close),
             )
-            send_builds(channel, shipyard.establish(sample, catalogue, budget, navy > 0))
             # The guard before the subs: an unescorted fleet is a free
             # kill queue for the first gunship (navy96c, log 2026-08-10).
             send_produces(channel, fleet_guard.hire(sample, budget, min(navy, 1)))
@@ -452,6 +451,13 @@ def play(
                     air_seen=airwatch.seen(),
                 ),
             )
+            # The shipyard sends AFTER the expander, never before: the
+            # engine holds one order per unit and whoever sends last holds
+            # the builder. v3 learned this (navy96b) and v4 forgot it by
+            # moving the call above the expander block -- all 48 navy96d
+            # walks exhausted with the builder re-tasked every tick while
+            # navy96c's factories stood 24/26 (log 2026-08-10).
+            send_builds(channel, shipyard.establish(sample, catalogue, budget, navy > 0))
             refused_now = sum(1 for claim in budget.ledger() if not claim["granted"])
             refused += refused_now
             # **The reasons are kept now, not just the count.** Every claim
