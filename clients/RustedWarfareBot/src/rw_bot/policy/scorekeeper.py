@@ -108,6 +108,12 @@ class Scorekeeper:
         self._previous_owned: Mapping[int, Entity] = {}
         self._unit_deaths: dict[str, int] = {}
         self._building_deaths: dict[str, int] = {}
+        # Peak simultaneous count of every type ever owned: the mechanism
+        # census. End-state tables cannot testify for a structure that
+        # stood and died, and five navy panels ran on exactly that gap --
+        # the ledger proved payment while nothing proved existence
+        # (log 2026-08-10). A channel's pilot reads this line.
+        self._owned_peak: dict[str, int] = {}
         #: Losses inferred on the last observation -- the doom watch's
         #: ``lost`` column, matching the trace's by construction: both run
         #: the same roster diff at the same cadence ([[policy-trace]]).
@@ -145,6 +151,12 @@ class Scorekeeper:
         self._engageable_end = len(engageable(self._profiles, army, targets))
         self.visible_now = {entity["unit_id"] for entity in targets}
         current_owned = owned_by_id(sample)
+        tick_census: dict[str, int] = {}
+        for held in current_owned.values():
+            tick_census[held["type_name"]] = tick_census.get(held["type_name"], 0) + 1
+        for name, count in tick_census.items():
+            if count > self._owned_peak.get(name, 0):
+                self._owned_peak[name] = count
         ticked = losses_between(self._previous_owned, current_owned, sample["frame"])
         self.losses_now = len(ticked)
         for loss in ticked:
@@ -292,6 +304,7 @@ class Scorekeeper:
             workers_end=self._workers_end,
             standing_end=self._standing_end,
             composition_end=self._composition_end,
+            owned_peak=_ranked(self._owned_peak),
             enemy_types_end=self._enemy_types_end,
             units_lost_to=_ranked(self._unit_deaths),
             buildings_lost_to=_ranked(self._building_deaths),

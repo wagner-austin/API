@@ -80,6 +80,7 @@ panel. Nothing on this list is a guess.
 8. **Blast radius matches trigger precision** — small reversible responses may gate on present signals; match-reshaping responses require prediction, which no present-tense scalar supplies (2026-08-08, the three-calibration arc).
 9. **Effects must replicate across trees** — a paired panel controls within-tree noise, not tree-to-tree variance; the same seeds flipped +217 to -198 between trees. Fresh-tree replication is the adoption bar (2026-08-09, imp-raid8x48).
 10. **Measure the response before the trigger** — a response that breaks even when correctly armed is a dead end at any trigger precision; the tilt netted -2 on its own home subset under a replicated 0.75-AUC oracle (2026-08-10, navdoom96).
+11. **Mechanism before measurement** — no panel runs until a pilot match's card proves the arm's mechanism EXECUTED (the `owned peak` census line: what stood, ever, at its peak). Five navy panels ran to verdict while the thing under test never existed: the budget proved payment, nothing proved existence, and a misread of truncated walks as acceptance cost two further panels. Ship the probe's own mechanics whole — every place a channel "improves" on a proven probe is where a panel dies (2026-08-10, navy96 through navy96e).
 
 ## The ML layer
 

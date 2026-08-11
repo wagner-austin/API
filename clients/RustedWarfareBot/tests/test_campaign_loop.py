@@ -473,3 +473,53 @@ def test_the_shipyards_order_lands_after_the_expanders() -> None:
     assert any('"type":"extractorT1"' in line for line in built), (
         "the expander never ordered, so the test proves nothing about ordering"
     )
+
+
+def test_the_mechanism_census_remembers_what_stood_and_died() -> None:
+    """Five navy panels ran to verdict without anything proving a paid-for
+    factory ever EXISTED: the end-state tables cannot testify for a
+    structure that stood and then died (log 2026-08-10). The peak census
+    can, and a pilot match is read against it before a panel runs."""
+    catalogue = {**CATALOGUE, "seaFactory": unit_stats("seaFactory", speed=0.0, price=1000)}
+    profiles = profiles_for(catalogue)
+    with_factory = sample(
+        CENTRE,
+        entity(50, "seaFactory", x=300.0, y=0.0),
+        entity(1, "c_tank", x=10.0),
+        entity(2, "c_tank", x=20.0),
+        credits=1000,
+    )
+    without = sample(CENTRE, entity(1, "c_tank", x=10.0), credits=1000)
+    scores = Scorekeeper(catalogue, profiles)
+    for observed in (with_factory, without):
+        scores.observe(observed, (), (), 0)
+    report = scores.report(
+        completed=0,
+        planned=0,
+        build_orders=0,
+        build_outcome="",
+        build_reason="",
+        produced=0,
+        expanded=0,
+        expanded_factories=0,
+        expand_reason="",
+        attack_orders=0,
+        rallied=0,
+        intercepts=0,
+        sightings=0,
+        raids=0,
+        marches=0,
+        killed=0,
+        refused_claims=0,
+        outlays=(),
+        reaches=(),
+        outcome="",
+    )
+    assert report["owned_peak"] == (
+        ("c_tank", 2),
+        ("commandCenter", 1),
+        ("seaFactory", 1),
+    )
+    assert report["standing_end"] == (("commandCenter", 1),)
+    rendered = format_report(report)
+    assert "owned peak     c_tank x2, commandCenter x1, seaFactory x1" in rendered

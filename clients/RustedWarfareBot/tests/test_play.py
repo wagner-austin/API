@@ -146,6 +146,7 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         # that bought none read identically ([[policy-economy]]).
         "structures     extractorT1 x3, landFactory x1",
         "composition    c_tank x4",
+        "owned peak     c_tank x4, extractorT1 x3, builder x1, landFactory x1",
         "units lost to  none",
         "works lost to  none",
         "enemy fields   none",
@@ -213,6 +214,7 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
         # No army, so no mix -- named rather than left blank, because an empty
         # field reads as a measurement that failed to happen.
         "composition    none",
+        "owned peak     builder x1",
         "units lost to  none",
         "works lost to  none",
         "enemy fields   none",
@@ -272,6 +274,7 @@ def test_the_sample_budget_defaults_when_not_given(
         "workers        1",
         "structures     extractorT1 x3, landFactory x1",
         "composition    c_tank x4",
+        "owned peak     c_tank x4, extractorT1 x3, builder x1, landFactory x1",
         "units lost to  none",
         "works lost to  none",
         "enemy fields   none",

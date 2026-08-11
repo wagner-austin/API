@@ -283,6 +283,7 @@ def _report() -> MatchReport:
         units_lost_to=(("c_artillery", 3),),
         buildings_lost_to=(),
         standing_end=(("extractorT1", 13), ("c_turret_t1", 4), ("landFactory", 1)),
+        owned_peak=(("c_tank", 24), ("extractorT1", 14), ("seaFactory", 1)),
         income_end=122,
         players_start=5,
         players_end=5,

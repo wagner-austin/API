@@ -129,6 +129,13 @@ class MatchReport(TypedDict):
             leaves the mix silently at whatever else was makeable. Without this
             the experiment cannot tell a mix that was built from a mix that was
             requested and quietly denied ([[policy-production]]).
+        owned_peak: Peak simultaneous count of every type ever owned,
+            commonest first -- the mechanism census. The end-state tables
+            cannot testify for anything that stood and then died, and five
+            navy panels ran to verdict on exactly that blindness: the
+            budget proved a sea factory was PAID for while nothing in the
+            card proved one ever EXISTED (log 2026-08-10). A channel's
+            pilot match is read against this line before its panel runs.
         income_end: Credits per second at the last observation.
         players_start: Players still in the match at the first observation.
         players_end: Players still in at the last.
@@ -195,6 +202,7 @@ class MatchReport(TypedDict):
     workers_end: int
     standing_end: tuple[tuple[str, int], ...]
     composition_end: tuple[tuple[str, int], ...]
+    owned_peak: tuple[tuple[str, int], ...]
     units_lost_to: tuple[tuple[str, int], ...]
     buildings_lost_to: tuple[tuple[str, int], ...]
     enemy_types_end: tuple[tuple[str, int], ...]
@@ -263,6 +271,7 @@ def format_report(report: MatchReport) -> tuple[str, ...]:
         f"workers        {report['workers_end']}",
         f"structures     {_format_composition(report['standing_end'])}",
         f"composition    {_format_composition(report['composition_end'])}",
+        f"owned peak     {_format_composition(report['owned_peak'])}",
         f"units lost to  {_format_composition(report['units_lost_to'])}",
         f"works lost to  {_format_composition(report['buildings_lost_to'])}",
         f"enemy fields   {_format_composition(report['enemy_types_end'])}",
