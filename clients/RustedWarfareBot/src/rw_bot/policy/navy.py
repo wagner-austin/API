@@ -35,11 +35,30 @@ from rw_bot.wire.state import Sample
 #: The structure the walk stands, and the reason it exists.
 FACTORY_TYPE = "seaFactory"
 
+#: The fleet's own anti-air, hired BEFORE the submarines: navy96c's
+#: factories died to lightGunships, and the stat sheet had already
+#: assigned this job -- the missile ship is the only hull that shoots
+#: air. A fleet without one is a free kill queue (log 2026-08-10).
+GUARD_TYPE = "missileShip"
+
 #: Fractions of the anchor-to-mirror line offered to the engine, nearest
-#: first: the shore closest to our base is the edge a builder can reach,
-#: and the live probe accepted the second candidate on duel_lake
-#: (log 2026-08-10, the sea probe).
-FRACTIONS: tuple[float, ...] = (0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6)
+#: first and FINE near the shore: navy96c's factories stood at 0.25 --
+#: 460 world units out, alone -- and died to gunships before hiring a
+#: single submarine, so the walk hugs our edge of the water at one-percent
+#: steps before conceding distance (log 2026-08-10).
+FRACTIONS: tuple[float, ...] = (
+    0.2,
+    0.21,
+    0.22,
+    0.23,
+    0.24,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+)
 
 #: Samples watched per candidate before the walk advances. Builders walk
 #: before they build, so patience is part of the sensor -- and each

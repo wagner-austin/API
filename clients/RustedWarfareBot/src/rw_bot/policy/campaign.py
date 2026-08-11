@@ -64,7 +64,7 @@ from rw_bot.policy.ledger import Outlays
 from rw_bot.policy.lurk import Lurker
 from rw_bot.policy.match_report import MatchReport
 from rw_bot.policy.medic import BUNKER_TYPE, Medic
-from rw_bot.policy.navy import Shipyard
+from rw_bot.policy.navy import GUARD_TYPE, Shipyard
 from rw_bot.policy.nuker import Nuker
 from rw_bot.policy.production import wanted_producers
 from rw_bot.policy.raid import Raider
@@ -263,6 +263,7 @@ def play(
     medic = Medic()
     bunker = Medic(BUNKER_TYPE)
     submarines = Medic("attackSubmarine")
+    fleet_guard = Medic(GUARD_TYPE)
     shipyard = Shipyard()
     flamer = Converter()
     gunner = TurretLadder()
@@ -410,6 +411,9 @@ def play(
                 nuker.advance(sample, catalogue, budget, free, workforce, nukes, committed_close),
             )
             send_builds(channel, shipyard.establish(sample, catalogue, budget, navy > 0))
+            # The guard before the subs: an unescorted fleet is a free
+            # kill queue for the first gunship (navy96c, log 2026-08-10).
+            send_produces(channel, fleet_guard.hire(sample, budget, min(navy, 1)))
             send_produces(channel, submarines.hire(sample, budget, navy))
             send_produces(channel, medic.hire(sample, budget, medics))
             send_produces(channel, bunker.hire(sample, budget, bunkers))

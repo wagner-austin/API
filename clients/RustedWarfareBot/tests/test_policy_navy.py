@@ -75,9 +75,9 @@ def test_one_claim_then_the_order_resends_and_patience_advances() -> None:
     # exactly once across two patience windows.
     assert claims == 1
     assert len(ordered) == 2 * PATIENCE + 1
-    assert set(ordered) == {200.0, 250.0}
+    assert set(ordered) == {200.0, 210.0}
     assert ordered[0] == 200.0
-    assert ordered[-1] == 250.0
+    assert ordered[-1] == 210.0
 
 
 def test_a_standing_or_growing_factory_ends_the_walk() -> None:
