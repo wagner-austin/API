@@ -51,21 +51,25 @@ The pivotal structural event is **`sniffer/world_state_dispatch.py` on 2026-04-0
 
 `action_lab/` is worth its own note: isolated probes, built because the integrated bot was too broken to trust. Diagnostic infrastructure, not the production path.
 
-### The wipe (2026-06)
+### The recovery commit (2026-06)
 
 101 commits, and one of them is **`62643d2c`, 2026-06-14, "Recover codebase from transcript after accidental wipe."** The codebase was reconstructed from a conversation transcript. `diagnostics/` dates from this month.
 
 `wiki/log.md`'s own record starts 2026-06-16, two days later — so the wiki has no entries covering anything before the recovery.[^4]
 
-### The eight weeks git does not have
+### The eight weeks with no commits (cause unestablished)
 
-This is the one hole in the record, and it is worth stating plainly because a reader will otherwise trust `git log` as complete.
+This is the one hole in the record. What follows separates what is measured from what is not, because an earlier draft of this page asserted a narrative it could not support.
 
-The last TankpitBot commit before the wipe is **2026-04-19**. The next is the recovery, **2026-06-14**. Between those dates there are no commits at all — and the recovery was reconstructed **from a conversation transcript, not from git**, arriving as one commit of 283 files (+46,957 / −7,215) spanning several projects.[^8]
+**Measured.** The last TankpitBot commit before the gap is **2026-04-19**; the next is **2026-06-14**, `62643d2c`, whose message reads *"Recover codebase from transcript after accidental wipe"*. Between those dates, zero commits here. That commit changed 283 files, of which **277 are under `clients/TankpitBot`** (+43,279 / -7,215 lines).[^8]
 
-So roughly eight weeks of development exists only as an end state. No messages, no diffs, no ordering, no record of what was tried and abandoned. Anything you want to know about that period has to be inferred from the code it produced.
+**Not established: what the "accidental wipe" was.** That commit message is the only evidence in this repository, and Austin did not recall the event when asked on 2026-08-10. One line of the diff argues against reading it as rubble recovery: `+0 -876 _test_hooks.py` alongside `+151 _test_hooks/__init__.py` is a file-to-package **refactor**, which is ordinary work. So the commit may be a large batch of uncommitted work that was reconstructed, and the word "wipe" may be carrying more narrative than the facts support. **Do not build on it.**
 
-Git's `--lost-found` holds 12 unreachable commits, but they are all 2026-07 and 2026-08 — orphaned by amends and rebases during recent work, not survivors of the wipe. **The eight weeks are not recoverable from this repository.**
+What can be said either way: substantial TankpitBot work in that window has no incremental history. Whatever the cause, it arrived as one commit -- no messages, no diffs, no ordering, no record of what was tried and abandoned.
+
+**The work did not stop; it moved.** Other projects live in separate repositories that a count here cannot see. `~/PROJECTS/MCPs` logged **880 commits inside this same Apr 19 - Jun 14 window**, including 71 in May (2026-05-01 to 05-28: `data-platform` migrations 086-090, watcher DRY cleanups), and April was MCPs' own peak at 866 -- the same month TankpitBot peaked at 317. `~/PROJECTS/Dashboards` accounts for February the same way, at 469 commits. There are roughly 58 project directories under `PROJECTS/`, so "the repo was idle" is never a safe inference from one repository's log.[^9]
+
+Git's `--lost-found` holds 12 unreachable commits, all 2026-07 and 2026-08, orphaned by amends and rebases during recent work. None predate the gap, so nothing in this repository recovers it.
 
 ### Instrumentation and doctrine (2026-07)
 
@@ -92,8 +96,9 @@ Three lessons recur across all eight months, each learned more than once:
 [^1]: `git log --diff-filter=A -- src/tankpit_bot/capture/trackers/` gives 2026-01-12; `-- src/tankpit_bot/sniffer/world_state_dispatch.py` gives 2026-04-04. The tracker shape is visible in the surviving `capture/trackers/mine.py` (`process_message(self, payload: str) -> str | None`). The deletion and both discarded analyses are recorded in the `[2026-08-10] audit` entry in `log.md`. `MineTracker` survives because `sniffer/core.py:244` pipes its output to `log.info`; the comment at `sniffer/core.py:116` states "the bot never reads it".
 [^2]: `git log --format=%ad --date=short -- .` tail gives 2025-12-30, `070bccf7`. The enforced set is `pyproject.toml` `[tool.mypy]` and `[tool.ruff.lint.flake8-tidy-imports.banned-api]`; see [[coding-standards]] footnote 1 for the field-by-field list.
 [^3]: `git log --diff-filter=A` per package directory, run 2026-08-10. Same-day arrivals: `capture`, `sniffer`, `protocol`, `state`, `browser` (all 2026-01-12); `bot` 2026-01-17; `bot/ai` 2026-03-24; `action_lab` and `replay` 2026-04-10; `diagnostics` 2026-06-14; `service` 2026-07-13; `contracts` and `ledger` 2026-07-18; `physics` and `validate` 2026-07-21; `sim` 2026-07-22; `analysis` 2026-08-06.
-[^4]: `wiki/log.md:7` is the first entry, dated 2026-06-16. Commit counts per month from `git log --format=%ad --date=format:%Y-%m -- .` piped through `uniq -c`: 2025-12 → 72, 2026-01 → 134, 2026-03 → 113, 2026-04 → 317, 2026-06 → 101, 2026-07 → 379, 2026-08 → 204. The two apparent gaps are different in kind, verified 2026-08-10 by comparing project-scoped against repo-wide counts: **2026-02** had 0 TankpitBot commits but **114 monorepo commits** — a real pause here while work went elsewhere. **2026-05** had 0 commits anywhere, and is part of the hole described in § The eight weeks git does not have. Project scale in context: the monorepo's own first commit is 2025-12-05 (`5c68b713`, monorepo-guards), 25 days before TankpitBot's, and TankpitBot is 1,320 of the repo's 2,978 commits (~44%).
+[^4]: `wiki/log.md:7` is the first entry, dated 2026-06-16. Commit counts per month from `git log --format=%ad --date=format:%Y-%m -- .` piped through `uniq -c`: 2025-12 → 72, 2026-01 → 134, 2026-03 → 113, 2026-04 → 317, 2026-06 → 101, 2026-07 → 379, 2026-08 → 204. The two apparent gaps are different in kind, verified 2026-08-10 by comparing project-scoped against repo-wide counts: **2026-02** had 0 TankpitBot commits but **114 monorepo commits** and **469 in `~/PROJECTS/Dashboards`** — that month's attention was Dashboards. **2026-05** had 0 commits in this monorepo, but **71 in `~/PROJECTS/MCPs`**, a separate repository this repo's history cannot see -- corrected 2026-08-10 after an earlier draft called the month idle. It also falls inside the hole described in § The eight weeks git does not have. Project scale in context: the monorepo's own first commit is 2025-12-05 (`5c68b713`, monorepo-guards), 25 days before TankpitBot's, and TankpitBot is 1,320 of the repo's 2,978 commits (~44%).
 [^5]: [[coding-standards]] § Code style, file-size bullet, and its footnote 4 citing `log.md:2426-2428` for the ruling and `log.md:2437` for the 40-file enumeration.
 [^6]: [[coding-standards]] § Testing, and the `[2026-08-08] audit` plus `[2026-08-09] update` entries in `log.md`. The mutation sweep was at 28 of 474 guards when this page was written, with 0 survivors in that tranche.
 [^7]: Enumerated with specifics in the `[2026-08-09] update` and `[2026-08-10] audit` entries of `log.md`.
 [^8]: `git log -1 62643d2c^ -- .` gives 2026-04-19 as the last pre-wipe commit; `62643d2c` itself is dated 2026-06-14 with the message "Recover codebase from transcript after accidental wipe" and `git show --stat` reports 283 files changed, 46,957 insertions, 7,215 deletions. `git fsck --lost-found` returns 12 dangling commits, all dated 2026-07-25 through 2026-08-07 — checked individually, none predate the wipe.
+[^9]: Per-repository counts run 2026-08-10: `~/PROJECTS/MCPs` (its own git root) has 2,242 commits, 880 of them between 2026-04-19 and 2026-06-14, 71 in May; `~/PROJECTS/Dashboards` has 884 commits, 469 in 2026-02 and 316 in 2026-01. Directory count under `PROJECTS/` from `ls -d`.
