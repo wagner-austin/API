@@ -18,7 +18,6 @@ from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.harness.sweep import SweepError, parse_jobs
 from rw_bot.service._test_hooks import Connection
 from rw_bot.service.queue import (
-    MatchServiceError,
     batch_results,
     batch_status,
     bootstrap,
@@ -26,6 +25,7 @@ from rw_bot.service.queue import (
     retry_failed,
     submit,
 )
+from rw_bot.service.queue_rows import MatchServiceError
 from rw_bot.service.submit import batch_config
 from rw_bot.validation import DecodeError, require_int, require_non_empty_str, require_str
 from rw_bot.wire.ndjson import NdjsonError, parse_object, render_json
@@ -94,7 +94,8 @@ def _decide(conn: Connection, method: str, path: str, body: bytes) -> tuple[int,
     parts = path.strip("/").split("/")
     if len(parts) == 3 and parts[0] == "batches" and parts[2] == "priority" and method == "POST":
         fields = parse_object(body.decode("utf-8"))
-        moved = reprioritize(conn, parts[1], require_int(fields, "priority"))
+        arm = require_str(fields, "label") if "label" in fields else ""
+        moved = reprioritize(conn, parts[1], require_int(fields, "priority"), arm)
         bumped: dict[str, str | int] = {"batch": parts[1], "moved": moved}
         return 200, _JSON, render_json(bumped).encode("utf-8")
     if len(parts) == 3 and parts[0] == "batches" and parts[2] == "retries" and method == "POST":

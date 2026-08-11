@@ -23,7 +23,8 @@ from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.service import _test_hooks
 from rw_bot.service._test_hooks import Connection
 from rw_bot.service.http import route_service_request
-from rw_bot.service.queue import MatchServiceError, bootstrap
+from rw_bot.service.queue import bootstrap
+from rw_bot.service.queue_rows import MatchServiceError
 
 EXIT_OK = 0
 EXIT_BAD_USAGE = 2

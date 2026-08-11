@@ -25,7 +25,8 @@ from scripts.match_service import (
 from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.service import _test_hooks as service_hooks
 from rw_bot.service.http import route_service_request
-from rw_bot.service.queue import MatchServiceError, claim, finish
+from rw_bot.service.queue import claim, finish
+from rw_bot.service.queue_rows import MatchServiceError
 from rw_bot.wire.ndjson import parse_object, render_json
 from tests.harness_fakes import FakeHost
 from tests.service_fakes import FakeConnection

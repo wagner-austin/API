@@ -15,7 +15,6 @@ from rw_bot.harness.runner import decode_sweep_config
 from rw_bot.harness.sweep import parse_job_line
 from rw_bot.service.queue import (
     ClaimedJob,
-    MatchServiceError,
     batch_results,
     batch_status,
     bootstrap,
@@ -27,6 +26,7 @@ from rw_bot.service.queue import (
     retry_failed,
     submit,
 )
+from rw_bot.service.queue_rows import MatchServiceError
 from tests.service_fakes import FakeConnection
 
 _MATCH = decode_match_config(
@@ -345,3 +345,15 @@ def test_reprioritize_moves_only_the_queued() -> None:
     assert reprioritize(conn, "demo", 10) == 1
     running = next(r for r in conn.store.jobs if r.job_id == held["job_id"])
     assert running.priority == 100
+
+
+def test_a_label_scoped_bump_moves_only_that_arm() -> None:
+    """The paired-panel case: the interesting half need not wait behind
+    its own controls (log 2026-08-10)."""
+    conn = _submitted()
+    submit(
+        conn, "demo", _CONFIG, (parse_job_line("beta|999|doctrines/flame-nocover.doctrine|400"),)
+    )
+    assert reprioritize(conn, "demo", 10, "beta") == 1
+    held = _claimed(conn, "w1", (1,))
+    assert held["job"]["label"] == "beta"

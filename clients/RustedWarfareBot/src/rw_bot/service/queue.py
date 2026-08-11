@@ -15,24 +15,21 @@ undecoded.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TypedDict
 
-from rw_bot import RwBotError
 from rw_bot.harness.match import MatchConfig, decode_match_config, encode_match_config
 from rw_bot.harness.runner import SweepConfig, decode_sweep_config, encode_sweep_config
 from rw_bot.harness.sweep import SweepJob, decode_sweep_job, encode_sweep_job
 from rw_bot.service._test_hooks import Connection
+from rw_bot.service.queue_rows import (
+    _claim_columns,
+    _lease_index,
+    _match_payload,
+    _reaped_id,
+    _result_columns,
+    _status_columns,
+)
 from rw_bot.wire.ndjson import parse_object, render_json
-
-
-class MatchServiceError(RwBotError):
-    """The queue answered with a shape the service cannot read.
-
-    Args:
-        code: Stable machine-readable identifier.
-        message: Human-readable description, naming what was malformed.
-    """
 
 
 class BatchStatus(TypedDict):
@@ -376,7 +373,7 @@ def finish(conn: Connection, job_id: int, ok: bool, card: str) -> None:
     conn.commit()
 
 
-def reprioritize(conn: Connection, batch: str, priority: int) -> int:
+def reprioritize(conn: Connection, batch: str, priority: int, label: str = "") -> int:
     """Move one batch's unclaimed jobs to a new place in the claim order.
 
     Lower runs sooner; the default is 100. Only queued rows move -- a
@@ -389,6 +386,9 @@ def reprioritize(conn: Connection, batch: str, priority: int) -> int:
         conn: An open connection; committed.
         batch: The batch whose queued jobs move.
         priority: The new priority; lower claims sooner.
+        label: Move only this arm's jobs, empty for the whole batch --
+            the paired-panel case: the interesting half need not wait
+            behind its own controls (log 2026-08-10).
 
     Returns:
         How many jobs moved.
@@ -398,10 +398,18 @@ def reprioritize(conn: Connection, batch: str, priority: int) -> int:
             unreadable.
     """
     cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE match_jobs SET priority = %s WHERE batch = %s AND state = 'queued' RETURNING id",
-        (priority, batch),
-    )
+    if label:
+        cursor.execute(
+            "UPDATE match_jobs SET priority = %s"
+            " WHERE batch = %s AND label = %s AND state = 'queued' RETURNING id",
+            (priority, batch, label),
+        )
+    else:
+        cursor.execute(
+            "UPDATE match_jobs SET priority = %s"
+            " WHERE batch = %s AND state = 'queued' RETURNING id",
+            (priority, batch),
+        )
     moved = tuple(_reaped_id(row) for row in cursor.fetchall())
     conn.commit()
     return len(moved)
@@ -467,125 +475,3 @@ def reap(conn: Connection, stale_seconds: int) -> int:
         cursor.execute("DELETE FROM clone_leases WHERE job_id = %s", (job_id,))
     conn.commit()
     return len(orphaned)
-
-
-def _claim_columns(row: Sequence[str | int]) -> tuple[int, str, str, str, str]:
-    """Validate the claim query's row shape.
-
-    Args:
-        row: What ``fetchone`` returned.
-
-    Returns:
-        The id, batch, encoded config, encoded match and encoded job.
-
-    Raises:
-        MatchServiceError: ``RW-SERVICE-001`` on any other shape.
-    """
-    if (
-        len(row) == 5
-        and isinstance(row[0], int)
-        and isinstance(row[1], str)
-        and isinstance(row[2], str)
-        and isinstance(row[3], str)
-        and isinstance(row[4], str)
-    ):
-        return row[0], row[1], row[2], row[3], row[4]
-    raise MatchServiceError("RW-SERVICE-001", f"claim row has an unreadable shape: {row!r}")
-
-
-def _match_payload(parsed: dict[str, str | int | float | bool]) -> dict[str, str | int]:
-    """Narrow a parsed match payload to the types its codec reads.
-
-    Args:
-        parsed: The stored match object, parsed.
-
-    Returns:
-        The same mapping, with every value proven ``str`` or ``int``.
-
-    Raises:
-        MatchServiceError: ``RW-SERVICE-001`` when a value is neither --
-            a stored match carries only paths and counts, so anything else
-            is corruption.
-    """
-    narrowed: dict[str, str | int] = {}
-    for key, value in parsed.items():
-        if not isinstance(value, (str, int)):
-            raise MatchServiceError(
-                "RW-SERVICE-001", f"match field {key} has an unreadable type: {value!r}"
-            )
-        narrowed[key] = value
-    return narrowed
-
-
-def _result_columns(row: Sequence[str | int]) -> tuple[str, int, str, str]:
-    """Validate one result row's shape.
-
-    Args:
-        row: One row of the results query.
-
-    Returns:
-        The label, seed, state and card text.
-
-    Raises:
-        MatchServiceError: ``RW-SERVICE-001`` on any other shape.
-    """
-    if (
-        len(row) == 4
-        and isinstance(row[0], str)
-        and isinstance(row[1], int)
-        and isinstance(row[2], str)
-        and isinstance(row[3], str)
-    ):
-        return row[0], row[1], row[2], row[3]
-    raise MatchServiceError("RW-SERVICE-001", f"result row has an unreadable shape: {row!r}")
-
-
-def _status_columns(row: Sequence[str | int]) -> tuple[str, int]:
-    """Validate one state-count row.
-
-    Args:
-        row: One row of the status query.
-
-    Returns:
-        The state and its count.
-
-    Raises:
-        MatchServiceError: ``RW-SERVICE-001`` on any other shape.
-    """
-    if len(row) == 2 and isinstance(row[0], str) and isinstance(row[1], int):
-        return row[0], row[1]
-    raise MatchServiceError("RW-SERVICE-001", f"status row has an unreadable shape: {row!r}")
-
-
-def _lease_index(row: Sequence[str | int]) -> int:
-    """Validate one lease row's clone index.
-
-    Args:
-        row: One row of the lease query.
-
-    Returns:
-        The leased clone index.
-
-    Raises:
-        MatchServiceError: ``RW-SERVICE-001`` on any other shape.
-    """
-    if len(row) == 1 and isinstance(row[0], int):
-        return row[0]
-    raise MatchServiceError("RW-SERVICE-001", f"lease row has an unreadable shape: {row!r}")
-
-
-def _reaped_id(row: Sequence[str | int]) -> int:
-    """Validate one requeued job id.
-
-    Args:
-        row: One row of the reap statement's RETURNING clause.
-
-    Returns:
-        The requeued job's id.
-
-    Raises:
-        MatchServiceError: ``RW-SERVICE-001`` on any other shape.
-    """
-    if len(row) == 1 and isinstance(row[0], int):
-        return row[0]
-    raise MatchServiceError("RW-SERVICE-001", f"reaped row has an unreadable shape: {row!r}")

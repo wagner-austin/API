@@ -200,13 +200,18 @@ class FakeCursor:
         self._rows = []
 
     def _reprioritize(self, params: tuple[str | int | bool, ...]) -> None:
-        priority, batch = params
+        priority = params[0]
+        batch = params[1]
+        label = params[2] if len(params) == 3 else None
         assert isinstance(priority, int)
         moved: list[tuple[str | int, ...]] = []
         for row in self._store.jobs:
-            if row.batch == batch and row.state == "queued":
-                row.priority = priority
-                moved.append((row.job_id,))
+            if row.batch != batch or row.state != "queued":
+                continue
+            if label is not None and row.label != label:
+                continue
+            row.priority = priority
+            moved.append((row.job_id,))
         self._rows = moved
 
     def _retry(self, params: tuple[str | int | bool, ...]) -> None:
