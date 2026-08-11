@@ -246,6 +246,12 @@ def _run_capture_impl(argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
         encoding="utf-8",
         errors="replace",
         check=False,
+        # The planner and the engine it spawns are latency-sensitive
+        # tenants on a machine that also runs Docker's VM and virus
+        # scans; the child inherits this class, so a co-tenant spike
+        # deschedules the batch work instead of the sample stream
+        # (log 2026-08-10).
+        creationflags=subprocess.ABOVE_NORMAL_PRIORITY_CLASS,
     )
     return finished.returncode, tuple(finished.stdout.splitlines())
 
@@ -327,7 +333,14 @@ def _spawn_match_impl(argv: Sequence[str], transcript: Path) -> SpawnedMatchProt
     """
     transcript.parent.mkdir(parents=True, exist_ok=True)
     with transcript.open("ab") as sink:
-        return subprocess.Popen(list(argv), stdout=sink, stderr=subprocess.STDOUT)
+        return subprocess.Popen(
+            list(argv),
+            stdout=sink,
+            stderr=subprocess.STDOUT,
+            # Same tenancy rule as run_capture: the match tree under this
+            # spawn inherits the class and outranks batch co-tenants.
+            creationflags=subprocess.ABOVE_NORMAL_PRIORITY_CLASS,
+        )
 
 
 def _serve_forever_impl(server: BaseServer) -> None:

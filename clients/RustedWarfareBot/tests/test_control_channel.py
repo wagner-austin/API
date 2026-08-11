@@ -265,7 +265,7 @@ def test_open_channel_passes_the_host_port_and_timeout_through() -> None:
     with _StubbedConnect(peer) as stub:
         channel = open_channel(27200)
         channel.close()
-    assert stub.calls == [("127.0.0.1", 27200, 30.0)]
+    assert stub.calls == [("127.0.0.1", 27200, 120.0)]
     assert peer.closed is True
 
 

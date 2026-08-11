@@ -39,7 +39,13 @@ from rw_bot.wire.posture import PostureOrder, encode_posture
 from rw_bot.wire.state import Sample
 
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_TIMEOUT_S = 30.0
+
+#: A descheduled engine pauses its sim, so a stalled sample stream resumes
+#: a still-valid match -- the planner dying at 30s threw away eight live
+#: navy96d matches when Docker's VM and Defender starved the fleet's CPU
+#: (log 2026-08-10). Two minutes tolerates a co-tenant spike; a genuinely
+#: dead engine still fails the match well inside its own duration.
+DEFAULT_TIMEOUT_S = 120.0
 
 _STREAM_ENDED = "RW-CHAN-001"
 
