@@ -1,0 +1,26 @@
+# imp-navy24: the submarine question at the rung where battleships are
+# the #2 killer and there are no wins to risk. v3 walk, in-batch control.
+base|12345|doctrines/flame-nocover.doctrine|10000
+base|1337|doctrines/flame-nocover.doctrine|10000
+base|141421|doctrines/flame-nocover.doctrine|10000
+base|16180|doctrines/flame-nocover.doctrine|10000
+base|173205|doctrines/flame-nocover.doctrine|10000
+base|223606|doctrines/flame-nocover.doctrine|10000
+base|244948|doctrines/flame-nocover.doctrine|10000
+base|24601|doctrines/flame-nocover.doctrine|10000
+base|264575|doctrines/flame-nocover.doctrine|10000
+base|2718|doctrines/flame-nocover.doctrine|10000
+base|271828|doctrines/flame-nocover.doctrine|10000
+base|282842|doctrines/flame-nocover.doctrine|10000
+navy2|12345|doctrines/flame-navy2.doctrine|10000
+navy2|1337|doctrines/flame-navy2.doctrine|10000
+navy2|141421|doctrines/flame-navy2.doctrine|10000
+navy2|16180|doctrines/flame-navy2.doctrine|10000
+navy2|173205|doctrines/flame-navy2.doctrine|10000
+navy2|223606|doctrines/flame-navy2.doctrine|10000
+navy2|244948|doctrines/flame-navy2.doctrine|10000
+navy2|24601|doctrines/flame-navy2.doctrine|10000
+navy2|264575|doctrines/flame-navy2.doctrine|10000
+navy2|2718|doctrines/flame-navy2.doctrine|10000
+navy2|271828|doctrines/flame-navy2.doctrine|10000
+navy2|282842|doctrines/flame-navy2.doctrine|10000
