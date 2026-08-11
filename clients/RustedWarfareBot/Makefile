@@ -6,7 +6,7 @@ SHELL := powershell.exe
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet income sweep
+.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet door income sweep
 
 help:
 	@Write-Host ""
@@ -39,6 +39,7 @@ help:
 	@Write-Host "  make fleet                       match fleet manager UI on 127.0.0.1:27500 (spawn/kill/restart parallel matches)"
 	@Write-Host "                                   WATCH_DIFFICULTY=3 WATCH_DOCTRINE=doctrines/aa-counter-guard.doctrine"
 	@Write-Host "  make host                        bot-hosted LAN game a human can join"
+	@Write-Host "  make door                        match-service HTTP door, detached (port 27501)"
 	@Write-Host "                                   HOST_MAP=maps/skirmish/[p2]duel_lake.tmx"
 	@Write-Host ""
 	@Write-Host "Java agent:" -ForegroundColor Yellow
@@ -395,6 +396,14 @@ watch:
 	@Write-Host ""
 	@Write-Host "==> watch (windowed match at difficulty $(WATCH_DIFFICULTY), log: $(WATCH_LOG))" -ForegroundColor Cyan
 	& scripts/make/watch.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -PlayLog "$(WATCH_LOG)" -Map "$(WATCH_MAP)" -Opponents $(WATCH_OPPONENTS) -Difficulty $(WATCH_DIFFICULTY) -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(WATCH_SAMPLES) $(WATCH_DOCTRINE) -" -Javac "$(JAVAC)" -Jar "$(JAR)"
+
+# The match service's HTTP door, detached from the launching terminal.
+# Reads the database password from the platform-postgres container at
+# launch; the DSN never lands on disk.
+door:
+	@Write-Host ""
+	@Write-Host "==> door (match service on http://127.0.0.1:27501/)" -ForegroundColor Cyan
+	& scripts/make/door.ps1
 
 # The match fleet: one user-owned manager process with a control page,
 # spawning `make play` children (seed, map, opponents, difficulty,
