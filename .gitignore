@@ -87,6 +87,10 @@ Thumbs.db
 !services/covenant-radar-api/data/external/
 !services/covenant-radar-api/data/external/**
 # Exclude large Kaggle datasets (>50MB, use kaggle CLI to download)
+# rw_matches is locally generated rather than downloaded -- the RustedWarfare
+# match fleet writes it -- but data.csv is 64MB, over the same threshold, and
+# it is reproducible by re-running matches. Same rule, different source.
+services/covenant-radar-api/data/external/rw_matches/
 services/covenant-radar-api/data/external/kaggle_amex_default/
 services/covenant-radar-api/data/external/kaggle_lending_club/
 services/covenant-radar-api/data/external/kaggle_home_credit/
@@ -162,3 +166,11 @@ coverage_html/
 
 # Claude temp directories
 tmpclaude-*
+
+# Local-machine compose override. Content is host-port remapping (platform-postgres
+# on 55432 because the MCPs stack owns 5432), so it is per-machine by definition.
+docker-compose.override.yml
+
+# Derived vector index for the wiki (hnsw.index + metadata), rebuilt from the
+# wiki content on demand. No chroma store is tracked anywhere in this repo.
+wiki/.chroma/
