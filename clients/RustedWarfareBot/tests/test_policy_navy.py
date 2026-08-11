@@ -112,13 +112,47 @@ def test_the_walk_gives_up_after_the_last_fraction() -> None:
 
 def test_the_walk_orders_with_the_newest_builder() -> None:
     """Dragging the opening's builder across the map is dragging the
-    opening with it; the walk takes the latest hire instead."""
+    opening with it; the walk takes the latest hire at pick time."""
     yard = Shipyard()
     world = sample(
         _ANCHOR, _BUILDER, entity(7, "builder", x=20.0, y=0.0), pools=(_POOL,), credits=4000
     )
     orders = yard.establish(world, _CATALOGUE, Budget(4000, 0), True)
     assert [o["unit_id"] for o in orders] == [7]
+
+
+def test_the_walk_keeps_its_builder_while_it_lives() -> None:
+    """navy96e's poison: ``builders[-1]`` re-resolved every tick, so each
+    hire re-targeted the walk to a fresh builder standing in the base and
+    nobody ever reached the shore -- unit 24, then 43, then 55, each with
+    forty ticks to live (log 2026-08-10). Once picked, the builder is
+    pinned until it dies, however many newer hires appear."""
+    yard = Shipyard()
+    first = _world()
+    assert [o["unit_id"] for o in yard.establish(first, _CATALOGUE, Budget(4000, 0), True)] == [2]
+    crowded = sample(
+        _ANCHOR, _BUILDER, entity(7, "builder", x=20.0, y=0.0), pools=(_POOL,), credits=4000
+    )
+    for _ in range(3):
+        orders = yard.establish(crowded, _CATALOGUE, Budget(4000, 0), True)
+        assert [o["unit_id"] for o in orders] == [2]
+
+
+def test_a_dead_builder_is_replaced_and_the_window_restarts() -> None:
+    """A replacement starts the trek from the base; inheriting a spent
+    patience window would refuse the fraction without ever reaching it."""
+    yard = Shipyard()
+    world = _world()
+    for _ in range(PATIENCE - 1):
+        yard.establish(world, _CATALOGUE, Budget(4000, 0), True)
+    survivor = sample(_ANCHOR, entity(7, "builder", x=20.0, y=0.0), pools=(_POOL,), credits=4000)
+    ordered: list[tuple[int, float]] = []
+    for _ in range(PATIENCE):
+        orders = yard.establish(survivor, _CATALOGUE, Budget(4000, 0), True)
+        ordered.extend((o["unit_id"], o["x"]) for o in orders)
+    # The replacement is ordered for a FULL window at the same fraction:
+    # the candidate did not advance on the dead builder's spent clock.
+    assert ordered == [(7, 200.0)] * PATIENCE
 
 
 def test_the_knob_off_a_missing_type_or_a_lost_base_stay_silent() -> None:

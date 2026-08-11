@@ -30,7 +30,7 @@ from rw_bot.policy.budget import Budget
 from rw_bot.policy.rush import mirror_point
 from rw_bot.policy.siting import find_anchor
 from rw_bot.wire.command import BuildOrder, build_order
-from rw_bot.wire.state import Sample
+from rw_bot.wire.state import Entity, Sample
 
 #: The structure the walk stands, and the reason it exists.
 FACTORY_TYPE = "seaFactory"
@@ -80,6 +80,36 @@ class Shipyard:
         self._candidate = 0
         self._waited = 0
         self._paid = False
+        # The walk's builder, pinned by id: the probe's factory stood
+        # because ONE builder accumulated walking progress across
+        # candidate windows, and navy96e's never did because
+        # ``builders[-1]`` re-resolved to whichever builder had just
+        # been hired -- unit 24, then 43, then 55, each starting the
+        # trek from the base with forty ticks to live (log 2026-08-10).
+        self._builder_id: int | None = None
+
+    def _pin_builder(self, builders: list[Entity]) -> int:
+        """Return the walk's builder, re-picking only when the pinned one died.
+
+        Pick the NEWEST builder -- dragging the opening's builder across
+        the map is dragging the opening with it -- and then KEEP it until
+        it dies. The patience window restarts with a replacement, because
+        a fresh builder starts the trek from the base and inheriting a
+        spent window refuses the fraction without ever having reached it.
+
+        Args:
+            builders: Our complete builders, roster order; never empty.
+
+        Returns:
+            The pinned builder's unit id.
+        """
+        alive = {worker["unit_id"] for worker in builders}
+        builder_id = self._builder_id
+        if builder_id is None or builder_id not in alive:
+            builder_id = builders[-1]["unit_id"]
+            self._builder_id = builder_id
+            self._waited = 0
+        return builder_id
 
     def establish(
         self,
@@ -131,6 +161,7 @@ class Shipyard:
         ]
         if anchor is None or goal is None or not builders:
             return ()
+        builder_id = self._pin_builder(builders)
         if not self._paid:
             claim = budget.claim(f"navy:{FACTORY_TYPE}", stats["price"])
             if not claim["granted"]:
@@ -148,10 +179,7 @@ class Shipyard:
             share = FRACTIONS[self._candidate]
         return (
             build_order(
-                # The NEWEST builder, not the opening's: builders[-1] by
-                # roster order is the latest hire, and dragging the first
-                # builder across the map is dragging the opening with it.
-                unit_id=builders[-1]["unit_id"],
+                unit_id=builder_id,
                 type_name=FACTORY_TYPE,
                 x=anchor["x"] + (goal[0] - anchor["x"]) * share,
                 y=anchor["y"] + (goal[1] - anchor["y"]) * share,
