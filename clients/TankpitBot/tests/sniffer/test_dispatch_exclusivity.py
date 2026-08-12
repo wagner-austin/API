@@ -35,6 +35,7 @@ something the second handler was supposed to do.
 from __future__ import annotations
 
 import ast
+from collections import Counter
 from pathlib import Path
 
 _SNIFFER = Path(__file__).resolve().parents[2] / "src" / "tankpit_bot" / "sniffer"
@@ -263,3 +264,84 @@ def test_the_declared_handler_types_match_the_source() -> None:
     module_types = _match_msg_types(_SNIFFER / "world_state_dispatch.py")
 
     assert module_types >= _RESOURCE_TYPES | _TANK_TYPES
+
+
+# The same first-match-wins shape inside ONE function: a cascade of arms
+# testing one discriminator, each ending in a bare return. Removing all
+# four of the scorecard cascade's returns leaves the accumulator
+# byte-identical across the 1,403,706 records in the 426 archived runs,
+# because no arm can match after an earlier one did. That is the property
+# below, and it is what makes those returns structural rather than
+# redundant: a second arm testing an already-claimed value would make the
+# first return the only thing preventing a double-apply.
+_CASCADES: tuple[tuple[str, Path, str, str], ...] = (
+    (
+        "scorecard channel cascade",
+        _ROOT / "diagnostics" / "session_scorecard_accumulator.py",
+        "route_scorecard_record",
+        "channel",
+    ),
+    (
+        "scorecard metrics kinds",
+        _ROOT / "diagnostics" / "session_scorecard_accumulator.py",
+        "_route_metrics_diagnostic",
+        "kind",
+    ),
+)
+
+
+def _compared_literals_in_order(path: Path, function: str, key: str) -> list[str | int]:
+    """Return every literal one function compares ``key`` against, with repeats.
+
+    ``_claimed_by`` returns a set, which cannot see a value tested twice
+    -- and a value tested twice is exactly the failure this reads for.
+
+    Args:
+        path: Module to parse.
+        function: Function whose cascade is being read.
+        key: Discriminator name, compared as a bare local.
+
+    Returns:
+        Every literal compared against ``key``, duplicates preserved.
+        The order is ``ast.walk`` order, not source order -- an arm
+        nested inside a ``BoolOp`` (``channel == "WIRE" and ...``) is
+        reached at a different depth than its siblings. Only the
+        multiset matters to the caller.
+    """
+    found: list[str | int] = []
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.FunctionDef) and node.name == function):
+            continue
+        for inner in ast.walk(node):
+            if not isinstance(inner, ast.Compare) or not _is_key_lookup(inner.left, key):
+                continue
+            found.extend(
+                comparator.value
+                for comparator in inner.comparators
+                if isinstance(comparator, ast.Constant) and isinstance(comparator.value, (str, int))
+            )
+    return found
+
+
+def test_every_cascade_arm_tests_a_distinct_value() -> None:
+    """No cascade tests one discriminator value in two arms.
+
+    A repeat means the second arm is unreachable for that value and the
+    first arm's return is suddenly load-bearing -- the failure being
+    silent either way, which is why it is read from the source rather
+    than waited for.
+    """
+    repeats: dict[str, list[str | int]] = {}
+    for name, path, function, key in _CASCADES:
+        literals = _compared_literals_in_order(path, function, key)
+        assert literals, f"{name}: read no arms -- the reader is wrong, not the source"
+        counts = Counter(literals)
+        duplicated = sorted(
+            (value for value, count in counts.items() if count > 1),
+            key=repr,
+        )
+        if duplicated:
+            repeats[name] = duplicated
+
+    assert repeats == {}
