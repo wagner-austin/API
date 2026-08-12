@@ -184,6 +184,59 @@ class TestDispatchSelfStatus:
             raise AssertionError("self_state should exist after move response")
         assert self_state["fuel"] == 1100
 
+    def test_long_form_status_emits_promotion_progress_on_change(self) -> None:
+        """The fuel-bearing 0x2E reports promotion progress, once per change.
+
+        This is the form that carries the signal. Across a 320-session
+        corpus the self tank appears in 64,792 long-form bodies and ZERO
+        short-form ones, so the promo emission in the tank-state handler
+        could never see it -- the resource handler claims the message
+        first. The progress was dropped every time until 2026-08-12.
+
+        Replays the measured promotion (bot-20260725-211120: promo
+        0 -> 3 -> 5 -> 6 -> 0 with rank 0 -> 1 at t+26.0s, Artax recruit
+        to private), including the repeated values the wire actually
+        sends. Only the transitions are events: 64,473 of those 64,792
+        bodies carry the same pinned 10, so a per-message emit would be
+        one identical record per status message and no information.
+        """
+        from tankpit_bot.protocol import TankStatusSyncDict as _Sync
+        from tankpit_bot.sniffer.world_state_tanks import (
+            update_world_state_from_move_response_full,
+        )
+        from tests._runtime_logging_support import capture_runtime_events, event_fields
+
+        ws = WorldService()
+        update_world_state_from_move_response_full(ws, 1301, 100, 100, 2, 0)
+
+        with capture_runtime_events() as records:
+            for promo, rank in ((0, 0), (0, 0), (3, 0), (5, 0), (6, 1), (0, 1), (10, 1), (10, 1)):
+                dispatch_world_state_update(
+                    ws,
+                    _Sync(
+                        msg_type=0x2E,
+                        subtype=1,
+                        tank_id=1301,
+                        damage_state=0,
+                        rank=rank,
+                        lb_score=151,
+                        promo_state=promo,
+                        promo_bar_lit=True,
+                        fuel=500,
+                    ),
+                )
+
+        progress = [
+            event_fields(record)["promo_state"]
+            for record in records
+            if event_fields(record).get("diagnostic_kind") == "self_promo_eligible"
+        ]
+        assert progress == [3, 5, 6, 10]
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("the self tank must be synced by the move response")
+        assert self_state["rank"] == 1
+
     def test_dispatch_self_promo_eligible_emits_diagnostic(self) -> None:
         """0x2E for SELF with promo_state > 0 emits ``self_promo_eligible``.
 

@@ -372,7 +372,13 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
         True if the message was handled, False otherwise.
     """
     match decoded:
-        case {"msg_type": 0x2E, "fuel": int(fuel), "rank": int(rank)} if fuel is not None:
+        case {
+            "msg_type": 0x2E,
+            "tank_id": int(tid),
+            "fuel": int(fuel),
+            "rank": int(rank),
+            "promo_state": int(promo),
+        } if fuel is not None:
             # The long (fuel-bearing) form is per-recipient — it is
             # ALWAYS the self tank, and it is the form the live
             # promotion arrived on (bot-20260725-211120: rank 0 -> 1
@@ -381,6 +387,32 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
             # reaches the rank-derived bars the tick it lands.
             update_world_state_from_fuel_total(ws, fuel, "wire_0x2E_tank_status_sync")
             ws.update_world_state_from_rank(rank, "wire_0x2E_tank_status_sync")
+            # Promotion PROGRESS telemetry. ``promo_state`` is the bar
+            # the client fills to ``2 * promo_state`` pixels: it climbs
+            # with damage dealt and resets at the promoting kill
+            # (bot-20260725-211120: 0 -> 3 -> 5 -> 6 -> 0 with rank
+            # 0 -> 1 at t+26.0s, Artax recruit -> private).
+            #
+            # This handler claims the message and returns, so the
+            # promo emission in ``_dispatch_tank_state`` never sees the
+            # self tank: across a 320-session corpus the self tank
+            # appears in 64,792 long-form bodies and ZERO short-form
+            # ones, so that branch cannot fire and the signal was
+            # dropped every time.
+            #
+            # Emitted on CHANGE only. 64,473 of those 64,792 bodies
+            # carry the same pinned value (10), so a per-message emit
+            # would be one identical event per status message and no
+            # information; the climb and the reset are entirely
+            # carried by the transitions.
+            if promo != ws.last_self_promo_state:
+                ws.last_self_promo_state = promo
+                if promo > 0:
+                    emit_diagnostic(
+                        diagnostic_kind="self_promo_eligible",
+                        tank_id=tid,
+                        promo_state=promo,
+                    )
             return True
         case {
             "msg_type": 0x44,

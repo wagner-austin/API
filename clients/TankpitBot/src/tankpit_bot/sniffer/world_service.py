@@ -175,6 +175,10 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         self.container_desync_ms: int = 0
         self.failed_scan_viewports: dict[str, int] = {}
         self.last_command_error: int = -1
+        # Last promotion-progress bar value seen on a self 0x2E, so the
+        # telemetry emits on CHANGE rather than once per status
+        # message. -1 is "nothing seen yet", distinct from a real 0.
+        self.last_self_promo_state: int = -1
         # Set by the 0x41 dispatch when the wire announces OUR OWN
         # death; the tick loop converts it into the ``deactivated``
         # session exit (a corpse has no decisions left).
