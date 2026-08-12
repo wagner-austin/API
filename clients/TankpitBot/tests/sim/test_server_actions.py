@@ -275,3 +275,52 @@ def test_another_tanks_statistics_key_is_not_answered_to_the_client() -> None:
     server = _server()
     server.queue_command(11, _statistics_key())
     assert [m for m in server.advance_tick() if m["msg_type"] == 0x56] == []
+
+
+def test_a_rejected_teleport_emits_no_landing_confirm() -> None:
+    """An unaffordable hop emits the refusal and nothing else.
+
+    The sibling rejection test filters the batch to supervisors, so it
+    cannot see what else the tick sent -- and that is the whole
+    question. Without the early return the rejected hop falls straight
+    into the landed path and the client receives a recentered 0x5A, a
+    0x3D position statement and a ``teleport_landed`` confirm for a hop
+    the server refused: ``[0x5A, 0x52, 0x3D, teleport_landed, 0x2E,
+    0x2E]`` against a tank still standing on its origin tile.
+
+    A bot told it landed while the server kept it in place believes it
+    is somewhere it is not, which is the belief every later decision is
+    built on.
+    """
+    server = _server()
+    server.world["tanks"][9]["fuel"] = 3
+    origin = (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"])
+    server.queue_command(9, _command(("teleport", 116), 30, 30))
+
+    messages = server.advance_tick()
+
+    assert _kinds(messages) == [0x52, 0x2E, 0x2E]
+    assert (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"]) == origin
+
+
+def test_a_pickup_outside_the_client_window_does_nothing_but_refuse() -> None:
+    """An out-of-window pickup is refused, and the world does not move.
+
+    The window check is the server's own reachability rule, and it has
+    to stop the command rather than merely report on it. The target here
+    is deliberately STOCKED so the empty-container check cannot be what
+    ends the tick: without the early return the tank is relocated to
+    (200, 200), the container is drained to zero and a pickup pair is
+    broadcast -- while the refusal goes out in the same batch. The
+    client is told no and the world says yes.
+    """
+    server = _server()
+    server.world["containers"].append(SimContainerDict(x=200, y=200, volume=90, dotted=True))
+    origin = (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"])
+    server.queue_command(9, _command(("pickup_fuel", 112), 200, 200))
+
+    messages = server.advance_tick()
+
+    assert _kinds(messages) == [0x52, 0x2E, 0x2E]
+    assert (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"]) == origin
+    assert [c["volume"] for c in server.world["containers"] if c["x"] == 200] == [90]

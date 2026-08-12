@@ -283,3 +283,33 @@ def get_world_terrain(ws: WorldService) -> dict[str, dict[str, int]]:
     for key, tile in ws.world_state["terrain"].items():
         terrain[key] = {"terrain_type": tile["terrain_type"]}
     return terrain
+
+
+def test_a_refused_press_builds_nothing_and_says_nothing_was_built() -> None:
+    """An out-of-reach press answers 0x52 and emits no build at all.
+
+    The sibling test above filters the batch to 0x52 error codes, so it
+    cannot see the rest -- and the rest is where the damage is. Without
+    the early return the refused press still emits the BuildPickup and
+    the TerrainUpdate for the target tile. The server's own registry
+    stays empty, so nothing was built; only the client is told
+    otherwise, and it will route around a block that does not exist on a
+    tile it could have driven through.
+
+    The registry starts empty so that "nothing was built" is a
+    statement about this press rather than about the fixture's
+    pre-existing block -- which is also what removes the 0x5A from the
+    batch, since there is no terrain left to re-broadcast.
+    """
+    world = _world()
+    world["blocks"] = []
+    server = SimServer(world, _map_with_pond(), client_id=9)
+    far = ClientCommandDict(
+        kind="block", command=98, x=30, y=30, target_id=0, slot=0, message_id=0, direction=0
+    )
+    server.queue_command(9, far)
+
+    messages = server.advance_tick()
+
+    assert [m["msg_type"] for m in messages] == [0x52, 0x2E]
+    assert world["blocks"] == []
