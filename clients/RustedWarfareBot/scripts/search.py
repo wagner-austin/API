@@ -22,6 +22,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.harness.margin import batch_margins
 from rw_bot.harness.search import (
     Candidate,
@@ -35,6 +36,7 @@ from rw_bot.harness.search import (
 from rw_bot.harness.sweep import parse_jobs
 from rw_bot.policy.doctrine_file import format_doctrine, parse_doctrine_lines
 from rw_bot.service import _test_hooks
+from rw_bot.service._test_hooks import Connection
 from rw_bot.service.queue import batch_status, bootstrap, submit
 from rw_bot.service.submit import batch_config
 
@@ -140,22 +142,68 @@ def write_variants(survivors: Sequence[Candidate], variant_dir: Path) -> None:
         path.write_text("".join(f"{line}\n" for line in format_doctrine(variant)), encoding="utf-8")
 
 
+def patient_connect(dsn: str) -> Connection:
+    """Connect to the queue, outlasting a database outage.
+
+    Docker crashed four times in three days and the fourth killed the
+    first search mid-poll on a connection timeout (log 2026-08-11). A
+    driver that runs for hours must survive the outages its queue rows
+    already do: name the outage, wait, try again, forever.
+
+    Args:
+        dsn: The queue database.
+
+    Returns:
+        An open connection.
+    """
+    while True:
+        try:
+            return _test_hooks.connect(dsn)
+        except Exception as error:
+            # The database sits behind an untyped seam on purpose (the
+            # service's own Protocol discipline), so the driver names the
+            # library by module instead of importing its classes: only a
+            # psycopg failure is an outage; anything else is a bug and
+            # propagates.
+            if type(error).__module__.split(".")[0] != "psycopg":
+                raise
+            host_hooks.write_line(
+                f"# database unreachable ({error}); retrying in {POLL_SECONDS:.0f}s"
+            )
+            _test_hooks.sleep(POLL_SECONDS)
+
+
 def wait_for_batch(dsn: str, batch: str) -> None:
     """Block until a batch has no queued or running matches.
 
     One connection per poll, never one held across the wait -- the
-    worker's own lifecycle law.
+    worker's own lifecycle law. A round that sits queued with nothing
+    claiming it is named loudly once: vhsearch1's first round waited on
+    an empty fleet in silence because the workers drain-and-exit when
+    the queue empties before a submission (log 2026-08-11).
 
     Args:
         dsn: The queue database.
         batch: The batch to wait on.
     """
+    stalled = 0
+    warned = False
     while True:
-        conn = _test_hooks.connect(dsn)
+        conn = patient_connect(dsn)
         status = batch_status(conn, batch)
         conn.close()
         if status["queued"] == 0 and status["running"] == 0:
             return
+        if status["running"] == 0:
+            stalled += 1
+            if stalled >= 3 and not warned:
+                sys.stdout.write(
+                    f"# WARNING {batch}: queued matches but nothing claims them;"
+                    " is the fleet up? (make fleet-up)\n"
+                )
+                warned = True
+        else:
+            stalled = 0
         _test_hooks.sleep(POLL_SECONDS)
 
 
@@ -194,7 +242,7 @@ def run_search(
         seeds = round_seeds(rng_seed, round_index, pairs)
         jobs = parse_jobs(round_job_lines(survivors, seeds, variant_dir))
         config = batch_config(batch, LOCKSTEP, MAP_PATH, DIFFICULTY, PIN_DELTA, FAST_FORWARD)
-        conn = _test_hooks.connect(dsn)
+        conn = patient_connect(dsn)
         bootstrap(conn)
         queued = submit(conn, batch, config, jobs)
         conn.close()

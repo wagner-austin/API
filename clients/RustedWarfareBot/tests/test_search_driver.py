@@ -11,6 +11,7 @@ import runpy
 from pathlib import Path
 
 import pytest
+from psycopg import OperationalError
 from scripts.search import EXIT_BAD_USAGE, EXIT_OK, SCHEDULE, SPACE, main, run_search
 
 from rw_bot.service import _test_hooks
@@ -31,10 +32,10 @@ class _Rig:
         return self.conn
 
     def sleep(self, seconds: float) -> None:
-        """Complete every queued job and file its scripted card."""
+        """Complete every open job and file its scripted card."""
         self.slept.append(seconds)
         for row in self.conn.store.jobs:
-            if row.state != "queued":
+            if row.state not in ("queued", "running"):
                 continue
             row.state = "done"
             if row.label == "decoys2":
@@ -119,3 +120,115 @@ def test_the_module_guard_runs_main() -> None:
     with pytest.raises(SystemExit) as caught:
         runpy.run_module("scripts.search", run_name="__main__")
     assert caught.value.code == EXIT_BAD_USAGE
+
+
+class _StallRig:
+    """Leaves the round unclaimed for three polls, then claims, then plays.
+
+    The claim step exercises the stall counter's reset: a poll that sees
+    running matches must forget the stall it was counting."""
+
+    def __init__(self, sweeps_root: Path) -> None:
+        self.inner = _Rig(sweeps_root)
+        self.sleeps = 0
+
+    def connect(self, dsn: str) -> Connection:
+        return self.inner.connect(dsn)
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps += 1
+        if self.sleeps == 4:
+            for row in self.inner.conn.store.jobs:
+                if row.state == "queued":
+                    row.state = "running"
+        elif self.sleeps >= 5:
+            self.inner.sleep(seconds)
+
+
+def test_a_round_nobody_claims_is_named_loudly_once(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The silent stall vhsearch1 hit: queued matches, no workers. The
+    driver keeps waiting -- the fleet may come back -- but says so."""
+    rig = _StallRig(tmp_path / "sweeps")
+    saved = (_test_hooks.connect, _test_hooks.sleep)
+    _test_hooks.connect = rig.connect
+    _test_hooks.sleep = rig.sleep
+    try:
+        lines = run_search(
+            "dsn://demo",
+            "probe",
+            rng_seed=3,
+            sweeps_root=tmp_path / "sweeps",
+            variant_dir=tmp_path / "variants",
+        )
+    finally:
+        (_test_hooks.connect, _test_hooks.sleep) = saved
+    warnings = [
+        line
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith("# WARNING probe-r0:")
+    ]
+    assert warnings == [
+        "# WARNING probe-r0: queued matches but nothing claims them;"
+        " is the fleet up? (make fleet-up)"
+    ]
+    assert any(line.startswith("# graduation order") for line in lines)
+
+
+def test_a_database_outage_is_outlasted_not_fatal(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Docker's fourth crash killed the first search mid-poll; the driver
+    now names the outage and retries instead of dying."""
+    rig = _Rig(tmp_path / "sweeps")
+
+    outages = [OperationalError("connection timeout expired"), OperationalError("still down")]
+
+    def flaky_connect(dsn: str) -> Connection:
+        if outages:
+            raise outages.pop(0)
+        return rig.connect(dsn)
+
+    saved = (_test_hooks.connect, _test_hooks.sleep)
+    _test_hooks.connect = flaky_connect
+    _test_hooks.sleep = rig.sleep
+    try:
+        lines = run_search(
+            "dsn://demo",
+            "probe",
+            rng_seed=3,
+            sweeps_root=tmp_path / "sweeps",
+            variant_dir=tmp_path / "variants",
+        )
+    finally:
+        (_test_hooks.connect, _test_hooks.sleep) = saved
+    retries = [
+        line
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith("# database unreachable")
+    ]
+    assert len(retries) == 2
+    assert any(line.startswith("# graduation order") for line in lines)
+
+
+def test_a_non_database_error_still_propagates(tmp_path: Path) -> None:
+    """The outage retry names psycopg by module; a real bug is not an
+    outage and must escape."""
+
+    def broken_connect(dsn: str) -> Connection:
+        raise ValueError("a programming error, not an outage")
+
+    saved = _test_hooks.connect
+    _test_hooks.connect = broken_connect
+    try:
+        with pytest.raises(ValueError):
+            run_search(
+                "dsn://demo",
+                "probe",
+                rng_seed=3,
+                sweeps_root=tmp_path / "sweeps",
+                variant_dir=tmp_path / "variants",
+            )
+    finally:
+        _test_hooks.connect = saved
