@@ -15,6 +15,7 @@ from tankpit_bot.bot.states import (
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
+from tests._runtime_logging_support import capture_runtime_events, event_fields
 from tests.conftest import (
     FakeEnv,
     FakeFileSystem,
@@ -39,6 +40,66 @@ class TestClearCommandError:
             started_ms=get_current_time_ms(),
             outcome="pending",
         )
+
+    def test_no_pending_error_emits_no_orphan_diagnostic(self, fake_env: FakeEnv) -> None:
+        """An empty error slot is silence, not an orphan worth reporting.
+
+        ``check_and_clear_command_error`` answers ``-1`` when nothing is
+        pending, and the scan/map_open wait paths call it on EVERY tick
+        they wait. Reporting that as an orphan stamps an
+        ``orphan_command_error`` with ``error_code=-1`` into the
+        diagnostic stream once per waiting tick, which is where the
+        scorecard reads its rejection counts from.
+
+        The control below proves the emitter fires for a genuine code,
+        so silence here is the guard rather than a dead emitter.
+        """
+        from tankpit_bot.bot.tick_loop_command_errors import _drain_orphan_command_error
+
+        ws = WorldService()
+        action = self._make_pending_action("scan")
+
+        with capture_runtime_events() as records:
+            _drain_orphan_command_error(ws, action)
+
+        kinds = [event_fields(record).get("diagnostic_kind") for record in records]
+        assert "orphan_command_error" not in kinds
+
+    def test_control_a_real_orphan_code_does_emit(self, fake_env: FakeEnv) -> None:
+        """Control: a genuine 0x52 arriving during a scan wait is reported."""
+        from tankpit_bot.bot.tick_loop_command_errors import _drain_orphan_command_error
+
+        ws = WorldService()
+        ws.last_command_error = 4
+        action = self._make_pending_action("scan")
+
+        with capture_runtime_events() as records:
+            _drain_orphan_command_error(ws, action)
+
+        kinds = [event_fields(record).get("diagnostic_kind") for record in records]
+        assert "orphan_command_error" in kinds
+
+    def test_clear_command_error_is_silent_when_nothing_is_pending(self, fake_env: FakeEnv) -> None:
+        """The movement path reports no orphan when there is no error at all.
+
+        Same shape as the scan path above, but the return value is
+        identical either way (``False``), so only the absence of the
+        diagnostic distinguishes the two. Without the guard, ``-1`` is
+        tested against the move whitelist, misses, and is announced as
+        an orphan on every tick a move waits.
+        """
+        from tankpit_bot.bot.tick_loop_command_errors import _clear_command_error
+
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        action = self._make_pending_action("move")
+
+        with capture_runtime_events() as records:
+            result = _clear_command_error(bot, action)
+
+        assert result is False
+        kinds = [event_fields(record).get("diagnostic_kind") for record in records]
+        assert "orphan_command_error" not in kinds
 
     def test_command_error_clears_collect_action(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``You can't do this`` (code 0) aborts a pending collect in < 1 s.

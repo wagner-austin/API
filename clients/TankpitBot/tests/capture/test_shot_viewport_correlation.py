@@ -24,7 +24,7 @@ from tankpit_bot.capture.xor import (
     reset_static_key_cache,
 )
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
-from tankpit_bot.protocol.commands import CMD_SHOOT, TYPE_COMBAT
+from tankpit_bot.protocol.commands import CMD_MOVE, CMD_SHOOT, TYPE_COMBAT
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tests.conftest import FakeFileSystem
 from tests.wire_builders import encode_wire_frame
@@ -218,6 +218,55 @@ class TestAnalyzeShotViewportCorrelation:
                             payload=encode_wire_frame(
                                 ord("!"),
                                 bytes([TYPE_COMBAT, CMD_SHOOT, 50, 60, 0]),
+                                xor_table,
+                            ),
+                            ws_url="wss://test/ws",
+                        ),
+                    ],
+                    magic,
+                )
+            )
+        finally:
+            core_hooks.path_exists = old_exists
+            core_hooks.read_text = old_read
+
+        assert result == {"shot_count": 0, "shots": []}
+
+    def test_a_non_shoot_action_of_shoot_shape_is_not_counted_as_a_shot(self) -> None:
+        """Only ``CMD_SHOOT`` produces a shot; same-shaped commands do not.
+
+        The existing malformed-payload test feeds several non-shoot
+        frames, but each is rejected downstream for a second reason --
+        a wrong type byte, or a data length that is not four -- so it
+        cannot distinguish the command-id check from those. This frame
+        is byte-for-byte the shape of a shoot command (combat type,
+        four data bytes) and differs ONLY in the command id, so the id
+        check is the sole thing keeping it out of the shot list.
+
+        A movement click misread as a shot invents a target the player
+        never fired at, and every correlation drawn from it -- the
+        viewport row match, the id match -- is drawn from a fiction.
+        """
+        magic = "shot-viewport-non-shoot"
+        static_key = "S" * 64
+        xor_table = build_xor_table(static_key, magic)
+
+        old_exists = core_hooks.path_exists
+        old_read = core_hooks.read_text
+        fake_fs = FakeFileSystem()
+        fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
+        core_hooks.path_exists = fake_fs.path_exists
+        core_hooks.read_text = fake_fs.read_text
+        try:
+            result = analyze_shot_viewport_correlation(
+                _make_session(
+                    [
+                        CapturedMessage(
+                            timestamp_ms=1100,
+                            direction="sent",
+                            payload=encode_wire_frame(
+                                ord("!"),
+                                bytes([TYPE_COMBAT, CMD_MOVE, 12, 34, 9, 3]),
                                 xor_table,
                             ),
                             ws_url="wss://test/ws",

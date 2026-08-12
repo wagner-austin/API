@@ -128,6 +128,35 @@ class TestBotCommandsWithoutCDP:
         result = bot.teleport_to(100, 100)
         assert result is False
 
+    def test_teleport_to_without_cdp_does_not_consume_a_pending_landing(
+        self, fake_env: FakeEnv
+    ) -> None:
+        """A refused teleport leaves the landing confirmation for its owner.
+
+        The sibling test above asserts only the return value, and the
+        return value is the same either way -- ``send_command_bytes``
+        answers False for a missing CDP regardless. What differs is the
+        SIDE EFFECT: ``teleport_to`` calls
+        ``check_and_clear_teleport_landed`` before dispatching, which
+        both reads and CLEARS the flag. Reaching that call with no CDP
+        consumes a landing confirmation that belongs to the previous
+        teleport, and the state machine waiting on it never sees it --
+        the action stays in flight until it times out.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.sniffer.world_service import WorldService
+        from tankpit_bot.sniffer.world_state_combat import (
+            check_and_clear_teleport_landed,
+            mark_teleport_landed,
+        )
+
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        mark_teleport_landed(ws)
+
+        assert bot.teleport_to(100, 100) is False
+        assert check_and_clear_teleport_landed(ws) is True
+
     def test_shoot_at_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.shoot_at returns False when CDP not available."""
         from tankpit_bot.bot.base import Bot

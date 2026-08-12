@@ -64,6 +64,51 @@ def test_parse_live_panel_text() -> None:
     assert parse_account_stats(_PANEL_TEXT) == _EXPECTED
 
 
+def test_stat_lines_without_the_panel_marker_parse_to_nothing() -> None:
+    """Stat-shaped text outside the panel is not account statistics.
+
+    The marker is what says "this is the C panel". Without it the same
+    five patterns would match anywhere they appear on the page -- a
+    chat line quoting someone's play time is the obvious case -- and
+    the session would record another player's numbers as its own
+    account baseline.
+    """
+    text = (
+        " Rank: private (139)\n"
+        " Play time: 42:3:10\n"
+        " Destroyed enemies: 89\n"
+        " Deactivated: 0\n"
+        " Promotion points: 157725\n"
+    )
+
+    assert parse_account_stats(text) is None
+
+
+def test_panel_missing_the_play_time_line_parses_to_nothing() -> None:
+    """A half-painted panel yields nothing rather than raising.
+
+    Mid-render is a normal observable state: the marker paints before
+    the stat lines, and a timed read can land between them. Reaching
+    the integer conversion with an unmatched ``Play time`` calls
+    ``.group()`` on ``None`` and raises ``AttributeError``, which
+    crashed sessions 20260611-004251 / 004405 / 012807. Callers poll
+    until non-``None``, so ``None`` is the correct answer.
+
+    ``Rank`` is present on purpose: the rank check sits AFTER this one,
+    so a page missing both would be caught by the later guard and the
+    two could not be told apart.
+    """
+    text = (
+        " Rank: private (139)\n"
+        " Statistics:\n"
+        " Destroyed enemies: 89\n"
+        " Deactivated: 0\n"
+        " Promotion points: 157725\n"
+    )
+
+    assert parse_account_stats(text) is None
+
+
 def test_parse_unpadded_play_time_fields() -> None:
     """Single-digit minutes/seconds parse: the game does not zero-pad.
 

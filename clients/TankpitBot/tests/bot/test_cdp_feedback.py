@@ -279,6 +279,65 @@ class TestBotCombatFeedback:
         ws.last_command_error = 0
         assert _has_pending_shot_feedback(bot, 100500) is False
 
+    def test_has_pending_shot_feedback_is_false_without_a_tracked_shot(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """No tracked shot ends the wait even while the shot clock is fresh.
+
+        ``DecideCtx`` rewrites ``last_shot_target_id`` to -1 on EVERY
+        tick (``context.py:121``) but leaves ``last_shoot_ms`` alone, so
+        "no shot tracked, clock still recent" is the ordinary state on
+        every tick after a shot where the bot does not fire again.
+        Reaching the elapsed-time arm in that state makes the loop wait
+        out the feedback window for a shot it is not tracking, and the
+        sync line it emits names ``id=-1``.
+
+        The sibling test above is the control: identical timings with a
+        real target id return True, so the False here comes from the
+        missing target rather than from a window that had already
+        closed.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
+
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        bot._ai_state["last_shot_target_id"] = -1
+        bot._ai_state["last_shot_target_name"] = ""
+        bot._ai_state["last_shoot_ms"] = 100000
+
+        assert _has_pending_shot_feedback(bot, 100500) is False
+
+    def test_has_pending_shot_feedback_ends_wait_on_a_buffered_hit(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A confirmed hit already in the buffer ends the wait.
+
+        The hit and the shot-response are set together by
+        ``mark_combat_hit`` but CLEARED independently, so a classifier
+        pass that consumes the response leaves the hit buffered. The
+        outcome is known at that point -- continuing to wait spends the
+        rest of the feedback window on a question already answered.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_combat_feedback import _has_pending_shot_feedback
+        from tankpit_bot.sniffer.world_state_combat import (
+            check_and_clear_our_shot_response,
+            mark_combat_hit,
+        )
+
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        bot._ai_state["last_shot_target_id"] = 50
+        bot._ai_state["last_shot_target_name"] = "Enemy"
+        bot._ai_state["last_shoot_ms"] = 100000
+        mark_combat_hit(ws, 1, 50)
+        check_and_clear_our_shot_response(ws)
+
+        assert _has_pending_shot_feedback(bot, 100500) is False
+
     def test_get_combat_feedback_hit_via_ammo_delta(
         self,
         fake_env: FakeEnv,
