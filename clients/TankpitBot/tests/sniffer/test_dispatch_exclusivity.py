@@ -287,6 +287,18 @@ _CASCADES: tuple[tuple[str, Path, str, str], ...] = (
         "_route_metrics_diagnostic",
         "kind",
     ),
+    (
+        "wire timeline combat and identity",
+        _ROOT / "validate" / "wire_timeline.py",
+        "_ingest_combat_and_identity",
+        "msg_type",
+    ),
+    (
+        "shadow timeline combat events",
+        _ROOT / "validate" / "shadow_timeline.py",
+        "_ingest_combat_events",
+        "msg_type",
+    ),
 )
 
 
