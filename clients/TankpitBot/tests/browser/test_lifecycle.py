@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Generator
 
 import pytest
@@ -22,6 +23,7 @@ from tests.action_lab._replay_page import (
     ClockAdvancingPage,
     ReplayClock,
 )
+from tests.conftest import FakeFileSystem
 from tests.fakes import FakeBrowser, FakeCDPSession
 
 _PAGE_HTML = (
@@ -198,13 +200,23 @@ class TestCleanupBrowser:
 
 
 class TestGatherIntel:
-    def test_returns_none_when_no_tpclient(self) -> None:
+    def test_returns_none_when_no_tpclient(self, fake_fs: FakeFileSystem) -> None:
+        """``gather_intel`` yields no key and saves no client source.
+
+        The second route into the tpclient writer, and the second one
+        that reached the REAL filesystem when the URL type check was
+        mutated away -- ``gather_intel`` delegates to
+        ``_capture_static_key``, so both entry points need the fixture
+        and both need to say that nothing was written.
+        """
         from tankpit_bot.browser.lifecycle import gather_intel
 
         page = ClockAdvancingPage(ReplayClock())
         cdp = FakeCDPSession()
-        result = gather_intel(page, cdp)
-        assert result is None
+
+        assert gather_intel(page, cdp) is None
+        written = [path for path in fake_fs.get_written_files() if path.endswith("tpclient.js")]
+        assert written == []
 
     def test_debug_js_websocket_logs_without_error(self) -> None:
         from tankpit_bot.browser.lifecycle import _debug_js_websocket
@@ -220,12 +232,43 @@ class TestGatherIntel:
         page = FakePage(cdp_session=cdp)
         _log_script_urls(page)
 
-    def test_capture_static_key_returns_none(self) -> None:
+    def test_capture_static_key_returns_none(
+        self,
+        fake_fs: FakeFileSystem,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A page with no tpclient URL says so, and saves nothing.
+
+        Two things are pinned here, and they came from opposite ends.
+
+        The write assertion is the one with a scar: the 2026-08-12
+        mutation sweep removed this return and truncated the checked-in
+        160KB ``tpclient.js`` to zero bytes, because the fetch was then
+        attempted against the string ``'None'``, came back empty, and the
+        empty result was written to the CWD-relative ``Path`` -- the
+        repository root during a test run. Every test still passed. The
+        suite could not tell the guard from absent; the working tree
+        could.
+
+        The message assertion is what still distinguishes this return
+        now that an empty fetch is refused downstream. Both paths end in
+        ``None`` and neither writes, so the diagnostic is the whole
+        difference -- and it is the accurate one. Reporting "fetched no
+        source from None" for a page that has no tpclient script at all
+        would send a reader looking at the network instead of the page.
+        """
         from tankpit_bot.browser.lifecycle import _capture_static_key
 
         page = ClockAdvancingPage(ReplayClock())
-        result = _capture_static_key(page)
-        assert result is None
+
+        with caplog.at_level(logging.WARNING):
+            assert _capture_static_key(page) is None
+
+        messages = [record.message for record in caplog.records]
+        assert any("Could not find tpclient script URL" in message for message in messages)
+        assert not any("Fetched no tpclient source" in message for message in messages)
+        written = [path for path in fake_fs.get_written_files() if path.endswith("tpclient.js")]
+        assert written == []
 
     @pytest.mark.usefixtures("fake_fs")
     def test_capture_static_key_with_real_headless_browser(
@@ -250,6 +293,43 @@ class TestGatherIntel:
         static_key = "J" * 1000
         page, cdp = _intel_page(headless_browser, f'var config = "{static_key}";')
         assert gather_intel(page, cdp) == static_key
+
+    def test_an_empty_tpclient_body_is_not_saved_over_the_tracked_copy(
+        self,
+        fake_fs: FakeFileSystem,
+        headless_browser: BrowserProtocol,
+    ) -> None:
+        """Real browser: a tpclient.js that serves nothing is not written.
+
+        The script tag exists and its URL resolves, so the fetch runs and
+        legitimately returns the empty string. The checked-in
+        ``tpclient.js`` is the reference copy later sessions read, so
+        saving an empty fetch over it destroys the artifact -- which is
+        what the old ``else ""`` did with a fetch that returned nothing
+        at all.
+        """
+        from tankpit_bot.browser.lifecycle import _capture_static_key
+
+        page, _ = _intel_page(headless_browser, "")
+
+        assert _capture_static_key(page) is None
+        written = [path for path in fake_fs.get_written_files() if path.endswith("tpclient.js")]
+        assert written == []
+
+    def test_control_a_served_body_is_saved(
+        self,
+        fake_fs: FakeFileSystem,
+        headless_browser: BrowserProtocol,
+    ) -> None:
+        """Control: real source IS written, so the silence above is the check."""
+        from tankpit_bot.browser.lifecycle import _capture_static_key
+
+        static_key = "L" * 1000
+        page, _ = _intel_page(headless_browser, f'var config = "{static_key}";')
+
+        assert _capture_static_key(page) == static_key
+        written = [path for path in fake_fs.get_written_files() if path.endswith("tpclient.js")]
+        assert len(written) == 1
 
     @pytest.mark.usefixtures("fake_fs")
     def test_capture_static_key_no_key_in_content(

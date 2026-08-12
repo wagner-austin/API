@@ -221,8 +221,14 @@ def _capture_static_key(page: PageProtocol) -> str | None:
         log.warning("Could not find tpclient script URL")
         return None
 
-    js_content_raw = page.evaluate(f"fetch('{tpclient_url}').then(r => r.text())")
-    js_content = str(js_content_raw) if js_content_raw is not None else ""
+    js_content = page.evaluate(f"fetch('{tpclient_url}').then(r => r.text())")
+    if not isinstance(js_content, str) or not js_content:
+        # A failed fetch used to become the empty string and be written
+        # anyway, which replaced the tracked reference copy with nothing.
+        # The checked-in tpclient.js IS the artifact later sessions read,
+        # so a fetch that returned no source has nothing to save.
+        log.warning("Fetched no tpclient source from %s", tpclient_url)
+        return None
 
     from pathlib import Path
 
