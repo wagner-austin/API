@@ -262,8 +262,6 @@ def _classify_diagnostic_record(
     handles ONLY kinds that don't appear on the scorecard.
     """
     kind = record["fields"].get("diagnostic_kind")
-    if not isinstance(kind, str):
-        return
     if kind == "action_outcome":
         accumulator["action_outcomes"].append(_classify_action_outcome(record))
     elif kind == "teleport_attempt":

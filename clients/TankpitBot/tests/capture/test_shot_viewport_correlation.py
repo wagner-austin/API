@@ -25,6 +25,7 @@ from tankpit_bot.capture.xor import (
 )
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
 from tankpit_bot.protocol.commands import CMD_MOVE, CMD_SHOOT, TYPE_COMBAT
+from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tests.conftest import FakeFileSystem
 from tests.wire_builders import encode_wire_frame
@@ -231,6 +232,62 @@ class TestAnalyzeShotViewportCorrelation:
             core_hooks.read_text = old_read
 
         assert result == {"shot_count": 0, "shots": []}
+
+    def test_a_one_byte_sent_frame_is_not_decoded_as_a_command(self) -> None:
+        """A frame too short to hold a command is skipped, not decoded.
+
+        Real captures are full of these: 148 of the 1,275 sent frames in
+        the 34 archived sessions are under three bytes, and 32 of them
+        are the single byte ``2d``. Decoding a command reads
+        ``decoded[1]`` for its id, which on a one-byte frame is an
+        ``IndexError`` -- not the ``ValueError`` the decode path catches.
+        Without the length check the correlation tool dies on the first
+        archived session it opens.
+
+        The existing malformed-payload test never reaches this: its
+        shortest surviving body is two bytes, which has an index 1 to
+        read and fails later as a plain invalid command.
+
+        The real shot in the same session is the control -- it proves the
+        session decodes at all, so the skip above is the length check
+        rather than a shot nothing could have found.
+        """
+        magic = "shot-viewport-short-frame"
+        static_key = "Q" * 64
+        xor_table = build_xor_table(static_key, magic)
+
+        old_exists = core_hooks.path_exists
+        old_read = core_hooks.read_text
+        fake_fs = FakeFileSystem()
+        fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
+        core_hooks.path_exists = fake_fs.path_exists
+        core_hooks.read_text = fake_fs.read_text
+        try:
+            result = analyze_shot_viewport_correlation(
+                _make_session(
+                    [
+                        CapturedMessage(
+                            timestamp_ms=1000,
+                            direction="sent",
+                            payload=base64.b64encode(encode_frame(b"-")).decode("ascii"),
+                            ws_url="wss://test/ws",
+                        ),
+                        CapturedMessage(
+                            timestamp_ms=1001,
+                            direction="sent",
+                            payload=_make_shoot_payload(50, 60, 514, xor_table),
+                            ws_url="wss://test/ws",
+                        ),
+                    ],
+                    magic,
+                )
+            )
+        finally:
+            core_hooks.path_exists = old_exists
+            core_hooks.read_text = old_read
+
+        assert result["shot_count"] == 1
+        assert result["shots"][0]["target_x"] == 50
 
     def test_a_non_shoot_action_of_shoot_shape_is_not_counted_as_a_shot(self) -> None:
         """Only ``CMD_SHOOT`` produces a shot; same-shaped commands do not.

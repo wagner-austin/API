@@ -218,6 +218,50 @@ def test_build_forage_economy_counts_every_metric(fake_fs: FakeFileSystem) -> No
     assert report["other_command_errors"] == 1
 
 
+def test_a_boolean_or_string_radar_field_is_not_a_count(fake_fs: FakeFileSystem) -> None:
+    """A non-int ``radar`` payload contributes nothing to the tally.
+
+    ``bool`` is a subclass of ``int``, so an unguarded read accepts JSON
+    ``true`` and folds it in as the number 1 -- a radar the run never
+    picked up, and a plausible enough number that nothing downstream
+    would question it. A string is louder: ``+=`` against the running
+    total raises ``TypeError`` and the whole report dies.
+
+    Every one of these fields is an int in all 427 archived runs, so
+    this is the untrusted-JSON boundary rather than a shape the bot
+    emits -- which is exactly why only the type check stands between a
+    hand-edited artifact and a wrong tally.
+
+    ``equipment_pickups == 2`` is the control: both records WERE routed
+    as equipment gains, so the zero tally is their payloads being
+    rejected, not the records being skipped.
+    """
+    _write_jsonl(
+        fake_fs,
+        _SOURCE,
+        [
+            _record("2026-07-26T10:00:00", diagnostic_kind="equipment_gain", radar=True),
+            _record("2026-07-26T10:00:10", diagnostic_kind="equipment_gain", radar="3"),
+        ],
+    )
+
+    report = build_forage_economy(_SOURCE)
+
+    assert report["equipment_pickups"] == 2
+    assert report["radars_gained"] == 0
+
+
+def test_control_an_int_radar_field_is_tallied(fake_fs: FakeFileSystem) -> None:
+    """Control: the same record carrying an int ``radar`` does tally."""
+    _write_jsonl(
+        fake_fs,
+        _SOURCE,
+        [_record("2026-07-26T10:00:00", diagnostic_kind="equipment_gain", radar=3)],
+    )
+
+    assert build_forage_economy(_SOURCE)["radars_gained"] == 3
+
+
 def test_build_forage_economy_empty_artifact_is_all_zero(fake_fs: FakeFileSystem) -> None:
     """A single-record artifact yields zero spans and None kills."""
     _write_jsonl(fake_fs, _SOURCE, [_record("2026-07-26T10:00:00", diagnostic_kind="noise")])
