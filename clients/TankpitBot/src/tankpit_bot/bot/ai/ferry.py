@@ -319,8 +319,6 @@ class SurfaceRouteTerrain:
         Returns:
             True if a teleport may be aimed at the tile.
         """
-        if not self._base.is_landing_legal(x, y):
-            return False
         return self._is_on_routing_surface(x, y)
 
     def is_landing_attainable(self, x: int, y: int) -> bool:

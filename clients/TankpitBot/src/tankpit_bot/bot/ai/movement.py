@@ -276,8 +276,6 @@ def _walk_or_teleport_with_terrain(
     terrain = ctx.terrain
     assert terrain is not None  # caller guarantees this
     if pickup_kind is not None:
-        if not is_pickup_target_actionable(ctx, tx, ty):
-            return None
         # A pickup is ONE server-routed click, and one command never
         # chains surfaces (user contract 2026-07-19/20): the route
         # must exist on the tank's CURRENT surface -- plain ground on

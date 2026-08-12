@@ -24,6 +24,7 @@ from tankpit_bot.bot.types import make_move_command
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_mine_state
 from tests.bot.ai._collect_helper_fixtures import _enemy
+from tests.bot.ai._ferry_fixtures import _ferry_tile
 from tests.bot.ai._support import (
     make_container,
     make_inventory,
@@ -212,6 +213,59 @@ class TestRecoveryHelpers:
         assert result["cmd_type"] == "pickup_equipment"
         assert result["target_x"] == 103
         assert result["target_y"] == 100
+
+    def test_walk_or_teleport_refuses_an_off_viewport_pickup_while_riding(self) -> None:
+        """A pickup never travels toward a tile the client cannot see.
+
+        A pickup is one server-routed click at a visible tile, and no
+        route to an unseen tile exists on either surface: on land the
+        viewport routing check answers ``None``, and while RIDING the
+        disembark move is itself viewport-clamped, so it has nowhere to
+        aim. Riding is the interesting case because it is the one that
+        reaches the disembark branch at all.
+
+        The control below runs the SAME riding world with the SAME
+        off-viewport tile as a plain move, which DOES act -- it clamps
+        to the viewport edge and approaches. That asymmetry is the
+        behaviour worth pinning: a move may travel toward a belief, a
+        pickup may not.
+        """
+        ws = WorldService()
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        world["terrain"].update(_ferry_tile(100, 100))
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(default_count=5),
+            100000,
+            InMemoryTerrainMap(),
+            "",
+            ws=ws,
+        )
+
+        assert walk_or_teleport(ctx, 200, 200, pickup_kind="equipment") is None
+
+    def test_walk_or_teleport_control_off_viewport_plain_move_still_acts(self) -> None:
+        """Control: the same riding world acts on that tile as a plain move."""
+        ws = WorldService()
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        world["terrain"].update(_ferry_tile(100, 100))
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(default_count=5),
+            100000,
+            InMemoryTerrainMap(),
+            "",
+            ws=ws,
+        )
+
+        result = walk_or_teleport(ctx, 200, 200, pickup_kind=None)
+
+        if result is None:
+            raise AssertionError("a plain move to an off-viewport tile must still act")
 
     def test_walk_or_teleport_picks_up_mined_tile_with_terrain(self) -> None:
         """Terrain routing still produces a legal command for mined pickup tiles."""

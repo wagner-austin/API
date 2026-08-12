@@ -217,8 +217,6 @@ def should_enter_hunt(ctx: DecideCtx) -> bool:
         True when stocked to the applicable bar and COLLECT has no
         entry condition.
     """
-    if should_enter_collect(ctx):
-        return False
     if held_human_combat_lock(ctx) and human_fight_resume_permitted(ctx):
         return True
     return ctx.fuel >= hunt_fuel_floor(ctx) and hunt_entry_permitted(ctx)
