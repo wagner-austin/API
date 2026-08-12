@@ -72,6 +72,91 @@ def _match_msg_types(path: Path) -> frozenset[int]:
     return frozenset(found)
 
 
+def _claimed_by(path: Path, function: str, key: str) -> frozenset[str | int]:
+    """Return the literals one function tests ``key`` against.
+
+    Covers both routing styles in the codebase: ``match`` mapping cases
+    (``case {"msg_type": 0x44, ...}``) and equality chains
+    (``if message["msg_type"] == 0x44``). A router written in the second
+    style is invisible to a match-only reader, which is how three of
+    these chains looked empty on the first pass.
+
+    Args:
+        path: Module to parse.
+        function: Function whose routing is being read.
+        key: Discriminator key, e.g. ``msg_type`` or ``kind``.
+
+    Returns:
+        Every literal the function routes on.
+    """
+    found: set[str | int] = set()
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.FunctionDef) and node.name == function):
+            continue
+        for inner in ast.walk(node):
+            found |= _case_literals(inner, key)
+            found |= _comparison_literals(inner, key)
+    return frozenset(found)
+
+
+def _case_literals(node: ast.AST, key: str) -> frozenset[str | int]:
+    """Return literals bound to ``key`` by one ``match`` mapping case.
+
+    Args:
+        node: Any AST node; non-mapping-patterns contribute nothing.
+        key: Discriminator key name.
+
+    Returns:
+        The literals this case routes on.
+    """
+    if not isinstance(node, ast.MatchMapping):
+        return frozenset()
+    found: set[str | int] = set()
+    for map_key, pattern in zip(node.keys, node.patterns, strict=True):
+        if not (isinstance(map_key, ast.Constant) and map_key.value == key):
+            continue
+        if isinstance(pattern, ast.MatchValue) and isinstance(pattern.value, ast.Constant):
+            literal = pattern.value.value
+            if isinstance(literal, (str, int)):
+                found.add(literal)
+    return frozenset(found)
+
+
+def _comparison_literals(node: ast.AST, key: str) -> frozenset[str | int]:
+    """Return literals compared against ``key`` by one ``==`` test.
+
+    Args:
+        node: Any AST node; non-comparisons contribute nothing.
+        key: Discriminator key name.
+
+    Returns:
+        The literals this comparison routes on.
+    """
+    if not isinstance(node, ast.Compare) or not _is_key_lookup(node.left, key):
+        return frozenset()
+    return frozenset(
+        comparator.value
+        for comparator in node.comparators
+        if isinstance(comparator, ast.Constant) and isinstance(comparator.value, (str, int))
+    )
+
+
+def _is_key_lookup(node: ast.expr, key: str) -> bool:
+    """Return whether ``node`` reads the discriminator ``key``.
+
+    Args:
+        node: Left-hand side of a comparison.
+        key: Discriminator key name.
+
+    Returns:
+        True for ``x[key]`` and for a bare name equal to ``key``.
+    """
+    if isinstance(node, ast.Subscript):
+        return isinstance(node.slice, ast.Constant) and node.slice.value == key
+    return isinstance(node, ast.Name) and node.id == key
+
+
 def test_the_four_dispatchers_claim_disjoint_message_types() -> None:
     """No message type is claimed by two handlers in the chain.
 
@@ -97,6 +182,56 @@ def test_the_four_dispatchers_claim_disjoint_message_types() -> None:
                 overlaps[(first, second)] = shared
 
     assert overlaps == {}
+
+
+_ROOT = Path(__file__).resolve().parents[2] / "src" / "tankpit_bot"
+
+# Every other first-match-wins chain in the codebase, each with the same
+# shape and the same mutation result: the early returns are unobservable
+# while the handlers stay disjoint. Listed here so one new overlapping
+# case anywhere fails a test instead of silently starving a handler.
+_CHAINS: tuple[tuple[str, Path, tuple[str, ...], str], ...] = (
+    (
+        "sim ghost consume",
+        _ROOT / "sim" / "ghost.py",
+        ("_consume_tank_message", "_consume_combat_social", "_consume_world_reads"),
+        "msg_type",
+    ),
+    (
+        "wire timeline ingest",
+        _ROOT / "validate" / "wire_timeline.py",
+        ("_ingest_fuel_and_hazards", "_ingest_combat_and_identity"),
+        "msg_type",
+    ),
+    (
+        "scorecard diagnostic routing",
+        _ROOT / "diagnostics" / "session_scorecard_accumulator.py",
+        ("_route_combat_diagnostic", "_route_fuel_diagnostic"),
+        "kind",
+    ),
+)
+
+
+def test_every_first_match_wins_chain_stays_disjoint() -> None:
+    """No handler in any dispatch chain claims another's message.
+
+    Same invariant as the world-state chain above, for the three other
+    chains built the same way. Each was confirmed disjoint when this was
+    written; an overlap introduced later means the second handler stops
+    running for that message and nothing says so.
+    """
+    collisions: dict[str, frozenset[str | int]] = {}
+    for name, path, functions, key in _CHAINS:
+        claimed = {fn: _claimed_by(path, fn, key) for fn in functions}
+        assert all(claimed.values()), f"{name}: a handler routed on nothing -- reader is wrong"
+        ordered = list(functions)
+        for index, first in enumerate(ordered):
+            for second in ordered[index + 1 :]:
+                shared = claimed[first] & claimed[second]
+                if shared:
+                    collisions[f"{name}: {first} x {second}"] = shared
+
+    assert collisions == {}
 
 
 def test_the_declared_handler_types_match_the_source() -> None:
