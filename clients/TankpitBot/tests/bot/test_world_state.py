@@ -83,6 +83,32 @@ class TestBotWithWorldState:
         assert nearest["x"] == 60
         assert nearest["y"] == 60
 
+    def test_get_nearest_fuel_container_without_position_but_with_containers(
+        self, fake_env: FakeEnv
+    ) -> None:
+        """Unknown position yields nothing even when containers are tracked.
+
+        The existing no-position test has no containers either, so the
+        empty-list check answers it and the position check is never
+        reached. With containers present the sort runs, and unpacking
+        ``my_x, my_y = pos`` on ``None`` raises ``TypeError`` -- which
+        is the state right after a radar sweep but before the first
+        position message, a real ordering on session start.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.protocol import RadarContainerDict
+
+        ws = WorldService()
+        containers: list[RadarContainerDict] = [
+            RadarContainerDict(x=10, y=10, volume=100),
+            RadarContainerDict(x=60, y=60, volume=200),
+        ]
+        update_world_state_from_radar(ws, containers, [], [])
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+
+        assert bot.get_fuel_containers() != []
+        assert bot.get_nearest_fuel_container() is None
+
     def test_get_nearest_fuel_container_no_fuel_containers(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_nearest_fuel_container returns None when no fuel containers."""
         from tankpit_bot.bot.base import Bot

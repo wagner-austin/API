@@ -6,17 +6,81 @@ import pytest
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
+from tankpit_bot.bot.ai.hunt_relay import stale_human_needs_map_refresh
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import (
+    consent_human,
     make_inventory,
     make_map_known_enemy,
     make_pursuit_target,
     make_scanned_ai_state,
     make_world,
 )
+
+
+def _stale_human_ctx(ws: WorldService, *, last_map_open_ms: int) -> DecideCtx:
+    """Build a context holding one stale map-known HUMAN enemy.
+
+    The human's map snapshot is 10s old against a 5s cooldown, so its
+    position is stale and a refresh is warranted on the merits. Only
+    ``last_map_open_ms`` varies between the two tests below.
+
+    Args:
+        ws: World service backing the context.
+        last_map_open_ms: When the map was last opened.
+
+    Returns:
+        Decision context at timestamp 100000.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "60": make_map_known_enemy(x=130, y=100, name="Austin", timestamp_ms=90000),
+    }
+    # Human combat requires consent (contract 2026-07-30); without it the
+    # rejection reason is "human_not_consented" and staleness is never
+    # reached, so neither test below would exercise the cooldown at all.
+    consent_human(ws, 60)
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 80000,
+            "last_map_open_ms": last_map_open_ms,
+        }
+    )
+    return DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+
+
+def test_map_refresh_is_refused_inside_the_open_cooldown() -> None:
+    """A stale human does not re-open the map during the cooldown.
+
+    The cooldown rate-limits the map-open COMMAND; the identically
+    named config value is also handed to ``stale_human_exists``, but
+    there it means something else -- the freshness window for a
+    map-known position. So the staleness test can say "yes, refresh"
+    while the rate limit says "not yet", and only this guard enforces
+    the second. Without it the acquire path re-opens the map every
+    tick a stale human is visible, which is the map-spam loop the
+    cooldown exists to prevent.
+
+    The companion test below runs the same world with an old
+    ``last_map_open_ms`` and asserts the refresh IS warranted, so this
+    refusal cannot be blamed on a world that would never want one.
+    """
+    ctx = _stale_human_ctx(WorldService(), last_map_open_ms=99500)
+
+    assert stale_human_needs_map_refresh(ctx) is False
+
+
+def test_map_refresh_is_warranted_once_the_cooldown_expires() -> None:
+    """Control: the same stale human DOES warrant a refresh after the cooldown."""
+    ctx = _stale_human_ctx(WorldService(), last_map_open_ms=90000)
+
+    assert stale_human_needs_map_refresh(ctx) is True
 
 
 def test_hunt_acquire_teleports_at_an_affordablemake_map_known_enemy() -> None:
