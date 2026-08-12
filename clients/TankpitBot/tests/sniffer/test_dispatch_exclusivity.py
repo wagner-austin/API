@@ -46,6 +46,18 @@ _TANK_TYPES = frozenset({0x21, 0x28, 0x2E, 0x3E, 0x41, 0x48, 0x53, 0x58})
 
 # 0x2E reaches both handlers by design; the resource handler claims it and
 # owns every effect the message carries, including promotion progress.
+#
+# The tank handler's damage case is the other effect the resource handler
+# shadows, and it was checked rather than assumed (2026-08-12). It drops
+# two things for the self tank: damage_state, a fuel-quartile estimator
+# the bot does not need for itself because it knows its own fuel exactly,
+# and the last_wire_seen_ms refresh. The second is the one worth proving,
+# and it is unread: the self tank IS in the registry (present in all six
+# sessions replayed), but every production consumer of last_wire_seen_ms
+# filters it out first -- threats.py and the three threat_acquisition
+# loops through _is_enemy, which is `not is_self and team != self_team`,
+# and hunt_acquire with the same check inlined. The only unfiltered
+# reader is action_lab's tracking probe, which is asked about one tank id.
 _KNOWN_OVERLAP = frozenset({0x2E})
 
 
@@ -208,6 +220,12 @@ _CHAINS: tuple[tuple[str, Path, tuple[str, ...], str], ...] = (
         _ROOT / "diagnostics" / "session_scorecard_accumulator.py",
         ("_route_combat_diagnostic", "_route_fuel_diagnostic"),
         "kind",
+    ),
+    (
+        "shadow timeline ingest",
+        _ROOT / "validate" / "shadow_timeline.py",
+        ("_ingest_tank_events", "_ingest_combat_events"),
+        "msg_type",
     ),
 )
 
