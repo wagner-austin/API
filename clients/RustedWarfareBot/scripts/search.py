@@ -225,17 +225,25 @@ def run_search(
 
     Returns:
         Report lines: each round's scores, then the survivors ranked for
-        graduation.
+        graduation. Every line is also written the moment it happens --
+        a driver that runs for fifteen hours and prints only at the end
+        is unreadable while it matters (log 2026-08-11).
 
     Raises:
         MatchServiceError: Through the queue, on unreadable rows.
         SweepError: When a job line cannot be parsed back.
     """
+    lines: list[str] = []
+
+    def note(text: str) -> None:
+        host_hooks.write_line(text)
+        lines.append(text)
+
     survivors: tuple[Candidate, ...] = (
         *single_moves(SPACE),
         *sampled_pairs(SPACE, PAIR_CANDIDATES, rng_seed),
     )
-    lines: list[str] = [f"# search {name} (rng {rng_seed}): {len(survivors)} candidates"]
+    note(f"# search {name} (rng {rng_seed}): {len(survivors)} candidates")
     for round_index, pairs in enumerate(SCHEDULE):
         batch = f"{name}-r{round_index}"
         write_variants(survivors, variant_dir)
@@ -246,23 +254,21 @@ def run_search(
         bootstrap(conn)
         queued = submit(conn, batch, config, jobs)
         conn.close()
-        lines.append(
-            f"# round {round_index}: {len(survivors)} arms, {pairs} pairs, {queued} queued"
-        )
+        note(f"# round {round_index}: {len(survivors)} arms, {pairs} pairs, {queued} queued")
         wait_for_batch(dsn, batch)
         margins = batch_margins(sweeps_root / batch)
         scores: dict[Candidate, float] = {}
         for moves in survivors:
             n, mean, sd = paired_delta(margins, candidate_label(moves), "control")
             scores[moves] = mean
-            lines.append(
+            note(
                 f"{batch} {candidate_label(moves):24} n={n:3}"
                 f"  margin delta {mean:+.3f} (sd {sd:.3f})"
             )
         survivors = keep_top(scores, max(1, len(survivors) // 2))
-    lines.append("# graduation order (full win-bar panel next, laws six and nine):")
+    note("# graduation order (full win-bar panel next, laws six and nine):")
     for moves in survivors:
-        lines.append(f"#   {candidate_label(moves)}")
+        note(f"#   {candidate_label(moves)}")
     return tuple(lines)
 
 
@@ -287,8 +293,8 @@ def main(
         sys.stdout.write("usage: search <dsn> <name> [rng-seed]\n")
         return EXIT_BAD_USAGE
     rng_seed = int(args[2]) if len(args) == 3 else 0
-    for line in run_search(args[0], args[1], rng_seed, sweeps_root, variant_dir):
-        sys.stdout.write(line + "\n")
+    # The report streams as it happens; the return value is for callers.
+    run_search(args[0], args[1], rng_seed, sweeps_root, variant_dir)
     return EXIT_OK
 
 
