@@ -164,6 +164,82 @@ def test_pre_fix_and_latest_files_are_ineligible(tmp_path: Path) -> None:
     assert validate_teleport_cost(tmp_path)["samples"] == 0
 
 
+def test_a_teleport_dispatch_line_is_not_a_landing(tmp_path: Path) -> None:
+    """A teleport line that is not an ``action_outcome`` is never paired.
+
+    Every dispatched teleport logs an action-bearing line carrying no
+    ``outcome`` field at all: 11,133 lines across the 427 archived runs
+    are exactly that shape. The record-kind check has to run before the
+    outcome string is touched, because ``outcome.startswith`` on the
+    absent field raises ``AttributeError`` -- without it the validator
+    dies on the first real log it opens instead of returning a wrong
+    cost.
+
+    The dispatch line here carries landing coordinates too, so a mutant
+    that somehow got past the attribute access would still be caught
+    pairing a dispatch as a landing.
+    """
+    _write_events(
+        tmp_path,
+        ELIGIBLE,
+        [
+            _fix(0, 0, 500),
+            '{"action_kind": "teleport", "landed_x": 3, "landed_y": 4}',
+            _fix(3, 4, 470),
+        ],
+    )
+
+    assert validate_teleport_cost(tmp_path)["samples"] == 0
+
+
+def test_control_a_dispatch_line_beside_a_real_landing_still_pairs(tmp_path: Path) -> None:
+    """Control: the dispatch line is ignored as a landing, not as an action.
+
+    Its kind is teleport-free, so it does not contaminate the window it
+    sits in -- the real outcome two lines later still pairs.
+    """
+    _write_events(
+        tmp_path,
+        ELIGIBLE,
+        [
+            _fix(0, 0, 500),
+            '{"action_kind": "teleport", "landed_x": 3, "landed_y": 4}',
+            _teleport(3, 4),
+            _fix(3, 4, 470),
+        ],
+    )
+
+    evidence = validate_teleport_cost(tmp_path)
+
+    assert evidence["samples"] == 1
+    assert evidence["exact"] == 1
+
+
+def test_a_dated_non_bot_file_is_not_an_eligible_run(tmp_path: Path) -> None:
+    """Eligibility needs the ``bot-`` prefix, not just digits at offset 4.
+
+    The date token is read positionally (``name[4:12]``), so any name
+    whose fifth through twelfth characters are digits parses as a run
+    date -- ``sim-20260701-000000.events.jsonl`` included. Without the
+    prefix check that file counts as a second post-fix run and its
+    samples are added to the evidence a second time. The archive's own
+    ``latest.events.jsonl`` escapes only by the accident that
+    ``"st.event"`` is not numeric, so the prefix check is the only thing
+    actually enforcing the documented exclusion.
+
+    ``samples == 1`` is its own control: had the check wrongly excluded
+    the ``bot-`` file as well, no pair would survive at all.
+    """
+    clean = [_fix(0, 0, 500), _teleport(3, 4), _fix(3, 4, 470)]
+    _write_events(tmp_path, ELIGIBLE, clean)
+    _write_events(tmp_path, "sim-20260701-000000.events.jsonl", clean)
+
+    evidence = validate_teleport_cost(tmp_path)
+
+    assert evidence["samples"] == 1
+    assert "across 1 post-fix runs" in evidence["detail"]
+
+
 def test_malformed_and_incomplete_lines_are_skipped(tmp_path: Path) -> None:
     """Bad JSON, non-object lines, and landed-less outcomes leave no pairs."""
     _write_events(

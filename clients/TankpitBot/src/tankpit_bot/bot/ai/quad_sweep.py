@@ -192,8 +192,6 @@ def plan_quad_sweep(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict
         extras exhausted).
     """
     extras = ctx.inventory["extra_radars"]["count"]
-    if extras == 0:
-        return None
     if ctx.fuel <= ctx.config["fuel_low_threshold"]:
         # Recon is an economy move, never a survival move: at or below
         # the fuel-low break every tick belongs to fuel acquisition
