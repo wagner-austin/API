@@ -133,7 +133,6 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # pending or the delta has already been consumed.
         self.pending_shot_inventory_snapshot: InventoryState | None = None
         self.killed_tank_ids: set[int] = set()
-        self.tank_death_anchors: dict[int, tuple[int, int]] = {}
         self.teleport_landed: bool = False
         self.radar_scan_complete: bool = False
         self.map_data_processed: bool = False

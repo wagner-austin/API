@@ -186,59 +186,12 @@ def update_world_state_from_move_response_full(
     ws.world_state = apply_tank_observation(ws.world_state, obs)
 
 
-def update_world_state_from_client_registry(
-    ws: WorldService,
-    tank_id: int,
-    name: str,
-    team: int,
-    x: int,
-    y: int,
-) -> bool:
-    """Refine a WIRE-KNOWN tank's position from the client-side registry.
-
-    Client registry refinement is NOT a wire observation -- it is a
-    DOM-scraped value used to nudge position when the wire has gone
-    quiet. The observation therefore sets ``is_wire_sourced=False`` so
-    neither ``last_wire_seen_ms`` nor ``last_position_update_ms``
-    advance; only the position value is updated. Tanks that the wire
-    has never confirmed are not refined (this method returns False).
-
-    Args:
-        ws: World service instance.
-        tank_id: Tank id (shared with the wire ID space).
-        name: Tank name from the registry entry.
-        team: Team id from the verified ``h`` field.
-        x: Absolute X coordinate.
-        y: Absolute Y coordinate.
-
-    Returns:
-        True when a wire-known tank was refined; False for unknown ids.
-    """
-    existing = ws.world_state["tanks"].get(str(tank_id))
-    if existing is None:
-        return False
-    obs = make_tank_observation(
-        tank_id=tank_id,
-        timestamp_ms=existing["timestamp_ms"],
-        is_wire_sourced=False,
-        storage_source="viewport",
-        fact_source="dom_registry_scrape",
-        position=(x, y),
-        team=team,
-        name=name,
-    )
-    ws.world_state = apply_tank_observation(ws.world_state, obs)
-    return True
-
-
 def update_world_state_from_tank_damage(
     ws: WorldService,
     tank_id: int,
     damage_state: int,
-    *,
-    refresh_wire_timestamp: bool = True,
 ) -> None:
-    """Update tank damage from TankStatusSync (0x2E) or registry truth.
+    """Update tank damage from a TankStatusSync (0x2E) wire message.
 
     Damage-only wire messages refresh ``last_wire_seen_ms`` (presence
     proof) but MUST NOT refresh ``last_position_update_ms`` -- the
@@ -249,23 +202,16 @@ def update_world_state_from_tank_damage(
         ws: World service instance.
         tank_id: Tank whose damage tier is being synced.
         damage_state: New damage tier (0-3).
-        refresh_wire_timestamp: True for wire-sourced updates; False
-            when the caller is a non-wire diagnostic (e.g.
-            registry-truth recomputation) and must preserve the
-            wire-seen timestamp.
     """
     previous = ws.world_state["tanks"].get(str(tank_id))
     if previous is None:
         return
-    ts = browser.get_current_time_ms() if refresh_wire_timestamp else previous["timestamp_ms"]
     obs = make_tank_observation(
         tank_id=tank_id,
-        timestamp_ms=ts,
-        is_wire_sourced=refresh_wire_timestamp,
+        timestamp_ms=browser.get_current_time_ms(),
+        is_wire_sourced=True,
         storage_source=previous["source"],
-        fact_source=(
-            "wire_0x2E_tank_status_sync" if refresh_wire_timestamp else "dom_registry_scrape"
-        ),
+        fact_source="wire_0x2E_tank_status_sync",
         damage_state=damage_state,
     )
     ws.world_state = apply_tank_observation(ws.world_state, obs)

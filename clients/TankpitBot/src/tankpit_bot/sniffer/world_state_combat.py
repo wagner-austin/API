@@ -183,17 +183,11 @@ def _decrement_ammo_for_weapon(ws: WorldService, weapon_byte: int) -> None:
 def mark_tank_killed(ws: WorldService, tank_id: int) -> None:
     """Record a tank as killed via Deactivation protocol message.
 
-    Also anchors the tank's current world-state position as its death
-    tile so the registry-truth module can suppress corpse re-ingestion.
-
     Args:
         ws: World service instance.
         tank_id: The killed tank's ID.
     """
     ws.killed_tank_ids.add(tank_id)
-    existing = ws.world_state["tanks"].get(str(tank_id))
-    if existing is not None:
-        ws.tank_death_anchors[tank_id] = (existing["x"], existing["y"])
 
 
 def drain_killed_tank_ids(ws: WorldService) -> set[int]:
@@ -208,30 +202,6 @@ def drain_killed_tank_ids(ws: WorldService) -> set[int]:
     result = ws.killed_tank_ids
     ws.killed_tank_ids = set()
     return result
-
-
-def get_death_anchor(ws: WorldService, tank_id: int) -> tuple[int, int] | None:
-    """Return the death-tile anchor for a killed tank.
-
-    Args:
-        ws: World service instance.
-        tank_id: Tank ID to look up.
-
-    Returns:
-        ``(x, y)`` tuple of the tile where the tank was last killed,
-        or ``None`` if the tank has no death anchor.
-    """
-    return ws.tank_death_anchors.get(tank_id)
-
-
-def clear_death_anchor(ws: WorldService, tank_id: int) -> None:
-    """Clear a tank's death-tile anchor after respawn evidence.
-
-    Args:
-        ws: World service instance.
-        tank_id: Tank whose death anchor to clear.
-    """
-    ws.tank_death_anchors.pop(tank_id, None)
 
 
 def mark_teleport_landed(ws: WorldService) -> None:
@@ -303,9 +273,7 @@ __all__ = [
     "check_and_clear_last_shot_victim_id",
     "check_and_clear_our_shot_response",
     "check_and_clear_teleport_landed",
-    "clear_death_anchor",
     "drain_killed_tank_ids",
-    "get_death_anchor",
     "mark_combat_hit",
     "mark_tank_killed",
     "mark_teleport_landed",
