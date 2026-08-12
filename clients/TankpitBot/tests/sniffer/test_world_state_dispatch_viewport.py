@@ -6,6 +6,7 @@ detail is now a sibling.
 
 from __future__ import annotations
 
+from tankpit_bot.protocol import ViewportUpdateDict
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.state.types import make_viewport_state
@@ -57,6 +58,58 @@ class TestDispatchViewportUpdate:
         # Tank 800 invalidated — in viewport but not in entity list
         assert ws.world_state["tanks"]["800"]["x"] == 58
         assert ws.world_state["tanks"]["800"]["y"] == 58
+
+    def test_sweep_with_nothing_stale_does_not_rebuild_world_state(self) -> None:
+        """A sweep that drops nothing leaves the world-state object alone.
+
+        Every field of the rebuilt ``WorldStateDict`` is copied straight
+        across when both registries come back unchanged, so the rebuilt
+        object COMPARES equal and only its identity differs. That makes
+        the wasted rebuild invisible to any assertion on contents --
+        which is why identity is the assertion here, matching
+        ``test_filter_killed_tanks_empty_killed`` in the collect-helper
+        tests.
+
+        Every 0x5A patch runs this sweep, and most patches enumerate
+        what is already known, so the no-op path is the common one.
+        """
+        from tankpit_bot.sniffer.world_state_tiles import _sweep_silent_viewport_tiles
+
+        ws = WorldService()
+        dispatch_world_state_update(
+            ws,
+            ViewportUpdateDict(msg_type=0x5A, viewport_left=46, viewport_top=46, entities=[]),
+        )
+        before = ws.world_state
+
+        _sweep_silent_viewport_tiles(ws, [], 46, 46)
+
+        assert ws.world_state is before
+
+    def test_sweep_drops_a_visible_container_the_patch_is_silent_about(self) -> None:
+        """Control: a genuinely stale visible entry is pruned, rebuilding state.
+
+        The first patch enumerates a container tile, so the belief enters
+        the VISIBLE layer (radar-sourced entries are exempt from this
+        sweep entirely). The second patch says nothing about that tile,
+        which is the server saying it is gone.
+        """
+        from tankpit_bot.protocol.types import ViewportEntityDict
+        from tankpit_bot.sniffer.world_state_tiles import _sweep_silent_viewport_tiles
+
+        ws = WorldService()
+        seen = ViewportEntityDict(col=4, row=4, cache_value=120, overlay_value=0, terrain_type=0)
+        dispatch_world_state_update(
+            ws,
+            ViewportUpdateDict(msg_type=0x5A, viewport_left=46, viewport_top=46, entities=[seen]),
+        )
+        assert ws.world_state["containers"]["49,49"]["source"] == "viewport"
+        before = ws.world_state
+
+        _sweep_silent_viewport_tiles(ws, [], 46, 46)
+
+        assert ws.world_state["containers"] == {}
+        assert ws.world_state is not before
 
     def test_dispatch_viewport_update_skips_empty_cache_rows(self) -> None:
         """Viewport rows with cache_value=0 do not affect tracked tank positions."""

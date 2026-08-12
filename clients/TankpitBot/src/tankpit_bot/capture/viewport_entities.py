@@ -290,8 +290,6 @@ def _decode_viewport_update(
     """
     decoded_data = xor_decode_body(body, xor_table, offset=1)
     parsed = try_decode_binary_message(body[0], decoded_data)
-    if parsed is None:
-        return None
     match parsed:
         case {
             "msg_type": 0x5A,
