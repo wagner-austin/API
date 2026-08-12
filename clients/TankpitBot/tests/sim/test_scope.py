@@ -84,7 +84,22 @@ def test_anchor_law_reproduces_every_measured_shift() -> None:
 
 
 def test_scope_center_recenters_like_a_teleport_landing() -> None:
-    """Direction 8 restores the rest-state window at (x-8, y-8)."""
+    """Direction 8 restores the rest-state window at (x-8, y-8).
+
+    The recenter arm's early return is unobservable: removing it
+    re-derives the same window in all 500 position/direction pairs
+    probed, because 8 belongs to none of the four compass tuples and
+    ``_centered_window`` is already map-clamped, so the trailing clamp
+    is idempotent.
+
+    Two defences overlap here, and neither can be pinned alone. The
+    return stops direction 8 before the tuples are consulted, so adding
+    8 to a compass tuple changes nothing while the return stands --
+    checked by injection, and this assertion does NOT catch it. Equally,
+    removing the return changes nothing while 8 stays out of the tuples.
+    Only breaking both at once moves the window, so what is asserted
+    below is the outcome the pair guarantees, not either mechanism.
+    """
     tracker = _tracker(100, 100, (100, 100))
     tracker.apply_scope_shift(SCOPE_CENTER)
     assert tracker.window == (92, 92)

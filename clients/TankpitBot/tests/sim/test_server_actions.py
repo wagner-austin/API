@@ -324,3 +324,39 @@ def test_a_pickup_outside_the_client_window_does_nothing_but_refuse() -> None:
     assert _kinds(messages) == [0x52, 0x2E, 0x2E]
     assert (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"]) == origin
     assert [c["volume"] for c in server.world["containers"] if c["x"] == 200] == [90]
+
+
+def test_only_map_open_is_answered_with_a_map_dump() -> None:
+    """No other command kind gets a full 0x4C map in its batch.
+
+    ``_process_other_command`` is a cascade whose FALL-THROUGH is the
+    map_open answer, so each earlier arm's return is the only thing
+    keeping the whole world out of that command's reply. Removing them
+    appends a 0x4C to every one: a block press, a scope shift and a
+    statistics key each start broadcasting the entire map, which is the
+    largest message the server sends and one the client answers by
+    rebuilding its terrain belief.
+
+    ``test_map_open_tick_emits_map_data`` is the standing control for
+    the fall-through itself -- it must keep emitting the map, or these
+    assertions would pass against a server that never dumps at all.
+    """
+    scope_shift = ClientCommandDict(
+        kind="scope", command=115, x=0, y=0, target_id=0, slot=0, message_id=0, direction=2
+    )
+    press = ClientCommandDict(
+        kind="block", command=98, x=10, y=11, target_id=0, slot=0, message_id=0, direction=0
+    )
+
+    for label, command, expected in (
+        ("block", press, [0x52, 0x2E, 0x2E]),
+        ("scope", scope_shift, [0x5A, 0x3D, 0x2E, 0x2E]),
+        ("statistics", _statistics_key(), [0x56, 0x2E, 0x2E]),
+    ):
+        server = _server()
+        server.queue_command(9, command)
+
+        kinds = _kinds(server.advance_tick())
+
+        assert kinds == expected, label
+        assert 0x4C not in kinds, label
