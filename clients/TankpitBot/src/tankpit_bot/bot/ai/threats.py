@@ -184,8 +184,6 @@ def find_locked_target_pursuit(
         or ``None`` when the locked target is genuinely missing
         (no entry, dead, or no lock).
     """
-    if locked_target_id == -1:
-        return None
     if str(locked_target_id) in killed:
         return None
     tank = world["tanks"].get(str(locked_target_id))

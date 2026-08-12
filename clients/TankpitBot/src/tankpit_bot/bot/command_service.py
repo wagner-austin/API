@@ -148,8 +148,6 @@ class CommandService:
         Returns:
             True if command was sent, False if CDP unavailable.
         """
-        if self.cdp is None:
-            return False
         cmd = make_teleport_command(x, y)
         return self.send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})")
 

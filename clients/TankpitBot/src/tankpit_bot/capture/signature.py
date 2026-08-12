@@ -38,9 +38,6 @@ def extract_message_signature(payload_b64: str, xor_table: bytes) -> bytes | Non
     # We verified dot exists in positions 0-2, so find() returns 0, 1, or 2
     dot_pos = payload.find(b".")
     start = dot_pos + 1
-    if len(payload) <= start:
-        return None
-
     decode_len = min(len(payload) - start, len(xor_table))
     decoded = bytes(payload[start + j] ^ xor_table[j] for j in range(decode_len))
     return decoded if decoded else None

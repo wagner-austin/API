@@ -294,11 +294,7 @@ def find_mine_clearance_shot(
         container in view has a shot that reopens it.
     """
     hostile = hostile_mines(world)
-    if not hostile:
-        return None
     denied, aim_candidates = _denied_containers(world, terrain, hostile)
-    if not denied:
-        return None
     best: tuple[int, int] | None = None
     best_key: tuple[int, int, int, int] | None = None
     for aim_x, aim_y in aim_candidates:
@@ -367,8 +363,6 @@ def find_corridor_clearance_shot(
         can be shot from here.
     """
     mines = hostile_mines(world)
-    if not mines:
-        return None
     left, top, right, bottom = viewport_visible_bounds(world["viewport"])
     corridor = shot_line_tiles(self_state["x"], self_state["y"], dest_x, dest_y)
     corridor.append((dest_x, dest_y))

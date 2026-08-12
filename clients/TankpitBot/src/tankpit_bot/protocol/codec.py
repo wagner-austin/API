@@ -188,9 +188,6 @@ def extract_magic_from_auth_payload(payload_bytes: bytes) -> str | None:
     Returns:
         Magic key string, or None if not an AUTH message or extraction fails.
     """
-    if len(payload_bytes) < 10:
-        return None
-
     # Skip 2-byte length prefix
     body = payload_bytes[2:]
     text = body.decode("utf-8", errors="replace")

@@ -254,8 +254,6 @@ def _superior_equipment_candidate(
     )
     if candidate is None:
         return None
-    if (candidate["x"], candidate["y"]) == (locked_target["x"], locked_target["y"]):
-        return None
     if not is_lock_release_warranted(
         ctx.self_state,
         locked_target["x"],

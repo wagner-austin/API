@@ -102,8 +102,6 @@ def scope_direction_toward(
     west = goal_x < sx
     south = goal_y > sy
     north = goal_y < sy
-    if not (east or west or south or north):
-        return None
     if north:
         direction = SCOPE_NORTHEAST if east else SCOPE_NORTHWEST if west else SCOPE_NORTH
     elif south:

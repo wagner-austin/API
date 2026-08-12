@@ -153,8 +153,6 @@ class StatusSubscriber:
                 notified = self._cond.wait(timeout=timeout)
                 if timeout is not None and not notified:
                     return None
-            if self._latest is None:
-                return None
             frame = self._latest
             self._latest = None
             return frame

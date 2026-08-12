@@ -136,8 +136,6 @@ def held_human_combat_lock(ctx: DecideCtx) -> bool:
         resume machinery releases the lock on its own.
     """
     target_id = ctx.ai_state["combat_target_id"]
-    if target_id == -1:
-        return False
     tank = ctx.filtered["tanks"].get(str(target_id))
     return tank is not None and is_human_name(tank["name"])
 

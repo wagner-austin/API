@@ -243,9 +243,6 @@ def find_path_segment_target(
         max_x=max_x,
         max_y=max_y,
     )
-    if len(path) <= 1:
-        return None
-
     best_step: tuple[int, int] | None = None
     for step in path[1:]:
         candidate_x = step["x"]

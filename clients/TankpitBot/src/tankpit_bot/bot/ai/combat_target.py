@@ -214,8 +214,6 @@ def get_locked_target(
         The matching threat from ``threats``, or ``None``.
     """
     target_id = ctx.ai_state["combat_target_id"]
-    if target_id == -1:
-        return None
     for t in threats:
         if t["tank_id"] == target_id:
             return t
