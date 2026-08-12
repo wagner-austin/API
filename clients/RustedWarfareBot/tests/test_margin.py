@@ -11,11 +11,10 @@ import runpy
 from pathlib import Path
 
 import pytest
-from scripts.margin import (
-    EXIT_BAD_USAGE,
-    EXIT_OK,
+from scripts.margin import EXIT_BAD_USAGE, EXIT_OK, main
+
+from rw_bot.harness.margin import (
     batch_margins,
-    main,
     margin_of,
     pressure_of,
     report,
