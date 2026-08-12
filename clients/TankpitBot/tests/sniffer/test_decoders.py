@@ -114,16 +114,55 @@ class TestTryDecodeBinary:
 class TestProcessReceivedMessage:
     """Tests for process_received_message internal paths."""
 
-    def test_single_byte_binary_returns_early(self) -> None:
-        """process_received_message handles 1-byte binary body (empty decoded data)."""
+    def test_a_body_with_no_bytes_after_its_type_is_not_decoded(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """An empty decoded body is dropped before the decoder sees it.
+
+        A one-byte frame is a type byte with nothing behind it, so XOR
+        decoding from offset 1 leaves zero bytes. Six wire types declare
+        a minimum length of 0, which an empty body satisfies -- without
+        this check 0x43 is handed to the decoder, comes back as a
+        CacheUpdate carrying no updates, and is announced as a received
+        message that never arrived.
+
+        This test previously called the function and asserted only that
+        it did not raise. That covered the line without pinning it: the
+        sweep could not tell the guard from absent, which is the whole
+        distinction between a covered line and a pinned one.
+        """
         from tankpit_bot.sniffer.decoders import process_received_message
 
-        # Frame: 2-byte LE length (1) + 1-byte binary body (0x01)
-        # xor_decode strips msg_type → empty decoded_data → early return
         ws = WorldService()
-        frame = b"\x01\x00\x01"
-        payload = base64.b64encode(frame).decode()
-        process_received_message(ws, payload, sniffer_xor_table())  # should not raise
+        set_protocol_frame_logging(True)
+        payload = base64.b64encode(b"\x01\x00\x43").decode()
+
+        with caplog.at_level(logging.INFO):
+            process_received_message(ws, payload, sniffer_xor_table())
+
+        assert not any("[RECEIVED]" in record.message for record in caplog.records)
+
+    def test_control_the_same_type_carrying_one_entry_is_decoded(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Control: a whole 4-byte entry behind the same type IS announced.
+
+        CacheUpdate entries are 4 wire bytes, so this is the shortest
+        0x43 the decoder accepts -- proof the silence above is the empty
+        body being dropped and not 0x43 going unlogged in general.
+        """
+        from tankpit_bot.sniffer.decoders import process_received_message
+
+        ws = WorldService()
+        set_protocol_frame_logging(True)
+        payload = base64.b64encode(b"\x05\x00\x43\x00\x00\x00\x00").decode()
+
+        with caplog.at_level(logging.INFO):
+            process_received_message(ws, payload, sniffer_xor_table())
+
+        assert any("[RECEIVED]" in record.message for record in caplog.records)
 
     def test_unknown_binary_type_logs_fallback(self) -> None:
         """process_received_message logs fallback for unrecognized binary type."""

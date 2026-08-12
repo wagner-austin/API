@@ -145,3 +145,65 @@ class TestDispatchRadarEmptyDelta:
         assert ws.consume_pending_radar_empty_delta() is False
         result = ws.get_world_state()
         assert "98,98" in result["containers"]
+
+
+class TestRadarReconcileNoOp:
+    """A radar that confirms what is already known changes nothing."""
+
+    def teardown_method(self) -> None:
+        """Reset the terrain hooks after each test."""
+        _test_hooks.path_exists = _test_hooks._real_path_exists
+        _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
+
+    def _service_with_radar_container(self) -> WorldService:
+        """Return a service holding one radar-sourced container in bounds.
+
+        Returns:
+            World service whose ``10,10`` container was confirmed by a
+            radar and therefore is eligible to go stale.
+        """
+        from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
+
+        ws = WorldService()
+        _test_hooks.path_exists = lambda path: False
+        _test_hooks.load_terrain_map = lambda path: InMemoryTerrainMap({})
+        ws.update_world_state_from_position(100, 100)
+        update_world_state_from_radar(ws, [RadarContainerDict(x=10, y=10, volume=600)], [], [])
+        return ws
+
+    def test_a_radar_that_prunes_nothing_leaves_the_world_state_object_alone(self) -> None:
+        """A scan that re-lists what is tracked does not replace the state.
+
+        ``_without_stale_radar_entries`` returns None when it pruned
+        nothing, so both layers returning None means the scan confirmed
+        exactly what was already known. Rebuilding anyway would hand
+        every holder of the current world state a fresh object with
+        identical contents -- content comparison cannot see the
+        difference, which is why the suite's idiom for "this path is a
+        no-op" is that the dict itself is not replaced.
+        """
+        from tankpit_bot.sniffer.world_state_radar import reconcile_radar_viewport_resources
+
+        ws = self._service_with_radar_container()
+        before = ws.world_state
+
+        reconcile_radar_viewport_resources(ws, [RadarContainerDict(x=10, y=10, volume=600)], None)
+
+        assert ws.world_state is before
+        assert "10,10" in ws.world_state["containers"]
+
+    def test_control_a_radar_that_omits_a_tracked_tile_does_replace_it(self) -> None:
+        """Control: the same tile, omitted by the new scan, is pruned.
+
+        One difference from the case above -- the scan no longer lists
+        the tile -- and the world state is rebuilt without it.
+        """
+        from tankpit_bot.sniffer.world_state_radar import reconcile_radar_viewport_resources
+
+        ws = self._service_with_radar_container()
+        before = ws.world_state
+
+        reconcile_radar_viewport_resources(ws, [], None)
+
+        assert ws.world_state is not before
+        assert "10,10" not in ws.world_state["containers"]

@@ -23,7 +23,7 @@ from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_fuel_total as _update_fuel_total,
 )
 from tankpit_bot.state import make_self_state
-from tankpit_bot.state.types import make_tank_state
+from tankpit_bot.state.types import SelfStateDict, make_tank_state
 from tests.bot._completion_fixtures import (
     _decode_action_outcome_lines,
     _make_bot_with_in_flight,
@@ -345,3 +345,107 @@ def test_artifact_jsonl_lines_round_trip_through_real_decoder(
     assert latest_events == archive_events
     assert len(latest_events) == 1
     assert require_str_field(latest_events[0]["fields"], "outcome") == "radar_complete"
+
+
+def _self_on_tile(x: int, y: int) -> SelfStateDict:
+    """Return a self state parked on one tile.
+
+    Args:
+        x: Tank X coordinate.
+        y: Tank Y coordinate.
+
+    Returns:
+        A self-state record the walk gate can compare against a target.
+    """
+    return make_self_state(
+        tank_id=1,
+        x=x,
+        y=y,
+        team=2,
+        rank=0,
+        fuel=1000,
+        leaderboard_position=1,
+    )
+
+
+class TestWalkGateOwnershipChecks:
+    """The walk gate completes a WALK, and only when it can see the tank."""
+
+    def test_a_teleport_in_flight_is_not_completed_by_the_walk_gate(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """A teleport standing on its own destination is not a finished walk.
+
+        The gate's only evidence is "the tank is on the action's target
+        tile", which a teleport satisfies the instant it lands and
+        before the landing flag arrives. Without the state check the
+        walk gate claims that teleport: it books
+        ``move_position_reached`` against a teleport action and drops
+        the bot to IDLE, so the teleport's own outcome is never
+        recorded and every teleport-keyed analysis -- cost validation
+        included -- loses the sample.
+        """
+        ws = WorldService()
+        configure_bot_runtime_logging("20260331-230405")
+        bot = _make_bot_with_in_flight(
+            world=ws,
+            state="TELEPORTING",
+            action_kind="teleport",
+            target_x=30,
+            target_y=40,
+            started_ms=get_current_time_ms() - 1,
+        )
+
+        assert bot._maybe_complete_walk(_self_on_tile(30, 40)) is False
+        assert bot._state_data["state"] == "TELEPORTING"
+
+    def test_a_walk_cannot_complete_while_the_tank_is_unseen(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """With no self state there is no position to compare the target to.
+
+        The gate reads ``self_state["x"]`` directly, so a missing self
+        state is a ``TypeError`` rather than a miss -- the tick dies
+        instead of waiting one more sync for the tank to appear.
+        """
+        ws = WorldService()
+        configure_bot_runtime_logging("20260331-230405")
+        bot = _make_bot_with_in_flight(
+            world=ws,
+            state="MOVING",
+            action_kind="move",
+            target_x=30,
+            target_y=40,
+            started_ms=get_current_time_ms() - 1,
+        )
+
+        assert bot._maybe_complete_walk(None) is False
+        assert bot._state_data["state"] == "MOVING"
+
+    def test_control_the_same_tile_completes_a_walk(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """Control: same tile, same target, MOVING -- the gate fires.
+
+        Only the state differs from the teleport case above, so the two
+        together show the state is what decides ownership.
+        """
+        ws = WorldService()
+        configure_bot_runtime_logging("20260331-230405")
+        bot = _make_bot_with_in_flight(
+            world=ws,
+            state="MOVING",
+            action_kind="move",
+            target_x=30,
+            target_y=40,
+            started_ms=get_current_time_ms() - 1,
+        )
+
+        assert bot._maybe_complete_walk(_self_on_tile(30, 40)) is True
+        assert bot._state_data["state"] == "IDLE"

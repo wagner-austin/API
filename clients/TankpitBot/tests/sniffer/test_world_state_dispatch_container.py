@@ -12,6 +12,57 @@ from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
 
+class TestDuplicatePickupBroadcast:
+    """The server sends every pickup twice; only one may reach the book."""
+
+    def test_the_second_broadcast_of_one_pickup_is_not_booked_again(self) -> None:
+        """A repeated ContainerPickup body books one fuel credit, not two.
+
+        The server broadcasts every pickup twice -- once to the picker,
+        once to the world view -- both inside ~200 ms, measured at a
+        43.9% duplicate rate across 13 sniff sessions. Every call to
+        ``update_world_state_from_container_pickup`` records a ``pickup``
+        entry in the fuel book, so without the dedup check each real
+        pickup is credited to the bot twice.
+
+        This is not hypothetical. It is the pickup double-count
+        corruption that makes every run before 2026-06-24 ineligible for
+        the teleport-cost validator, which is why
+        ``POST_FUEL_FIX_DATE`` exists at all.
+        """
+        from tankpit_bot.container.types import ContainerPickupDict, ContainerPickupRecordDict
+
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        message = ContainerPickupDict(
+            msg_type="container_pickup",
+            pickups=(ContainerPickupRecordDict(x=50, y=60, remaining_volume=0),),
+        )
+
+        dispatch_world_state_update(ws, message)
+        dispatch_world_state_update(ws, message)
+
+        assert [entry["kind"] for entry in ws.fuel_book["entries"]] == ["pickup"]
+
+    def test_control_two_distinct_pickups_are_both_booked(self) -> None:
+        """Control: different tiles are different signatures, so both count."""
+        from tankpit_bot.container.types import ContainerPickupDict, ContainerPickupRecordDict
+
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+
+        for x, y in ((50, 60), (51, 60)):
+            dispatch_world_state_update(
+                ws,
+                ContainerPickupDict(
+                    msg_type="container_pickup",
+                    pickups=(ContainerPickupRecordDict(x=x, y=y, remaining_volume=0),),
+                ),
+            )
+
+        assert [entry["kind"] for entry in ws.fuel_book["entries"]] == ["pickup", "pickup"]
+
+
 class TestDispatchTilePatchUpdates:
     """Tests for absolute tile patch dispatch in world state."""
 
