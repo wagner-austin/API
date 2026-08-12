@@ -68,6 +68,38 @@ def _routed(records: list[RuntimeEventRecordDict]) -> ScorecardAccumulatorDict:
     return accumulator
 
 
+def test_a_kill_diagnostic_on_another_channel_is_not_counted() -> None:
+    """A record's CHANNEL decides its router, not the fields it carries.
+
+    The channel cascade ends with an explicit ``!= "DIAGNOSTIC"`` arm,
+    and it is the only thing enforcing that. Without it every record
+    that is not STATE, WORLD, or a WIRE shot is handed to the diagnostic
+    router -- 925,744 AI, SYNC, WIRE and WIRE_COMPLETE records across the
+    427 archived runs -- and stays harmless only because all ~20 routing
+    branches happen to be gated on a ``diagnostic_kind`` literal that
+    those records do not carry.
+
+    Routing all 1,403,706 archived records with the arm removed produces
+    a byte-identical accumulator, so no current emitter puts a
+    ``diagnostic_kind`` on another channel and the record below is
+    constructed rather than observed. The arm is what keeps that true:
+    one ``emit_ai(diagnostic_kind=...)`` would otherwise inflate the kill
+    count of every scorecard, silently and in the bot's favour.
+    """
+    accumulator = _routed([_record(channel="AI", fields={"diagnostic_kind": "tank_deactivated"})])
+
+    assert accumulator["kills"] == 0
+
+
+def test_control_the_same_kill_diagnostic_on_its_own_channel_counts() -> None:
+    """Control: on the DIAGNOSTIC channel that exact record IS a kill."""
+    accumulator = _routed(
+        [_record(channel="DIAGNOSTIC", fields={"diagnostic_kind": "tank_deactivated"})]
+    )
+
+    assert accumulator["kills"] == 1
+
+
 def _fuel_sample_record(
     *,
     fuel: int,

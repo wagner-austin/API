@@ -110,6 +110,34 @@ def test_untracked_and_malformed_frames_are_skipped() -> None:
     assert timeline["sent_actions"] == []
 
 
+def test_an_untracked_type_with_no_declared_minimum_is_skipped() -> None:
+    """The tracked-type check runs BEFORE the minimum-length lookup.
+
+    ``MSG_MIN_LENGTHS`` only carries the types the sniffer decodes, so
+    indexing it with an arbitrary wire byte is a ``KeyError``, not a
+    miss. Of the 249 untracked received frames in the 34 archived
+    capture sessions, 66 are types ``0x24`` and ``0x2d`` -- neither of
+    which has an entry -- so extracting any real session would die on
+    them if the type check did not come first.
+
+    The test above cannot catch this: its untracked text frame is
+    ``0x3d``, which DOES have a declared minimum and so fails later and
+    quietly. The identity in this session is the control -- it proves
+    extraction ran rather than aborting before the frame was reached.
+    """
+    session = make_session(
+        [
+            identity_message(50, SELF_ID),
+            frame_message(100, b"$untracked", "received"),
+        ]
+    )
+
+    timeline = extract_wire_timeline(session)
+
+    assert timeline["self_id"] == SELF_ID
+    assert timeline["fuel_readings"] == []
+
+
 def test_below_min_length_message_is_skipped() -> None:
     """A tracked type shorter than its wire minimum is dropped, not decoded."""
     tiny_shot = frame_message(100, xor_encode_body(0x53, bytes(4)), "received")
