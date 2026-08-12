@@ -88,6 +88,49 @@ class TestDispatchRadarEmptyDelta:
         # The empty delta is pending; a RadarAck(found=True) should preserve
         assert ws.consume_pending_radar_empty_delta() is True
 
+    def test_no_pending_delta_is_not_recent_on_a_fresh_clock(self) -> None:
+        """Nothing pending is never "recent", however young the clock is.
+
+        The sibling test below already consumes with nothing pending,
+        but under the wall clock (~1.79e12 ms) the recency arithmetic
+        answers False on its own: ``now - 0 <= 2000`` cannot hold. It
+        holds whenever the clock reads under the 2s window, which is
+        exactly what a replay or sim clock does -- ``_replay_page``
+        starts at 0 and ``ReplayClock(1000)`` starts at 1000.
+
+        There, an unset sentinel of 0 would be read as a timestamp two
+        seconds ago and the caller would preserve a radar cache on the
+        strength of an empty delta that was never observed.
+        """
+        from tankpit_bot import _test_hooks as core_hooks
+
+        def _fresh_clock() -> int:
+            return 500
+
+        ws = WorldService()
+        saved = core_hooks.get_current_time_ms
+        core_hooks.get_current_time_ms = _fresh_clock
+        try:
+            assert ws.consume_pending_radar_empty_delta() is False
+        finally:
+            core_hooks.get_current_time_ms = saved
+
+    def test_a_real_pending_delta_is_recent_on_the_same_fresh_clock(self) -> None:
+        """Control: a delta actually marked on that clock does read as recent."""
+        from tankpit_bot import _test_hooks as core_hooks
+
+        def _fresh_clock() -> int:
+            return 500
+
+        ws = WorldService()
+        saved = core_hooks.get_current_time_ms
+        core_hooks.get_current_time_ms = _fresh_clock
+        try:
+            ws.mark_pending_radar_empty_delta()
+            assert ws.consume_pending_radar_empty_delta() is True
+        finally:
+            core_hooks.get_current_time_ms = saved
+
     def test_nonempty_tunneled_radar_processes_immediately(self) -> None:
         """Dispatching a non-empty tunneled 0x4F processes containers immediately."""
         from tankpit_bot.protocol.types import RadarScanResultDict

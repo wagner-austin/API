@@ -22,6 +22,40 @@ from tankpit_bot.sniffer.world_state_inventory import (
 class TestCombatHitTracking:
     """Tests for mark_combat_hit and check_and_clear_combat_hit."""
 
+    def test_an_unknown_weapon_byte_records_no_shot_entry(self) -> None:
+        """A weapon byte outside 0-3 is not billed to any book.
+
+        The byte arrives from the wire, so its range is the server's
+        promise rather than ours. Only 0-3 have a cost and a fuel-entry
+        kind; past the check, a self-fired shot raises ``KeyError`` on
+        the cost lookup and an enemy shot books a phantom ``enemy_hit``
+        against the fuel ledger, which the reconciler then has to
+        explain.
+
+        The control below fires the same enemy shot with a valid byte
+        and does record, so the silence here is the range check rather
+        than a shooter nothing bills for.
+        """
+        from tankpit_bot.sniffer.world_state_dispatch_combat import _record_shot_fuel_entry
+
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+
+        _record_shot_fuel_entry(ws, shooter_id=777, weapon=7)
+
+        assert ws.fuel_book["entries"] == []
+
+    def test_control_a_valid_enemy_weapon_byte_does_record(self) -> None:
+        """Control: weapon 1 from the same enemy books an ``enemy_hit``."""
+        from tankpit_bot.sniffer.world_state_dispatch_combat import _record_shot_fuel_entry
+
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+
+        _record_shot_fuel_entry(ws, shooter_id=777, weapon=1)
+
+        assert [entry["kind"] for entry in ws.fuel_book["entries"]] == ["enemy_hit"]
+
     def test_check_and_clear_returns_false_by_default(self) -> None:
         """check_and_clear_combat_hit returns False when no hit recorded."""
         ws = WorldService()

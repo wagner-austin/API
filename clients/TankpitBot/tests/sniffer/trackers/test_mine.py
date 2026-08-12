@@ -32,6 +32,22 @@ class TestMineTracker:
             raise AssertionError("_xor_table was not populated after set_magic")
         assert len(xor_table) == 1000
 
+    def test_process_message_before_the_magic_arrives_returns_none(self) -> None:
+        """Messages seen before the session magic are skipped, not decoded.
+
+        A capture starts before the AUTH frame that carries the magic,
+        so the tracker sees traffic while ``_xor_table`` is still None.
+        Every decode path below needs that table --
+        ``_process_mine_command`` asserts on it outright -- so reaching
+        them turns an ordinary ordering into an ``AssertionError`` on a
+        payload the tracker simply cannot read yet.
+        """
+        tracker = MineTracker()
+        assert tracker._xor_table is None
+        payload = frame_payload(bytes([0x21, 0x6B, 10, 20, 0]))
+
+        assert tracker.process_message(payload, direction="sent") is None
+
     def test_mines_placed_property(self) -> None:
         """Test mines_placed property returns count."""
         tracker = MineTracker()
