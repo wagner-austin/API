@@ -46,7 +46,8 @@ panel. Nothing on this list is a guess.
 
 ## Open questions (measurement running or queued)
 
-- (none -- the docket is between arcs; candidates: a different response for the doom model to drive, hold v2 designs, the exporter productionization)
+- **vhsearch1** (running, 2026-08-11): the first machine-proposed docket -- successive halving over 16 doctrine candidates (10 singles + 6 sampled pairs around the champion: flame, close, raid, tech, medics, decoys), margin-triaged rounds of 8 then 16 pairs, ~280 matches. Whatever tops the ranking graduates to an ordinary +4 win-bar panel and fresh-tree replication; the search proposes, the bar disposes.
+- Still on the docket behind it: a response worth driving with the banked doom model, hold v2 designs, the exporter productionization.
 
 ## Closed questions (measured, with the log entry that closed them)
 
@@ -104,3 +105,15 @@ matches served across its first two days, through two Docker outages, a
 worker crash, and three of its own concurrency bugs — each found by
 production load, fixed same-day, and regression-locked. Panels that were
 an evening of babysitting are now one submission.
+
+Grown since (2026-08-10/11): the live dashboard at ``GET /`` (lanes,
+per-arm verdict tallies, whole batch history), label-scoped priority
+(a paired panel's arm jumps its own controls), interleaved pair job
+files (the paired read fills in seed by seed), the detached door
+(``make door``) and one-command fleet recovery (``make fleet-up``),
+AboveNormal match launches with a 120s channel so co-tenants cannot
+starve the sample stream, the ``owned peak`` mechanism census on every
+card (law eleven's instrument), the dense margin
+(``scripts/margin.py``), and the search driver (``scripts/search.py``).
+Two more Docker outages and one eight-hour overnight stall were
+recovered without losing a row.
