@@ -377,6 +377,25 @@ def test_extract_magic_from_auth_payload_too_few_parts() -> None:
     assert result is None
 
 
+def test_extract_magic_from_auth_payload_two_parts_with_a_long_tail() -> None:
+    """A two-part AUTH line yields nothing even when its tail is long enough.
+
+    The sibling ``_too_few_parts`` case above cannot distinguish the
+    field-count rule from the magic-length rule: its last token is nine
+    characters, so the ``len(magic) < 10`` check rejects it regardless.
+    Here the tail is fourteen characters and would be accepted as a
+    magic key, so the field-count rule is the only thing refusing it --
+    a real AUTH line carries session, hash and timestamp fields before
+    the key, and a payload missing them is not one.
+    """
+    body = "%AUTH abcdefghij1234"
+    payload = bytes([0x00, 0x14]) + body.encode("utf-8")
+
+    result = extract_magic_from_auth_payload(payload)
+
+    assert result is None
+
+
 def test_extract_magic_from_auth_payload_magic_too_short() -> None:
     """Test returns None when magic is too short."""
     # Magic is only 5 chars (needs at least 10)

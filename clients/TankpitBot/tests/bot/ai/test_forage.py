@@ -221,6 +221,61 @@ class TestForageSearch:
         assert decision["behavior"]["reason_kind"] == "forage_radar"
         assert decision["behavior"]["score"] == 900
 
+    def test_stocked_extras_below_the_spend_floor_yield_nothing(self) -> None:
+        """With extras stocked and a scan not worth its cost, foraging is over.
+
+        An extra-radar scan reveals the WHOLE viewport from anywhere, so
+        once the shared spend economics refuse the scan there is no walk
+        that improves it and the free radar can never fire. The planner
+        must yield ``None`` and let the caller teleport to fresh ground.
+
+        Returning a decision anyway is the artax flags 1-3 regression
+        (2026-08-06): the forager kept handing back one-tile walks,
+        which starved the collect hop one rung below and produced a
+        one-tile-per-tick edge crawl. Four uncovered tiles is under
+        ``RADAR_SPEND_REVEAL_FLOOR_TILES`` (32) but above zero, so the
+        viewport is NOT fully covered and a walk target genuinely
+        exists -- which is exactly what the fall-through would return.
+        """
+        coverage = _full_viewport_coverage(100000)
+        for uncovered in ("95,95", "95,96", "96,95", "96,96"):
+            del coverage[uncovered]
+        ctx = _ctx(radars=30, scanned_tiles=coverage, terrain=InMemoryTerrainMap())
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT",
+        )
+
+        assert decision is None
+
+    def test_control_stocked_extras_above_the_floor_still_scan(self) -> None:
+        """Control for the test above: the same setup CAN produce a decision.
+
+        Identical context except that enough of the viewport is
+        uncovered to clear the spend floor. This must return a radar
+        decision, so the ``None`` above is attributable to the spend
+        gate rather than to a context that could never decide anything.
+        """
+        coverage = _full_viewport_coverage(100000)
+        for row in range(92, 96):
+            for col in range(92, 104):
+                del coverage[f"{col},{row}"]
+        ctx = _ctx(radars=30, scanned_tiles=coverage, terrain=InMemoryTerrainMap())
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT",
+        )
+
+        if decision is None:
+            raise AssertionError("48 uncovered tiles must clear the spend floor")
+        assert decision["command"]["cmd_type"] == "radar"
+
     def test_walks_when_the_free_radar_would_reveal_nothing_new(self) -> None:
         """An already-covered radar footprint yields a walk, not a scan.
 

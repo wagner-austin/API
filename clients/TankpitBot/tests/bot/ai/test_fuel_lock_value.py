@@ -165,6 +165,68 @@ class TestLockContinuationIntegration:
         assert decision is None
         assert updated["resource_target_kind"] == ""
 
+    def test_refreshed_belief_for_the_locked_tile_does_not_release(self) -> None:
+        """A lock is never released to chase the tile it already holds.
+
+        ``locked_target`` is a remembered snapshot; the candidate comes
+        from the CURRENT world. When the same tile is re-read with more
+        fuel than the snapshot recorded, the value rule fires on the
+        volume difference alone -- locked score ``min(10,207)-10 = 0``
+        floors to 1, candidate score ``min(100,207)-10 = 90``, and
+        ``90 >= 2*1``. Only the same-tile check stops the release, and
+        without it the bot drops the lock to walk to where it is
+        already going. The companion control below runs the same
+        numbers on a DIFFERENT tile and asserts it DOES release, so a
+        continuation here cannot be blamed on weak inputs.
+        """
+        ws = WorldService()
+        world, self_state = make_world(
+            self_x=100,
+            self_y=100,
+            fuel=893,
+            containers={"105,105": _fuel_container(105, 105, 100)},
+        )
+        ai_state = make_scanned_ai_state()
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+
+        decision, _updated = continue_or_release_fuel_lock(
+            ctx, ctx.base, _fuel_container(105, 105, 10)
+        )
+
+        if decision is None:
+            raise AssertionError("a lock must not release to its own tile")
+        assert decision["behavior"]["reason_kind"] == "fuel_locked"
+        assert decision["behavior"]["target_x"] == 105
+        assert decision["behavior"]["target_y"] == 105
+
+    def test_control_same_volumes_on_another_tile_do_release(self) -> None:
+        """Control for the test above: the value rule fires off-tile.
+
+        Identical volumes and deficit, candidate moved to its own tile.
+        This must RELEASE, proving the numbers really do trip the value
+        rule and that the continuation above comes from the same-tile
+        check rather than from an unexercised release path.
+        """
+        ws = WorldService()
+        world, self_state = make_world(
+            self_x=100,
+            self_y=100,
+            fuel=893,
+            containers={
+                "105,105": _fuel_container(105, 105, 10),
+                "104,104": _fuel_container(104, 104, 100),
+            },
+        )
+        ai_state = make_scanned_ai_state()
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+
+        decision, updated = continue_or_release_fuel_lock(
+            ctx, ctx.base, _fuel_container(105, 105, 10)
+        )
+
+        assert decision is None
+        assert updated["resource_target_kind"] == ""
+
     def test_comparable_lock_continues(self) -> None:
         """A lock on comparable-value fuel keeps dispatching."""
         ws = WorldService()

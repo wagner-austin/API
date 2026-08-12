@@ -81,6 +81,95 @@ class TestBotStateUpdateDetail:
         bot._update_state_from_world()
         assert bot.get_state() == "TELEPORTING"
 
+    def test_low_fuel_does_not_stomp_a_completed_walk(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A completion ends the tick; LOW_FUEL waits for the next one.
+
+        The sibling stomp tests above are carried by the excluded-state
+        list -- TELEPORTING and COLLECTING can never be overwritten
+        because ``_maybe_transition_to_low_fuel`` refuses those states
+        outright. IDLE is NOT excluded, so the only thing protecting a
+        just-completed walk is the early return in the completion
+        chain: the walk lands the tank in IDLE, and without that return
+        the low-fuel arm runs in the same tick and overwrites it.
+
+        That is the ordering the chain's docstring names ("LOW_FUEL
+        would stomp TELEPORTING/COLLECTING states and cause repeated
+        command spam"), and this is the arm of it no test reached.
+        """
+        from tankpit_bot.bot.base import Bot
+
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        bot._magic = "test_magic"
+        bot._update_state_from_world()
+        ws.update_world_state_from_position(196, 85)
+        _sm_update_fuel(ws, 100)
+        bot._update_state_from_world()
+        # Target equals the tank's current tile, so the walk completes
+        # on this tick and transitions to IDLE.
+        bot._state_data = _set_bot_action(bot._state_data, "MOVING", "move", 196, 85)
+        bot._state_data["fuel_threshold"] = 200
+
+        bot._update_state_from_world()
+
+        assert bot.get_state() == "IDLE"
+
+    def test_low_fuel_does_not_stomp_a_completed_scan(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A completed scan lands in IDLE and survives the same tick.
+
+        Same ordering contract as the completed walk: SCANNING is an
+        excluded state, but the IDLE the scan completes INTO is not, so
+        only the early return keeps low fuel from overwriting it.
+        """
+        from tankpit_bot.bot.base import Bot
+
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        bot._magic = "test_magic"
+        bot._update_state_from_world()
+        ws.update_world_state_from_position(196, 85)
+        _sm_update_fuel(ws, 100)
+        bot._update_state_from_world()
+        bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 196, 85)
+        bot._state_data["fuel_threshold"] = 200
+        ws.mark_radar_scan_complete()
+
+        bot._update_state_from_world()
+
+        assert bot.get_state() == "IDLE"
+
+    def test_low_fuel_does_not_stomp_a_completed_collection(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A completed collection lands in IDLE and survives the same tick.
+
+        The pickup completes by position (target tile equals the tank's
+        tile). COLLECTING is excluded from the low-fuel arm; the IDLE it
+        completes into is not.
+        """
+        from tankpit_bot.bot.base import Bot
+
+        ws = WorldService()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        bot._magic = "test_magic"
+        bot._update_state_from_world()
+        ws.update_world_state_from_position(196, 85)
+        _sm_update_fuel(ws, 100)
+        bot._update_state_from_world()
+        bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 196, 85)
+        bot._state_data["fuel_threshold"] = 200
+
+        bot._update_state_from_world()
+
+        assert bot.get_state() == "IDLE"
+
     def test_low_fuel_does_not_stomp_collecting(
         self,
         fake_env: FakeEnv,

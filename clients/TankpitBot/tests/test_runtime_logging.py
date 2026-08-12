@@ -37,6 +37,38 @@ from tests._runtime_logging_support import run_child_logger
 from tests.conftest import FakeFileSystem
 
 
+def test_event_handler_skips_record_whose_channel_is_not_a_string(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """A ``runtime_channel`` that is present but not a string is dropped.
+
+    The sibling checks either side of this one are already pinned: a
+    record missing the keys entirely, and a record whose
+    ``runtime_fields`` extra is absent. Neither reaches this arm, which
+    fires only when both keys EXIST and one of them is the wrong type --
+    the shape a mis-typed call site produces.
+
+    ``runtime_fields`` is supplied here deliberately. Without it the
+    record would be caught by the later fields check instead, and the
+    test would pass whether or not this arm existed.
+
+    The artifact must stay empty. Nothing downstream re-validates the
+    channel: :func:`encode_runtime_event_record` copies it straight into
+    the JSON object, so a non-string channel would be written verbatim
+    and every reader that groups by channel would see a phantom stream.
+    """
+    artifacts = configure_bot_runtime_logging("20260331-230405")
+
+    logger = run_child_logger("20260331-230405", "non_string_channel")
+    logger.info(
+        "channel arrived as an int",
+        extra={"runtime_channel": 7, "runtime_message": "m", "runtime_fields": {}},
+    )
+
+    files = fake_fs.get_written_files()
+    assert files[artifacts["latest_events_path"]] == ""
+
+
 def test_configure_bot_runtime_logging_writes_text_and_event_artifacts(
     fake_fs: FakeFileSystem,
 ) -> None:

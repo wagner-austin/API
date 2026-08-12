@@ -121,6 +121,18 @@ def test_is_room_info_text_rejects_non_numeric_room_id() -> None:
     assert is_room_info_text(text) is False
 
 
+def test_is_room_info_text_rejects_non_numeric_player_count() -> None:
+    """Room payloads need a numeric player count in field 2.
+
+    The sibling checks on fields 0 and 4 are already pinned above and
+    below; this is the same structural rule for the field between them,
+    which no payload in the suite happened to violate.
+    """
+    text = "1|Practice|x|0,0,0,0,0,0,0|1|p|field01.gif|2026"
+
+    assert is_room_info_text(text) is False
+
+
 def test_is_room_info_text_rejects_non_gif_image_name() -> None:
     """Room payloads need a field-image filename ending in .gif."""
     text = "1|Practice|1|0,0,0,0,0,0,0|1|p|field01.png|2026"

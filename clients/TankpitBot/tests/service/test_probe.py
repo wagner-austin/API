@@ -76,6 +76,27 @@ class TestProbeHealthURL:
         finally:
             await server.close()
 
+    async def test_returns_false_when_status_is_not_200_despite_an_ok_body(self) -> None:
+        """A failing status is not ours even when the body reads ``ok``.
+
+        The body check alone would accept this: an unhealthy or
+        error-serving instance that still prints ``ok`` in its payload
+        would be mistaken for a live sibling and suppress our own
+        startup. Status and body must BOTH agree.
+        """
+
+        async def unhealthy_but_ok_body(_request: web.Request) -> web.Response:
+            return web.Response(status=500, text="ok")
+
+        server = await self._run_test_server(unhealthy_but_ok_body)
+        try:
+            result = await self._probe_in_thread(
+                f"http://127.0.0.1:{server.port}/health",
+            )
+            assert result is False
+        finally:
+            await server.close()
+
     async def test_returns_false_when_body_is_not_ok(self) -> None:
         """A ``200`` response with any other body is another server, not us."""
 

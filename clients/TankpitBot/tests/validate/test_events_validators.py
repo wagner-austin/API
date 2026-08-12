@@ -55,6 +55,30 @@ def _write_events(events_dir: Path, name: str, lines: list[str]) -> None:
     (events_dir / name).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def test_boolean_belief_field_is_not_accepted_as_a_coordinate(tmp_path: Path) -> None:
+    """A JSON ``true`` in a coordinate field does not become the number 1.
+
+    ``bool`` is a subclass of ``int`` in Python, so a plain
+    ``isinstance(value, int)`` check accepts ``True`` and silently
+    yields the coordinate 1. The sample must be rejected instead, which
+    leaves the teleport with no preceding fix and therefore no pair.
+    """
+    _write_events(
+        tmp_path,
+        ELIGIBLE,
+        [
+            '{"diagnostic_kind": "self_alignment_sample", '
+            '"belief_x": true, "belief_y": 0, "belief_fuel": 500}',
+            _teleport(3, 4),
+            _fix(3, 4, 470),
+        ],
+    )
+
+    evidence = validate_teleport_cost(tmp_path)
+
+    assert evidence["samples"] == 0
+
+
 def test_clean_pair_is_exact(tmp_path: Path) -> None:
     """A 3-4-5 hop debiting exactly 30 re-derives the formula.
 
