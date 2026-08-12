@@ -67,6 +67,48 @@ def test_attempt_ids_are_per_kind_monotonic(ledger: LedgerService) -> None:
     assert second_scan["event_id"] == 3
 
 
+def test_transfer_from_a_kind_with_nothing_pending_is_a_no_op(
+    ledger: LedgerService,
+) -> None:
+    """Transferring from an empty kind leaves the destination untouched.
+
+    The docstring's contract is "no-op when ``from_kind`` has no pending
+    decision", and the destination is the part worth pinning: reaching
+    ``register_pending_decision`` with ``None`` would close the
+    destination's real pending decision as ``superseded`` -- a
+    fabricated outcome for a decision nothing re-planned -- and then
+    store ``None`` in its place, so the outcome that eventually arrives
+    would pair against nothing.
+    """
+    from tankpit_bot.ledger.outcome._emit import (
+        pending_decision_ids,
+        register_pending_decision,
+        transfer_pending_decision,
+    )
+
+    register_pending_decision(ledger, "map_open", 42)
+
+    transfer_pending_decision(ledger, "teleport", "map_open")
+
+    assert pending_decision_ids(ledger) == {"map_open": 42}
+    assert outcome_counts(ledger, "map_open").get("superseded", 0) == 0
+
+
+def test_transfer_moves_a_real_pending_decision(ledger: LedgerService) -> None:
+    """Control: a genuine transfer does move the decision to the new kind."""
+    from tankpit_bot.ledger.outcome._emit import (
+        pending_decision_ids,
+        register_pending_decision,
+        transfer_pending_decision,
+    )
+
+    register_pending_decision(ledger, "teleport", 7)
+
+    transfer_pending_decision(ledger, "teleport", "map_open")
+
+    assert pending_decision_ids(ledger) == {"map_open": 7}
+
+
 def test_ring_records_and_counts_outcomes(ledger: LedgerService) -> None:
     """Emitted outcomes land in their kind's ring and are countable."""
     emit_scan_radar_complete(ledger, duration_ms=10, target_x=1, target_y=2)

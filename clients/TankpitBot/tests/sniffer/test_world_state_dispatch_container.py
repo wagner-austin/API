@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+
+import pytest
+
 from tankpit_bot.protocol import RadarContainerDict
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
@@ -472,3 +476,40 @@ class TestRemoveContainerAt:
         ws = WorldService()
         remove_container_at(ws, 99, 99)
         assert len(ws.world_state["containers"]) == 0
+
+    def test_missing_container_does_not_log_a_removal(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Nothing was removed, so nothing claims a removal.
+
+        The state assertion above cannot see this: ``remove_container``
+        returns the SAME world-state object when the key is absent, so
+        the store is untouched either way and only the log line differs.
+        A "Removed unreachable container" for a container that was never
+        there is a false entry in the record a session post-mortem reads
+        to explain where a belief went.
+        """
+        from tankpit_bot.sniffer.world_state_containers import remove_container_at
+
+        ws = WorldService()
+
+        with caplog.at_level(logging.INFO):
+            remove_container_at(ws, 99, 99)
+
+        assert not any("Removed unreachable container" in r.message for r in caplog.records)
+
+    def test_control_removing_a_real_container_does_log(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Control: a genuine removal is announced, so silence above is the guard."""
+        from tankpit_bot.sniffer.world_state_containers import remove_container_at
+
+        ws = WorldService()
+        update_world_state_from_radar(ws, [RadarContainerDict(x=50, y=60, volume=100)], [], [])
+
+        with caplog.at_level(logging.INFO):
+            remove_container_at(ws, 50, 60)
+
+        assert any("Removed unreachable container" in r.message for r in caplog.records)

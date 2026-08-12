@@ -180,6 +180,46 @@ def test_session_decoder_decodes_command() -> None:
     assert decoder.commands[0]["direction"] == "sent"
 
 
+def test_session_decoder_drops_a_frame_truncated_mid_body() -> None:
+    """A body shorter than its header declares is not decoded.
+
+    A capture can end mid-frame, and a websocket payload can arrive
+    split. Slicing past the end does not raise in Python -- it silently
+    yields the short bytes -- so without the length check the decoder
+    reads a partial body as a whole message and records a lobby line
+    the sender never completed. The header here declares ten bytes
+    against seven present.
+    """
+    codec = ProtocolCodec("A", "A")
+
+    body = b"+4|Room"
+    raw = bytes([10, 0]) + body  # little-endian length 10, only 7 bytes follow
+    payload = base64.b64encode(raw).decode("ascii")
+
+    session = CaptureSession(
+        session_id="test",
+        start_timestamp_ms=0,
+        end_timestamp_ms=1000,
+        base_url="https://test.com",
+        messages=[
+            CapturedMessage(
+                timestamp_ms=500,
+                direction="received",
+                payload=payload,
+                ws_url="wss://test.com/ws",
+            )
+        ],
+        magic="A",
+        game_log=[],
+        tank_names={},
+    )
+
+    decoder = SessionDecoder(session, codec)
+    decoder.decode_all()
+
+    assert decoder.lobby_messages == []
+
+
 def test_session_decoder_decodes_lobby_message() -> None:
     """Test SessionDecoder decodes a lobby message."""
     codec = ProtocolCodec("A", "A")
