@@ -8,15 +8,17 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "fee6f258a2eca770e7edb72e4a4911af56ea8cd1"
-fact_checked: "2026-08-07"
+  "src/tankpit_bot": "6f779b912976c63d4217f4379fdffd458efcd92e"
+fact_checked: "2026-08-12"
 confidence: high
 hubs: [codebase]
 ---
 
 # Services — DI Architecture
 
-Three services, injected two different ways. `CDPService` and `CommandService` are constructor kwargs on `SessionBase` (`cdp_service=` / `command_service=`, each defaulting to a self-constructed instance when omitted).[^1] `WorldService` is **not** a `SessionBase` kwarg — it is a module-level singleton in `sniffer/world_state.py` reached through `get_world_service()`, with `reset_world_state()` rebinding it for test isolation.[^4]
+Three services, all injected the same way. `CDPService`, `CommandService` and `WorldService` are constructor kwargs on `SessionBase` (`cdp_service=` / `command_service=` / `world=`), each defaulting to a self-constructed instance when omitted.[^1][^4]
+
+**This page previously said `WorldService` was the exception** — a module-level singleton in `sniffer/world_state.py` reached through `get_world_service()`, rebound by `reset_world_state()` for test isolation. That is no longer true in any part: `world_state.py` **has been deleted**, and `get_world_service` and `reset_world_state` no longer exist anywhere in `src/tankpit_bot`. Each session now owns its world as `self.world`, which is what makes two sessions in one process keep two independent worlds — the thing the singleton made impossible. See [[session-state-deglobalisation]] step 8, which did the work.[^4]
 
 ## CDPService (`browser/cdp_service.py`)
 
@@ -74,7 +76,7 @@ Standalone hookable functions in `browser/lifecycle.py`, used by both bot and sn
 - `gather_intel()` — extracts static XOR key, terrain, field info
 - `cleanup_browser()` — closes browser and cleans up
 
-[^1]: Architecture phases A-C, landed 2026-06-14 on the merged `combat-rework` branch (commit accounting on [[module-map]] [^1]). Verified against the current tree 2026-08-05, since the whole-tree pin has drifted 84 files since this page was written: the three service modules are `src/tankpit_bot/browser/cdp_service.py`, `src/tankpit_bot/bot/command_service.py`, and `src/tankpit_bot/sniffer/world_service.py`, all present; the two injected as constructor kwargs appear in the `SessionBase.__init__` signature at `src/tankpit_bot/browser/session_base.py:38-45`, which is keyword-only for `headless`, `prefer_account`, `cdp_service`, `command_service`.
+[^1]: Architecture phases A-C, landed 2026-06-14 on the merged `combat-rework` branch (commit accounting on [[module-map]] [^1]). Verified against the current tree 2026-08-05, since the whole-tree pin has drifted 84 files since this page was written: the three service modules are `src/tankpit_bot/browser/cdp_service.py`, `src/tankpit_bot/bot/command_service.py`, and `src/tankpit_bot/sniffer/world_service.py`, all present; all three now appear in the `SessionBase.__init__` signature at `src/tankpit_bot/browser/session_base.py:38-42`, keyword-only for `headless`, `prefer_account`, `cdp_service`, `command_service` and — added since this footnote was written — `world: WorldService | None = None`, whose docstring calls it "The third member of the same injection list as the two services above". Re-read 2026-08-12.
 [^2]: Architecture phase D + bot decomposition, 2026-06-16 (same commit accounting as [^1]). The composition it produced is verified in the [[inheritance-chain]] line table, re-measured 2026-08-05. The four standalone lifecycle functions named above are in `src/tankpit_bot/browser/lifecycle.py`.
 [^3]: `src/tankpit_bot/action_lab/probe_factory.py:18` — `create_probe_services()`; `create_probe()` is defined in the same module. Call sites re-counted 2026-08-07: 14 modules under `src/tankpit_bot/action_lab/` contain `= create_probe(`, matching the list above exactly (`queue_probe.py:155` is the one whose factory import is function-local).
-[^4]: sniffer/world_state.py:18-33 — `_service = WorldService()` at module scope; `get_world_service()` returns it; `reset_world_state()` rebinds the global for tests. Verified 2026-07-31 against `browser/session_base.py:38-45`, whose `__init__` keyword-only parameters are `headless`, `prefer_account`, `cdp_service`, `command_service` — no `world_service`.
+[^4]: **Re-verified 2026-08-12, and the earlier reading is now false.** `src/tankpit_bot/browser/session_base.py:74` — `self.world: WorldService = world if world is not None else WorldService()`, carrying the comment "This session's world state -- ITS OWN, not a process global. Two sessions in one process now keep two independent worlds, which the module singleton made impossible ([[session-state-deglobalisation]] step 8)." `src/tankpit_bot/sniffer/world_state.py` no longer exists, and a grep across `src/tankpit_bot` for `get_world_service` / `reset_world_state` / `_service = WorldService()` returns nothing. `WorldService` itself lives at `sniffer/world_service.py`, with `world_service_beliefs.py` / `world_service_movement.py` / `world_service_radar.py` alongside it. What this footnote previously recorded — `world_state.py:18-33`, the module-scope `_service`, and a `SessionBase.__init__` whose keyword-only parameters were `headless`, `prefer_account`, `cdp_service`, `command_service` with no world parameter — was accurate on 2026-07-31 and was undone by the de-globalisation.
