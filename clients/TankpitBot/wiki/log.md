@@ -4248,3 +4248,35 @@ Docker Desktop's backend IPC hung at 21:25 on 2026-08-09 with **nothing logged**
 Ruled out with evidence: container crashes (`restarts=0`, `exit=0`, `oom=false` on every container), memory (32 GB free, zero OOM events), the match fleet (its code contains no docker/wsl/netsh call; its only kills are `taskkill /T` on its own match-tree pids and a port holder that must be named exactly `java`).
 
 **Why it wedged is not knowable from what exists:** dockerd's stdout is a pipe into Docker Desktop's `memlogd` ring buffer, reachable only through the IPC that hung, and `/var/log` inside the VM holds one stale `apk.log`. The diagnostic channel and the failed channel are the same channel. A watchdog was built to close that gap and then **deleted**: the evidence actually needed was already in `com.docker.backend.exe.log` and the container logs, so the gap was analytical, not instrumental.
+
+## [2026-08-12] audit | The guard sweep finishes: 103 survivors resolved, and 13 of them cannot be pinned at all
+
+Both sweeps closed. 26 commits, ending `c25891d5`; verified 6,066 passed, 100.00% coverage, and every claimed kill re-mutated against the final tree (**31/31 still die**). New page: [[guard-mutation-sweep]].
+
+### The number that matters is the kind mix, not the total
+
+**76 of 474** guards survived the first sweep, **27 of 113** the second — which collected the guards the first pass structurally could not see, because its collector required an `if` body of exactly one statement and anything that logged before returning was invisible. That 25% is the higher rate, and it is the expected one: a log line is precisely the effect assertions skip.
+
+Of the 27, **14 were killed and 13 are structural** — dispatch-chain and cascade arms whose removal changes nothing observable. That was measured, not argued: all four scorecard cascade returns removed and 1,403,706 archived records re-routed gave byte-identical accumulators; the three `sim/ghost` returns removed recompiled all 34 capture sessions to byte-identical specs. **No test can kill those 13, and none does.** What is enforced instead is the property that makes them unobservable — cascade arms must test pairwise-distinct values, read from the source and negative-controlled by injecting a duplicate arm (`df7f9ef0`, `6efbab0a`).
+
+### Two faults 6,000 passing tests could not see
+
+A **survived** mutant in `_capture_static_key` truncated the tracked 160 KB `tpclient.js` to zero bytes while the whole suite stayed green (`9a7a63cc`). A fetch returning nothing became `""` and was written to a CWD-relative path; the guard was the only thing keeping two tests off the real filesystem, and neither installed the filesystem fake because under unmutated code they never reached the writer. The suite was blind; the working tree was not.
+
+`MSG_MIN_LENGTHS` listed `0x45` and `0x4B`, container-only subtypes with no top-level decoder, while a comment asserted twice that every listed type had one (`c25891d5`). Removing them made `roundtrip.py`'s `message is None` arm unreachable — it existed only to absorb the table's lie — and moved that fixture's top-level `0x45` from "invalid frame" to "skipped", consistent with the `0x99` beside it that was already skipped without being counted.
+
+### Method, in order of how often it saved the analysis
+
+**Probe before classifying** — reading produced the wrong answer roughly 40% of the time. The worst case was a docstring I wrote asserting an existing test caught a regression; injecting that regression showed it did not, because the guard returns before the code the test targets is ever consulted. Two overlapping defences, neither pinnable alone.
+
+**Negative-control the detector, again after refactoring it.** mypy rejected a `seen.add()` comprehension in the duplicate-arm reader; the rewrite had to be re-controlled, because a detection rewrite can stop detecting silently.
+
+**Verify against a green baseline.** The harness prints KILLED when the mutant run fails *for any reason*, so a broken test in the same file manufactures a false kill. Caught once, on `decoders:133`.
+
+### Loop exit routes need a narrower target, not a longer timeout
+
+Five guards retired with **no verdict** across two runs: removing a loop's exit route leaves it non-terminating, one hanging test eats the 600 s per-mutant cap, and the whole run dies. Sweeping only the two files that drive `run_tick_loop` (and the one driving the enemy-teleport settle) makes the hang land in seconds and attributes it — all five are **killed by non-termination**.
+
+### Harness hazards worth not repeating
+
+`run_in_background` already detaches; wrapping the sweep in `nohup ... &` produced a process the tool could not see or stop, so a second sweep ran concurrently against the same repo and both wrote verdicts. Six were discarded rather than trusted — `movement.py:461` appearing twice was the tell. A sweep also mutates `src/` repo-wide, so nothing else may edit the tree while one runs.
