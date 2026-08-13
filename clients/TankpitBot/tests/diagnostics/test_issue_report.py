@@ -63,35 +63,6 @@ def test_build_issue_report_summarizes_clean_probe_run(fake_fs: FakeFileSystem) 
     assert len(report["action_outcomes"]) == 1
 
 
-def test_recovery_boxed_in_diagnostic_is_promoted_to_top_level_issue(
-    fake_fs: FakeFileSystem,
-) -> None:
-    """A ``recovery_boxed_in`` diagnostic surfaces loudly in the summary.
-
-    The boxed-in terminal action should be near-unreachable after the
-    terrain-aware approach and capped search ring; any occurrence is a
-    top-level issue so it cannot be silently absorbed by the fallback
-    action.
-    """
-    from tankpit_bot.runtime_logging import configure_bot_runtime_logging
-
-    artifacts = configure_bot_runtime_logging("20260610-120000")
-    _emit_session_room("1", "field01.gif")
-    emit_diagnostic(
-        diagnostic_kind="recovery_boxed_in",
-        behavior_mode="COLLECT",
-        fuel=140,
-        self_x=100,
-        self_y=100,
-    )
-
-    report = build_issue_report(Path(artifacts["latest_events_path"]))
-    rendered = render_issue_report(report)
-
-    assert report["recovery_boxed_in_count"] == 1
-    assert "recovery owner hit its boxed-in terminal action 1 time(s)" in rendered
-
-
 def test_build_issue_report_counts_teleport_failures(fake_fs: FakeFileSystem) -> None:
     """Non-landed teleport statuses contribute to ``teleport_failure_count``."""
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")

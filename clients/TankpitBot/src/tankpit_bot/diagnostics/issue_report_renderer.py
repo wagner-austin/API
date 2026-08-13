@@ -225,11 +225,6 @@ def _collect_top_level_issues(report: IssueReportDict) -> list[str]:
             f"{report['map_open_dispatches']} "
             f"vs completed={report['map_open_completions']} (delta={delta})"
         )
-    if report["recovery_boxed_in_count"] > 0:
-        issues.append(
-            f"recovery owner hit its boxed-in terminal action "
-            f"{report['recovery_boxed_in_count']} time(s)"
-        )
     if report["session_room"] is None:
         issues.append("session room unknown -- analysis terrain is unverifiable")
     issues.extend(_collect_scorecard_issues(report["scorecard"]))

@@ -263,7 +263,6 @@ def test_issue_report_round_trip_with_session_room_present() -> None:
             container_pickups_full=0,
             container_pickups_partial=0,
         ),
-        recovery_boxed_in_count=0,
     )
 
     decoded = decode_issue_report(_round_trip(encode_issue_report(report)))
@@ -334,7 +333,6 @@ def test_issue_report_round_trip_with_no_session_room() -> None:
             container_pickups_full=0,
             container_pickups_partial=0,
         ),
-        recovery_boxed_in_count=0,
     )
 
     decoded = decode_issue_report(_round_trip(encode_issue_report(report)))
@@ -430,7 +428,6 @@ def test_decode_issue_report_treats_absent_session_room_as_none() -> None:
                 container_pickups_partial=0,
             )
         ),
-        "recovery_boxed_in_count": 0,
     }
 
     report = decode_issue_report(raw)

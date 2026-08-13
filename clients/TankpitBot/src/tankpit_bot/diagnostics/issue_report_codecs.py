@@ -74,7 +74,6 @@ def encode_issue_report(report: IssueReportDict) -> JSONObject:
         "map_open_dispatches": report["map_open_dispatches"],
         "map_open_completions": report["map_open_completions"],
         "scorecard": encode_session_scorecard(report["scorecard"]),
-        "recovery_boxed_in_count": report["recovery_boxed_in_count"],
     }
 
 
@@ -117,7 +116,6 @@ def decode_issue_report(data: JSONObject) -> IssueReportDict:
         map_open_dispatches=require_int(data, "map_open_dispatches"),
         map_open_completions=require_int(data, "map_open_completions"),
         scorecard=decode_session_scorecard(_require_object(data, "scorecard")),
-        recovery_boxed_in_count=require_int(data, "recovery_boxed_in_count"),
     )
 
 

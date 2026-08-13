@@ -216,7 +216,6 @@ class _ReportAccumulatorDict(TypedDict):
         mode: Latest non-empty mode string observed.
         map_open_dispatches: Count of ``WIRE`` events whose message
             starts with ``map_open``.
-        recovery_boxed_in_count: Count of ``recovery_boxed_in`` events.
         scorecard: Nested scorecard accumulator. Populated by
             :func:`route_scorecard_record` for every event.
     """
@@ -228,7 +227,6 @@ class _ReportAccumulatorDict(TypedDict):
     session_room: SessionRoomRecordDict | None
     mode: str
     map_open_dispatches: int
-    recovery_boxed_in_count: int
     scorecard: ScorecardAccumulatorDict
 
 
@@ -242,7 +240,6 @@ def _new_accumulator() -> _ReportAccumulatorDict:
         session_room=None,
         mode="unconfigured",
         map_open_dispatches=0,
-        recovery_boxed_in_count=0,
         scorecard=new_scorecard_accumulator(),
     )
 
@@ -272,8 +269,6 @@ def _classify_diagnostic_record(
         accumulator["fuel_target_selections"].append(_classify_fuel_target_selection(record))
     elif kind == "session_room_joined":
         accumulator["session_room"] = _classify_session_room(record)
-    elif kind == "recovery_boxed_in":
-        accumulator["recovery_boxed_in_count"] += 1
 
 
 def _route_record(
@@ -365,7 +360,6 @@ def build_issue_report(source_path: Path) -> IssueReportDict:
         map_open_dispatches=accumulator["map_open_dispatches"],
         map_open_completions=map_open_completions,
         scorecard=build_session_scorecard(accumulator["scorecard"]),
-        recovery_boxed_in_count=accumulator["recovery_boxed_in_count"],
     )
 
 

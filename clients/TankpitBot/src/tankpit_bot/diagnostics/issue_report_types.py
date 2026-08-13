@@ -446,7 +446,6 @@ class IssueReportDict(TypedDict):
     map_open_dispatches: int
     map_open_completions: int
     scorecard: SessionScorecardDict
-    recovery_boxed_in_count: int
 
 
 __all__ = [
