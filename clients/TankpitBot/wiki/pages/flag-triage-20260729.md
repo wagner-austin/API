@@ -11,7 +11,7 @@ source_paths:
   - "src/tankpit_bot/bot/ai/resource_search.py"
   - "src/tankpit_bot/state/scan_coverage.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/resource_search.py": "686bc58c7432924e24f0f6e23dd920849499a29f"
+  "src/tankpit_bot/bot/ai/resource_search.py": "fda4022fcd559f9723f9fd5d19a0c400c50d3f5d"
   "src/tankpit_bot/state/scan_coverage.py": "06c0ae372146a32a3bc5e5e5a4cd300277ebdac6"
 fact_checked: "2026-08-07"
 confidence: high

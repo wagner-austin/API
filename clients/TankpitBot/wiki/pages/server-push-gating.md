@@ -12,7 +12,7 @@ source_paths:
   - "src/tankpit_bot/action_lab/enemy_teleport.py"
 source_git_blobs:
   "bot_watch_probe.capture_session.json": "694fa343cbc2c92ad1fb30b4c7fb30d2bcbf58f6"
-  "src/tankpit_bot/action_lab/enemy_teleport.py": "4e1f80882925c961ac6fa7e36631734d2a0996e9"
+  "src/tankpit_bot/action_lab/enemy_teleport.py": "f5134f56b6615d1e6dbe76c6fd97049508190a24"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [protocol]
@@ -122,10 +122,10 @@ position instead of repeating run 7's frozen-origin rejections.[^2]
     wiki/log.md entries of 2026-07-24 (anomaly → falsifications →
     law), captures `bot_watch_nomap_probe`, `bot_watch_wake_probe`,
     `bot_watch_nomap_hb_probe` at repo root.
-[^2]: `src/tankpit_bot/action_lab/enemy_teleport.py:65` —
-    `_heartbeat_action` (per-beat drain) and `_settle_dwell` at `:86`
-    (shuffle), called from the beat loop at `:118` and from the two
-    settle sites at `:182` and `:398`; driven by `make bot-watch`
+[^2]: `src/tankpit_bot/action_lab/enemy_teleport.py:64` —
+    `_heartbeat_action` (per-beat drain) and `_settle_dwell` at `:85`
+    (shuffle), called from the beat loop at `:117` and from the two
+    settle sites at `:181` and `:398`; driven by `make bot-watch`
     (`Makefile:173`), see [[make-targets]]. **Repinned 2026-08-07:**
     the probe was split — enemy selection and result shaping moved to
     `action_lab/enemy_teleport_targeting.py`, reached through the

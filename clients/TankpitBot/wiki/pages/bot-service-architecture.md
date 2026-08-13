@@ -9,9 +9,9 @@ source_paths:
   - "src/tankpit_bot/bot/config.py"
   - "src/tankpit_bot/browser/live_view.py"
 source_git_blobs:
-  "src/tankpit_bot/service": "44d5dab8256704ceb24bbadd697f1756a0ae4693"
-  "src/tankpit_bot/bot/config.py": "a81fafe6dda99fc36d1af0e2af7777b574523bbc"
-  "src/tankpit_bot/browser/live_view.py": "3fa929e9df72efd53f42d3c3405a469067b66f26"
+  "src/tankpit_bot/service": "6664510541dbdeabe7e6e64d3740ca3d7c127a3c"
+  "src/tankpit_bot/bot/config.py": "3bfa12cce1125ce8414ca99e64202ae0add5d71b"
+  "src/tankpit_bot/browser/live_view.py": "e7e18cb9ca4092ed4cbc2ab2762ef934ab909282"
 fact_checked: "2026-08-06"
 confidence: medium
 hubs: [architecture]

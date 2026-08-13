@@ -9,7 +9,7 @@ source_paths:
   - "runs/sniff"
   - "src/tankpit_bot/sim/movement.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/movement.py": "972c144ffa6df56bb7998f2f4efb32683b5700cd"
+  "src/tankpit_bot/sim/movement.py": "b94c2a79cf9896fb351d2804c6242fe8669cee2f"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [game-mechanics]
@@ -51,7 +51,7 @@ click again to reach your destination land tile. it takes two
 actions because you have to embark and disembark."[^4]
 
 Planner consequence: **pickup dispatches route on the CURRENT surface**
-(`SurfaceRouteTerrain` gate at `src/tankpit_bot/bot/ai/movement.py:294`,
+(`SurfaceRouteTerrain` gate at `src/tankpit_bot/bot/ai/movement.py:288`,
 `SurfaceRouteTerrain(terrain, water=riding)` — the PLANNER's movement
 module, not the sim's `sim/movement.py` referenced elsewhere on this
 page) — plain ground when
