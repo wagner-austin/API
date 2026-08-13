@@ -132,8 +132,13 @@ def _process_single_message(ws: WorldService, body: bytes, xor_table: bytes) -> 
     if len(decoded_data) == 0:
         return
 
-    # All types in MSG_MIN_LENGTHS have corresponding decoder implementations,
-    # so decode_message always succeeds for known types with sufficient data.
+    # Every type in MSG_MIN_LENGTHS has a top-level decoder, so
+    # decode_message cannot answer "unknown type" for anything the table
+    # admits. That was NOT true until 2026-08-12 -- the table listed the
+    # container-only subtypes 0x45 and 0x4B, which decode_message has no
+    # case for -- and it is now enforced by
+    # test_every_declared_type_is_decodable_at_top_level rather than
+    # asserted here.
     min_len = MSG_MIN_LENGTHS.get(msg_type)
     if min_len is not None and len(decoded_data) >= min_len:
         binary_decoded = protocol.decode_message(msg_type, decoded_data)
@@ -172,8 +177,13 @@ def try_decode_binary(ws: WorldService, msg_type: int, data: bytes, raw_body: by
             f"SHORT 0x{msg_type:02X} '{msg_char}' need={min_len} got={len(data)} data={hex_preview}"
         )
 
-    # All types in MSG_MIN_LENGTHS have corresponding decoder implementations,
-    # so decode_message always succeeds for known types with sufficient data.
+    # Every type in MSG_MIN_LENGTHS has a top-level decoder, so
+    # decode_message cannot answer "unknown type" for anything the table
+    # admits. That was NOT true until 2026-08-12 -- the table listed the
+    # container-only subtypes 0x45 and 0x4B, which decode_message has no
+    # case for -- and it is now enforced by
+    # test_every_declared_type_is_decodable_at_top_level rather than
+    # asserted here.
     binary_decoded = protocol.decode_message(msg_type, data)
 
     dispatch_world_state_update(ws, binary_decoded)

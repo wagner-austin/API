@@ -253,8 +253,9 @@ class TestProcessReceivedMessage:
     def test_chat_message_decodes_and_dispatches(self) -> None:
         """process_received_message decodes 0x4D ChatMessage through full path.
 
-        All types in MSG_MIN_LENGTHS have decoders, so decode_message
-        succeeds and the message is dispatched to world state.
+        0x4D is in MSG_MIN_LENGTHS, and every type the table admits has
+        a top-level decoder, so decode_message succeeds and the message
+        is dispatched to world state.
         """
         from tankpit_bot.sniffer.decoders import process_received_message
 
@@ -312,3 +313,41 @@ class TestProcessReceivedMessage:
 
         # No self_state should have been created since this is not binary Rf.
         assert ws.world_state["self_state"] is None
+
+
+def test_every_declared_type_is_decodable_at_top_level() -> None:
+    """``MSG_MIN_LENGTHS`` membership promises a top-level decoder exists.
+
+    Three consumers read the table as exactly that promise:
+    ``decoders.py`` hands anything in it to ``protocol.decode_message``,
+    ``roundtrip.py`` skips anything absent, and ``capture_audit.py``
+    counts a decode failure for a listed type as a replay finding.
+
+    The promise was false until 2026-08-12. The table listed 0x45
+    MineDetonation and 0x4B MinePlacement, which are container-only
+    subtypes -- they arrive tunneled inside a 0x2E envelope and are
+    decoded by ``container.decoders``, and ``decode_message`` has no case
+    for either. A top-level frame of either type raised ``DecodeError``
+    straight out of ``process_received_message``, and an archived one
+    would have been reported as a replay decode failure for a type the
+    top-level router never owned. Neither ever arrives that way, which is
+    why nothing caught it.
+
+    Only "unknown type" counts as a violation here: a decoder complaining
+    about the CONTENT of 64 zero bytes is doing its job.
+    """
+    from tankpit_bot import protocol
+    from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
+    from tankpit_bot.wire.helpers import DecodeError
+
+    for msg_type, min_len in sorted(MSG_MIN_LENGTHS.items()):
+        try:
+            protocol.decode_message(msg_type, bytes(max(min_len, 64)))
+        except DecodeError as error:
+            if "unknown type" not in str(error):
+                continue
+            raise AssertionError(
+                f"MSG_MIN_LENGTHS admits 0x{msg_type:02X} but decode_message has no "
+                f"top-level decoder for it, so decoders.py would hand it straight to "
+                f"a DecodeError and capture_audit.py would call that a replay finding"
+            ) from error

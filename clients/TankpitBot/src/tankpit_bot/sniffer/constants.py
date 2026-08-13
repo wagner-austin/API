@@ -67,13 +67,27 @@ MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D, 0x2B, 
 TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x3D, 0x2B, 0x24, 0x2A, 0x25, 0x2D})
 
 # Message type -> minimum data length (from protocol.py _require_* calls)
+#
+# Membership means exactly one thing, and three consumers rely on it:
+# ``protocol.decode_message`` can decode this type as a TOP-LEVEL frame.
+# ``decoders.py`` hands anything in here to the decoder, ``roundtrip.py``
+# skips anything absent, and ``capture_audit.py`` counts a decode failure
+# in here as a replay finding.
+#
+# 0x45 MineDetonation and 0x4B MinePlacement are therefore deliberately
+# ABSENT (2026-08-12). They are container-only subtypes: they arrive
+# tunneled inside a 0x2E envelope and are decoded by
+# ``container.decoders.decode_container_message``, and
+# ``protocol.decode_message`` has no case for either. Listing them made
+# the promise above false -- a top-level frame of either type raised
+# DecodeError straight out of ``process_received_message``, and an
+# archived one would have been logged as a replay decode failure that
+# was really just a type the top-level router never owned.
 MSG_MIN_LENGTHS: dict[int, int] = {
     ord("S"): 12,  # ShootEvent
     ord("A"): 6,  # Deactivation (status, victim u16, promo flag, killer u16)
     ord("B"): 9,  # BuildPickup (Jg: tank_id, src x/y, drop x/y, direction, obstacle_type, flag)
-    ord("K"): 4,  # MinePlacement
     ord("L"): 2,  # MapData (Ig: u16 RLE count + RLE bytes + 5-byte tank entries)
-    ord("E"): 0,  # MineDetonation (no minimum)
     ord("D"): 3,  # FuelGain
     ord("d"): 2,  # FuelDeposit
     ord("I"): 6,  # Inventory

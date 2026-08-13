@@ -45,10 +45,19 @@ def _green_session() -> CaptureSession:
     """Build a session whose every binary message round-trips exactly.
 
     Includes skipped traffic (a sent command, a lobby text frame, an
-    unknown outer type), the two plaintext toggle acks (un-XORed raw
-    echoes, round-tripped against the raw-frame encoder), and three
-    invalid-but-counted frames: an undecodable top-level 0x45, a 0x43
-    cache body with a torn record, and a 0x53 shorter than its minimum.
+    unknown outer type 0x99, and a top-level 0x45), the two plaintext
+    toggle acks (un-XORed raw echoes, round-tripped against the
+    raw-frame encoder), and two invalid-but-counted frames: a 0x43 cache
+    body with a torn record, and a 0x53 shorter than its minimum.
+
+    The 0x45 moved from counted to skipped on 2026-08-12. It is a
+    container-only subtype -- it arrives tunneled inside a 0x2E envelope
+    -- and it was counted as an invalid frame only because
+    MSG_MIN_LENGTHS wrongly listed it, so the router fed it to a decoder
+    that had no case for it. It is now skipped at the membership check,
+    exactly like the 0x99 above: both are types the top-level router does
+    not own, and "invalid" should mean a frame that failed to decode, not
+    a type that was never routed here.
     """
     messages = [
         identity_message(1000, SELF_ID),
@@ -100,7 +109,7 @@ def test_green_tree_passes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     assert "roundtrip-33" in out
     assert "roundtrip-autoscroll_ack" in out
     assert "roundtrip-chat_ack" in out
-    assert "invalid-frames  skipped=3" in out
+    assert "invalid-frames  skipped=2" in out
     assert "0 mismatches" in out
 
 
@@ -135,7 +144,7 @@ def test_collect_evidence_families(tmp_path: Path) -> None:
     assert by_id["roundtrip-46"]["exact"] == 2
     assert by_id["roundtrip-46"]["mismatches"] == 0
     assert by_id["roundtrip-46"]["detail"] == "byte-identical"
-    assert by_id["invalid-frames"]["samples"] == 3
+    assert by_id["invalid-frames"]["samples"] == 2
     assert evidence[-1]["claim_id"] == "invalid-frames"
 
 

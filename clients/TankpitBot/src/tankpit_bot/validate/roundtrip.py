@@ -22,8 +22,8 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.capture.xor import build_session_xor_table, xor_decode_body
 from tankpit_bot.protocol import (
+    decode_message,
     is_text_message,
-    try_decode_binary_message,
     try_decode_plaintext_ack,
 )
 from tankpit_bot.protocol.encoders import (
@@ -124,13 +124,18 @@ def _roundtrip_body(body: bytes, xor_table: bytes, tally: _Tally) -> None:
     if len(payload) < MSG_MIN_LENGTHS[msg_type]:
         tally.invalid_frames += 1
         return
+    # ``decode_message`` rather than ``try_decode_binary_message``: the
+    # try_ variant returns None for a type no decoder claims, which used
+    # to need its own invalid-frame arm here. Membership in
+    # MSG_MIN_LENGTHS now promises a decoder exists -- enforced by
+    # test_every_declared_type_is_decodable_at_top_level -- so the only
+    # remaining failure is a decoder rejecting the CONTENT, which raises
+    # and is counted below. That also drops an Optional the caller could
+    # never see as None (2026-08-12).
     try:
-        message = try_decode_binary_message(msg_type, payload)
+        message = decode_message(msg_type, payload)
     except DecodeError as error:
         log.debug("roundtrip: undecodable 0x%02X frame: %s", msg_type, error)
-        tally.invalid_frames += 1
-        return
-    if message is None:
         tally.invalid_frames += 1
         return
     if msg_type == _ENVELOPE_TYPE:
