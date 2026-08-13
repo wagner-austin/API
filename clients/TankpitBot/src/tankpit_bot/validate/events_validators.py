@@ -16,6 +16,7 @@ artifact of the OLD bot, not of the physics.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TypedDict
 
@@ -64,7 +65,33 @@ class _EventScan(TypedDict):
     fixes: list[_AlignmentFix]
     teleport_outcomes: list[_TeleportOutcome]
     action_lines: list[_ActionLine]
+    fuel_moves: list[int]
     skipped_lines: int
+
+
+_FUEL_MOVE = re.compile(r"Fuel: \d+ -> \d+ \(([+-]\d+)\)")
+
+
+def _fuel_move_delta(record: JSONObject) -> int | None:
+    """Return a WORLD fuel line's signed delta, or None when not one.
+
+    Every absolute-fuel wire message logs one of these, and
+    ``set_self_fuel`` is the only writer of the belief they report, so a
+    line here IS a wire-observed fuel movement rather than a prediction.
+
+    Args:
+        record: Parsed JSON record.
+
+    Returns:
+        The signed delta, or None when the record is not a fuel line.
+    """
+    message = record.get("message")
+    if not isinstance(message, str):
+        return None
+    match = _FUEL_MOVE.search(message)
+    if match is None:
+        return None
+    return int(match.group(1))
 
 
 def _get_int(record: JSONObject, key: str) -> int | None:
@@ -91,6 +118,11 @@ def _scan_record(scan: _EventScan, parsed: JSONObject, line_no: int) -> None:
         parsed: Parsed JSON record.
         line_no: Record's line number.
     """
+    delta = _fuel_move_delta(parsed)
+    if delta is not None:
+        if delta != 0:
+            scan["fuel_moves"].append(line_no)
+        return
     diagnostic_kind = parsed.get("diagnostic_kind")
     action_kind = parsed.get("action_kind")
     if diagnostic_kind == "self_alignment_sample":
@@ -131,6 +163,7 @@ def _scan_events_file(path: Path) -> _EventScan:
         fixes=[],
         teleport_outcomes=[],
         action_lines=[],
+        fuel_moves=[],
         skipped_lines=0,
     )
     for line_no, raw in enumerate(path.read_text(encoding="utf-8").splitlines()):
@@ -196,6 +229,38 @@ def _window_is_clean(
     )
 
 
+def _window_holds_one_fuel_move(scan: _EventScan, pre_line: int, post_line: int) -> bool:
+    """Report whether at most ONE fuel movement sits in a fix window.
+
+    The measured cost is ``pre.fuel - post.fuel``, so it is the
+    teleport's cost only when the teleport is the only thing that moved
+    fuel between the two fixes. A second movement -- damage taken, a
+    container draining -- is folded into the difference and reported as
+    a physics mismatch that never happened.
+
+    That is not hypothetical: all 7 mismatches in the archive were this,
+    and the teleport's own debit was exact in every one of them (4 single
+    hits at 45, one dual at 90, two pickups at +91 and +484). Counting
+    movements rather than recognising their SIZE is deliberate --
+    45 is shared by the single, missile and homing victim costs, armor
+    absorption and a mine detonation, so any test keyed on the magnitude
+    mis-attributes the cause.
+
+    Every clean window in the archive holds exactly one movement and
+    every contaminated one holds two, so this separates them completely.
+
+    Args:
+        scan: One file's scanned events.
+        pre_line: Opening fix line.
+        post_line: Closing fix line.
+
+    Returns:
+        False when a second fuel movement contaminates the window.
+    """
+    moves = sum(1 for line in scan["fuel_moves"] if pre_line <= line <= post_line)
+    return moves <= 1
+
+
 def _pair_teleports(scan: _EventScan) -> tuple[int, int, int]:
     """Pair each teleport outcome with clean fuel fixes around it.
 
@@ -216,8 +281,10 @@ def _pair_teleports(scan: _EventScan) -> tuple[int, int, int]:
             pre["line"] < other["line"] < post["line"] and other is not outcome
             for other in scan["teleport_outcomes"]
         )
-        if other_teleport or not _window_is_clean(
-            scan, pre["line"], post["line"], _TELEPORT_FREE_KINDS
+        if (
+            other_teleport
+            or not _window_is_clean(scan, pre["line"], post["line"], _TELEPORT_FREE_KINDS)
+            or not _window_holds_one_fuel_move(scan, pre["line"], post["line"])
         ):
             continue
         predicted = teleport_cost(pre["x"], pre["y"], outcome["landed_x"], outcome["landed_y"])

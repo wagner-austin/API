@@ -43,6 +43,19 @@ def _teleport(landed_x: int, landed_y: int, outcome: str = "landed_exact") -> st
     )
 
 
+def _fuel(old: int, new: int) -> str:
+    """Build one WORLD fuel-movement line.
+
+    Args:
+        old: Fuel before the movement.
+        new: Fuel after it.
+
+    Returns:
+        JSON line text.
+    """
+    return f'{{"channel": "WORLD", "message": "Fuel: {old} -> {new} ({new - old:+d})"}}'
+
+
 def _write_events(events_dir: Path, name: str, lines: list[str]) -> None:
     """Write one events file.
 
@@ -240,6 +253,90 @@ def test_a_dated_non_bot_file_is_not_an_eligible_run(tmp_path: Path) -> None:
     assert "across 1 post-fix runs" in evidence["detail"]
 
 
+def test_a_second_fuel_movement_excludes_the_window(tmp_path: Path) -> None:
+    """A hit inside the window is excluded, not reported as bad physics.
+
+    The measured cost is ``pre.fuel - post.fuel``, so it is the
+    teleport's cost only while the teleport is the only thing moving
+    fuel between the fixes. Every one of the 7 mismatches this validator
+    used to report was a second movement folded into that difference --
+    4 single hits at 45, one dual at 90, two pickups at +91 and +484 --
+    and the teleport's own debit was exact in all seven.
+
+    Here the 3-4-5 hop debits its exact 30 and then a 45 hit lands. The
+    window must vanish from the evidence rather than count as a 75-cost
+    teleport, because a claim that reports a contaminated measurement as
+    a failure is worse than one that reports fewer samples.
+    """
+    _write_events(
+        tmp_path,
+        ELIGIBLE,
+        [
+            _fix(0, 0, 500),
+            _teleport(3, 4),
+            _fuel(500, 470),
+            _fuel(470, 425),
+            _fix(3, 4, 425),
+        ],
+    )
+
+    evidence = validate_teleport_cost(tmp_path)
+
+    assert (evidence["samples"], evidence["mismatches"]) == (0, 0)
+
+
+def test_control_one_fuel_movement_still_pairs(tmp_path: Path) -> None:
+    """Control: the same hop with only its own debit is measured.
+
+    Distinguishes the exclusion above from the fuel lines simply
+    breaking the pairing -- one movement is the normal shape of every
+    clean window in the archive.
+
+    The landing confirm rides along because the real batch carries one
+    between the debit and the closing fix: a WORLD line with a message
+    that is not a fuel movement must not be mistaken for one.
+    """
+    _write_events(
+        tmp_path,
+        ELIGIBLE,
+        [
+            _fix(0, 0, 500),
+            _teleport(3, 4),
+            _fuel(500, 470),
+            '{"channel": "WORLD", "message": "TELEPORT_LANDED: server confirmed teleport"}',
+            _fix(3, 4, 470),
+        ],
+    )
+
+    evidence = validate_teleport_cost(tmp_path)
+
+    assert (evidence["samples"], evidence["exact"]) == (1, 1)
+
+
+def test_a_zero_delta_fuel_line_is_not_a_movement(tmp_path: Path) -> None:
+    """``(+0)`` readings are re-reports, not a second movement.
+
+    The wire re-states the same total routinely -- the landing batch
+    carries one between the debit and the confirm -- so counting them
+    would exclude every clean window in the archive.
+    """
+    _write_events(
+        tmp_path,
+        ELIGIBLE,
+        [
+            _fix(0, 0, 500),
+            _teleport(3, 4),
+            _fuel(500, 470),
+            _fuel(470, 470),
+            _fix(3, 4, 470),
+        ],
+    )
+
+    evidence = validate_teleport_cost(tmp_path)
+
+    assert (evidence["samples"], evidence["exact"]) == (1, 1)
+
+
 def test_malformed_and_incomplete_lines_are_skipped(tmp_path: Path) -> None:
     """Bad JSON, non-object lines, and landed-less outcomes leave no pairs."""
     _write_events(
@@ -283,7 +380,13 @@ def test_a_record_is_classified_once_by_its_diagnostic_kind() -> None:
     """
     from tankpit_bot.validate.events_validators import _EventScan, _scan_record
 
-    scan = _EventScan(fixes=[], teleport_outcomes=[], action_lines=[], skipped_lines=0)
+    scan = _EventScan(
+        fixes=[],
+        teleport_outcomes=[],
+        action_lines=[],
+        fuel_moves=[],
+        skipped_lines=0,
+    )
 
     _scan_record(
         scan,
@@ -311,7 +414,13 @@ def test_a_pickup_dispatch_is_one_action_line_not_two() -> None:
     """
     from tankpit_bot.validate.events_validators import _EventScan, _scan_record
 
-    scan = _EventScan(fixes=[], teleport_outcomes=[], action_lines=[], skipped_lines=0)
+    scan = _EventScan(
+        fixes=[],
+        teleport_outcomes=[],
+        action_lines=[],
+        fuel_moves=[],
+        skipped_lines=0,
+    )
 
     _scan_record(
         scan,
