@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
 from platform_core.logging import get_logger
 
 from tankpit_bot.diagnostics.event_stream import run_analyzer_cli
@@ -61,14 +63,30 @@ def _render_teleport_section(report: IssueReportDict) -> list[str]:
 
 
 def _render_map_open_section(report: IssueReportDict) -> list[str]:
-    """Return the map_open section lines."""
+    """Return the map_open section lines, tallied per origin.
+
+    The already-open case is the NORMAL path, not an anomaly: a teleport
+    needs the map overlay open, the hop itself closes it, and the
+    executor checks ``map_visible`` before sending a second open that the
+    server would treat as a no-op. It therefore fires on essentially
+    every successful teleport -- 10,569 times across the 427 archived
+    runs.
+
+    One line per event listed those as ``[SKIP]``, which read as a list
+    of failures and buried the case worth seeing: 24 of the archived
+    events come from ``executor.dispatch_command.map_open`` rather than
+    the teleport precondition, meaning the planner asked to open a map
+    that was already open. A per-origin tally puts that on its own line
+    instead of 24 rows inside 10,545.
+    """
     lines = [
         f"=== MAP_OPENS (dispatched={report['map_open_dispatches']}, "
         f"completed_via_map_data={report['map_open_completions']}, "
-        f"skipped_already_open={len(report['map_open_skipped'])}) ==="
+        f"already_open={len(report['map_open_skipped'])}) ==="
     ]
-    for skipped in report["map_open_skipped"]:
-        lines.append(f"  [SKIP] origin={skipped['origin']} at {skipped['timestamp']}")
+    per_origin = Counter(skipped["origin"] for skipped in report["map_open_skipped"])
+    for origin, count in sorted(per_origin.items()):
+        lines.append(f"  already open, no open sent: {count}x from {origin}")
     lines.append("")
     return lines
 

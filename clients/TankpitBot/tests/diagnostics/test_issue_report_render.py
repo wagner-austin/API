@@ -25,18 +25,34 @@ from tankpit_bot.runtime_logging import (
 def test_render_issue_report_lists_map_open_skipped_origin(
     fake_fs: FakeFileSystem,
 ) -> None:
-    """Each ``map_open_skipped_already_open`` entry appears in the rendered output."""
+    """Already-open events are tallied per origin, not listed one per row.
+
+    The already-open case is the normal path -- it fires on essentially
+    every successful teleport -- so a row per event read as a list of
+    failures and buried the rarer origin. Two events from one origin must
+    collapse to a single counted line, and a second origin must still get
+    its own.
+    """
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
     _emit_session_room("1", "field01.gif")
+    for _ in range(2):
+        emit_diagnostic(
+            diagnostic_kind="map_open_skipped_already_open",
+            origin="acquisition_phase",
+            command_name="map_open",
+        )
     emit_diagnostic(
         diagnostic_kind="map_open_skipped_already_open",
-        origin="acquisition_phase",
+        origin="executor.dispatch_command.map_open",
         command_name="map_open",
     )
 
     rendered = render_issue_report(build_issue_report(Path(artifacts["latest_events_path"])))
 
-    assert "[SKIP] origin=acquisition_phase" in rendered
+    assert "already_open=3" in rendered
+    assert "already open, no open sent: 2x from acquisition_phase" in rendered
+    assert "already open, no open sent: 1x from executor.dispatch_command.map_open" in rendered
+    assert "[SKIP]" not in rendered
 
 
 def test_render_issue_report_lists_fuel_rejection_summary(
