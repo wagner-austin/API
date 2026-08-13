@@ -316,6 +316,29 @@ def test_acquire_gives_up_when_the_map_never_syncs() -> None:
     assert _acquire(probe) is None
 
 
+def test_a_timed_out_acquisition_does_not_engage_a_ready_target() -> None:
+    """A failed acquisition ends the attempt before any target is read.
+
+    The sibling test above leaves the enemy lookup unstubbed, so it
+    returns ``None`` and the NEXT guard yields ``None`` too -- the two
+    are indistinguishable, and the acquisition check could be deleted
+    without that test noticing. Here an enemy and a landing tile are
+    both ready, so the acquisition check is the only thing that can end
+    the attempt.
+
+    It has to: a timed-out acquisition means the map never synced, so
+    the world any target would be chosen from is whatever was buffered
+    before the map opened -- stale by construction, and the probe would
+    teleport into a fight it picked from a stale frame.
+    """
+    probe = _ProbeHarness()
+    _stub_acquisition(None)
+    _stub_enemy_lookup(_enemy())
+    _stub_landing(102, 100)
+
+    assert _acquire(probe) is None
+
+
 def test_acquire_gives_up_when_no_enemy_is_fresh() -> None:
     """The map opened but showed nothing worth engaging."""
     probe = _ProbeHarness()

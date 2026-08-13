@@ -437,3 +437,42 @@ def test_pre_extension_damage_ledger_reads_zero(tmp_path: Path) -> None:
 
     assert digest["damage_dealt"] == 0
     assert digest["damage_taken"] == 0
+
+
+def test_a_shot_outcome_does_not_also_write_the_damage_ledger(tmp_path: Path) -> None:
+    """The combat router claims an outcome record and stops reading it.
+
+    ``_apply_combat_diagnostic`` handles two kinds in one cascade: the
+    ``action_outcome`` arm counts the hit, and the FALL-THROUGH reads
+    ``dealt_fuel`` / ``taken_fuel`` as the authoritative end-of-run
+    damage totals. No archived outcome record carries those fields --
+    42,082 of them, none -- so removing the arm's return changes no
+    published number today.
+
+    The shape below is constructed, and the reason to hold the line is
+    what the fall-through means: those totals are the ledger's
+    fuel-confirmed figures, emitted ONCE at teardown. A per-shot record
+    that reached them would overwrite the run's damage accounting with
+    whatever a single shot happened to carry, and the digest is what a
+    post-mortem trusts for how much damage the session actually did.
+    """
+    lines = [
+        _event("2026-08-06T21:00:00", "STATE", "start"),
+        _event(
+            "2026-08-06T21:00:02",
+            "DIAGNOSTIC",
+            "diagnostic_kind=action_outcome",
+            diagnostic_kind="action_outcome",
+            action_kind="shoot",
+            outcome="hit",
+            dealt_fuel=999,
+            taken_fuel=888,
+        ),
+    ]
+    path = tmp_path / "events.jsonl"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    digest = build_run_digest(path)
+
+    assert digest["hits"] == 1
+    assert (digest["damage_dealt"], digest["damage_taken"]) == (0, 0)

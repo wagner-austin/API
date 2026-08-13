@@ -8,6 +8,8 @@ stuck ON).
 
 from __future__ import annotations
 
+import logging
+
 import base64
 
 import pytest
@@ -182,15 +184,35 @@ class TestEnsureAutoscrollOff:
         assert keyboard.presses == ["a"]
         assert page.waits == [1500.0]
 
-    def test_setting_was_off_round_trips_back_off(self) -> None:
-        """Ack ``A1`` then ``A0`` proves off -> on -> off."""
+    def test_setting_was_off_round_trips_back_off(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Ack ``A1`` then ``A0`` proves off -> on -> off, and says which.
+
+        The two verified-OFF lines describe opposite session starts --
+        one where the setting was already off and the probe press had to
+        be undone, one where it was on and a single press corrected it.
+        They are the only record of which happened, because both end with
+        autoscroll off and neither touches state a later assertion could
+        read.
+
+        Without the early return this path logs BOTH, so the run log
+        claims the setting was on at session start AND that it was off.
+        The viewport model depends on autoscroll having been off
+        throughout, and this line is the evidence a post-mortem uses to
+        decide whether the window origins in the capture can be trusted.
+        """
         messages: list[CapturedMessage] = []
         keyboard = _FakeKeyboard(messages, [b"A1", b"A0"])
         page = _FakePage(keyboard)
 
-        ensure_autoscroll_off(page, messages, self.ws)
+        with caplog.at_level(logging.INFO):
+            ensure_autoscroll_off(page, messages, self.ws)
 
         assert keyboard.presses == ["a", "a"]
+        verdicts = [r.message for r in caplog.records if "Autoscroll verified OFF" in r.message]
+        assert verdicts == ["Autoscroll verified OFF (was off; press-verify round trip)"]
 
     def test_missing_ack_raises(self) -> None:
         """No ack after a press is a hard failure, never a guess."""

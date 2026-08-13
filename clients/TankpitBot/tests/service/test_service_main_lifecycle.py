@@ -118,7 +118,18 @@ class TestExitWhenIdle:
 
     @pytest.mark.asyncio
     async def test_a_video_viewer_keeps_the_service_alive(self) -> None:
-        """An open ``/video`` connection resets the idle clock every poll."""
+        """An open ``/video`` connection resets the idle clock every poll.
+
+        Awaiting the task is also what pins the shutdown exit. The
+        monitor's ``return`` after ``stop_event.set()`` is unobservable --
+        the loop it sits in is ``while not stop_event.is_set()`` and
+        there is no ``await`` between the set and the next check, so no
+        other coroutine can intervene and the loop ends either way. It is
+        structural rather than redundant: it terminates the body at a
+        control-flow boundary, and the equivalence holds only because
+        nothing follows the block. What matters is asserted here -- the
+        task completes rather than polling forever.
+        """
         stop_event = asyncio.Event()
         frames = FrameBus()
         subscriber = frames.subscribe()
