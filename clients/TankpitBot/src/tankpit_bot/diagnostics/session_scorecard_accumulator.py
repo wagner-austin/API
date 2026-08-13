@@ -98,6 +98,10 @@ class ScorecardAccumulatorDict(TypedDict):
     """Mutable scratch space for scorecard-relevant event records.
 
     Attributes:
+        scope_shift_sends_at: Timestamps of dispatched ``scope_shift``
+            commands. Same reason as the map opens below: a scope
+            shift is a command, not a state, so the tick that sends
+            one transitions nowhere and its seconds land in IDLE.
         map_open_completions_at: Timestamps of completed ``map_open``
             actions. A map open is dispatched FROM the IDLE state and
             has no state of its own, so without these the seconds it
@@ -166,6 +170,7 @@ class ScorecardAccumulatorDict(TypedDict):
     """
 
     map_open_completions_at: list[str]
+    scope_shift_sends_at: list[str]
     state_transitions: list[tuple[str, str]]
     kills: int
     shots: int
@@ -217,6 +222,7 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
     # See :class:`ScorecardAccumulatorDict` for the contract.
     return ScorecardAccumulatorDict(
         map_open_completions_at=[],
+        scope_shift_sends_at=[],
         state_transitions=[],
         kills=0,
         shots=0,
@@ -512,6 +518,9 @@ def _route_metrics_diagnostic(
         record: Decoded event record carrying the structured payload.
         accumulator: Scorecard accumulator to update in place.
     """
+    if kind == "scope_shift_sent":
+        accumulator["scope_shift_sends_at"].append(record["timestamp"])
+        return
     if kind == "self_statistics":
         accumulator["career_destroyed_last"] = require_int_field(record["fields"], "destroyed")
         accumulator["career_deactivated_last"] = require_int_field(record["fields"], "deactivated")

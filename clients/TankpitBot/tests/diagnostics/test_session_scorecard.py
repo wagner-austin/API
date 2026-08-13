@@ -244,6 +244,52 @@ class TestBuildScorecard:
         assert budget["TELEPORTING"] == 2
         assert accumulator["map_open_completions_at"] == ["2026-08-12T19:45:16"]
 
+    def test_scope_shift_seconds_are_split_out_of_idle(self) -> None:
+        """The tick that steers the scope is not idle either.
+
+        A scope shift is a command, not a state, so the tick dispatching
+        one transitions nowhere and its seconds land in IDLE -- the same
+        reason map opens did. The quad sweep pays a shift to frame each
+        quadrant before spending a radar on it, so this is the other half
+        of what IDLE was hiding: with both split out, run
+        20260812-194435 reports IDLE 0s across 5 zero-length stretches.
+
+        The marker sits on the OPENING edge of the stretch, unlike the
+        map open's completion, because the send happens in the tick that
+        enters IDLE rather than the one that leaves it.
+        """
+        accumulator = _routed(
+            [
+                _record(
+                    channel="STATE",
+                    message="SCANNING -> IDLE",
+                    timestamp="2026-08-12T19:45:34",
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    timestamp="2026-08-12T19:45:34",
+                    fields={"diagnostic_kind": "scope_shift_sent"},
+                ),
+                _record(
+                    channel="STATE",
+                    message="IDLE -> SCANNING",
+                    timestamp="2026-08-12T19:45:36",
+                ),
+                _record(
+                    channel="STATE",
+                    message="SCANNING -> IDLE",
+                    timestamp="2026-08-12T19:45:38",
+                ),
+            ]
+        )
+
+        scorecard = build_session_scorecard(accumulator)
+
+        budget = {record["state"]: record["seconds"] for record in scorecard["state_budget"]}
+        assert budget["IDLE/scope_shift"] == 2
+        assert "IDLE" not in budget
+        assert accumulator["scope_shift_sends_at"] == ["2026-08-12T19:45:34"]
+
     def test_fuel_aggregates(self) -> None:
         """Fuel min/last/count come from the self_alignment_sample bucket."""
         accumulator = _routed(

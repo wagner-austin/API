@@ -45,44 +45,83 @@ def _budget_sort_key(record: StateBudgetRecordDict) -> tuple[int, str]:
 _IDLE_STATE = "IDLE"
 
 _MAP_OPEN_LEG = "IDLE/map_open"
-"""Budget bucket for the IDLE stretches that were opening the map.
+"""Budget bucket for the IDLE stretches that were opening the map."""
 
-Not a bot state -- the HFSM has none for map_open, which is why the
-time landed in IDLE. The name keeps the origin visible rather than
-inventing a state the state machine does not have."""
+_SCOPE_SHIFT_LEG = "IDLE/scope_shift"
+"""Budget bucket for the IDLE stretches that steered the scope.
+
+Neither of these is a bot state: the HFSM has none for ``map_open`` or
+``scope_shift`` because both are COMMANDS, and a tick that dispatches one
+transitions nowhere. That is the whole reason their seconds landed in
+IDLE. The names keep the origin visible instead of inventing states the
+state machine does not have.
+
+Together they accounted for every second of the 16 IDLE seconds in run
+20260812-194435 -- 10 opening the map for a teleport, 6 steering the quad
+sweep -- leaving zero seconds in which the bot was actually idle."""
+
+
+def _idle_bucket(
+    previous_moment: datetime,
+    moment: datetime,
+    map_open_completions: list[datetime],
+    scope_shift_sends: list[datetime],
+) -> str:
+    """Return the bucket an IDLE stretch belongs to.
+
+    The two markers sit at opposite ends of their stretch, so their
+    boundary tests differ and neither is arbitrary. A map open is seen
+    COMPLETING, which is what releases IDLE, so its timestamp lands on
+    the stretch's closing edge: ``(previous, moment]``. A scope shift is
+    seen being SENT by the very tick that entered IDLE, so its timestamp
+    lands on the opening edge: ``[previous, moment)``.
+
+    Args:
+        previous_moment: When the IDLE stretch began.
+        moment: When it ended.
+        map_open_completions: Map-open completion moments.
+        scope_shift_sends: Scope-shift dispatch moments.
+
+    Returns:
+        The map-open bucket, the scope-shift bucket, or plain ``IDLE``.
+    """
+    if any(previous_moment < completion <= moment for completion in map_open_completions):
+        return _MAP_OPEN_LEG
+    if any(previous_moment <= send < moment for send in scope_shift_sends):
+        return _SCOPE_SHIFT_LEG
+    return _IDLE_STATE
 
 
 def _build_state_budget(
     transitions: list[tuple[str, str]],
     map_open_completions_at: list[str],
+    scope_shift_sends_at: list[str],
 ) -> list[StateBudgetRecordDict]:
     """Sum seconds spent in each bot state from STATE-channel transitions.
 
-    The interval between consecutive ``A -> B`` transitions is credited
-    to the EARLIER transition's destination -- the state the bot was
-    actually in during that interval. Non-transition STATE lines (the
-    initial bare state announcement) carry no interval and are skipped.
-    Each interval is also one VISIT to its state, so the per-state
-    stretch count and longest single visit fall out of the same walk --
-    that pair distinguishes tick-boundary residue (many short visits)
-    from a stall (one long visit) at no extra cost.
+        The interval between consecutive ``A -> B`` transitions is credited
+        to the EARLIER transition's destination -- the state the bot was
+        actually in during that interval. Non-transition STATE lines (the
+        initial bare state announcement) carry no interval and are skipped.
+        Each interval is also one VISIT to its state, so the per-state
+        stretch count and longest single visit fall out of the same walk --
+        that pair distinguishes tick-boundary residue (many short visits)
+        from a stall (one long visit) at no extra cost.
 
-    An IDLE stretch during which a ``map_open`` completed is credited to
-    ``IDLE/map_open`` instead. A map open is dispatched FROM idle and has
-    no state of its own -- a teleport needs the overlay open, the hop
-    closes it again, and the open cannot share the hop's tick -- so those
-    seconds are a protocol round trip the bot is obliged to make, not
-    time it sat still. Folded into IDLE they overstated idleness by more
-    than half: 10 of 16 IDLE seconds in run 20260812-194435.
+    An IDLE stretch that was dispatching a command is credited to that
+        command instead -- see :func:`_idle_bucket` and
+        :data:`_SCOPE_SHIFT_LEG`.
 
-    Args:
-        transitions: ``(timestamp, message)`` pairs in stream order.
-        map_open_completions_at: Timestamps of completed map opens.
+        Args:
+            transitions: ``(timestamp, message)`` pairs in stream order.
+            map_open_completions_at: Timestamps of completed map opens.
+            scope_shift_sends_at: Timestamps of dispatched scope shifts.
 
-    Returns:
-        Per-state totals sorted by descending seconds then state name.
+        Returns:
+            Per-state totals sorted by descending seconds then state name.
     """
     completions = [datetime.fromisoformat(moment) for moment in map_open_completions_at]
+    sends = [datetime.fromisoformat(moment) for moment in scope_shift_sends_at]
     totals: Counter[str] = Counter()
     visits: Counter[str] = Counter()
     longest: dict[str, int] = {}
@@ -96,10 +135,8 @@ def _build_state_budget(
         if previous_moment is not None:
             interval = int((moment - previous_moment).total_seconds())
             bucket = previous_state
-            if previous_state == _IDLE_STATE and any(
-                previous_moment < completion <= moment for completion in completions
-            ):
-                bucket = _MAP_OPEN_LEG
+            if previous_state == _IDLE_STATE:
+                bucket = _idle_bucket(previous_moment, moment, completions, sends)
             totals[bucket] += interval
             visits[bucket] += 1
             longest[bucket] = max(longest.get(bucket, 0), interval)
@@ -250,6 +287,7 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         state_budget=_build_state_budget(
             accumulator["state_transitions"],
             accumulator["map_open_completions_at"],
+            accumulator["scope_shift_sends_at"],
         ),
         kills=accumulator["kills"],
         shots=accumulator["shots"],
