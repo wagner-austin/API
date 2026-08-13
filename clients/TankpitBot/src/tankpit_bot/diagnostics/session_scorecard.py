@@ -42,7 +42,20 @@ def _budget_sort_key(record: StateBudgetRecordDict) -> tuple[int, str]:
     return (-record["seconds"], record["state"])
 
 
-def _build_state_budget(transitions: list[tuple[str, str]]) -> list[StateBudgetRecordDict]:
+_IDLE_STATE = "IDLE"
+
+_MAP_OPEN_LEG = "IDLE/map_open"
+"""Budget bucket for the IDLE stretches that were opening the map.
+
+Not a bot state -- the HFSM has none for map_open, which is why the
+time landed in IDLE. The name keeps the origin visible rather than
+inventing a state the state machine does not have."""
+
+
+def _build_state_budget(
+    transitions: list[tuple[str, str]],
+    map_open_completions_at: list[str],
+) -> list[StateBudgetRecordDict]:
     """Sum seconds spent in each bot state from STATE-channel transitions.
 
     The interval between consecutive ``A -> B`` transitions is credited
@@ -54,12 +67,22 @@ def _build_state_budget(transitions: list[tuple[str, str]]) -> list[StateBudgetR
     that pair distinguishes tick-boundary residue (many short visits)
     from a stall (one long visit) at no extra cost.
 
+    An IDLE stretch during which a ``map_open`` completed is credited to
+    ``IDLE/map_open`` instead. A map open is dispatched FROM idle and has
+    no state of its own -- a teleport needs the overlay open, the hop
+    closes it again, and the open cannot share the hop's tick -- so those
+    seconds are a protocol round trip the bot is obliged to make, not
+    time it sat still. Folded into IDLE they overstated idleness by more
+    than half: 10 of 16 IDLE seconds in run 20260812-194435.
+
     Args:
         transitions: ``(timestamp, message)`` pairs in stream order.
+        map_open_completions_at: Timestamps of completed map opens.
 
     Returns:
         Per-state totals sorted by descending seconds then state name.
     """
+    completions = [datetime.fromisoformat(moment) for moment in map_open_completions_at]
     totals: Counter[str] = Counter()
     visits: Counter[str] = Counter()
     longest: dict[str, int] = {}
@@ -72,9 +95,14 @@ def _build_state_budget(transitions: list[tuple[str, str]]) -> list[StateBudgetR
         moment = datetime.fromisoformat(timestamp)
         if previous_moment is not None:
             interval = int((moment - previous_moment).total_seconds())
-            totals[previous_state] += interval
-            visits[previous_state] += 1
-            longest[previous_state] = max(longest.get(previous_state, 0), interval)
+            bucket = previous_state
+            if previous_state == _IDLE_STATE and any(
+                previous_moment < completion <= moment for completion in completions
+            ):
+                bucket = _MAP_OPEN_LEG
+            totals[bucket] += interval
+            visits[bucket] += 1
+            longest[bucket] = max(longest.get(bucket, 0), interval)
         previous_state = destination
         previous_moment = moment
     records = [
@@ -219,7 +247,10 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
     approach_counts = Counter((row["target_x"], row["target_y"]) for row in approaches)
     return SessionScorecardDict(
         duration_seconds=duration_seconds,
-        state_budget=_build_state_budget(accumulator["state_transitions"]),
+        state_budget=_build_state_budget(
+            accumulator["state_transitions"],
+            accumulator["map_open_completions_at"],
+        ),
         kills=accumulator["kills"],
         shots=accumulator["shots"],
         combat_misses=accumulator["combat_misses"],

@@ -98,6 +98,11 @@ class ScorecardAccumulatorDict(TypedDict):
     """Mutable scratch space for scorecard-relevant event records.
 
     Attributes:
+        map_open_completions_at: Timestamps of completed ``map_open``
+            actions. A map open is dispatched FROM the IDLE state and
+            has no state of its own, so without these the seconds it
+            spends waiting for MAP_DATA are credited to IDLE and the
+            budget reads as though the bot sat doing nothing.
         state_transitions: ``(timestamp, message)`` pairs from the
             ``STATE`` channel, in stream order.
         kills: Count of ``tank_deactivated`` events. Since the DOM
@@ -160,6 +165,7 @@ class ScorecardAccumulatorDict(TypedDict):
         last_timestamp: Timestamp of the last record, or ``""``.
     """
 
+    map_open_completions_at: list[str]
     state_transitions: list[tuple[str, str]]
     kills: int
     shots: int
@@ -210,6 +216,7 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
     # 0x56 Statistics or a 0x43 ContainerPickup fires during the run.
     # See :class:`ScorecardAccumulatorDict` for the contract.
     return ScorecardAccumulatorDict(
+        map_open_completions_at=[],
         state_transitions=[],
         kills=0,
         shots=0,
@@ -406,14 +413,35 @@ def _route_scorecard_diagnostic(
         else:
             accumulator["scans_builtin"] += 1
     elif kind == "action_outcome":
-        counter_key = (
-            f"{require_str_field(record['fields'], 'action_kind')}:"
-            f"{require_str_field(record['fields'], 'outcome')}"
-        )
-        counts = accumulator["action_outcome_counts"]
-        counts[counter_key] = counts.get(counter_key, 0) + 1
+        _route_action_outcome(record, accumulator)
     else:
         _route_metrics_diagnostic(kind, record, accumulator)
+
+
+def _route_action_outcome(
+    record: RuntimeEventRecordDict,
+    accumulator: ScorecardAccumulatorDict,
+) -> None:
+    """Tally one action outcome, and remember completed map opens.
+
+    Split out of :func:`_route_scorecard_diagnostic` for the same reason
+    as :func:`_route_metrics_diagnostic`: keeping the primary router
+    under the C901 complexity ceiling.
+
+    The map-open timestamp is kept because a map open is dispatched FROM
+    the IDLE state and has no state of its own, so the state budget needs
+    it to tell an idle stretch from one that was waiting on MAP_DATA.
+
+    Args:
+        record: Decoded ``action_outcome`` DIAGNOSTIC record.
+        accumulator: Scorecard accumulator to update in place.
+    """
+    action_kind = require_str_field(record["fields"], "action_kind")
+    counter_key = f"{action_kind}:{require_str_field(record['fields'], 'outcome')}"
+    counts = accumulator["action_outcome_counts"]
+    counts[counter_key] = counts.get(counter_key, 0) + 1
+    if action_kind == "map_open":
+        accumulator["map_open_completions_at"].append(record["timestamp"])
 
 
 def _route_fuel_diagnostic(

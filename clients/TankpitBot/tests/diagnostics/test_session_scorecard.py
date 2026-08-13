@@ -179,6 +179,71 @@ class TestBuildScorecard:
         ]
         assert scorecard["duration_seconds"] == 45
 
+    def test_map_open_seconds_are_split_out_of_idle(self) -> None:
+        """An IDLE stretch that was opening the map is not counted as idle.
+
+        A map open is dispatched FROM idle and has no state of its own: a
+        teleport needs the overlay open, the hop closes it again, and the
+        open cannot share the hop's tick. Folding those seconds into IDLE
+        overstated idleness by more than half in run 20260812-194435 --
+        10 of 16 IDLE seconds were a map open in flight.
+
+        The second IDLE stretch carries a ``shoot`` outcome and stays
+        IDLE, which pins two things at once: the split needs a completion
+        inside the window rather than relabelling every IDLE stretch, and
+        it keys on the action KIND rather than on any outcome arriving.
+        """
+        accumulator = _routed(
+            [
+                _record(
+                    channel="STATE",
+                    message="COLLECTING -> IDLE",
+                    timestamp="2026-08-12T19:45:12",
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    timestamp="2026-08-12T19:45:16",
+                    fields={
+                        "diagnostic_kind": "action_outcome",
+                        "action_kind": "map_open",
+                        "outcome": "map_data_processed",
+                    },
+                ),
+                _record(
+                    channel="STATE",
+                    message="IDLE -> TELEPORTING",
+                    timestamp="2026-08-12T19:45:16",
+                ),
+                _record(
+                    channel="STATE",
+                    message="TELEPORTING -> IDLE",
+                    timestamp="2026-08-12T19:45:18",
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    timestamp="2026-08-12T19:45:20",
+                    fields={
+                        "diagnostic_kind": "action_outcome",
+                        "action_kind": "shoot",
+                        "outcome": "hit",
+                    },
+                ),
+                _record(
+                    channel="STATE",
+                    message="IDLE -> SCANNING",
+                    timestamp="2026-08-12T19:45:24",
+                ),
+            ]
+        )
+
+        scorecard = build_session_scorecard(accumulator)
+
+        budget = {record["state"]: record["seconds"] for record in scorecard["state_budget"]}
+        assert budget["IDLE/map_open"] == 4
+        assert budget["IDLE"] == 6
+        assert budget["TELEPORTING"] == 2
+        assert accumulator["map_open_completions_at"] == ["2026-08-12T19:45:16"]
+
     def test_fuel_aggregates(self) -> None:
         """Fuel min/last/count come from the self_alignment_sample bucket."""
         accumulator = _routed(
