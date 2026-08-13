@@ -7,7 +7,7 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "fee6f258a2eca770e7edb72e4a4911af56ea8cd1"
+  "src/tankpit_bot": "6f779b912976c63d4217f4379fdffd458efcd92e"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [codebase]
@@ -30,7 +30,7 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 | `container/` | The container message family, decoded from inside `protocol/decoders/tank.py` | `types.py`, `decoders/`, `encoders.py`. Imports `wire` and nothing else |
 | `types/` | The shared vocabulary every layer names — a true leaf, imports nothing from this codebase | `constants.py` (terrain/team/damage codes, ASCII glyphs — was `state/types/constants.py`, where it made `physics` and `state` mutually dependent), `modes.py` (`BehaviorMode` — was `bot/ai/modes.py`, the one file forcing `service` to import `bot`), `literals.py`, `message.py`, `session.py`, `cdp.py`, `config.py`, `probe.py` ([[package-layering]]) |
 | `analysis/` | The typed capture-scan owner — one load-XOR-split-decode pipeline instead of forty | `scan.py` (`scan_session`, direction-tagged frames), `types.py`, `_test_hooks.py`. Thirty of the forty `analysis_scripts/` each wrote this pipeline for themselves; every step now delegates to the module that already owned it ([[capture-differ]]) |
-| `sniffer/` | Passive WebSocket sniffer — captures traffic without playing | `core.py` (entry point), `world_state.py` + `world_state_*.py` (state machine) |
+| `sniffer/` | Passive WebSocket sniffer — captures traffic without playing | `core.py` (entry point), `world_service.py` + `world_service_beliefs/movement/radar.py` (the service each session now owns), `world_state_*.py` (the state machine — `world_state_dispatch*.py` plus one module per subject: combat, containers, inventory, radar, tanks, tiles). The singleton module `world_state.py` that this row used to name **no longer exists**; see [[services]] [^4] and [[session-state-deglobalisation]] step 8 |
 | `capture/` | Post-hoc capture analysis — shot correlation, viewport analysis | `stats.py`, `viewport_analysis.py`, `trackers/` |
 | `action_lab/` | Live probes — isolated experiments against the real server | `probe_base.py` (ProbeBase), `probe_factory.py` (DI), teleport/fuel/equipment/movement probes |
 | `diagnostics/` | Runtime + offline diagnostics — issue reports, alignment checks | `issue_report.py`, `entity_alignment.py`, `self_alignment.py`, `session_stats.py` |
