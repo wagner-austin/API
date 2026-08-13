@@ -176,10 +176,16 @@ class TestProcessReceivedMessage:
         payload = base64.b64encode(frame).decode()
         process_received_message(ws, payload, sniffer_xor_table())  # log fallback, not raise
 
-    def test_decodable_binary_dispatches(self) -> None:
-        """process_received_message decodes and dispatches a valid binary message.
+    def test_decodable_binary_dispatches(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A decoded message is announced once, not once per exit path.
 
-        Uses a 0x3F (Sync) message which has min_len=0 and is fully decodable.
+        Uses a 0x3F (Sync) message, which has min_len=0 and is fully
+        decodable. The decode branch logs the formatted message and then
+        returns; the line after it is the unknown-type fallback that
+        prints a bare type and length. Without the return BOTH are
+        logged for every message the sniffer successfully decodes, so
+        the protocol log doubles in size and each real message is
+        trailed by a line implying it was not understood.
         """
         from tankpit_bot.sniffer.decoders import process_received_message
 
@@ -187,10 +193,17 @@ class TestProcessReceivedMessage:
         # MSG_MIN_LENGTHS[0x3F] = 0, so condition passes
         # try_decode_binary_message returns SyncDict
         ws = WorldService()
+        set_protocol_frame_logging(True)
         body = bytes([0x3F, 0x00])
         frame = len(body).to_bytes(2, "little") + body
         payload = base64.b64encode(frame).decode()
-        process_received_message(ws, payload, sniffer_xor_table())  # decode, log, dispatch
+
+        with caplog.at_level(logging.INFO):
+            process_received_message(ws, payload, sniffer_xor_table())
+
+        announced = [r.message for r in caplog.records if "[RECEIVED]" in r.message]
+        assert len(announced) == 1
+        assert "len=" not in announced[0]
 
     def test_zero_length_frame_carries_no_message(self) -> None:
         """A zero-length frame is legal framing and dispatches nothing.

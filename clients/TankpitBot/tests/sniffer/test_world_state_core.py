@@ -6,6 +6,10 @@ sibling.
 
 from __future__ import annotations
 
+import logging
+
+import pytest
+
 from tankpit_bot import _test_hooks
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_inventory import (
@@ -195,6 +199,47 @@ class TestWorldStateCore:
         fresh = WorldService()
         assert fresh.world_state["self_state"] is None
         assert fresh.terrain_map is None
+
+    def test_no_selected_room_says_so_rather_than_blaming_the_registry(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """With no room selected, the diagnostic names the missing room.
+
+        Both this arm and the one after it return None, and neither
+        touches world state, so the log line is the entire observable
+        difference between them. Without this return the lookup runs with
+        ``None`` as the key, misses, and reports "No registered room
+        image for selected room None" -- which sends a reader to check
+        the room-image registry when the actual problem is that no room
+        was ever selected. Terrain silently missing is what makes every
+        pathfind fall back to open ground, so the first line of the
+        investigation matters.
+        """
+        ws = WorldService()
+        ws.register_room_image("1", "field01.gif")
+
+        with caplog.at_level(logging.WARNING):
+            assert ws._load_terrain_map_if_needed() is None
+
+        messages = [record.message for record in caplog.records]
+        assert any("No selected room is available" in message for message in messages)
+        assert not any("No registered room image" in message for message in messages)
+
+    def test_control_a_selected_room_with_no_image_blames_the_registry(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Control: a room IS selected but unregistered -- the other message."""
+        ws = WorldService()
+        ws.set_selected_room("7")
+
+        with caplog.at_level(logging.WARNING):
+            assert ws._load_terrain_map_if_needed() is None
+
+        messages = [record.message for record in caplog.records]
+        assert any("No registered room image" in message for message in messages)
+        assert not any("No selected room is available" in message for message in messages)
 
     def test_load_terrain_map_returns_none_if_no_file(self) -> None:
         """Test returns None when no terrain file exists."""

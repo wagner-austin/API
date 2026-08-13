@@ -262,3 +262,61 @@ def test_malformed_and_incomplete_lines_are_skipped(tmp_path: Path) -> None:
         ],
     )
     assert validate_teleport_cost(tmp_path)["samples"] == 0
+
+
+def test_a_record_is_classified_once_by_its_diagnostic_kind() -> None:
+    """A fix that also carries an action kind is a fix, and nothing else.
+
+    ``_scan_record`` is a cascade: the two diagnostic kinds it knows are
+    claimed first, and only an unclaimed record is read for an
+    ``action_kind``. No archived record is both -- 38,945
+    self_alignment_samples and 14,375 container_pickup_dispatched lines
+    across the 427 runs, none carrying an action kind -- which is why
+    removing either return currently changes no published number.
+
+    The shape is constructed, and the reason to hold the line anyway is
+    that it is one keyword away: an ``emit_diagnostic`` call that stamps
+    action context onto an alignment sample would make every fix ALSO an
+    action line, and action lines are what exclude a fix window from the
+    pairing. The teleport-cost evidence would quietly lose samples with
+    nothing reporting why.
+    """
+    from tankpit_bot.validate.events_validators import _EventScan, _scan_record
+
+    scan = _EventScan(fixes=[], teleport_outcomes=[], action_lines=[], skipped_lines=0)
+
+    _scan_record(
+        scan,
+        {
+            "diagnostic_kind": "self_alignment_sample",
+            "belief_x": 3,
+            "belief_y": 4,
+            "belief_fuel": 470,
+            "action_kind": "walk",
+        },
+        7,
+    )
+
+    assert [(fix["x"], fix["y"], fix["fuel"]) for fix in scan["fixes"]] == [(3, 4, 470)]
+    assert scan["action_lines"] == []
+
+
+def test_a_pickup_dispatch_is_one_action_line_not_two() -> None:
+    """The pickup arm claims the record; its action kind is not read again.
+
+    Same cascade, second arm. Without its return the dispatch is
+    appended once as ``pickup`` and then a second time under whatever
+    ``action_kind`` it carries, so one dispatched pickup contaminates a
+    fix window twice over and counts as two actions in the report.
+    """
+    from tankpit_bot.validate.events_validators import _EventScan, _scan_record
+
+    scan = _EventScan(fixes=[], teleport_outcomes=[], action_lines=[], skipped_lines=0)
+
+    _scan_record(
+        scan,
+        {"diagnostic_kind": "container_pickup_dispatched", "action_kind": "collect"},
+        11,
+    )
+
+    assert [(line["line"], line["kind"]) for line in scan["action_lines"]] == [(11, "pickup")]
