@@ -177,11 +177,11 @@ Net diff: 26 files, +358/−318 — the system got smaller.[^3]
 |---|---|
 | Hostile mine tile impassable on ground, water, and ferry cells | `test_ferry.py::test_hostile_mine_tile_is_impassable_on_any_surface` |
 | Composition takes enemy mines, skips same-team mines | `test_ferry.py::test_compose_folds_hostile_mines_but_not_friendly` |
-| Mine-blocking propagates through both pickup routing surfaces | `test_ferry.py::TestSurfaceRouteTerrain::test_mined_tile_blocks_both_surfaces` |
+| Mine-blocking propagates through both pickup routing surfaces | `test_ferry_landing_choice.py::TestSurfaceRouteTerrain::test_mined_tile_blocks_both_surfaces` |
 | A* routes around composed mines; direct-line and segment helpers see them | `test_pathfinding.py` (3 rewritten mine tests) |
 | Pickup on a mined container tile services from adjacency | `test_reachability.py::test_collection_reachable_from_adjacent_landing_tile` |
 | Dot-hop selector never proposes a mined dot (the 17:16 loop) | `test_resource_search.py::test_skips_dot_on_hostile_mine_tile` |
-| A teleport at a mined tile IS dispatchable (displacement physics) | `test_executor.py::test_teleport_to_mined_tile_is_dispatchable` |
+| A teleport at a mined tile IS dispatchable (displacement physics) | `test_executor_dispatch.py::TestDispatchCommand::test_teleport_to_mined_tile_is_dispatchable` |
 
 The general rule for future dynamic impassability (new obstacle
 classes, temporary hazards): compose them into

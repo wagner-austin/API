@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.executor import (
     dispatch_command,
 )
@@ -19,7 +20,7 @@ from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
-from tankpit_bot.state.types import WorldStateDict, make_container_state
+from tankpit_bot.state.types import WorldStateDict, make_container_state, make_mine_state
 from tankpit_bot.state.types.coord import coord_key
 from tests.bot._executor_support import (
     _make_bot,
@@ -38,6 +39,25 @@ def _believe_container(ws: WorldService, x: int, y: int, *, is_fuel: bool, volum
             "containers": {
                 coord_key(x, y): make_container_state(
                     x=x, y=y, is_fuel=is_fuel, volume=volume, timestamp_ms=1000
+                )
+            },
+        }
+    )
+
+
+def _believe_hostile_mine(ws: WorldService, x: int, y: int) -> None:
+    """Install one enemy-team mine into the given world service.
+
+    Self is team 0 in these fixtures (``update_self_position`` seeds a
+    fresh self at team 0), so team 1 is hostile under
+    :func:`~tankpit_bot.bot.ai.equipment.hostile_mines`.
+    """
+    ws.world_state = WorldStateDict(
+        **{
+            **ws.world_state,
+            "mines": {
+                coord_key(x, y): make_mine_state(
+                    x=x, y=y, mine_type=1, tank_id=99, team=1, timestamp_ms=1000
                 )
             },
         }
@@ -230,6 +250,34 @@ class TestDispatchCommand:
         assert result is True
         sent_methods = fake_cdp._sent_methods
         runtime_calls = [m for m in sent_methods if m == "Runtime.evaluate"]
+        assert len(runtime_calls) == 1
+
+    def test_teleport_to_mined_tile_is_dispatchable(self, fake_env: FakeEnv) -> None:
+        """A teleport aimed at a hostile-mined tile still dispatches.
+
+        Landing legality is a different question from walkability: the
+        server displaces the landing off a mined tile and charges the
+        plain cost, so a mine at the target is no reason to withhold
+        the send ([[terrain-composition]], [[teleport-mechanics]]
+        Placement). The executor's mine veto was deleted 2026-07-20
+        (commit 6d2afdbe) because it was wrong physics and looped the
+        pursuit; this test is the standing proof it stays deleted.
+
+        Target (120,120) from (100,100) costs 169 against 800 fuel, so
+        the refusal predictor does not suppress the send for cost.
+        """
+        bot, fake_cdp = _make_bot(fake_env)
+        _believe_hostile_mine(bot.world, 120, 120)
+        assert coord_key(120, 120) in hostile_mines(bot.world.world_state)
+
+        result = dispatch_command(
+            bot,
+            make_teleport_command(120, 120),
+            _make_snapshot(map_visible=True),
+        )
+
+        assert result is True
+        runtime_calls = [m for m in fake_cdp._sent_methods if m == "Runtime.evaluate"]
         assert len(runtime_calls) == 1
 
 
