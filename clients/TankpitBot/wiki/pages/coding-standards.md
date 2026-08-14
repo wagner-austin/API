@@ -8,8 +8,8 @@ source_paths:
   - "tests"
 source_git_blobs:
   "src/tankpit_bot": "fe0b742e68683be646eb604743ac226ded9af783"
-  "tests": "07661d343d3f4afa534e2fa8ed054ff12e5eb11c"
-fact_checked: "2026-08-10"
+  "tests": "1c3dacc521450fcbbe2ea15e859ed72c56656581"
+fact_checked: "2026-08-14"
 confidence: high
 hubs: [architecture]
 ---
@@ -29,7 +29,7 @@ hubs: [architecture]
 - No `unittest.mock` anywhere in the test suite[^2]
 - `MonkeyPatchBanRule` guard enforces save-and-restore DI pattern, 0 violations[^2]
 - `_test_hooks` DI pattern: `tankpit_bot/_test_hooks/` is a package of 8 domain submodules exposing module-level injectable callables and Protocols; tests swap in protocol-matching implementations by save-and-restore ([[testing-patterns]])[^2]
-- **A test that swaps a `_test_hooks` attribute must restore it, and the guard now checks.** A swap left in place leaks to every later test on the same xdist worker. The autouse `_restore_hooks` fixture resets 16 attrs centrally; anything outside that list must be put back under a recognised guard — a `finally` body, a post-`yield` fixture, a `teardown_*` method, or an ancestor `conftest.py`. `scripts/hook_restore_rules.py` fails the build otherwise, with no allowlist. Found exactly one real leak across 391 assignment sites (`remove_file`, fixed centrally); 6,171 tests at 100% coverage had never noticed it, because coverage proves a line ran and says nothing about what happens after the test ends.[^5]
+- **A test that swaps a `_test_hooks` attribute must restore it, and the guard now checks.** A swap left in place leaks to every later test on the same xdist worker. The autouse `_restore_hooks` fixture resets 16 attrs centrally; anything outside that list must be put back under a recognised guard — a `finally` body, a post-`yield` fixture, a `teardown_*` method, or an ancestor `conftest.py`. `scripts/hook_restore_rules.py` fails the build otherwise, with no allowlist. Found exactly one real leak across 391 assignment sites (`remove_file`, fixed centrally); the 6,171 tests passing at 100% coverage on 2026-08-08 had never noticed it, because coverage proves a line ran and says nothing about what happens after the test ends.[^5]
 - No weak assertions (`assert len(x) >= 0` etc.) — concrete assertions on specific values[^2]
 - 100% coverage required (`fail_under = 100` in `pyproject.toml`)[^2]
 - **No exclusions, no omissions, no exemptions, no exceptions** (user ruling 2026-08-07, verbatim). No coverage `omit` entry, no `exclude_lines`, no guard allowlist, no `# pragma`, no `noqa`, no `type: ignore`, no xfail or skip to get a gate green — and an existing one is a defect to delete, not a precedent to extend. An exempted gate measures the files someone already chose to test, not the codebase, and the exemption is self-perpetuating: `combat_probe.py` sat at 69% and its script at 0% purely because being on the list meant nobody wrote the tests, and both reached 100% through the `_test_hooks` seams every other probe already used. Code that looks untestable is missing a seam — add it.[^2]

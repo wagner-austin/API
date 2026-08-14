@@ -8,16 +8,16 @@ source_paths:
   - "tests"
   - "scripts/guard.py"
 source_git_blobs:
-  "tests": "07661d343d3f4afa534e2fa8ed054ff12e5eb11c"
+  "tests": "1c3dacc521450fcbbe2ea15e859ed72c56656581"
   "scripts/guard.py": "4400a8ac1a753c2ac44df75a88180ba69eeb8353"
-fact_checked: "2026-08-07"
+fact_checked: "2026-08-14"
 confidence: high
 hubs: [codebase]
 ---
 
 # Testing Patterns
 
-5,631 tests, 100% coverage, zero mocks, zero monkey-patching.[^1]
+6,119 tests as of 2026-08-14, 100% coverage, zero mocks, zero monkey-patching.[^1]
 
 ## `_test_hooks` DI pattern
 
@@ -82,7 +82,7 @@ aiohttp thread and the tick-loop thread by design ([[bot-service-architecture]])
 Four live-only probe paths are `omit`-ed: `action_lab/combat_probe.py`,
 `action_lab/enemy_tracking.py`, and their two `scripts/` wrappers.[^1]
 
-[^1]: pyproject.toml [tool.coverage.report] — fail_under=100, branch=true, concurrency=greenlet
+[^1]: `pyproject.toml` `[tool.coverage.report]` — `fail_under=100`, `branch=true`, `concurrency=greenlet`. The test count is not in that file and is not derivable from it: it is a live figure measured by `poetry run pytest --collect-only -q`, which reported **6,119 tests collected** on 2026-08-14. It carries an as-of date because it moves with every commit — the page previously read "5,631", the figure recorded when this page was written on 2026-08-07, stated flatly and with no source behind it.
 [^2]: tankpit_bot/_test_hooks/__init__.py — 8 submodules, all protocol-based
 [^3]: `WeakAssertionRule` (`name = "test-quality"`) in the api monorepo at `libs/monorepo_guards/src/monorepo_guards/test_quality_rules.py:418,421`, reached from this project through `scripts/guard.py`. Its module docstring at `:1-14` enumerates what it rejects: `weak-assertion-is-not-none`, `-isinstance`, `-hasattr`, `-len-zero` (`assert len(x) > 0` "checks existence not content"), `-in-output`, `-key-in-dict`, and `mock-without-assert-called-with`. The stated rationale is the one this page relies on — "Coverage shows lines executed, not correctness proven."
 [^4]: `MonkeyPatchBanRule` — enforces save-and-restore, 0 violations. **Corrected 2026-08-07:** this footnote attributed the rule to `_hooks_guard.py`, which enforces nothing. The rule lives in the api monorepo at `libs/monorepo_guards/src/monorepo_guards/monkey_patch_rules.py:79` (`name = "monkey-patch-ban"` at `:82`), registered in the orchestrator's rule list at `orchestrator.py:71`, and reaches this project through `scripts/guard.py`. `src/tankpit_bot/_hooks_guard.py` is the opposite kind of thing — a DI seam whose own docstring says it exists so guard TESTS can inject a fake orchestrator instead of scanning the real monorepo filesystem (`scripts/guard.py:22,59-60,91-92`; reset in `tests/conftest.py:195-196`). Anchors re-taken 2026-08-12, each having shifted by two lines; the monorepo-side anchors in this footnote — `monkey_patch_rules.py:79` and `:82`, `orchestrator.py:71` — still land exactly.
