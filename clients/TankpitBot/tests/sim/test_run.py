@@ -328,6 +328,85 @@ def test_ferry_session_scouts_boards_and_drains_the_water_larder(
     assert narrow_json_to_bool(client["alive"]) is True
 
 
+def _install_wrong_pond_terrain(fake_fs: FakeFileSystem) -> None:
+    """The live-deadlock geometry: the ferry's puddle is not the pond.
+
+    Runs bot-20260804-234008 and bot-20260805-070006 both stalled on a
+    ferry docked one land ridge away from the goal's pond (field01
+    truth: the (106,11-12) pond holds 4,456 water tiles and does not
+    contain (112,15)). Here each water seed floats on its own tiny
+    pond and the scenario's ferry tile (118,112) sits alone in a 3x3
+    puddle, so no goal ever shares a water body with a ferry. The
+    ponds total 43 water tiles — below ``_FERRY_WATER_SPACING`` (300)
+    — because ``seed_ferries`` floats a ferry on every 300th water
+    tile map-wide, and a first cut of this world used a 304-tile lake:
+    the seeder placed one SAME-pond ferry on it and the gate correctly
+    boarded it, which is the happy soak again, not this test.
+
+    Args:
+        fake_fs: The installed fake file system.
+    """
+    fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
+    goal_pond = {(x, y) for x in range(110, 115) for y in range(110, 115)}
+    ferry_puddle = {(x, y) for x in range(117, 120) for y in range(111, 114)}
+    deep_pond = {(x, y) for x in range(119, 122) for y in range(115, 118)}
+    water = dict.fromkeys(goal_pond | ferry_puddle | deep_pond, "W")
+
+    def load_wrong_pond_terrain(gif_path: Path) -> TerrainMapProtocol:
+        """Return the split-pond terrain for any requested field."""
+        del gif_path
+        return InMemoryTerrainMap(terrain_data=water)
+
+    _test_hooks.load_terrain_map = load_wrong_pond_terrain
+
+
+def test_ferry_session_never_boards_the_wrong_pond_ferry(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """A ferry off the goal's water body is declined, never boarded.
+
+    The sim-side pin of the pond gate the 2026-08-05 log queued: the
+    happy soak above proves a same-pond ferry IS boarded; this world
+    proves the adversarial geometry that live play authored twice is
+    declined instead of deadlocked on. The paired assertions kill the
+    gate's mutant both ways — the water fuel must be CONSIDERED and
+    refused ``no_landing`` (a session that never looks at the water
+    proves nothing), and no larder hop may ever land inside the
+    ferry's puddle, drifted or not.
+    """
+    _install_wrong_pond_terrain(fake_fs)
+    exit_code = main(["--ferry", "--rounds", "60", "--stamp", "20260813-000001"])
+    assert exit_code == 0
+    files = fake_fs.get_written_files()
+    events_path = next(path for path in files if path.endswith("latest.sim.events.jsonl"))
+    declined_no_landing = 0
+    for line in files[events_path].splitlines():
+        if not line:
+            continue
+        event = narrow_json_to_dict(load_json_str(line))
+        if event.get("hop_kind") != "fuel_larder":
+            continue
+        if event.get("diagnostic_kind") == "hop_selected":
+            landing_x = narrow_json_to_int(event["landing_x"])
+            landing_y = narrow_json_to_int(event["landing_y"])
+            assert not (117 <= landing_x <= 119 and 111 <= landing_y <= 113)
+        if event.get("diagnostic_kind") == "hop_declined":
+            assert narrow_json_to_int(event["ferry_served"]) == 0
+            if narrow_json_to_int(event["no_landing"]) > 0:
+                declined_no_landing += 1
+    assert declined_no_landing > 0
+    world_path = next(path for path in files if "sim-20260813-000001.world.json" in path)
+    world_doc = narrow_json_to_dict(load_json_str(files[world_path]))
+    containers = [narrow_json_to_dict(c) for c in narrow_json_to_list(world_doc["containers"])]
+    lake_fuel = next(c for c in containers if c["x"] == 112 and c["y"] == 112)
+    deep_fuel = next(c for c in containers if c["x"] == 120 and c["y"] == 115)
+    assert narrow_json_to_int(lake_fuel["volume"]) == 700
+    assert narrow_json_to_int(deep_fuel["volume"]) == 500
+    tanks = [narrow_json_to_dict(t) for t in narrow_json_to_list(world_doc["tanks"])]
+    client = next(t for t in tanks if t["tank_id"] == 9)
+    assert narrow_json_to_bool(client["alive"]) is True
+
+
 def _write_small_atlas(fake_fs: FakeFileSystem, path: Path, stamp: str) -> tuple[int, int]:
     """A three-tile mined atlas beside the stamp-selected spawn.
 

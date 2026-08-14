@@ -577,12 +577,13 @@ rather than the refactor.[^3]
    `SessionBase` no longer arms any tracker — the BOT was paying for
    twelve of them too.
 
-   **Still standing, and worth a decision:** the eleven tracker
-   *classes* in `capture/trackers/` now have no production
-   instantiation at all — ~1,400 lines of source and ~2,900 lines of
-   tests whose only callers are those tests. `MineTracker` and
-   `CombatTracker` stay. Deleting the rest is a separate call from
-   this step's scope.
+   **Resolved 2026-08-10 (`cfe47b09`):** the eleven orphaned tracker
+   *classes* are deleted — 8 modules, 11 test files, −4,270 lines net.
+   Only `MineTracker` survives, owned by the sniffer, and the package
+   `__init__` no longer re-exports anything: the re-export was the
+   mechanism that made the orphans look alive to call-graph sweeps.
+   The note here that `CombatTracker` would also stay did not survive
+   the 2026-08-10 audit — it was as orphaned as the other ten.
 10. ~~**`runtime_logging.py` + `runtime_context.py`**~~ **SHIPPED —
     context half 2026-08-07, artifact half 2026-08-08.**
 

@@ -4280,3 +4280,40 @@ Five guards retired with **no verdict** across two runs: removing a loop's exit 
 ### Harness hazards worth not repeating
 
 `run_in_background` already detaches; wrapping the sweep in `nohup ... &` produced a process the tool could not see or stop, so a second sweep ran concurrently against the same repo and both wrote verdicts. Six were discarded rather than trusted — `movement.py:461` appearing twice was the tell. A sweep also mutates `src/` repo-wide, so nothing else may edit the tree while one runs.
+
+---
+## [2026-08-10] delete | The eleven orphaned pretty-printers go — the audit's open decision, closed the same evening
+
+(Entry written retroactively 2026-08-13; the same-day audit entry above ends with "the user's to make", and this is the call that was made.)
+
+Commit `cfe47b09` (21:59, hours after the audit): the eleven tracker classes in `capture/trackers/` are deleted — 8 modules, 11 test files, **−4,270 lines net**. They were the January 2026 reverse-engineering toolkit; `sniffer/world_state_dispatch.py` (2026-04-04) superseded all twelve with structured `WorldStateDict` updates, and eleven were orphaned that day and never removed.
+
+**Why they survived four months of cleanups:** the package `__init__.py` re-exported them, so an AST call-graph sweep saw a reference and an unreferenced class looked live — exactly why the 2026-08-07 re-export purge (`0ee86133`) walked past them. The `__init__` now re-exports nothing, and all three `MineTracker` importers name `capture.trackers.mine` directly.
+
+**`MineTracker` stays for a narrower reason than "the bot needs it" — it does not.** The sniffer pipes its line to `log.info` and the bot never reads it. Narration nobody calls is dead; narration the capture tool calls is the tool working. The earlier plan to also keep `CombatTracker` ([[session-state-deglobalisation]] step 9) did not survive the audit.
+
+Gate at the commit: 5,980 passed, 100.00% coverage; statements 30,426 -> 29,789 with coverage unchanged — source and tests went together and nothing was left uncovered.
+
+---
+## [2026-08-13] fix | The state budget stops calling protocol round trips "idle"; a contaminated validator window and a dead report field go too
+
+(Entry written retroactively 2026-08-13 for the 2026-08-12 21:10 -> 2026-08-13 08:49 batch: `464ddd8a`, `73de3e51`, `6d337b9a`, `e2775de7`, `d4f875cd`.)
+
+**Idle was overstated by more than half, then by all of it.** A map open is dispatched FROM the IDLE state and has no state of its own, so every second waiting on MAP_DATA was credited to IDLE (`464ddd8a`); a scope shift is a COMMAND with no HFSM state, so the quad sweep's steering ticks were credited the same way (`73de3e51`). Run 20260812-194435's "IDLE 16s (11x)" decomposed to: IDLE/map_open 10s (3x), IDLE/scope_shift 6s (3x), IDLE 0s (5x, zero-length pass-throughs). **Zero seconds of actual idleness — the old label named the wrong thing entirely.** The two markers sit at opposite ends of their stretch (a map open is observed COMPLETING, a scope shift is observed being SENT), so `_idle_bucket` tests them on opposite edges; getting that the same way round would silently drop every scope shift.
+
+**The teleport-cost validator's 7 "mismatches" were all measurement faults** (`6d337b9a`): in every one the teleport's own debit was exactly `floor(6*euclid)` with a SECOND fuel movement folded into the pre/post difference — 4 single hits, one dual, two pickups. `_window_is_clean` inspected `action_lines` (things the bot DID), and being shot is not an action. The new predicate counts fuel MOVEMENTS and rejects a second one — counting rather than recognising magnitudes, because 45 is shared by five different causes and mis-attributed three times while investigating. The rule separates the archive completely: all 3,869 clean windows hold exactly one movement, all 7 contaminated hold two. Evidence line: samples=3875 exact=3868 mismatches=7 -> samples=3869 exact=3869 mismatches=0. Also recorded: dispatch-anchored wire debits confirm `floor(6*euclid)` on 8,032 of 8,032 archived teleports, an instrument NOT adopted because the fuel book's per-entry attribution never reaches events.jsonl.
+
+**`recovery_boxed_in` outlived its emitter by seven weeks** (`e2775de7`): the combat rework deleted the emitter 2026-06-23, nothing emitted it in 174 runs since, and the report field could only ever read 0 — field, codec pair, renderer branch and the test asserting a count nothing produces, all removed. Worth noting how it lasted: the mutation sweep only mutates guards, so instrumentation outliving its instrument is invisible to it, and nothing in the gate looks for it.
+
+**Wiki repin** (`d4f875cd`): 8 drifted directory-tree pins re-established after path-exists and line-anchor checks passed on all 73 pages. Tree pins drift on any commit to the package and carry mostly noise; file-plus-line pins carry the signal.
+
+---
+## [2026-08-13] build | The wrong-pond ferry soak lands — the queued adversarial geometry, pinned end to end and negative-controlled
+
+The follow-up queued 2026-08-05 ("the ferry scenario only encodes the happy geometry... a wrong-pond sim scenario variant is the queued follow-up") is built: `tests/sim/test_run.py::test_ferry_session_never_boards_the_wrong_pond_ferry` runs the production bot through `--ferry` against the live-deadlock geometry — each water seed on its own tiny pond, the scenario's ferry alone in a 3x3 puddle, no goal sharing a water body with any ferry.
+
+**The first cut rebuilt the happy soak by accident, and the seeder was why.** A 304-tile ridge-split lake put one water body over `_FERRY_WATER_SPACING` (300), so `seed_ferries` floated one SAME-pond ferry onto it and the pond gate correctly boarded it — the gate WORKING is indistinguishable from the gate absent unless the world starves the seeder. The shipped terrain totals 43 water tiles, below the spacing, so the only ferry is the scenario's own wrong-pond one.
+
+**Paired assertions, per the mutation-sweep doctrine:** the water fuel must be CONSIDERED and refused (at least one `fuel_larder` `hop_declined` with `no_landing > 0`, every decline carrying `ferry_served == 0`), no `hop_selected` may ever land inside the puddle (drift-proof: the box, not the seed tile), both water containers end at their seeded volumes, and the client survives. **Negative-controlled before being trusted:** with the pond membership check disabled the larder hopped onto the puddle at (119,113) on the first opportunity and the landing assertion killed the mutant; the gate restored, the test passes.
+
+Also in this operation: [[session-state-deglobalisation]] step 9's stale "still standing" note replaced with the 2026-08-10 resolution, and the two retroactive entries above.
