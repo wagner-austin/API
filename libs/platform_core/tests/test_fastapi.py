@@ -13,11 +13,11 @@ from platform_core.fastapi import (
 )
 
 # ---------------------------------------------------------------------------
-# Mock classes for testing
+# Fake classes for testing
 # ---------------------------------------------------------------------------
 
 
-class _MockURL:
+class _FakeURL:
     def __init__(self, path: str) -> None:
         self._path = path
 
@@ -26,15 +26,15 @@ class _MockURL:
         return self._path
 
 
-class _MockRequest:
-    """Mock request that satisfies _RequestProto."""
+class _FakeRequest:
+    """Fake request that satisfies _RequestProto."""
 
     def __init__(self, path: str, method: str) -> None:
-        self._url = _MockURL(path)
+        self._url = _FakeURL(path)
         self._method = method
 
     @property
-    def url(self) -> _MockURL:
+    def url(self) -> _FakeURL:
         return self._url
 
     @property
@@ -42,8 +42,8 @@ class _MockRequest:
         return self._method
 
 
-class _MockJSONResponse:
-    """Mock response that satisfies _JSONResponseProto."""
+class _FakeJSONResponse:
+    """Fake response that satisfies _JSONResponseProto."""
 
     def __init__(self, content: dict[str, str], status_code: int) -> None:
         from platform_core.json_utils import dump_json_str
@@ -64,8 +64,8 @@ class _MockJSONResponse:
 _StarletteHandler = Callable[[Request, Exception], Awaitable[Response]]
 
 
-class _MockFastAPIApp:
-    """Mock FastAPI app that records registered handlers."""
+class _FakeFastAPIApp:
+    """Fake FastAPI app that records registered handlers."""
 
     def __init__(self) -> None:
         self.handlers: dict[int | type[Exception], _StarletteHandler] = {}
@@ -85,34 +85,33 @@ class _MockFastAPIApp:
 
 def test_fastapi_app_adapter_registers_handler() -> None:
     """Test that FastAPIAppAdapter registers exception handlers correctly."""
-    mock_app = _MockFastAPIApp()
-    adapter = FastAPIAppAdapter(mock_app)
+    fake_app = _FakeFastAPIApp()
+    adapter = FastAPIAppAdapter(fake_app)
 
     async def test_handler(request: _RequestProto, exc: Exception) -> _JSONResponseProto:
-        return _MockJSONResponse({"code": "TEST", "message": str(exc)}, 500)
+        return _FakeJSONResponse({"code": "TEST", "message": str(exc)}, 500)
 
     adapter.add_exception_handler(ValueError, test_handler)
 
-    assert ValueError in mock_app.handlers
+    assert ValueError in fake_app.handlers
 
 
 def test_fastapi_app_adapter_handler_conversion() -> None:
     """Test that adapter properly converts Protocol response to Starlette Response."""
-    mock_app = _MockFastAPIApp()
-    adapter = FastAPIAppAdapter(mock_app)
+    fake_app = _FakeFastAPIApp()
+    adapter = FastAPIAppAdapter(fake_app)
 
     async def test_handler(request: _RequestProto, exc: Exception) -> _JSONResponseProto:
-        return _MockJSONResponse({"code": "TEST", "message": str(exc)}, 418)
+        return _FakeJSONResponse({"code": "TEST", "message": str(exc)}, 418)
 
     adapter.add_exception_handler(ValueError, test_handler)
 
-    wrapped_handler = mock_app.handlers[ValueError]
-    # Use a real mock that works with the handler
-    # The handler expects Request, but will work with anything that has the same attrs
+    wrapped_handler = fake_app.handlers[ValueError]
     exc = ValueError("test error")
 
     async def run_handler() -> Response:
-        # Create a minimal mock that works with Starlette's Request signature
+        # A real Starlette Request built from a minimal ASGI scope, so the
+        # adapter is exercised against the type it actually receives.
         scope: dict[str, str | list[tuple[bytes, bytes]]] = {
             "type": "http",
             "method": "GET",
@@ -129,8 +128,8 @@ def test_fastapi_app_adapter_handler_conversion() -> None:
 
 def test_fastapi_app_adapter_memoryview_body() -> None:
     """Test that adapter handles memoryview body correctly."""
-    mock_app = _MockFastAPIApp()
-    adapter = FastAPIAppAdapter(mock_app)
+    fake_app = _FakeFastAPIApp()
+    adapter = FastAPIAppAdapter(fake_app)
 
     class _MemoryViewResponse:
         def __init__(self) -> None:
@@ -150,7 +149,7 @@ def test_fastapi_app_adapter_memoryview_body() -> None:
 
     adapter.add_exception_handler(RuntimeError, memoryview_handler)
 
-    wrapped_handler = mock_app.handlers[RuntimeError]
+    wrapped_handler = fake_app.handlers[RuntimeError]
     exc = RuntimeError("test")
 
     async def run_handler() -> Response:
@@ -175,19 +174,19 @@ def test_fastapi_app_adapter_memoryview_body() -> None:
 
 def test_install_exception_handlers_fastapi_registers_handlers() -> None:
     """Test that install_exception_handlers_fastapi registers both handlers."""
-    mock_app = _MockFastAPIApp()
-    install_exception_handlers_fastapi(mock_app, logger_name="test-fastapi", request_id_var=None)
+    fake_app = _FakeFastAPIApp()
+    install_exception_handlers_fastapi(fake_app, logger_name="test-fastapi", request_id_var=None)
 
-    assert AppError in mock_app.handlers
-    assert Exception in mock_app.handlers
+    assert AppError in fake_app.handlers
+    assert Exception in fake_app.handlers
 
 
 def test_install_exception_handlers_fastapi_app_error_handler() -> None:
     """Test that installed AppError handler returns correct response."""
-    mock_app = _MockFastAPIApp()
-    install_exception_handlers_fastapi(mock_app, logger_name="test-fastapi", request_id_var=None)
+    fake_app = _FakeFastAPIApp()
+    install_exception_handlers_fastapi(fake_app, logger_name="test-fastapi", request_id_var=None)
 
-    app_error_handler = mock_app.handlers[AppError]
+    app_error_handler = fake_app.handlers[AppError]
     exc = AppError(ErrorCode.NOT_FOUND, "Resource not found")
 
     async def run_handler() -> Response:
@@ -208,10 +207,10 @@ def test_install_exception_handlers_fastapi_app_error_handler() -> None:
 
 def test_install_exception_handlers_fastapi_unhandled_exception_handler() -> None:
     """Test that installed Exception handler returns generic error response."""
-    mock_app = _MockFastAPIApp()
-    install_exception_handlers_fastapi(mock_app, logger_name="test-fastapi", request_id_var=None)
+    fake_app = _FakeFastAPIApp()
+    install_exception_handlers_fastapi(fake_app, logger_name="test-fastapi", request_id_var=None)
 
-    exception_handler = mock_app.handlers[Exception]
+    exception_handler = fake_app.handlers[Exception]
     exc = RuntimeError("unexpected error")
 
     async def run_handler() -> Response:
@@ -238,15 +237,15 @@ def test_install_exception_handlers_fastapi_custom_internal_error_code() -> None
     class CustomErrorCode(ErrorCodeBase):
         CUSTOM_INTERNAL = "CUSTOM_INTERNAL"
 
-    mock_app = _MockFastAPIApp()
+    fake_app = _FakeFastAPIApp()
     install_exception_handlers_fastapi(
-        mock_app,
+        fake_app,
         logger_name="test-fastapi",
         request_id_var=None,
         internal_error_code=CustomErrorCode.CUSTOM_INTERNAL,
     )
 
-    exception_handler = mock_app.handlers[Exception]
+    exception_handler = fake_app.handlers[Exception]
     exc = ValueError("boom")
 
     async def run_handler() -> Response:
