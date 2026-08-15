@@ -111,17 +111,31 @@ class TestNullableHookRule:
 
         assert NullableHookRule().run([path]) == []
 
-    def test_reports_placeholder_for_non_name_target(self, tmp_path: Path) -> None:
-        """An attribute target still reports, without a hook name."""
+    def test_accepts_an_optional_callback_on_a_fake(self, tmp_path: Path) -> None:
+        """Per-instance state in a fake is not a hook declaration.
+
+        Hooks modules also hold the fakes tests inject, and a fake's optional
+        callback is assigned through self, not declared as a module or class
+        name -- which is how this rule first reported FakeKafkaConsumer.
+        """
         path = _write(
             tmp_path / "_test_hooks.py",
-            "class C:\n    pass\n\n\nC.hook: SomeProto | None = None\n",
+            "from collections.abc import Callable\n\n\n"
+            "class FakeConsumer:\n"
+            "    def __init__(self) -> None:\n"
+            "        self._on_poll: Callable[[], None] | None = None\n",
         )
 
-        violations = NullableHookRule().run([path])
+        assert NullableHookRule().run([path]) == []
 
-        assert len(violations) == 1
-        assert "<hook>" in violations[0].line
+    def test_flags_a_hook_declared_in_a_class_body(self, tmp_path: Path) -> None:
+        """A Hooks container declares its hooks as class-body names."""
+        path = _write(
+            tmp_path / "_test_hooks.py",
+            "class Hooks:\n    load_model: ModelLoaderProto | None = None\n",
+        )
+
+        assert len(NullableHookRule().run([path])) == 1
 
 
 class TestHookDispatchRule:

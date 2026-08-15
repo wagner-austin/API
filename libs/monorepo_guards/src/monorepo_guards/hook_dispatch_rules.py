@@ -192,17 +192,22 @@ class NullableHookRule:
             value = node.value
             if not isinstance(value, ast.Constant) or value.value is not None:
                 continue
+            # A hook is a module-level or class-body name. "self._on_poll:
+            # Callable[[], None] | None = None" in a fake's __init__ is
+            # per-instance state, and reading it as a hook is how this rule
+            # first reported FakeKafkaConsumer.
+            target = node.target
+            if not isinstance(target, ast.Name):
+                continue
             if not _optional_hook_annotation(node.annotation, local_protocols):
                 continue
-            target = node.target
-            hook_name = target.id if isinstance(target, ast.Name) else "<hook>"
             out.append(
                 Violation(
                     file=path,
                     line_no=node.lineno,
                     kind="nullable-hook-declaration",
                     line=(
-                        f"{hook_name} must be bound to its real implementation, "
+                        f"{target.id} must be bound to its real implementation, "
                         "not declared as '| None = None'"
                     ),
                 )
