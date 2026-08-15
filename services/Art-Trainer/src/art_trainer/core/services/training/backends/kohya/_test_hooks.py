@@ -1,11 +1,13 @@
-"""Test hooks for Kohya backend.
+"""Test hooks for the Kohya backend.
 
-Follows the covenant pattern: production code sets hooks to real implementations,
-tests set hooks to fakes for isolation.
+Each hook is bound to its real implementation here, so callers invoke it
+directly with no conditional. Tests rebind a hook to a fake and call
+reset_hooks() to restore the real implementations.
 """
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import Protocol
 
@@ -67,6 +69,53 @@ class ConfigWriter(Protocol):
         ...
 
 
+def _real_subprocess_runner(
+    args: list[str],
+    *,
+    cwd: Path | None = None,
+    timeout: int | None = None,
+) -> SubprocessResult:
+    """Run a subprocess and capture its output.
+
+    Args:
+        args: Command and arguments.
+        cwd: Working directory.
+        timeout: Timeout in seconds.
+
+    Returns:
+        Subprocess result with returncode, stdout, stderr.
+    """
+    from art_trainer.core.services.training.backends.kohya.runner import SubprocessResultImpl
+
+    completed = subprocess.run(
+        args,
+        cwd=str(cwd) if cwd is not None else None,
+        timeout=timeout,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return SubprocessResultImpl(
+        returncode=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+    )
+
+
+def _real_config_writer(config: KohyaConfig, path: Path) -> None:
+    """Write a Kohya config to a TOML file.
+
+    Args:
+        config: Kohya configuration TypedDict.
+        path: Path to write the TOML file.
+    """
+    import toml
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        toml.dump(config, handle)
+
+
 class Hooks:
     """Container for test hooks.
 
@@ -74,14 +123,14 @@ class Hooks:
     Tests set these to fakes for isolation.
     """
 
-    subprocess_runner: SubprocessRunner | None = None
-    config_writer: ConfigWriter | None = None
+    subprocess_runner: SubprocessRunner = _real_subprocess_runner
+    config_writer: ConfigWriter = _real_config_writer
 
 
 def reset_hooks() -> None:
-    """Reset all hooks to None (for test cleanup)."""
-    Hooks.subprocess_runner = None
-    Hooks.config_writer = None
+    """Restore every hook to its real implementation."""
+    Hooks.subprocess_runner = _real_subprocess_runner
+    Hooks.config_writer = _real_config_writer
 
 
 __all__ = [

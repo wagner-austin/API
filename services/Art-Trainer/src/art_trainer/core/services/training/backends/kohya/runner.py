@@ -5,7 +5,6 @@ This module handles subprocess execution for the Kohya_ss training scripts.
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 from . import _test_hooks
@@ -54,7 +53,8 @@ def run_subprocess(
 ) -> _test_hooks.SubprocessResult:
     """Run a subprocess.
 
-    Uses the subprocess_runner hook if set, otherwise runs real subprocess.
+    Runs through the subprocess_runner hook, which is bound to the real
+    subprocess call.
 
     Args:
         args: Command and arguments.
@@ -64,23 +64,7 @@ def run_subprocess(
     Returns:
         Subprocess result with returncode, stdout, stderr.
     """
-    if _test_hooks.Hooks.subprocess_runner is not None:
-        return _test_hooks.Hooks.subprocess_runner(args, cwd=cwd, timeout=timeout)
-
-    cwd_str = str(cwd) if cwd is not None else None
-    result = subprocess.run(
-        args,
-        cwd=cwd_str,
-        timeout=timeout,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return SubprocessResultImpl(
-        returncode=result.returncode,
-        stdout=result.stdout,
-        stderr=result.stderr,
-    )
+    return _test_hooks.Hooks.subprocess_runner(args, cwd=cwd, timeout=timeout)
 
 
 __all__ = [

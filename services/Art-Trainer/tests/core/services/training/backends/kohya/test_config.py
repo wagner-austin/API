@@ -139,9 +139,8 @@ def test_write_kohya_config_with_fake_writer() -> None:
 
 
 def test_write_kohya_config_real_toml(tmp_path: Path) -> None:
-    """Test write_kohya_config writes real TOML file when hook is None."""
-    # Make sure hook is None to use real TOML writing
-    _test_hooks.Hooks.config_writer = None
+    """Test write_kohya_config writes a real TOML file through the bound hook."""
+    _test_hooks.reset_hooks()
 
     config: KohyaConfig = {
         "pretrained_model_name_or_path": "test-model",

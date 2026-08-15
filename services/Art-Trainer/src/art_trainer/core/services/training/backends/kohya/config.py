@@ -9,8 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, TypedDict
 
-import toml
-
 from art_trainer.core.contracts.lora import LoraTrainConfig
 
 # Base model to pretrained model path mapping
@@ -145,7 +143,8 @@ def build_kohya_config(config: LoraTrainConfig) -> KohyaConfig:
 def write_kohya_config(config: KohyaConfig, path: Path) -> None:
     """Write Kohya config dictionary to TOML file.
 
-    Uses the config_writer hook if set, otherwise uses toml.dump.
+    Writes through the config_writer hook, which is bound to the real TOML
+    writer.
 
     Args:
         config: KohyaConfig TypedDict.
@@ -154,13 +153,7 @@ def write_kohya_config(config: KohyaConfig, path: Path) -> None:
     # Lazy import to avoid circular dependency
     from . import _test_hooks
 
-    if _test_hooks.Hooks.config_writer is not None:
-        _test_hooks.Hooks.config_writer(config, path)
-        return
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        toml.dump(config, f)
+    _test_hooks.Hooks.config_writer(config, path)
 
 
 __all__ = [

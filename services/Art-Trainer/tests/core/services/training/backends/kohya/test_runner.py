@@ -60,9 +60,8 @@ def test_subprocess_result_impl_properties() -> None:
 
 
 def test_run_subprocess_real_subprocess(tmp_path: Path) -> None:
-    """Test run_subprocess executes real subprocess when hook is None."""
-    # Make sure hook is None to use real subprocess
-    _test_hooks.Hooks.subprocess_runner = None
+    """Test run_subprocess executes a real subprocess through the bound hook."""
+    _test_hooks.reset_hooks()
 
     # Run a simple echo command
     result = run_subprocess(
@@ -77,7 +76,7 @@ def test_run_subprocess_real_subprocess(tmp_path: Path) -> None:
 
 def test_run_subprocess_real_subprocess_no_cwd() -> None:
     """Test run_subprocess without cwd uses None."""
-    _test_hooks.Hooks.subprocess_runner = None
+    _test_hooks.reset_hooks()
 
     result = run_subprocess(
         ["python", "-c", "print('test_exact_output_67890')"],

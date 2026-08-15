@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from platform_workers.rq_harness import WorkerConfig
+from platform_workers.rq_harness import WorkerConfig, run_rq_worker
 
 
 class WorkerRunnerProtocol(Protocol):
@@ -19,13 +19,13 @@ class WorkerRunnerProtocol(Protocol):
         ...
 
 
-# Module-level injectable runner for testing.
-# Tests set this BEFORE running worker_entry as __main__.
-# Because this is a separate module, it persists across runpy.run_module.
-test_runner: WorkerRunnerProtocol | None = None
+# Hook for the worker runner, bound to the real RQ runner. Tests rebind
+# it BEFORE running worker_entry as __main__; because this is a separate
+# module, the binding persists across runpy.run_module.
+worker_runner: WorkerRunnerProtocol = run_rq_worker
 
 
 __all__ = [
     "WorkerRunnerProtocol",
-    "test_runner",
+    "worker_runner",
 ]
