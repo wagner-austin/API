@@ -12,7 +12,8 @@ from typing import Generic, Protocol, TypeVar
 import discord
 import pytest
 from platform_discord.protocols import InteractionProto, UserProto, _DiscordInteraction
-from tests.support.discord_fakes import FakeAttachment, FakeBot, RecordingInteraction
+from tests.support.discord_fakes import FakeAttachment, FakeBot
+from tests.support.discord_recorders import RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot import _test_hooks

@@ -9,7 +9,7 @@ from platform_core.job_events import (
 )
 
 from clubbot.services.jobs.turkic_notifier import TurkicEventSubscriber
-from tests.support.discord_fakes import TrackingBot, TrackingUser
+from tests.support.discord_recorders import TrackingBot, TrackingUser
 
 
 @pytest.mark.asyncio

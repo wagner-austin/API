@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 
 import pytest
-from tests.support.discord_fakes import FakeBot, FakeDigitService
+from tests.support.digits_fakes import FakeDigitService
+from tests.support.discord_fakes import FakeBot
 from tests.support.settings import build_settings
 
 from clubbot.cogs.digits import DigitsCog

@@ -4,11 +4,8 @@ import logging
 
 import pytest
 from platform_discord.protocols import BotProto
-from tests.support.discord_fakes import (
-    FakeBot,
-    RecordedSend,
-    RecordingInteraction,
-)
+from tests.support.discord_fakes import FakeBot
+from tests.support.discord_recorders import RecordedSend, RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot.cogs.invite import InviteCog, _resolve_app_id

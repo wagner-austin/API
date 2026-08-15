@@ -266,7 +266,7 @@ def test_default_create_service_container_from_env() -> None:
 
 def test_default_wrap_interaction_wraps_discord_interaction() -> None:
     """Test _default_wrap_interaction wraps a discord.Interaction."""
-    from tests.support.discord_fakes import RecordingInteraction
+    from tests.support.discord_recorders import RecordingInteraction
 
     fake_inter = RecordingInteraction()
     result = _test_hooks._default_wrap_interaction(fake_inter)

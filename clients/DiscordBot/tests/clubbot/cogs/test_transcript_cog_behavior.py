@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 
 import pytest
-from tests.support.discord_fakes import FakeBot, RecordingInteraction
+from tests.support.discord_fakes import FakeBot
+from tests.support.discord_recorders import RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot.cogs.transcript import TranscriptCog

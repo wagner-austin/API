@@ -4,7 +4,8 @@ import logging
 
 import pytest
 from platform_core.errors import AppError, ErrorCode
-from tests.support.discord_fakes import FakeBot, RecordedSend, RecordingInteraction
+from tests.support.discord_fakes import FakeBot
+from tests.support.discord_recorders import RecordedSend, RecordingInteraction
 from tests.support.settings import SettingsFactory
 
 from clubbot.cogs.qr import QRCog

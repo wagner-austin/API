@@ -5,10 +5,10 @@ import logging
 import pytest
 from platform_core.errors import AppError
 from platform_discord.protocols import InteractionProto
+from tests.support.digits_fakes import FakeDigitService
 from tests.support.discord_fakes import (
     FakeAttachment,
     FakeBot,
-    FakeDigitService,
     FakeFollowup,
     FakeResponse,
     FakeUser,

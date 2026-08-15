@@ -1,16 +1,16 @@
-"""
-Protocol-compliant fake implementations for Discord testing.
+"""Protocol-compliant fake implementations for Discord testing.
 
 These fakes implement the protocols defined in platform_discord.protocols
-without importing discord.py directly, avoiding Any types.
+without importing discord.py directly, avoiding Any types. They answer calls
+and hold no assertions; the doubles that record what was sent to them are in
+tests.support.discord_recorders.
 """
 
 from __future__ import annotations
 
-from typing import Literal, NoReturn, Protocol, TypedDict
+from typing import NoReturn
 
 import discord
-from platform_core.errors import AppError, ErrorCode
 from platform_discord.embed_helpers import EmbedData, EmbedFieldData, EmbedProto
 from platform_discord.protocols import (
     FileProto,
@@ -19,9 +19,6 @@ from platform_discord.protocols import (
     ResponseProto,
     UserProto,
 )
-
-from clubbot.services.digits.app import DigitService
-from clubbot.services.handai.client import PredictResult
 
 
 class FakeEmbed:
@@ -226,6 +223,24 @@ class FakeFollowupRaises:
         raise RuntimeError("followup.send failed")
 
 
+class RaisingFollowup:
+    """Followup that raises a provided exception type on send."""
+
+    def __init__(self, exc_type: type[BaseException]) -> None:
+        self._exc_type = exc_type
+
+    async def send(
+        self,
+        content: str | None = None,
+        *,
+        embed: EmbedProto | None = None,
+        file: FileProto | None = None,
+        ephemeral: bool = False,
+    ) -> MessageProto:
+        _ = (content, embed, file, ephemeral)
+        raise self._exc_type()
+
+
 class FakeInteraction:
     """Protocol-compliant fake implementing InteractionProto.
 
@@ -277,207 +292,6 @@ class FakeBotRaises:
         raise RuntimeError("fetch_user failed")
 
 
-class FakeLogger(Protocol):
-    """Protocol for logger used in tests."""
-
-    def debug(self, msg: str, *args: str, extra: dict[str, str] | None = None) -> None: ...
-    def info(self, msg: str, *args: str, extra: dict[str, str] | None = None) -> None: ...
-    def warning(self, msg: str, *args: str, extra: dict[str, str] | None = None) -> None: ...
-    def exception(self, msg: str, *args: str, extra: dict[str, str] | None = None) -> None: ...
-
-
-class RecordedSend(TypedDict):
-    """Record of a message sent via response or followup."""
-
-    where: Literal["response", "followup"]
-    content: str | None
-    embed: EmbedProto | None
-    file: FileProto | None
-    ephemeral: bool
-
-
-class RecordingResponse:
-    """Response that records sends for assertions."""
-
-    def __init__(self, sent: list[RecordedSend], *, done: bool = False) -> None:
-        self._done = done
-        self._sent = sent
-
-    def is_done(self) -> bool:
-        return self._done
-
-    async def send_message(
-        self,
-        content: str | None = None,
-        *,
-        embed: EmbedProto | None = None,
-        ephemeral: bool = False,
-    ) -> None:
-        self._done = True
-        self._sent.append(
-            {
-                "where": "response",
-                "content": content,
-                "embed": embed,
-                "file": None,
-                "ephemeral": ephemeral,
-            }
-        )
-
-    async def defer(self, *, ephemeral: bool = False) -> None:
-        self._done = True
-        self._sent.append(
-            {
-                "where": "response",
-                "content": None,
-                "embed": None,
-                "file": None,
-                "ephemeral": ephemeral,
-            }
-        )
-
-
-class RecordingFollowup:
-    """Followup that records sends for assertions."""
-
-    def __init__(self, sent: list[RecordedSend]) -> None:
-        self._sent = sent
-
-    async def send(
-        self,
-        content: str | None = None,
-        *,
-        embed: EmbedProto | None = None,
-        file: FileProto | None = None,
-        ephemeral: bool = False,
-    ) -> MessageProto:
-        self._sent.append(
-            {
-                "where": "followup",
-                "content": content,
-                "embed": embed,
-                "file": file,
-                "ephemeral": ephemeral,
-            }
-        )
-        return FakeMessage()
-
-
-class RecordingInteraction:
-    """Interaction that records all response/followup sends."""
-
-    def __init__(
-        self,
-        *,
-        user: UserProto | None = None,
-        response_done: bool = False,
-    ) -> None:
-        usr: UserProto = user if user is not None else FakeUser()
-        self._user = usr
-        self.sent: list[RecordedSend] = []
-        self.response = RecordingResponse(self.sent, done=response_done)
-        self.followup = RecordingFollowup(self.sent)
-
-    @property
-    def user(self) -> UserProto:
-        return self._user
-
-
-class RaisingFollowup:
-    """Followup that raises a provided exception type on send."""
-
-    def __init__(self, exc_type: type[BaseException]) -> None:
-        self._exc_type = exc_type
-
-    async def send(
-        self,
-        content: str | None = None,
-        *,
-        embed: EmbedProto | None = None,
-        file: FileProto | None = None,
-        ephemeral: bool = False,
-    ) -> MessageProto:
-        _ = (content, embed, file, ephemeral)
-        raise self._exc_type()
-
-
-class FakeMessageSource:
-    """Fake message source that completes immediately for lifecycle tests."""
-
-    __slots__ = ("_index", "_messages", "closed")
-
-    def __init__(self, *, messages: list[str] | None = None) -> None:
-        self.closed = False
-        self._messages: list[str] = messages if messages is not None else []
-        self._index = 0
-
-    async def subscribe(self, channel: str) -> None:
-        _ = channel
-
-    async def get(self) -> str | None:
-        if self._index >= len(self._messages):
-            return None
-        msg = self._messages[self._index]
-        self._index += 1
-        return msg
-
-    async def close(self) -> None:
-        self.closed = True
-
-
-class TrackingMessage:
-    """Message that records embed edits into its parent TrackingUser."""
-
-    def __init__(self, owner: TrackingUser) -> None:
-        self._owner = owner
-
-    @property
-    def id(self) -> int:
-        return 12345
-
-    async def edit(
-        self, *, content: str | None = None, embed: EmbedProto | None = None
-    ) -> MessageProto:
-        _ = content
-        if embed is not None:
-            self._owner.embeds.append(embed)
-        return self
-
-
-class TrackingUser:
-    """User that records sent and edited embeds in a list."""
-
-    def __init__(self, *, user_id: int = 67890) -> None:
-        self._id = user_id
-        self.embeds: list[EmbedProto | None] = []
-
-    @property
-    def id(self) -> int:
-        return self._id
-
-    async def send(
-        self,
-        content: str | None = None,
-        *,
-        embed: EmbedProto | None = None,
-        file: FileProto | None = None,
-    ) -> MessageProto:
-        _ = (content, file)
-        self.embeds.append(embed)
-        return TrackingMessage(self)
-
-
-class TrackingBot:
-    """Bot that returns a provided TrackingUser from fetch_user."""
-
-    def __init__(self, user: TrackingUser) -> None:
-        self._user = user
-
-    async def fetch_user(self, user_id: int, /) -> UserProto:
-        _ = user_id
-        return self._user
-
-
 class NoIdUser:
     """User-like object with missing id attribute (id -> None)."""
 
@@ -494,24 +308,6 @@ class NoIdUser:
     ) -> MessageProto:
         _ = (content, embed, file)
         return FakeMessage()
-
-
-class NoIdUserInteraction:
-    """Interaction with a NoIdUser for testing user.id=None error paths.
-
-    This is a separate class because NoIdUser.id returns int|None which doesn't
-    match UserProto.id -> int, so we can't use RecordingInteraction.
-    """
-
-    def __init__(self, *, response_done: bool = False) -> None:
-        self._user = NoIdUser()
-        self.sent: list[RecordedSend] = []
-        self.response = RecordingResponse(self.sent, done=response_done)
-        self.followup = RecordingFollowup(self.sent)
-
-    @property
-    def user(self) -> NoIdUser:
-        return self._user
 
 
 class StrAppIdBot:
@@ -548,110 +344,25 @@ class FakeAttachment(discord.Attachment):
         return self._data
 
 
-class FakeDigitService(DigitService):
-    """DigitService fake returning a predictable prediction."""
+class FakeMessageSource:
+    """Fake message source that completes immediately for lifecycle tests."""
 
-    def __init__(self, max_mb: int = 2) -> None:
-        self._max_image_mb = max_mb
+    __slots__ = ("_index", "_messages", "closed")
 
-    @property
-    def max_image_bytes(self) -> int:
-        return self._max_image_mb * 1024 * 1024
+    def __init__(self, *, messages: list[str] | None = None) -> None:
+        self.closed = False
+        self._messages: list[str] = messages if messages is not None else []
+        self._index = 0
 
-    async def read_image(
-        self, *, data: bytes, filename: str, content_type: str, request_id: str
-    ) -> PredictResult:
-        _ = (data, filename, content_type, request_id)
-        return PredictResult(
-            digit=3,
-            confidence=0.9,
-            probs=(0.9, 0.05, 0.05),
-            model_id="m",
-            uncertain=False,
-            latency_ms=10,
-        )
+    async def subscribe(self, channel: str) -> None:
+        _ = channel
 
+    async def get(self) -> str | None:
+        if self._index >= len(self._messages):
+            return None
+        msg = self._messages[self._index]
+        self._index += 1
+        return msg
 
-class RejectingDigitService(FakeDigitService):
-    """DigitService fake that raises a specific exception."""
-
-    def __init__(self, error: Exception) -> None:
-        super().__init__()
-        self._error = error
-
-    async def read_image(
-        self, *, data: bytes, filename: str, content_type: str, request_id: str
-    ) -> PredictResult:
-        _ = (data, filename, content_type, request_id)
-        raise self._error
-
-
-class TooLargeError(AppError[ErrorCode]):
-    def __init__(self) -> None:
-        super().__init__(ErrorCode.INVALID_INPUT, "Image is too large", http_status=400)
-
-
-class RecordingLogger:
-    """Logger that records all calls for test verification."""
-
-    def __init__(self) -> None:
-        self.debug_calls: list[tuple[str, tuple[str, ...], dict[str, str] | None]] = []
-        self.info_calls: list[tuple[str, tuple[str, ...], dict[str, str] | None]] = []
-        self.warning_calls: list[tuple[str, tuple[str, ...], dict[str, str] | None]] = []
-        self.exception_calls: list[tuple[str, tuple[str, ...], dict[str, str] | None]] = []
-        self.extra: dict[str, str] | None = None
-
-    def debug(self, msg: str, *args: str, extra: dict[str, str] | None = None) -> None:
-        self.debug_calls.append((msg, args, extra))
-
-    def info(self, msg: str, *args: str, extra: dict[str, str] | None = None) -> None:
-        self.info_calls.append((msg, args, extra))
-
-    def warning(self, msg: str, *args: str, extra: dict[str, str] | None = None) -> None:
-        self.warning_calls.append((msg, args, extra))
-
-    def exception(self, msg: str, *args: str, extra: dict[str, str] | None = None) -> None:
-        self.exception_calls.append((msg, args, extra))
-
-
-class RecordingLoggerWithExtra(RecordingLogger):
-    """Logger with extra dict for request_id propagation tests."""
-
-    def __init__(self, extra: dict[str, str]) -> None:
-        super().__init__()
-        self.extra = extra
-
-
-__all__ = [
-    "FakeAttachment",
-    "FakeBot",
-    "FakeBotRaises",
-    "FakeDigitService",
-    "FakeEmbed",
-    "FakeFile",
-    "FakeFollowup",
-    "FakeFollowupRaises",
-    "FakeInteraction",
-    "FakeLogger",
-    "FakeMessage",
-    "FakeMessageSource",
-    "FakeResponse",
-    "FakeResponseRaises",
-    "FakeUser",
-    "NoIdUser",
-    "NoIdUserInteraction",
-    "NoneAppIdBot",
-    "RaisingFollowup",
-    "RecordedSend",
-    "RecordingFollowup",
-    "RecordingInteraction",
-    "RecordingLogger",
-    "RecordingLoggerWithExtra",
-    "RecordingResponse",
-    "RejectingDigitService",
-    "StrAppIdBot",
-    "TooLargeError",
-    "TrackingBot",
-    "TrackingMessage",
-    "TrackingUser",
-]
+    async def close(self) -> None:
+        self.closed = True

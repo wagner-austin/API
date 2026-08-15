@@ -4,7 +4,8 @@ import asyncio
 
 import pytest
 from platform_discord.subscriber import MessageSource
-from tests.support.discord_fakes import FakeBot, FakeEmbed, TrackingBot, TrackingUser
+from tests.support.discord_fakes import FakeBot, FakeEmbed
+from tests.support.discord_recorders import TrackingBot, TrackingUser
 
 from clubbot.services.jobs.trainer_notifier import TrainerEventSubscriber
 

@@ -4,7 +4,8 @@ import pytest
 from platform_discord.protocols import (
     InteractionProto,
 )
-from tests.support.discord_fakes import FakeBot, FakeUser, RecordingInteraction
+from tests.support.discord_fakes import FakeBot, FakeUser
+from tests.support.discord_recorders import RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot.cogs.base import _Logger

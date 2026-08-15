@@ -15,7 +15,8 @@ from clubbot._test_hooks import (
 )
 from clubbot.cogs.trainer import TrainerCog
 from clubbot.config import DiscordbotSettings
-from tests.support.discord_fakes import FakeBot, FakeUser, RecordingInteraction
+from tests.support.discord_fakes import FakeBot, FakeUser
+from tests.support.discord_recorders import RecordingInteraction
 from tests.support.settings import build_settings
 
 

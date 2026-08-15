@@ -20,7 +20,7 @@ from platform_discord.embed_helpers import EmbedProto
 from platform_discord.handwriting import DigitsEventV1, DigitsRuntime, RequestAction
 from platform_discord.protocols import FileProto
 from platform_discord.subscriber import MessageSource
-from tests.support.discord_fakes import TrackingBot, TrackingUser
+from tests.support.discord_recorders import TrackingBot, TrackingUser
 
 import clubbot.services.jobs.digits_notifier as dn
 

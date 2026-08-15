@@ -5,7 +5,9 @@ import logging
 import pytest
 from monorepo_guards._types import UnknownJson
 from platform_discord.protocols import InteractionProto
-from tests.support.discord_fakes import FakeBot, FakeDigitService, RecordingInteraction
+from tests.support.digits_fakes import FakeDigitService
+from tests.support.discord_fakes import FakeBot
+from tests.support.discord_recorders import RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot.cogs.digits import DigitsCog
