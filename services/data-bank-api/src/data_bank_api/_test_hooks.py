@@ -10,7 +10,7 @@ from platform_core.config import _optional_env_str
 from platform_core.data_bank_client import DataBankClient
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_workers.redis import RedisStrProto, redis_for_kv
-from platform_workers.rq_harness import WorkerConfig
+from platform_workers.rq_harness import WorkerConfig, run_rq_worker
 
 from data_bank_api.api.config import JobParams
 from data_bank_api.core.corpus_download import ensure_corpus_file as _default_ensure_corpus
@@ -57,10 +57,10 @@ def _default_storage_factory(
     return Storage(root, min_free_gb, max_file_bytes=max_file_bytes)
 
 
-# Module-level injectable runner for testing.
-# Tests set this BEFORE running worker_entry as __main__.
-# Because this is a separate module, it persists across runpy.run_module.
-test_runner: WorkerRunnerProtocol | None = None
+# Hook for the worker runner, bound to the real RQ runner. Tests rebind
+# it BEFORE running worker_entry as __main__; because this is a separate
+# module, the binding persists across runpy.run_module.
+worker_runner: WorkerRunnerProtocol = run_rq_worker
 
 # Hook for environment variable access. Tests can override to provide fake values.
 get_env: Callable[[str], str | None] = _default_get_env

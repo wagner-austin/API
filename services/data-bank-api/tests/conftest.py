@@ -19,7 +19,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_platform_get_env = platform_hooks.get_env
     original_get_env = _test_hooks.get_env
     original_redis_factory = _test_hooks.redis_factory
-    original_test_runner = _test_hooks.test_runner
+    original_worker_runner = _test_hooks.worker_runner
     original_storage_factory = _test_hooks.storage_factory
     original_ensure_corpus = _test_hooks.ensure_corpus_file
     original_local_corpus_factory = _test_hooks.local_corpus_service_factory
@@ -34,7 +34,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     platform_hooks.get_env = original_platform_get_env
     _test_hooks.get_env = original_get_env
     _test_hooks.redis_factory = original_redis_factory
-    _test_hooks.test_runner = original_test_runner
+    _test_hooks.worker_runner = original_worker_runner
     _test_hooks.storage_factory = original_storage_factory
     _test_hooks.ensure_corpus_file = original_ensure_corpus
     _test_hooks.local_corpus_service_factory = original_local_corpus_factory
