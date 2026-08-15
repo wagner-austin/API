@@ -102,7 +102,7 @@ At zero builders the builder now goes **into** the composition rather than behin
 
 This section records three consecutive wrong answers to one question, because the sequence is the useful part. The question was: can an owned extractor upgrade itself?
 
-1. **"No — the engine never offers it."** A probe played the real opening until four extractors were standing, asked what every owned structure offered, and got nothing. Correct observation, wrong conclusion.
+1. **"No — the engine never offers it."** A probe played the real opening until four extractors were standing, asked what every owned structure offered, and got nothing.[^3] Correct observation, wrong conclusion.
 2. **"No — it is gated behind a tech level the bot never has."** `extractorT2` declares `techLevel: 2`, and `ag.java:594` registers a type's build action only into the action lists at or above its tier. That is all true, and it is not why the extractor was silent.
 3. **"No — it needs a tier-2 builder, costing 44,500 credits of experimental prerequisites."** The build tree says `extractorT2` is produced by `combatEngineer`, `mechEngineer` or `extractorT1`; the first two are unreachable, so the chain looked like builder → `experimentalLandFactory` (11,000) → `experimentalDropship` (30,000) → `combatEngineer` (3,500). Also true, also not the answer.
 

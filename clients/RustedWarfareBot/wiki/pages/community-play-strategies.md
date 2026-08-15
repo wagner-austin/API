@@ -178,7 +178,7 @@ dip 2,450). Every arm still loses; what moved and what did not:[^8]
   survival of the batch**, dip 2,800. Cheap AOE beats expensive AOE on
   both axes.
 - **Reflex pair at Impossible** (kite + flee-hurt): wiped 2,983, dip
-  2,250. Buys survival time, zero lethality ([[policy-situation]]).
+  2,250. Buys survival time, zero lethality ([[policy-exact-timing]]).
 - **The shared death**: every arm ends `income 0/s, extractors 0` — the
   AI kills the extractors and the bot dies broke, identically, regardless
   of composition.
@@ -237,7 +237,7 @@ dip 2,450). Every arm still loses; what moved and what did not:[^8]
   deeper story: 6,200 / 7,050 / 6,550 where the unfunded champion swung
   2,050-9,100 — the fortification line kills 6-7k of their army
   *reliably*, which is the precondition the momentum strike window was
-  shelved for ("no wave dies on our line" — [[policy-situation]]). The
+  shelved for ("no wave dies on our line" — [[policy-exact-timing]]). The
   strike arm on top of this line is the next measurement.[^9]
 - **Strike on the wall — NOT refuted; the run measured something else**
   (flame-strike, strike 5000, seed 12345): wiped 2,253, dip 2,050,
@@ -256,7 +256,7 @@ dip 2,450). Every arm still loses; what moved and what did not:[^8]
   claims (dips clustering 6-7k across varied conditions) are the robust
   ones. Strike itself remains unmeasured on the champion; it also needs
   ``rush 1`` to convert a release into a march — released units without
-  visible targets stand still ([[policy-situation]], [[policy-combat]]).
+  visible targets stand still ([[policy-exact-timing]], [[policy-combat]]).
 - **The walking wall, refuted on the champion** (flame-creep, creep 50,
   seed 12345): wiped 2,769, dip 3,500 against the champion's 3,938 /
   6,200. Eleven thousand credits of advancing turrets and repair bays

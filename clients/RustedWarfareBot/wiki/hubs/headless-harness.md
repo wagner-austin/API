@@ -15,5 +15,6 @@ Run artifacts are archived under `runs/` and are the primary sources this wiki c
 [The Exact-Timing Regime — the Ladder Re-Founded](../pages/policy-exact-timing.md) -- the certified seed-pure simulation, the un-handicapped AI it revealed, the boot-sandbox compile trap, and the honest ladder every new rate is measured against
 
 [The Match Service: Engine Slots Become a Queue](../pages/harness-match-service.md) -- the Postgres queue, leased clones and ports, the HTTP door, the results mirror, and the dashboard; how a panel became one submission
+[Run Lifecycle: Why Ad-Hoc Jobs Stopped Being Enough](../pages/harness-run-lifecycle.md) -- the failure modes of detached shell jobs at concurrency, and the requirements that produced the match service
 
 [The Doctrine Search: Screening With a Confirmatory Backstop](../pages/harness-doctrine-search.md) -- the dense margin, successive halving over knob combinations, what the method is and is not, and the corners it cuts, named

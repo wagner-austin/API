@@ -21,8 +21,9 @@ The repair bay's class is `units/d/r`. Three readings pin its behaviour:[^1]
 Eligibility is `a(am) = !am2.q()` — broad, with the one exclusion behind
 `q()` not yet named from this read.[^1]
 
-Consequences for policy, already in code: the creep wall lays a bay every
-third structure ([[policy-creep]]), the hospital arm stands one at the base
+Consequences for policy, already in code: the creep verb lays a bay every
+third structure (`rw_bot/policy/creep.py`, retained behind `creep 0` --
+log 2026-08-09), the hospital arm stands one at the base
 the flee reflex runs toward, and both work by proximity alone.
 
 ## The combat engineer — offer verified, auto-heal inferred
