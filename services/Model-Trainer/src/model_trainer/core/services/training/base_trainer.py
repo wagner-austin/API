@@ -34,7 +34,7 @@ from model_trainer.core.contracts.model import (
     TrainOutcome,
     ValidationMetrics,
 )
-from model_trainer.core.services.model.backends.gpt2._dl import DataLoader
+from model_trainer.core.services.training.dataloader import DataLoader
 from model_trainer.core.services.training.dataset_builder import CausalLMDataset
 from model_trainer.core.types import (
     LMModelProto,

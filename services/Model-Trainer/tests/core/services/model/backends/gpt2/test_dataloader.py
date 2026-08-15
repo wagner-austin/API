@@ -4,7 +4,7 @@ from collections.abc import Generator
 
 import torch
 
-from model_trainer.core.services.model.backends.gpt2._dl import DataLoader
+from model_trainer.core.services.training.dataloader import DataLoader
 
 
 class _Ds:

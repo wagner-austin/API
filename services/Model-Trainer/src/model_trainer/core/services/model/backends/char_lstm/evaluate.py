@@ -14,9 +14,9 @@ from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.infra.paths import model_dir as _model_dir
 from model_trainer.core.infra.paths import model_eval_dir
+from model_trainer.core.services.training.dataloader import DataLoader
 from model_trainer.core.services.training.dataset_builder import CausalLMDataset
 
-from ..gpt2._dl import DataLoader
 from .io import load_prepared_char_lstm_from_handle as _load_prepared_from_handle
 from .io import token_ids
 

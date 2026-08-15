@@ -1,3 +1,21 @@
+"""Strictly-typed adapter over ``torch.utils.data.DataLoader``.
+
+This lives in the training package rather than inside a model backend because
+nothing about it is backend-specific, and three consumers outside the gpt2
+backend already depended on it: ``base_trainer``, ``char_lstm/evaluate`` and
+``gpt2/evaluate``.
+
+Its previous home in ``backends/gpt2/_dl.py`` also closed an import cycle.
+``base_trainer`` imported it, which initialised ``backends/gpt2/__init__``,
+which imported ``backends/gpt2/train``, which imported ``base_trainer`` while
+that module was still executing. The cycle only surfaced when ``base_trainer``
+was reached first, which is what the hf_lm backend does through its deferred
+``_default_create_trainer`` import: every hf_lm training run died with
+``ImportError: cannot import name 'BaseTrainer' from partially initialized
+module``. Test import order initialises the gpt2 package first, so the suite
+never reproduced it.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Generator

@@ -13,9 +13,9 @@ from model_trainer.core.contracts.dataset import DatasetBuilder, DatasetConfig
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.infra.paths import model_dir as _model_dir
 from model_trainer.core.infra.paths import model_eval_dir
+from model_trainer.core.services.training.dataloader import DataLoader
 from model_trainer.core.services.training.dataset_builder import CausalLMDataset
 
-from ._dl import DataLoader
 from .hf_gpt2 import load_gpt2_model
 from .io import load_encoder_for_dataset as load_tokenizer_for_dataset
 from .io import token_ids

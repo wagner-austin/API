@@ -15,8 +15,8 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel
 from model_trainer.core.encoding import Encoder, ListEncoded
 from model_trainer.core.services.model.backends.char_lstm.train import train_prepared_char_lstm
-from model_trainer.core.services.model.backends.gpt2._dl import DataLoader
 from model_trainer.core.services.training import base_trainer as bt
+from model_trainer.core.services.training.dataloader import DataLoader
 from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
