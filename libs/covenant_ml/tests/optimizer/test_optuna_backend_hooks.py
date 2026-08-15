@@ -1,18 +1,16 @@
-"""Tests for Optuna module hook management.
+"""Tests for the optuna factories hook.
 
-Tests set_optuna_module_hook, use_real_optuna, and hook error handling.
+Covers the binding the module ships with and a rebinding to fakes.
 """
 
 from __future__ import annotations
 
 import numpy as np
-import pytest
 from numpy.typing import NDArray
 
+from covenant_ml.optimizer.optuna_backend import _hooks as _backend_hooks
 from covenant_ml.optimizer.optuna_backend import (
     create_xgboost_optimizer,
-    set_optuna_module_hook,
-    use_real_optuna,
 )
 from covenant_ml.optimizer.search_spaces import make_xgboost_default_space
 from covenant_ml.optimizer.types import (
@@ -22,8 +20,6 @@ from covenant_ml.optimizer.types import (
 )
 
 from .conftest import (
-    FakeObjective,
-    get_fake_optuna_factories,
     make_optuna_config,
     make_optuna_test_data,
 )
@@ -33,43 +29,9 @@ from .conftest import (
 # =============================================================================
 
 
-def test_set_optuna_module_hook_can_be_cleared() -> None:
-    """Hook can be set to None to clear it."""
-    set_optuna_module_hook(get_fake_optuna_factories)
-    set_optuna_module_hook(None)
-    optimizer = create_xgboost_optimizer()
-    x, y, names = make_optuna_test_data(n_samples=20)
-    with pytest.raises(RuntimeError, match="hook not set"):
-        optimizer.optimize(
-            x_features=x,
-            y_labels=y,
-            feature_names=names,
-            search_space=make_xgboost_default_space(),
-            config=make_optuna_config(n_trials=1),
-            objective=FakeObjective(),
-        )
-
-
-def test_optimizer_raises_when_hook_not_set() -> None:
-    """Optimizer raises RuntimeError when hook is not set."""
-    set_optuna_module_hook(None)
-    optimizer = create_xgboost_optimizer()
-    x, y, names = make_optuna_test_data(n_samples=20)
-    with pytest.raises(RuntimeError, match="hook not set"):
-        optimizer.optimize(
-            x_features=x,
-            y_labels=y,
-            feature_names=names,
-            search_space=make_xgboost_default_space(),
-            config=make_optuna_config(n_trials=1),
-            objective=FakeObjective(),
-        )
-
-
-def test_use_real_optuna_sets_hook() -> None:
-    """use_real_optuna() sets the hook to use real Optuna."""
-    set_optuna_module_hook(None)
-    use_real_optuna()
+def test_the_hook_is_bound_to_real_optuna() -> None:
+    """The module binds real optuna, so an optimizer runs with nothing wired."""
+    assert _backend_hooks.optuna_factories is _backend_hooks._real_optuna_factories
 
     def simple_objective(
         x_features: NDArray[np.float64],
@@ -101,4 +63,4 @@ def test_use_real_optuna_sets_hook() -> None:
         assert summary["n_trials_complete"] == 1
         assert summary["best_value"] == 0.75
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories

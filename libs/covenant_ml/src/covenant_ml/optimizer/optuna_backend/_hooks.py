@@ -1,13 +1,16 @@
-"""Optuna module hook mechanism for dependency injection.
+"""The optuna factories the backend optimizers build their study from.
 
 Strict typing only: no Any, no casts, no stubs.
-Production code sets the hook to real Optuna at startup.
-Tests can set a fake implementation.
+
+The hook is bound to the real optuna import, so a caller reaches optuna
+without wiring anything first. Tests rebind ``optuna_factories`` and restore
+it afterwards; read it through the module rather than importing the name, so
+the rebinding is visible at the call site.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import Protocol
 
 from ._protocols import (
     OptunaCreateStudyProtocol,
@@ -16,63 +19,23 @@ from ._protocols import (
     OptunaTPESamplerProtocol,
 )
 
-_optuna_module_hook: (
-    Callable[
-        [],
-        tuple[
-            OptunaCreateStudyProtocol,
-            OptunaTPESamplerProtocol,
-            OptunaMedianPrunerProtocol,
-        ],
-    ]
-    | None
-) = None
 
+class OptunaFactoriesProtocol(Protocol):
+    """Protocol for the optuna factory provider."""
 
-def set_optuna_module_hook(
-    hook: Callable[
-        [],
-        tuple[
-            OptunaCreateStudyProtocol,
-            OptunaTPESamplerProtocol,
-            OptunaMedianPrunerProtocol,
-        ],
-    ]
-    | None,
-) -> None:
-    """Set hook for Optuna module access.
+    def __call__(
+        self,
+    ) -> tuple[
+        OptunaCreateStudyProtocol,
+        OptunaTPESamplerProtocol,
+        OptunaMedianPrunerProtocol,
+    ]:
+        """Provide the optuna entry points an optimizer needs.
 
-    Production code sets this to real Optuna at startup.
-    Tests can set a fake implementation.
-
-    Args:
-        hook: Callable returning (create_study, TPESampler, MedianPruner)
-    """
-    global _optuna_module_hook
-    _optuna_module_hook = hook
-
-
-def get_optuna_factories() -> tuple[
-    OptunaCreateStudyProtocol,
-    OptunaTPESamplerProtocol,
-    OptunaMedianPrunerProtocol,
-]:
-    """Get Optuna factories via hook.
-
-    The hook MUST be set before calling this function.
-
-    Returns:
-        Tuple of (create_study, TPESampler, MedianPruner) factories.
-
-    Raises:
-        RuntimeError: If hook is not set.
-    """
-    if _optuna_module_hook is None:
-        raise RuntimeError(
-            "Optuna module hook not set. "
-            "Call set_optuna_module_hook() or use_real_optuna() before optimization."
-        )
-    return _optuna_module_hook()
+        Returns:
+            Tuple of (create_study, TPESampler, MedianPruner) factories.
+        """
+        ...
 
 
 def _real_optuna_factories() -> tuple[
@@ -99,16 +62,10 @@ def _real_optuna_factories() -> tuple[
     return create_study, tpe_sampler, median_pruner
 
 
-def use_real_optuna() -> None:
-    """Set the hook to use real Optuna.
-
-    Call this at application startup before running optimization.
-    """
-    set_optuna_module_hook(_real_optuna_factories)
+optuna_factories: OptunaFactoriesProtocol = _real_optuna_factories
 
 
 __all__ = [
-    "get_optuna_factories",
-    "set_optuna_module_hook",
-    "use_real_optuna",
+    "OptunaFactoriesProtocol",
+    "optuna_factories",
 ]

@@ -69,10 +69,6 @@ def main(
         logger: Logger instance. If None, uses default logger after setup.
         runner: Worker runner function. If None, uses the worker_runner hook.
     """
-    from covenant_ml.optimizer import use_real_optimizer
-
-    use_real_optimizer()
-
     setup_logging(
         level="INFO",
         format_mode="json",

@@ -7,8 +7,6 @@ Wraps Optuna's TPE (Tree-structured Parzen Estimator) for Bayesian optimization.
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
-from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -46,6 +44,16 @@ from ..types import (
     TrialResult,
     XGBoostSearchSpace,
 )
+from . import _hooks
+from ._hooks import (
+    OptunaCreateStudyProtocol,
+    OptunaMedianPrunerProtocol,
+    OptunaPrunerProtocol,
+    OptunaSamplerProtocol,
+    OptunaStudyProtocol,
+    OptunaTPESamplerProtocol,
+    OptunaTrialProtocol,
+)
 
 _log = get_logger(__name__)
 
@@ -53,195 +61,6 @@ _log = get_logger(__name__)
 # =============================================================================
 # Optuna Protocol Definitions (minimal for module hook)
 # =============================================================================
-
-
-class OptunaSamplerProtocol(Protocol):
-    """Protocol for Optuna sampler."""
-
-    ...
-
-
-class OptunaTrialProtocol(Protocol):
-    """Protocol for Optuna trial object."""
-
-    @property
-    def number(self) -> int: ...
-
-    def suggest_int(
-        self,
-        name: str,
-        low: int,
-        high: int,
-        *,
-        log: bool = False,
-    ) -> int: ...
-
-    def suggest_float(
-        self,
-        name: str,
-        low: float,
-        high: float,
-        *,
-        log: bool = False,
-    ) -> float: ...
-
-    def suggest_categorical(
-        self,
-        name: str,
-        choices: tuple[float, ...] | tuple[int, ...] | tuple[str, ...],
-    ) -> float | int | str: ...
-
-
-class OptunaPrunerProtocol(Protocol):
-    """Protocol for Optuna pruner."""
-
-    ...
-
-
-class OptunaStudyProtocol(Protocol):
-    """Protocol for Optuna study object."""
-
-    @property
-    def best_trial(self) -> OptunaTrialProtocol: ...
-
-    @property
-    def best_value(self) -> float: ...
-
-    @property
-    def best_params(self) -> dict[str, float | int | str]: ...
-
-    def optimize(
-        self,
-        func: Callable[[OptunaTrialProtocol], float],
-        n_trials: int,
-        timeout: float | None = None,
-        callbacks: list[Callable[[OptunaStudyProtocol, OptunaTrialProtocol], None]] | None = None,
-    ) -> None: ...
-
-
-class OptunaCreateStudyProtocol(Protocol):
-    """Protocol for optuna.create_study function."""
-
-    def __call__(
-        self,
-        *,
-        direction: str,
-        sampler: OptunaSamplerProtocol,
-        pruner: OptunaPrunerProtocol | None = None,
-    ) -> OptunaStudyProtocol: ...
-
-
-class OptunaTPESamplerProtocol(Protocol):
-    """Protocol for TPESampler constructor."""
-
-    def __call__(
-        self,
-        *,
-        seed: int,
-        n_startup_trials: int,
-    ) -> OptunaSamplerProtocol: ...
-
-
-class OptunaMedianPrunerProtocol(Protocol):
-    """Protocol for MedianPruner constructor."""
-
-    def __call__(
-        self,
-        *,
-        n_startup_trials: int,
-        n_warmup_steps: int,
-    ) -> OptunaPrunerProtocol: ...
-
-
-# =============================================================================
-# Module Hook for Optuna
-# =============================================================================
-
-_optuna_hook: (
-    Callable[
-        [],
-        tuple[
-            OptunaCreateStudyProtocol,
-            OptunaTPESamplerProtocol,
-            OptunaMedianPrunerProtocol,
-        ],
-    ]
-    | None
-) = None
-
-
-def set_optuna_tpe_hook(
-    hook: Callable[
-        [],
-        tuple[
-            OptunaCreateStudyProtocol,
-            OptunaTPESamplerProtocol,
-            OptunaMedianPrunerProtocol,
-        ],
-    ]
-    | None,
-) -> None:
-    """Set hook for Optuna module access.
-
-    Production code sets this to real Optuna at startup.
-    Tests can set a fake implementation.
-
-    Args:
-        hook: Callable returning (create_study, TPESampler, MedianPruner).
-    """
-    global _optuna_hook
-    _optuna_hook = hook
-
-
-def _get_optuna_factories() -> tuple[
-    OptunaCreateStudyProtocol,
-    OptunaTPESamplerProtocol,
-    OptunaMedianPrunerProtocol,
-]:
-    """Get Optuna factories via hook.
-
-    Returns:
-        Tuple of (create_study, TPESampler, MedianPruner) factories.
-
-    Raises:
-        RuntimeError: If hook is not set.
-    """
-    if _optuna_hook is None:
-        raise RuntimeError(
-            "Optuna TPE hook not set. "
-            "Call set_optuna_tpe_hook() or use_real_optuna_tpe() before optimization."
-        )
-    return _optuna_hook()
-
-
-def _real_optuna_factories() -> tuple[
-    OptunaCreateStudyProtocol,
-    OptunaTPESamplerProtocol,
-    OptunaMedianPrunerProtocol,
-]:
-    """Get real Optuna factories via dynamic import.
-
-    Returns:
-        Tuple of (create_study, TPESampler, MedianPruner) factories.
-    """
-    optuna_mod = __import__("optuna")
-    create_study: OptunaCreateStudyProtocol = optuna_mod.create_study
-
-    samplers_submod = __import__("optuna.samplers", fromlist=["TPESampler"])
-    tpe_sampler: OptunaTPESamplerProtocol = samplers_submod.TPESampler
-
-    pruners_submod = __import__("optuna.pruners", fromlist=["MedianPruner"])
-    median_pruner: OptunaMedianPrunerProtocol = pruners_submod.MedianPruner
-
-    return create_study, tpe_sampler, median_pruner
-
-
-def use_real_optuna_tpe() -> None:
-    """Set the hook to use real Optuna.
-
-    Call this at application startup before running optimization.
-    """
-    set_optuna_tpe_hook(_real_optuna_factories)
 
 
 # =============================================================================
@@ -729,7 +548,7 @@ class OptunaTpeOptimizer:
         Returns:
             Summary with best hyperparameters and trial statistics.
         """
-        create_study, tpe_sampler, median_pruner = _get_optuna_factories()
+        create_study, tpe_sampler, median_pruner = _hooks.optuna_factories()
 
         self._trials_complete = 0
         self._trials_pruned = 0
@@ -858,8 +677,13 @@ def create_optuna_tpe_optimizer() -> OptunaTpeOptimizer:
 
 
 __all__ = [
+    "OptunaCreateStudyProtocol",
+    "OptunaMedianPrunerProtocol",
+    "OptunaPrunerProtocol",
+    "OptunaSamplerProtocol",
+    "OptunaStudyProtocol",
+    "OptunaTPESamplerProtocol",
     "OptunaTpeOptimizer",
+    "OptunaTrialProtocol",
     "create_optuna_tpe_optimizer",
-    "set_optuna_tpe_hook",
-    "use_real_optuna_tpe",
 ]

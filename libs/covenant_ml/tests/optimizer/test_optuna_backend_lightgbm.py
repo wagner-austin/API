@@ -5,9 +5,9 @@ Uses fake Optuna implementation for testing without mocks.
 
 from __future__ import annotations
 
+from covenant_ml.optimizer.optuna_backend import _hooks as _backend_hooks
 from covenant_ml.optimizer.optuna_backend import (
     create_lightgbm_optimizer,
-    set_optuna_module_hook,
 )
 from covenant_ml.optimizer.optuna_backend.lightgbm import (
     _extract_lightgbm_dart_best_params,
@@ -253,7 +253,7 @@ def test_extract_lightgbm_dart_best_params_with_gbdt() -> None:
 
 def test_lightgbm_optimizer_runs_trials() -> None:
     """LightGBM optimizer runs all trials and returns summary."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_lightgbm_optimizer()
         x, y, names = make_optuna_test_data()
@@ -271,12 +271,12 @@ def test_lightgbm_optimizer_runs_trials() -> None:
         assert objective.call_count == 5
         assert "learning_rate" in summary["best_float_params"]
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_lightgbm_optimizer_with_pruning_disabled() -> None:
     """LightGBM optimizer works with pruning disabled."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_lightgbm_optimizer()
         x, y, names = make_optuna_test_data()
@@ -290,12 +290,12 @@ def test_lightgbm_optimizer_with_pruning_disabled() -> None:
         )
         assert summary["n_trials_complete"] == 3
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_lightgbm_optimizer_with_trial_callback() -> None:
     """LightGBM optimizer calls trial_callback for each trial."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         callbacks: list[TrialResult] = []
 
@@ -317,12 +317,12 @@ def test_lightgbm_optimizer_with_trial_callback() -> None:
         for result in callbacks:
             assert result["state"] == "complete"
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_lightgbm_optimizer_with_timeout() -> None:
     """LightGBM optimizer accepts timeout_seconds."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_lightgbm_optimizer()
         x, y, names = make_optuna_test_data()
@@ -336,4 +336,4 @@ def test_lightgbm_optimizer_with_timeout() -> None:
         )
         assert summary["n_trials_complete"] == 3
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories

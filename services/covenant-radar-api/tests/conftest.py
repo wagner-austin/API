@@ -6,7 +6,6 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from covenant_ml.optimizer import use_real_optuna
 from covenant_ml.testing import set_cuda_hook
 from covenant_persistence import ConnectionProtocol
 from covenant_persistence.testing import InMemoryConnection, InMemoryStore
@@ -28,10 +27,6 @@ from covenant_radar_api.integrations.datadog.tracing import reset_tracing_state
 from covenant_radar_api.seeding import _test_hooks as seeding_test_hooks
 from covenant_radar_api.worker import _test_hooks as worker_job_hooks
 from scripts import guard as guard_mod
-
-# Set up real Optuna for all optimization tests.
-# This must be called at module load time so the hook is set before any tests run.
-use_real_optuna()
 
 # =============================================================================
 # Container And Store for Testing

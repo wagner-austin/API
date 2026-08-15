@@ -14,6 +14,7 @@ from collections.abc import Callable
 
 import numpy as np
 
+from covenant_ml.optimizer.strategies import _hooks as _tpe_hooks
 from covenant_ml.optimizer.strategies.optuna_tpe import (
     OptunaCreateStudyProtocol,
     OptunaMedianPrunerProtocol,
@@ -24,7 +25,6 @@ from covenant_ml.optimizer.strategies.optuna_tpe import (
     OptunaTPESamplerProtocol,
     OptunaTrialProtocol,
     create_optuna_tpe_optimizer,
-    set_optuna_tpe_hook,
 )
 from covenant_ml.optimizer.types import OptimizationConfig
 
@@ -230,7 +230,7 @@ class TestOptunaTpeOptimizer:
 
     def test_optimize_with_fake_hook(self) -> None:
         """Optimize runs with fake Optuna hook."""
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -250,11 +250,11 @@ class TestOptunaTpeOptimizer:
             assert summary["n_trials_complete"] == 3
             assert summary["best_value"] > 0
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
     def test_optimize_with_pruning_enabled(self) -> None:
         """Optimize runs with pruning enabled."""
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -283,7 +283,7 @@ class TestOptunaTpeOptimizer:
 
             assert summary["n_trials_complete"] == 3
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 class TestOptunaTpeFactory:
@@ -305,7 +305,7 @@ class TestOptunaTpeWithMLP:
 
     def test_optimize_with_mlp_space(self) -> None:
         """Optimize runs with MLP search space."""
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -324,7 +324,7 @@ class TestOptunaTpeWithMLP:
 
             assert summary["n_trials_complete"] == 3
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 class TestOptunaTpeWithLSTM:
@@ -332,7 +332,7 @@ class TestOptunaTpeWithLSTM:
 
     def test_optimize_with_lstm_space(self) -> None:
         """Optimize runs with LSTM search space."""
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -351,7 +351,7 @@ class TestOptunaTpeWithLSTM:
 
             assert summary["n_trials_complete"] == 3
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 class TestOptunaTpeWithLightGBM:
@@ -359,7 +359,7 @@ class TestOptunaTpeWithLightGBM:
 
     def test_optimize_with_lightgbm_space(self) -> None:
         """Optimize runs with LightGBM search space."""
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -378,7 +378,7 @@ class TestOptunaTpeWithLightGBM:
 
             assert summary["n_trials_complete"] == 3
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 # =============================================================================
@@ -391,7 +391,7 @@ class TestOptunaTpeWithDART:
 
     def test_optimize_with_xgboost_dart(self) -> None:
         """Optimize runs with XGBoost DART search space."""
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -410,11 +410,11 @@ class TestOptunaTpeWithDART:
 
             assert summary["n_trials_complete"] == 3
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
     def test_optimize_with_lightgbm_dart(self) -> None:
         """Optimize runs with LightGBM DART search space."""
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -433,7 +433,7 @@ class TestOptunaTpeWithDART:
 
             assert summary["n_trials_complete"] == 3
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 # =============================================================================
@@ -441,49 +441,14 @@ class TestOptunaTpeWithDART:
 # =============================================================================
 
 
-class TestOptunaTpeHookNotSet:
-    """Tests for OptunaTpeOptimizer when hook is not set."""
+class TestOptunaFactoriesBinding:
+    """Tests for the optuna factories the strategy ships bound to."""
 
-    def test_optimize_raises_when_hook_not_set(self) -> None:
-        """Optimize raises RuntimeError when hook is not set."""
-        import pytest
+    def test_the_hook_is_bound_to_real_optuna(self) -> None:
+        """The strategy binds real optuna, so nothing has to be wired first."""
+        assert _tpe_hooks.optuna_factories is _tpe_hooks._real_optuna_factories
 
-        set_optuna_tpe_hook(None)
-        optimizer = OptunaTpeOptimizer()
-        x = make_features(100, 10)
-        y = make_labels(100)
-        space = make_xgboost_search_space()
-        config = make_optimization_config(n_trials=3)
-
-        with pytest.raises(RuntimeError, match="Optuna TPE hook not set"):
-            optimizer.optimize(
-                x_features=x,
-                y_labels=y,
-                feature_names=[f"f{i}" for i in range(10)],
-                search_space=space,
-                config=config,
-                objective=dummy_objective,
-            )
-
-
-class TestUseRealOptunaTpe:
-    """Tests for use_real_optuna_tpe function."""
-
-    def test_use_real_optuna_tpe_sets_hook(self) -> None:
-        """use_real_optuna_tpe sets the hook to real factories."""
-        from covenant_ml.optimizer.strategies.optuna_tpe import (
-            _get_optuna_factories,
-            use_real_optuna_tpe,
-        )
-
-        # Ensure hook is None first
-        set_optuna_tpe_hook(None)
-
-        # Set real optuna hook
-        use_real_optuna_tpe()
-
-        # Get factories - optuna is installed so this works
-        factories = _get_optuna_factories()
+        factories = _tpe_hooks.optuna_factories()
         assert len(factories) == 3
 
         # Verify each factory is callable
@@ -493,7 +458,7 @@ class TestUseRealOptunaTpe:
         assert callable(median_pruner)
 
         # Reset hook
-        set_optuna_tpe_hook(None)
+        _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 # =============================================================================
@@ -508,7 +473,7 @@ class TestOptunaTpeWithDARTNoParams:
         """Optimize runs with XGBoost DART without rate_drop/skip_drop."""
         from .conftest import make_xgboost_dart_no_params_space, xgboost_dart_no_params_objective
 
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -528,7 +493,7 @@ class TestOptunaTpeWithDARTNoParams:
             assert summary["n_trials_complete"] == 3
             assert summary["best_string_params"].get("booster") == "dart"
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
     def test_optimize_with_lightgbm_dart_no_params(self) -> None:
         """Optimize runs with LightGBM DART without drop_rate/skip_drop."""
@@ -537,7 +502,7 @@ class TestOptunaTpeWithDARTNoParams:
             make_lightgbm_dart_no_params_space,
         )
 
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -557,7 +522,7 @@ class TestOptunaTpeWithDARTNoParams:
             assert summary["n_trials_complete"] == 3
             assert summary["best_string_params"].get("boosting_type") == "dart"
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 # =============================================================================
@@ -572,7 +537,7 @@ class TestOptunaTpeWithCategoricalParams:
         """Optimize runs with categorical int parameters."""
         from .conftest import make_xgboost_categorical_space
 
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -593,13 +558,13 @@ class TestOptunaTpeWithCategoricalParams:
             best_max_depth = summary["best_int_params"].get("max_depth")
             assert best_max_depth in (3, 5, 7)
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
     def test_optimize_with_categorical_float(self) -> None:
         """Optimize runs with categorical float parameters."""
         from .conftest import make_xgboost_categorical_float_space
 
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -620,7 +585,7 @@ class TestOptunaTpeWithCategoricalParams:
             best_lr = summary["best_float_params"].get("learning_rate")
             assert best_lr in (0.01, 0.05, 0.1)
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 # =============================================================================
@@ -635,7 +600,7 @@ class TestOptunaTpeWithTimeout:
         """Optimize runs with timeout configured."""
         from .conftest import make_timeout_config
 
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -655,7 +620,7 @@ class TestOptunaTpeWithTimeout:
             # With fake implementation, all trials complete before timeout
             assert summary["n_trials_complete"] == 5
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 # =============================================================================
@@ -670,7 +635,7 @@ class TestOptunaTpeWithNonDARTBoosters:
         """Optimize runs with XGBoost gbtree booster (non-DART)."""
         from .conftest import make_xgboost_gbtree_space
 
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -693,13 +658,13 @@ class TestOptunaTpeWithNonDARTBoosters:
             assert "rate_drop" not in summary["best_float_params"]
             assert "skip_drop" not in summary["best_float_params"]
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
     def test_optimize_with_lightgbm_gbdt(self) -> None:
         """Optimize runs with LightGBM gbdt boosting (non-DART)."""
         from .conftest import make_lightgbm_gbdt_space
 
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -722,7 +687,7 @@ class TestOptunaTpeWithNonDARTBoosters:
             assert "drop_rate" not in summary["best_float_params"]
             assert "skip_drop" not in summary["best_float_params"]
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories
 
 
 # =============================================================================
@@ -737,7 +702,7 @@ class TestOptunaTpeWithTrialCallback:
         """Trial callback is called for each completed trial."""
         from covenant_ml.optimizer.types import TrialResult
 
-        set_optuna_tpe_hook(_make_fake_optuna_hook())
+        _tpe_hooks.optuna_factories = _make_fake_optuna_hook()
         try:
             optimizer = OptunaTpeOptimizer()
             x = make_features(100, 10)
@@ -765,4 +730,4 @@ class TestOptunaTpeWithTrialCallback:
                 assert result["state"] == "complete"
                 assert result["value"] > 0
         finally:
-            set_optuna_tpe_hook(None)
+            _tpe_hooks.optuna_factories = _tpe_hooks._real_optuna_factories

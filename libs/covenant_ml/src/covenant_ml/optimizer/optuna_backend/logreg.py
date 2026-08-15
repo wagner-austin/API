@@ -21,7 +21,7 @@ from ..types import (
     SampledStringParams,
     TrialResult,
 )
-from ._hooks import get_optuna_factories
+from . import _hooks
 from ._protocols import OptunaPrunerProtocol, OptunaTrialProtocol
 from ._sampling import sample_param_float, sample_param_int, sample_param_str
 
@@ -72,7 +72,7 @@ class OptunaLogRegOptimizer:
         trial_callback: TrialCallbackProtocol | None = None,
     ) -> OptimizationSummary:
         """Run hyperparameter optimization using Optuna TPE."""
-        create_study, tpe_sampler, median_pruner = get_optuna_factories()
+        create_study, tpe_sampler, median_pruner = _hooks.optuna_factories()
 
         self._trials_complete = 0
         self._trials_pruned = 0

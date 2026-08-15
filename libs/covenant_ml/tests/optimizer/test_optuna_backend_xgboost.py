@@ -5,9 +5,9 @@ Uses fake Optuna implementation for testing without mocks.
 
 from __future__ import annotations
 
+from covenant_ml.optimizer.optuna_backend import _hooks as _backend_hooks
 from covenant_ml.optimizer.optuna_backend import (
     create_xgboost_optimizer,
-    set_optuna_module_hook,
 )
 from covenant_ml.optimizer.optuna_backend.xgboost import (
     _extract_xgboost_dart_best_params,
@@ -214,7 +214,7 @@ def test_extract_xgboost_dart_best_params_with_gbtree() -> None:
 
 def test_xgboost_optimizer_runs_trials() -> None:
     """XGBoost optimizer runs all trials and returns summary."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_xgboost_optimizer()
         x, y, names = make_optuna_test_data()
@@ -233,12 +233,12 @@ def test_xgboost_optimizer_runs_trials() -> None:
         assert 0.0 <= summary["best_value"] <= 1.0
         assert "learning_rate" in summary["best_float_params"]
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_xgboost_optimizer_with_callback() -> None:
     """XGBoost optimizer calls trial callback after each trial."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         callbacks: list[TrialResult] = []
 
@@ -261,12 +261,12 @@ def test_xgboost_optimizer_with_callback() -> None:
             assert result["trial_number"] == i
             assert result["state"] == "complete"
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_xgboost_optimizer_with_categorical_space() -> None:
     """XGBoost optimizer works with categorical search space."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_xgboost_optimizer()
         x, y, names = make_optuna_test_data()
@@ -281,12 +281,12 @@ def test_xgboost_optimizer_with_categorical_space() -> None:
         assert summary["n_trials_complete"] == 5
         assert summary["best_int_params"]["max_depth"] in (3, 4, 5, 6, 7, 8)
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_xgboost_optimizer_with_timeout() -> None:
     """XGBoost optimizer accepts timeout parameter."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_xgboost_optimizer()
         x, y, names = make_optuna_test_data()
@@ -300,12 +300,12 @@ def test_xgboost_optimizer_with_timeout() -> None:
         )
         assert summary["n_trials_complete"] == 3
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_xgboost_optimizer_with_pruning_disabled() -> None:
     """XGBoost optimizer works with pruning disabled."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_xgboost_optimizer()
         x, y, names = make_optuna_test_data()
@@ -319,4 +319,4 @@ def test_xgboost_optimizer_with_pruning_disabled() -> None:
         )
         assert summary["n_trials_complete"] == 3
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories

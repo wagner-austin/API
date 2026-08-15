@@ -6,7 +6,6 @@ Each backend has its own module with an optimizer class and factory function.
 Strict typing only: no Any, no casts, no stubs.
 """
 
-from ._hooks import set_optuna_module_hook, use_real_optuna
 from .cleargbm import OptunaClearGBMOptimizer, create_cleargbm_optimizer
 from .lightgbm import OptunaLightGBMOptimizer, create_lightgbm_optimizer
 from .logreg import OptunaLogRegOptimizer, create_logreg_optimizer
@@ -30,6 +29,4 @@ __all__ = [
     "create_mlp_optimizer",
     "create_random_forest_optimizer",
     "create_xgboost_optimizer",
-    "set_optuna_module_hook",
-    "use_real_optuna",
 ]

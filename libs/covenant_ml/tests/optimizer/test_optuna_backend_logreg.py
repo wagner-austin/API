@@ -5,9 +5,9 @@ Uses fake Optuna implementation for testing without mocks.
 
 from __future__ import annotations
 
+from covenant_ml.optimizer.optuna_backend import _hooks as _backend_hooks
 from covenant_ml.optimizer.optuna_backend import (
     create_logreg_optimizer,
-    set_optuna_module_hook,
 )
 from covenant_ml.optimizer.optuna_backend.logreg import _sample_logreg_optional_params
 from covenant_ml.optimizer.search_spaces import (
@@ -82,7 +82,7 @@ def test_sample_logreg_optional_params_partial() -> None:
 
 def test_logreg_optimizer_completes_trials() -> None:
     """LogReg optimizer completes configured number of trials."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_logreg_optimizer()
         x, y, names = make_optuna_test_data()
@@ -96,12 +96,12 @@ def test_logreg_optimizer_completes_trials() -> None:
         )
         assert summary["n_trials_complete"] == 3
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_logreg_optimizer_returns_best_params() -> None:
     """LogReg optimizer returns best parameters in summary."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_logreg_optimizer()
         x, y, names = make_optuna_test_data()
@@ -119,12 +119,12 @@ def test_logreg_optimizer_returns_best_params() -> None:
         assert "penalty" in summary["best_string_params"]
         assert "solver" in summary["best_string_params"]
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_logreg_optimizer_best_value_in_summary() -> None:
     """LogReg optimizer returns best value in summary."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_logreg_optimizer()
         x, y, names = make_optuna_test_data()
@@ -138,12 +138,12 @@ def test_logreg_optimizer_best_value_in_summary() -> None:
         )
         assert 0.5 <= summary["best_value"] <= 1.0
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_logreg_optimizer_records_duration() -> None:
     """LogReg optimizer records total duration."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_logreg_optimizer()
         x, y, names = make_optuna_test_data()
@@ -157,12 +157,12 @@ def test_logreg_optimizer_records_duration() -> None:
         )
         assert summary["total_duration_seconds"] >= 0.0
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_logreg_optimizer_without_pruning() -> None:
     """LogReg optimizer works without pruning."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_logreg_optimizer()
         x, y, names = make_optuna_test_data()
@@ -176,12 +176,12 @@ def test_logreg_optimizer_without_pruning() -> None:
         )
         assert summary["n_trials_complete"] == 3
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_logreg_optimizer_with_trial_callback() -> None:
     """LogReg optimizer calls trial_callback for each trial."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         callbacks: list[TrialResult] = []
 
@@ -203,12 +203,12 @@ def test_logreg_optimizer_with_trial_callback() -> None:
         for result in callbacks:
             assert result["state"] == "complete"
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_logreg_optimizer_with_timeout() -> None:
     """LogReg optimizer accepts timeout_seconds."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_logreg_optimizer()
         x, y, names = make_optuna_test_data()
@@ -222,12 +222,12 @@ def test_logreg_optimizer_with_timeout() -> None:
         )
         assert summary["n_trials_complete"] == 3
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
 
 
 def test_logreg_optimizer_with_focused_space() -> None:
     """LogReg optimizer works with focused space (no optional params)."""
-    set_optuna_module_hook(get_fake_optuna_factories)
+    _backend_hooks.optuna_factories = get_fake_optuna_factories
     try:
         optimizer = create_logreg_optimizer()
         x, y, names = make_optuna_test_data()
@@ -243,4 +243,4 @@ def test_logreg_optimizer_with_focused_space() -> None:
         assert len(summary["best_string_params"]) == 0
         assert "l1_ratio" not in summary["best_float_params"]
     finally:
-        set_optuna_module_hook(None)
+        _backend_hooks.optuna_factories = _backend_hooks._real_optuna_factories
