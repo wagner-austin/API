@@ -23,6 +23,8 @@ from ..schemas.runs import (
     ChatHistoryResponse,
     ChatRequest,
     ChatResponse,
+    ClozeRequest,
+    ClozeResponse,
     EvaluateRequest,
     EvaluateResponse,
     GenerateRequest,
@@ -36,6 +38,7 @@ from ..schemas.runs import (
 )
 from ..validators.runs import (
     _decode_chat_request,
+    _decode_cloze_request,
     _decode_generate_request,
     _decode_score_request,
     _decode_train_request,
@@ -326,6 +329,42 @@ class _RunsRoutes:
         _logger.info("runs cancel", extra=extra5)
         return CancelResponse(status="cancellation-requested")
 
+    async def enqueue_cloze(self: _RunsRoutes, run_id: str, request: Request) -> ClozeResponse:
+        raw_body = await request.body()
+        from platform_core.json_utils import load_json_str
+
+        body = load_json_str(raw_body.decode("utf-8"))
+        req: ClozeRequest = _decode_cloze_request(body)
+        orchestrator = self.c.inference_orchestrator
+        extra: LoggingExtra = {
+            "category": "api",
+            "service": "runs",
+            "run_id": run_id,
+            "event": "runs_enqueue_cloze",
+        }
+        _logger.info("runs enqueue cloze", extra=extra)
+        out = orchestrator.enqueue_cloze(run_id, req)
+        return {
+            "request_id": out["request_id"],
+            "status": out["status"],
+            "total": out["total"],
+            "correct": out["correct"],
+            "accuracy": out["accuracy"],
+            "chance": out["chance"],
+        }
+
+    def get_cloze(self: _RunsRoutes, run_id: str, request_id: str) -> ClozeResponse:
+        orchestrator = self.c.inference_orchestrator
+        out = orchestrator.get_cloze(run_id, request_id)
+        return {
+            "request_id": out["request_id"],
+            "status": out["status"],
+            "total": out["total"],
+            "correct": out["correct"],
+            "accuracy": out["accuracy"],
+            "chance": out["chance"],
+        }
+
     async def enqueue_score(self: _RunsRoutes, run_id: str, request: Request) -> ScoreResponse:
         raw_body = await request.body()
         from platform_core.json_utils import load_json_str
@@ -465,6 +504,8 @@ def build_router(container: ServiceContainer) -> APIRouter:
     router.add_api_route("/{run_id}/logs/stream", h.run_logs_stream, methods=["GET"])
     router.add_api_route("/{run_id}/cancel", h.cancel_run, methods=["POST"])
     # Inference routes
+    router.add_api_route("/{run_id}/cloze", h.enqueue_cloze, methods=["POST"])
+    router.add_api_route("/{run_id}/cloze/{request_id}", h.get_cloze, methods=["GET"])
     router.add_api_route("/{run_id}/score", h.enqueue_score, methods=["POST"])
     router.add_api_route("/{run_id}/score/{request_id}", h.get_score, methods=["GET"])
     router.add_api_route("/{run_id}/generate", h.enqueue_generate, methods=["POST"])

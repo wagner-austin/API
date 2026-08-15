@@ -9,6 +9,7 @@ MSG_KEY_PREFIX: Final[str] = "runs:message:"
 ARTIFACT_FILE_ID_PREFIX: Final[str] = "runs:artifact:"
 CANCEL_KEY_PREFIX: Final[str] = "runs:"
 SCORE_KEY_PREFIX: Final[str] = "runs:score:"
+CLOZE_KEY_PREFIX: Final[str] = "runs:cloze:"
 GENERATE_KEY_PREFIX: Final[str] = "runs:gen:"
 CONVERSATION_KEY_PREFIX: Final[str] = "runs:conv:"
 CONVERSATION_META_KEY_PREFIX: Final[str] = "runs:conv:meta:"
@@ -43,6 +44,10 @@ def score_key(run_id: str, request_id: str) -> str:
     return f"{SCORE_KEY_PREFIX}{run_id}:{request_id}"
 
 
+def cloze_key(run_id: str, request_id: str) -> str:
+    return f"{CLOZE_KEY_PREFIX}{run_id}:{request_id}"
+
+
 def generate_key(run_id: str, request_id: str) -> str:
     return f"{GENERATE_KEY_PREFIX}{run_id}:{request_id}"
 
@@ -62,6 +67,7 @@ def progress_key(run_id: str) -> str:
 __all__ = [
     "ARTIFACT_FILE_ID_PREFIX",
     "CANCEL_KEY_PREFIX",
+    "CLOZE_KEY_PREFIX",
     "CONVERSATION_KEY_PREFIX",
     "CONVERSATION_META_KEY_PREFIX",
     "EVAL_KEY_PREFIX",
@@ -73,6 +79,7 @@ __all__ = [
     "STATUS_KEY_PREFIX",
     "artifact_file_id_key",
     "cancel_key",
+    "cloze_key",
     "conversation_key",
     "conversation_meta_key",
     "eval_key",

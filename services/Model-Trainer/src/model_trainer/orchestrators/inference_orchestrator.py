@@ -6,12 +6,19 @@ from typing import Literal
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 from platform_core.logging import get_logger
-from platform_core.trainer_keys import generate_key, score_key
+from platform_core.trainer_keys import cloze_key, generate_key, score_key
 from platform_workers.redis import RedisStrProto
 
-from ..api.schemas.runs import GenerateRequest, GenerateResponse, ScoreRequest, ScoreResponse
+from ..api.schemas.runs import (
+    ClozeRequest,
+    ClozeResponse,
+    GenerateRequest,
+    GenerateResponse,
+    ScoreRequest,
+    ScoreResponse,
+)
 from ..core.config.settings import Settings
-from ..core.contracts.queue import GenerateJobPayload, ScoreJobPayload
+from ..core.contracts.queue import ClozeJobPayload, GenerateJobPayload, ScoreJobPayload
 from ..core.infra.redis_utils import get_with_retry, set_with_retry
 from ..core.services.queue.rq_adapter import RQEnqueuer
 
@@ -106,6 +113,100 @@ class InferenceOrchestrator:
             "surprisal": None,
             "topk": None,
             "tokens": None,
+        }
+
+    def enqueue_cloze(self: InferenceOrchestrator, run_id: str, req: ClozeRequest) -> ClozeResponse:
+        """Enqueue a cloze evaluation job and return its initial response.
+
+        Args:
+            run_id: Run whose model will be scored.
+            req: Item set and token budget.
+
+        Returns:
+            Response carrying the generated request_id and a queued status.
+        """
+        request_id = str(uuid.uuid4())
+
+        payload: ClozeJobPayload = {
+            "run_id": run_id,
+            "request_id": request_id,
+            "items_file_id": req["items_file_id"],
+            "max_seq_len": req["max_seq_len"],
+        }
+
+        _ = self._enq.enqueue_cloze(payload)
+
+        cache: dict[str, JSONValue] = {
+            "status": "queued",
+            "total": None,
+            "correct": None,
+            "accuracy": None,
+            "chance": None,
+        }
+        set_with_retry(self._redis, cloze_key(run_id, request_id), dump_json_str(cache))
+
+        _logger.info(
+            "cloze enqueued",
+            extra={
+                "category": "inference",
+                "service": "orchestrator",
+                "run_id": run_id,
+                "request_id": request_id,
+                "event": "cloze_enqueued",
+            },
+        )
+
+        return {
+            "request_id": request_id,
+            "status": "queued",
+            "total": None,
+            "correct": None,
+            "accuracy": None,
+            "chance": None,
+        }
+
+    def get_cloze(self: InferenceOrchestrator, run_id: str, request_id: str) -> ClozeResponse:
+        """Get the result of a cloze evaluation job.
+
+        Args:
+            run_id: Run the job was submitted against.
+            request_id: Identifier returned when the job was enqueued.
+
+        Returns:
+            Current status and, once completed, the counts and accuracy.
+
+        Raises:
+            AppError: With ``DATA_NOT_FOUND`` when no cache entry exists for the
+                request, or the entry is not a JSON object.
+        """
+        raw = get_with_retry(self._redis, cloze_key(run_id, request_id))
+        if raw is None:
+            raise AppError(
+                ModelTrainerErrorCode.DATA_NOT_FOUND,
+                "cloze request not found",
+                model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
+            )
+
+        obj = load_json_str(str(raw))
+        if not isinstance(obj, dict):
+            raise AppError(
+                ModelTrainerErrorCode.DATA_NOT_FOUND,
+                "cloze cache corrupt",
+                model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
+            )
+
+        total_v = obj.get("total")
+        correct_v = obj.get("correct")
+        accuracy_v = obj.get("accuracy")
+        chance_v = obj.get("chance")
+
+        return {
+            "request_id": request_id,
+            "status": _narrow_status(obj.get("status")),
+            "total": total_v if isinstance(total_v, int) else None,
+            "correct": correct_v if isinstance(correct_v, int) else None,
+            "accuracy": float(accuracy_v) if isinstance(accuracy_v, int | float) else None,
+            "chance": float(chance_v) if isinstance(chance_v, int | float) else None,
         }
 
     def get_score(self: InferenceOrchestrator, run_id: str, request_id: str) -> ScoreResponse:

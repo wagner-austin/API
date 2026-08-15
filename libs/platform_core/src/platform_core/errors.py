@@ -139,6 +139,10 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     DATA_NOT_FOUND = "DATA_NOT_FOUND"
     LOGS_READ_FAILED = "LOGS_READ_FAILED"
 
+    # Cloze evaluation errors
+    CLOZE_ITEMS_EMPTY = "CLOZE_ITEMS_EMPTY"
+    CLOZE_ITEM_UNSCOREABLE = "CLOZE_ITEM_UNSCOREABLE"
+
     # Infrastructure errors
     CUDA_NOT_AVAILABLE = "CUDA_NOT_AVAILABLE"
     CUDA_OOM = "CUDA_OOM"
@@ -530,6 +534,9 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     ModelTrainerErrorCode.EVAL_NOT_FOUND: 404,
     ModelTrainerErrorCode.DATA_NOT_FOUND: 404,
     ModelTrainerErrorCode.LOGS_READ_FAILED: 500,
+    # Cloze evaluation errors
+    ModelTrainerErrorCode.CLOZE_ITEMS_EMPTY: 400,
+    ModelTrainerErrorCode.CLOZE_ITEM_UNSCOREABLE: 400,
     # Infrastructure errors
     ModelTrainerErrorCode.CUDA_NOT_AVAILABLE: 503,
     ModelTrainerErrorCode.CUDA_OOM: 507,

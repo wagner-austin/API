@@ -10,6 +10,7 @@ from platform_workers.rq_harness import RQClientQueue, RQJobLike
 from ... import _test_hooks
 from ...contracts.conversation import ChatJobPayload
 from ...contracts.queue import (
+    ClozeJobPayload,
     EvalJobPayload,
     GenerateJobPayload,
     ScoreJobPayload,
@@ -124,6 +125,29 @@ class RQEnqueuer:
             failure_ttl=self.settings.failure_ttl_sec,
             retry=retry,
             description=f"tokenizer:{payload['tokenizer_id']}",
+        )
+        return job.get_id()
+
+    def enqueue_cloze(self: RQEnqueuer, payload: ClozeJobPayload) -> str:
+        conn = self._connection()
+        q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
+        retry = _test_hooks.rq_retry_factory(
+            max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
+        )
+        payload_dict: dict[str, JSONValue] = {
+            "run_id": payload["run_id"],
+            "request_id": payload["request_id"],
+            "items_file_id": payload["items_file_id"],
+            "max_seq_len": payload["max_seq_len"],
+        }
+        job: RQJobLike = q.enqueue(
+            "model_trainer.worker.cloze_job.process_cloze_job",
+            payload_dict,
+            job_timeout=self.settings.job_timeout_sec,
+            result_ttl=self.settings.result_ttl_sec,
+            failure_ttl=self.settings.failure_ttl_sec,
+            retry=retry,
+            description=f"cloze:{payload['run_id']}:{payload['request_id']}",
         )
         return job.get_id()
 

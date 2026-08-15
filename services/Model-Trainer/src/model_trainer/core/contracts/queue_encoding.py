@@ -26,7 +26,7 @@ from platform_core.json_utils import (
 )
 
 from .model import GgufExportConfig, LoraConfig, QuantizationConfig, UnslothConfig
-from .queue import TrainJobPayload, TrainRequestPayload
+from .queue import ClozeJobPayload, TrainJobPayload, TrainRequestPayload
 
 
 def encode_lora_config(config: LoraConfig) -> JSONObject:
@@ -626,6 +626,51 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
     }
 
 
+def encode_cloze_job_payload(payload: ClozeJobPayload) -> JSONObject:
+    """Encode ClozeJobPayload TypedDict to JSONObject for RQ serialization.
+
+    Args:
+        payload: Cloze evaluation job payload to encode.
+
+    Returns:
+        JSON-serializable dictionary suitable for RQ job queue.
+    """
+    return {
+        "run_id": payload["run_id"],
+        "request_id": payload["request_id"],
+        "items_file_id": payload["items_file_id"],
+        "max_seq_len": payload["max_seq_len"],
+    }
+
+
+def decode_cloze_job_payload(obj: JSONObject) -> ClozeJobPayload:
+    """Decode JSONObject to ClozeJobPayload with full validation.
+
+    Args:
+        obj: JSON object to decode.
+
+    Returns:
+        Validated ClozeJobPayload TypedDict.
+
+    Raises:
+        JSONTypeError: If required fields are missing, have wrong types, or
+            ``max_seq_len`` is not positive.
+    """
+    run_id = require_str(obj, "run_id")
+    request_id = require_str(obj, "request_id")
+    items_file_id = require_str(obj, "items_file_id")
+    max_seq_len = require_int(obj, "max_seq_len")
+    if max_seq_len <= 0:
+        raise JSONTypeError(f"Field 'max_seq_len' must be positive, got {max_seq_len}")
+
+    return {
+        "run_id": run_id,
+        "request_id": request_id,
+        "items_file_id": items_file_id,
+        "max_seq_len": max_seq_len,
+    }
+
+
 def encode_train_job_payload(payload: TrainJobPayload) -> JSONObject:
     """Encode TrainJobPayload TypedDict to JSONObject for RQ serialization.
 
@@ -672,12 +717,14 @@ def decode_train_job_payload(obj: JSONObject) -> TrainJobPayload:
 
 
 __all__ = [
+    "decode_cloze_job_payload",
     "decode_gguf_export_config",
     "decode_lora_config",
     "decode_quantization_config",
     "decode_train_job_payload",
     "decode_train_request_payload",
     "decode_unsloth_config",
+    "encode_cloze_job_payload",
     "encode_gguf_export_config",
     "encode_lora_config",
     "encode_quantization_config",

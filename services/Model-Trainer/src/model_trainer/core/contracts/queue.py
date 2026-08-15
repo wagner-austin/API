@@ -81,6 +81,22 @@ class TokenizerTrainPayload(TypedDict):
     seed: int
 
 
+class ClozeJobPayload(TypedDict):
+    """Payload for a cloze evaluation job.
+
+    Attributes:
+        run_id: Training run whose model is scored.
+        request_id: Identifier the caller polls for the result.
+        items_file_id: Data-bank file holding the newline-delimited item set.
+        max_seq_len: Token budget each rendered candidate is truncated to.
+    """
+
+    run_id: str
+    request_id: str
+    items_file_id: str
+    max_seq_len: int
+
+
 class ScoreJobPayload(TypedDict):
     """Payload for score inference job."""
 

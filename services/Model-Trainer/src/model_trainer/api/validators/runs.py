@@ -14,6 +14,7 @@ from platform_core.validators import (
 
 from ..schemas.runs import (
     ChatRequest,
+    ClozeRequest,
     EvaluateRequest,
     GenerateRequest,
     GgufExportConfigRequest,
@@ -797,6 +798,34 @@ def _decode_evaluate_request(obj: JSONValue) -> EvaluateRequest:
         result["path_override"] = path_override
 
     return result
+
+
+def _decode_cloze_request(obj: JSONValue) -> ClozeRequest:
+    """Decode and validate a cloze evaluation request.
+
+    Args:
+        obj: Parsed request body.
+
+    Returns:
+        Validated ClozeRequest.
+
+    Raises:
+        AppError: With ``INVALID_INPUT`` when ``items_file_id`` is missing or
+            empty, or ``max_seq_len`` falls outside the supported range.
+    """
+    d = load_json_dict(obj)
+
+    items_file_id = validate_str(d.get("items_file_id"), "items_file_id")
+    if items_file_id.strip() == "":
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="items_file_id must not be blank",
+            http_status=422,
+        )
+
+    max_seq_len = validate_int_range(d.get("max_seq_len"), "max_seq_len", ge=8, default=512)
+
+    return ClozeRequest(items_file_id=items_file_id, max_seq_len=max_seq_len)
 
 
 def _decode_score_request(obj: JSONValue) -> ScoreRequest:

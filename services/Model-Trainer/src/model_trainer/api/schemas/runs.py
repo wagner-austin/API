@@ -181,6 +181,29 @@ class ScoreResponse(TypedDict, total=True):
     tokens: list[str] | None
 
 
+class ClozeRequest(TypedDict, total=True):
+    """Request to score a cloze item set with a trained model."""
+
+    items_file_id: str
+    max_seq_len: int
+
+
+class ClozeResponse(TypedDict, total=True):
+    """Response from cloze evaluation.
+
+    ``chance`` is the accuracy uniform guessing reaches on the same candidate
+    counts. It is reported alongside ``accuracy`` because accuracy alone is not
+    interpretable: a four-way item set floors at 25% before any knowledge.
+    """
+
+    request_id: str
+    status: Literal["queued", "running", "completed", "failed"]
+    total: int | None
+    correct: int | None
+    accuracy: float | None
+    chance: float | None
+
+
 class GenerateRequest(TypedDict, total=True):
     """Request to generate text from a trained model."""
 
