@@ -100,9 +100,6 @@ def _reset_test_hooks_impl(
     orig_tokenizer_enqueue_hook = _test_hooks.tokenizer_enqueue_hook
     # GPT2 backend hooks
     orig_load_prepared_gpt2_from_handle = _test_hooks.load_prepared_gpt2_from_handle
-    # Guard hooks
-    orig_guard_find_monorepo_root = _test_hooks.guard_find_monorepo_root
-    orig_guard_load_orchestrator = _test_hooks.guard_load_orchestrator
     # Platform core config hooks
     orig_get_env = config_test_hooks.get_env
     # Platform ML torch hooks (for device resolution)
@@ -176,9 +173,6 @@ def _reset_test_hooks_impl(
     _test_hooks.tokenizer_enqueue_hook = orig_tokenizer_enqueue_hook
     # GPT2 backend hooks
     _test_hooks.load_prepared_gpt2_from_handle = orig_load_prepared_gpt2_from_handle
-    # Guard hooks
-    _test_hooks.guard_find_monorepo_root = orig_guard_find_monorepo_root
-    _test_hooks.guard_load_orchestrator = orig_guard_load_orchestrator
     # Platform core config hooks
     config_test_hooks.get_env = orig_get_env
     # Platform ML torch hooks

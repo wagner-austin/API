@@ -6,7 +6,7 @@ from pathlib import Path
 
 from scripts.guard import main as guard_main
 
-from model_trainer.core import _test_hooks
+from scripts import _test_hooks
 
 
 def _write(path: Path, text: str) -> None:
@@ -78,22 +78,27 @@ def test_guard_main_entry_no_violations(tmp_path: Path) -> None:
     )
     assert result.returncode == 0
 
-    # Cover __main__ entry point by calling main() directly with args
-    # instead of using runpy.run_path with sys.argv patching
-    # Set up hooks to make guard use tmp_path as root
-    class _FakeFindRoot:
-        def __call__(self, start: Path) -> Path:
-            return tmp_path
+    # Cover the main() entry point by calling it directly with args instead of
+    # using runpy.run_path with sys.argv patching. Fakes are installed by
+    # rebinding the guard hooks and restored afterwards.
+    class _FakeIsDir:
+        def __call__(self, path: Path) -> bool:
+            return True
 
     class _FakeLoader:
-        def __call__(self, monorepo_root: Path) -> _test_hooks.RunForProjectProto:
+        def __call__(self, monorepo_root: Path) -> _test_hooks.RunForProjectProtocol:
             def _run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
                 return 0
 
             return _run_for_project
 
-    _test_hooks.guard_find_monorepo_root = _FakeFindRoot()
-    _test_hooks.guard_load_orchestrator = _FakeLoader()
-
-    code = guard_main(["--root", str(tmp_path)])
+    original_is_dir = _test_hooks.is_dir
+    original_load_orchestrator = _test_hooks.load_orchestrator
+    _test_hooks.is_dir = _FakeIsDir()
+    _test_hooks.load_orchestrator = _FakeLoader()
+    try:
+        code = guard_main(["--root", str(tmp_path)])
+    finally:
+        _test_hooks.is_dir = original_is_dir
+        _test_hooks.load_orchestrator = original_load_orchestrator
     assert code == 0

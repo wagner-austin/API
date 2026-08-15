@@ -881,34 +881,6 @@ load_prepared_gpt2_from_handle: LoadPreparedGpt2FromHandleProto = (
 
 
 # ============================================================================
-# Guard script hooks for testing
-# ============================================================================
-
-
-class FindMonorepoRootProto(Protocol):
-    """Protocol for _find_monorepo_root hook."""
-
-    def __call__(self, start: Path) -> Path: ...
-
-
-class RunForProjectProto(Protocol):
-    """Protocol for run_for_project hook."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
-
-
-class LoadOrchestratorProto(Protocol):
-    """Protocol for _load_orchestrator hook."""
-
-    def __call__(self, monorepo_root: Path) -> RunForProjectProto: ...
-
-
-# Guard hooks - None means use default behavior (production implementation)
-guard_find_monorepo_root: FindMonorepoRootProto | None = None
-guard_load_orchestrator: LoadOrchestratorProto | None = None
-
-
-# ============================================================================
 # Training metrics hooks for timing, memory, and model info
 # ============================================================================
 
