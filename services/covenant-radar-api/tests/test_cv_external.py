@@ -10,12 +10,19 @@ from __future__ import annotations
 
 import runpy
 import sys
-from collections.abc import Iterator
+from collections.abc import Generator
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
+from covenant_ml.backends.protocol import (
+    BackendCapabilities,
+    ClassifierBackend,
+    PreparedClassifier,
+    ProgressCallback,
+)
+from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
+from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.datasets.registry import DatasetRegistry
 from covenant_ml.datasets.types import (
     DatasetConfig,
@@ -23,19 +30,22 @@ from covenant_ml.datasets.types import (
     LoadedDataset,
     TargetColumnSpec,
 )
+from covenant_ml.optimizer.types import (
+    SampledFloatParams,
+    SampledIntParams,
+    SearchSpace,
+)
 from covenant_ml.types import (
+    BackendName,
     ClassifierTrainConfig,
     EvalMetrics,
     FeatureImportance,
     TrainOutcome,
 )
+from numpy.typing import NDArray
 from scripts.cv_external import EXIT_BAD_USAGE, EXIT_OK, main
 
-from covenant_radar_api.worker import _test_hooks as hooks
-
-if TYPE_CHECKING:
-    from covenant_ml.backends.protocol import ProgressCallback
-    from numpy.typing import NDArray
+from covenant_radar_api.worker import _test_hooks
 
 
 def _dataset_config(name: str, grouped: bool) -> DatasetConfig:
@@ -153,17 +163,55 @@ class _FakeCVBackend:
         assert Path(path).exists()
         return _FakePrepared()
 
+    def backend_name(self) -> BackendName:
+        return "cleargbm"
 
-class _FakeClassifierRegistry:
-    def __init__(self, backend: _FakeCVBackend) -> None:
-        self._backend = backend
+    def capabilities(self) -> BackendCapabilities:
+        raise NotImplementedError("the CV runner does not query backend capabilities")
 
-    def get(self, name: str) -> _FakeCVBackend:
-        return self._backend
+    def prepare(
+        self,
+        *,
+        n_features: int,
+        n_classes: int,
+        feature_names: list[str] | None,
+    ) -> PreparedClassifier:
+        raise NotImplementedError("the CV runner trains from raw arrays, it does not prepare")
+
+    def evaluate(
+        self,
+        *,
+        model: PreparedClassifier,
+        x: NDArray[np.float64],
+        y: NDArray[np.int64],
+    ) -> EvalMetrics:
+        raise NotImplementedError("the CV runner scores folds itself from predict_proba")
+
+    def save(self, *, model: PreparedClassifier, path: str) -> None:
+        raise NotImplementedError("train() already writes the model file")
+
+    def get_feature_importances(
+        self,
+        *,
+        model: PreparedClassifier,
+        feature_names: list[str] | None,
+    ) -> list[FeatureImportance] | None:
+        raise NotImplementedError("the CV runner reports AUC, not importances")
+
+    def get_default_search_space(self) -> SearchSpace:
+        raise NotImplementedError("the CV runner does not tune hyperparameters")
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        raise NotImplementedError("the CV runner does not tune hyperparameters")
 
 
 @pytest.fixture()
-def cv_hooks() -> Iterator[_FakeCVBackend]:
+def cv_hooks() -> Generator[_FakeCVBackend, None, None]:
     """Install fake registry, loader and backend; restore on exit."""
     backend = _FakeCVBackend()
     registry = DatasetRegistry(
@@ -176,16 +224,34 @@ def cv_hooks() -> Iterator[_FakeCVBackend]:
     def fake_loader(
         config: DatasetConfig,
         external_dir: Path,
-        progress_callback: object = None,
+        progress_callback: ProgressCallbackProtocol | None = None,
     ) -> LoadedDataset:
         return _fake_dataset(grouped=config.get("group_column") is not None)
 
-    saved = (hooks.dataset_registry_factory, hooks.dataset_loader, hooks.registry_factory)
-    hooks.dataset_registry_factory = fake_registry
-    hooks.dataset_loader = fake_loader
-    hooks.registry_factory = lambda: _FakeClassifierRegistry(backend)  # type: ignore[assignment]
+    def backend_factory() -> ClassifierBackend:
+        return backend
+
+    classifier_registry = ClassifierRegistry()
+    classifier_registry.register("cleargbm", BackendRegistration(backend_factory))
+    classifier_registry.register("lightgbm", BackendRegistration(backend_factory))
+
+    def fake_classifier_registry() -> ClassifierRegistry:
+        return classifier_registry
+
+    saved = (
+        _test_hooks.dataset_registry_factory,
+        _test_hooks.dataset_loader,
+        _test_hooks.registry_factory,
+    )
+    _test_hooks.dataset_registry_factory = fake_registry
+    _test_hooks.dataset_loader = fake_loader
+    _test_hooks.registry_factory = fake_classifier_registry
     yield backend
-    (hooks.dataset_registry_factory, hooks.dataset_loader, hooks.registry_factory) = saved
+    (
+        _test_hooks.dataset_registry_factory,
+        _test_hooks.dataset_loader,
+        _test_hooks.registry_factory,
+    ) = saved
 
 
 def test_every_fold_scores_its_held_out_groups(
@@ -194,13 +260,16 @@ def test_every_fold_scores_its_held_out_groups(
     """Three folds, perfect ranking feature: three fold lines at AUC 1, and
     the inner early-stopping split is grouped on every fold."""
     assert main(["grouped_fake", "cleargbm", "3", "7"], external_dir=tmp_path) == EXIT_OK
+    # The runner writes to stdout, and so does logging once another test in the
+    # session has configured a stdout handler, so its lines are identified by
+    # value rather than by position in the stream.
     out = capsys.readouterr().out.splitlines()
-    assert out[0] == "grouped_fake via cleargbm: 120 rows, 12 groups, 3 folds, seed 7"
+    assert "grouped_fake via cleargbm: 120 rows, 12 groups, 3 folds, seed 7" in out
+    assert "mean auc 1.0000 +/- 0.0000 over 3 folds" in out
     fold_lines = [line for line in out if line.startswith("fold ")]
     assert len(fold_lines) == 3
     assert all("auc 1.0000" in line for line in fold_lines)
     assert all("4 held-out groups, 40 rows" in line for line in fold_lines)
-    assert out[-1] == "mean auc 1.0000 +/- 0.0000 over 3 folds"
     assert cv_hooks.inner_groups_seen == [True, True, True]
 
 
@@ -219,16 +288,21 @@ def test_an_ungrouped_dataset_is_refused_with_the_reason(
     """Row-level CV of correlated rows would score memorization as skill;
     saying so beats a quietly wrong number."""
     assert main(["flat_fake", "cleargbm"], external_dir=tmp_path) == EXIT_BAD_USAGE
-    assert "has no group column" in capsys.readouterr().out
+    assert capsys.readouterr().out == (
+        "flat_fake has no group column; grouped CV needs one -- a plain "
+        "k-fold of correlated rows would score memorization as skill\n"
+    )
 
 
 def test_unknown_dataset_and_backend_are_usage_errors(
     cv_hooks: _FakeCVBackend, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     assert main(["missing", "cleargbm"], external_dir=tmp_path) == EXIT_BAD_USAGE
-    assert "dataset must be one of: flat_fake, grouped_fake" in capsys.readouterr().out
+    assert capsys.readouterr().out == (
+        "dataset must be one of: flat_fake, grouped_fake (got missing)\n"
+    )
     assert main(["grouped_fake", "catboost"], external_dir=tmp_path) == EXIT_BAD_USAGE
-    assert "backend must be cleargbm or lightgbm" in capsys.readouterr().out
+    assert capsys.readouterr().out == "backend must be cleargbm or lightgbm (got catboost)\n"
 
 
 def test_a_bad_argument_count_prints_usage(capsys: pytest.CaptureFixture[str]) -> None:
