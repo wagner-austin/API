@@ -375,7 +375,7 @@ play:
 # ([[multiplayer-portability-invariants]]).
 HOST_MAP ?= maps/skirmish/[p2]duel_lake.tmx
 HOST_SAMPLES ?= 20000
-HOST_DOCTRINE ?= doctrines/aa-counter-guard.doctrine
+HOST_DOCTRINE ?= doctrines/flame-nocover.doctrine
 HOST_LOG ?= runs/host.log
 host:
 	@Write-Host ""
@@ -391,7 +391,7 @@ WATCH_MAP ?= maps/skirmish/[p2]duel_lake.tmx
 WATCH_OPPONENTS ?= 1
 WATCH_DIFFICULTY ?= 3
 WATCH_SAMPLES ?= 20000
-WATCH_DOCTRINE ?= doctrines/aa-counter-guard.doctrine
+WATCH_DOCTRINE ?= doctrines/flame-nocover.doctrine
 WATCH_LOG ?= runs/watch.log
 watch:
 	@Write-Host ""
