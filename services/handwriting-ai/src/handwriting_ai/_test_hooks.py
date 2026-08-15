@@ -53,7 +53,7 @@ from platform_workers.redis import (
     redis_for_kv,
     redis_raw_for_rq,
 )
-from platform_workers.rq_harness import RQClientQueue, WorkerConfig, rq_queue
+from platform_workers.rq_harness import RQClientQueue, WorkerConfig, rq_queue, run_rq_worker
 from torch.nn import Module as TorchModule
 from torch.optim.optimizer import Optimizer as TorchOptimizer
 
@@ -219,10 +219,10 @@ def _default_artifact_store_factory(api_url: str, api_key: str) -> ArtifactStore
 # Module-level hooks
 # =============================================================================
 
-# Module-level injectable runner for testing.
-# Tests set this BEFORE running worker_entry as __main__.
-# Because this is a separate module, it persists across runpy.run_module.
-test_runner: WorkerRunnerProtocol | None = None
+# Hook for the worker runner, bound to the real RQ runner. Tests rebind
+# it BEFORE running worker_entry as __main__; because this is a separate
+# module, the binding persists across runpy.run_module.
+worker_runner: WorkerRunnerProtocol = run_rq_worker
 
 # Hook for guard find_monorepo_root. Tests can override to return fake paths.
 guard_find_monorepo_root: GuardFindMonorepoRootProtocol = _default_guard_find_monorepo_root
