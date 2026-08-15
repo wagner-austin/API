@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import JSONObject
 
-from tankpit_bot import _hooks_guard, _test_hooks
+from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import (
     AppendTextProtocol,
     CDPSessionProtocol,
@@ -186,14 +186,6 @@ def _restore_hooks() -> Generator[None, None, None]:
     replay_test_hooks.process_received_message_hook = (
         replay_test_hooks._real_process_received_message
     )
-
-
-@pytest.fixture(autouse=True)
-def _restore_guard_hooks() -> Generator[None, None, None]:
-    """Restore guard hooks after each test."""
-    yield
-    _hooks_guard.guard_find_monorepo_root = None
-    _hooks_guard.guard_load_orchestrator = None
 
 
 @pytest.fixture(autouse=True)
