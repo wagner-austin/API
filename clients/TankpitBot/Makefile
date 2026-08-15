@@ -62,7 +62,7 @@ install:
 	@Write-Host ""
 	@Write-Host "==> install" -ForegroundColor Cyan
 	poetry lock
-	poetry install --with dev
+	poetry sync --with dev
 	poetry run playwright install chromium
 	@Write-Host "[install] done" -ForegroundColor Green
 
@@ -71,7 +71,7 @@ lint:
 	@Write-Host "==> lint" -ForegroundColor Cyan
 	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" } }
 	poetry lock
-	poetry install --with dev
+	poetry sync --with dev
 	@Write-Host ""
 	@Write-Host "  -> guard" -ForegroundColor DarkCyan
 	if ((Test-Path ".\\scripts\\guard.py") -or (Test-Path ".\\scripts\\guard\\__main__.py")) { poetry run python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { Write-Host "[lint] guard failed" -ForegroundColor Red; exit $$LASTEXITCODE } }
@@ -92,7 +92,7 @@ test:
 	@Write-Host ""
 	@Write-Host "==> test" -ForegroundColor Cyan
 	poetry lock
-	poetry install --with dev
+	poetry sync --with dev
 	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("src","scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; poetry run python -m pytest -n auto -v @covArgs
 	@Write-Host ""
 	@Write-Host "[test] passed" -ForegroundColor Green

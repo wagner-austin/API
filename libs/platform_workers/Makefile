@@ -6,7 +6,7 @@ SHELL := powershell.exe
 lint:
 	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" } }
 	poetry lock
-	poetry install --with dev
+	poetry sync --with dev
 	# Run guard scripts if present (prefer module invocation)
 	if ((Test-Path ".\\scripts\\guard.py") -or (Test-Path ".\\scripts\\guard\\__main__.py")) { poetry run python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }
 	poetry run ruff check . --fix
@@ -15,7 +15,7 @@ lint:
 
 test:
 	poetry lock
-	poetry install --with dev
+	poetry sync --with dev
 	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("src","scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; poetry run pytest -n auto -v @covArgs
 
 check: lint | test
