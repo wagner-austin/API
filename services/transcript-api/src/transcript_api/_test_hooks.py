@@ -10,7 +10,7 @@ from typing import BinaryIO, Protocol
 
 from platform_core.json_utils import JSONValue
 from platform_workers.redis import RedisStrProto, redis_for_kv
-from platform_workers.rq_harness import WorkerConfig
+from platform_workers.rq_harness import WorkerConfig, run_rq_worker
 
 from .types import (
     AudioChunk,
@@ -455,8 +455,10 @@ def _default_stt_provider_factory(
 # Module-level hooks
 # =========================================================================
 
-# Hook for worker runner (used by worker_entry.py)
-test_runner: WorkerRunnerProtocol | None = None
+# Hook for the worker runner, bound to the real RQ runner. Tests rebind
+# it BEFORE running worker_entry as __main__; because this is a separate
+# module, the binding persists across runpy.run_module.
+worker_runner: WorkerRunnerProtocol = run_rq_worker
 
 # Hook for Redis client factory
 redis_factory: Callable[[str], RedisStrProto] = _default_redis_for_kv
@@ -566,7 +568,7 @@ __all__ = [
     "stt_client_builder",
     "stt_provider_factory",
     "subprocess_run",
-    "test_runner",
+    "worker_runner",
     "yt_api_factory",
     "yt_dlp_factory",
     "yt_exceptions_factory",

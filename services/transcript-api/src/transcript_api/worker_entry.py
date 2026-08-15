@@ -8,7 +8,7 @@ from platform_core.config import _require_env_str
 from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.logging import get_logger, setup_logging
 from platform_core.queues import TRANSCRIPT_QUEUE
-from platform_workers.rq_harness import WorkerConfig, run_rq_worker
+from platform_workers.rq_harness import WorkerConfig
 
 from transcript_api import _test_hooks
 
@@ -25,16 +25,6 @@ class WorkerRunnerProtocol(Protocol):
     """Protocol for worker runner function."""
 
     def __call__(self, config: WorkerConfig) -> None: ...
-
-
-def _get_default_runner() -> WorkerRunnerProtocol:
-    """Get the default worker runner.
-
-    Returns test_runner from _test_hooks if set (for testing), otherwise run_rq_worker.
-    """
-    if _test_hooks.test_runner is not None:
-        return _test_hooks.test_runner
-    return run_rq_worker
 
 
 def _build_config() -> WorkerConfig:
@@ -79,7 +69,7 @@ def main(
     Args:
         config: Worker configuration. If None, builds from environment.
         logger: Logger instance. If None, uses default logger after setup.
-        runner: Worker runner function. If None, uses _get_default_runner().
+        runner: Worker runner function. If None, uses the worker_runner hook.
     """
     setup_logging(
         level="INFO",
@@ -90,7 +80,9 @@ def main(
     )
     resolved_logger: LoggerProtocol = logger if logger is not None else get_logger(__name__)
     resolved_config: WorkerConfig = config if config is not None else _build_config()
-    resolved_runner: WorkerRunnerProtocol = runner if runner is not None else _get_default_runner()
+    resolved_runner: WorkerRunnerProtocol = (
+        runner if runner is not None else _test_hooks.worker_runner
+    )
     _run_worker(resolved_config, resolved_logger, resolved_runner)
 
 

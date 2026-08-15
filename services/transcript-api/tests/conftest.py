@@ -25,7 +25,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_os_remove = _test_hooks.os_remove
     original_mkdtemp = _test_hooks.mkdtemp
     original_subprocess_run = _test_hooks.subprocess_run
-    original_test_runner = _test_hooks.test_runner
+    original_worker_runner = _test_hooks.worker_runner
     original_openai_client_factory = _test_hooks.openai_client_factory
     original_yt_api_factory = _test_hooks.yt_api_factory
     original_yt_exceptions_factory = _test_hooks.yt_exceptions_factory
@@ -52,7 +52,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.os_remove = original_os_remove
     _test_hooks.mkdtemp = original_mkdtemp
     _test_hooks.subprocess_run = original_subprocess_run
-    _test_hooks.test_runner = original_test_runner
+    _test_hooks.worker_runner = original_worker_runner
     _test_hooks.openai_client_factory = original_openai_client_factory
     _test_hooks.yt_api_factory = original_yt_api_factory
     _test_hooks.yt_exceptions_factory = original_yt_exceptions_factory
