@@ -1,7 +1,7 @@
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 
-.PHONY: infra up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test check
+.PHONY: infra up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test
 
 # ---------------------------------------------------------------------------
 # Infrastructure
@@ -77,7 +77,7 @@ logs:
 	docker compose logs -f
 
 # ---------------------------------------------------------------------------
-# Development: lint, test, check across all libs/services/clients
+# Development: lint and test across all libs/services/clients
 # ---------------------------------------------------------------------------
 lint:
 	$$root = Get-Location; $$dirs = @(); foreach ($$p in @("libs","services","clients")) { foreach ($$d in Get-ChildItem -Path $$p -Directory) { if (Test-Path (Join-Path $$d.FullName "Makefile")) { $$dirs += $$d } } }; $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Linting $$d.Name ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make lint; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($$failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll lint passed" -ForegroundColor Green }
@@ -85,5 +85,7 @@ lint:
 test:
 	$$root = Get-Location; $$dirs = @(); foreach ($$p in @("libs","services","clients")) { foreach ($$d in Get-ChildItem -Path $$p -Directory) { if (Test-Path (Join-Path $$d.FullName "Makefile")) { $$dirs += $$d } } }; $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Testing $$d.Name ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make test; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($$failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll tests passed" -ForegroundColor Green }
 
-check:
-	.\\scripts\\check-all.ps1
+# No root `check` target. Checking every lib, service and client in one
+# command rebuilt every virtualenv in the monorepo to answer a question about
+# one project, so it was too slow to actually be run. Run `make check` inside
+# the project you changed.
