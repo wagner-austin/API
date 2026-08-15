@@ -255,11 +255,6 @@ class HooksContainer:
     cli_confirm_ask: CliConfirmAskHook
     cli_get_console: CliGetConsoleHook
 
-    # Guard-script hooks. None means "use the production behaviour". Kept on
-    # the container so the per-test reset covers them like every other hook.
-    guard_find_monorepo_root: FindMonorepoRootProto | None
-    guard_load_orchestrator: LoadOrchestratorProto | None
-
     def reset(self) -> None:
         """Restore every hook to its production implementation.
 
@@ -372,7 +367,6 @@ def _prod_load_tokens(path: str | None = None) -> OAuthTokens | None:
     Raises:
         AppError[CalendarErrorCode]: If tokens are partially configured in environment.
     """
-    from pathlib import Path
 
     from platform_core.config import config_test_hooks
     from platform_core.json_utils import (
@@ -427,7 +421,6 @@ def _prod_load_tokens(path: str | None = None) -> OAuthTokens | None:
 
 def _prod_save_tokens(tokens: OAuthTokens, path: str | None = None) -> None:
     """Production token saver - writes to ~/.google/calendar_tokens.json."""
-    from pathlib import Path
 
     from platform_core.json_utils import dump_json_str
 
@@ -461,7 +454,6 @@ def _prod_load_credentials(path: str | None = None) -> OAuthCredentials:
     Raises:
         AppError[CalendarErrorCode]: If credentials not found or partially configured.
     """
-    from pathlib import Path
 
     from platform_core.config import config_test_hooks
     from platform_core.json_utils import (
@@ -539,14 +531,12 @@ def _prod_current_time() -> int:
 
 def _prod_read_file(path: str) -> str:
     """Production file reader."""
-    from pathlib import Path
 
     return Path(path).read_text(encoding="utf-8")
 
 
 def _prod_write_file(path: str, content: str) -> None:
     """Production file writer."""
-    from pathlib import Path
 
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -555,7 +545,6 @@ def _prod_write_file(path: str, content: str) -> None:
 
 def _prod_file_exists(path: str) -> bool:
     """Production file exists check."""
-    from pathlib import Path
 
     return Path(path).exists()
 
@@ -765,8 +754,6 @@ def _prod_cli_get_console() -> Console:
 
 def _init_production_hooks() -> None:
     """Initialize hooks with production implementations."""
-    hooks.guard_find_monorepo_root = None
-    hooks.guard_load_orchestrator = None
     hooks.http_get = _prod_http_get
     hooks.http_post = _prod_http_post
     hooks.http_patch = _prod_http_patch
@@ -804,61 +791,6 @@ def reset_hooks() -> None:
     _cli_env_cache = {}
     _cli_default_console = None
     _init_production_hooks()
-
-
-# =============================================================================
-# Guard Script Hooks
-# =============================================================================
-
-
-class RunForProjectProto(Protocol):
-    """Protocol for run_for_project function from monorepo_guards."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guard checks for a project.
-
-        Args:
-            monorepo_root: Root directory of the monorepo.
-            project_root: Root directory of the project to check.
-
-        Returns:
-            Exit code (0 for success).
-        """
-        ...
-
-
-class FindMonorepoRootProto(Protocol):
-    """Protocol for finding the monorepo root directory."""
-
-    def __call__(self, start: Path) -> Path:
-        """Find monorepo root by searching upward for libs directory.
-
-        Args:
-            start: Starting directory for search.
-
-        Returns:
-            Path to monorepo root.
-        """
-        ...
-
-
-class LoadOrchestratorProto(Protocol):
-    """Protocol for loading the guard orchestrator."""
-
-    def __call__(self, monorepo_root: Path) -> RunForProjectProto:
-        """Load the orchestrator's run_for_project function.
-
-        Args:
-            monorepo_root: Root directory of the monorepo.
-
-        Returns:
-            The run_for_project function.
-        """
-        ...
-
-
-# Guard hooks - None means use default behavior (production implementation)
-# The guard hooks live on HooksContainer; see the class definition.
 
 
 # =============================================================================
