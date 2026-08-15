@@ -4,12 +4,12 @@ tags: [platform-workers, rq, redis, background-jobs, libs]
 related:
   - "[[monorepo-discipline]]"
 source_paths:
-  - libs/platform_workers/
+  - libs/platform_workers
   - libs/platform_workers/README.md
 source_git_blobs:
-  "libs/platform_workers/": d32221668a076e52b3da5e6b9c21641fd50c4154
+  "libs/platform_workers": b731d11049525ea3ae686819d63572969544cfb7
   "libs/platform_workers/README.md": 2738a93b4df60fa12e22e87feea8857f4e51b74b
-fact_checked: "2026-07-20"
+fact_checked: "2026-08-14"
 confidence: high
 hubs: [libs]
 ---
@@ -74,6 +74,6 @@ The corollary: if you find yourself needing background work in a service that do
 
 [^1]: [`libs/platform_workers/README.md`](../../libs/platform_workers/README.md) — "Typed Redis helpers and RQ (Redis Queue) harness for background job processing."
 [^2]: `libs/platform_workers/src/platform_workers/redis.py:282,315,324,336` — `redis_raw_for_rq(url) -> _RedisBytesClient`, `redis_for_kv(url) -> RedisStrProto`, `redis_for_rq(url) -> RedisBytesProto`, `redis_for_pubsub(url) -> RedisAsyncProto`. Four distinct return protocols is what makes the mis-pass a type error.
-[^3]: `libs/platform_workers/src/platform_workers/rq_harness.py` — `WorkerConfig(TypedDict)` at `:19`, `rq_retry(*, max_retries: int, intervals: list[int]) -> RQRetryLike` at `:102`, `get_current_job() -> CurrentJobProto | None` at `:229`, `run_rq_worker(config: WorkerConfig) -> None` at `:240`, `rq_fetch_job(job_id: str, connection: _RedisBytesClient) -> FetchedJobProto` at `:290`.
+[^3]: `libs/platform_workers/src/platform_workers/rq_harness.py` — `WorkerConfig(TypedDict)` at `:19`, `rq_retry(*, max_retries: int, intervals: list[int]) -> RQRetryLike` at `:102`, `get_current_job() -> CurrentJobProto | None` at `:229`, `run_rq_worker(config: WorkerConfig) -> None` at `:240`, `rq_fetch_job(job_id: str, connection: _RedisBytesClient) -> FetchedJobProto` at `:290`. All five re-verified exact 2026-08-14. The re-check was prompted by the trailing-slash under-pin: this page's `libs/platform_workers/` entry had been pinned to the package's `.gitignore` rather than to the tree, so nothing under it was watched. What changed since the 2026-07-20 check is `_RQJobInternal`, which declared `get_id()`; rq has removed that method in favour of an `id` property, so the protocol as written raised `AttributeError` against any modern rq while the test fakes — which implemented the protocol as declared — kept passing. Protocol and fake now both mirror `id`. This page asserts nothing about `get_id`, so no claim here was wrong; the anchors below the protocol did all shift by 8 lines and are re-taken above.
 [^4]: `libs/platform_workers/src/platform_workers/health.py` — `readyz_redis(redis: RedisStrProto) -> ReadyResponse` at `:17` returning `{"status": "degraded", "reason": "redis error"}` (`:34`), `{"status": "degraded", "reason": "redis no-pong"}` (`:38`), else `{"status": "ready", "reason": None}` (`:40`); `readyz_redis_with_workers(redis, *, workers_key: str = "rq:workers")` at `:43-47`, which additionally calls `redis.scard(workers_key)` (`:75`) and returns `{"status": "degraded", "reason": "no-worker"}` when the count is `<= 0` (`:84-86`). `ReadyResponse` is imported from `platform_core.health` (`:9`).
 [^5]: Verified 2026-07-31 by grepping every `pyproject.toml` under `services/` and `libs/` for a `platform_workers` dependency. The ten services listed are exactly the matches; `github-stats-api`, `grandma-api`, and `opportunity-radar-api` return no match. (`libs/platform_discord` and `libs/platform_music` also consume it, but they are libs rather than services.)

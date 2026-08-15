@@ -5,13 +5,13 @@ related:
   - "[[platform-workers-rq-pattern]]"
 source_paths:
   - monorepo-guards.toml
-  - libs/monorepo_guards/
+  - libs/monorepo_guards
   - README.md
 source_git_blobs:
   "monorepo-guards.toml": 496d1d68863cdea918fb7a0f94153179d711805e
-  "libs/monorepo_guards/": 8ccb12ad72ef6ba9140636f991480dbca3073708
+  "libs/monorepo_guards": e2a1c8af86163f22fe189caa5c8a195b21a48a11
   "README.md": 84d4506bb73716438a79e40e4a0fe09dba2851e4
-fact_checked: "2026-07-31"
+fact_checked: "2026-08-14"
 confidence: high
 hubs: [infrastructure]
 ---
@@ -62,6 +62,6 @@ If your change makes any of the three rules seem too restrictive, that's usually
 
 [^1]: [README.md](../../README.md) `:171-172` — verbatim: "**Type Safety**: mypy strict mode, zero `Any` types, zero `cast`, zero `type: ignore`" and "**Test Coverage**: 100% statement + branch coverage enforced". **Quote corrected 2026-08-05:** this footnote previously read "Type Safety: mypy strict mode, zero `Any` types. 100% Test Coverage: Statements and branches" and cited a "§ Services table" it does not come from. Neither half matched the file — the Type Safety line has since been extended with `zero cast, zero type: ignore`, and the coverage line was reworded, so the string "100% Test Coverage" appears nowhere in README.md. Re-read from the file rather than repinned.
 [^2]: Verified 2026-07-31 by sweeping every `pyproject.toml` at depth ≤ 2 under `libs/` and `services/`: 36 of 36 declare `strict = true`. `libs/covenant_ml/pyproject.toml:44,49-52` is representative — `strict = true` plus `disallow_any_unimported`, `disallow_any_expr`, `disallow_any_decorated`, and `disallow_any_explicit` all `true`, which is what makes an explicit `Any` a failure rather than a warning.
-[^3]: Same sweep, 2026-07-31 — 36 of 36 `pyproject.toml` files declare both `branch = true` and `fail_under = 100`, with no exceptions. `libs/covenant_ml/pyproject.toml:88,93` is representative. Per-package scoping follows from each package carrying its own `[tool.coverage]` block rather than a repo-level one.
+[^3]: Same sweep, 2026-07-31; re-checked 2026-08-14 after the trailing-slash under-pin was found — this page's `libs/monorepo_guards/` entry had been pinned to that package's `.gitignore` rather than to its tree, so nothing under it was watched. The only change since is `ExceptionsRule._log_call_any` in `exceptions_rules.py`, which added `write_line` to the set of calls that count as surfacing a failure in an `except` body (the sanctioned output channel of the stdlib-only clients). This page states the three rules' intent and asserts nothing about that regex, so no claim moved. 36 of 36 `pyproject.toml` files declare both `branch = true` and `fail_under = 100`, with no exceptions. `libs/covenant_ml/pyproject.toml:88,93` is representative. Per-package scoping follows from each package carrying its own `[tool.coverage]` block rather than a repo-level one.
 [^4]: `libs/monorepo_guards/src/monorepo_guards/` — 30 modules defining 33 `*Rule` classes across 31 distinct rule names (counted 2026-07-31), so "20+ rules" holds with margin. Config at `monorepo-guards.toml` in the repo root.
 [^5]: [synthesis] over the three verified layers — `pyproject.toml` at depth ≤ 2 under `libs/` and `services/` (36 of 36 declaring `strict = true`, and 36 of 36 declaring both `branch = true` and `fail_under = 100`), plus `libs/monorepo_guards/src/monorepo_guards/` (30 modules, 33 `*Rule` classes, 31 distinct rule names). Those measurements are [^2], [^3] and [^4]; this footnote adds no source of its own. **Documented negative:** the assertion that removing a layer "historically produced a real fire" is an editorial judgement — no incident record exists for it in this repo, and none is cited.
