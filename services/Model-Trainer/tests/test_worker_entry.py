@@ -13,7 +13,6 @@ from platform_workers.rq_harness import WorkerConfig
 from model_trainer import _test_hooks
 from model_trainer.worker_entry import (
     _build_config,
-    _get_default_runner,
     _run_worker,
     main,
 )
@@ -129,34 +128,11 @@ def test_main_builds_config_from_env_when_not_provided() -> None:
     assert runner.configs[0]["queue_name"] == TRAINER_QUEUE
 
 
-def test_get_default_runner_returns_test_runner_when_set() -> None:
-    """Test _get_default_runner returns test_runner when set."""
-
-    def _custom_runner(config: WorkerConfig) -> None:
-        pass
-
-    original = _test_hooks.test_runner
-    _test_hooks.test_runner = _custom_runner
-
-    result = _get_default_runner()
-
-    _test_hooks.test_runner = original
-
-    assert result is _custom_runner
-
-
-def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> None:
-    """Test _get_default_runner returns run_rq_worker when test_runner is None."""
+def test_worker_runner_hook_is_bound_to_the_real_rq_runner() -> None:
+    """The hook holds the production runner, so no fallback branch is needed."""
     from platform_workers.rq_harness import run_rq_worker
 
-    original = _test_hooks.test_runner
-    _test_hooks.test_runner = None
-
-    result = _get_default_runner()
-
-    _test_hooks.test_runner = original
-
-    assert result is run_rq_worker
+    assert _test_hooks.worker_runner is run_rq_worker
 
 
 def test_main_uses_test_runner_when_set() -> None:
@@ -169,14 +145,14 @@ def test_main_uses_test_runner_when_set() -> None:
         received_configs.append(config)
 
     # Set the test runner in _test_hooks
-    original = _test_hooks.test_runner
-    _test_hooks.test_runner = _recording_runner
+    original = _test_hooks.worker_runner
+    _test_hooks.worker_runner = _recording_runner
 
     # Call main() with no args - should use test_runner
     main()
 
     # Restore
-    _test_hooks.test_runner = original
+    _test_hooks.worker_runner = original
 
     assert len(received_configs) == 1
     assert received_configs[0]["redis_url"] == "redis://test-runner:6379/0"
@@ -200,8 +176,8 @@ def test_main_guard_executes_main() -> None:
         received_configs.append(config)
 
     # Set the test runner in _test_hooks BEFORE running as __main__
-    original = _test_hooks.test_runner
-    _test_hooks.test_runner = _recording_runner
+    original = _test_hooks.worker_runner
+    _test_hooks.worker_runner = _recording_runner
 
     # Remove the module from sys.modules to avoid the RuntimeWarning
     # about the module being found in sys.modules prior to execution
@@ -220,7 +196,7 @@ def test_main_guard_executes_main() -> None:
         sys.modules[module_name] = saved_module
 
     # Restore test runner
-    _test_hooks.test_runner = original
+    _test_hooks.worker_runner = original
 
     # The guard should have been triggered, calling main()
     assert len(received_configs) == 1
