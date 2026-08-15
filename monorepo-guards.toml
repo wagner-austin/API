@@ -3,7 +3,11 @@
 # consistency and prevent configuration drift.
 
 [guards]
-directories = ["src", "scripts", "tests"]
+# "python" is the maturin ``python-source`` root used by the mixed Rust/Python
+# crates (libs/cleargbm_rs): their importable Python lives there rather than in
+# "src", which holds Rust. Listing it here keeps that code under the same guards
+# as every other package instead of silently escaping them.
+directories = ["src", "scripts", "tests", "python"]
 exclude_parts = [
     ".venv",
     "__pycache__",
