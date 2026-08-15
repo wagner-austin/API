@@ -21,8 +21,14 @@ only production reaches::
             return _test_hooks.guard_find_monorepo_root(start)
         return _find_root_impl(start)
 
-Both halves are detected: the nullable declaration in the hooks module, and
-the check-then-call dispatch wherever it appears.
+The same branch is often written as an ``or``, which reads as one expression
+but does exactly the same thing -- picks between two implementations at run
+time -- and is easy to miss when reviewing for the ``is not None`` form::
+
+    sync_func = _test_hooks.orchestrator_sync_global_override or self._sync_global
+
+All three halves are detected: the nullable declaration in the hooks module,
+the check-then-call dispatch, and the or-ed fallback binding.
 """
 
 from __future__ import annotations
@@ -222,7 +228,11 @@ class NullableHookRule:
 
 
 class HookDispatchRule:
-    """Ban ``if hook is not None: return hook(...)`` conditional dispatch."""
+    """Ban run-time choices between a hook and a second implementation.
+
+    Two spellings are flagged: ``if hook is not None: return hook(...)`` and
+    ``func = hook or fallback``.
+    """
 
     name = "hook-dispatch"
 
@@ -271,6 +281,27 @@ class HookDispatchRule:
             return None
         return checked
 
+    def _fallback_target(self, node: ast.Assign | ast.AnnAssign) -> str | None:
+        """Return the hook an or-ed fallback binding chooses between.
+
+        Only a binding is treated as dispatch: ``if hooks.x or y:`` asks a
+        question about the hook, whereas ``f = hooks.x or y`` picks one of two
+        implementations and gives it a name to call.
+
+        Args:
+            node: Assignment to inspect.
+
+        Returns:
+            The hook's dotted path, or None when this is not the pattern.
+        """
+        value = node.value
+        if not isinstance(value, ast.BoolOp) or not isinstance(value.op, ast.Or):
+            return None
+        checked = _attribute_path(value.values[0])
+        if checked is None or not self._references_hooks(checked):
+            return None
+        return checked
+
     def run(self, files: list[Path]) -> list[Violation]:
         """Run the rule over the given files.
 
@@ -278,28 +309,40 @@ class HookDispatchRule:
             files: Python files to scan.
 
         Returns:
-            Every check-then-call hook dispatch found.
+            Every conditional and or-ed hook dispatch found.
         """
         out: list[Violation] = []
         for path in files:
             tree = ast.parse(path.read_text(encoding="utf-8", errors="strict"), filename=str(path))
             for node in ast.walk(tree):
-                if not isinstance(node, ast.If):
-                    continue
-                hook = self._dispatch_target(node)
-                if hook is None:
-                    continue
-                out.append(
-                    Violation(
-                        file=path,
-                        line_no=node.lineno,
-                        kind="hook-conditional-dispatch",
-                        line=(
-                            f"call {hook} directly; production binds it to the real "
-                            "implementation, so no 'is not None' branch is needed"
-                        ),
-                    )
-                )
+                if isinstance(node, ast.If):
+                    hook = self._dispatch_target(node)
+                    if hook is not None:
+                        out.append(
+                            Violation(
+                                file=path,
+                                line_no=node.lineno,
+                                kind="hook-conditional-dispatch",
+                                line=(
+                                    f"call {hook} directly; production binds it to the real "
+                                    "implementation, so no 'is not None' branch is needed"
+                                ),
+                            )
+                        )
+                elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    hook = self._fallback_target(node)
+                    if hook is not None:
+                        out.append(
+                            Violation(
+                                file=path,
+                                line_no=node.lineno,
+                                kind="hook-fallback-dispatch",
+                                line=(
+                                    f"call {hook} directly; or-ing it with a fallback leaves a "
+                                    "second implementation that only production reaches"
+                                ),
+                            )
+                        )
         return out
 
 

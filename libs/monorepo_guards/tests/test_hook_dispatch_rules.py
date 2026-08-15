@@ -250,6 +250,88 @@ class TestHookDispatchRule:
 
         assert HookDispatchRule().run([path]) == []
 
+    def test_flags_or_ed_fallback_binding(self, tmp_path: Path) -> None:
+        """Or-ing a hook with a fallback is the same dispatch, spelled shorter.
+
+        DiscordBot's orchestrator wrote both of its live hooks this way, and
+        the 'is not None' check alone did not see them.
+        """
+        path = _write(
+            tmp_path / "orchestrator.py",
+            "def sync(self):\n"
+            "    sync_func = _test_hooks.sync_global_override or self._sync_global\n"
+            "    return sync_func()\n",
+        )
+
+        violations = HookDispatchRule().run([path])
+
+        assert [v.kind for v in violations] == ["hook-fallback-dispatch"]
+        assert violations[0].line_no == 2
+
+    def test_flags_annotated_or_ed_fallback_binding(self, tmp_path: Path) -> None:
+        """The annotated form of the same binding is flagged."""
+        path = _write(
+            tmp_path / "orchestrator.py",
+            "def start(self):\n    get_cog: GetCog = hooks.get_cog_override or self.bot.get_cog\n",
+        )
+
+        assert len(HookDispatchRule().run([path])) == 1
+
+    def test_accepts_or_ed_hook_in_a_condition(self, tmp_path: Path) -> None:
+        """Asking whether either is set is a question, not a choice of impl."""
+        path = _write(
+            tmp_path / "orchestrator.py",
+            "def ready():\n    if hooks.override or default_ready:\n        return True\n"
+            "    return False\n",
+        )
+
+        assert HookDispatchRule().run([path]) == []
+
+    def test_accepts_or_ed_binding_that_names_no_hook(self, tmp_path: Path) -> None:
+        """An ordinary or-ed default is not a hooks reference."""
+        path = _write(
+            tmp_path / "service.py",
+            "def run(config):\n    timeout = config.timeout or 30\n    return timeout\n",
+        )
+
+        assert HookDispatchRule().run([path]) == []
+
+    def test_accepts_or_ed_binding_rooted_in_a_call(self, tmp_path: Path) -> None:
+        """An attribute chain rooted in a call is not a hooks reference."""
+        path = _write(
+            tmp_path / "service.py",
+            "def run():\n    f = get_hooks().override or real\n    return f()\n",
+        )
+
+        assert HookDispatchRule().run([path]) == []
+
+    def test_accepts_and_ed_binding(self, tmp_path: Path) -> None:
+        """Only 'or' picks a fallback; 'and' does not."""
+        path = _write(
+            tmp_path / "service.py",
+            "def run():\n    ok = hooks.enabled and hooks.ready\n    return ok\n",
+        )
+
+        assert HookDispatchRule().run([path]) == []
+
+    def test_accepts_plain_hook_binding(self, tmp_path: Path) -> None:
+        """Binding a hook to a name without a fallback is the sanctioned form."""
+        path = _write(
+            tmp_path / "service.py",
+            "def run():\n    f = _test_hooks.sync_global\n    return f()\n",
+        )
+
+        assert HookDispatchRule().run([path]) == []
+
+    def test_accepts_annotation_without_a_value(self, tmp_path: Path) -> None:
+        """A bare annotation binds nothing, so it dispatches nothing."""
+        path = _write(
+            tmp_path / "service.py",
+            "class C:\n    hook: SomeProto\n",
+        )
+
+        assert HookDispatchRule().run([path]) == []
+
     def test_flags_qualified_callable_annotation(self, tmp_path: Path) -> None:
         """A dotted Callable annotation is recognised."""
         path = _write(
