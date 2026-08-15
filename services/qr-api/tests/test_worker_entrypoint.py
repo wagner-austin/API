@@ -13,7 +13,6 @@ from qr_api import _test_hooks
 from qr_api._test_hooks import _default_get_env
 from qr_api.worker_entry import (
     _build_config,
-    _get_default_runner,
     _run_worker,
     main,
 )
@@ -23,10 +22,10 @@ from qr_api.worker_entry import (
 def _restore_hooks() -> Generator[None, None, None]:
     """Restore all hooks after each test."""
     original_get_env = _test_hooks.get_env
-    original_test_runner = _test_hooks.test_runner
+    original_worker_runner = _test_hooks.worker_runner
     yield
     _test_hooks.get_env = original_get_env
-    _test_hooks.test_runner = original_test_runner
+    _test_hooks.worker_runner = original_worker_runner
 
 
 class _RecordingLogger:
@@ -132,34 +131,27 @@ def test_main_builds_config_from_env_when_not_provided() -> None:
     assert runner.configs[0]["queue_name"] == QR_QUEUE
 
 
-def test_get_default_runner_returns_test_runner_when_set() -> None:
-    """Test _get_default_runner returns test_runner when set."""
-
-    def _custom_runner(config: WorkerConfig) -> None:
-        pass
-
-    original = _test_hooks.test_runner
-    _test_hooks.test_runner = _custom_runner
-
-    result = _get_default_runner()
-
-    _test_hooks.test_runner = original
-
-    assert result is _custom_runner
-
-
-def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> None:
-    """Test _get_default_runner returns run_rq_worker when test_runner is None."""
+def test_worker_runner_hook_is_bound_to_the_real_rq_runner() -> None:
+    """The hook holds the production runner, so no fallback branch is needed."""
     from platform_workers.rq_harness import run_rq_worker
 
-    original = _test_hooks.test_runner
-    _test_hooks.test_runner = None
+    assert _test_hooks.worker_runner is run_rq_worker
 
-    result = _get_default_runner()
 
-    _test_hooks.test_runner = original
+def test_main_uses_the_rebound_worker_runner() -> None:
+    """Rebinding the hook is what redirects main() to a different runner."""
 
-    assert result is run_rq_worker
+    def _custom_runner(config: WorkerConfig) -> None:
+        recorded.append(config)
+
+    recorded: list[WorkerConfig] = []
+    _test_hooks.worker_runner = _custom_runner
+    _test_hooks.get_env = lambda key: {"REDIS_URL": "redis://hook:6379/0"}.get(key)
+
+    main()
+
+    assert len(recorded) == 1
+    assert recorded[0]["redis_url"] == "redis://hook:6379/0"
 
 
 def test_main_uses_test_runner_when_set() -> None:
@@ -173,7 +165,7 @@ def test_main_uses_test_runner_when_set() -> None:
         received_configs.append(config)
 
     # Set the test runner in _test_hooks
-    _test_hooks.test_runner = _recording_runner
+    _test_hooks.worker_runner = _recording_runner
 
     # Call main() with no args - should use test_runner
     main()
@@ -201,7 +193,7 @@ def test_main_guard_executes_main() -> None:
         received_configs.append(config)
 
     # Set the test runner in _test_hooks BEFORE running as __main__
-    _test_hooks.test_runner = _recording_runner
+    _test_hooks.worker_runner = _recording_runner
 
     # Remove the module from sys.modules to avoid the RuntimeWarning
     # about the module being found in sys.modules prior to execution
