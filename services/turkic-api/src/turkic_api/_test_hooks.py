@@ -2,12 +2,12 @@
 
 This module is the registry: one module-level name per injectable dependency,
 each bound to its production implementation at import time. Production code calls
-the hook directly and never asks whether it has been replaced —
+the hook directly and never asks whether it has been replaced â€”
 
     from turkic_api import _test_hooks
     client = _test_hooks.redis_factory(url)
 
-— and a test rebinds the name before exercising the code under test, restoring
+â€” and a test rebinds the name before exercising the code under test, restoring
 it afterwards (``tests/conftest.py`` does this automatically for every hook).
 There is no conditional anywhere, because there is nothing to be conditional
 about: the hook is always present and always callable.
@@ -24,6 +24,7 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 
 from platform_workers.redis import RedisStrProto
+from platform_workers.rq_harness import run_rq_worker
 
 from turkic_api._hook_defaults import (
     _default_build_lang_script_filter,
@@ -73,7 +74,10 @@ from turkic_api._hook_protocols import (
     WorkerRunnerProtocol,
 )
 
-test_runner: WorkerRunnerProtocol | None = None
+# Hook for the worker runner, bound to the real RQ runner. Tests rebind
+# it BEFORE running worker_entry as __main__; because this is a separate
+# module, the binding persists across runpy.run_module.
+worker_runner: WorkerRunnerProtocol = run_rq_worker
 get_env: Callable[[str], str | None] = _default_get_env
 redis_factory: Callable[[str], RedisStrProto] = _default_redis_for_kv
 local_corpus_service_factory: LocalCorpusServiceFactoryProtocol = _default_local_corpus_factory
@@ -180,7 +184,7 @@ __all__ = [
     "stream_culturax_hook",
     "stream_oscar_hook",
     "stream_wikipedia_xml_hook",
-    "test_runner",
     "to_ipa",
     "wikipedia_requests_get",
+    "worker_runner",
 ]

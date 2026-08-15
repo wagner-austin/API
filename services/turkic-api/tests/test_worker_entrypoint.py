@@ -13,7 +13,6 @@ from platform_workers.rq_harness import WorkerConfig
 from turkic_api import _test_hooks
 from turkic_api.worker_entry import (
     _build_config,
-    _get_default_runner,
     _run_worker,
     main,
 )
@@ -128,28 +127,11 @@ def test_main_builds_config_from_settings_when_not_provided() -> None:
     assert runner.configs[0]["queue_name"] == TURKIC_QUEUE
 
 
-def test_get_default_runner_returns_test_runner_when_set() -> None:
-    """Test _get_default_runner returns test_runner when set."""
-
-    def _custom_runner(config: WorkerConfig) -> None:
-        pass
-
-    _test_hooks.test_runner = _custom_runner
-
-    result = _get_default_runner()
-
-    assert result is _custom_runner
-
-
-def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> None:
-    """Test _get_default_runner returns run_rq_worker when test_runner is None."""
+def test_worker_runner_hook_is_bound_to_the_real_rq_runner() -> None:
+    """The hook holds the production runner, so no fallback branch is needed."""
     from platform_workers.rq_harness import run_rq_worker
 
-    _test_hooks.test_runner = None
-
-    result = _get_default_runner()
-
-    assert result is run_rq_worker
+    assert _test_hooks.worker_runner is run_rq_worker
 
 
 def test_main_uses_test_runner_when_set() -> None:
@@ -170,7 +152,7 @@ def test_main_uses_test_runner_when_set() -> None:
         received_configs.append(config)
 
     # Set the test runner in _test_hooks
-    _test_hooks.test_runner = _recording_runner
+    _test_hooks.worker_runner = _recording_runner
 
     # Call main() with no args - should use test_runner
     main()
@@ -204,7 +186,7 @@ def test_main_guard_executes_main() -> None:
         received_configs.append(config)
 
     # Set the test runner in _test_hooks BEFORE running as __main__
-    _test_hooks.test_runner = _recording_runner
+    _test_hooks.worker_runner = _recording_runner
 
     # Remove the module from sys.modules to avoid the RuntimeWarning
     # about the module being found in sys.modules prior to execution

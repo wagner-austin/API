@@ -35,7 +35,7 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     original_platform_get_env = config_test_hooks.get_env
 
     # Store original values - turkic hooks
-    original_test_runner = _test_hooks.test_runner
+    original_worker_runner = _test_hooks.worker_runner
     original_get_env = _test_hooks.get_env
     original_redis_factory = _test_hooks.redis_factory
     original_local_corpus_service_factory = _test_hooks.local_corpus_service_factory
@@ -57,7 +57,7 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     config_test_hooks.get_env = original_platform_get_env
 
     # Restore original values - turkic hooks
-    _test_hooks.test_runner = original_test_runner
+    _test_hooks.worker_runner = original_worker_runner
     _test_hooks.get_env = original_get_env
     _test_hooks.redis_factory = original_redis_factory
     _test_hooks.local_corpus_service_factory = original_local_corpus_service_factory
