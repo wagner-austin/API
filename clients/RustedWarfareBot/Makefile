@@ -6,7 +6,7 @@ SHELL := powershell.exe
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet door fleet-up income sweep
+.PHONY: help lint test check sources install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet door fleet-up income sweep
 
 help:
 	@Write-Host ""
@@ -17,6 +17,7 @@ help:
 	@Write-Host "  make check                       lint + test (the gate)"
 	@Write-Host "  make lint                        guard + ruff + mypy over src, tests, scripts"
 	@Write-Host "  make test                        pytest + coverage (100% statements and branches)"
+	@Write-Host "  make sources                     wiki provenance and navigation gate"
 	@Write-Host "  make install                     poetry install"
 	@Write-Host ""
 	@Write-Host "Game probes (need the pinned copy at $(GAME_DIR)):" -ForegroundColor Yellow
@@ -100,12 +101,22 @@ test:
 	@Write-Host ""
 	@Write-Host "[test] passed" -ForegroundColor Green
 
+# The wiki's mechanical contract, gated: cited paths resolve with anchors in
+# bounds, wikilinks land, footnotes pair, every page is hub-reachable, and the
+# index counts are true. Enforced because the 2026-08-14 hand audit found five
+# defects that had accumulated silently -- and its own first run then caught
+# the hand audit overcounting every hub by the format-comment line.
+sources:
+	@Write-Host ""
+	@Write-Host "==> sources (wiki provenance and navigation)" -ForegroundColor Cyan
+	poetry run python -m scripts.wiki_check
+
 # The Java half is gated here too. Without agent-selftest in the chain, a
 # patcher regression or an obfuscated name that moved in a game update stays
 # invisible until a live run dies in the engine, which is the worst place to
 # read a build error. It needs the pinned game copy, which every other game
 # target already requires.
-check: lint | test agent-selftest
+check: lint sources | test agent-selftest
 	@Write-Host ""
 	@Write-Host "=== ALL CHECKS PASSED ===" -ForegroundColor Green
 	@Write-Host ""
