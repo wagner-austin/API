@@ -22,7 +22,7 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     original_platform_get_env = config_test_hooks.get_env
 
     # Store original values - music-wrapped hooks
-    original_test_runner = _test_hooks.test_runner
+    original_worker_runner = _test_hooks.worker_runner
     original_get_env = _test_hooks.get_env
     original_require_env = _test_hooks.require_env
     original_redis_factory = _test_hooks.redis_factory
@@ -45,7 +45,7 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     config_test_hooks.get_env = original_platform_get_env
 
     # Restore original values - music-wrapped hooks
-    _test_hooks.test_runner = original_test_runner
+    _test_hooks.worker_runner = original_worker_runner
     _test_hooks.get_env = original_get_env
     _test_hooks.require_env = original_require_env
     _test_hooks.redis_factory = original_redis_factory

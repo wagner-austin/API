@@ -36,6 +36,7 @@ from platform_workers.rq_harness import (
     _RedisBytesClient,
     redis_raw_for_rq,
     rq_queue,
+    run_rq_worker,
 )
 
 # =============================================================================
@@ -343,9 +344,10 @@ def _default_guard_load_orchestrator(monorepo_root: Path) -> GuardRunForProjectP
 # Module-level hooks
 # =============================================================================
 
-# Hook for worker runner (used by worker_entry.py)
-# Tests set this BEFORE running worker_entry as __main__.
-test_runner: WorkerRunnerProtocol | None = None
+# Hook for the worker runner, bound to the real RQ runner. Tests rebind
+# it BEFORE running worker_entry as __main__; because this is a separate
+# module, the binding persists across runpy.run_module.
+worker_runner: WorkerRunnerProtocol = run_rq_worker
 
 # Hook for environment variable access. Tests can override to provide fake values.
 get_env: Callable[[str], str | None] = _default_get_env
@@ -420,7 +422,6 @@ guard_load_orchestrator: GuardLoadOrchestratorProtocol = _default_guard_load_orc
 
 
 __all__ = [
-    # Protocols
     "GuardFindMonorepoRootProtocol",
     "GuardLoadOrchestratorProtocol",
     "GuardRunForProjectProtocol",
@@ -432,7 +433,6 @@ __all__ = [
     "UrlOpenPostProtocol",
     "UrlOpenProtocol",
     "WorkerRunnerProtocol",
-    # Default implementations
     "_default_build_renderer",
     "_default_get_env",
     "_default_get_job",
@@ -448,7 +448,6 @@ __all__ = [
     "_default_spotify_exchange_code",
     "_default_urlopen_get",
     "_default_urlopen_post",
-    # Module-level hooks
     "build_renderer",
     "get_env",
     "get_job",
@@ -462,7 +461,10 @@ __all__ = [
     "rq_conn",
     "rq_queue_factory",
     "spotify_exchange_code",
-    "test_runner",
     "urlopen_get",
     "urlopen_post",
+    "worker_runner",
+    # Default implementations
+    # Module-level hooks
+    # Protocols
 ]
