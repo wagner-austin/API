@@ -322,6 +322,20 @@ class FakeFileSystem:
         """
         self._files[str(path)] = content
 
+    def replace_text(self, path: Path, content: str) -> None:
+        """Atomically replace text in the fake file map.
+
+        The in-memory dict assignment is already atomic from a
+        reader's perspective, so the fake and the real hook share the
+        same observable contract: whole old content or whole new
+        content, never a torn write.
+
+        Args:
+            path: File path.
+            content: File content.
+        """
+        self._files[str(path)] = content
+
     def read_text(self, path: Path) -> str:
         """Read text from fake file.
 
@@ -383,11 +397,22 @@ class FakeFileSystem:
         """
         from fnmatch import fnmatch
 
-        matches = [
-            Path(key)
-            for key in self._files
-            if Path(key).parent == directory and fnmatch(Path(key).name, pattern)
-        ]
+        # Match the REAL hook's Path.glob contract exactly: the
+        # pattern applies to the path relative to ``directory``,
+        # segment by segment, and ``*`` never crosses a separator
+        # (so "*/knowledge.json" finds instance files one level down
+        # without a flat "*.json" ever matching nested paths).
+        pattern_parts = pattern.split("/")
+        matches: list[Path] = []
+        for key in self._files:
+            candidate = Path(key)
+            if not candidate.is_relative_to(directory):
+                continue
+            parts = candidate.relative_to(directory).parts
+            if len(parts) != len(pattern_parts):
+                continue
+            if all(fnmatch(part, glob) for part, glob in zip(parts, pattern_parts, strict=True)):
+                matches.append(candidate)
         return sorted(matches)
 
     def get_written_files(self) -> dict[str, str]:
@@ -449,6 +474,7 @@ def fake_fs() -> Generator[FakeFileSystem, None, None]:
     original_append_text = _test_hooks.append_text
     original_path_exists = _test_hooks.path_exists
     original_glob_paths = _test_hooks.glob_paths
+    original_replace_text = _test_hooks.replace_text
 
     # Create a 1000-character fake static key for testing
     # This matches the expected format of the real key
@@ -460,6 +486,7 @@ def fake_fs() -> Generator[FakeFileSystem, None, None]:
     _test_hooks.append_text = fs.append_text
     _test_hooks.path_exists = fs.path_exists
     _test_hooks.glob_paths = fs.glob_paths
+    _test_hooks.replace_text = fs.replace_text
 
     # Pre-populate the static key file
     fs.write_text(DEFAULT_STATIC_KEY_PATH, fake_static_key)
@@ -471,6 +498,7 @@ def fake_fs() -> Generator[FakeFileSystem, None, None]:
     _test_hooks.append_text = original_append_text
     _test_hooks.path_exists = original_path_exists
     _test_hooks.glob_paths = original_glob_paths
+    _test_hooks.replace_text = original_replace_text
 
 
 def make_fake_get_env(env_vars: dict[str, str]) -> Callable[[str], str | None]:
