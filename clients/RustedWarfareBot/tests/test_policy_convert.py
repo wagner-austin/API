@@ -196,3 +196,62 @@ def test_an_empty_field_offers_no_step() -> None:
     budget = Budget(20_000, reserve=0)
     assert ladder.convert(_ladder_world(), budget, 2) == ()
     assert budget.spent() == 0
+
+
+def test_an_overridden_holder_is_evicted_and_the_channel_re_offers() -> None:
+    """The battery converts the same base turret and the engine honors
+    whoever sent last (log 2026-08-14): a holder that became a DIFFERENT
+    fork -- standing, not the target, no longer offering it -- must not
+    count as underway, or the headcount runs one short for the rest of
+    the match. A second holder gets the order instead."""
+    flamer = Converter()
+    ordered = flamer.convert(_world(holders=2), Budget(10_000, reserve=0), 1)
+    assert [o["unit_id"] for o in ordered] == [700]
+    stolen = sample(
+        entity(213, "commandCenter"),
+        entity(700, "c_turret_t1_artillery", x=100.0),
+        entity(701, "c_turret_t1", x=101.0),
+        credits=4000,
+        options=(option(701, FLAME_TYPE, key="u_flame_1", index=0, price=1000),),
+    )
+    orders = flamer.convert(stolen, Budget(10_000, reserve=0), 1)
+    assert [o["unit_id"] for o in orders] == [701]
+
+
+def test_a_holder_mid_conversion_still_offering_is_not_evicted() -> None:
+    """A converting structure keeps offering the upgrade it is
+    performing; only the override -- standing as another fork with no
+    offer left -- is eviction, so the duplicate rule holds."""
+    flamer = Converter()
+    flamer.convert(_world(holders=1), Budget(10_000, reserve=0), 1)
+    still_converting = _world(holders=1, converting=True)
+    assert flamer.convert(still_converting, Budget(10_000, reserve=0), 1) == ()
+
+
+def test_the_ladders_overridden_holder_is_evicted_and_re_offered() -> None:
+    """The Converter's eviction rule, lifted to the ladder (log
+    2026-08-14): a base turret ordered up the gun chain that stands as
+    the ARTILLERY fork was overridden by the battery; counting it
+    underway would run the chain short forever."""
+    gunner = TurretLadder()
+    two_bases = sample(
+        entity(213, "commandCenter"),
+        entity(700, "c_turret_t1", x=100.0),
+        entity(701, "c_turret_t1", x=101.0),
+        credits=20_000,
+        options=(
+            option(700, "c_turret_t2_gun", key="u_gun_0", index=0, price=1000),
+            option(701, "c_turret_t2_gun", key="u_gun_1", index=1, price=1000),
+        ),
+    )
+    ordered = gunner.convert(two_bases, Budget(20_000, reserve=0), 1)
+    assert [o["unit_id"] for o in ordered] == [700]
+    stolen = sample(
+        entity(213, "commandCenter"),
+        entity(700, "c_turret_t1_artillery", x=100.0),
+        entity(701, "c_turret_t1", x=101.0),
+        credits=20_000,
+        options=(option(701, "c_turret_t2_gun", key="u_gun_1", index=0, price=1000),),
+    )
+    orders = gunner.convert(stolen, Budget(20_000, reserve=0), 1)
+    assert [o["unit_id"] for o in orders] == [701]

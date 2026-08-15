@@ -3,7 +3,9 @@
 The engine's acceptance is read from the roster, never assumed from the
 order -- so the fake world here grants water by growing a factory and
 refuses it by silence, exactly the sensor the live probe proved
-(log 2026-08-10, the sea probe).
+(log 2026-08-10, the sea probe). Funding is its own early-tick step and
+the builder holds the incomplete factory: the battery's pilots measured
+both defects in this walk's twin (log 2026-08-14).
 """
 
 from __future__ import annotations
@@ -45,11 +47,19 @@ def _world() -> Sample:
     return sample(_ANCHOR, _BUILDER, pools=(_POOL,), credits=4000)
 
 
+def _step(yard: Shipyard, world: Sample, budget: Budget) -> tuple[float, ...]:
+    """One tick of the channel: fund, then walk; the quartermaster's order."""
+    yard.fund(world, _CATALOGUE, budget, True)
+    return tuple(o["x"] for o in yard.establish(world, _CATALOGUE, budget, True))
+
+
 def test_the_walk_offers_the_nearest_fraction_first() -> None:
     """Anchor (0,0), mirror (1000,0): the first candidate is 20 percent of
     the way to the reflected start."""
     yard = Shipyard()
-    orders = yard.establish(_world(), _CATALOGUE, Budget(4000, 0), True)
+    budget = Budget(4000, 0)
+    yard.fund(_world(), _CATALOGUE, budget, True)
+    orders = yard.establish(_world(), _CATALOGUE, budget, True)
     assert [(o["type_name"], o["unit_id"], o["x"], o["y"]) for o in orders] == [
         (FACTORY_TYPE, 2, 200.0, 0.0)
     ]
@@ -67,10 +77,9 @@ def test_one_claim_then_the_order_resends_and_patience_advances() -> None:
     claims = 0
     for _ in range(2 * PATIENCE + 1):
         budget = Budget(4000, 0)
-        orders = yard.establish(world, _CATALOGUE, budget, True)
+        ordered.extend(_step(yard, world, budget))
         follow_up = budget.claim("produce:c_tank", 4000)
         claims += 0 if follow_up["granted"] else 1
-        ordered.extend(o["x"] for o in orders)
     # One claim total, an order every tick, and the fraction advanced
     # exactly once across two patience windows.
     assert claims == 1
@@ -80,45 +89,99 @@ def test_one_claim_then_the_order_resends_and_patience_advances() -> None:
     assert ordered[-1] == 210.0
 
 
-def test_a_standing_or_growing_factory_ends_the_walk() -> None:
+def test_a_finished_factory_ends_the_walk() -> None:
     yard = Shipyard()
     wet = sample(
+        _ANCHOR,
+        _BUILDER,
+        entity(9, FACTORY_TYPE, x=250.0, y=0.0),
+        pools=(_POOL,),
+        credits=4000,
+    )
+    assert _step(yard, wet, Budget(4000, 0)) == ()
+
+
+def test_an_incomplete_factory_holds_the_builder_on_construction() -> None:
+    """The battery's sixth pilot: the expander re-tasks a released
+    builder and the abandoned construction dies unfinished (log
+    2026-08-14). While the factory is incomplete the walk re-sends the
+    build at the STANDING factory, winning the builder back every tick;
+    completion releases it."""
+    yard = Shipyard()
+    growing = sample(
         _ANCHOR,
         _BUILDER,
         entity(9, FACTORY_TYPE, x=250.0, y=0.0, complete=False),
         pools=(_POOL,),
         credits=4000,
     )
-    assert yard.establish(wet, _CATALOGUE, Budget(4000, 0), True) == ()
+    budget = Budget(4000, 0)
+    yard.fund(growing, _CATALOGUE, budget, True)
+    orders = yard.establish(growing, _CATALOGUE, budget, True)
+    assert [(o["type_name"], o["unit_id"], o["x"], o["y"]) for o in orders] == [
+        (FACTORY_TYPE, 2, 250.0, 0.0)
+    ]
 
 
 def test_an_unfunded_walk_withholds_toward_the_factory() -> None:
-    """The saving pattern every strategic purchase uses: refused, the
-    price is withheld so lesser claims cannot snipe the accrual."""
+    """The saving pattern, now early in the tick where it binds: refused,
+    the price is withheld so lesser claims cannot snipe the accrual."""
     yard = Shipyard()
     budget = Budget(300, 0)
-    assert yard.establish(_world(), _CATALOGUE, budget, True) == ()
+    assert _step(yard, _world(), budget) == ()
     lesser = budget.claim("produce:c_tank", 300)
     assert lesser["granted"] is False
+
+
+def test_a_dead_factory_re_funds_its_rebuild() -> None:
+    """The engine charges per attempt, so the books must too (the
+    battery's second pilot; log 2026-08-14)."""
+    yard = Shipyard()
+    claims = 0
+    budget = Budget(4000, 0)
+    _step(yard, _world(), budget)
+    claims += 0 if budget.claim("produce:c_tank", 4000)["granted"] else 1
+    stood = sample(
+        _ANCHOR, _BUILDER, entity(9, FACTORY_TYPE, x=250.0, y=0.0), pools=(_POOL,), credits=4000
+    )
+    assert _step(yard, stood, Budget(4000, 0)) == ()
+    razed = Budget(4000, 0)
+    orders = _step(yard, _world(), razed)
+    claims += 0 if razed.claim("produce:c_tank", 4000)["granted"] else 1
+    assert len(orders) == 1
+    assert claims == 2
 
 
 def test_the_walk_gives_up_after_the_last_fraction() -> None:
     yard = Shipyard()
     world = _world()
     for _ in range(len(FRACTIONS) * (PATIENCE + 2) + 5):
-        yard.establish(world, _CATALOGUE, Budget(4000, 0), True)
-    assert yard.establish(world, _CATALOGUE, Budget(4000, 0), True) == ()
+        _step(yard, world, Budget(4000, 0))
+    assert _step(yard, world, Budget(4000, 0)) == ()
 
 
-def test_the_walk_orders_with_the_newest_builder() -> None:
+def test_the_walk_orders_with_the_newest_builder_not_spoken_for() -> None:
     """Dragging the opening's builder across the map is dragging the
-    opening with it; the walk takes the latest hire at pick time."""
+    opening with it; the walk takes the latest hire at pick time -- and
+    never one another walk has pinned."""
     yard = Shipyard()
     world = sample(
         _ANCHOR, _BUILDER, entity(7, "builder", x=20.0, y=0.0), pools=(_POOL,), credits=4000
     )
-    orders = yard.establish(world, _CATALOGUE, Budget(4000, 0), True)
+    budget = Budget(4000, 0)
+    yard.fund(world, _CATALOGUE, budget, True)
+    orders = yard.establish(world, _CATALOGUE, budget, True)
     assert [o["unit_id"] for o in orders] == [7]
+    avoided = Shipyard()
+    other = Budget(4000, 0)
+    avoided.fund(world, _CATALOGUE, other, True)
+    assert [
+        o["unit_id"] for o in avoided.establish(world, _CATALOGUE, other, True, avoid_builder=7)
+    ] == [2]
+    starved = Shipyard()
+    lone = Budget(4000, 0)
+    starved.fund(_world(), _CATALOGUE, lone, True)
+    assert starved.establish(_world(), _CATALOGUE, lone, True, avoid_builder=2) == ()
 
 
 def test_the_walk_keeps_its_builder_while_it_lives() -> None:
@@ -129,7 +192,10 @@ def test_the_walk_keeps_its_builder_while_it_lives() -> None:
     pinned until it dies, however many newer hires appear."""
     yard = Shipyard()
     first = _world()
-    assert [o["unit_id"] for o in yard.establish(first, _CATALOGUE, Budget(4000, 0), True)] == [2]
+    budget = Budget(4000, 0)
+    yard.fund(first, _CATALOGUE, budget, True)
+    assert [o["unit_id"] for o in yard.establish(first, _CATALOGUE, budget, True)] == [2]
+    assert yard.pinned_builder() == 2
     crowded = sample(
         _ANCHOR, _BUILDER, entity(7, "builder", x=20.0, y=0.0), pools=(_POOL,), credits=4000
     )
@@ -144,7 +210,7 @@ def test_a_dead_builder_is_replaced_and_the_window_restarts() -> None:
     yard = Shipyard()
     world = _world()
     for _ in range(PATIENCE - 1):
-        yard.establish(world, _CATALOGUE, Budget(4000, 0), True)
+        _step(yard, world, Budget(4000, 0))
     survivor = sample(_ANCHOR, entity(7, "builder", x=20.0, y=0.0), pools=(_POOL,), credits=4000)
     ordered: list[tuple[int, float]] = []
     for _ in range(PATIENCE):
@@ -157,10 +223,16 @@ def test_a_dead_builder_is_replaced_and_the_window_restarts() -> None:
 
 def test_the_knob_off_a_missing_type_or_a_lost_base_stay_silent() -> None:
     yard = Shipyard()
-    assert yard.establish(_world(), _CATALOGUE, Budget(4000, 0), False) == ()
+    off = Budget(4000, 0)
+    yard.fund(_world(), _CATALOGUE, off, False)
+    assert yard.establish(_world(), _CATALOGUE, off, False) == ()
     bare = {name: stats for name, stats in _CATALOGUE.items() if name != FACTORY_TYPE}
-    assert yard.establish(_world(), bare, Budget(4000, 0), True) == ()
+    poor = Budget(4000, 0)
+    yard.fund(_world(), bare, poor, True)
+    assert yard.establish(_world(), bare, poor, True) == ()
     builderless = sample(_ANCHOR, pools=(_POOL,), credits=4000)
-    assert yard.establish(builderless, _CATALOGUE, Budget(4000, 0), True) == ()
+    funded = Budget(4000, 0)
+    yard.fund(builderless, _CATALOGUE, funded, True)
+    assert yard.establish(builderless, _CATALOGUE, funded, True) == ()
     poolless = sample(_ANCHOR, _BUILDER, credits=4000)
     assert yard.establish(poolless, _CATALOGUE, Budget(4000, 0), True) == ()
