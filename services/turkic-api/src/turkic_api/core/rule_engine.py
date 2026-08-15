@@ -14,6 +14,9 @@ specification, and the frozen goldens pin every one of them:
 * The **after context matches the untouched source**, ahead of the cursor.
 * The **output is never re-examined**, so a replacement cannot trigger a second
   rule.
+* A **context position past an end of the text matches a negated set** and no
+  other kind of element, so ``ئ } [^$AsuVowel]`` in ``ar_lat.rules`` fires on a
+  word-final hamza carrier as well as on one followed by a consonant.
 
 An earlier version of this engine read ``}`` as a *left* context and matched it
 against the source. Two wrongs cancelled for the rule files of the time, and
@@ -45,22 +48,23 @@ def _matches(rule: Rule, out: list[str], source: str, cursor: int) -> bool:
 
     width = len(rule.before)
     if width:
-        if len(out) < width:
-            return False
-        window = out[len(out) - width :]
-        if any(char not in element for element, char in zip(rule.before, window, strict=True)):
+        missing = max(0, width - len(out))
+        window: list[str | None] = [None] * missing + list(out[len(out) - width + missing :])
+        if any(
+            not element.accepts(char) for element, char in zip(rule.before, window, strict=True)
+        ):
             return False
 
     end = cursor + len(rule.source)
     if end > len(source):
         return False
-    if any(source[cursor + n] not in element for n, element in enumerate(rule.source)):
+    if any(not element.accepts(source[cursor + n]) for n, element in enumerate(rule.source)):
         return False
 
-    stop = end + len(rule.after)
-    if stop > len(source):
-        return False
-    return not any(source[end + n] not in element for n, element in enumerate(rule.after))
+    return all(
+        element.accepts(source[end + n] if end + n < len(source) else None)
+        for n, element in enumerate(rule.after)
+    )
 
 
 def apply_rules(text: str, ruleset: RuleSet) -> str:

@@ -13,15 +13,25 @@ table was recorded below. The digests therefore certify ICU agreement
 without ICU being present: reproducing a digest means reproducing, output
 for output, what ICU produced on the day it was measured.
 
-Verified on 2026-08-14 against PyICU 78.3, rules vendored from
-turkic-transliteration ``dd5fc51``. Two sweeps were run:
+Verified on 2026-08-15 against PyICU 78.3, rules vendored from
+turkic-transliteration ``503d807``. Three sweeps have been run:
 
-* The frozen sweep below — 61,535 probes across 13 rule files, 0
+* The frozen sweep below — 61,692 probes across 13 rule files, 0
   mismatches. It is what the test suite re-checks.
-* A larger exhaustive sweep, adding a full cube over every rule file's
-  context characters — 449,326 probes, 0 mismatches. That one is too slow
-  to keep (26s for ``fi_ipa`` alone), so it is recorded here as a
-  one-time result rather than run on every commit.
+* A full cube over ``ar_lat``'s own alphabet plus a space — 64,000
+  probes, 0 mismatches, run when that file gained the engine's first
+  negated set and with it the first rule whose match depends on a word
+  boundary. The space is what makes it a boundary test rather than an
+  end-of-string test.
+* A larger exhaustive sweep on 2026-08-14, adding a full cube over every
+  rule file's context characters — 449,326 probes, 0 mismatches. That one
+  is too slow to keep (26s for ``fi_ipa`` alone), so it is recorded here
+  as a one-time result rather than run on every commit.
+
+Only ``ar_lat``'s digest moved between the 2026-08-14 and 2026-08-15
+measurements. The other twelve reproduced byte for byte, which is what
+says the engine's new handling of negated sets and text boundaries left
+every rule that does not use them alone.
 
 The probe set is derived from each rule set's *own* alphabet, so it tracks
 the rules rather than being a fixed list. That is deliberate: a rule
@@ -47,7 +57,7 @@ import itertools
 from typing import Final
 
 from turkic_api.core.rule_engine import apply_rules
-from turkic_api.core.rule_parser import Rule, RuleSet
+from turkic_api.core.rule_parser import MatchSet, Rule, RuleSet
 
 # How many members of a character set stand in for it in a targeted probe.
 # Two is enough to show a set is read as a set rather than as one literal.
@@ -59,7 +69,7 @@ _RECORD_SEPARATOR: Final = b"\x1e"
 # SHA-256 over each rule file's probe-to-output table. Measured against
 # PyICU 78.3; see this module's docstring.
 SWEEP_DIGESTS: Final[dict[str, str]] = {
-    "ar_lat.rules": "c249cae9998798aa36b6c178cec7588a050e7f18beecfedc6d0937deee09d9c4",
+    "ar_lat.rules": "1fe7c974279e2dc128a07150124a995c14293407eef813b6494ac211c623c981",
     "az_ipa.rules": "bcd33aed22d6dfc5d8349298b9f8c90de5d7226af4be38c6621d5d62ead96776",
     "fi_ipa.rules": "e73378c2eb1b66f3b34ec877d4d581665af5d1e3691e64d34c8d0d02bc0c324a",
     "kk_ipa.rules": "10a50804b0c00e49b5910ca46a573a26e89503aafdbbda6f60fb7645b02ecd0c",
@@ -88,19 +98,32 @@ def rule_alphabet(ruleset: RuleSet) -> list[str]:
     chars: set[str] = set()
     for rule in ruleset.rules:
         for element in rule.source:
-            chars |= element
+            chars |= element.members
     return sorted(chars)
 
 
-def _representatives(element: frozenset[str]) -> list[str]:
-    """Return up to ``_REPRESENTATIVES`` members of ``element``, in order."""
-    return sorted(element)[:_REPRESENTATIVES]
+def _representatives(element: MatchSet, alphabet: list[str]) -> list[str]:
+    """Return up to ``_REPRESENTATIVES`` characters the element accepts.
+
+    A negated set names what it rejects, so its representatives have to be
+    drawn from the file's own alphabet instead of from its members.
+
+    Args:
+        element: The pattern element to find characters for.
+        alphabet: The whole file's source alphabet.
+
+    Returns:
+        Accepted characters in code-point order, at most
+        ``_REPRESENTATIVES`` of them, empty when the alphabet offers none.
+    """
+    accepted = alphabet if element.negated else sorted(element.members)
+    return [char for char in accepted if element.accepts(char)][:_REPRESENTATIVES]
 
 
-def _outsider(element: frozenset[str], alphabet: list[str]) -> str | None:
+def _outsider(element: MatchSet, alphabet: list[str]) -> str | None:
     """Return a character the element rejects, or None if it accepts all."""
     for char in alphabet:
-        if char not in element:
+        if not element.accepts(char):
             return char
     return None
 
@@ -118,18 +141,19 @@ def _rule_probes(rule: Rule, alphabet: list[str]) -> list[str]:
         one position of it, and the bare source with and without a repeat.
     """
     window = list(rule.before) + list(rule.source) + list(rule.after)
-    probes = [
-        "".join(combination)
-        for combination in itertools.product(*(_representatives(e) for e in window))
-    ]
+    stand_ins = [_representatives(element, alphabet) for element in window]
+    if any(not choices for choices in stand_ins):
+        return []
+    probes = ["".join(combination) for combination in itertools.product(*stand_ins)]
     for position, element in enumerate(window):
         outsider = _outsider(element, alphabet)
         if outsider is None:
             continue
-        broken = [_representatives(other)[0] for other in window]
+        broken = [choices[0] for choices in stand_ins]
         broken[position] = outsider
         probes.append("".join(broken))
-    bare = "".join(_representatives(element)[0] for element in rule.source)
+    offset = len(rule.before)
+    bare = "".join(stand_ins[offset + n][0] for n in range(len(rule.source)))
     probes.extend([bare, bare + bare])
     return probes
 

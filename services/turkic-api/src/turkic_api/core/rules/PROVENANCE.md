@@ -21,16 +21,17 @@ frozen engine goldens in `tests/golden_sweep.py`.
 | | |
 |---|---|
 | Repository | `turkic-transliteration` |
-| Commit | `dd5fc51081319f0c20d8338c7cb0f276fe8bf564` |
-| Commit date | 2026-08-14 |
-| Vendored on | 2026-08-14 |
+| Commit | `503d807b862193521f22ba587326d266d1c78f11` |
+| Commit date | 2026-08-15 |
+| Vendored on | 2026-08-15 |
 | Upstream path | `src/turkic_translit/rules/` |
 
-The twelve vendored files are byte-identical to the ones published in
-`turkic-translit` **0.5.4** on PyPI, once line endings are normalised: every
-hash in the table below equals the hash of the corresponding member of that
-release's wheel. So the copy can be checked against a published artifact, not
-only against one developer's checkout.
+Eleven of the twelve vendored files are byte-identical to the ones published
+in `turkic-translit` **0.5.4** on PyPI, once line endings are normalised, so
+the copy can be checked against a published artifact rather than only against
+one developer's checkout. `ar_lat.rules` is the exception and is ahead of that
+release: it was corrected upstream in `503d807`, after 0.5.4 shipped, and its
+hash below will not match the wheel until the next release.
 
 ## Files
 
@@ -47,7 +48,7 @@ disagreeing on a fresh Windows clone.
 
 | File | SHA-256 | Origin |
 |---|---|---|
-| `ar_lat.rules` | `b720d7c4f395b8bfd608643b5f1a06f6e34270b09969a6ad4610840101e5e448` | upstream |
+| `ar_lat.rules` | `e4b3734d246a29bc2bb1948ba6e69eb806004f3c72a7bfe88a6214c22bf06e7b` | upstream |
 | `az_ipa.rules` | `9f02f13c0f10422d19526ccb341221646294a30695d3c0b4664a0625c80b45d3` | upstream |
 | `fi_ipa.rules` | `e79d45c4ac2316bfe0d39bc7ddd32b15ecdb52b85fdca1044b27045d39eeed27` | upstream |
 | `kk_ipa.rules` | `f0eaa4c6a8f7c3f6bec220793a085d3d81f385ed69604317e37963a26747a414` | upstream |
@@ -85,11 +86,20 @@ the Uzbek `yo` vowel, the Kazakh `у` glide, a Turkish rule that deleted vowels,
 and three Finnish defects. Those corrections are the reason this directory was
 re-vendored; the previous copy predated all of them.
 
-One defect is still present and is reproduced deliberately. `ar_lat.rules`
-contains `ء > ' ;   ع > ' ;`, and ICU reads `'` as a quote delimiter — so the
-two apostrophes bracket a literal, ء maps to the text `` ;   ع > ``, and the rule
-for ع is swallowed into that literal and never exists, leaving ع
-untransliterated. The engine reproduces this rather than repairing it, because
-repairing it here would make this service disagree with the project that owns
-the rules; the fix belongs upstream. See
-`tests/test_rule_engine_goldens.py::test_arabic_quoting_defect_is_reproduced_not_repaired`.
+`ar_lat.rules` was corrected separately on 2026-08-15, and that correction is
+why this directory was re-vendored again. The file transliterates Arabic-Script
+Uyghur to Latin-Script Uyghur but named no source, and the upstream guard that
+requires a `Source-*` header exempts Latin files, so nothing checked its
+mappings against anything. It now cites Duval & Janbaz (2006), the paper that
+documents the standard the Xinjiang University conferences settled in July
+2001, and three defects it had hidden are fixed against that source: a pair of
+bare apostrophes that ICU read as one quoted literal, swallowing the rule
+between them so ain emitted nothing; a missing rule for yeh, which passed
+through as Arabic; and a vowel written with a diaeresis where p. 9 records the
+committee choosing an acute accent.
+
+That correction is also the first rule in any vendored file to use a negated
+set, and so the first whose match depends on there being no character at a
+position. The engine here gained both, measured against PyICU rather than
+inferred, and the twelve untouched files reproduced their previous digests
+exactly — which is the evidence that the new handling changed nothing else.

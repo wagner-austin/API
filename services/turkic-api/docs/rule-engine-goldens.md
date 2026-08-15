@@ -84,10 +84,14 @@ for name, value in sorted(digests.items()):
 
 **A single mismatch means stop.** The engine and ICU disagree, and the rules
 cannot be adopted until the engine is corrected — pasting the new digests would
-freeze the disagreement instead of fixing it. The last time this ran, the
-disagreement was real: the engine read `}` as a *left* context where ICU reads it
-as a right one, and matched contexts against the source where ICU matches the
-converted output.
+freeze the disagreement instead of fixing it. Both times this has run, the
+disagreement was real. On 2026-08-14 the engine read `}` as a *left* context
+where ICU reads it as a right one, and matched contexts against the source where
+ICU matches the converted output. On 2026-08-15 a re-vendored `ar_lat.rules`
+brought the first negated set, which the engine had been reading as a literal
+`^` among the members, and with it the first rule whose match turns on a text
+boundary; both were implemented from what PyICU actually did rather than from
+the specification.
 
 Paste the printed digests into `SWEEP_DIGESTS`, update this module's docstring
 with the PyICU version and the date, and delete the throwaway environment.

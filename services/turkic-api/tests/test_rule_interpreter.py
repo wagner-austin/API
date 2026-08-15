@@ -220,6 +220,69 @@ class TestVariables:
         with pytest.raises(RuleParseError, match="trailing backslash in character set"):
             parse_rules("$A = [a\\")
 
+    def test_a_set_may_name_a_variable_among_its_members(self) -> None:
+        """``[$V x]`` is the union, which is how ``[^$AsuVowel]`` is written."""
+        assert run("$V = [ab] ; [$V c] > Q ;", "abcd") == "QQQd"
+
+    def test_a_variable_named_inside_a_set_must_be_defined(self) -> None:
+        with pytest.raises(RuleParseError, match=r"\$Missing' is not defined"):
+            parse_rules("[$Missing a] > b ;")
+        with pytest.raises(RuleParseError, match=r"\$Missing' is not defined"):
+            parse_rules("$A = [$Missing] ;")
+
+    def test_a_bare_dollar_inside_a_set_is_refused(self) -> None:
+        with pytest.raises(RuleParseError, match="not followed by a variable name"):
+            parse_rules("[$ a] > b ;")
+
+    def test_a_variable_may_be_defined_from_another(self) -> None:
+        assert run("$A = [ab] ; $B = [$A c] ; $B > Q ;", "abcd") == "QQQd"
+
+    def test_a_variable_cannot_be_defined_as_a_negated_set(self) -> None:
+        """A variable holds what it names, so the negation cannot be dropped."""
+        with pytest.raises(RuleParseError, match="cannot be defined as a negated set"):
+            parse_rules("$A = [^ab] ;")
+
+
+class TestNegatedSets:
+    """``[^...]`` accepts every character it does not name, boundaries included.
+
+    ICU treats a position past an end of the text as matching a negated set
+    and no other kind of element. That was measured against PyICU 78.3, and
+    ``ar_lat.rules`` depends on it: a word-final hamza carrier is written as
+    an apostrophe, one before a vowel is dropped.
+    """
+
+    def test_negated_set_in_source_position(self) -> None:
+        assert run("[^ab] > Q ;", "abcd") == "abQQ"
+
+    def test_negated_set_as_an_after_context(self) -> None:
+        assert run("a } [^b] > X ;", "ab") == "ab"
+        assert run("a } [^b] > X ;", "ac") == "Xc"
+
+    def test_negated_after_context_matches_the_end_of_the_text(self) -> None:
+        assert run("a } [^b] > X ;", "a") == "X"
+
+    def test_positive_after_context_does_not_match_the_end_of_the_text(self) -> None:
+        """The asymmetry is the point: only a negated set matches a boundary."""
+        assert run("a } [b] > X ;", "a") == "a"
+        assert run("a } [b] > X ;", "ab") == "Xb"
+
+    def test_negated_before_context_matches_the_start_of_the_text(self) -> None:
+        assert run("[^b] { a > X ;", "a") == "X"
+        assert run("[^b] { a > X ;", "ba") == "ba"
+        assert run("[^b] { a > X ;", "ca") == "cX"
+
+    def test_a_negated_before_context_is_matched_against_the_output(self) -> None:
+        """Left contexts see converted output, so the negation applies to it."""
+        assert run("c > b ; [^b] { a > X ;", "ca") == "ba"
+        assert run("c > d ; [^b] { a > X ;", "ca") == "dX"
+
+    def test_a_wide_before_context_is_padded_at_the_start(self) -> None:
+        """Two positions of context with one character of output available."""
+        assert run("[^x] [^y] { a > Q ;", "a") == "Q"
+        assert run("[^x] [^y] { a > Q ;", "ya") == "ya"
+        assert run("[^x] [^y] { a > Q ;", "za") == "zQ"
+
 
 class TestMalformedRules:
     """Every refusal the parser makes."""

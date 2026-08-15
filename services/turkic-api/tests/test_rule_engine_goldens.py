@@ -12,7 +12,7 @@ those digests were measured.
 
 Two layers, for two different failure modes:
 
-* The **digests** cover 61,535 probes per commit and will catch any
+* The **digests** cover 61,692 probes per commit and will catch any
   divergence at all, but say nothing about what diverged.
 * The **spot checks** are hand-picked and name the semantics they protect,
   so a digest failure has somewhere to look. Each one is a case where a
@@ -37,7 +37,8 @@ _RULES_DIR: Final[Path] = (
 RULE_FILES: Final[tuple[str, ...]] = tuple(sorted(SWEEP_DIGESTS))
 
 # Cases where a plausible misreading of ICU's rule language changes the
-# answer. Every value was measured against PyICU 78.3 on 2026-08-14.
+# answer. Every value was measured against PyICU 78.3: the ar_lat ones
+# on 2026-08-15, the rest on 2026-08-14.
 SPOT_CHECKS: Final[dict[str, dict[str, str]]] = {
     # у is [w] next to a vowel and [u] otherwise. The left context is
     # matched against the IPA already emitted, not against the Cyrillic
@@ -138,9 +139,27 @@ SPOT_CHECKS: Final[dict[str, dict[str, str]]] = {
         "ж": "ʒ",
     },
     "az_ipa.rules": {"ə": "æ", "c": "d͡ʒ", "ç": "t͡ʃ", "q": "ɡ", "x": "x", "ğ": "ɣ"},
-    # ء and ع are the upstream quoting defect, kept deliberately; see
-    # test_arabic_quoting_defect_is_reproduced_not_repaired.
-    "ar_lat.rules": {"ب": "b", "ئ": "", "بئب": "bb", "بعب": "bعb"},
+    # The hamza carrier is the only rule in any vendored file whose match
+    # depends on a negated set and therefore on a text boundary: it is
+    # dropped before a vowel and written as an apostrophe elsewhere,
+    # including at the end of a word. ء and ع were the quoting defect and
+    # now emit the apostrophe the standard asks for.
+    "ar_lat.rules": {
+        "ب": "b",
+        "ئ": "'",
+        "ئا": "a",
+        "بئا": "b'a",
+        "بئ": "b'",
+        "ائ": "a'",
+        "ائا": "aa",
+        "ء": "'",
+        "ع": "'",
+        "بعب": "b'b",
+        "ې": "é",
+        "ي": "y",
+        "نگ": "n'g",
+        "ڭ": "ng",
+    },
     "ug_ipa.rules": {"ئا": "ɑ", "ا": "ɑ", "ې": "e", "ۇ": "u"},
     "kk_lat.rules": {
         "ә": "ä",
@@ -223,21 +242,44 @@ def test_spot_checks_cover_every_rule_file() -> None:
     assert set(SPOT_CHECKS) == set(SWEEP_DIGESTS)
 
 
-def test_arabic_quoting_defect_is_reproduced_not_repaired() -> None:
-    """``ar_lat.rules`` has an upstream defect, and this engine keeps it.
+def test_the_arabic_quoting_defect_is_gone_from_the_vendored_copy() -> None:
+    """``ar_lat.rules`` carried a defect that lost a rule, and no longer does.
 
-    The file contains ``ء > ' ;   ع > ' ;``. ICU reads ``'`` as a quote
-    delimiter, so the two apostrophes bracket a literal — ء is mapped to
-    the text `` ;   ع > `` and the rule for ع is swallowed into that
-    literal and never exists, leaving ع untransliterated.
+    The file used to contain ``ء > ' ; ع > ' ;``. ICU reads ``'`` as a
+    quote delimiter, so the two apostrophes bracketed a literal: ء mapped
+    to the text `` ;   ع > `` and the rule for ع was swallowed into that
+    literal and never existed, leaving ع untransliterated. This engine
+    reproduced the defect faithfully, and a golden test pinned it, because
+    repairing it here would have made this service disagree with the
+    project that owns the rules.
 
-    This engine reproduces that faithfully. Repairing it here would make
-    this service disagree with the upstream project that owns the rules,
-    which is the exact divergence the goldens exist to prevent. The fix
-    belongs upstream, in the rule file; when it lands, this test changes
-    with it.
+    It was repaired upstream instead, in ``503d807``, by doubling the
+    apostrophes — which is how the ICU syntax spells one. Both letters now
+    emit an apostrophe and the old defective output appears nowhere.
     """
     ruleset = load_rules("ar_lat.rules")
-    assert apply_rules("ء", ruleset) == " ;   ع > "
-    assert apply_rules("ع", ruleset) == "ع"
-    assert apply_rules("بعب", ruleset) == "bعb"
+
+    assert apply_rules("ء", ruleset) == "'"
+    assert apply_rules("ع", ruleset) == "'"
+    assert apply_rules("بعب", ruleset) == "b'b"
+    assert " ;   ع > " not in apply_rules("ء", ruleset)
+
+
+def test_a_word_final_hamza_carrier_is_written_and_an_intervocalic_one_is_not() -> None:
+    """The one rule in any vendored file that depends on a text boundary.
+
+    ``ئ } [^$AsuVowel]`` is the engine's only negated set, and the only
+    place where a match turns on whether there is a character at all.
+    Latin-Script Uyghur writes the hiatus as an apostrophe word-finally,
+    where it stands for the etymological ﻉ or ﺀ of an Arabic loan, but
+    leaves it unwritten between two vowels. Both readings are checked
+    together, and once more with a following space, because an engine that
+    treated the end of the string as a special case rather than the end of
+    a word would pass the first and fail the last.
+    """
+    ruleset = load_rules("ar_lat.rules")
+
+    assert apply_rules("ۋۇقۇئ", ruleset) == "wuqu'"
+    assert apply_rules("ۋۇقۇئ ب", ruleset) == "wuqu' b"
+    assert apply_rules("سائەت", ruleset) == "saet"
+    assert apply_rules("قۇرئان", ruleset) == "qur'an"

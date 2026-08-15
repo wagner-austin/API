@@ -1,15 +1,85 @@
+# Arabic-Script Uyghur → Latin-Script Uyghur (ar_lat.rules)
+#
+# Source-Authors: Duval, J. R.; Janbaz, W. A.
+# Source-Year: 2006
+# Source-Title: An Introduction to Latin-Script Uyghur
+# Source-Container: 2006 Middle East & Central Asia Politics, Economics, and Society Conference, University of Utah, Salt Lake City, 7-9 September 2006
+# Source-Id: https://web.archive.org/web/20061201110649/http://www.uyghurdictionary.org/excerpts/An%20Introduction%20to%20LSU.pdf
+#
+# The target is Latin-Script Uyghur (LSU), also called Uyghur Latin Yeziqi
+# (ULY), the standard made public on 3 July 2001 by the conferences held at
+# Xinjiang University; Table 3 (p. 11) gives the ASU → LSU correspondence
+# this file implements, and the second author sat on the committee that
+# produced it.
+#
+# Corroborated: Saleh, I. & Janbaz, W. A. (2006) 'Web Development
+# Considerations for Unicode-based Text Processing in Uyghur Language',
+# 30th Internationalization and Unicode Conference, Washington DC, which
+# gives the same account of the glottal-stop signs (p. 8) and writes LSU
+# with é throughout its running text.
+#
+# Divergence on record: Mayer (2021), Issues in Uyghur backness harmony,
+# Table 2.4 (p. 42), writes <ë> for /e/. He does not claim to use LSU, and
+# notes that several Latin representations and informal variants circulate.
+# Duval & Janbaz p. 9 records that ë was one of the three candidates the
+# committee considered for ﺋﯥ and that é was the one chosen, so é is the
+# standard and ë is a variant. This file follows the standard.
+#
+# ---------------------------------------------------------------------------
+
+# The two macros this file needs, for the three hamza-carrier rules below.
+# The left context is Latin, not Arabic, because ICU matches a left context
+# against text it has already transliterated; the right context is Arabic,
+# because ICU matches that against source text it has not yet reached.
+$LatCons = [b c d f g h j k l m n p q r s t w x y z] ;
+$AsuVowel = [ا ە و ۇ ۆ ۈ ې ى] ;
+
+# Contextual rules first. ICU takes the first rule that matches at a
+# position rather than the longest, so every rule whose input is a letter
+# in a context has to stand ahead of the plain rule for that same letter.
+
+# The apostrophe as a reading guard (Duval & Janbaz pp. 12-13, rule 6).
+# ﻥ+گ is not the single letter ڭ, and ﺱ+ھ is not the single letter ﺵ, and
+# ڭ+ھ would read as one digraph plus a stray h. Each pair takes an
+# apostrophe so the digraph reading is blocked: In'gliz, Is'haq, Chong'haji.
+ن } گ > n'' ;
+س } ھ > s'' ;
+ڭ } ھ > ng'' ;
+
+# The hamza carrier is not a letter of ASU: it is part of the initial form
+# of every vowel, and is dropped there. Everywhere else it marks a hiatus,
+# and LSU writes that hiatus as an apostrophe in two of the three places it
+# can stand. After a consonant it is written (Qur'an, qet'i). Word-finally
+# it is written, because there it carries the etymological ﻉ or ﺀ of an
+# Arabic loan (wuqu', toghra'). Between two vowels it is not written, since
+# two adjacent vowels already belong to two syllables (saet, qaide).
+$LatCons { ئ > '' ;
+ئ } [^$AsuVowel] > '' ;
+ئ > ;
+
 # consonants
 ب > b ;  پ > p ;  ت > t ;  ج > j ;  چ > ch ;
 ح > h ;  خ > x ;  د > d ;  ر > r ;  ز > z ;  س > s ;
 ش > sh ; ص > s ;  ط > t ;  غ > gh ;
 ف > f ;  ق > q ;  ك > k ;  گ > g ;  ل > l ;  م > m ;  ن > n ;
-ه > h ;  ھ > h ;  ژ > zh ;  ڭ > ng ;  ۋ > w ;
+ه > h ;  ھ > h ;  ژ > zh ;  ڭ > ng ;  ۋ > w ;  ي > y ;
 
-# vowels  (hamza carrier ئ can be dropped or mapped to ')
+# ح, ص and ط are not letters of modern ASU. Duval & Janbaz note (p. 4 n. 14)
+# that the letters written for purely Arabic phonemes were dropped from the
+# 1920s on, so they appear only in unreformed spellings of Arabic-origin
+# words; mapping them keeps such a word from passing through as Arabic.
+
+# vowels
 ا > a ;   ە > e ;   ۆ > ö ;   و > o ;
-ۇ > u ;   ۈ > ü ;   ى > i ;   ې > ë ;
+ۇ > u ;   ۈ > ü ;   ى > i ;   ې > é ;
 
 # glottals
-ء > ' ;   ع > ' ;   ئ > ;
+#
+# ﺀ and ﻉ survive only in literary Arabic-origin spellings, where the
+# hiatus they mark is written in LSU as an apostrophe (toghra', wuqu').
+# The apostrophes are doubled because a bare one opens a quoted literal in
+# the ICU rule syntax rather than emitting a character, which is how the
+# rule for ﻉ was previously swallowed into the rule for ﺀ and lost.
+ء > '' ;   ع > '' ;
 
 :: NFC ;

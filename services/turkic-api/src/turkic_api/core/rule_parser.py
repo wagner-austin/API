@@ -2,9 +2,9 @@
 
 The parser owns what a statement *means*: which elements are the before
 context, which are the input, which are the after context, and what a variable
-or a directive does. Every element it produces is a set of single characters, so
-the engine below it needs no notion of literals, sets or variables — only of
-whether a character is a member.
+or a directive does. Every element it produces is a :class:`MatchSet`, so the
+engine below it needs no notion of literals, sets or variables — only of whether
+one accepts the character at a position.
 
 It refuses more than it accepts. A rule that is parsed but misunderstood
 transliterates silently and wrongly, which costs far more to find than a file
@@ -23,6 +23,38 @@ _RULES_DIR: Final[Path] = Path(__file__).with_suffix("").parent / "rules"
 _NFC_DIRECTIVE: Final = "NFC"
 
 
+class MatchSet(NamedTuple):
+    """The characters one element of a pattern accepts.
+
+    Attributes:
+        members: The characters named literally, plus the contents of any
+            variables the set referenced.
+        negated: Whether the set was written ``[^...]``, in which case it
+            accepts every character it does not name.
+    """
+
+    members: frozenset[str]
+    negated: bool
+
+    def accepts(self, char: str | None) -> bool:
+        """Report whether this element matches one position.
+
+        ``None`` means the position is past an end of the text. ICU treats
+        that as matching a negated set and not matching a positive one, so
+        ``a } [^b] > X`` rewrites a lone "a" while ``a } [b] > X`` does
+        not. That was measured against PyICU 78.3, not inferred.
+
+        Args:
+            char: The character at the position, or None at a boundary.
+
+        Returns:
+            Whether the element accepts what is there.
+        """
+        if char is None:
+            return self.negated
+        return (char in self.members) != self.negated
+
+
 class Rule(NamedTuple):
     """One transform rule, with every element reduced to a set of characters.
 
@@ -37,10 +69,10 @@ class Rule(NamedTuple):
         output: Replacement text. Empty means deletion.
     """
 
-    before: tuple[frozenset[str], ...]
+    before: tuple[MatchSet, ...]
     anchor_start: bool
-    source: tuple[frozenset[str], ...]
-    after: tuple[frozenset[str], ...]
+    source: tuple[MatchSet, ...]
+    after: tuple[MatchSet, ...]
     output: str
 
 
@@ -56,11 +88,37 @@ class RuleSet(NamedTuple):
     normalize_nfc: bool
 
 
+def _defined(
+    name: str,
+    macros: dict[str, frozenset[str]],
+    offset: int,
+    text: str,
+) -> frozenset[str]:
+    """Return the contents of a variable, refusing an undefined one.
+
+    Args:
+        name: Variable name, without the ``$``.
+        macros: Variables defined so far.
+        offset: Offset of the reference, for error reporting.
+        text: Whole rule file, for error reporting.
+
+    Returns:
+        The characters the variable names.
+
+    Raises:
+        RuleParseError: If the variable has not been defined.
+    """
+    members = macros.get(name)
+    if members is None:
+        raise fail(text, offset, f"variable '${name}' is not defined")
+    return members
+
+
 def _elements(
     tokens: list[Token],
     macros: dict[str, frozenset[str]],
     text: str,
-) -> tuple[frozenset[str], ...]:
+) -> tuple[MatchSet, ...]:
     """Reduce pattern tokens to one character set per element.
 
     Args:
@@ -75,17 +133,17 @@ def _elements(
         RuleParseError: On an operator or anchor inside a section, or a
             reference to a variable that has not been defined.
     """
-    elements: list[frozenset[str]] = []
+    elements: list[MatchSet] = []
     for token in tokens:
         if token.kind == "char":
-            elements.append(frozenset({token.text}))
+            elements.append(MatchSet(frozenset({token.text}), False))
         elif token.kind == "set":
-            elements.append(token.members)
+            members = set(token.members)
+            for name in token.refs:
+                members |= _defined(name, macros, token.offset, text)
+            elements.append(MatchSet(frozenset(members), token.negated))
         elif token.kind == "var":
-            members = macros.get(token.text)
-            if members is None:
-                raise fail(text, token.offset, f"variable '${token.text}' is not defined")
-            elements.append(members)
+            elements.append(MatchSet(_defined(token.text, macros, token.offset, text), False))
         else:
             raise fail(text, token.offset, f"unexpected {token.text!r} in a rule pattern")
     return tuple(elements)
@@ -205,12 +263,23 @@ def _parse_macro(
 ) -> None:
     """Record a ``$Name = [ chars ]`` definition.
 
+    A variable holds the characters it names, so a negated definition is
+    refused rather than stored with its negation dropped. Nothing in the
+    vendored files writes one, and a variable whose meaning silently
+    inverted would be the class of defect this parser exists to prevent.
+
     Raises:
-        RuleParseError: If the right-hand side is not exactly one set.
+        RuleParseError: If the right-hand side is not exactly one set, or
+            that set is negated.
     """
     if len(tokens) != 3 or tokens[2].kind != "set":
         raise fail(text, tokens[0].offset, "a variable must be defined as one '[...]' set")
-    macros[tokens[0].text] = tokens[2].members
+    if tokens[2].negated:
+        raise fail(text, tokens[2].offset, "a variable cannot be defined as a negated set")
+    members = set(tokens[2].members)
+    for name in tokens[2].refs:
+        members |= _defined(name, macros, tokens[2].offset, text)
+    macros[tokens[0].text] = frozenset(members)
 
 
 def _parse_directive(tokens: list[Token], text: str) -> None:
@@ -280,6 +349,7 @@ def load_rules(name: str) -> RuleSet:
 
 
 __all__ = [
+    "MatchSet",
     "Rule",
     "RuleSet",
     "load_rules",
