@@ -205,19 +205,19 @@ make check  # Must pass 100%
 
 ### Building Balanced Corpora
 
-Download and build IPA-balanced corpora from OSCAR:
+Not here. Building IPA-balanced training corpora belongs to
+`turkic-transliteration`, whose `corpus` package owns streaming, filtering,
+cleaning, the symbol map and equalisation, and which the LSTM experiments build
+from directly.
 
-```bash
-poetry run python scripts/build_balanced_corpora.py \
-  --source oscar --threshold 0.95 --out-dir data/balanced/oscar
-```
+This service used to carry a second implementation of that pipeline. Nothing in
+the API or the worker imported it — it existed only to feed its own CLI — and the
+corpora actually used were built by the other one, so the two were free to
+disagree and did. It was removed rather than kept in sync.
 
-The script:
-- Streams from HuggingFace OSCAR dataset (set `HF_TOKEN` env var)
-- Filters with FastText language ID at the confidence threshold
-- Transliterates to IPA
-- Balances all corpora to the bottleneck language's character count
-- Writes manifest.json with run metadata
+What this service keeps is what it serves: transliteration
+(`core/translit.py`), corpus fetching for API jobs (`core/corpus.py`,
+`core/corpus_download.py`) and language identification (`core/langid.py`).
 
 ### Adding New Language Support
 
@@ -274,11 +274,22 @@ The Discord bot subscribes to these events via `TurkicEventSubscriber` in `clien
 ## Architecture
 
 ### Pure Python Transliteration
-- No PyICU dependency (no libicu system requirement at deploy time)
-- Rules-based transliteration engine over the same `.rules` files shipped by the upstream `turkic-transliteration` library
-- Unicode normalization (NFC)
-- Deterministic output
-- Parity guarantee: `tests/test_pyicu_parity.py` asserts byte-identical output against the PyICU library for every shared IPA rule file plus a per-language sentence-level North-Wind-and-Sun set — the reimplementation is engine-swappable, not semantically drifting
+- No PyICU dependency, so deploying needs no libicu system library
+- No dependency on the upstream `turkic-transliteration` project either — not at
+  runtime and not in the test suite. Its `.rules` files are **vendored** here as a
+  byte-identical copy, with the upstream commit and a SHA-256 per file recorded in
+  `src/turkic_api/core/rules/PROVENANCE.md`
+- Rules-based engine implementing the subset of ICU's transform language those
+  files use, with Unicode normalisation (NFC) and deterministic output
+- Parity guarantee: `tests/golden_sweep.py` carries a SHA-256 per rule file over a
+  61,535-probe table measured against PyICU 78.3, and
+  `tests/test_rule_engine_goldens.py` re-checks it on every commit. Because the
+  two engines cannot both be present, the comparison was made once and frozen —
+  reproducing a digest means reproducing what ICU produced, output for output
+- Drift is caught by hashes rather than by hope: `tests/test_rule_vendoring.py`
+  asserts the recorded hashes against the files, and a monorepo guard
+  (`dependency-escape`) fails any Poetry path dependency that resolves outside
+  this repository, which is how the old cross-checkout dependency got in
 
 ### Dependency Injection
 - FastAPI `Depends()` for all dependencies

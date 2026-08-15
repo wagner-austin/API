@@ -147,6 +147,13 @@ def test_to_ipa_uz_cyrillic_script() -> None:
 
 ## Audit Methodology
 
+> This is a record of an audit run on 2025-12-01, kept for its findings. Two
+> things it names have since moved: `build_balanced_corpora.py` no longer lives
+> here — corpus building belongs to `turkic-transliteration`, whose `corpus`
+> package owns it — and the rule files are now vendored from that project rather
+> than maintained here, so the gaps below were fixed upstream. See
+> `src/turkic_api/core/rules/PROVENANCE.md`.
+
 1. Ran `build_balanced_corpora.py` with OSCAR source, 0.95 LID threshold
 2. Analyzed output files for non-IPA Unicode characters
 3. Cross-referenced with `.rules` files to identify gaps
