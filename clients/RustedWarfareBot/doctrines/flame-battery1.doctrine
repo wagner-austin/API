@@ -1,9 +1,9 @@
-# Impossible triage arm (log 2026-07-31): one knob off the tech champion.
-# The champion dies at Impossible to early waves before heavy mass exists
-# (rival walls 126-303k, engagements zero). Which single posture change
-# buys the most survival is a doctrine question, asked cheaply here.
+# The battery arm (log 2026-08-13/14): the champion plus one shore
+# artillery battery -- the naval hole's cheapest candidate response, the
+# turret probe's mechanism shipped whole. $2,100 all-in, gated only by
+# the walk finding land; everything else is flame-nocover exactly.
 
-name vh-close2
+name flame-battery1
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
 heavies heavyTank,heavyTank
 max_workers 8
@@ -30,12 +30,12 @@ allin 0
 strike 0
 medics 0
 navy 0
-battery 0
+battery 1
 decoys 0
 hp_floor 0
 bunkers 0
 flame 2
-close 2
+close 3
 income_ladder 0
 guns 0
 nukes 0
