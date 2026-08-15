@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import logging
 
+import pytest
 from discord.ext import commands
 from tests.support.settings import build_settings
 
-from clubbot import _test_hooks
 from clubbot.container import ServiceContainer
 from clubbot.orchestrator import BotOrchestrator
 from clubbot.services.qr.client import QRService
 
 
-class _Cog(commands.Cog):
-    """Test cog that tracks ensure_subscriber_started calls."""
+class _CountingSubscriberCog(commands.Cog):
+    """Cog that satisfies SubscriberCog and counts the starts it receives."""
 
     def __init__(self) -> None:
         self.n = 0
@@ -21,32 +21,31 @@ class _Cog(commands.Cog):
         self.n += 1
 
 
-def test_orchestrator_starts_background_subscribers() -> None:
+class DigitsCog(_CountingSubscriberCog):
+    """Registered under the name start_background_subscribers looks up."""
+
+
+class TrainerCog(_CountingSubscriberCog):
+    """Registered under the name start_background_subscribers looks up."""
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_starts_background_subscribers() -> None:
+    """Cogs added to the real bot are found by name and started once each."""
     cfg = build_settings()
     cont = ServiceContainer(cfg=cfg, qr_service=QRService(cfg))
     orch = BotOrchestrator(cont)
-    _ = orch.build_bot()
+    bot = orch.build_bot()
 
-    dg = _Cog()
-    tr = _Cog()
+    digits = DigitsCog()
+    trainer = TrainerCog()
+    await bot.add_cog(digits)
+    await bot.add_cog(trainer)
 
-    def fake_get_cog(name: str) -> _test_hooks.CogLike | None:
-        if name == "DigitsCog":
-            result: _test_hooks.CogLike = dg
-            return result
-        if name == "TrainerCog":
-            result2: _test_hooks.CogLike = tr
-            return result2
-        return None
+    orch.start_background_subscribers()
 
-    original = _test_hooks.orchestrator_get_cog_override
-    _test_hooks.orchestrator_get_cog_override = fake_get_cog
-    try:
-        orch.start_background_subscribers()
-        assert dg.n == 1
-        assert tr.n == 1
-    finally:
-        _test_hooks.orchestrator_get_cog_override = original
+    assert digits.n == 1
+    assert trainer.n == 1
 
 
 logger = logging.getLogger(__name__)

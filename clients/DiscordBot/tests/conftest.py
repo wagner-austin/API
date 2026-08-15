@@ -44,8 +44,6 @@ def reset_hooks() -> None:
     _test_hooks.wrap_interaction = _test_hooks._default_wrap_interaction
     _test_hooks.tree_sync = _test_hooks._default_tree_sync
     _test_hooks.discord_exception_types = _test_hooks._default_discord_exception_types
-    _test_hooks.orchestrator_sync_global_override = None
-    _test_hooks.orchestrator_build_bot_override = None
     _test_hooks.orchestrator_build_bot = _test_hooks._default_orchestrator_build_bot
     _test_hooks.validate_youtube_url = _test_hooks._default_validate_youtube_url
     _test_hooks.asyncio_to_thread = _test_hooks._default_asyncio_to_thread

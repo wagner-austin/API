@@ -19,7 +19,7 @@ Usage in tests:
 from __future__ import annotations
 
 import urllib.parse as _url
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
@@ -571,24 +571,6 @@ async def _default_app_command_error_handler(
 
 
 # =============================================================================
-# Orchestrator Sync Hook (for testing sync_commands exception paths)
-# =============================================================================
-
-
-class OrchestratorSyncGlobalProtocol(Protocol):
-    """Protocol for orchestrator _sync_global method."""
-
-    async def __call__(self) -> bool:
-        """Perform global command sync. Returns True if sync was performed."""
-        ...
-
-
-# Global hook for orchestrator _sync_global. When set, orchestrator calls this
-# instead of its own _sync_global method. Tests use this to inject exceptions.
-orchestrator_sync_global_override: OrchestratorSyncGlobalProtocol | None = None
-
-
-# =============================================================================
 # Orchestrator Build Bot Hook (for testing run() method)
 # =============================================================================
 
@@ -598,14 +580,6 @@ class BotRunnerProtocol(Protocol):
 
     def run(self, token: str) -> None:
         """Run the bot with the given token."""
-        ...
-
-
-class OrchestratorBuildBotProtocol(Protocol):
-    """Protocol for orchestrator build_bot override."""
-
-    def __call__(self) -> BotRunnerProtocol:
-        """Build and return a bot-like object."""
         ...
 
 
@@ -637,10 +611,6 @@ def _default_orchestrator_build_bot(orchestrator: OrchestratorLike) -> BotRunner
 # Hook for orchestrator build_bot. Production calls build_bot(); tests override.
 orchestrator_build_bot: OrchestratorBuildBotHookProtocol = _default_orchestrator_build_bot
 
-# Legacy: Global hook for orchestrator build_bot (for backwards compatibility).
-# Deprecated - use orchestrator_build_bot instead.
-orchestrator_build_bot_override: OrchestratorBuildBotProtocol | None = None
-
 
 # =============================================================================
 # Orchestrator Service Registry Hook
@@ -664,48 +634,6 @@ def _default_get_service_registry() -> dict[str, ServiceDef]:
 
 # Hook for getting SERVICE_REGISTRY. Tests override to return custom registries.
 get_service_registry: GetServiceRegistryProtocol = _default_get_service_registry
-
-
-# =============================================================================
-# Orchestrator Bot.get_cog Hook
-# =============================================================================
-
-
-class CogLike(Protocol):
-    """Protocol for cog-like objects."""
-
-    def ensure_subscriber_started(self) -> None:
-        """Ensure the subscriber is started."""
-        ...
-
-
-class GetCogProtocol(Protocol):
-    """Protocol for bot.get_cog method."""
-
-    def __call__(self, name: str) -> CogLike | None:
-        """Get a cog by name."""
-        ...
-
-
-# Override for bot.get_cog. When set, orchestrator.start_background_subscribers uses this.
-orchestrator_get_cog_override: GetCogProtocol | None = None
-
-
-# =============================================================================
-# Orchestrator Add Listener Hook
-# =============================================================================
-
-
-class AddListenerProtocol(Protocol):
-    """Protocol for bot.add_listener method."""
-
-    def __call__(self, func: Callable[[], Awaitable[None]], name: str | None = None) -> None:
-        """Add a listener function."""
-        ...
-
-
-# Override for bot.add_listener. When set, orchestrator.register_listeners uses this.
-orchestrator_add_listener_override: AddListenerProtocol | None = None
 
 
 # =============================================================================
@@ -1187,7 +1115,6 @@ asyncio_to_thread: AsyncioToThreadProtocol = _default_asyncio_to_thread
 
 
 __all__ = [
-    "AddListenerProtocol",
     "AppCommand",
     "AppCommandErrorHandlerProtocol",
     "AppCommandLike",
@@ -1205,7 +1132,6 @@ __all__ = [
     "BuildDigitsEnqueuerProtocol",
     # Transcript service protocols
     "CaptionsProtocol",
-    "CogLike",
     "CommandTree",
     "CreateBotOrchestratorProtocol",
     "CreateServiceContainerProtocol",
@@ -1219,7 +1145,6 @@ __all__ = [
     "FetchedUserLike",
     "FileLike",
     "FollowupProtoLike",
-    "GetCogProtocol",
     "GetServiceRegistryProtocol",
     "GuardFindMonorepoRootProtocol",
     "GuardLoadOrchestratorProtocol",
@@ -1230,9 +1155,7 @@ __all__ = [
     "LoadSettingsProtocol",
     "MessageLike",
     "OrchestratorBuildBotHookProtocol",
-    "OrchestratorBuildBotProtocol",
     "OrchestratorLike",
-    "OrchestratorSyncGlobalProtocol",
     # QR service protocols
     "QRResultLike",
     "QRServiceFactoryProtocol",
@@ -1315,11 +1238,7 @@ __all__ = [
     "guard_load_orchestrator",
     "load_httpx_module",
     "load_settings",
-    "orchestrator_add_listener_override",
     "orchestrator_build_bot",
-    "orchestrator_build_bot_override",
-    "orchestrator_get_cog_override",
-    "orchestrator_sync_global_override",
     # QR service hooks
     "qr_service_factory",
     "redis_raw_for_rq",

@@ -11,7 +11,12 @@ from clubbot.services.qr.client import QRService
 
 
 def test_orchestrator_registry_skip_branch() -> None:
-    # Only include digits in registry to force 'continue' branch for trainer
+    """A service absent from the registry is skipped before its cog is sought.
+
+    Only digits is registered, so trainer takes the 'continue' branch; digits
+    itself has no cog on the bot, which is the not-a-SubscriberCog branch.
+    """
+
     def decode_event(s: str) -> None:
         return None
 
@@ -29,22 +34,9 @@ def test_orchestrator_registry_skip_branch() -> None:
         cont = ServiceContainer(cfg=cfg, qr_service=QRService(cfg))
         orch = BotOrchestrator(cont)
         bot = orch.build_bot()
+        assert bot.get_cog("DigitsCog") is None
 
-        original_get_cog = bot.get_cog
-
-        def fake_get_cog(name: str) -> _test_hooks.CogLike | None:
-            cog = original_get_cog(name)
-            if cog is not None and hasattr(cog, "ensure_subscriber_started"):
-                result: _test_hooks.CogLike = cog
-                return result
-            return None
-
-        original_cog_override = _test_hooks.orchestrator_get_cog_override
-        _test_hooks.orchestrator_get_cog_override = fake_get_cog
-        try:
-            orch.start_background_subscribers()
-        finally:
-            _test_hooks.orchestrator_get_cog_override = original_cog_override
+        orch.start_background_subscribers()
     finally:
         _test_hooks.get_service_registry = original_registry
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 from collections.abc import Awaitable, Callable
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 import discord
 from discord.ext import commands
@@ -19,6 +19,22 @@ class GuildLike(Protocol):
 
     id: int
     name: str
+
+
+@runtime_checkable
+class SubscriberCog(Protocol):
+    """Protocol for cogs that own a background event subscriber.
+
+    Only some of the registry's cogs consume a Redis event channel, and
+    ``commands.Bot.get_cog`` is typed as returning the base ``Cog``. Making
+    the protocol runtime-checkable lets ``start_background_subscribers``
+    both narrow the type and answer the question it actually has -- does
+    this cog have a subscriber to start -- with one check.
+    """
+
+    def ensure_subscriber_started(self) -> None:
+        """Start the cog's event subscriber if it is not already running."""
+        ...
 
 
 class BotOrchestrator:
@@ -71,9 +87,7 @@ class BotOrchestrator:
     async def sync_commands(self) -> None:
         assert self.bot is not None
         logger = self.logger
-        # Use hook if set (for testing exception paths), otherwise call own method
-        sync_func = _test_hooks.orchestrator_sync_global_override or self._sync_global
-        task: asyncio.Task[bool] = asyncio.create_task(sync_func())
+        task: asyncio.Task[bool] = asyncio.create_task(self._sync_global())
         await asyncio.wait({task})
         exc = task.exception()
         if exc is None:
@@ -161,13 +175,11 @@ class BotOrchestrator:
             "trainer": "TrainerCog",
             # transcript currently API-only in this bot; no subscriber class
         }
-        # Use hook override if set, otherwise use bot's get_cog
-        get_cog = _test_hooks.orchestrator_get_cog_override or self.bot.get_cog
         for sid, cog_name in id_to_cog.items():
             if sid not in service_registry:
                 continue
-            cog = get_cog(cog_name)
-            if cog is not None and hasattr(cog, "ensure_subscriber_started"):
+            cog = self.bot.get_cog(cog_name)
+            if isinstance(cog, SubscriberCog):
                 cog.ensure_subscriber_started()
 
     def _preflight_token_check(self) -> None:

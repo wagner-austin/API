@@ -173,39 +173,51 @@ class _HTTPError(Exception):
     """Test exception for HTTP errors - name contains 'HTTP'."""
 
 
+def _tree_sync_raising(error: Exception) -> _test_hooks.TreeSyncFactoryProtocol:
+    """Build a tree_sync hook that fails the way the real endpoint can.
+
+    Args:
+        error: Exception the sync should raise.
+
+    Returns:
+        A tree sync hook that always raises ``error``.
+    """
+
+    async def _raising(tree: BotTreeProto, guild: SnowflakeLike | None = None) -> list[AppCommand]:
+        raise error
+
+    return _raising
+
+
 @pytest.mark.asyncio
 async def test_sync_commands_exception_paths() -> None:
-    """Test sync_commands handles Forbidden and HTTP exceptions correctly."""
-    orch = _build_orchestrator()
+    """Forbidden is logged and swallowed; an HTTP failure propagates.
 
-    async def raise_forbidden() -> bool:
-        raise _ForbiddenError()
-
-    async def raise_http() -> bool:
-        raise _HTTPError()
+    The failure is injected at the tree_sync hook, the only place _sync_global
+    can fail, so the classification runs against the real _sync_global.
+    """
+    orch = _build_orchestrator(command_sync_global=True)
 
     # Test Forbidden path - should log warning and not re-raise
-    _test_hooks.orchestrator_sync_global_override = raise_forbidden
+    _test_hooks.tree_sync = _tree_sync_raising(_ForbiddenError())
     await orch.sync_commands()
 
     # Test HTTP path - should re-raise
-    _test_hooks.orchestrator_sync_global_override = raise_http
+    _test_hooks.tree_sync = _tree_sync_raising(_HTTPError())
     with pytest.raises(_HTTPError):
         await orch.sync_commands()
+
+
+class _WeirdError(Exception):
+    """Test exception whose name matches neither 'Forbidden' nor 'HTTP'."""
 
 
 @pytest.mark.asyncio
 async def test_sync_commands_unknown_exception_to_runtime_error() -> None:
     """Test sync_commands converts unknown exceptions to RuntimeError."""
-    orch = _build_orchestrator()
+    orch = _build_orchestrator(command_sync_global=True)
 
-    class _WeirdError(Exception):
-        pass
-
-    async def raise_weird() -> bool:
-        raise _WeirdError()
-
-    _test_hooks.orchestrator_sync_global_override = raise_weird
+    _test_hooks.tree_sync = _tree_sync_raising(_WeirdError())
     with pytest.raises(RuntimeError):
         await orch.sync_commands()
 
