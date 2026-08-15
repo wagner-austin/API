@@ -6,10 +6,13 @@ As long as the letter-level rules stay the same, this test is
 deterministic and will fail loudly on any accidental change to
 :file:`ky_ipa.rules`.
 
-The text is byte-identical to the equivalent test in the sibling
-``turkic-transliteration`` project so ``test_pyicu_parity`` can
-compare PyICU output against this project's custom rule engine on
-the same input.
+The text is byte-identical to the equivalent test in
+``turkic-transliteration``, which is what made it usable as shared input
+when the two engines were compared directly. That comparison no longer
+runs here — there is no dependency on that project and no ICU in this
+environment — and is enforced instead by the frozen digests in
+``tests/golden_sweep.py``. Keeping the text identical still costs nothing
+and keeps the two projects' sentence-level cases comparable by eye.
 
 Source:
     McCollum, A. G. (2020). "Vowel harmony and positional variation in
