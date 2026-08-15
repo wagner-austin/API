@@ -333,3 +333,60 @@ class TestHookDispatchRule:
         )
 
         assert HookDispatchRule().run([path]) == []
+
+    def test_flags_hook_typed_against_a_locally_defined_protocol(self, tmp_path: Path) -> None:
+        """A hook protocol need not be named with a Proto suffix to be recognised.
+
+        Containers such as Model-Trainer's finetuning strategies declare hooks
+        against names like PeftModelCreator, which the suffix check alone missed.
+        """
+        path = _write(
+            tmp_path / "_test_hooks.py",
+            "from typing import Protocol\n\n\n"
+            "class PeftModelCreator(Protocol):\n"
+            "    def __call__(self) -> None: ...\n\n\n"
+            "class Hooks:\n"
+            "    create_peft_model: PeftModelCreator | None = None\n",
+        )
+
+        violations = NullableHookRule().run([path])
+
+        assert [v.kind for v in violations] == ["nullable-hook-declaration"]
+
+    def test_flags_hook_typed_against_a_qualified_local_protocol(self, tmp_path: Path) -> None:
+        """The same holds when the annotation is written as a dotted name."""
+        path = _write(
+            tmp_path / "_test_hooks.py",
+            "from typing import Protocol\n\n\n"
+            "class Runner(Protocol):\n"
+            "    def __call__(self) -> None: ...\n\n\n"
+            "hook: mod.Runner | None = None\n",
+        )
+
+        assert len(NullableHookRule().run([path])) == 1
+
+    def test_accepts_optional_state_typed_against_a_non_protocol_class(
+        self, tmp_path: Path
+    ) -> None:
+        """A class that is not a Protocol is data, so an optional field is allowed."""
+        path = _write(
+            tmp_path / "_test_hooks.py",
+            "class Settings:\n    pass\n\n\nvalue: Settings | None = None\n",
+        )
+
+        assert NullableHookRule().run([path]) == []
+
+    def test_flags_hook_typed_against_a_protocol_with_a_preceding_base(
+        self, tmp_path: Path
+    ) -> None:
+        """A Protocol declared after another base is still recognised."""
+        path = _write(
+            tmp_path / "_test_hooks.py",
+            "from typing import Generic, Protocol, TypeVar\n\n"
+            "T = TypeVar('T')\n\n\n"
+            "class Loader(Generic[T], Protocol):\n"
+            "    def __call__(self) -> None: ...\n\n\n"
+            "hook: Loader | None = None\n",
+        )
+
+        assert len(NullableHookRule().run([path])) == 1

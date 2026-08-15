@@ -47,7 +47,33 @@ def _is_hooks_module(path: Path) -> bool:
     return stem.endswith("_hooks") or stem.endswith("_hooks_guard")
 
 
-def _annotation_names_a_hook(node: ast.expr) -> bool:
+def _local_protocol_names(tree: ast.AST) -> frozenset[str]:
+    """Collect names of Protocol classes defined in a module.
+
+    Hook protocols are not always named with a ``Proto`` suffix -- a container
+    may declare ``create_peft_model: PeftModelCreator | None`` -- so the
+    suffix alone misses them. Reading the module's own Protocol classes
+    catches those without widening the rule to every optional attribute.
+
+    Args:
+        tree: Parsed module.
+
+    Returns:
+        Names of classes declared with a Protocol base.
+    """
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for base in node.bases:
+            if (isinstance(base, ast.Name) and base.id == "Protocol") or (
+                isinstance(base, ast.Attribute) and base.attr == "Protocol"
+            ):
+                names.add(node.name)
+    return frozenset(names)
+
+
+def _annotation_names_a_hook(node: ast.expr, local_protocols: frozenset[str]) -> bool:
     """Report whether an annotation names a callable hook type.
 
     Protocol types and ``Callable`` aliases are hooks; ordinary data types
@@ -55,14 +81,21 @@ def _annotation_names_a_hook(node: ast.expr) -> bool:
 
     Args:
         node: Annotation expression, already stripped of the ``| None``.
+        local_protocols: Protocol classes declared in the same module.
 
     Returns:
         True when the annotation names a hook type.
     """
     if isinstance(node, ast.Name):
-        return node.id.endswith("Proto") or node.id.endswith("Protocol")
+        return (
+            node.id.endswith("Proto") or node.id.endswith("Protocol") or node.id in local_protocols
+        )
     if isinstance(node, ast.Attribute):
-        return node.attr.endswith("Proto") or node.attr.endswith("Protocol")
+        return (
+            node.attr.endswith("Proto")
+            or node.attr.endswith("Protocol")
+            or node.attr in local_protocols
+        )
     if isinstance(node, ast.Subscript):
         base = node.value
         if isinstance(base, ast.Name):
@@ -72,11 +105,12 @@ def _annotation_names_a_hook(node: ast.expr) -> bool:
     return False
 
 
-def _optional_hook_annotation(node: ast.expr) -> bool:
+def _optional_hook_annotation(node: ast.expr, local_protocols: frozenset[str]) -> bool:
     """Report whether an annotation is ``<HookType> | None``.
 
     Args:
         node: Annotation expression from an annotated assignment.
+        local_protocols: Protocol classes declared in the same module.
 
     Returns:
         True when the annotation unions a hook type with None.
@@ -87,9 +121,9 @@ def _optional_hook_annotation(node: ast.expr) -> bool:
     left_is_none = isinstance(left, ast.Constant) and left.value is None
     right_is_none = isinstance(right, ast.Constant) and right.value is None
     if right_is_none:
-        return _annotation_names_a_hook(left)
+        return _annotation_names_a_hook(left, local_protocols)
     if left_is_none:
-        return _annotation_names_a_hook(right)
+        return _annotation_names_a_hook(right, local_protocols)
     return False
 
 
@@ -145,13 +179,14 @@ class NullableHookRule:
             One violation per nullable hook declaration.
         """
         out: list[Violation] = []
+        local_protocols = _local_protocol_names(tree)
         for node in ast.walk(tree):
             if not isinstance(node, ast.AnnAssign):
                 continue
             value = node.value
             if not isinstance(value, ast.Constant) or value.value is not None:
                 continue
-            if not _optional_hook_annotation(node.annotation):
+            if not _optional_hook_annotation(node.annotation, local_protocols):
                 continue
             target = node.target
             hook_name = target.id if isinstance(target, ast.Name) else "<hook>"
