@@ -206,7 +206,8 @@ class TestMakeDefaultRegistry:
             # that grows with every export (rw_matches) declares 0, meaning
             # "shape contract only, no census".
             if config["n_samples_expected"] == 0:
-                assert "group_column" in config, (
+                group_column = config.get("group_column")
+                assert group_column is not None and len(group_column) > 0, (
                     f"{name}: only grouped, growing datasets may omit the sample census"
                 )
             else:
