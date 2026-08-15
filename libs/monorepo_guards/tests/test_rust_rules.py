@@ -455,8 +455,29 @@ class TestRustCoverageRule:
         kinds = {v.kind for v in violations}
         assert "rust-coverage-missing" in kinds
 
-    def test_allows_legacy_coverage_config(self, tmp_path: Path) -> None:
-        """Test that legacy --fail-under-lines/regions configuration passes."""
+    def test_allows_segment_coverage_config(self, tmp_path: Path) -> None:
+        """Test that the segment-coverage binary invocation passes."""
+        _write(tmp_path / "Cargo.toml", '[package]\nname = "test"')
+        makefile = """
+test:
+\tcargo test
+\tcargo llvm-cov --all-features --json --output-path coverage.json
+\tcargo run --bin check_segment_coverage -- --threshold 100
+"""
+        _write(tmp_path / "Makefile", makefile)
+        config = _make_config(tmp_path)
+        rule = RustCoverageRule(config)
+
+        violations = rule.run([])
+
+        assert violations == []
+
+    def test_rejects_llvm_cov_line_and_region_gates(self, tmp_path: Path) -> None:
+        """Test that llvm-cov's own line/region gates are not accepted.
+
+        They report phantom misses for generic instantiations, so they cannot
+        express the 100% requirement the segment checker enforces.
+        """
         _write(tmp_path / "Cargo.toml", '[package]\nname = "test"')
         makefile = """
 test:
@@ -469,29 +490,16 @@ test:
 
         violations = rule.run([])
 
-        assert violations == []
+        kinds = {v.kind for v in violations}
+        assert "rust-coverage-missing" in kinds
 
-    def test_allows_segment_coverage_config(self, tmp_path: Path) -> None:
-        """Test that segment-based coverage configuration passes."""
+    def test_rejects_threshold_below_one_hundred(self, tmp_path: Path) -> None:
+        """Test that a lowered threshold is flagged."""
         _write(tmp_path / "Cargo.toml", '[package]\nname = "test"')
-        makefile = """
-test:
-\tcargo test
-\tcargo llvm-cov --json --output-path coverage.json
-\tpython tools/check_segment_coverage.py --threshold 100
-"""
-        _write(tmp_path / "Makefile", makefile)
-        config = _make_config(tmp_path)
-        rule = RustCoverageRule(config)
-
-        violations = rule.run([])
-
-        assert violations == []
-
-    def test_flags_partial_legacy_config(self, tmp_path: Path) -> None:
-        """Test that partial legacy config (only lines or only regions) fails."""
-        _write(tmp_path / "Cargo.toml", '[package]\nname = "test"')
-        _write(tmp_path / "Makefile", "test:\n\tcargo llvm-cov --fail-under-lines 100")
+        _write(
+            tmp_path / "Makefile",
+            "test:\n\tcargo run --bin check_segment_coverage -- --threshold 95",
+        )
         config = _make_config(tmp_path)
         rule = RustCoverageRule(config)
 
