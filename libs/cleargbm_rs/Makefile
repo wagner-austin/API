@@ -21,7 +21,7 @@ rust-test:
 # Uses segment-based check to avoid false negatives from generic instantiations
 rust-cov:
 	cargo llvm-cov --all-features --json --output-path coverage.json
-	python tools/check_segment_coverage.py --threshold 100
+	cargo run --bin check_segment_coverage -- --threshold 100
 
 # Python linting: ruff + mypy + guard
 python-lint:

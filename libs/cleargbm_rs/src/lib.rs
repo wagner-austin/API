@@ -39,6 +39,7 @@ macro_rules! propagate_into {
 }
 
 pub mod binning;
+pub mod coverage_check;
 pub mod error;
 pub mod histogram;
 pub mod hooks;
