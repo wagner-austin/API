@@ -1,0 +1,82 @@
+
+==> play (headless match on port 27759, log: runs/battery-pilot2.log)
+& scripts/make/play.ps1 -Port 27759 -GameDir ".game" -Seed 424243 -Lockstep 75 -Settle 22 -PlayLog "runs/battery-pilot2.log" -Map "maps/skirmish/[p2]duel_lake.tmx" -Opponents 1 -Difficulty 2 -Tree "" -PinDelta 0 -FastForward 10 -RngTap 0 -ExtraAgentArgs "" -Module scripts.play -Catalogue "wiki/sources/m0-probe/printunits.log" -TypeDump "wiki/sources/m11-pools/type-flags.ndjson" -PlayArgs "10000 doctrines/flame-battery1.doctrine -" -Javac ".game/jvm64/bin/javac.exe" -Jar ".game/jvm64/bin/jar.exe"
+[play] engine random pinned to seed 424243
+[play] lockstep every 75 frames
+[play] 1 opponent(s) at difficulty 2 on maps/skirmish/[p2]duel_lake.tmx
+[play] fast-forward: 10x
+[play] -sandbox withheld; the agent starts the match
+[play] channel open; the world is held at its first frame, no settle
+doctrine: flame-battery1
+owned at compile (frame 0): builder commandCenter
+goals: extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> hoverTank -> c_artillery
+plan:  extractorT1 -> extractorT1 -> extractorT1 -> landFactory -> c_tank -> c_tank -> c_tank -> hoverTank -> c_artillery
+  extractorT1 costs 700, goes on a resource pool
+  extractorT1 costs 700, goes on a resource pool
+  extractorT1 costs 700, goes on a resource pool
+  landFactory costs 700, goes on the ring
+  c_tank costs 350, goes on the ring
+  c_tank costs 350, goes on the ring
+  c_tank costs 350, goes on the ring
+  hoverTank costs 450, goes on the ring
+  c_artillery costs 900, goes on the ring
+plan total: 5200 credits, holding 4000
+verdict        wiped (wiped)
+plan           0/9 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   19
+reinforced     121
+expansions     32 (6 factories) (every worker is already building something)
+extractors     0 -> 0
+attack orders  162
+rallied        116
+intercepted    196
+sightings      273
+raids          0
+marches        117
+army           0 -> 0
+army value     500 -> 0
+total worth    3500 -> 0
+best rival     3500 -> 133750 (peak 133750, worst dip 3000)
+workers        0
+structures     none
+composition    none
+owned peak     builder x8, c_tank x7, extractorT1 x7, c_antiAirTurret x4, heavyTank x3, hoverTank x3, landFactory x3, c_artillery x2, c_turret_t1 x1, commandCenter x1, editorOrBuilder x1, extractorT2 x1
+units lost to  scout x28, lightGunship x27, c_turret_t1 x13, hoverTank x11, gunBoat x9, missileShip x9, c_artillery x7, c_tank x7, c_helicopter x5, heavyHoverTank x5, c_turret_t2_gun x3, mechGun x3, gunShip x2, mechArtillery x1
+works lost to  scout x6, c_tank x4, c_artillery x3, mechGun x3, c_turret_t1 x1, heavyHoverTank x1, lightGunship x1, missileShip x1
+enemy fields   c_antiAirTurret x17, c_turret_t1 x16, builder x13, c_artillery x11, scout x10, c_interceptor x8, hoverTank x7, lightSub x7, extractorT2 x6, c_antiAirTurretT2 x5, c_tank x5, mechArtillery x5, mechMissile x5, attackSubmarine x4, c_turret_t2_flame x4, landFactory x4, lightGunship x4, mechGun x4, c_helicopter x3, mechFactory x3, airFactory x2, c_turret_t2_gun x2, extractorT1 x2, heavyInterceptor x2, hovercraft x2, amphibiousJet x1, commandCenter x1, dropship x1, fabricatorT1 x1, missileShip x1, missileTank x1, plasmaTank x1, seaFactory x1
+income         0/s
+enemies seen   2 -> 159 (0 engageable)
+engaged gone   64
+players        2 -> 1 (1 eliminated)
+claims refused 8775
+samples seen   5140
+frames elapsed 385425
+engine clock   1156275 ms
+credits left   642
+reach          plan-holds-only-worker  reached   144  acted     0  last: the opening plan is using the only free worker
+reach          plan-first-in-line      reached   191  acted     0  last: the plan is waiting for the next free worker
+reach          income                  reached  4496  acted    76  last: 332 credits, need 700 to expand past a 0 reserve
+reach          spare-throughput        reached  4250  acted     6  last: production is not the constraint
+reach          aa-cover                reached   939  acted    15  last: c_antiAirTurret wanted 600 of 0 available
+reach          defence                 reached   924  acted     0  last: cover disabled by doctrine
+reach          throughput              reached   924  acted     0  last: production is not the constraint
+reach          no-free-worker          reached   309  acted     0  last: every worker is already building something
+spend          produce:c_tank          asked   616  got    49  spent   17150  held: produce:c_tank wanted 350 of 346 available; 0 already committed this tick
+spend          produce:hoverTank       asked   974  got    38  spent   17100  held: produce:hoverTank wanted 450 of 335 available; 0 already committed this tick
+spend          produce:heavyTank       asked   850  got    15  spent   12000  held: produce:heavyTank wanted 800 of 642 available; 0 already committed this tick
+spend          produce:c_artillery     asked  1008  got    11  spent    9900  held: produce:c_artillery wanted 900 of 898 available; 0 already committed this tick
+spend          expand:c_antiAirTurret  asked    15  got    15  spent    9000
+spend          expand:extractorT1      asked    76  got    11  spent    7700  held: expand:extractorT1 wanted 700 of 250 available; 450 already committed this tick
+spend          plan:extractorT1        asked     7  got     7  spent    4900
+spend          expand:landFactory      asked     6  got     6  spent    4200
+spend          produce:builder         asked    36  got     8  spent    4000  held: produce:builder wanted 500 of 498 available; 0 already committed this tick
+spend          plan:c_tank             asked     6  got     6  spent    2100
+spend          tech:landFactory        asked   199  got     1  spent    2000  held: tech:landFactory wanted 2000 of 1997 available past a 900 reserve; 0 already committed this tick
+spend          plan:hoverTank          asked     4  got     4  spent    1800
+spend          battery:c_turret_t1_artilleryasked   360  got     1  spent    1600  held: battery:c_turret_t1_artillery wanted 1600 of 1578 available past a 900 reserve; 0 already committed this tick
+spend          upgrade:extractorT2     asked  2555  got     1  spent    1400  held: upgrade:extractorT2 wanted 1400 of 0 available past a 900 reserve; 0 already committed this tick
+spend          plan:c_artillery        asked     1  got     1  spent     900
+spend          plan:landFactory        asked     1  got     1  spent     700
+spend          battery:c_turret_t1     asked     1  got     1  spent     500
+spend          upgrade:extractorT3     asked  2236  got     0  spent       0  held: upgrade:extractorT3 wanted 4000 of 339 available past a 900 reserve; 0 already committed this tick
+[play] game stopped

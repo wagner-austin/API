@@ -1,0 +1,1275 @@
+2026-08-13 22:08:44.795: File logging started
+2026-08-13 22:08:44.795: Game arguments:
+2026-08-13 22:08:44.795: arg: -nodisplay
+2026-08-13 22:08:44.795: arg: -nosound
+2026-08-13 22:08:44.795: arg: -width
+2026-08-13 22:08:44.795: arg: 800
+2026-08-13 22:08:44.795: arg: -height
+2026-08-13 22:08:44.795: arg: 600
+2026-08-13 22:08:44.795: arg: -log
+2026-08-13 22:08:44.795: arg: c:\users\test\projects\api\clients\rustedwarfarebot\runs/turret-probe.log
+2026-08-13 22:08:44.795: OS name: Windows 10
+2026-08-13 22:08:44.795: OS version: 10.0
+2026-08-13 22:08:44.806: LWJGL version: 2.9.3
+2026-08-13 22:08:44.806: Build Number: #28
+2026-08-13 22:08:44.806: Game Version: 1.15
+2026-08-13 22:08:44.806: Game Code: 176
+2026-08-13 22:08:44.812: Is 64bit: true
+2026-08-13 22:08:44.812: JVM maxMemory:1048576000
+2026-08-13 22:08:44.812: JVM totalMemory:1048576000
+2026-08-13 22:08:44.813: JVM freeMemory:1038090240
+2026-08-13 22:08:44.813: steam not requested
+corroding: nativePollOnce:100,0
+2026-08-13 22:08:44.831: --- ERROR: Skipping display mode call
+2026-08-13 22:08:44.832: screenHeight:800.0
+2026-08-13 22:08:44.832: screenWidth:600.0
+2026-08-13 22:08:44.832: Overriding width to:800
+2026-08-13 22:08:44.832: Overriding height to:600
+Thu Aug 13 22:08:44 PDT 2026 INFO:Slick Build #84
+Thu Aug 13 22:08:44 PDT 2026 INFO:LWJGL Version: 2.9.3
+Thu Aug 13 22:08:44 PDT 2026 INFO:OriginalDisplayMode: 1920 x 1080 x 32 @59Hz
+Thu Aug 13 22:08:44 PDT 2026 INFO:TargetDisplayMode: 800 x 600 x 0 @0Hz
+Thu Aug 13 22:08:45 PDT 2026 INFO:Starting display 800x600
+Thu Aug 13 22:08:45 PDT 2026 INFO:Use Java PNG Loader = true
+Thu Aug 13 22:08:45 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:45 PDT 2026 DEBUG:Creating FBO 32x32
+2026-08-13 22:08:45.432: --Now loading:displayModes
+2026-08-13 22:08:45.440: --Now loading:starting controllers
+2026-08-13 22:08:45.502: Disabling sound with NullSoundFactory
+2026-08-13 22:08:45.509: --Now loading:loading libRocket
+2026-08-13 22:08:45.509: start libRocket setup
+In Java with: Hello from C++
+2026-08-13 22:08:45.554: --Now loading:libRocket - fonts
+2026-08-13 22:08:45.592: NotoSansCJKsc start
+2026-08-13 22:08:45.614: NotoSansCJKsc end
+2026-08-13 22:08:45.614: end libRocket setup
+2026-08-13 22:08:45.614: --Now loading:GuiEngine
+2026-08-13 22:08:45.615: libRocket setup took:105.626ms
+2026-08-13 22:08:45.615: --Now loading:GameEngine
+2026-08-13 22:08:45.619: GameEngine:GameEngine()
+2026-08-13 22:08:45.620: Created new gameEngine of:com.corrodinggames.rts.game.i
+2026-08-13 22:08:45.620: --- ----------------- ----
+2026-08-13 22:08:45.620: --- GameEngine:init() ----
+2026-08-13 22:08:45.620: --- ----------------- ----
+2026-08-13 22:08:45.622: Version:v1.15
+2026-08-13 22:08:45.631: --Now loading:Asset Index
+2026-08-13 22:08:45.632: ------- createIndex -------
+2026-08-13 22:08:45.632: c:
+2026-08-13 22:08:45.632: densityScaleRaw*densityScaleMultiplier: 1.0
+2026-08-13 22:08:45.632: packageName:dedicatedServer
+2026-08-13 22:08:45.633: --Now loading:InputController
+2026-08-13 22:08:45.637: slickToAndroidCodes: Could not find keycode for: NUMLOCK, RWIN, CONVERT, STOP, AX, UNDERLINE, DELETE, NOCONVERT, APPS, DECIMAL, SCROLL, END, KANJI, NUMPADDECIMAL, LWIN, CIRCUMFLEX, UNLABELED, F14, F13, COLON, F15, CAPITAL, 
+2026-08-13 22:08:45.637: gdxToAndroidCodes: Could not find keycode for: END, META_ALT_LEFT_ON, COLON, ANY_KEY, META_SHIFT_RIGHT_ON, 
+2026-08-13 22:08:45.637: gdxToSlickCodes: Could not find keycode for: MEDIA_REWIND, MEDIA_PLAY_PAUSE, BUTTON_SELECT, CENTER, BUTTON_X, BUTTON_Z, BUTTON_Y, MEDIA_PREVIOUS, SWITCH_CHARSET, SEARCH, META_ALT_ON, CAMERA, SHIFT_LEFT, BUTTON_START, MUTE, CALL, PICTSYMBOLS, FOCUS, VOLUME_DOWN, ENVELOPE, BUTTON_L2, BUTTON_L1, META_SHIFT_ON, NUM, SOFT_RIGHT, NOTIFICATION, STAR, MENU, DPAD_CENTER, BUTTON_R2, BUTTON_R1, BUTTON_THUMBL, MEDIA_FAST_FORWARD, BUTTON_THUMBR, EXPLORER, BACKSPACE, ENDCALL, FORWARD_DEL, BUTTON_MODE, SYM, SOFT_LEFT, PLUS, MEDIA_NEXT, META_ALT_LEFT_ON, MEDIA_STOP, VOLUME_UP, POUND, META_SHIFT_LEFT_ON, DEL, ANY_KEY, BUTTON_C, SHIFT_RIGHT, BUTTON_B, BUTTON_A, HEADSETHOOK, META_SHIFT_RIGHT_ON, UNKNOWN, CLEAR, 
+2026-08-13 22:08:45.638: getControllerCount:0
+2026-08-13 22:08:45.638: --Now loading:SettingsEngine
+2026-08-13 22:08:45.639: loadFromFileSystem filepath: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-08-13 22:08:45.654: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-08-13 22:08:45.657: densityScale(): 1.0
+2026-08-13 22:08:45.657: Locale: forceEnglish
+2026-08-13 22:08:45.672: Locale: Using Strings.properties as locale
+2026-08-13 22:08:45.673: Locale.init took:15.581ms
+2026-08-13 22:08:45.695: --Now loading:AudioEngine
+2026-08-13 22:08:45.696: AudioEngine took:1.310ms
+2026-08-13 22:08:45.696: --Now loading:MusicController
+2026-08-13 22:08:45.697: Null musicFactory - load
+2026-08-13 22:08:45.698: Loaded track:Cont-Edgen-6084.ogg
+2026-08-13 22:08:45.698: --Now loading:music
+2026-08-13 22:08:45.698: Loaded track:battletanks1B.ogg
+2026-08-13 22:08:45.698: --Now loading:music
+2026-08-13 22:08:45.698: Loaded track:sile-Justin_R-6891.ogg
+2026-08-13 22:08:45.698: --Now loading:music
+2026-08-13 22:08:45.698: Loaded track:Acti-Rudy_Ves-8657.ogg
+2026-08-13 22:08:45.698: --Now loading:music
+2026-08-13 22:08:45.698: Loaded track:Ove - Earth Is All We Have.ogg
+2026-08-13 22:08:45.698: --Now loading:music
+2026-08-13 22:08:45.699: Loaded track:[noloop]Ove Melaa - Theme Crystalized.ogg
+2026-08-13 22:08:45.699: --Now loading:music
+2026-08-13 22:08:45.700: Loaded track:[noloop]The Planets - Mars (Part A).ogg
+2026-08-13 22:08:45.700: --Now loading:music
+2026-08-13 22:08:45.700: Loaded track:[noloop]The Planets - Mars (Part B).ogg
+2026-08-13 22:08:45.700: --Now loading:music
+2026-08-13 22:08:45.700: Loaded track:Adama-Bobthede-11966.ogg
+2026-08-13 22:08:45.700: --Now loading:music
+2026-08-13 22:08:45.701: init(): using GraphicsSlick2d
+2026-08-13 22:08:45.701: --Now loading:graphics.init
+2026-08-13 22:08:45.706: Creating BitmapOrTextureAlias: 1024x1024
+Thu Aug 13 22:08:45 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:45 PDT 2026 DEBUG:Creating FBO 1024x1024
+2026-08-13 22:08:45.713: --Now loading:Fonts
+2026-08-13 22:08:45.714: New font:16 bold:false
+2026-08-13 22:08:45.947: loadGlyphs
+2026-08-13 22:08:45.947: New font:18 bold:false
+2026-08-13 22:08:45.992: loadGlyphs
+2026-08-13 22:08:45.992: --Now loading:effects.init
+2026-08-13 22:08:46.033: --Now loading:minimapHandler
+2026-08-13 22:08:46.035: We have an initial screen size, can do early setup of image buffers
+2026-08-13 22:08:46.035: --Now loading:Map Buffers
+2026-08-13 22:08:46.035: Density size changed now: 1.0, refreshing fonts
+2026-08-13 22:08:46.041: map:setupLayerBuffers for size:603
+2026-08-13 22:08:46.041: layerBufferSize:1024
+2026-08-13 22:08:46.041: layerBuffer:2x2 = 4 x2 for soft fade 
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 1024x1024
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 1024x1024
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 1024x1024
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 1024x1024
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 1024x1024
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 1024x1024
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 1024x1024
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 1024x1024
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 1024x1024
+2026-08-13 22:08:46.096: ----- layerBuffers create in:54.6903 ms
+2026-08-13 22:08:46.096: Creating minimap image buffers..
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 240x240
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 240x240
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 240x240
+2026-08-13 22:08:46.100: --Now loading:PathEngine
+2026-08-13 22:08:46.104: PathEngine:We have 24 cores, creating extra solvers
+2026-08-13 22:08:46.104: --Now loading:GroupController
+2026-08-13 22:08:46.104: --Now loading:CollisionEngine
+2026-08-13 22:08:46.105: --Now loading:InterfaceEngine
+2026-08-13 22:08:46.120: New font:16 bold:true
+2026-08-13 22:08:46.153: loadGlyphs
+2026-08-13 22:08:46.154: New font:14 bold:true
+2026-08-13 22:08:46.183: loadGlyphs
+2026-08-13 22:08:46.183: New font:34 bold:false
+2026-08-13 22:08:46.214: loadGlyphs
+2026-08-13 22:08:46.239: New font:20 bold:true
+2026-08-13 22:08:46.263: loadGlyphs
+2026-08-13 22:08:46.263: New font:18 bold:true
+2026-08-13 22:08:46.292: loadGlyphs
+2026-08-13 22:08:46.292: New font:12 bold:false
+2026-08-13 22:08:46.317: loadGlyphs
+2026-08-13 22:08:46.318: smallTextPaint size: 12.0
+2026-08-13 22:08:46.318: New font:10 bold:false
+2026-08-13 22:08:46.343: loadGlyphs
+2026-08-13 22:08:46.343: New font:8 bold:false
+2026-08-13 22:08:46.371: loadGlyphs
+2026-08-13 22:08:46.371: New font:20 bold:false
+2026-08-13 22:08:46.398: loadGlyphs
+2026-08-13 22:08:46.398: New font:14 bold:false
+2026-08-13 22:08:46.425: loadGlyphs
+2026-08-13 22:08:46.426: --Now loading:NetworkEngine
+2026-08-13 22:08:46.433: --Now loading:StatsHandler
+2026-08-13 22:08:46.438: --Now loading:ModEngine
+2026-08-13 22:08:46.439: disabledSteam - loadWorkshopMods
+2026-08-13 22:08:46.447: loading mod custom units at:/SD/mods/units
+2026-08-13 22:08:46.447: loading mod custom units at:builtin_mods
+2026-08-13 22:08:46.466: openAssetCached: Cache hit for: builtin_mods/mega_builders/mod-info.txt
+2026-08-13 22:08:46.468: loading mod custom units at:builtin_mods_enabled
+2026-08-13 22:08:46.468: ========= Mods ===========
+2026-08-13 22:08:46.468: Number of mods:1
+2026-08-13 22:08:46.468: Mod: 'Mega Builders
+2026-08-13 22:08:46.468: ================================
+2026-08-13 22:08:46.468: Loading mod selection
+2026-08-13 22:08:46.468: --Now loading:CommandController
+2026-08-13 22:08:46.469: --Now loading:GameSaver
+2026-08-13 22:08:46.471: --Now loading:ReplayEngine
+2026-08-13 22:08:46.472: --Now loading:UnitGeoIndex
+2026-08-13 22:08:46.472: --Now loading:Precalculating map fog
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 353x353
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 21x21
+2026-08-13 22:08:46.504: smoothFog load took:28.025ms
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 440x440
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 440x440
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 240x240
+Thu Aug 13 22:08:46 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Thu Aug 13 22:08:46 PDT 2026 DEBUG:Creating FBO 240x240
+2026-08-13 22:08:46.517: --Now loading:ScorchMark.load
+2026-08-13 22:08:46.522: --Now loading:Projectile.load
+2026-08-13 22:08:46.526: --Now loading:Emitter.load
+2026-08-13 22:08:46.526: --Now loading:Unit.loadAllUnits
+2026-08-13 22:08:46.542: Recreating image data from texture: res/drawable/extractor.png (0.483ms)
+2026-08-13 22:08:46.579: Recreating image data from texture: res/drawable/base.png (0.836ms)
+2026-08-13 22:08:46.615: Recreating image data from texture: res/drawable/ship.png (0.444ms)
+2026-08-13 22:08:46.629: Recreating image data from texture: res/drawable/laser_tank_base.png (0.613ms)
+2026-08-13 22:08:46.646: Recreating image data from texture: res/drawable/heavy_hover_tank.png (0.896ms)
+2026-08-13 22:08:46.667: Recreating image data from texture: res/drawable/unit_icon_building.png (0.618ms)
+2026-08-13 22:08:46.687: Recreating image data from texture: res/drawable/wall_v.png (0.411ms)
+2026-08-13 22:08:46.707: Recreating image data from texture: res/drawable/supply_depot.png (0.451ms)
+2026-08-13 22:08:46.718: loadAllUnits took:192.513ms
+2026-08-13 22:08:46.719: --Now loading:Loading custom unit data
+2026-08-13 22:08:46.719: disabledSteam - loadWorkshopMods
+2026-08-13 22:08:46.719: loading mod custom units at:/SD/mods/units
+2026-08-13 22:08:46.719: loading mod custom units at:builtin_mods
+2026-08-13 22:08:46.720: loading mod custom units at:builtin_mods_enabled
+2026-08-13 22:08:46.720: ========= Mods ===========
+2026-08-13 22:08:46.720: Number of mods:1
+2026-08-13 22:08:46.720: Mod: 'Mega Builders
+2026-08-13 22:08:46.720: ================================
+2026-08-13 22:08:47.587: Setting missingPlaceHolder
+2026-08-13 22:08:48.091: Disabled mod at:builtin_mods/mega_builders (name:Mega Builders)
+2026-08-13 22:08:48.091: ==Timing==
+2026-08-13 22:08:48.091: imageLoad: 108.812ms
+2026-08-13 22:08:48.091: imageLoadOrGet: 173.415ms
+2026-08-13 22:08:48.091: soundLoad: 0ms
+2026-08-13 22:08:48.091: soundLoadOrGet: 0.258ms
+2026-08-13 22:08:48.091: iniParse: 34.977ms
+2026-08-13 22:08:48.091: unitParse: 1302.728ms
+2026-08-13 22:08:48.091: iniOpen: 789.854ms
+2026-08-13 22:08:48.091: iniClose: 0.155ms
+2026-08-13 22:08:48.091: iniSetup: 69.714ms
+2026-08-13 22:08:48.091: actionParse: 56.844ms
+2026-08-13 22:08:48.091: unitParsePartA: 334.889ms
+2026-08-13 22:08:48.091: unitParsePartB: 367.393ms
+2026-08-13 22:08:48.092: unitParsePartC: 460.874ms
+2026-08-13 22:08:48.092: unitParsePartD: 469.046ms
+2026-08-13 22:08:48.092: enableAll: 
+2026-08-13 22:08:48.112: Done loading custom units. image cacheHits:402 image cacheMisses:305 (in: 1391.9309ms)
+2026-08-13 22:08:48.112: ========= Mods data loaded ===========
+2026-08-13 22:08:48.112: Number of mods:1
+2026-08-13 22:08:48.113: Mod: 'Mega Builders' - Memory use:0.00 mb - disabled  (disabled)
+2026-08-13 22:08:48.113: ================================
+2026-08-13 22:08:48.131: --Now loading:getAllUnitsChecksum
+2026-08-13 22:08:48.132: CustomUnits took:1412.772ms
+2026-08-13 22:08:48.132: isOverLiquid called without map loaded
+2026-08-13 22:08:48.132: isOverLiquid called without map loaded
+2026-08-13 22:08:48.132: isOverLiquid called without map loaded
+2026-08-13 22:08:48.132: isOverLiquid called without map loaded
+2026-08-13 22:08:48.132: allUnitsChecksum took:0.570ms
+2026-08-13 22:08:48.144: Init completed
+2026-08-13 22:08:48.144: Loading took:2512.685ms
+2026-08-13 22:08:48.144: --Now loading:Loading map data
+2026-08-13 22:08:48.144: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-08-13 22:08:48.153: --- setStoppedIfNotInGameThread ---
+2026-08-13 22:08:48.153: --- setStopped ---
+2026-08-13 22:08:48.153: gameThread already null
+2026-08-13 22:08:48.164: enableAll: 
+2026-08-13 22:08:48.171:  --- Loading map ---
+2026-08-13 22:08:48.171: Mapfile: assets/maps/menu_background/menu2.tmx
+2026-08-13 22:08:48.178: ---- Loading map data ----
+2026-08-13 22:08:48.213: Map size: 170, 170
+2026-08-13 22:08:48.214: Setting up team fog..
+2026-08-13 22:08:48.373: FileLoader: Could not find asset:assets/tilesets/../../decoration.tsx
+2026-08-13 22:08:48.373: FileLoader: Could not find asset:assets/tilesets/../../decoration.tsx
+2026-08-13 22:08:48.373: FileLoader: Could not find asset:assets/tilesets/../decoration.tsx
+2026-08-13 22:08:48.380: MapLayer create: Ground
+2026-08-13 22:08:48.386: MapLayer create: Items
+2026-08-13 22:08:48.389: MapLayer create: Units
+2026-08-13 22:08:48.425: Map type: mission
+2026-08-13 22:08:48.427: New font:24 bold:true
+2026-08-13 22:08:48.453: loadGlyphs
+2026-08-13 22:08:48.456: Found 6 map triggers
+2026-08-13 22:08:48.456: global Seed: 101279042
+2026-08-13 22:08:48.456: getMapLevel for :maps/menu_background/menu2.tmx file:menu2.tmx
+2026-08-13 22:08:48.456: StateEngine: get(maps/menu_background/menu2.tmx)=null  (key=maps/menu_background/menu2.tmx)
+2026-08-13 22:08:48.456: PathEngine: Setting up map costs
+2026-08-13 22:08:48.486: PathEngine: Ready
+2026-08-13 22:08:48.487: selectAnyOnScreenBuilder: no builder found
+2026-08-13 22:08:48.559: loadAMenuMap took:413.991ms
+2026-08-13 22:08:48.559: --Now loading:Last setup
+2026-08-13 22:08:48.559: --Now loading:init complete
+2026-08-13 22:08:48.559: version: 1.15 176:#28
+2026-08-13 22:08:48.559: --- setRunning ---
+getNewTextureHolder: append:1
+2026-08-13 22:08:48.609: convertTexturePath for: drawable:title.png
+2026-08-13 22:08:48.613: ui[debug]: convertTextOnPage
+2026-08-13 22:08:48.614: convertTextOnPage:_class: '${hideUnless(isIOS())}' to 'hide'
+2026-08-13 22:08:48.614: converted key to:class
+2026-08-13 22:08:48.614: convertTextOnPage:_class: '${hideUnless(isIOS())}' to 'hide'
+2026-08-13 22:08:48.614: converted key to:class
+2026-08-13 22:08:48.614: convertTextOnPage:_class: '${hideUnless(isDesktop())}' to ''
+2026-08-13 22:08:48.614: converted key to:class
+2026-08-13 22:08:48.614: convertTextOnPage:_class: '${hideUnless(canResume())}' to 'hide'
+2026-08-13 22:08:48.614: converted key to:class
+2026-08-13 22:08:48.615: convertTextOnPage:_class: '${fullVersionOnlyStyle()}' to ''
+2026-08-13 22:08:48.615: converted key to:class
+2026-08-13 22:08:48.615: convertTextOnPage:_class: '${hideUnless(usingMods())}' to ''
+2026-08-13 22:08:48.615: converted key to:class
+2026-08-13 22:08:48.616: convertTextOnPage:_class: '${hideUnless(isDesktop())}' to ''
+2026-08-13 22:08:48.616: converted key to:class
+2026-08-13 22:08:48.616: ConvertText - { #1 = peak:2.59ms avg:2.59ms total:2.59ms }
+ScriptEngine:HandleEvent:onShowNewScreen();
+2026-08-13 22:08:48.616: --- setRunning ---
+2026-08-13 22:08:48.616: SlickContainer:setup
+2026-08-13 22:08:48.617: -----------------------------
+2026-08-13 22:08:48.617: ----- Game init finished in:3115.1154 ms
+2026-08-13 22:08:48.622: ai_debug(3):firstRun: no command center found
+2026-08-13 22:08:48.623: Not showing defeated message: Player - 4 had no starting units (Team: A)
+2026-08-13 22:08:48.623: ai_debug(4):firstRun: no command center found
+2026-08-13 22:08:48.623: Not showing defeated message: Player - 5 had no starting units (Team: E)
+2026-08-13 22:08:48.623: ai_debug(5):firstRun: no command center found
+2026-08-13 22:08:48.623: Not showing defeated message: Player - 6 had no starting units (Team: F)
+2026-08-13 22:08:48.623: ai_debug(6):firstRun: no command center found
+2026-08-13 22:08:48.623: Not showing defeated message: Player - 7 had no starting units (Team: G)
+2026-08-13 22:08:48.623: ai_debug(7):firstRun: no command center found
+2026-08-13 22:08:48.624: Not showing defeated message: Player - 8 had no starting units (Team: H)
+2026-08-13 22:08:48.624: ai_debug(8):firstRun: no command center found
+2026-08-13 22:08:48.624: Not showing defeated message: Player - 9 had no starting units (Team: I)
+2026-08-13 22:08:48.624: ai_debug(9):firstRun: no command center found
+2026-08-13 22:08:48.624: Not showing defeated message: Player - 10 had no starting units (Team: J)
+2026-08-13 22:08:48.644: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:2 (#units:4)
+2026-08-13 22:08:48.644: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:3 (#units:3)
+2026-08-13 22:08:48.644: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:5 (#units:7)
+2026-08-13 22:08:48.644: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:5 (#units:1)
+2026-08-13 22:08:48.645: Building smoothFog_cache
+getNewTextureHolder: append:2
+getNewTextureHolder: append:3
+getNewTextureHolder: append:4
+getNewTextureHolder: append:5
+getNewTextureHolder: append:6
+2026-08-13 22:08:48.724: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-08-13 22:08:48.845: MissionEngine:triggerLog:firstActivation: move at:2150 for teamId:1 to targetId:6 (#units:5)
+2026-08-13 22:08:49.249: MissionEngine:triggerLog:firstActivation: move at:8150 for teamId:1 to targetId:6 (#units:4)
+[rw-agent] map-load errors armed to crash; a missing map can no longer drift
+[rw-agent] engine random seeded with 424242; opponent choices are now repeatable
+[rw-agent] Math.random seeded with 424242; opponent placement is now repeatable
+[rw-agent] Collections.shuffle seeded with 424242; unit-mix order is now repeatable
+[rw-agent] match starting on maps/skirmish/[p2]duel_lake.tmx; asking for 1 opponent(s)
+ScriptEngine:HandleEvent:open('sandboxOptions.rml', 'maps/skirmish/[p2]duel_lake.tmx'); setValueById('numberOfAIs', '1'); loadConfigAndStartNewSandbox('maps/skirmish/[p2]duel_lake.tmx');
+getNewTextureHolder: append:7
+2026-08-13 22:08:49.581: alpha=0.8
+2026-08-13 22:08:49.581: convertTexturePath for: panel2.png
+getNewTextureHolder: append:8
+2026-08-13 22:08:49.584: convertTexturePath for: assets/gui/button_close_hover.png
+2026-08-13 22:08:49.585: convertTexturePath already had path:assets/gui/button_close_hover.png
+getNewTextureHolder: append:9
+2026-08-13 22:08:49.586: convertTexturePath for: assets/gui/button_close.png
+2026-08-13 22:08:49.586: convertTexturePath already had path:assets/gui/button_close.png
+getNewTextureHolder: append:10
+2026-08-13 22:08:49.589: convertTexturePath for: widgets.png
+2026-08-13 22:08:49.626: ui[debug]: convertTextOnPage
+2026-08-13 22:08:49.627: convertTextOnPage:_src: '${getMapThumbnail(mode)}' to 'drawable:error_missingmap.png'
+2026-08-13 22:08:49.627: converted key to:src
+2026-08-13 22:08:49.627: ConvertText - { #1 = peak:0.75ms avg:0.75ms total:0.75ms }
+ScriptEngine:HandleEvent:setPageMinWidthAndHeight(700, 700); showLevelOptions(); onShowNewScreen();
+2026-08-13 22:08:49.627: setPageMinWidthAndHeight(700.0, 700.0)
+2026-08-13 22:08:49.632: --- setRunning ---
+2026-08-13 22:08:49.632: --- setRunning ---
+2026-08-13 22:08:49.632: openDocument - { #1 = peak:67.74ms avg:67.74ms total:67.74ms }
+2026-08-13 22:08:49.632: LoadResources - { #4 = peak:3.73ms avg:2.43ms total:9.73ms }
+2026-08-13 22:08:49.637: Starting sandbox from map: maps/skirmish/[p2]duel_lake.tmx
+2026-08-13 22:08:49.637: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-08-13 22:08:49.638: endGame: network disconnect
+2026-08-13 22:08:49.638: Disconnect: shutdownServer
+2026-08-13 22:08:49.689: --- setStoppedIfNotInGameThread ---
+2026-08-13 22:08:49.689: --- setStopped ---
+2026-08-13 22:08:49.689: gameThread already null
+2026-08-13 22:08:49.690: --- setStopped ---
+2026-08-13 22:08:49.690: gameThread already null
+2026-08-13 22:08:49.690: Max teams on map: maps/skirmish/[p2]duel_lake.tmx = 2
+2026-08-13 22:08:49.690: Allies: 0/0
+2026-08-13 22:08:49.690: --- setStoppedIfNotInGameThread ---
+2026-08-13 22:08:49.690: --- setStopped ---
+2026-08-13 22:08:49.690: gameThread already null
+2026-08-13 22:08:49.700: enableAll: 
+2026-08-13 22:08:49.705:  --- Loading map ---
+2026-08-13 22:08:49.705: Mapfile: assets/maps/skirmish/[p2]duel_lake.tmx
+2026-08-13 22:08:49.713: ---- Loading map data ----
+2026-08-13 22:08:49.714: Map size: 130, 130
+2026-08-13 22:08:49.714: Setting up team fog..
+2026-08-13 22:08:49.737: MapLayer create: Ground
+2026-08-13 22:08:49.738: MapLayer create: Items
+2026-08-13 22:08:49.739: MapLayer create: Units
+2026-08-13 22:08:49.747: Recreating image data from texture: tilesets/longgrass.png (1.185ms)
+2026-08-13 22:08:49.753: Recreating image data from texture: tilesets/misc.png (1.436ms)
+2026-08-13 22:08:49.753: Map type: skirmish
+2026-08-13 22:08:49.754: Found 0 map triggers
+2026-08-13 22:08:49.754: global Seed: 195310768
+2026-08-13 22:08:49.754: there are 4 units on this map and 20 trees
+2026-08-13 22:08:49.754: getMapLevel for :maps/skirmish/[p2]duel_lake.tmx file:[p2]duel_lake.tmx
+2026-08-13 22:08:49.754: StateEngine: get(maps/skirmish/[p2]duel_lake.tmx)=null  (key=maps/skirmish/[p2]duel_lake.tmx)
+2026-08-13 22:08:49.754: PathEngine: Setting up map costs
+2026-08-13 22:08:49.764: PathEngine: Ready
+2026-08-13 22:08:49.765: selectAnyOnScreenBuilder: found builder
+2026-08-13 22:08:49.767: Building smoothFog_cache
+2026-08-13 22:08:49.837: --- setRunning ---
+[rw-agent] tick-split generator installed: draws under the simulation tick are pinned; render-path draws use a side stream
+[rw-agent] tick bracket armed: sim draws route by phase, not by stack
+[rw-agent] engine random seeded with 424242; opponent choices are now repeatable
+[rw-agent] Math.random seeded with 424242; opponent placement is now repeatable
+[rw-agent] Collections.shuffle seeded with 424242; unit-mix order is now repeatable
+[rw-agent] synced-draw seed pinned to 424242 from the match seed
+[rw-agent] difficulty set to 3
+[rw-agent] logic step pinned to 3ms; the simulation no longer measures the wall clock
+[rw-agent] fast-forward armed: 4x -- up to 3 extra engine tick(s) per render pass, boundary-aligned
+[rw-agent] ambient spawner silenced; its wall-paced draws are off the sim stream
+[rw-agent] AI think-timers restored to constructed state for 1 team(s)
+[rw-agent] channel listening on 127.0.0.1:27687, sampling every 250ms
+[rw-agent] match live; frame zeroed, channel open, world held for the planner
+2026-08-13 22:08:49.848: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-08-13 22:08:49.849: Creating new debug editor
+2026-08-13 22:08:49.855: --setting up minimap--
+2026-08-13 22:08:49.855: Creating minimap image buffers..
+2026-08-13 22:08:49.861: Minimap map render took:6.447ms
+2026-08-13 22:08:49.870: --- Mouse API succeeded
+[rw-agent] channel: planner connected
+[rw-agent] channel: planner disconnected
+[rw-agent] channel: planner connected
+[rw-agent] map scan: 9 resource pool(s)
+[rw-agent] fog: DISABLED on this map -- every visibility test passes
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1091.6888, 1656.0444)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1082.4445, 1688.2222)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1073.2, 1720.4)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1063.9556, 1752.5778)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] channel: build c_turret_t1 by 24 at (1054.711, 1784.7556)
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+[rw-agent] produce: c_turret_t1_artillery via action 'c_turret_t1_artillery_1' on com.corrodinggames.rts.game.units.custom.a.g [applies=false available=true locked=false room=true]
+[rw-agent] ERROR produce: refusing to dispatch c_turret_t1_artillery on c_turret_t1 -- applies=false: locked, on cooldown, or unaffordable
+[rw-agent] channel: produce c_turret_t1_artillery by 149
+2026-08-13 22:14:40.384: Saving game to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\saves\autosave.rwsave
+2026-08-13 22:14:40.385: GameSaver:saveCurrentMap took:0
+2026-08-13 22:14:40.387: TeamHistory(0): totalValues written:10
+2026-08-13 22:14:40.387: TeamHistory(1): totalValues written:185
+2026-08-13 22:14:40.387: TeamHistory(-1): totalValues written:0
+2026-08-13 22:14:40.387: TeamHistory(-1): totalValues written:0
+2026-08-13 22:14:40.387: TeamHistory(-1): totalValues written:0
+2026-08-13 22:14:40.387: TeamHistory(-1): totalValues written:0
+2026-08-13 22:14:40.387: TeamHistory(-1): totalValues written:0
+2026-08-13 22:14:40.387: TeamHistory(-1): totalValues written:0
+2026-08-13 22:14:40.387: TeamHistory(-1): totalValues written:0
+2026-08-13 22:14:40.387: TeamHistory(-1): totalValues written:0
+2026-08-13 22:14:40.391: GameSaver:saveGame took:6
+2026-08-13 22:14:40.391: Finished writing save, renaming to final filename
+2026-08-13 22:14:40.391: renameFile: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\saves\autosave.rwsave.tmp2 to:C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\saves\autosave.rwsave
+2026-08-13 22:14:40.391: Failed to rename to final file
+2026-08-13 22:14:40.391: Auto save failed: Failed to rename to final file. Check file permissions of storage.
+2026-08-13 22:14:40.391: Autosaved (7.865ms)
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+[rw-agent] ERROR channel: no owned unit with id 24; it may have died since the sample
+2026-08-13 22:16:44.499: network:cannot send sendSystemMessage:Player has been wiped out (Team: A), we are not a server
+2026-08-13 22:17:19.136: buildAndReplaceClearanceCost being skipped
+[rw-agent] channel: planner disconnected

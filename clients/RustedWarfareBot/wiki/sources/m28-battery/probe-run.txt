@@ -1,0 +1,28 @@
+
+==> play (headless match on port 27687, log: runs/turret-probe.log)
+& scripts/make/play.ps1 -Port 27687 -GameDir ".game" -Seed 424242 -Lockstep 0 -Settle 22 -PlayLog "runs/turret-probe.log" -Map "maps/skirmish/[p2]duel_lake.tmx" -Opponents 1 -Difficulty 3 -Tree "" -PinDelta 0 -FastForward 4 -RngTap 0 -ExtraAgentArgs "" -Module scripts.turret_probe -Catalogue "wiki/sources/m0-probe/printunits.log" -TypeDump "wiki/sources/m11-pools/type-flags.ndjson" -PlayArgs "2500" -Javac ".game/jvm64/bin/javac.exe" -Jar ".game/jvm64/bin/jar.exe"
+[play] engine random pinned to seed 424242
+[play] 1 opponent(s) at difficulty 3 on maps/skirmish/[p2]duel_lake.tmx
+[play] fast-forward: 4x
+[play] -sandbox withheld; the agent starts the match
+[play] channel open; the world is held at its first frame, no settle
+[battery] anchor (990,2010) mirror (1452,401) builder 24
+[battery] fraction 0.22: refused after 40
+[battery] fraction 0.20: refused after 40
+[battery] fraction 0.18: refused after 40
+[battery] fraction 0.16: refused after 40
+[battery] turret STANDS at fraction 0.14: (1040,1780) complete=False
+[battery] turret offers: c_turret_t2_gun[avail=True price=1000], c_turret_t1_artillery[avail=True price=1600], c_turret_t2_flame[avail=True price=700], c_turret_t1_lightning[avail=True price=2200]
+[battery] BATTERY STANDS: unit 149 at (1040,1780) complete=True hp=1000
+[battery] in reach: hoverTank (HOVER) at 342 hp=150/150
+[battery] DREW BLOOD: hoverTank (HOVER) at 194 hp=78/150
+[battery] in reach: gunShip (AIR) at 347 hp=260/260
+[battery] in reach: c_interceptor (AIR) at 347 hp=250/250
+[battery] in reach: heavyInterceptor (AIR) at 328 hp=150/150
+[battery] in reach: c_interceptor (AIR) at 338 hp=250/250
+[battery] in reach: c_interceptor (AIR) at 346 hp=250/250
+[battery] fraction 0.14: refused after 40
+[battery] fraction 0.12: refused after 40
+[battery] fraction 0.10: refused after 40
+[battery] done: placed_at=0.14 battery=True fate=gone bled=hoverTank
+[play] game stopped
