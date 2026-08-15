@@ -46,9 +46,7 @@ panel. Nothing on this list is a guess.
 
 ## Open questions (measurement running or queued)
 
-- The docket after the battery: spatial reasoning over per-layer grids (reachability, threat fields, value fields -- the turret-siting arithmetic generalized), hold v2 designs, a response worth driving with the banked doom model, and the exporter productionization. Composition tuning, the naval theater, the tilt, and the battery are all measured closed; the next gain must come from a capability class the bot does not yet have.
-- **The artillery battery** (probed 2026-08-13, log entry same day): the naval hole's cheapest untested response -- the ground turret's artillery fork reaches 350 against the battleship's 240, $2,100 all-in, conversion machinery already shipped (the flame channel's `Converter` takes the fork as an argument). Probe proved the whole mechanism chain live (placed at the shore-most land, converted in place, drew attributed blood); ship contact unproven because a bare probe dies to air first. Next: pilot with the champion per law eleven, then a panel if the card carries the mechanism.
-- Still on the docket behind them: a response worth driving with the banked doom model, hold v2 designs, the exporter productionization.
+- The docket after the battery: the spatial layer (its first slice shipped 2026-08-15 -- coverage recorded as three trace columns, accumulating on every future match; next steps are the doom refit with spatial features once a corpus exists, and hold v2 designed against the field), a response worth driving with the banked doom model, and the exporter productionization. Composition tuning, the naval theater, the tilt, and the battery are all measured closed; the next gain must come from a capability class the bot does not yet have.
 
 ## Closed questions (measured, with the log entry that closed them)
 
