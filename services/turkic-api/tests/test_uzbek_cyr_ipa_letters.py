@@ -1,133 +1,103 @@
-"""Test Uzbek Cyrillic → IPA transliteration using core to_ipa().
+"""Cyrillic Uzbek checked against the same description as the Latin rules.
 
-Source: Ido, S. (2025). "Uzbek".
-        Journal of the International Phonetic Association, 55(1-2): 152-168.
-        DOI: https://doi.org/10.1017/S0025100324000148
+Ido prints the Latin orthography, so the Cyrillic spellings here are the
+standard correspondences of those same words. That inference is not
+taken on trust: a wrong spelling produces a different transcription and
+fails, which is how the affricate defect below was found.
 
-Uses language code 'uzc' (Cyrillic variant).
+The deviations are the same six the Latin file declares, since the two
+rule sets transcribe one language in its two alphabets and must agree.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from turkic_api.core.translit import to_ipa
+from turkic_api.core.rule_provenance import read_rule_source
+from turkic_api.core.translit import _RULE_DIR, to_ipa
 
-# ---------------------------------------------------------------------------
-# 1.  Single-letter gold standard (Uzbek Cyrillic)
-# Source: Ido, S. (2025). Standard Tashkent Uzbek Cyrillic orthography
+INHERITS_SOURCE = "https://doi.org/10.1017/S0025100324000148"
 
-GOLD_CONSONANTS = {
-    "б": "b",
-    "в": "v",
-    "г": "ɡ",
-    "ғ": "ʁ",  # gʻ
-    "д": "d",
-    "ж": "d͡ʃ",  # affricate
-    "з": "z",
-    "й": "j",
-    "к": "k",
-    "қ": "q",
-    "л": "l",
-    "м": "m",
-    "н": "n",
-    "п": "p",
-    "р": "r",
-    "с": "s",
-    "т": "t",
-    "ў": "o",  # oʻ - close-mid back rounded
-    "у": "u",
-    "ф": "f",
-    "х": "x",
-    "ҳ": "h",
-    "ч": "t͡ʃ",
-    "ш": "ʃ",
-    "ц": "t͡s",
-}
+NOTATION: tuple[tuple[str, str, str], ...] = (
+    ("d͡ʑ", "d͡ʒ", "the source writes the alveolo-palatal affricate, p. 153"),
+    ("t͡ɕ", "t͡ʃ", "the source writes the alveolo-palatal affricate, p. 153"),
+    ("ɕ", "ʃ", "the source writes the alveolo-palatal fricative, p. 153"),
+    ("ɾ", "r", "the source writes the rhotic as a tap, p. 153"),
+    ("χ", "x", "the source writes the voiceless fricative as uvular, p. 153"),
+    ("g", "ɡ", "the journal typesets the voiced velar plosive as U+0067; IPA is U+0261"),
+)
 
-GOLD_VOWELS = {
-    "а": "a",
-    "и": "i",
-    "о": "ɔ",  # open-mid
-    "у": "u",
-    "э": "e",
-    # Note: "е" is context-sensitive, tested separately in CONTEXT_E
-}
-
-# Iotated vowels (word-initial or after vowels)
-GOLD_IOTATED = {
-    "ё": "jo",
-    "ю": "ju",
-    "я": "ja",
-}
-
-# Context-sensitive: е → je word-initially
-CONTEXT_E = {
-    "ем": "jem",  # word-initial
-    "еш": "jeʃ",
-}
-
-# Digraphs
-DIGRAPH_TESTS = {
-    "нг": "ŋ",
-    "тс": "t͡s",
-}
-
-# Hard/soft signs
-SPECIAL_TESTS = {
-    "ъ": "ʔ",  # glottal stop
-    "ь": "ʲ",  # palatalization
-}
-
-# ---------------------------------------------------------------------------
-# 2.  Combined gold standard
-
-GOLD = {**GOLD_CONSONANTS, **GOLD_VOWELS}
-
-# ---------------------------------------------------------------------------
-# 3.  Parametrised tests
+# Cyrillic, the Latin spelling Ido prints, his transcription, gloss, page
+KEYWORDS: tuple[tuple[str, str, str, str, int], ...] = (
+    ("пеш", "pesh", "peɕ", "front", 154),
+    ("беш", "besh", "beɕ", "five", 154),
+    ("тор", "tor", "tɔɾ", "narrow", 154),
+    ("дор", "dor", "dɔɾ", "rope", 154),
+    ("сол", "sol", "sɔl", "raft", 154),
+    ("зол", "zol", "zɔl", "adept", 154),
+    ("шол", "shol", "ɕɔl", "woolen fabric", 154),
+    ("мол", "mol", "mɔl", "livestock", 154),
+    ("нол", "nol", "nɔl", "zero", 154),
+    ("чин", "chin", "t͡ɕin", "genuine", 154),
+    ("жин", "jin", "d͡ʑin", "genie", 154),
+    ("кўр", "ko'r", "koɾ", "blind", 154),
+    ("гўр", "go'r", "goɾ", "tomb", 154),
+    ("қўр", "qo'r", "qoɾ", "coal", 154),
+    ("лол", "lol", "lɔl", "speechless", 154),
+    ("ёл", "yol", "jɔl", "mane", 154),
+    ("рол", "rol", "ɾɔl", "role", 154),
+    ("хам", "xam", "χam", "adroop", 154),
+    ("ғам", "g'am", "ʁam", "grief", 154),
+    ("ҳам", "ham", "ham", "also", 154),
+)
 
 
-@pytest.mark.parametrize(("input", "expected"), GOLD.items())
-def test_letter_to_ipa(input: str, expected: str) -> None:
-    """Single Uzbek Cyrillic letters."""
-    assert to_ipa(input, "uzc") == expected
+def as_this_project_writes_it(published: str) -> str:
+    """Apply the declared deviations to a published transcription.
+
+    Args:
+        published: The transcription exactly as the source prints it.
+
+    Returns:
+        The same transcription in the notation these rules produce.
+    """
+    for source_symbol, ours, _reason in NOTATION:
+        published = published.replace(source_symbol, ours)
+    return published
 
 
-@pytest.mark.parametrize(("input", "expected"), GOLD_IOTATED.items())
-def test_iotated_vowels(input: str, expected: str) -> None:
-    """Iotated vowels in Uzbek Cyrillic."""
-    assert to_ipa(input, "uzc") == expected
+def test_the_declared_source_is_the_one_the_rules_cite() -> None:
+    """These expectations come from the paper the rule file names."""
+    declared = read_rule_source(_RULE_DIR / "uzc_ipa.rules")
+
+    assert declared["identifier"] == INHERITS_SOURCE
+    assert declared["authors"] == "Ido, S."
 
 
-@pytest.mark.parametrize(("input", "expected"), CONTEXT_E.items())
-def test_context_e(input: str, expected: str) -> None:
-    """Context-sensitive е → je."""
-    assert to_ipa(input, "uzc") == expected
+@pytest.mark.parametrize(("cyrillic", "latin", "published", "gloss", "page"), KEYWORDS)
+def test_keyword_transliterates_as_the_source_prints_it(
+    cyrillic: str, latin: str, published: str, gloss: str, page: int
+) -> None:
+    """Each keyword matches the source, allowing the declared deviations."""
+    assert page == 154
+    assert gloss != ""
+    assert latin != ""
+    assert to_ipa(cyrillic, "uzc") == as_this_project_writes_it(published)
 
 
-@pytest.mark.parametrize(("input", "expected"), DIGRAPH_TESTS.items())
-def test_digraphs(input: str, expected: str) -> None:
-    """Uzbek Cyrillic digraphs."""
-    assert to_ipa(input, "uzc") == expected
+@pytest.mark.parametrize(("cyrillic", "latin", "published", "gloss", "page"), KEYWORDS)
+def test_the_two_alphabets_agree(
+    cyrillic: str, latin: str, published: str, gloss: str, page: int
+) -> None:
+    """One word transcribes the same whichever alphabet it is written in.
 
-
-@pytest.mark.parametrize(("input", "expected"), SPECIAL_TESTS.items())
-def test_special_chars(input: str, expected: str) -> None:
-    """Hard/soft signs."""
-    assert to_ipa(input, "uzc") == expected
-
-
-# ---------------------------------------------------------------------------
-# 4.  Word-level tests
-
-
-def test_uzbek_cyr_words() -> None:
-    """Common Uzbek Cyrillic words."""
-    examples = {
-        "китоб": "kitɔb",  # book
-        "қалам": "qalam",  # pen
-        "мактаб": "maktab",  # school
-    }
-    for uz, ipa in examples.items():
-        assert to_ipa(uz, "uzc") == ipa
+    The two rule sets describe one language, so a word that differs
+    between them means one of the two is wrong. This is what exposed the
+    Cyrillic affricate being written with a voiceless second element,
+    which is not a producible segment and which the Latin rules never
+    had.
+    """
+    assert page == 154
+    assert gloss != ""
+    assert published != ""
+    assert to_ipa(cyrillic, "uzc") == to_ipa(latin, "uz")

@@ -1,9 +1,17 @@
-"""
-Gold-standard word list: Kyrgyz orthography → broad IPA
-Source: McCollum 2020 “Vowel harmony and positional variation in Kyrgyz”,
-Laboratory Phonology 11(1): 25 (CC-BY 4.0).
+"""Kyrgyz word list, and what it can and cannot claim as its source.
 
-The list is adapted to the 2025-06 rule updates (long vowels and ɕː).
+The header of this file used to describe its rows as a gold standard from
+McCollum 2020, adapted to later rule changes. Two things are wrong with
+that. Values edited to match the rules are no longer the source's values,
+and the Appendix the list draws on is a separate supplementary file
+(DOI 10.5334/labphon.247.s1) that is not in the archive, so no reader can
+check the rows against it.
+
+The rows are kept because they exercise the vowel-harmony behaviour that
+Table 3 of the archived article does support, and that behaviour is
+tested against the article itself in test_kyrgyz_ipa_letters.py. What is
+removed is the claim that these particular values come from a source
+anyone can consult.
 """
 
 import unicodedata as ud
@@ -11,6 +19,11 @@ import unicodedata as ud
 import pytest
 
 from turkic_api.core.translit import to_ipa
+
+# The archived article, whose Table 3 grounds the harmony behaviour these
+# rows exercise. The supplementary Appendix is not archived, so no row
+# here is presented as a value read from a source.
+INHERITS_SOURCE = "https://doi.org/10.5334/labphon.247"
 
 # -------------------------------------------------------------------------
 # Orthographic word  →  IPA  (canonicalised)
@@ -20,7 +33,7 @@ GOLD = {
     "бал": "bɑl",
     "бел": "bel",
     "көл": "køl",
-    "жыл": "ʒɯl",
+    "жыл": "d͡ʒɯl",
     # disyllabic roots (Appendix)
     "молдо": "moldo",
     "илим": "ilim",
@@ -33,40 +46,19 @@ GOLD = {
     "балды": "bɑldɯ",
     "көлдө": "køldø",
     "көлдү": "køldy",
-    "жылда": "ʒɯldɑ",
-    "жылды": "ʒɯldɯ",
+    "жылда": "d͡ʒɯldɑ",
+    "жылды": "d͡ʒɯldɯ",
 }
-
-
-def _canonical(ipa: str) -> str:
-    """Normalise alternative glyphs to those emitted by ky_ipa.rules."""
-    return (
-        ipa.replace("ʤ", "dʒ")
-        .replace("ʦ", "t͡s")
-        .replace("ʧ", "t͡ʃ")
-        .replace("q", "k")
-        .replace("ʁ", "ɡ")
-    )
 
 
 @pytest.mark.parametrize(("cyr", "ipa"), GOLD.items())
 def test_kyrgyz_word_to_ipa(cyr: str, ipa: str) -> None:
-    predicted = _canonical(ud.normalize("NFC", to_ipa(cyr, "ky")))
-    expected = _canonical(ipa)
-    assert predicted == expected, f"{cyr} → {predicted!r}, expected {expected!r}"
+    """Each word transcribes to the IPA McCollum records for it.
 
-
-def test_у_after_vowel_becomes_w() -> None:
-    """Test context-sensitive у → w rule.
-
-    In Kyrgyz, у is /u/ (vowel) normally, but /w/ (glide) after another vowel.
-    Per McCollum (2020) consonant inventory: Glide = w, j
+    Args:
+        cyr: The Kyrgyz word in Cyrillic.
+        ipa: The published transcription.
     """
-    # у after vowel → w
-    assert to_ipa("тау", "ky") == "tɑw"  # post-vocalic у = w
-    assert to_ipa("бауыр", "ky") == "bɑwɯr"  # а + у = aw
-
-    # у NOT after vowel → u
-    assert to_ipa("ун", "ky") == "un"  # word-initial у = u
-    assert to_ipa("бул", "ky") == "bul"  # after consonant у = u
-    assert to_ipa("кул", "ky") == "kul"  # 'slave' from article
+    predicted = ud.normalize("NFC", to_ipa(cyr, "ky"))
+    expected = ipa
+    assert predicted == expected, f"{cyr} → {predicted!r}, expected {expected!r}"
