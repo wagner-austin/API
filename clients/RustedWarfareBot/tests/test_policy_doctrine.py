@@ -55,6 +55,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         strike=0,
         medics=0,
         navy=0,
+        battery=0,
         bunkers=0,
         flame=0,
         close=0,
