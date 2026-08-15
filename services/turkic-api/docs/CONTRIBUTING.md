@@ -33,7 +33,10 @@ turkic-api/
 │           ├── langid.py     # Language identification
 │           ├── corpus.py     # Corpus service
 │           ├── corpus_download.py  # Corpus file filtering
-│           ├── transliteval.py     # Rule-based transliteration
+│           ├── rule_lexer.py       # Rule text to tokens
+│           ├── rule_parser.py      # Tokens to rules
+│           ├── rule_engine.py      # Applying rules to text
+│           ├── rule_errors.py      # Refusals, with source positions
 │           └── models.py     # Core TypedDict models
 ├── tests/                    # 52 test modules, 503 test cases
 ├── scripts/                  # Development tools

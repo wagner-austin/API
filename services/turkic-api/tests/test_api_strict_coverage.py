@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -12,7 +11,6 @@ from turkic_api.api import models
 from turkic_api.api.jobs import _decode_job_params
 from turkic_api.api.main import _to_json_simple
 from turkic_api.api.types import JsonDict, JSONValue
-from turkic_api.core import transliteval as te
 from turkic_api.core.corpus import CorpusService, LocalCorpusService
 from turkic_api.core.models import ProcessSpec
 
@@ -240,49 +238,3 @@ def test_local_corpus_service_stream_and_errors(tmp_path: Path) -> None:
     missing = LocalCorpusService(str(tmp_path / "missing"))
     with pytest.raises(FileNotFoundError):
         list(missing.stream(spec))
-
-
-def test_transliteval_edge_cases_and_rule_files(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="rule lhs must be non-empty"):
-        te._rule("", "x")
-
-    match = re.match(r"^(?P<x>\d+)?$", "")
-    if match is None:
-        pytest.fail("expected match")
-    with pytest.raises(te.RuleParseError):
-        te._group(match, "x", 1, "")
-
-    with pytest.raises(te.RuleParseError):
-        te._parse_rule_stmt("$$$", {}, 1)
-
-    bad_path = te._RULES_DIR / "unclosed_macro_test.rules"
-    bad_path.write_text("$A = [abc\n", encoding="utf-8")
-    try:
-        with pytest.raises(te.RuleParseError, match="macro definition missing closing"):
-            te.load_rules("unclosed_macro_test.rules")
-    finally:
-        bad_path.unlink(missing_ok=True)
-
-    # Test _truncate_output: simple case where entire last item is removed
-    out: list[str] = ["abcd"]
-    te._truncate_output(out, 2)
-    assert out == ["ab"]
-
-    # Test _truncate_output: case where last item is partially truncated (lines 288-289)
-    out2: list[str] = ["abc", "defgh"]
-    te._truncate_output(out2, 2)
-    assert out2 == ["abc", "def"]
-
-    # Verify all production rule files parse and apply correctly.
-    # Production files follow naming convention: {lang}_{fmt}.rules (e.g., kk_ipa.rules).
-    # The format part is either "ipa" or "lat". This filter excludes temp test files
-    # created during parallel test execution (e.g., bad_macro.rules, delete.rules).
-    rule_dir = te._RULES_DIR
-    production_files: tuple[Path, ...] = tuple(
-        p
-        for p in rule_dir.glob("*.rules")
-        if "_" in p.stem and p.stem.split("_")[-1] in ("ipa", "lat")
-    )
-    for path in production_files:
-        rules = te.load_rules(path.name)
-        te.apply_rules("test", rules)
