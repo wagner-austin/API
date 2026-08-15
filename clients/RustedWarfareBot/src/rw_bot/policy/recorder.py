@@ -11,6 +11,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
+from rw_bot.mechanics.combat_profile import CombatProfile
+from rw_bot.mechanics.upgrades import TIER_CHAINS, satisfies
+from rw_bot.policy.economy import EXTRACTOR_TYPE
+from rw_bot.policy.field import coverage
 from rw_bot.policy.scoreboard import local_player, rival_income
 from rw_bot.policy.trace import (
     Loss,
@@ -36,13 +40,23 @@ class Recorder:
         losses: Every inferred loss, in order.
     """
 
-    def __init__(self, path: Path | None) -> None:
+    def __init__(self, path: Path | None, profiles: Mapping[str, CombatProfile]) -> None:
         """Open a recorder.
 
         Args:
             path: Where to write the trace, or None to keep none.
+            profiles: Combat profiles by type name, for the coverage
+                columns the recorder reads off the sample itself -- the
+                same pattern as the income pair: no other pass wants
+                these numbers ([[policy-trace]]).
         """
         self._path = path
+        self._profiles = profiles
+        # The same family count_extractors counts, computed once so the
+        # column and the scoreboard can never drift apart silently.
+        self._extractors = frozenset(
+            name for chain in TIER_CHAINS for name in chain if satisfies(name, EXTRACTOR_TYPE)
+        )
         self.ticks: list[Tick] = []
         self.losses: list[Loss] = []
         self._previous: Mapping[int, Entity] = {}
@@ -99,6 +113,7 @@ class Recorder:
         # only on a stream that predates the player record, where zero is the
         # honest column ([[policy-economy]]).
         local = local_player(sample)
+        covered = coverage(sample, self._profiles, self._extractors)
         self.ticks.append(
             Tick(
                 frame=sample["frame"],
@@ -122,6 +137,9 @@ class Recorder:
                 world=world_digest(sample),
                 plan=plan,
                 workers=workers,
+                eco_covered=covered["eco_covered"],
+                own_covered=covered["own_covered"],
+                foe_covered=covered["foe_covered"],
             )
         )
 

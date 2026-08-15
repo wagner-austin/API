@@ -126,6 +126,16 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
             side-effects; a decision is now a column read, cut at recording
             boundaries so the loop's order never bends for the record
             (log 2026-08-09).
+        eco_covered: Finished extractors of ours standing inside at least
+            one visible hostile gun's reach this sample -- the spatial
+            layer's first columns (log 2026-08-15), APPENDED after
+            ``events`` so every positional reader's index survives, the
+            same appendix rule the enemy-shape columns followed.
+        own_covered: Owned complete entities standing inside hostile
+            reach, structures and army alike.
+        foe_covered: Visible hostiles standing inside our own guns'
+            reach; the pair with ``own_covered`` is the engagement
+            balance no single count carries.
         world: A deterministic digest of every visible entity's identity,
             position and health -- CRC32 over a canonical rendering, never
             Python's randomised ``hash``. The divergence detector: two
@@ -156,6 +166,9 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
     world: int
     plan: str
     workers: int
+    eco_covered: int
+    own_covered: int
+    foe_covered: int
 
 
 def owned_by_id(sample: Sample) -> Mapping[int, Entity]:
@@ -233,6 +246,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{'worth':>9}{'rival':>9}{'income':>8}{'rival_income':>14}{'world':>12}"
         f"{'plan':>10}{'workers':>9}"
         f"{'navy_seen':>11}{'air_seen':>10}{'navy_blood':>12}{'events':>8}"
+        f"{'eco_covered':>13}{'own_covered':>13}{'foe_covered':>13}"
     ]
     lines.extend(
         f"{t['frame']:>8}{t['army']:>6}{t['credits']:>9}"
@@ -241,6 +255,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{t['worth']:>9}{t['rival']:>9}{t['income']:>8}{t['rival_income']:>14}"
         f"{t['world']:>12}{t['plan']:>10}{t['workers']:>9}"
         f"{t['navy_seen']:>11}{t['air_seen']:>10}{t['navy_blood']:>12}{t['events']:>8}"
+        f"{t['eco_covered']:>13}{t['own_covered']:>13}{t['foe_covered']:>13}"
         for t in ticks
     )
     lines.append("")
