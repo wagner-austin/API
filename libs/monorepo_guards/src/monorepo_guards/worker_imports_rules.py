@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import ClassVar
 
 from monorepo_guards import Violation
 
@@ -17,26 +16,9 @@ class WorkerImportsRule:
 
     name = "worker-imports"
 
-    _CANONICAL_PATHS: ClassVar[set[str]] = {
-        "libs/platform_workers/src/platform_workers/redis.py",
-        "libs/platform_workers/src/platform_workers/rq_harness.py",
-        "libs/platform_workers/src/platform_workers/testing.py",
-        "libs/platform_workers/src/platform_workers/_fakes.py",
-    }
-
-    def _is_canonical(self, path: Path) -> bool:
-        posix = path.as_posix()
-        resolved = path.resolve().as_posix()
-        for canonical in self._CANONICAL_PATHS:
-            if posix.endswith(canonical) or resolved.endswith(canonical):
-                return True
-        return False
-
     def _should_check(self, path: Path) -> bool:
         posix = path.as_posix()
-        if "/tests/" in posix or "/scripts/" in posix:
-            return False
-        return not self._is_canonical(path)
+        return not ("/tests/" in posix or "/scripts/" in posix)
 
     def _check_import_node(self, path: Path, node: ast.Import) -> list[Violation]:
         violations: list[Violation] = []
@@ -63,6 +45,12 @@ class WorkerImportsRule:
 
     def _check_import_from_node(self, path: Path, node: ast.ImportFrom) -> list[Violation]:
         if node.module is None:
+            return []
+        # A relative import names a sibling module, not the third-party package:
+        # "from .redis import X" inside platform_workers reaches its own redis.py
+        # and carries module == "redis" with level == 1. Without this check the
+        # rule reports the canonical wrapper itself as a direct redis import.
+        if node.level > 0:
             return []
         if node.module == "redis" or node.module.startswith("redis."):
             return [
