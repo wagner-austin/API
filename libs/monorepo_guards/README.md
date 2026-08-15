@@ -62,6 +62,20 @@ make lint
 | `ConfigHelpersRule` | Config helper usage |
 | `EnvRule` | Environment variable usage |
 
+### Dependency Rules
+
+| Rule | Description |
+|------|-------------|
+| `EscapingPathDependencyRule` | Forbids a Poetry `path` dependency that resolves outside the monorepo, in any dependency group |
+
+A path dependency is how one project here consumes another, and it is resolved
+relative to the project that declares it — so nothing stops it climbing past the
+monorepo root into a sibling checkout on one machine. Such a dependency builds
+only there, and it stays working long after it should have been removed, because
+`poetry install` does not uninstall what the lock file no longer names. Use
+`poetry sync` so the environment matches the lock, and this rule so the
+dependency cannot be declared in the first place.
+
 ### Error Handling Rules
 
 | Rule | Description |
