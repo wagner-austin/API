@@ -7,8 +7,6 @@ from contextlib import nullcontext
 from pathlib import Path
 from typing import Protocol
 
-import pytest
-
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
@@ -31,7 +29,6 @@ from .testing import (
     FakeDataset,
     FakeEncoder,
     FakeEvalModel,
-    FakeHFModel,
     fake_load_tokenizer,
     make_test_config,
 )
@@ -135,152 +132,6 @@ class TestEvaluateHfLm:
             artifacts_root=str(tmp_path / "artifacts"),
             data_root=str(tmp_path / "data"),
         )
-
-    def test_raises_when_load_bpe_hook_not_initialized(
-        self, tmp_path: Path, settings_factory: _SettingsFactory
-    ) -> None:
-        """Test error when load_tokenizer hook is None."""
-        cfg = make_test_config()
-        settings = self._make_settings(tmp_path, settings_factory)
-        dataset_builder = _FakeDatasetBuilder([])
-
-        with pytest.raises(RuntimeError, match=r"Hooks\.load_tokenizer not initialized"):
-            evaluate_hf_lm(
-                run_id="test-run",
-                cfg=cfg,
-                settings=settings,
-                dataset_builder=dataset_builder,
-            )
-
-    def test_raises_when_load_prepared_model_hook_not_initialized(
-        self, tmp_path: Path, settings_factory: _SettingsFactory
-    ) -> None:
-        """Test error when load_prepared_model hook is None."""
-        Hooks.load_tokenizer = fake_load_tokenizer
-
-        cfg = make_test_config()
-        settings = self._make_settings(tmp_path, settings_factory)
-        dataset_builder = _FakeDatasetBuilder([])
-
-        with pytest.raises(RuntimeError, match=r"Hooks\.load_prepared_model not initialized"):
-            evaluate_hf_lm(
-                run_id="test-run",
-                cfg=cfg,
-                settings=settings,
-                dataset_builder=dataset_builder,
-            )
-
-    def test_raises_when_get_model_dir_hook_not_initialized(
-        self, tmp_path: Path, settings_factory: _SettingsFactory
-    ) -> None:
-        """Test error when get_model_dir hook is None."""
-        Hooks.load_tokenizer = fake_load_tokenizer
-        Hooks.load_prepared_model = lambda p, t: PreparedLMModel(
-            model=FakeHFModel(),
-            tokenizer_id="test",
-            eos_id=0,
-            pad_id=1,
-            max_seq_len=128,
-            tok_for_dataset=FakeEncoder(),
-        )
-
-        cfg = make_test_config()
-        settings = self._make_settings(tmp_path, settings_factory)
-        dataset_builder = _FakeDatasetBuilder([])
-
-        with pytest.raises(RuntimeError, match=r"Hooks\.get_model_dir not initialized"):
-            evaluate_hf_lm(
-                run_id="test-run",
-                cfg=cfg,
-                settings=settings,
-                dataset_builder=dataset_builder,
-            )
-
-    def test_raises_when_get_eval_dir_hook_not_initialized(
-        self, tmp_path: Path, settings_factory: _SettingsFactory
-    ) -> None:
-        """Test error when get_eval_dir hook is None."""
-        Hooks.load_tokenizer = fake_load_tokenizer
-        Hooks.load_prepared_model = lambda p, t: PreparedLMModel(
-            model=FakeHFModel(),
-            tokenizer_id="test",
-            eos_id=0,
-            pad_id=1,
-            max_seq_len=128,
-            tok_for_dataset=FakeEncoder(),
-        )
-        Hooks.get_model_dir = lambda s, r: Path("/tmp/model")
-
-        cfg = make_test_config()
-        settings = self._make_settings(tmp_path, settings_factory)
-        dataset_builder = _FakeDatasetBuilder([])
-
-        with pytest.raises(RuntimeError, match=r"Hooks\.get_eval_dir not initialized"):
-            evaluate_hf_lm(
-                run_id="test-run",
-                cfg=cfg,
-                settings=settings,
-                dataset_builder=dataset_builder,
-            )
-
-    def test_raises_when_create_causal_dataset_hook_not_initialized(
-        self, tmp_path: Path, settings_factory: _SettingsFactory
-    ) -> None:
-        """Test error when create_causal_dataset hook is None."""
-        Hooks.load_tokenizer = fake_load_tokenizer
-        Hooks.load_prepared_model = lambda p, t: PreparedLMModel(
-            model=FakeHFModel(),
-            tokenizer_id="test",
-            eos_id=0,
-            pad_id=1,
-            max_seq_len=128,
-            tok_for_dataset=FakeEncoder(),
-        )
-        Hooks.get_model_dir = lambda s, r: Path("/tmp/model")
-        Hooks.get_eval_dir = lambda s, r: Path("/tmp/eval")
-
-        cfg = make_test_config()
-        settings = self._make_settings(tmp_path, settings_factory)
-        dataset_builder = _FakeDatasetBuilder([])
-
-        with pytest.raises(RuntimeError, match=r"Hooks\.create_causal_dataset not initialized"):
-            evaluate_hf_lm(
-                run_id="test-run",
-                cfg=cfg,
-                settings=settings,
-                dataset_builder=dataset_builder,
-            )
-
-    def test_raises_when_create_dataloader_hook_not_initialized(
-        self, tmp_path: Path, settings_factory: _SettingsFactory
-    ) -> None:
-        """Test error when create_dataloader hook is None."""
-        Hooks.load_tokenizer = fake_load_tokenizer
-        Hooks.load_prepared_model = lambda p, t: PreparedLMModel(
-            model=FakeHFModel(),
-            tokenizer_id="test",
-            eos_id=0,
-            pad_id=1,
-            max_seq_len=128,
-            tok_for_dataset=FakeEncoder(),
-        )
-        Hooks.get_model_dir = lambda s, r: Path("/tmp/model")
-        Hooks.get_eval_dir = lambda s, r: Path("/tmp/eval")
-        Hooks.create_causal_dataset = (
-            lambda *, files, tokenizer, max_len, eos_id, pad_id: FakeDataset()
-        )
-
-        cfg = make_test_config()
-        settings = self._make_settings(tmp_path, settings_factory)
-        dataset_builder = _FakeDatasetBuilder([])
-
-        with pytest.raises(RuntimeError, match=r"Hooks\.create_dataloader not initialized"):
-            evaluate_hf_lm(
-                run_id="test-run",
-                cfg=cfg,
-                settings=settings,
-                dataset_builder=dataset_builder,
-            )
 
     def test_evaluates_model_and_returns_result(
         self, tmp_path: Path, settings_factory: _SettingsFactory

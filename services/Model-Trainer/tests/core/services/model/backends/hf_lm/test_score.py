@@ -78,21 +78,6 @@ class TestReadTextOrPath:
         with pytest.raises(AppError, match="path must be under data_root"):
             _read_text_or_path(cfg, settings)
 
-    def test_raises_when_hook_not_initialized(
-        self, tmp_path: Path, settings_factory: _SettingsFactory
-    ) -> None:
-        """Test error when read_text_file hook not set."""
-        test_file = tmp_path / "text.txt"
-        test_file.write_text("Test text")
-
-        cfg = make_score_config(text=None, path=str(test_file))
-        settings = settings_factory(
-            artifacts_root=str(tmp_path),
-            data_root=str(tmp_path),
-        )
-        with pytest.raises(RuntimeError, match=r"Hooks\.read_text_file not initialized"):
-            _read_text_or_path(cfg, settings)
-
     def test_reads_file_via_hook(self, tmp_path: Path, settings_factory: _SettingsFactory) -> None:
         """Test that file is read via hook."""
         test_file = tmp_path / "text.txt"

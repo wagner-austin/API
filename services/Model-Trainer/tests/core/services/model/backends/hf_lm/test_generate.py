@@ -78,21 +78,6 @@ class TestReadPrompt:
         with pytest.raises(AppError, match="prompt_path must be under data_root"):
             _read_prompt(cfg, settings)
 
-    def test_raises_when_hook_not_initialized(
-        self, tmp_path: Path, settings_factory: _SettingsFactory
-    ) -> None:
-        """Test error when read_text_file hook not set."""
-        test_file = tmp_path / "prompt.txt"
-        test_file.write_text("Test prompt")
-
-        cfg = make_generate_config(prompt_text=None, prompt_path=str(test_file))
-        settings = settings_factory(
-            artifacts_root=str(tmp_path),
-            data_root=str(tmp_path),
-        )
-        with pytest.raises(RuntimeError, match=r"Hooks\.read_text_file not initialized"):
-            _read_prompt(cfg, settings)
-
     def test_reads_file_via_hook(self, tmp_path: Path, settings_factory: _SettingsFactory) -> None:
         """Test that file is read via hook."""
         test_file = tmp_path / "prompt.txt"

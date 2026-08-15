@@ -395,69 +395,6 @@ class TestLoadPreparedHFLMFromHandle:
         ):
             load_prepared_hf_lm_from_handle(tmpdir, _FakeTokHandle())
 
-    def test_raises_when_model_loader_not_configured(self) -> None:
-        """Test that RuntimeError is raised when model loader not set."""
-
-        class _FakeTokHandle(TokenizerHandle):
-            def encode(self, text: str) -> list[int]:
-                return []
-
-            def decode(self, ids: list[int]) -> str:
-                return ""
-
-            def token_to_id(self, token: str) -> int | None:
-                return 0
-
-            def get_vocab_size(self) -> int:
-                return 100
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Write valid metadata
-            metadata: JSONObject = {
-                "strategy_name": "full",
-                "hub_model_id": "test/model",
-                "tokenizer_id": "test-tok",
-                "is_peft": False,
-            }
-            (Path(tmpdir) / "hf_lm_metadata.json").write_text(
-                dump_json_str(metadata), encoding="utf-8"
-            )
-
-            with pytest.raises(RuntimeError, match="HF model loader hook not configured"):
-                load_prepared_hf_lm_from_handle(tmpdir, _FakeTokHandle())
-
-    def test_raises_when_tokenizer_loader_not_configured(self) -> None:
-        """Test that RuntimeError is raised when tokenizer loader not set."""
-
-        class _FakeTokHandle(TokenizerHandle):
-            def encode(self, text: str) -> list[int]:
-                return []
-
-            def decode(self, ids: list[int]) -> str:
-                return ""
-
-            def token_to_id(self, token: str) -> int | None:
-                return 0
-
-            def get_vocab_size(self) -> int:
-                return 100
-
-        Hooks.load_hf_model = _FakeModelLoader()
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            metadata: JSONObject = {
-                "strategy_name": "full",
-                "hub_model_id": "test/model",
-                "tokenizer_id": "test-tok",
-                "is_peft": False,
-            }
-            (Path(tmpdir) / "hf_lm_metadata.json").write_text(
-                dump_json_str(metadata), encoding="utf-8"
-            )
-
-            with pytest.raises(RuntimeError, match="HF tokenizer loader hook not configured"):
-                load_prepared_hf_lm_from_handle(tmpdir, _FakeTokHandle())
-
     def test_loads_prepared_model_successfully(self) -> None:
         """Test successful loading of prepared model."""
         from model_trainer.core.services.finetuning.strategies._test_hooks import (

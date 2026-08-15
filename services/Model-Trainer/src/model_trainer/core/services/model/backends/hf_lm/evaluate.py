@@ -94,36 +94,13 @@ def evaluate_hf_lm(
 
     Raises:
         FileNotFoundError: If model files do not exist.
-        RuntimeError: If required hooks are not initialized.
     """
-    # Get hooks
-    load_tok: TokenizerLoader | None = Hooks.load_tokenizer
-    if load_tok is None:
-        raise RuntimeError("Hooks.load_tokenizer not initialized - call init_production_hooks()")
-
-    load_model: PreparedModelLoader | None = Hooks.load_prepared_model
-    if load_model is None:
-        raise RuntimeError(
-            "Hooks.load_prepared_model not initialized - call init_production_hooks()"
-        )
-
-    model_dir_fn: ModelDirFn | None = Hooks.get_model_dir
-    if model_dir_fn is None:
-        raise RuntimeError("Hooks.get_model_dir not initialized - call init_production_hooks()")
-
-    eval_dir_fn: EvalDirFn | None = Hooks.get_eval_dir
-    if eval_dir_fn is None:
-        raise RuntimeError("Hooks.get_eval_dir not initialized - call init_production_hooks()")
-
-    create_dataset: CreateCausalDatasetFn | None = Hooks.create_causal_dataset
-    if create_dataset is None:
-        raise RuntimeError(
-            "Hooks.create_causal_dataset not initialized - call init_production_hooks()"
-        )
-
-    create_loader: CreateDataLoaderFn | None = Hooks.create_dataloader
-    if create_loader is None:
-        raise RuntimeError("Hooks.create_dataloader not initialized - call init_production_hooks()")
+    load_tok: TokenizerLoader = Hooks.load_tokenizer
+    load_model: PreparedModelLoader = Hooks.load_prepared_model
+    model_dir_fn: ModelDirFn = Hooks.get_model_dir
+    eval_dir_fn: EvalDirFn = Hooks.get_eval_dir
+    create_dataset: CreateCausalDatasetFn = Hooks.create_causal_dataset
+    create_loader: CreateDataLoaderFn = Hooks.create_dataloader
 
     # Load tokenizer for dataset (optional for hf_lm - uses HF tokenizer from hub)
     tokenizer_id = cfg["tokenizer_id"]

@@ -6,7 +6,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
-import pytest
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -150,31 +149,6 @@ class TestTrainPreparedHfLm:
             artifacts_root=str(tmp_path / "artifacts"),
             data_root=str(tmp_path / "data"),
         )
-
-    def test_raises_when_hook_not_initialized(
-        self, tmp_path: Path, settings_factory: _SettingsFactory
-    ) -> None:
-        """Test that RuntimeError is raised when hook is None."""
-        prepared = PreparedLMModel(
-            model=FakeHFModel(),
-            tokenizer_id="test-tok",
-            eos_id=0,
-            pad_id=1,
-            max_seq_len=128,
-            tok_for_dataset=FakeEncoder(),
-        )
-        cfg = make_test_config()
-        settings = self._make_settings(tmp_path, settings_factory)
-
-        with pytest.raises(RuntimeError, match=r"Hooks\.create_trainer not initialized"):
-            train_prepared_hf_lm(
-                prepared,
-                cfg,
-                settings,
-                run_id="test-run",
-                redis_hb=lambda _: None,
-                cancelled=lambda: False,
-            )
 
     def test_calls_trainer_train(self, tmp_path: Path, settings_factory: _SettingsFactory) -> None:
         """Test that trainer.train() is called and result returned."""

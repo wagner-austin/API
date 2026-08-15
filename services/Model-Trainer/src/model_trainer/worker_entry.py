@@ -14,9 +14,6 @@ from model_trainer import _test_hooks
 from model_trainer.core.services.finetuning.strategies._test_hooks import (
     init_production_hooks as init_finetuning_hooks,
 )
-from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
-    init_production_hooks as init_hf_lm_hooks,
-)
 
 
 class LoggerProtocol(Protocol):
@@ -76,7 +73,6 @@ def main(
         runner: Worker runner function. If None, uses the worker_runner hook.
     """
     # Initialize production hooks for training backends
-    init_hf_lm_hooks()
     init_finetuning_hooks()
 
     setup_logging(

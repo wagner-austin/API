@@ -357,55 +357,6 @@ class ReadTextFileFn(Protocol):
         ...
 
 
-class Hooks:
-    """Container for HF LM backend test hooks.
-
-    Production code sets these to real implementations.
-    Tests set these to fakes for isolation.
-    """
-
-    # io.py / prepare.py hooks
-    load_hf_model: HFModelLoader | None = None
-    load_hf_tokenizer: HFTokenizerLoader | None = None
-
-    # train.py hooks
-    create_trainer: CreateTrainerFn | None = None
-
-    # evaluate.py hooks
-    load_tokenizer: TokenizerLoader | None = None
-    load_prepared_model: PreparedModelLoader | None = None
-    create_causal_dataset: CreateCausalDatasetFn | None = None
-    create_dataloader: CreateDataLoaderFn | None = None
-    get_model_dir: ModelDirFn | None = None
-    get_eval_dir: EvalDirFn | None = None
-
-    # generate.py / score.py hooks
-    read_text_file: ReadTextFileFn | None = None
-
-    @classmethod
-    def reset(cls) -> None:
-        """Restore every hook to its default.
-
-        The restoration `reset_hooks()` performs, exposed as a classmethod so
-        an autouse fixture can name the container it protects.
-        """
-        reset_hooks()
-
-
-def reset_hooks() -> None:
-    """Reset all hooks to None for test cleanup."""
-    Hooks.load_hf_model = None
-    Hooks.load_hf_tokenizer = None
-    Hooks.create_trainer = None
-    Hooks.load_tokenizer = None
-    Hooks.load_prepared_model = None
-    Hooks.create_causal_dataset = None
-    Hooks.create_dataloader = None
-    Hooks.get_model_dir = None
-    Hooks.get_eval_dir = None
-    Hooks.read_text_file = None
-
-
 def _default_load_hf_model(model_id_or_path: str) -> LMModelProto:
     """Production implementation for loading HuggingFace models.
 
@@ -648,11 +599,43 @@ def _default_read_text_file(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def init_production_hooks() -> None:
-    """Initialize hooks with production implementations.
+class Hooks:
+    """Container for HF LM backend hooks, each bound to its real implementation.
 
-    Call this at application startup to wire real implementations.
+    Production calls these without wiring anything first. Tests assign a fake
+    and call reset() afterwards, which puts the real implementation back.
     """
+
+    # io.py / prepare.py hooks
+    load_hf_model: HFModelLoader = _default_load_hf_model
+    load_hf_tokenizer: HFTokenizerLoader = _default_load_hf_tokenizer
+
+    # train.py hooks
+    create_trainer: CreateTrainerFn = _default_create_trainer
+
+    # evaluate.py hooks
+    load_tokenizer: TokenizerLoader = _default_load_tokenizer
+    load_prepared_model: PreparedModelLoader = _default_load_prepared_model
+    create_causal_dataset: CreateCausalDatasetFn = _default_create_causal_dataset
+    create_dataloader: CreateDataLoaderFn = _default_create_dataloader
+    get_model_dir: ModelDirFn = _default_get_model_dir
+    get_eval_dir: EvalDirFn = _default_get_eval_dir
+
+    # generate.py / score.py hooks
+    read_text_file: ReadTextFileFn = _default_read_text_file
+
+    @classmethod
+    def reset(cls) -> None:
+        """Restore every hook to its real implementation.
+
+        The restoration `reset_hooks()` performs, exposed as a classmethod so
+        an autouse fixture can name the container it protects.
+        """
+        reset_hooks()
+
+
+def reset_hooks() -> None:
+    """Restore every hook to the production implementation it is bound to."""
     Hooks.load_hf_model = _default_load_hf_model
     Hooks.load_hf_tokenizer = _default_load_hf_tokenizer
     Hooks.create_trainer = _default_create_trainer
@@ -682,6 +665,5 @@ __all__ = [
     "ReadTextFileFn",
     "TokenizerLoader",
     "TrainerProto",
-    "init_production_hooks",
     "reset_hooks",
 ]

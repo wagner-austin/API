@@ -46,11 +46,7 @@ def _read_prompt(cfg: GenerateConfig, settings: Settings) -> str:
                 "prompt_path must be under data_root",
                 model_trainer_status_for(ModelTrainerErrorCode.CORPUS_NOT_FOUND),
             )
-        read_fn: ReadTextFileFn | None = Hooks.read_text_file
-        if read_fn is None:
-            raise RuntimeError(
-                "Hooks.read_text_file not initialized - call init_production_hooks()"
-            )
+        read_fn: ReadTextFileFn = Hooks.read_text_file
         return read_fn(resolved)
     raise AppError(
         ModelTrainerErrorCode.CORPUS_NOT_FOUND,

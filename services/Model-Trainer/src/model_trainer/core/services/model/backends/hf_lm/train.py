@@ -45,14 +45,8 @@ def train_prepared_hf_lm(
 
     Returns:
         TrainOutcome with final metrics and output directory.
-
-    Raises:
-        RuntimeError: If create_trainer hook is not initialized.
     """
-    create_fn: CreateTrainerFn | None = Hooks.create_trainer
-    if create_fn is None:
-        raise RuntimeError("Hooks.create_trainer not initialized - call init_production_hooks()")
-
+    create_fn: CreateTrainerFn = Hooks.create_trainer
     trainer: TrainerProto = create_fn(
         prepared,
         cfg,

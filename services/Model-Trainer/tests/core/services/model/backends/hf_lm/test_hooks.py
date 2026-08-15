@@ -24,7 +24,6 @@ from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
     _default_load_prepared_model,
     _default_load_tokenizer,
     _default_read_text_file,
-    init_production_hooks,
     reset_hooks,
 )
 from model_trainer.core.types import LMModelProto
@@ -66,37 +65,36 @@ def _reset_hooks() -> Generator[None, None, None]:
 class TestHooksReset:
     """Tests for reset_hooks function."""
 
-    def test_reset_hooks_clears_model_loader(self) -> None:
-        """Test that reset_hooks sets load_hf_model to None."""
+    def test_reset_hooks_restores_the_real_model_loader(self) -> None:
+        """A fake model loader is replaced by the production implementation."""
         Hooks.load_hf_model = _FakeModelLoader()
         reset_hooks()
-        hook: HFModelLoader | None = Hooks.load_hf_model
-        assert hook is None
+        hook: HFModelLoader = Hooks.load_hf_model
+        assert hook is _default_load_hf_model
 
-    def test_reset_hooks_clears_tokenizer_loader(self) -> None:
-        """Test that reset_hooks sets load_hf_tokenizer to None."""
+    def test_reset_hooks_restores_the_real_tokenizer_loader(self) -> None:
+        """A fake tokenizer loader is replaced by the production implementation."""
         Hooks.load_hf_tokenizer = _FakeTokenizerLoader()
         reset_hooks()
-        hook: HFTokenizerLoader | None = Hooks.load_hf_tokenizer
-        assert hook is None
+        hook: HFTokenizerLoader = Hooks.load_hf_tokenizer
+        assert hook is _default_load_hf_tokenizer
 
 
-class TestHooksInit:
-    """Tests for init_production_hooks function."""
+class TestHooksAreBoundAtImport:
+    """The container is usable with no wiring step."""
 
-    def test_init_production_hooks_sets_model_loader(self) -> None:
-        """Test that init_production_hooks sets load_hf_model."""
-        init_production_hooks()
-        # Verify it's a callable (production implementation)
-        hook = Hooks.load_hf_model
-        assert callable(hook)
-
-    def test_init_production_hooks_sets_tokenizer_loader(self) -> None:
-        """Test that init_production_hooks sets load_hf_tokenizer."""
-        init_production_hooks()
-        # Verify it's a callable (production implementation)
-        hook = Hooks.load_hf_tokenizer
-        assert callable(hook)
+    def test_every_hook_holds_its_production_implementation(self) -> None:
+        """No caller has to initialize the container before using it."""
+        assert Hooks.load_hf_model is _default_load_hf_model
+        assert Hooks.load_hf_tokenizer is _default_load_hf_tokenizer
+        assert Hooks.create_trainer is _default_create_trainer
+        assert Hooks.load_tokenizer is _default_load_tokenizer
+        assert Hooks.load_prepared_model is _default_load_prepared_model
+        assert Hooks.create_causal_dataset is _default_create_causal_dataset
+        assert Hooks.create_dataloader is _default_create_dataloader
+        assert Hooks.get_model_dir is _default_get_model_dir
+        assert Hooks.get_eval_dir is _default_get_eval_dir
+        assert Hooks.read_text_file is _default_read_text_file
 
 
 class _CapturingModelLoader:
@@ -361,10 +359,7 @@ class TestDefaultLoadPreparedModel:
         )
         from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 
-        # Initialize production hooks for loading (test is specifically for defaults)
-        init_production_hooks()
-
-        # Also set the finetuning strategy hook for loading full models
+        # Set the finetuning strategy hook for loading full models
         def full_loader(model_path: str) -> LMModelProto:
             return _default_load_hf_model(model_path)
 

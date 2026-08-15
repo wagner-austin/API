@@ -153,53 +153,6 @@ class TestHFTokenizerEncoder:
 class TestPrepareHFLMWithHandle:
     """Tests for prepare_hf_lm_with_handle function."""
 
-    def test_raises_when_model_loader_not_configured(self) -> None:
-        """Test that RuntimeError is raised when model loader not set."""
-        from model_trainer.core.contracts.tokenizer import TokenizerHandle
-
-        class _FakeTokHandle(TokenizerHandle):
-            def encode(self, text: str) -> list[int]:
-                return []
-
-            def decode(self, ids: list[int]) -> str:
-                return ""
-
-            def token_to_id(self, token: str) -> int | None:
-                return 0
-
-            def get_vocab_size(self) -> int:
-                return 100
-
-        cfg = make_test_config()
-        tok = _FakeTokHandle()
-
-        with pytest.raises(RuntimeError, match="HF model loader hook not configured"):
-            prepare_hf_lm_with_handle(tok, cfg)
-
-    def test_raises_when_tokenizer_loader_not_configured(self) -> None:
-        """Test that RuntimeError is raised when tokenizer loader not set."""
-        from model_trainer.core.contracts.tokenizer import TokenizerHandle
-
-        class _FakeTokHandle(TokenizerHandle):
-            def encode(self, text: str) -> list[int]:
-                return []
-
-            def decode(self, ids: list[int]) -> str:
-                return ""
-
-            def token_to_id(self, token: str) -> int | None:
-                return 0
-
-            def get_vocab_size(self) -> int:
-                return 100
-
-        Hooks.load_hf_model = _FakeModelLoader()
-        cfg = make_test_config()
-        tok = _FakeTokHandle()
-
-        with pytest.raises(RuntimeError, match="HF tokenizer loader hook not configured"):
-            prepare_hf_lm_with_handle(tok, cfg)
-
     def test_returns_prepared_model_with_full_strategy(self) -> None:
         """Test that prepare_hf_lm_with_handle returns PreparedLMModel."""
         from model_trainer.core.contracts.tokenizer import TokenizerHandle

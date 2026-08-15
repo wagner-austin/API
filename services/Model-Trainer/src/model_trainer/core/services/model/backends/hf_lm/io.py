@@ -249,11 +249,7 @@ def load_prepared_hf_lm_from_handle(
 
     # Load base model from HuggingFace
     load_model = HFHooks.load_hf_model
-    if load_model is None:
-        raise RuntimeError("HF model loader hook not configured")
     load_hf_tokenizer = HFHooks.load_hf_tokenizer
-    if load_hf_tokenizer is None:
-        raise RuntimeError("HF tokenizer loader hook not configured")
 
     base_model = load_model(metadata["hub_model_id"])
     hf_tokenizer = load_hf_tokenizer(metadata["hub_model_id"])

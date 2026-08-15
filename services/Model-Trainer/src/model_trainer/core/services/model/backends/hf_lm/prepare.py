@@ -157,11 +157,7 @@ def prepare_hf_lm_with_handle(
 
     # Load HF model and tokenizer via hooks
     load_model = Hooks.load_hf_model
-    if load_model is None:
-        raise RuntimeError("HF model loader hook not configured")
     load_tokenizer = Hooks.load_hf_tokenizer
-    if load_tokenizer is None:
-        raise RuntimeError("HF tokenizer loader hook not configured")
 
     base_model = load_model(hub_model_id)
     hf_tokenizer = load_tokenizer(hub_model_id)
