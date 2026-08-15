@@ -7,12 +7,15 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from procart.ffmpeg_runner import RealFfmpegRunner
+
 
 class _FfmpegRunnerProto(Protocol):
     def encode_frames_to_video(self, frames_dir: str, fps: int, output_path: str) -> None: ...
 
 
-# Default to None; main.py sets real instance. Tests inject fakes.
-FFMPEG_RUNNER: _FfmpegRunnerProto | None = None
+# Bound to the real runner at import time so callers invoke it directly.
+# Tests rebind it to a fake and restore it afterwards.
+FFMPEG_RUNNER: _FfmpegRunnerProto = RealFfmpegRunner()
 
 __all__ = ["FFMPEG_RUNNER"]

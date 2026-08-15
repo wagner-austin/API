@@ -88,22 +88,3 @@ async def test_render_video_endpoint_invokes_hook(tmp_path: str | bytes) -> None
         import os
 
         assert os.path.exists(vp) and os.path.getsize(vp) > 0
-
-
-@pytest.mark.asyncio
-async def test_render_video_endpoint_missing_hook_raises(tmp_path: str | bytes) -> None:
-    from procart_api import _test_hooks as _hooks
-
-    # Ensure hook is None to exercise error branch
-    _hooks.FFMPEG_RUNNER = None
-
-    app = create_app()
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-        scene = _scene_minimal()
-        out_dir = str(tmp_path)
-        req_video: _VideoRequest = {"scene": scene, "output_dir": out_dir}
-        # ASGITransport re-raises application exceptions rather than turning
-        # them into a response, so the missing runner surfaces here directly.
-        with pytest.raises(ValueError, match="FFMPEG_RUNNER is not set"):
-            await ac.post("/render/video", json=req_video)

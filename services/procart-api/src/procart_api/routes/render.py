@@ -112,10 +112,7 @@ def build_router() -> APIRouter:
         os.makedirs(frames_dir, exist_ok=True)
         video_path = os.path.join(output_dir, scene_id, f"{scene_id}.mp4")
         fps = int(scene["timing"]["fps"])  # Fps
-        runner = _hooks.FFMPEG_RUNNER
-        if runner is None:
-            raise ValueError("FFMPEG_RUNNER is not set")
-        runner.encode_frames_to_video(frames_dir, fps, video_path)
+        _hooks.FFMPEG_RUNNER.encode_frames_to_video(frames_dir, fps, video_path)
         return {"video_path": video_path}
 
     r.add_api_route("/preview", preview, methods=["POST"])

@@ -8,17 +8,22 @@ from procart.ffmpeg_runner import RealFfmpegRunner
 from procart_api import _test_hooks as _hooks
 
 
-def test_hooks_default_and_main_startup_sets_runner() -> None:
-    # Reset hook and reload main to exercise assignment path.
-    _hooks.FFMPEG_RUNNER = None
+def test_ffmpeg_runner_hook_is_bound_to_the_real_runner() -> None:
+    """The hook holds the real runner at import time, with no startup assignment.
+
+    Binding it in _test_hooks rather than in main() means every caller reaches a
+    usable runner without a None check, and reloading main cannot change it.
+    """
+    assert type(_hooks.FFMPEG_RUNNER).__name__ == RealFfmpegRunner.__name__
+
+
+def test_reloading_main_leaves_the_hook_bound() -> None:
+    """main no longer assigns the hook, so a reload leaves the binding intact."""
     import procart_api.main as main_mod
 
     importlib.reload(main_mod)
-    runner = _hooks.FFMPEG_RUNNER
-    # Reloading main() must install the real runner, not merely something.
-    assert type(runner).__name__ == RealFfmpegRunner.__name__
-    has_attr = hasattr(runner, "encode_frames_to_video")
-    assert has_attr is True
+
+    assert type(_hooks.FFMPEG_RUNNER).__name__ == RealFfmpegRunner.__name__
 
 
 def test_main_module_main_block_executes() -> None:
