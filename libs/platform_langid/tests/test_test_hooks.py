@@ -1,10 +1,10 @@
-"""Tests for platform_langid._test_hooks module."""
+"""Tests for the platform_langid hook modules."""
 
 from __future__ import annotations
 
 import pytest
 
-from platform_langid import _test_hooks
+from platform_langid import _hook_defaults, _test_hooks
 from platform_langid.testing import reset_hooks
 from platform_langid.types import default_detector_config
 
@@ -15,50 +15,50 @@ class TestDetectAudioFormat:
     def test_detect_wav_format(self) -> None:
         """Detect WAV format from RIFF/WAVE header."""
         wav_header = b"RIFF\x00\x00\x00\x00WAVEfmt "
-        result = _test_hooks._detect_audio_format(wav_header)
+        result = _hook_defaults._detect_audio_format(wav_header)
         assert result == "wav"
 
     def test_detect_mp3_id3_format(self) -> None:
         """Detect MP3 format from ID3 header."""
         mp3_header = b"ID3\x04\x00\x00\x00\x00\x00\x00\x00\x00"
-        result = _test_hooks._detect_audio_format(mp3_header)
+        result = _hook_defaults._detect_audio_format(mp3_header)
         assert result == "mp3"
 
     def test_detect_mp3_sync_format(self) -> None:
         """Detect MP3 format from sync bytes."""
         mp3_header = b"\xff\xfb\x90\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-        result = _test_hooks._detect_audio_format(mp3_header)
+        result = _hook_defaults._detect_audio_format(mp3_header)
         assert result == "mp3"
 
     def test_detect_ogg_format(self) -> None:
         """Detect OGG format from OggS header."""
         ogg_header = b"OggS\x00\x02\x00\x00\x00\x00\x00\x00"
-        result = _test_hooks._detect_audio_format(ogg_header)
+        result = _hook_defaults._detect_audio_format(ogg_header)
         assert result == "ogg"
 
     def test_detect_flac_format(self) -> None:
         """Detect FLAC format from fLaC header."""
         flac_header = b"fLaC\x00\x00\x00\x22\x00\x00\x00\x00"
-        result = _test_hooks._detect_audio_format(flac_header)
+        result = _hook_defaults._detect_audio_format(flac_header)
         assert result == "flac"
 
     def test_detect_webm_format(self) -> None:
         """Detect WebM format from EBML header."""
         webm_header = b"\x1a\x45\xdf\xa3\x01\x00\x00\x00\x00\x00\x00\x00"
-        result = _test_hooks._detect_audio_format(webm_header)
+        result = _hook_defaults._detect_audio_format(webm_header)
         assert result == "webm"
 
     def test_audio_too_short_raises(self) -> None:
         """Raise ValueError if audio data is too short."""
         short_data = b"\x00\x00\x00"
         with pytest.raises(ValueError, match="Audio data too short"):
-            _test_hooks._detect_audio_format(short_data)
+            _hook_defaults._detect_audio_format(short_data)
 
     def test_unknown_format_raises(self) -> None:
         """Raise ValueError for unknown audio format."""
         unknown_data = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b"
         with pytest.raises(ValueError, match="Unknown audio format"):
-            _test_hooks._detect_audio_format(unknown_data)
+            _hook_defaults._detect_audio_format(unknown_data)
 
 
 class TestDefaultAudioLoader:
