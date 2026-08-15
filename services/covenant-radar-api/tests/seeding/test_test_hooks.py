@@ -58,15 +58,15 @@ class TestModuleLevelHooks:
 class TestLoadPsycopgModule:
     """Tests for psycopg module loader."""
 
-    def test_returns_real_module_when_hook_is_none(self) -> None:
-        """Test _load_psycopg_module returns real psycopg when hook is None."""
+    def test_the_bound_hook_loads_the_real_module(self) -> None:
+        """The hook the module binds by default imports the real psycopg."""
         import pytest
 
-        orig_hook = _test_hooks.load_psycopg_module_hook
-        _test_hooks.load_psycopg_module_hook = None
+        orig_hook = _test_hooks.load_psycopg_module
+        _test_hooks.load_psycopg_module = _test_hooks._real_load_psycopg_module
 
         try:
-            module = _test_hooks._load_psycopg_module()
+            module = _test_hooks.load_psycopg_module()
             # Verify module has connect method (required by protocol)
             # We call it with invalid DSN expecting OperationalError
             psycopg = __import__("psycopg")
@@ -75,10 +75,10 @@ class TestLoadPsycopgModule:
             with pytest.raises(operational_error):
                 module.connect("host= dbname=x", autocommit=True)
         finally:
-            _test_hooks.load_psycopg_module_hook = orig_hook
+            _test_hooks.load_psycopg_module = orig_hook
 
-    def test_uses_hook_when_set(self) -> None:
-        """Test _load_psycopg_module uses hook when set."""
+    def test_uses_a_rebound_hook(self) -> None:
+        """A rebound hook is what the loader returns."""
         from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 
         store = InMemoryStore()
@@ -95,16 +95,16 @@ class TestLoadPsycopgModule:
             fake: _test_hooks.PsycopgModuleProtocol = FakePsycopgModule()
             return fake
 
-        orig_hook = _test_hooks.load_psycopg_module_hook
-        _test_hooks.load_psycopg_module_hook = fake_hook
+        orig_hook = _test_hooks.load_psycopg_module
+        _test_hooks.load_psycopg_module = fake_hook
 
         try:
-            module = _test_hooks._load_psycopg_module()
+            module = _test_hooks.load_psycopg_module()
             # Call connect to verify it's the fake
             module.connect("test-dsn", autocommit=True)
             assert hook_called[0] is True
         finally:
-            _test_hooks.load_psycopg_module_hook = orig_hook
+            _test_hooks.load_psycopg_module = orig_hook
 
 
 class TestPsycopgConnectAutocommit:
@@ -126,8 +126,8 @@ class TestPsycopgConnectAutocommit:
             fake: _test_hooks.PsycopgModuleProtocol = FakePsycopgModule()
             return fake
 
-        orig_hook = _test_hooks.load_psycopg_module_hook
-        _test_hooks.load_psycopg_module_hook = fake_hook
+        orig_hook = _test_hooks.load_psycopg_module
+        _test_hooks.load_psycopg_module = fake_hook
 
         try:
             # This will now hit the return conn line
@@ -136,18 +136,18 @@ class TestPsycopgConnectAutocommit:
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
         finally:
-            _test_hooks.load_psycopg_module_hook = orig_hook
+            _test_hooks.load_psycopg_module = orig_hook
 
-    def test_calls_real_psycopg_when_hook_is_none(self) -> None:
+    def test_calls_real_psycopg_through_the_bound_hook(self) -> None:
         """Test _psycopg_connect_autocommit calls real psycopg.connect.
 
         We test this by providing an invalid DSN and expecting psycopg
-        to raise OperationalError, proving the function was called correctly.
+        to raise OperationalError, proving the real module was reached.
         """
         import pytest
 
-        orig_hook = _test_hooks.load_psycopg_module_hook
-        _test_hooks.load_psycopg_module_hook = None
+        orig_hook = _test_hooks.load_psycopg_module
+        _test_hooks.load_psycopg_module = _test_hooks._real_load_psycopg_module
 
         try:
             # Load the error class with proper type annotation
@@ -158,7 +158,7 @@ class TestPsycopgConnectAutocommit:
             with pytest.raises(operational_error):
                 _test_hooks._psycopg_connect_autocommit("host= dbname=x")
         finally:
-            _test_hooks.load_psycopg_module_hook = orig_hook
+            _test_hooks.load_psycopg_module = orig_hook
 
 
 class TestExports:

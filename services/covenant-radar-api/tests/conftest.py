@@ -200,10 +200,10 @@ def _reset_config_hooks_impl() -> Generator[None, None, None]:
 
 def _reset_worker_hooks_impl() -> Generator[None, None, None]:
     """Reset worker entry test hooks after each test."""
-    orig_runner = app_test_hooks.test_runner
+    orig_runner = app_test_hooks.worker_runner
     orig_data_bank_uploader = worker_job_hooks.data_bank_uploader
     yield
-    app_test_hooks.test_runner = orig_runner
+    app_test_hooks.worker_runner = orig_runner
     worker_job_hooks.data_bank_uploader = orig_data_bank_uploader
 
 

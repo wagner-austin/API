@@ -69,20 +69,18 @@ class LoadPsycopgModuleHook(Protocol):
         ...
 
 
-# Hook for loading psycopg module - tests override to provide fake
-load_psycopg_module_hook: LoadPsycopgModuleHook | None = None
+def _real_load_psycopg_module() -> PsycopgModuleProtocol:
+    """Import psycopg and return it behind its protocol.
 
-
-def _load_psycopg_module() -> PsycopgModuleProtocol:
-    """Load psycopg module dynamically.
-
-    If load_psycopg_module_hook is set (by tests), uses that.
-    Otherwise loads the real psycopg module.
+    Returns:
+        The psycopg module.
     """
-    if load_psycopg_module_hook is not None:
-        return load_psycopg_module_hook()
     module: PsycopgModuleProtocol = __import__("psycopg")
     return module
+
+
+# Hook for loading psycopg module - tests rebind it to return a fake module.
+load_psycopg_module: LoadPsycopgModuleHook = _real_load_psycopg_module
 
 
 def _psycopg_connect_autocommit(dsn: str) -> ConnectionProtocol:
@@ -91,7 +89,7 @@ def _psycopg_connect_autocommit(dsn: str) -> ConnectionProtocol:
     Uses autocommit=True to prevent failed transactions from blocking
     subsequent queries. Each statement commits immediately.
     """
-    module = _load_psycopg_module()
+    module = load_psycopg_module()
     conn: ConnectionProtocol = module.connect(dsn, autocommit=True)
     return conn
 

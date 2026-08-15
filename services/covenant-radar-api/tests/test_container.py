@@ -247,16 +247,16 @@ def test_container_close_closes_resources(
 # =============================================================================
 
 
-def test_load_psycopg_module_returns_real_module() -> None:
-    """Test _load_psycopg_module returns real psycopg when hook is None."""
+def test_the_bound_hook_loads_the_real_module() -> None:
+    """The hook the module binds by default imports the real psycopg."""
     from covenant_radar_api.core import _test_hooks
 
     # Ensure hook is None (default production behavior)
-    orig_hook = _test_hooks.load_psycopg_module_hook
-    _test_hooks.load_psycopg_module_hook = None
+    orig_hook = _test_hooks.load_psycopg_module
+    _test_hooks.load_psycopg_module = _test_hooks._real_load_psycopg_module
 
     try:
-        module = _test_hooks._load_psycopg_module()
+        module = _test_hooks.load_psycopg_module()
         # Verify module has connect method (required by protocol)
         # We call it with invalid DSN expecting OperationalError
         psycopg = __import__("psycopg")
@@ -266,11 +266,11 @@ def test_load_psycopg_module_returns_real_module() -> None:
         with pytest.raises(operational_error):
             module.connect("host= dbname=x", autocommit=True)
     finally:
-        _test_hooks.load_psycopg_module_hook = orig_hook
+        _test_hooks.load_psycopg_module = orig_hook
 
 
-def test_load_psycopg_module_uses_hook_when_set() -> None:
-    """Test _load_psycopg_module uses hook when set."""
+def test_load_psycopg_module_uses_a_rebound_hook() -> None:
+    """A rebound hook is what the loader returns."""
     from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 
     from covenant_radar_api.core import _test_hooks
@@ -290,16 +290,16 @@ def test_load_psycopg_module_uses_hook_when_set() -> None:
         fake: PsycopgModuleProtocol = FakePsycopgModule()
         return fake
 
-    orig_hook = _test_hooks.load_psycopg_module_hook
-    _test_hooks.load_psycopg_module_hook = fake_hook
+    orig_hook = _test_hooks.load_psycopg_module
+    _test_hooks.load_psycopg_module = fake_hook
 
     try:
-        module = _test_hooks._load_psycopg_module()
+        module = _test_hooks.load_psycopg_module()
         # Call connect to verify it's the fake
         module.connect("test-dsn", autocommit=True)
         assert hook_called[0] is True
     finally:
-        _test_hooks.load_psycopg_module_hook = orig_hook
+        _test_hooks.load_psycopg_module = orig_hook
 
 
 def test_psycopg_connect_autocommit_with_hook() -> None:
@@ -321,8 +321,8 @@ def test_psycopg_connect_autocommit_with_hook() -> None:
         fake: PsycopgModuleProtocol = FakePsycopgModule()
         return fake
 
-    orig_hook = _test_hooks.load_psycopg_module_hook
-    _test_hooks.load_psycopg_module_hook = fake_hook
+    orig_hook = _test_hooks.load_psycopg_module
+    _test_hooks.load_psycopg_module = fake_hook
 
     try:
         # This will now hit the return conn line
@@ -331,7 +331,7 @@ def test_psycopg_connect_autocommit_with_hook() -> None:
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
     finally:
-        _test_hooks.load_psycopg_module_hook = orig_hook
+        _test_hooks.load_psycopg_module = orig_hook
 
 
 def test_psycopg_connect_autocommit_calls_real_psycopg() -> None:
@@ -340,8 +340,8 @@ def test_psycopg_connect_autocommit_calls_real_psycopg() -> None:
     from covenant_radar_api.core import _test_hooks
 
     # Ensure hook is None to use real psycopg
-    orig_hook = _test_hooks.load_psycopg_module_hook
-    _test_hooks.load_psycopg_module_hook = None
+    orig_hook = _test_hooks.load_psycopg_module
+    _test_hooks.load_psycopg_module = _test_hooks._real_load_psycopg_module
 
     try:
         psycopg = __import__("psycopg")
@@ -350,7 +350,7 @@ def test_psycopg_connect_autocommit_calls_real_psycopg() -> None:
         with pytest.raises(operational_error):
             _test_hooks._psycopg_connect_autocommit("host= dbname=x")
     finally:
-        _test_hooks.load_psycopg_module_hook = orig_hook
+        _test_hooks.load_psycopg_module = orig_hook
 
 
 def test_default_kv_factory_calls_real_redis() -> None:

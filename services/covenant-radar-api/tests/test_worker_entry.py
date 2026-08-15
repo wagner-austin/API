@@ -11,7 +11,6 @@ from platform_workers.rq_harness import WorkerConfig
 from covenant_radar_api import _test_hooks
 from covenant_radar_api.worker_entry import (
     _build_config,
-    _get_default_runner,
     _run_worker,
     main,
 )
@@ -137,9 +136,6 @@ def test_worker_entry_module_exports() -> None:
     assert "redis_url" in cfg
     assert "queue_name" in cfg
 
-    # Verify _get_default_runner returns a callable
-    assert callable(entry._get_default_runner())
-
     # Verify LoggerProtocol defines info method - call it on a test instance
     class _TestLogger:
         def info(self, message: str, *, extra: dict[str, str]) -> None:
@@ -152,32 +148,15 @@ def test_worker_entry_module_exports() -> None:
     assert "__call__" in dir(entry.WorkerRunnerProtocol)
 
 
-def test_get_default_runner_returns_test_runner_when_set() -> None:
-    """Test _get_default_runner returns test_runner when set."""
-
-    def _custom_runner(config: WorkerConfig) -> None:
-        pass
-
-    _test_hooks.test_runner = _custom_runner
-
-    result = _get_default_runner()
-
-    assert result is _custom_runner
-
-
-def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> None:
-    """Test _get_default_runner returns run_rq_worker when test_runner is None."""
+def test_worker_runner_hook_holds_the_real_runner() -> None:
+    """The hook is usable with no wiring step, so main() needs no fallback."""
     from platform_workers.rq_harness import run_rq_worker
 
-    _test_hooks.test_runner = None
-
-    result = _get_default_runner()
-
-    assert result is run_rq_worker
+    assert _test_hooks.worker_runner is run_rq_worker
 
 
-def test_main_uses_test_runner_when_set() -> None:
-    """Test main() uses test_runner when set in _test_hooks."""
+def test_main_uses_the_worker_runner_hook() -> None:
+    """Test main() uses the runner bound in _test_hooks."""
     env = make_fake_env()
     env.set("REDIS_URL", "redis://test-runner:6379/0")
 
@@ -186,10 +165,10 @@ def test_main_uses_test_runner_when_set() -> None:
     def _recording_runner(config: WorkerConfig) -> None:
         received_configs.append(config)
 
-    # Set the test runner in _test_hooks
-    _test_hooks.test_runner = _recording_runner
+    # Rebind the runner hook in _test_hooks
+    _test_hooks.worker_runner = _recording_runner
 
-    # Call main() with no args - should use test_runner
+    # Call main() with no args - should use the hook
     main()
 
     assert len(received_configs) == 1
@@ -201,7 +180,7 @@ def test_main_guard_executes_main() -> None:
     """Test the if __name__ == '__main__' guard executes main().
 
     Uses runpy.run_module to actually execute the module as __main__.
-    Because _test_hooks is a separate module, our test_runner persists.
+    Because _test_hooks is a separate module, our rebinding persists.
     """
     import runpy
     import sys
@@ -214,8 +193,8 @@ def test_main_guard_executes_main() -> None:
     def _recording_runner(config: WorkerConfig) -> None:
         received_configs.append(config)
 
-    # Set the test runner in _test_hooks BEFORE running as __main__
-    _test_hooks.test_runner = _recording_runner
+    # Rebind the runner hook BEFORE running as __main__
+    _test_hooks.worker_runner = _recording_runner
 
     # Remove the module from sys.modules to avoid the RuntimeWarning
     # about the module being found in sys.modules prior to execution

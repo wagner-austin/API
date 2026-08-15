@@ -41,22 +41,12 @@ from covenant_ml.optimizer.types import (
 )
 from covenant_ml.types import BackendName, PredictorProtocol
 from numpy.typing import NDArray
-from platform_workers.rq_harness import WorkerConfig
 
 from covenant_radar_api.worker.optimize_types import UnifiedOptimizeParseResult
 
 # =============================================================================
 # Worker Runner Hook
 # =============================================================================
-
-
-class WorkerRunnerProtocol(Protocol):
-    """Protocol for worker runner function."""
-
-    def __call__(self, config: WorkerConfig) -> None: ...
-
-
-test_runner: WorkerRunnerProtocol | None = None
 
 
 # =============================================================================
@@ -850,7 +840,6 @@ __all__ = [
     "TimeSeriesDatasetRegistry",
     "TimeSeriesLoaderCallable",
     "TimeSeriesRegistryFactoryProtocol",
-    "WorkerRunnerProtocol",
     "data_bank_uploader",
     "dataset_loader",
     "dataset_registry_factory",
@@ -863,7 +852,6 @@ __all__ = [
     "optimizer_registry_factory",
     "random_forest_loader",
     "registry_factory",
-    "test_runner",
     "timeseries_loader",
     "timeseries_registry_factory",
 ]
