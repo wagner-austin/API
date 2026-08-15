@@ -58,13 +58,23 @@ class Converter:
         self._type = type_name
         self._ordered: set[int] = set()
 
-    def convert(self, sample: Sample, budget: Budget, wanted: int) -> tuple[ProduceOrder, ...]:
+    def convert(
+        self,
+        sample: Sample,
+        budget: Budget,
+        wanted: int,
+        exclude: int | None = None,
+    ) -> tuple[ProduceOrder, ...]:
         """Order the next conversion when the headcount is short and funded.
 
         Args:
             sample: One observation of the world.
             budget: The tick's credits.
             wanted: Converted structures the doctrine keeps, zero for none.
+            exclude: A holder another channel owns, never taken here --
+                the battery's site turret awaits a pricier fork, and the
+                pilot proved this channel funds first and steals it
+                (log 2026-08-14).
 
         Returns:
             The produce order to send, or nothing this tick.
@@ -79,6 +89,22 @@ class Converter:
             if entity["type_name"] == self._type:
                 alive += 1
             roster[entity["unit_id"]] = entity["type_name"]
+        # An ordered holder that became a DIFFERENT fork was overridden --
+        # the engine honors whoever sent last, and the battery converts
+        # the same base turret (log 2026-08-14). It no longer offers this
+        # target and never will, so counting it underway would run the
+        # headcount one short for the rest of the match. A holder still
+        # offering the target is genuinely mid-conversion and stays: a
+        # converting structure keeps offering the upgrade it is
+        # performing ([[policy-holding-ground]]).
+        offering = {
+            option["unit_id"] for option in sample["options"] if option["produces"] == self._type
+        }
+        self._ordered -= {
+            unit_id
+            for unit_id in self._ordered
+            if unit_id in roster and roster[unit_id] != self._type and unit_id not in offering
+        }
         # A holder mid-conversion is a conversion already paid for: it was
         # ordered, still stands, and has not yet become the target. Counting
         # it prevents the duplicate the queue cannot signal -- converting
@@ -88,7 +114,8 @@ class Converter:
         )
         if alive + underway >= wanted:
             return ()
-        offer = _conversion_offer(sample, self._type, self._ordered)
+        untouchable = self._ordered if exclude is None else self._ordered | {exclude}
+        offer = _conversion_offer(sample, self._type, untouchable)
         if offer is None:
             return ()
         holder, price = offer
@@ -175,13 +202,21 @@ class TurretLadder:
         """
         return {unit_id for unit_id, tgt in self._ordered if tgt == target}
 
-    def convert(self, sample: Sample, budget: Budget, wanted: int) -> tuple[ProduceOrder, ...]:
+    def convert(
+        self,
+        sample: Sample,
+        budget: Budget,
+        wanted: int,
+        exclude: int | None = None,
+    ) -> tuple[ProduceOrder, ...]:
         """Advance the chain one funded step when the top count is short.
 
         Args:
             sample: One observation of the world.
             budget: The tick's credits.
             wanted: Top-tier turrets the doctrine keeps, zero for none.
+            exclude: A holder another channel owns, never taken here
+                (log 2026-08-14, the battery's site turret).
 
         Returns:
             The produce order to send, or nothing this tick.
@@ -194,11 +229,26 @@ class TurretLadder:
             for entity in sample["entities"]
             if entity["mine"] and entity["complete"]
         }
+        # The Converter's eviction rule, lifted (log 2026-08-14): an
+        # ordered holder that stands as something other than its target
+        # and no longer offers it was overridden by another channel, and
+        # counting it underway runs the chain short forever.
+        offering: dict[str, set[int]] = {}
+        for step in (mid, top):
+            offering[step] = {
+                option["unit_id"] for option in sample["options"] if option["produces"] == step
+            }
+        self._ordered -= {
+            (unit_id, tgt)
+            for unit_id, tgt in self._ordered
+            if unit_id in roster and roster[unit_id] != tgt and unit_id not in offering[tgt]
+        }
         tops = sum(1 for name in roster.values() if name == top)
         need_top = wanted - tops - self._underway(roster, top)
         if need_top <= 0:
             return ()
-        offer = _conversion_offer(sample, top, self._ordered_for(top))
+        spoken_for = set() if exclude is None else {exclude}
+        offer = _conversion_offer(sample, top, self._ordered_for(top) | spoken_for)
         if offer is None:
             # No idle mid offers the top yet: feed the pipeline, bounded by
             # what the top still needs -- an unbounded feed would convert
@@ -207,7 +257,7 @@ class TurretLadder:
             mids = sum(1 for name in roster.values() if name == mid)
             if mids + self._underway(roster, mid) >= need_top:
                 return ()
-            offer = _conversion_offer(sample, mid, self._ordered_for(mid))
+            offer = _conversion_offer(sample, mid, self._ordered_for(mid) | spoken_for)
             if offer is None:
                 return ()
             target = mid

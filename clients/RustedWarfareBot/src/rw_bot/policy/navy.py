@@ -15,6 +15,13 @@ the order in silence while a wet point grows a factory. This channel is
 that walk with a budget: one candidate at a time, a patience window per
 candidate, the claim-or-withhold discipline every saving channel uses.
 
+The battery's five pilots re-audited this walk (log 2026-08-14): its
+claim moved EARLY in the tick (a tail-of-tick withhold binds nobody --
+the starvation pilot five measured), and the walk now holds its builder
+on the incomplete factory (the expander re-tasks a released builder and
+an abandoned construction dies unfinished -- pilot six's defect, masked
+here only because water is unreachable by the land army).
+
 The submarines themselves need nothing new: once the factory stands,
 :class:`~rw_bot.policy.medic.Medic` keeps the headcount alive through the
 same hire machinery that staffs combat engineers, because a sub is just a
@@ -80,6 +87,11 @@ class Shipyard:
         self._candidate = 0
         self._waited = 0
         self._paid = False
+        # Whether the factory has ever been observed standing -- what
+        # tells "not built yet" (keep saving) from "stood and died"
+        # (re-fund the rebuild): the engine charges per attempt, so the
+        # books must too (the battery's second pilot; log 2026-08-14).
+        self._stood = False
         # The walk's builder, pinned by id: the probe's factory stood
         # because ONE builder accumulated walking progress across
         # candidate windows, and navy96e's never did because
@@ -88,28 +100,94 @@ class Shipyard:
         # trek from the base with forty ticks to live (log 2026-08-10).
         self._builder_id: int | None = None
 
-    def _pin_builder(self, builders: list[Entity]) -> int:
+    def _pin_builder(self, builders: list[Entity], avoid: int | None) -> int | None:
         """Return the walk's builder, re-picking only when the pinned one died.
 
-        Pick the NEWEST builder -- dragging the opening's builder across
-        the map is dragging the opening with it -- and then KEEP it until
-        it dies. The patience window restarts with a replacement, because
-        a fresh builder starts the trek from the base and inheriting a
-        spent window refuses the fraction without ever having reached it.
+        Pick the NEWEST builder not claimed by another walk -- dragging
+        the opening's builder across the map is dragging the opening with
+        it -- and then KEEP it until it dies. The patience window restarts
+        with a replacement, because a fresh builder starts the trek from
+        the base and inheriting a spent window refuses the fraction
+        without ever having reached it.
 
         Args:
             builders: Our complete builders, roster order; never empty.
+            avoid: A builder id another walk has pinned, or None.
 
         Returns:
-            The pinned builder's unit id.
+            The pinned builder's unit id, or None when every builder is
+            claimed elsewhere.
         """
         alive = {worker["unit_id"] for worker in builders}
         builder_id = self._builder_id
-        if builder_id is None or builder_id not in alive:
-            builder_id = builders[-1]["unit_id"]
+        if builder_id is None or builder_id not in alive or builder_id == avoid:
+            candidates = [w["unit_id"] for w in builders if w["unit_id"] != avoid]
+            if not candidates:
+                return None
+            builder_id = candidates[-1]
             self._builder_id = builder_id
             self._waited = 0
         return builder_id
+
+    def pinned_builder(self) -> int | None:
+        """Return the id of the builder this walk holds, or None.
+
+        Exposed so a second walk can avoid pinning the same builder --
+        two live walks re-sending against one builder would override
+        each other every tick ([[policy-holding-ground]]).
+        """
+        return self._builder_id
+
+    def _factory(self, sample: Sample) -> Entity | None:
+        """Return our sea factory, standing or under construction."""
+        for entity in sample["entities"]:
+            if entity["mine"] and entity["type_name"] == FACTORY_TYPE:
+                return entity
+        return None
+
+    def fund(
+        self,
+        sample: Sample,
+        catalogue: Mapping[str, UnitStats],
+        budget: Budget,
+        wanted: bool,
+    ) -> None:
+        """Claim the factory price once, EARLY in the tick.
+
+        The battery's fifth pilot measured what a tail-of-tick claim is
+        worth: 4,866 refusals while the army spent every credit first,
+        because a withhold at the end of the chain binds nobody (log
+        2026-08-14). The shipyard carried the same defect, masked only by
+        early-game balances; funding is now its own step, called before
+        the hires and conversions.
+
+        Args:
+            sample: One observation of the world.
+            catalogue: Unit stats by type name, for the factory's price.
+            budget: The tick's credits.
+            wanted: Whether the doctrine plays the water at all.
+        """
+        if not wanted or self._candidate >= len(FRACTIONS):
+            return
+        if self._factory(sample) is not None:
+            self._stood = True
+            return
+        if self._stood:
+            # It stood and is gone: the walk resumes and the rebuild
+            # re-funds, because the engine will charge again.
+            self._stood = False
+            self._paid = False
+        if self._paid:
+            return
+        stats = catalogue.get(FACTORY_TYPE)
+        if stats is None:
+            return
+        claim = budget.claim(f"navy:{FACTORY_TYPE}", stats["price"])
+        if not claim["granted"]:
+            budget.withhold(stats["price"])
+            return
+        self._paid = True
+        self._waited = 0
 
     def establish(
         self,
@@ -117,40 +195,38 @@ class Shipyard:
         catalogue: Mapping[str, UnitStats],
         budget: Budget,
         wanted: bool,
+        avoid_builder: int | None = None,
     ) -> tuple[BuildOrder, ...]:
         """Offer the current candidate, advancing when patience runs out.
 
         Args:
             sample: One observation of the world.
-            catalogue: Unit stats by type name, for the anchor and the
-                factory's price.
-            budget: The tick's credits; the factory price is claimed while
-                the walk is live and withheld toward when refused, the
-                saving pattern every strategic purchase uses
-                ([[policy-budget]]).
+            catalogue: Unit stats by type name, for the anchor.
+            budget: The tick's credits, unread: :meth:`fund` claims the
+                factory early in the tick, where a refusal binds the
+                spenders below it; kept for call-compatibility.
             wanted: Whether the doctrine plays the water at all.
+            avoid_builder: A builder id another walk has pinned, never
+                taken here.
 
         Returns:
-            At most one build order -- the current candidate, re-sent every
-            tick once the price is claimed ONCE. Both halves were measured
-            separately: claiming per tick consumed 369,000 credits and the
-            economy never existed (navy96), and ordering once let the
-            expander re-task the builder a tick later and the factory never
-            stood (navy96b interim). The navy sends after the expander in
-            the tick, so the re-sent order lands last and wins the builder
-            (log 2026-08-10).
+            At most one build order. While walking: the current
+            candidate, re-sent every tick once :meth:`fund` has paid.
+            While the factory is INCOMPLETE: the same order at the
+            standing factory, so the expander cannot re-task the builder
+            away from an unfinished construction (the battery's sixth
+            pilot; log 2026-08-14). Both re-sends land after the
+            expander's, which is what wins the builder (log 2026-08-10).
         """
+        del budget
         if not wanted or self._candidate >= len(FRACTIONS):
             return ()
-        for entity in sample["entities"]:
-            if entity["mine"] and entity["type_name"] == FACTORY_TYPE:
-                # Standing or under construction either way: the walk's job
-                # is done and the headcount channel takes over.
-                return ()
-        stats = catalogue.get(FACTORY_TYPE)
-        if stats is None:
-            # A catalogue without the type cannot price the claim; the
-            # doctrine asked for water the build simply cannot describe.
+        factory = self._factory(sample)
+        if factory is not None and factory["complete"]:
+            # Standing finished: the walk's job is done and the headcount
+            # channel takes over.
+            return ()
+        if factory is None and not self._paid:
             return ()
         anchor = find_anchor(sample, catalogue)
         goal = mirror_point(sample, catalogue)
@@ -161,14 +237,20 @@ class Shipyard:
         ]
         if anchor is None or goal is None or not builders:
             return ()
-        builder_id = self._pin_builder(builders)
-        if not self._paid:
-            claim = budget.claim(f"navy:{FACTORY_TYPE}", stats["price"])
-            if not claim["granted"]:
-                budget.withhold(stats["price"])
-                return ()
-            self._paid = True
-            self._waited = 0
+        builder_id = self._pin_builder(builders, avoid_builder)
+        if builder_id is None:
+            return ()
+        if factory is not None:
+            # The construction hold: keep the builder on the incomplete
+            # factory until the engine reports it finished.
+            return (
+                build_order(
+                    unit_id=builder_id,
+                    type_name=FACTORY_TYPE,
+                    x=factory["x"],
+                    y=factory["y"],
+                ),
+            )
         share = FRACTIONS[self._candidate]
         self._waited += 1
         if self._waited > PATIENCE:
@@ -187,4 +269,4 @@ class Shipyard:
         )
 
 
-__all__ = ["FACTORY_TYPE", "FRACTIONS", "PATIENCE", "Shipyard"]
+__all__ = ["FACTORY_TYPE", "FRACTIONS", "GUARD_TYPE", "PATIENCE", "Shipyard"]
