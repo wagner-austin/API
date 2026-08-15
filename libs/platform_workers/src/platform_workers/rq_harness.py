@@ -91,12 +91,10 @@ class _RQModuleProtocol(Protocol):
 
 
 def _load_rq_module() -> _RQModuleProtocol:
-    """Load the rq module, using test hook if set."""
+    """Load the rq module through the hook bound to the real import."""
     from .testing import hooks
 
-    if hooks.load_rq_module is not None:
-        return hooks.load_rq_module()
-    return __import__("rq")
+    return hooks.load_rq_module()
 
 
 def rq_retry(*, max_retries: int, intervals: list[int]) -> RQRetryLike:
@@ -305,14 +303,7 @@ def rq_fetch_job(job_id: str, connection: _RedisBytesClient) -> FetchedJobProto:
     """
     from .testing import hooks
 
-    if hooks.fetch_job is not None:
-        return hooks.fetch_job(job_id, connection)
-
-    # Dynamic import with Protocol annotation to avoid Any types
-    rq_job_mod = __import__("rq.job", fromlist=["Job"])
-    job_cls: _RQJobClassProto = rq_job_mod.Job
-    result: FetchedJobProto = job_cls.fetch(job_id, connection=connection)
-    return result
+    return hooks.fetch_job(job_id, connection)
 
 
 __all__ = [

@@ -9,6 +9,7 @@ code sets hooks to real implementations at startup; tests set them to fakes.
 
 from __future__ import annotations
 
+import importlib as _importlib
 from typing import Protocol
 
 # Re-export all fakes from _fakes module
@@ -49,11 +50,15 @@ from ._fakes import (
 from .redis import (
     RedisBytesProto,
     RedisStrProto,
+    _RedisAsyncioModule,
     _RedisBytesClient,
+    _RedisBytesModule,
+    _RedisStrModule,
 )
 from .rq_harness import (
     FetchedJobProto,
     RQRetryLike,
+    _RQJobClassProto,
     _RQModuleProtocol,
 )
 
@@ -63,21 +68,25 @@ from .rq_harness import (
 
 
 class LoadStrModuleHook(Protocol):
-    """Protocol for loading the string-mode kv module."""
+    """Protocol for loading the string-mode kv module.
 
-    def __call__(self) -> FakeRedisStrModule: ...
+    Typed against the real module contract, not the fake, so the production
+    implementation satisfies it and the hook needs no nullable fallback.
+    """
+
+    def __call__(self) -> _RedisStrModule: ...
 
 
 class LoadBytesModuleHook(Protocol):
     """Protocol for loading the bytes-mode kv module."""
 
-    def __call__(self) -> FakeRedisBytesModule: ...
+    def __call__(self) -> _RedisBytesModule: ...
 
 
 class LoadAsyncModuleHook(Protocol):
     """Protocol for loading the async kv module."""
 
-    def __call__(self) -> FakeRedisAsyncioModule: ...
+    def __call__(self) -> _RedisAsyncioModule: ...
 
 
 class LoadRQModuleHook(Protocol):
@@ -97,11 +106,69 @@ class FetchJobHook(Protocol):
 # =============================================================================
 
 
+def _real_load_redis_str_module() -> _RedisStrModule:
+    """Production implementation importing the redis module.
+
+    Returns:
+        The imported redis module.
+    """
+    return __import__("redis")
+
+
+def _real_load_redis_bytes_module() -> _RedisBytesModule:
+    """Production implementation importing the redis module for bytes clients.
+
+    Returns:
+        The imported redis module.
+    """
+    return __import__("redis")
+
+
+def _real_load_redis_asyncio_module() -> _RedisAsyncioModule:
+    """Production implementation importing the redis.asyncio module.
+
+    Returns:
+        The imported redis.asyncio module.
+    """
+    module: _RedisAsyncioModule = _importlib.import_module("redis.asyncio")
+    return module
+
+
+def _real_load_rq_module() -> _RQModuleProtocol:
+    """Production implementation importing the rq module.
+
+    Returns:
+        The imported rq module.
+    """
+    return __import__("rq")
+
+
+def _real_fetch_job(job_id: str, connection: _RedisBytesClient) -> FetchedJobProto:
+    """Production implementation fetching an RQ job by id.
+
+    Args:
+        job_id: Identifier of the job to fetch.
+        connection: Redis connection the job lives on.
+
+    Returns:
+        The fetched job.
+
+    Raises:
+        NoSuchJobError: If the job does not exist. Use load_no_such_job_error()
+            to get the exception type for catching.
+    """
+    rq_job_mod = __import__("rq.job", fromlist=["Job"])
+    job_cls: _RQJobClassProto = rq_job_mod.Job
+    result: FetchedJobProto = job_cls.fetch(job_id, connection=connection)
+    return result
+
+
 class HooksContainer:
     """Container for dependency injection hooks in platform_workers.
 
-    Production code sets these hooks to real implementations at startup.
-    Tests set them to fakes to avoid external dependencies.
+    Every hook is bound to its real implementation here, so callers invoke it
+    directly and there is no conditional dispatch. Tests rebind a hook to a
+    fake and call reset() to restore the real implementations.
 
     Attributes:
         load_redis_str_module: Hook to load redis module for str clients.
@@ -112,24 +179,24 @@ class HooksContainer:
     """
 
     # Redis module loaders
-    load_redis_str_module: LoadStrModuleHook | None = None
-    load_redis_bytes_module: LoadBytesModuleHook | None = None
-    load_redis_asyncio_module: LoadAsyncModuleHook | None = None
+    load_redis_str_module: LoadStrModuleHook = _real_load_redis_str_module
+    load_redis_bytes_module: LoadBytesModuleHook = _real_load_redis_bytes_module
+    load_redis_asyncio_module: LoadAsyncModuleHook = _real_load_redis_asyncio_module
 
     # RQ module loader
-    load_rq_module: LoadRQModuleHook | None = None
+    load_rq_module: LoadRQModuleHook = _real_load_rq_module
 
     # RQ job fetch hook
-    fetch_job: FetchJobHook | None = None
+    fetch_job: FetchJobHook = _real_fetch_job
 
     @classmethod
     def reset(cls) -> None:
-        """Reset all hooks to None (production defaults)."""
-        cls.load_redis_str_module = None
-        cls.load_redis_bytes_module = None
-        cls.load_redis_asyncio_module = None
-        cls.load_rq_module = None
-        cls.fetch_job = None
+        """Restore every hook to its real implementation."""
+        cls.load_redis_str_module = _real_load_redis_str_module
+        cls.load_redis_bytes_module = _real_load_redis_bytes_module
+        cls.load_redis_asyncio_module = _real_load_redis_asyncio_module
+        cls.load_rq_module = _real_load_rq_module
+        cls.fetch_job = _real_fetch_job
 
 
 # Global hooks instance
