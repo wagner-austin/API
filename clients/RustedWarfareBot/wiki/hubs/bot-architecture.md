@@ -39,6 +39,7 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [Production — Keeping the Queues Full](../pages/policy-production.md) -- why a priority list cannot express an army, and the three measured failures behind the composition rule
 [Playing Matches in Parallel](../pages/harness-parallel-matches.md) -- the sweep harness: jobs as data, resumable by construction, one result file per match
 [Holding Ground - 44 of 46 Pools, and Why the Bot Loses](../pages/policy-holding-ground.md) -- the bot loses at full length; expansion without defence is a credit shredder
+[The Artillery Battery: a Shore Turret That Outranges the Fleet](../pages/policy-battery.md) -- the naval hole's cheapest response: the 350-reach fork vs the 240-reach battleship, the five defects its pilots bought, and the quartermaster seam it lives in
 [The Exact-Timing Regime — the Ladder Re-Founded](../pages/policy-exact-timing.md) -- the certified seed-pure simulation, the un-handicapped AI it revealed, the boot-sandbox compile trap, and the honest ladder every new rate is measured against
 
 [Determinism — One Seed, One Answer](../pages/policy-determinism.md) -- the seed, the hold, the lockstep, the pinned frame delta: what makes a solo run bit-identical, and the parallel residual that is not
