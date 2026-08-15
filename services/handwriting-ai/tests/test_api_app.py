@@ -35,6 +35,65 @@ from handwriting_ai.inference.manifest import ModelManifest
 from handwriting_ai.inference.types import PredictOutput
 
 
+def _no_future_prepared(preprocessed: Tensor) -> Future[PredictOutput]:
+    """Fail loudly if the engine submits before a test prepared a future.
+
+    Args:
+        preprocessed: Preprocessed image tensor, unused.
+
+    Returns:
+        Never returns.
+
+    Raises:
+        AssertionError: Always.
+    """
+    _ = preprocessed
+    raise AssertionError("test submitted inference without preparing a future")
+
+
+class _FakePool:
+    """Pool that ignores the implementation and returns a prepared future.
+
+    submit_fn is reassignable so one engine can be driven through several
+    outcomes without being rebuilt.
+    """
+
+    def __init__(self) -> None:
+        self.submit_fn: Callable[[Tensor], Future[PredictOutput]] = _no_future_prepared
+
+    def submit(
+        self, fn: _test_hooks.PredictImplProtocol, preprocessed: Tensor
+    ) -> Future[PredictOutput]:
+        """Return the prepared future instead of running fn.
+
+        Args:
+            fn: The engine's real implementation, deliberately not called.
+            preprocessed: Preprocessed image tensor.
+
+        Returns:
+            The future submit_fn produces.
+        """
+        _ = fn
+        return self.submit_fn(preprocessed)
+
+
+def _bind_fake_pool() -> _FakePool:
+    """Bind the pool hook to a fake; call before building an engine.
+
+    Returns:
+        The fake pool, so a test can set submit_fn per phase.
+    """
+    pool = _FakePool()
+
+    def _make(settings: Settings) -> _test_hooks.InferencePoolProtocol:
+        _ = settings
+        made: _test_hooks.InferencePoolProtocol = pool
+        return made
+
+    _test_hooks.make_inference_pool = _make
+    return pool
+
+
 def _make_future(result_fn: Callable[[float | None], PredictOutput]) -> Future[PredictOutput]:
     """Create a Future that calls result_fn when result() is called.
 
@@ -163,6 +222,7 @@ def test_basic_routes_and_models(tmp_path: Path) -> None:
 
 def test_read_success_uncertain_and_visual(tmp_path: Path) -> None:
     settings = _mk_settings(tmp_path)
+    pool = _bind_fake_pool()
     engine = InferenceEngine(settings)
 
     probs_tuple = tuple(0.1 for _ in range(10))
@@ -177,7 +237,7 @@ def test_read_success_uncertain_and_visual(tmp_path: Path) -> None:
         _ = preprocessed  # Unused
         return fut
 
-    _test_hooks.submit_predict_override = _submit_predict_stub
+    pool.submit_fn = _submit_predict_stub
 
     app = create_app(settings=settings, engine_provider=lambda: engine)
     client = TestClient(app)
@@ -191,6 +251,7 @@ def test_read_success_uncertain_and_visual(tmp_path: Path) -> None:
 
 def test_read_timeout_and_not_ready(tmp_path: Path) -> None:
     settings = _mk_settings(tmp_path)
+    pool = _bind_fake_pool()
     engine = InferenceEngine(settings)
 
     # Timeout path
@@ -203,7 +264,7 @@ def test_read_timeout_and_not_ready(tmp_path: Path) -> None:
         _ = preprocessed  # Unused
         return fut_timeout
 
-    _test_hooks.submit_predict_override = _submit_timeout
+    pool.submit_fn = _submit_timeout
     app1 = create_app(settings=settings, engine_provider=lambda: engine)
     c1 = TestClient(app1)
     r1 = c1.post("/v1/read", files={"file": ("a.png", _png_bytes(), "image/png")})
@@ -220,7 +281,7 @@ def test_read_timeout_and_not_ready(tmp_path: Path) -> None:
         _ = preprocessed  # Unused
         return fut_not_ready
 
-    _test_hooks.submit_predict_override = _submit_not_ready
+    pool.submit_fn = _submit_not_ready
     app2 = create_app(settings=settings, engine_provider=lambda: engine)
     c2 = TestClient(app2)
     r2 = c2.post("/v1/read", files={"file": ("a.png", _png_bytes(), "image/png")})
@@ -230,6 +291,7 @@ def test_read_timeout_and_not_ready(tmp_path: Path) -> None:
 
 def test_read_validation_paths(tmp_path: Path) -> None:
     settings = _mk_settings(tmp_path)
+    pool = _bind_fake_pool()
     engine = InferenceEngine(settings)
     # Successful future (not used when validation fails)
     probs_val = tuple(0.1 for _ in range(10))
@@ -242,7 +304,7 @@ def test_read_validation_paths(tmp_path: Path) -> None:
         _ = preprocessed  # Unused
         return _make_future(_return_out)
 
-    _test_hooks.submit_predict_override = _submit_success
+    pool.submit_fn = _submit_success
     app = create_app(settings=settings, engine_provider=lambda: engine)
     client = TestClient(app)
 
@@ -386,6 +448,7 @@ def test_admin_upload_activate_and_errors(tmp_path: Path) -> None:
 def test_exception_handlers_and_api_key(tmp_path: Path) -> None:
     # Require API key
     settings = _mk_settings(tmp_path, api_key="secret")
+    pool = _bind_fake_pool()
     engine = InferenceEngine(settings)
     probs_zeros = tuple(0.0 for _ in range(10))
     out: PredictOutput = {"digit": 0, "confidence": 1.0, "probs": probs_zeros, "model_id": "m"}
@@ -397,7 +460,7 @@ def test_exception_handlers_and_api_key(tmp_path: Path) -> None:
         _ = preprocessed  # Unused
         return _make_future(_return_out2)
 
-    _test_hooks.submit_predict_override = _submit_success2
+    pool.submit_fn = _submit_success2
     app = create_app(settings=settings, engine_provider=lambda: engine)
 
     def _boom_app() -> None:

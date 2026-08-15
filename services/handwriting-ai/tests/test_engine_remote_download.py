@@ -9,7 +9,7 @@ from platform_core.json_utils import JSONTypeError
 from handwriting_ai import _test_hooks
 from handwriting_ai._test_hooks import ArtifactStoreProtocol
 from handwriting_ai.config import Settings
-from handwriting_ai.inference.engine import InferenceEngine
+from handwriting_ai.inference.engine import InferenceEngine, download_remote_artifact
 
 
 def _settings(tmp: Path) -> Settings:
@@ -53,7 +53,7 @@ def test_download_remote_manifest_read_error(tmp_path: Path) -> None:
     manifest_path.mkdir()  # Replace with directory to cause read error
 
     with pytest.raises(OSError):
-        engine._download_remote_if_needed(model_dir, manifest_path)
+        download_remote_artifact(engine._settings, model_dir, manifest_path)
 
 
 def test_download_remote_manifest_not_object(tmp_path: Path) -> None:
@@ -66,7 +66,7 @@ def test_download_remote_manifest_not_object(tmp_path: Path) -> None:
 
     engine = InferenceEngine(s)
     with pytest.raises(JSONTypeError, match="manifest must be a JSON object"):
-        engine._download_remote_if_needed(model_dir, manifest_path)
+        download_remote_artifact(engine._settings, model_dir, manifest_path)
 
 
 def test_download_remote_v2_missing_file_id(tmp_path: Path) -> None:
@@ -79,7 +79,7 @@ def test_download_remote_v2_missing_file_id(tmp_path: Path) -> None:
 
     engine = InferenceEngine(s)
     with pytest.raises(RuntimeError, match="v2 manifest missing file_id"):
-        engine._download_remote_if_needed(model_dir, manifest_path)
+        download_remote_artifact(engine._settings, model_dir, manifest_path)
 
 
 def test_download_remote_missing_data_bank_config(tmp_path: Path) -> None:
@@ -96,7 +96,7 @@ def test_download_remote_missing_data_bank_config(tmp_path: Path) -> None:
 
     engine = InferenceEngine(s)
     with pytest.raises(RuntimeError, match="missing data-bank-api configuration"):
-        engine._download_remote_if_needed(model_dir, manifest_path)
+        download_remote_artifact(engine._settings, model_dir, manifest_path)
 
 
 def test_download_remote_success(tmp_path: Path) -> None:
@@ -148,7 +148,7 @@ def test_download_remote_success(tmp_path: Path) -> None:
     _test_hooks.artifact_store_factory = _factory
 
     engine = InferenceEngine(s)
-    engine._download_remote_if_needed(model_dir, manifest_path)
+    download_remote_artifact(engine._settings, model_dir, manifest_path)
     # Verify download was called (model.pt should now exist)
     assert (model_dir / "model.pt").exists()
 
@@ -166,10 +166,10 @@ def test_ensure_artifacts_with_manifest_only_triggers_download(tmp_path: Path) -
 
     download_called = {"count": 0}
 
-    def _fake_download(model_dir: Path, manifest_path: Path) -> None:
+    def _fake_download(settings: Settings, model_dir: Path, manifest_path: Path) -> None:
         download_called["count"] += 1
 
-    _test_hooks.download_remote_override = _fake_download
+    _test_hooks.download_remote = _fake_download
 
     engine = InferenceEngine(s)
     result = engine._ensure_artifacts_present(model_dir)
@@ -186,12 +186,12 @@ def test_ensure_artifacts_download_creates_model(tmp_path: Path) -> None:
     manifest_path.write_text('{"schema_version":"v1"}', encoding="utf-8")
     # model.pt doesn't exist initially
 
-    def _fake_download(model_dir: Path, manifest_path: Path) -> None:
+    def _fake_download(settings: Settings, model_dir: Path, manifest_path: Path) -> None:
         # Simulate download creating model.pt
-        _ = manifest_path  # Unused
+        _ = (settings, manifest_path)  # Unused
         (model_dir / "model.pt").write_bytes(b"model")
 
-    _test_hooks.download_remote_override = _fake_download
+    _test_hooks.download_remote = _fake_download
 
     engine = InferenceEngine(s)
     result = engine._ensure_artifacts_present(model_dir)

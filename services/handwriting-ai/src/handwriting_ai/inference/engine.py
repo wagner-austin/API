@@ -35,7 +35,7 @@ class InferenceEngine:
     def __init__(self, settings: Settings) -> None:
         self._settings = ensure_settings(settings, create_dirs=False)
         self._logger = get_logger("handwriting_ai")
-        self._pool = _make_pool(self._settings)
+        self._pool = _test_hooks.make_inference_pool(self._settings)
         self._model_lock = threading.RLock()
         self._model: TorchModel | None = None
         self._manifest: ModelManifest | None = None
@@ -57,11 +57,6 @@ class InferenceEngine:
         return self._manifest
 
     def submit_predict(self, preprocessed: Tensor) -> Future[PredictOutput]:
-        override = _test_hooks.submit_predict_override
-        if override is not None:
-            # Use test hook for injecting fake futures
-            fut: Future[PredictOutput] = override(preprocessed)
-            return fut
         return self._pool.submit(self._predict_impl, preprocessed)
 
     def _predict_impl(self, preprocessed: Tensor) -> PredictOutput:
@@ -104,7 +99,7 @@ class InferenceEngine:
 
         if not (manifest_path.exists() and model_path.exists()):
             if manifest_path.exists():
-                self._download_remote_if_needed(model_dir, manifest_path)
+                _test_hooks.download_remote(self._settings, model_dir, manifest_path)
             if not (manifest_path.exists() and model_path.exists()):
                 return None
 
@@ -169,41 +164,6 @@ class InferenceEngine:
                 self._logger.error("artifact_mtime_unavailable error=%s", exc)
                 raise
 
-    def _download_remote_if_needed(self, model_dir: Path, manifest_path: Path) -> None:
-        override = _test_hooks.download_remote_override
-        if override is not None:
-            override(model_dir, manifest_path)
-            return
-        # Load raw JSON and detect v2 with file_id
-        try:
-            raw_text = manifest_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            self._logger.error("manifest_read_failed error=%s", exc)
-            raise
-        value: JSONValue = load_json_str(raw_text)
-        if not isinstance(value, dict):
-            raise JSONTypeError("manifest must be a JSON object for remote fetch")
-        schema = str(value.get("schema_version", "")).strip()
-        if schema != "v2.0":
-            return  # Only v2 manifests support remote fetching
-        file_id_val = value.get("file_id")
-        if not isinstance(file_id_val, str) or file_id_val.strip() == "":
-            raise RuntimeError("v2 manifest missing file_id; cannot fetch remote artifact")
-        # Require data-bank config from settings
-        app = self._settings["app"]
-        api_url = str(app.get("data_bank_api_url", ""))
-        api_key = str(app.get("data_bank_api_key", ""))
-        if api_url.strip() == "" or api_key.strip() == "":
-            raise RuntimeError("missing data-bank-api configuration for remote download")
-        store = _test_hooks.artifact_store_factory(api_url, api_key)
-        expected_root = model_dir.name
-        store.download_artifact(
-            file_id_val,
-            dest_dir=model_dir.parent,
-            request_id="handwriting-engine-bootstrap",
-            expected_root=expected_root,
-        )
-
     def reload_if_changed(self) -> bool:
         """Reload active model if manifest or weights changed on disk.
 
@@ -230,6 +190,52 @@ class InferenceEngine:
 
         self.try_load_active()
         return self.ready
+
+
+def download_remote_artifact(settings: Settings, model_dir: Path, manifest_path: Path) -> None:
+    """Fetch the artifact a v2 manifest names, if it names one.
+
+    A v1 manifest carries its weights beside it and needs no fetch, so this
+    returns without doing anything for one.
+
+    Args:
+        settings: Application settings, carrying the data-bank config.
+        model_dir: Directory the artifact belongs in.
+        manifest_path: Manifest to read the file id from.
+
+    Raises:
+        OSError: If the manifest cannot be read.
+        JSONTypeError: If the manifest is not a JSON object.
+        RuntimeError: If a v2 manifest has no file_id, or the data-bank
+            configuration needed to fetch it is missing.
+    """
+    logger = get_logger("handwriting_ai")
+    try:
+        raw_text = manifest_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.error("manifest_read_failed error=%s", exc)
+        raise
+    value: JSONValue = load_json_str(raw_text)
+    if not isinstance(value, dict):
+        raise JSONTypeError("manifest must be a JSON object for remote fetch")
+    schema = str(value.get("schema_version", "")).strip()
+    if schema != "v2.0":
+        return  # Only v2 manifests support remote fetching
+    file_id_val = value.get("file_id")
+    if not isinstance(file_id_val, str) or file_id_val.strip() == "":
+        raise RuntimeError("v2 manifest missing file_id; cannot fetch remote artifact")
+    app = settings["app"]
+    api_url = str(app.get("data_bank_api_url", ""))
+    api_key = str(app.get("data_bank_api_key", ""))
+    if api_url.strip() == "" or api_key.strip() == "":
+        raise RuntimeError("missing data-bank-api configuration for remote download")
+    store = _test_hooks.artifact_store_factory(api_url, api_key)
+    store.download_artifact(
+        file_id_val,
+        dest_dir=model_dir.parent,
+        request_id="handwriting-engine-bootstrap",
+        expected_root=model_dir.name,
+    )
 
 
 def _make_pool(settings: Settings) -> ThreadPoolExecutor:

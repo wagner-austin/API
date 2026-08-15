@@ -114,8 +114,8 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     original_event_factory = _test_hooks.event_factory
     original_load_state_dict_file = _test_hooks.load_state_dict_file
     original_validate_state_dict = _test_hooks.validate_state_dict
-    original_submit_predict_override = _test_hooks.submit_predict_override
-    original_download_remote_override = _test_hooks.download_remote_override
+    original_make_inference_pool = _test_hooks.make_inference_pool
+    original_download_remote = _test_hooks.download_remote
     original_run_preprocess = _test_hooks.run_preprocess
     original_preprocess_signature = _test_hooks.preprocess_signature
 
@@ -256,8 +256,8 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     _test_hooks.event_factory = original_event_factory
     _test_hooks.load_state_dict_file = original_load_state_dict_file
     _test_hooks.validate_state_dict = original_validate_state_dict
-    _test_hooks.submit_predict_override = original_submit_predict_override
-    _test_hooks.download_remote_override = original_download_remote_override
+    _test_hooks.make_inference_pool = original_make_inference_pool
+    _test_hooks.download_remote = original_download_remote
     _test_hooks.run_preprocess = original_run_preprocess
     _test_hooks.preprocess_signature = original_preprocess_signature
 

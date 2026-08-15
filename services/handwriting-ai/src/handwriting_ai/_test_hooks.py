@@ -726,11 +726,106 @@ validate_state_dict: ValidateStateDictProtocol = _default_validate_state_dict
 # =============================================================================
 
 
-# Override for submit_predict. If set, called instead of actual inference.
-submit_predict_override: Callable[[torch.Tensor], Future[PredictOutput]] | None = None
+class PredictImplProtocol(Protocol):
+    """Protocol for the engine's per-request inference implementation."""
 
-# Override for download_remote. If set, called instead of actual download.
-download_remote_override: Callable[[Path, Path], None] | None = None
+    def __call__(self, preprocessed: torch.Tensor) -> PredictOutput:
+        """Run inference on one preprocessed image.
+
+        Args:
+            preprocessed: Preprocessed image tensor.
+
+        Returns:
+            Prediction for that image.
+        """
+        ...
+
+
+class InferencePoolProtocol(Protocol):
+    """Protocol for the executor the engine submits inference to."""
+
+    def submit(self, fn: PredictImplProtocol, preprocessed: torch.Tensor) -> Future[PredictOutput]:
+        """Schedule one inference and return its future.
+
+        Args:
+            fn: Implementation to run.
+            preprocessed: Preprocessed image tensor.
+
+        Returns:
+            Future carrying the prediction.
+        """
+        ...
+
+
+class MakeInferencePoolProtocol(Protocol):
+    """Protocol for the inference pool factory."""
+
+    def __call__(self, settings: HandwritingAiSettings) -> InferencePoolProtocol:
+        """Build the pool the engine submits inference to.
+
+        Args:
+            settings: Application settings.
+
+        Returns:
+            Pool sized from settings.
+        """
+        ...
+
+
+class DownloadRemoteProtocol(Protocol):
+    """Protocol for fetching a v2 manifest's remote model artifact."""
+
+    def __call__(
+        self, settings: HandwritingAiSettings, model_dir: Path, manifest_path: Path
+    ) -> None:
+        """Download the artifact the manifest names, if it names one.
+
+        Args:
+            settings: Application settings, carrying the data-bank config.
+            model_dir: Directory the artifact belongs in.
+            manifest_path: Manifest to read the file id from.
+        """
+        ...
+
+
+def _default_make_inference_pool(settings: HandwritingAiSettings) -> InferencePoolProtocol:
+    """Build the real bounded thread pool.
+
+    The engine module is imported here rather than at module scope because it
+    imports this one.
+
+    Args:
+        settings: Application settings.
+
+    Returns:
+        ThreadPoolExecutor sized from settings.
+    """
+    from .inference.engine import _make_pool
+
+    return _make_pool(settings)
+
+
+def _default_download_remote(
+    settings: HandwritingAiSettings, model_dir: Path, manifest_path: Path
+) -> None:
+    """Fetch the remote artifact named by a v2 manifest.
+
+    Args:
+        settings: Application settings, carrying the data-bank config.
+        model_dir: Directory the artifact belongs in.
+        manifest_path: Manifest to read the file id from.
+    """
+    from .inference.engine import download_remote_artifact
+
+    download_remote_artifact(settings, model_dir, manifest_path)
+
+
+# Hook for building the inference pool. Tests bind a pool returning prepared
+# futures, which is how they drive the engine's timeout and not-ready paths.
+make_inference_pool: MakeInferencePoolProtocol = _default_make_inference_pool
+
+# Hook for the remote artifact download. Tests bind a fake download.
+download_remote: DownloadRemoteProtocol = _default_download_remote
 
 
 # =============================================================================
