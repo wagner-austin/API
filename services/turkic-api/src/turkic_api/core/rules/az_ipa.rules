@@ -1,23 +1,34 @@
 # Azerbaijani (North) → IPA transliteration rules (az_ipa.rules)
 #
-# Source: Ghaffarvand Mokari, P. & Werner, S. (2017). "Azerbaijani".
-#         Journal of the International Phonetic Association, 47(2): 207–212.
-#         DOI: https://doi.org/10.1017/S0025100317000184
+# Source-Authors: Ghaffarvand Mokari, P. & Werner, S.
+# Source-Year: 2017
+# Source-Title: Azerbaijani
+# Source-Container: Journal of the International Phonetic Association 47(2): 207-212
+# Source-Id: https://doi.org/10.1017/S0025100317000184
 #
-# Additional reference: Standard Baku-oriented descriptions of orthography & pronunciation
-#                       (e.g., Siegel, Essentials of Azerbaijani).
+# SCOPE: the cited Illustration describes the Tabriz variety (p. 207),
+# written in Arabic script; these rules map the Latin alphabet of the
+# Baku standard. Its chart (p. 208) has an alveolar affricate pair the
+# Baku standard lacks and parenthesises the palatal and velar plosives,
+# so only the shared inventory is taken from it. Both page readings were
+# confirmed by a second reader. This is the journal's only Azerbaijani
+# Illustration (CrossRef record for ISSN 0025-1003, checked 2026-08).
+#
+# Corroborated by the variety-matched description: Ragagnin, E. (2021)
+# 'Azeri', in Johanson & Csató (eds.), The Turkic Languages, 2nd ed.,
+# Routledge, 242-261 (https://doi.org/10.4324/9781003243809-17): Baku
+# standard (p. 242), the same nine vowels (p. 243), affricates č and ǰ
+# with the alveolar pair dialectal, "vs. standard Azeri čay and geǰä"
+# (p. 244). Word pairs pinned in test_azerbaijani_ragagnin_words.py.
 #
 # Simplified: no vowel length, no stress, no aspiration marking, no dental vs. alveolar
 # distinctions, no automatic final devoicing, no systematic palatal/velar allophony.
 
-# ---------------------------------------------------------------------------
-
-# 0. MACROS  (IPA target symbols; used in contexts below)
-
-$V   = [ i y e œ æ ɑ o u ɯ ];   # all vowels
-$BV  = [ ɑ o u ɯ ];             # back vowels
-$FV  = [ i y e œ æ ];           # front vowels
-$RV  = [ o œ u y ];             # rounded vowels
+# The map below is context-free. Azerbaijani has fronting and rounding
+# harmony (p. 4), but the orthography writes every vowel, so a
+# grapheme-to-phoneme transform never has to compute a harmonic value and
+# nothing here needs the harmony classes of Table 1. They were once
+# declared as macros no rule referred to, and have been removed.
 
 # ---------------------------------------------------------------------------
 

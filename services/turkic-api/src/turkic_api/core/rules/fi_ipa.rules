@@ -1,14 +1,23 @@
 # Finnish → IPA transliteration rules (fi_ipa.rules)
 #
-# Source: Suomi, K., Toivanen, J., & Ylitalo, R. (2008).
-#         Finnish sound structure: Phonetics, phonology, phonotactics and prosody.
-#         Studia Humaniora Ouluensia 9. Oulu: Oulu University Press.
-#         ISBN: 978-951-42-8984-2
-#         Available at: https://urn.fi/URN:ISBN:9789514289842
+# Source-Authors: Suomi, K., Toivanen, J. & Ylitalo, R.
+# Source-Year: 2008
+# Source-Title: Finnish sound structure: Phonetics, phonology, phonotactics and prosody
+# Source-Container: Studia Humaniora Ouluensia 9. Oulu: Oulu University Press
+# Source-Id: https://urn.fi/URN:ISBN:9789514289842
 #
 # Simplified: segmental phonemes only, no allophonic rules (like [h x ç] allophones,
 # vowel centralisation, or sandhi / glottalisation). Quantity is handled purely
 # by doubled letters → long segments (ː).
+#
+# Corroborated: Karlsson, F. (2018) Finnish: A Comprehensive Grammar,
+# Routledge (ISBN 978-1-138-82103-3), ch. 2: letter table with ʋ and ɑ
+# (p. 16); ng/nk as in the context rules below, rengas [reŋːɑs] and
+# Helsinki [helsiŋki] (p. 14); doubled letters as length (p. 21). His h
+# allophones [ɦ x ç] are the ones declared out of scope above. Fourteen
+# printed words pinned in test_finnish_karlsson_words.py. JIPA has no
+# Finnish Illustration (CrossRef record for ISSN 0025-1003, checked
+# 2026-08).
 
 # 0.  MACROS  (symbols in the source alphabet, case-sensitive)
 
@@ -16,6 +25,11 @@ $V = [ a ä e i o ö u y A Ä E I O Ö U Y ];          # orthographic vowels
 $C = [ b c d f g h j k l m n p q r s t v w x z
        B C D F G H J K L M N P Q R S T V W X Z
        š Š ž Ž ' ];
+
+# The same eight vowels on the output side. A left context is matched
+# against text the transform has already rewritten, so a rule that looks
+# backwards past the cursor has to name the IPA vowels, not the letters.
+$Vout = [ ɑ æ e i o ø u y ];
 
 # consonant letters & apostrophe
 
@@ -25,19 +39,37 @@ $C = [ b c d f g h j k l m n p q r s t v w x z
 #     Applied before the one-to-one grapheme → phoneme map.
 
 
-# 1.1 NASAL + K/G  →  [ŋ] / [ŋː]
-#     Very simplified treatment:
-#       nk  → ŋk      (e.g. kenkä)
-#       ng  → ŋː      (e.g. kengän, sangen)
+# 1.1 THE VELAR NASAL
+#     The source calls this "the only fully systematic exception" to the
+#     one-grapheme-one-phoneme principle of Finnish orthography, because
+#     the Latin alphabet has no letter for /ŋ/ and none was adopted (p. 141):
+#
+#       <n> before <k>          → ŋ    kenkä 'shoe'                  (p. 141)
+#       <ng> between vowels     → ŋː   kengän 'of shoe', tango       (p. 141)
+#       <ng> before a consonant → ŋ    Englanti [eŋlɑnt̪i]            (p. 57)
+#       <gn>                    → ŋn   kognitio [koŋnit̪io]           (p. 57)
+#
+#     The length of intervocalic <ng> is not stipulated by the orthography
+#     chapter; it follows from the phonotactics. A singleton /ŋ/ cannot
+#     stand between vowels — "all consonants except /ŋ/ can occur" as a
+#     word-internal C (p. 56) — and in native words /ŋ/ occurs only in
+#     /ŋk/ (p. 57). The two environments the source transcribes, Englanti
+#     with one and kengän with two, are exactly what that predicts.
 
-n } k > ŋ ;      N } K > ŋ ;
+[nN] } [kK] > ŋ ;
 
-ng > ŋː ;
-NG > ŋː ;
+$Vout { [nN] [gG] } $V > ŋː ;
+[nN] [gG] } $C > ŋ ;
+
+[gG] } [nN] > ŋ ;
 
 
 # 1.2 V / W → [ʋ]
-#     <w> is used only in names / stylistic contexts, pronounced like <v>.
+#     The phoneme is the labiodental approximant, listed as /ʋ/ in group (1)
+#     of the consonant inventory (p. 25). The graphemes <v> and <w> "are
+#     non-distinct in Finnish in the sense that the choice between them
+#     implies no difference in pronunciation"; <w> is not used for native
+#     words in the standard orthography, only in trade names (pp. 142-143).
 
 v  > ʋ ;
 V  > ʋ ;
@@ -49,13 +81,16 @@ W  > ʋ ;
 
 
 # 1.3 POSTALVEOLAR FRICATIVE
-#     Standard orthography uses <š>. Many texts use <sh>; we map both to /ʃ/.
-#     Note: š/Š geminates are handled in section 2.2
-
-s h > ʃ ;
-S h > ʃ ;
-s H > ʃ ;
-S H > ʃ ;
+#     The grapheme is <š>, and it is handled by the one-to-one map in
+#     section 2.2 along with its geminate.
+#
+#     There is deliberately no <sh> digraph rule. The source licenses none:
+#     /ʃ/ is a group (5) phoneme written <š> (pp. 25, 141). Meanwhile <sh>
+#     arises constantly inside native compounds, because an obstruent may
+#     precede /h/ across a morpheme boundary (p. 57, restriction 5) and
+#     Finnish compounds put an -s against an h-initial second member —
+#     keskus+hallinto, kuningas+huone, rakennus+hanke. A digraph rule
+#     deletes the /s/ from every one of those.
 
 
 # 1.4 GLOTTAL STOP
@@ -86,9 +121,17 @@ Z  > s ;
 # ---------------------------------------------------------------------------
 
 # 2.  ONE-TO-ONE GRAPHEME → SEGMENT MAP
-#     Long segments (double letters) are mapped to IPA Vː / Cː.
-#     NOTE: Some long consonants (bb, dd, ff, gg, šš) only occur in loans,
-#     but we include them for completeness.
+#     "A given vowel phoneme is always written with the same grapheme. This
+#     is true of most consonant phonemes, too" (p. 20).
+#
+#     Long segments (double letters) are mapped to IPA Vː / Cː. The source
+#     writes them instead as sequences of two identical phonemes — taakka
+#     is /t̪ɑɑkkɑ/ there and tɑːkːɑ here (p. 19) — and marks the dental
+#     place on /t̪ d̪/, which is left off here. Both are notational.
+#
+#     /dd bb gg ff ʃʃ/ occur only in recent loanwords and /hh/ only in
+#     hihhuli, but they are mapped for completeness; /jj/ and /ʋʋ/ the
+#     source reports do not occur at all (p. 56).
 
 
 # 2.1 VOWELS
@@ -193,7 +236,7 @@ HH  > hː ;
 šš  > ʃː ;
 ŠŠ  > ʃː ;
 
-jj  > jː ;    # geminate /j/ only in some dialects / expressive forms
+jj  > jː ;
 
 
 # Short consonants

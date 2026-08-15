@@ -1,8 +1,5 @@
-# Kazakh → Latin transliteration rules (kk_lat.rules)
-#
-# Source: Official Kazakh Latin alphabet (April 2021)
-#         Presidential Decree No. 569 on the Kazakh alphabet and spelling rules
-#         Republic of Kazakhstan, April 19, 2021
+# Official Kazakh Latin alphabet (April 2021)
+# https://en.wikipedia.org/wiki/Kazakh_alphabets
 
 А > A ;  а > a ;
 Ә > Ä ;  ә > ä ;

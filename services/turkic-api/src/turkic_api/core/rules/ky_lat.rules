@@ -1,9 +1,5 @@
-# Kyrgyz → Latin transliteration rules (ky_lat.rules)
-#
-# Source: Modern Practical Latin Transliteration system for Kyrgyz
-#         Uses pre-composed Unicode code-points (NFC normalization)
-#         Digraphs treated as atomic tokens
-
+# Kyrgyz → Modern Practical Latin Transliteration (NFC)
+# One line per pair; use pre‑composed Unicode code‑points; digraphs are atomic tokens.
 А > A ;  а > a ;
 Б > B ;  б > b ;
 В > V ;  в > v ;

@@ -1,8 +1,10 @@
 # Turkish → IPA transliteration rules (tr_ipa.rules)
 #
-# Source: Zimmer, K. & Orgun, O. (1992). "Turkish".
-#         Journal of the International Phonetic Association, 22(1-2): 43-45.
-#         DOI: https://doi.org/10.1017/S0025100300004588
+# Source-Authors: Zimmer, K. & Orgun, O.
+# Source-Year: 1992
+# Source-Title: Turkish
+# Source-Container: Journal of the International Phonetic Association 22(1-2): 43-45
+# Source-Id: https://doi.org/10.1017/S0025100300004588
 #
 # Additional reference: Berkeley TELL transcription sheet
 #
@@ -11,19 +13,34 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # 0.  MACROS  (letters in the *source* alphabet, case-sensitive)
 $Vsrc  = [a e ı i o ö u ü A E I İ O Ö U Ü];   # all vowels
-$BVsrc = [a ı o u A I O U];                   # back  vowels
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  SOFT-G  (Ğ/ğ   "yumuşak g")
 # Per TELL: "vowel length when syllable-final and silence when syllable-initial"
+#
+# Syllable position is decided by what FOLLOWS. Turkish syllabifies VCV as
+# V.CV, so a soft-g between vowels is an onset and TELL gives it silence;
+# one before a consonant or a word boundary is a coda and lengthens the
+# vowel before it. Zimmer & Orgun agree on the phonetics: lengthening
+# "when word-final or followed by a consonant", and "elsewhere when
+# intervocalic, it is phonetically zero" (p. 44).
 
-# 1 a. syllable-final lengthening (after vowel)
+# 1 a. syllable-initial (a vowel follows): silence
+ğ } $Vsrc > ;
+Ğ } $Vsrc > ;
+
+# 1 b. syllable-final (after a vowel, nothing else matched): lengthening
 $Vsrc { ğ } > ː ;
 $Vsrc { Ğ } > ː ;
 
-# 1 c. (optional) word-initial deletion  – leave OFF to keep single-letter test
-# ^ğ > ;
-# ^Ğ > ;
+# There is no word-initial case to handle: no Turkish word begins with
+# the letter, which is why rule 1 b can take "after a vowel" as its only
+# condition.
+#
+# Corroborated: Csató & Johanson (2021, 'Turkish', The Turkic Languages,
+# 2nd ed., Routledge, 195-217, https://doi.org/10.4324/9781003243809-13)
+# print ‹dağ› [dɑː] and ‹düğme› [dyːmε] (p. 195), one word per context
+# above. Pinned in test_turkish_routledge_words.py.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2.  DIRECT ORTHOGRAPHY → IPA MAP  (one-to-one segmental rules)
@@ -59,10 +76,18 @@ Y > j ;  y > j ;
 Z > z ;  z > z ;
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3.  OPTIONAL PHONETIC REFINEMENTS  (uncomment if desired)
-
-# { l } $BVsrc > ɫ ;   # dark l next to back vowels
-# { L } $BVsrc > ɫ ;
+# 3.  THE SECOND LATERAL
+#
+# Zimmer & Orgun give Turkish two lateral phonemes, "a palatalized
+# postalveolar lateral" and "a velarized dental lateral", the velarized
+# one of which "does not occur after front vowels" (p. 44). The
+# orthography writes both with <l>, so a grapheme-to-phoneme map that
+# distinguished them would have to compute the distinction from the
+# surrounding vowels rather than read it off the spelling.
+#
+# These rules do not: <l> is the plain lateral everywhere, one of the
+# three declared departures from the Illustration. The lost contrast is
+# pinned in the inventory test.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ADDITIONS 2025-12-02: Missing chars found in OSCAR corpus audit

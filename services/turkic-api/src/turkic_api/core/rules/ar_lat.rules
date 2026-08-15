@@ -1,10 +1,3 @@
-# Uyghur Arabic Script → Latin transliteration rules (ar_lat.rules)
-#
-# Source: Standard Uyghur Arabic-to-Latin romanization
-#         Based on Uyghur Yëngi Yeziq (ULY - Uyghur Latin Alphabet)
-#
-# Purpose: Converts Uyghur text written in Arabic script to Latin romanization
-
 # consonants
 ب > b ;  پ > p ;  ت > t ;  ج > j ;  چ > ch ;
 ح > h ;  خ > x ;  د > d ;  ر > r ;  ز > z ;  س > s ;

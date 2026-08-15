@@ -1,8 +1,10 @@
 # Kyrgyz → IPA transliteration rules (ky_ipa.rules)
 #
-# Source: McCollum, A. G. (2020). "Vowel harmony and positional variation in Kyrgyz".
-#         Laboratory Phonology, 11(1): article 25.
-#         DOI: https://doi.org/10.5334/labphon.247
+# Source-Authors: McCollum, A. G.
+# Source-Year: 2020
+# Source-Title: Vowel harmony and positional variation in Kyrgyz
+# Source-Container: Laboratory Phonology 11(1): article 25
+# Source-Id: https://doi.org/10.5334/labphon.247
 #
 # Features: Includes long vowel representations (double letters → ː)
 # License: CC-BY 4.0 (source article)
@@ -10,17 +12,41 @@
 # Cyrillic vowels for context-sensitive rules (input side)
 $CV = [А а Ә ә Е е Ё ё И и О о Ө ө У у Ү ү Ы ы І і Э э Ю ю Я я];
 
-# ---------------------------------------------------------------------------
-# /je/ only after another vowel
-$CV } Е > je ;
-$CV } е > je ;
+# Vowels as this file writes them. A left context is matched against text
+# that has already been transliterated, so a rule looking leftwards for a
+# vowel has to name the IPA symbol rather than the Cyrillic letter.
+$Vout = [ɑ e i o ø u y ɯ ɪ ʊ æ];
 
 # ---------------------------------------------------------------------------
-# digraph affricates (loans)
-ДЖ > ʤ ;  дж > ʤ ;
+# /je/ only after another vowel
+$Vout { Е > je ;
+$Vout { е > je ;
+
+# ---------------------------------------------------------------------------
+# Affricate spellings of one phoneme. Table 3 gives ʤɯl 'year' and ʤol
+# 'road', so <ж> is the affricate; <дж> is a variant spelling of the same
+# phoneme and must be caught first so it does not surface as d + d͡ʒ.
+#
+# Table 1 does list /ʒ/ separately, but as a phoneme of the language, not
+# as the value of this letter: it is the fricative of Russian loans, which
+# these rules do not distinguish orthographically. Mapping <ж> to it is
+# the Russian value of the letter, not the Kyrgyz one.
+#
+# Not particular to McCollum's consultant: Kara (2003: 11, Lincom) gives
+# the affricate in his consonant table, and it continues Common Turkic
+# word-initial *y-, whose affrication is the textbook isogloss separating
+# Kyrgyz from Kazakh (jyl : ʒəl : d͡ʒɯl). Karakoç & Kalieva (2021,
+# 'Kirghiz', The Turkic Languages, 2nd ed., Routledge, 370-387,
+# https://doi.org/10.4324/9781003243809-24) also write the letter as ǰ:
+# ǰaː ‹жаа-› 'to rain', ǰöː ‹жɵɵ› 'by foot' (p. 370).
+ДЖ > d͡ʒ ;  дж > d͡ʒ ;
 
 # ---------------------------------------------------------------------------
 # long vowels written with double letters  ◄ NEW
+# Corroborated: Karakoç & Kalieva (2021: 370) give 14 vowel types, 8
+# short and 6 long, the long ones "orthographically written with
+# digraphs" — ‹жаак› ǰaːḳ 'cheek', ‹соо› soː 'alive'. *iː and *ïː are
+# lacking, hence no digraphs for и/і below.
 АА > ɑː ; аа > ɑː ;
 ЕЕ > eː ; ее > eː ;
 ИИ > iː ; ии > iː ;
@@ -34,8 +60,8 @@ $CV } е > je ;
 # /w/ after vowels (glide), /u/ elsewhere (vowel)
 # Per McCollum (2020): Kyrgyz has both /u/ vowel and /w/ glide
 # MUST come before У > u to take precedence
-$CV } У > w ;
-$CV } у > w ;
+$Vout { У > w ;
+$Vout { у > w ;
 
 # ---------------------------------------------------------------------------
 # One-to-one grapheme → phone map
@@ -47,7 +73,7 @@ $CV } у > w ;
 Д > d ;  д > d ;
 Е > e ;  е > e ;
 Ё > jo ; ё > jo ;
-Ж > ʒ ;  ж > ʒ ;
+Ж > d͡ʒ ;  ж > d͡ʒ ;
 З > z ;  з > z ;
 И > i ;  и > i ;
 Й > j ;  й > j ;
@@ -67,8 +93,8 @@ $CV } у > w ;
 Ү > y ;  ү > y ;
 Ф > f ;  ф > f ;
 Х > x ;  х > x ;
-Ц > ʦ ; ц > ʦ ;
-Ч > ʧ ;  ч > ʧ ;
+Ц > t͡s ; ц > t͡s ;
+Ч > t͡ʃ ;  ч > t͡ʃ ;
 Ш > ʃ ;  ш > ʃ ;
 Щ > ɕː ; щ > ɕː ;          # Russian loan phoneme  ◄ CHANGED
 Ъ > ʔ ;  ъ > ʔ ;
@@ -87,6 +113,17 @@ $CV } у > w ;
 # Archaic/variant Cyrillic letters (appear in OSCAR data)
 Ѳ > θ ;  ѳ > θ ;    # FITA - Greek theta loans
 Ҥ > ŋ ;  ҥ > ŋ ;    # EN WITH TAIL - velar nasal
+
+# Letters of neighbouring Cyrillic alphabets. None of these is a Kyrgyz
+# letter; they reach a Kyrgyz corpus in quoted or mixed-script material.
+# Without a rule they passed through as Cyrillic into what is supposed to
+# be IPA, which is the one outcome that is certainly wrong. Each takes the
+# value our own sourced rule file gives it for the language that owns it.
+І > ɪ ;  і > ɪ ;    # Kazakh; kk_ipa.rules (McCollum & Chen 2021)
+Ұ > ʊ ;  ұ > ʊ ;    # Kazakh; kk_ipa.rules
+Ә > æ ;  ә > æ ;    # Kazakh; kk_ipa.rules
+Һ > h ;  һ > h ;    # Kazakh; kk_ipa.rules
+Ҳ > h ;  ҳ > h ;    # Uzbek; uzc_ipa.rules (Ido 2025)
 
 # ---------------------------------------------------------------------------
 

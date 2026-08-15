@@ -1,15 +1,26 @@
 # Uyghur → IPA transliteration rules (ug_ipa.rules)
 #
-# Source: McCollum, A. G. (2021). "Transparency, locality, and contrast in Uyghur backness harmony".
-#         Laboratory Phonology: Journal of the Association for Laboratory Phonology, 12(1): article 8.
-#         DOI: https://doi.org/10.5334/labphon.239
+# Source-Authors: McCollum, A. G.
+# Source-Year: 2021
+# Source-Title: Transparency, locality, and contrast in Uyghur backness harmony
+# Source-Container: Laboratory Phonology 12(1): article 8
+# Source-Id: https://doi.org/10.5334/labphon.239
 #
 # Simplified:
 #   - 7-vowel system /ɑ æ e i y ø o u/ (+ marginal /e/)
 #   - no explicit [i]~[ɯ] alternation
 #   - no diphthongs, no length, no optional allophones in the core map
+#
+# Corroborated: Yakup, A. (2021) 'Uyghur', in Johanson & Csató (eds.),
+# The Turkic Languages, 2nd ed., Routledge, 409-427
+# (https://doi.org/10.4324/9781003243809-26): the same vowels a ä e i o
+# ö u ü and consonant table (p. 410); his tiɣ [tɯɣ] is the [i]~[ɯ]
+# alternation left unmodelled here. Empirical check:
+# test_uyghur_mfa_agreement.py.
 
-$V = [ɑ æ e i y ø o u];        # vowel macro (phonemic set used here)
+# The map below is context-free, so it declares no macros. The seven
+# vowels above are asserted as an inventory in the tests instead of being
+# restated here as a set no rule refers to.
 
 # ---------------------------------------------------------------------------
 

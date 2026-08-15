@@ -1,19 +1,28 @@
 # Uzbek (Latin) → IPA transliteration rules (uz_ipa.rules)
 #
-# Source: Ido, S. (2025). "Uzbek".
-#         Journal of the International Phonetic Association, 55(1-2): 152-168.
-#         DOI: https://doi.org/10.1017/S0025100324000148
+# Source-Authors: Ido, S.
+# Source-Year: 2025
+# Source-Title: Uzbek
+# Source-Container: Journal of the International Phonetic Association 55(1-2): 152-168
+# Source-Id: https://doi.org/10.1017/S0025100324000148
 #
 # Basis: Standard/Tashkent Uzbek.
 # Segmental only: no stress, no vowel deletion, no automatic /i ~ ɘ/ split.
 # Orthography: Official Uzbek Latin (sh, ch, ng, gʻ, oʻ).
+#
+# Corroborated: Boeschoten, H. (2021) 'Uzbek', in Johanson & Csató
+# (eds.), The Turkic Languages, 2nd ed., Routledge, 388-408
+# (https://doi.org/10.4324/9781003243809-25). His consonant table
+# (p. 390) matches this file; his å [ɒ] is the open value of plain <o>;
+# the spelling's front/back mergers (p. 389) are the reduction Ido's
+# inventory encodes. One divergence: he lists the labial as w where Ido
+# (2025) gives /v/; this file follows Ido.
 
 # ---------------------------------------------------------------------------
 # Macros (orthographic)
 # ---------------------------------------------------------------------------
 
 $Apo    = [ʼ ' ‘ ’ ʻ ʾ] ;          # apostrophe-like marks used in oʻ, gʻ, loans
-$V_orth = [a e i o oʻ u] ;         # Latin vowel letters (for contexts only)
 
 # ---------------------------------------------------------------------------
 # Multi-character sequences and digraphs
@@ -45,9 +54,12 @@ tS  > t͡s ;
 # ‹yo / yu / ya / ye› sequences (mostly in loans)
 # ---------------------------------------------------------------------------
 
-yo  > jo ;
-Yo  > jo ;
-YO  > jo ;
+# The vowel here is the one plain <o> carries, not the one <oʻ>
+# does: Ido gives yol 'mane' as /jɔl/ (p. 154). Writing <o> instead
+# put the close vowel on every <yo> in the corpus.
+yo  > jɔ ;
+Yo  > jɔ ;
+YO  > jɔ ;
 
 yu  > ju ;
 Yu  > ju ;

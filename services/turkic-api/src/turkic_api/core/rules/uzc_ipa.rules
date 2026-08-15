@@ -1,8 +1,10 @@
 # Uzbek (Cyrillic) → IPA transliteration rules (uzc_ipa.rules)
 #
-# Source: Ido, S. (2025). "Uzbek".
-#         Journal of the International Phonetic Association, 55(1-2): 152-168.
-#         DOI: https://doi.org/10.1017/S0025100324000148
+# Source-Authors: Ido, S.
+# Source-Year: 2025
+# Source-Title: Uzbek
+# Source-Container: Journal of the International Phonetic Association 55(1-2): 152-168
+# Source-Id: https://doi.org/10.1017/S0025100324000148
 #
 # Basis: Standard/Tashkent Uzbek, modern Cyrillic orthography.
 # Ў = oʻ, Ғ = gʻ. Russian-only letters kept minimal; hard/soft signs treated phonemically.
@@ -12,6 +14,11 @@
 # ---------------------------------------------------------------------------
 
 $V_cyr = [А Е Ё И О Ў У Э Ю Я а е ё и о ў у э ю я] ;
+
+# Vowels as this file writes them. A left context is matched against text
+# that has already been transliterated, so a rule looking leftwards for a
+# vowel has to name the IPA symbol rather than the Cyrillic letter.
+$Vout = [a e i ɔ o u ø y ɪ ʊ æ ɨ] ;
 
 # ---------------------------------------------------------------------------
 # Digraphs / multi-letter sequences
@@ -39,19 +46,25 @@ $V_cyr = [А Е Ё И О Ў У Э Ю Я а е ё и о ў у э ю я] ;
 # ‹Е е›: je vs e (word-initial / after vowel / Ъ / Ь)
 # ---------------------------------------------------------------------------
 
+# The contextual rules come before the word-initial one because ICU's
+# rule-masking check does not model the ^ anchor: it reads an anchored
+# rule as having no left context at all, so an earlier ^ rule looks
+# general enough to hide every contextual rule for the same letter and
+# the file will not compile.
+
+# After vowels. Written with the Cyrillic set these never matched, and
+# because the bracket was the right-context one they replaced the
+# preceding vowel instead of the ‹е›.
+$Vout { Е > je ;
+$Vout { е > je ;
+
+# After hard/soft signs, which this file writes as ʔ and ʲ
+[ʔ ʲ] { Е > je ;
+[ʔ ʲ] { е > je ;
+
 # Word-initial
 ^ Е > je ;
 ^ е > je ;
-
-# After vowels
-$V_cyr } Е > je ;
-$V_cyr } е > je ;
-
-# After hard/soft signs
-Ъ } Е > je ;
-ъ } Е > je ;
-Ь } Е > je ;
-ь } Е > je ;
 
 # Default
 Е > e ;
@@ -61,7 +74,8 @@ $V_cyr } е > je ;
 # Other iotated vowels
 # ---------------------------------------------------------------------------
 
-Ё > jo ;  ё > jo ;
+# Matches О/о above, not Ў/ў: the Cyrillic ё carries the open vowel.
+Ё > jɔ ;  ё > jɔ ;
 Ю > ju ;  ю > ju ;
 Я > ja ;  я > ja ;
 
@@ -76,8 +90,11 @@ $V_cyr } е > je ;
 Ғ > ʁ ;  ғ > ʁ ;      # gʻ
 Д > d ;  д > d ;
 
-# ‹Ж ж› corresponds to Latin ‹j›, phonemic affricate
-Ж > d͡ʃ ; ж > d͡ʃ ;
+# ‹Ж ж› corresponds to Latin ‹j›, phonemic affricate. The second
+# element is voiced: a voiced stop tied to a voiceless fricative is
+# not a producible segment, and the Latin rules already write the
+# voiced affricate for the same phoneme.
+Ж > d͡ʒ ; ж > d͡ʒ ;
 
 З > z ;  з > z ;
 
@@ -119,5 +136,32 @@ $V_cyr } е > je ;
 Ъ > ʔ ;  ъ > ʔ ;      # treated as glottal stop in loans / boundary marker
 Ь > ʲ ;  ь > ʲ ;      # palatalization marker in some loans
 Э > e ;  э > e ;
+
+# ---------------------------------------------------------------------------
+# Letters outside the Uzbek Cyrillic alphabet
+#
+# None of these is an Uzbek letter. They reach an Uzbek Cyrillic corpus in
+# Russian text or in quoted material from the neighbouring Turkic
+# languages. Without a rule they passed through as Cyrillic into what is
+# supposed to be IPA, which is the one outcome that is certainly wrong.
+#
+# The Russian letters take their Russian values, as <ъ>, <ь> and <ц> above
+# already do. The Turkic ones take the value our own sourced rule file
+# gives them for the language that owns the letter. Kazakh and Kyrgyz
+# disagree on the height of the two front rounded vowels, and a letter of
+# indeterminate origin cannot settle that, so <ө> and <ү> take the cardinal
+# symbols Kyrgyz uses rather than the reduced ones Kazakh uses.
+# ---------------------------------------------------------------------------
+Ы > ɨ ;  ы > ɨ ;      # Russian
+Щ > ɕː ; щ > ɕː ;     # Russian
+Ѳ > θ ;  ѳ > θ ;      # FITA, Greek theta loans
+І > ɪ ;  і > ɪ ;      # Kazakh; kk_ipa.rules (McCollum & Chen 2021)
+Ұ > ʊ ;  ұ > ʊ ;      # Kazakh; kk_ipa.rules
+Ә > æ ;  ә > æ ;      # Kazakh; kk_ipa.rules
+Һ > h ;  һ > h ;      # Kazakh; kk_ipa.rules
+Ң > ŋ ;  ң > ŋ ;      # Kazakh and Kyrgyz agree
+Ҥ > ŋ ;  ҥ > ŋ ;      # EN WITH TAIL, velar nasal; ky_ipa.rules
+Ө > ø ;  ө > ø ;      # Kyrgyz; ky_ipa.rules (McCollum 2020)
+Ү > y ;  ү > y ;      # Kyrgyz; ky_ipa.rules
 
 :: NFC ;
