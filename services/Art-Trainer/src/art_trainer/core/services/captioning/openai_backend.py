@@ -64,19 +64,9 @@ class OpenAICaptioner:
         if self._client is not None:
             return self._client
 
-        client: _test_hooks.OpenAIClient
-
-        # Use hook if set, otherwise use real client
-        hook_factory = _test_hooks.Hooks.openai_client_factory
-        if hook_factory is not None:
-            client = hook_factory(api_key=self._api_key)
-        else:
-            # Dynamic import with Protocol type annotation
-            openai_raw = __import__("openai", fromlist=["OpenAI"])
-            openai_mod: _test_hooks.OpenAIModule = openai_raw
-            openai_cls: _test_hooks.OpenAIClientFactory = openai_mod.OpenAI
-            client = openai_cls(api_key=self._api_key)
-
+        client: _test_hooks.OpenAIClient = _test_hooks.Hooks.openai_client_factory(
+            api_key=self._api_key
+        )
         self._client = client
         return client
 

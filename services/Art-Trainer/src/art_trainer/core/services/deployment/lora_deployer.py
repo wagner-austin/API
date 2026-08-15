@@ -60,11 +60,7 @@ def deploy_lora(
         lora_name = f"{lora_name}.safetensors"
     dest_path = comfyui_lora_dir / lora_name
 
-    # Copy using hook or default
-    if _test_hooks.Hooks.file_copier is not None:
-        copied_path = _test_hooks.Hooks.file_copier(lora_path, dest_path)
-    else:
-        copied_path = _test_hooks._default_file_copier(lora_path, dest_path)
+    copied_path = _test_hooks.Hooks.file_copier(lora_path, dest_path)
 
     return {
         "success": True,

@@ -27,21 +27,6 @@ class FileCopier(Protocol):
         ...
 
 
-class Hooks:
-    """Container for test hooks.
-
-    Attributes:
-        file_copier: Hook for file copying operations.
-    """
-
-    file_copier: FileCopier | None = None
-
-
-def reset_hooks() -> None:
-    """Reset all hooks to None for test isolation."""
-    Hooks.file_copier = None
-
-
 def _default_file_copier(src: Path, dst: Path) -> Path:
     """Default file copier using shutil.
 
@@ -57,6 +42,21 @@ def _default_file_copier(src: Path, dst: Path) -> Path:
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
     return dst
+
+
+class Hooks:
+    """Container for deployment hooks.
+
+    Attributes:
+        file_copier: Hook for file copying operations, bound to shutil.copy2.
+    """
+
+    file_copier: FileCopier = _default_file_copier
+
+
+def reset_hooks() -> None:
+    """Restore every hook to the implementation the container binds."""
+    Hooks.file_copier = _default_file_copier
 
 
 __all__ = [

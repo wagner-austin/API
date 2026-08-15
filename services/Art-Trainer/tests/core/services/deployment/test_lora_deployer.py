@@ -135,9 +135,9 @@ def test_deploy_lora_source_not_found(tmp_path: Path) -> None:
 
 
 def test_deploy_lora_uses_default_copier(tmp_path: Path) -> None:
-    """Test deploy_lora uses default file copier when hook not set."""
+    """The copier the container binds really copies the file to disk."""
     settings = _make_test_settings(tmp_path)
-    _test_hooks.Hooks.file_copier = None
+    _test_hooks.reset_hooks()
 
     # Create source LoRA file with content
     lora_path = tmp_path / "output" / "lora_test.safetensors"

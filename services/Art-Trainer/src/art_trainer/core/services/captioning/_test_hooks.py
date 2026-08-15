@@ -304,8 +304,73 @@ class CaptionBackendFactory(Protocol):
 # =============================================================================
 
 
+# =============================================================================
+# Production implementations
+# =============================================================================
+
+
+def _default_openai_client_factory(api_key: str) -> OpenAIClient:
+    """Build the real OpenAI client.
+
+    The module is imported here rather than at module scope so importing the
+    hooks costs nothing until a caption is actually requested.
+
+    Args:
+        api_key: API key.
+
+    Returns:
+        OpenAI client instance.
+    """
+    openai_raw = __import__("openai", fromlist=["OpenAI"])
+    openai_mod: OpenAIModule = openai_raw
+    openai_cls: OpenAIClientFactory = openai_mod.OpenAI
+    return openai_cls(api_key=api_key)
+
+
+def _default_gemini_client_factory(api_key: str) -> GeminiClient:
+    """Build the real Gemini client.
+
+    Args:
+        api_key: API key.
+
+    Returns:
+        Gemini client instance.
+    """
+    genai_raw = __import__("google.genai", fromlist=["Client"])
+    genai_mod: GeminiModule = genai_raw
+    client_cls: GeminiClientFactory = genai_mod.Client
+    return client_cls(api_key=api_key)
+
+
+class _DefaultGeminiPartFactory:
+    """The real google.genai Part class, reached on each call.
+
+    A class rather than a function because GeminiPartFactory is named by its
+    from_bytes method, which is how google.genai spells it and how the
+    captioner calls it.
+    """
+
+    def from_bytes(self, data: bytes, mime_type: str) -> GeminiPart:
+        """Create part from bytes.
+
+        Args:
+            data: Image bytes.
+            mime_type: MIME type.
+
+        Returns:
+            Part instance.
+        """
+        types_raw = __import__("google.genai.types", fromlist=["Part"])
+        types_mod: GeminiTypesModule = types_raw
+        return types_mod.Part.from_bytes(data=data, mime_type=mime_type)
+
+
 class Hooks:
-    """Container for test hooks.
+    """Container for captioning hooks.
+
+    The Gemini and OpenAI hooks are bound to the real clients, so a caller
+    reaches the vendor SDK without wiring anything; tests rebind them and
+    reset_hooks() puts the real implementations back.
 
     Attributes:
         caption_generator: Hook for BLIP caption generation.
@@ -317,18 +382,18 @@ class Hooks:
 
     caption_generator: CaptionGenerator | None = None
     caption_backend_factory: CaptionBackendFactory | None = None
-    gemini_client_factory: GeminiClientFactory | None = None
-    gemini_part_factory: GeminiPartFactory | None = None
-    openai_client_factory: OpenAIClientFactory | None = None
+    gemini_client_factory: GeminiClientFactory = _default_gemini_client_factory
+    gemini_part_factory: GeminiPartFactory = _DefaultGeminiPartFactory()
+    openai_client_factory: OpenAIClientFactory = _default_openai_client_factory
 
 
 def reset_hooks() -> None:
-    """Reset all hooks to None for test isolation."""
+    """Restore every hook to the implementation the container binds."""
     Hooks.caption_generator = None
     Hooks.caption_backend_factory = None
-    Hooks.gemini_client_factory = None
-    Hooks.gemini_part_factory = None
-    Hooks.openai_client_factory = None
+    Hooks.gemini_client_factory = _default_gemini_client_factory
+    Hooks.gemini_part_factory = _DefaultGeminiPartFactory()
+    Hooks.openai_client_factory = _default_openai_client_factory
 
 
 __all__ = [

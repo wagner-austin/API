@@ -63,19 +63,9 @@ class GeminiCaptioner:
         if self._client is not None:
             return self._client
 
-        client: _test_hooks.GeminiClient
-
-        # Use hook if set, otherwise use real client
-        hook_factory = _test_hooks.Hooks.gemini_client_factory
-        if hook_factory is not None:
-            client = hook_factory(api_key=self._api_key)
-        else:
-            # Dynamic import with Protocol type annotation
-            genai_raw = __import__("google.genai", fromlist=["Client"])
-            genai_mod: _test_hooks.GeminiModule = genai_raw
-            client_cls: _test_hooks.GeminiClientFactory = genai_mod.Client
-            client = client_cls(api_key=self._api_key)
-
+        client: _test_hooks.GeminiClient = _test_hooks.Hooks.gemini_client_factory(
+            api_key=self._api_key
+        )
         self._client = client
         return client
 
@@ -108,16 +98,7 @@ class GeminiCaptioner:
         # Determine MIME type
         mime_type = _get_mime_type(suffix)
 
-        # Get part factory from hook or real module
-        part_factory: _test_hooks.GeminiPartFactory
-        hook_part_factory = _test_hooks.Hooks.gemini_part_factory
-        if hook_part_factory is not None:
-            part_factory = hook_part_factory
-        else:
-            # Import types module for Part
-            types_raw = __import__("google.genai.types", fromlist=["Part"])
-            types_mod: _test_hooks.GeminiTypesModule = types_raw
-            part_factory = types_mod.Part
+        part_factory: _test_hooks.GeminiPartFactory = _test_hooks.Hooks.gemini_part_factory
 
         image_part: _test_hooks.GeminiPart = part_factory.from_bytes(
             data=image_bytes,
