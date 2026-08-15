@@ -23,8 +23,15 @@ class HttpxRule:
     _CANONICAL_PATH: ClassVar[str] = "libs/platform_core/src/platform_core/data_bank_client.py"
 
     # No service code should import httpx directly; use DataBankClient instead.
-    # Exception: _test_hooks.py files need httpx types for dependency injection.
-    _ALLOWED_PATHS: ClassVar[frozenset[str]] = frozenset(["_test_hooks.py"])
+    #
+    # Exception: a dependency-injection hook module has to name the transport
+    # types it injects, or the Protocol it declares cannot match the real
+    # signature. That applies to the whole hook module regardless of how it is
+    # divided — a registry large enough to split into its contracts and its
+    # production implementations does not stop being a hook module.
+    _ALLOWED_PATHS: ClassVar[frozenset[str]] = frozenset(
+        ["_test_hooks.py", "_hook_protocols.py", "_hook_defaults.py"]
+    )
 
     def _is_canonical(self, path: Path) -> bool:
         posix = path.as_posix()

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from monorepo_guards.httpx_rules import HttpxRule
 
 
@@ -100,14 +102,27 @@ def test_httpx_rule_flags_turkic_jobs_disallowed(tmp_path: Path) -> None:
     assert len(violations) == 1
 
 
-def test_httpx_rule_allows_test_hooks_file(tmp_path: Path) -> None:
-    """Test that _test_hooks.py files are allowed to import httpx.
+@pytest.mark.parametrize("filename", ["_test_hooks.py", "_hook_protocols.py", "_hook_defaults.py"])
+def test_httpx_rule_allows_every_hook_module(tmp_path: Path, filename: str) -> None:
+    """A hook module may name the transport types it injects.
 
-    Covers httpx_rules.py line 43 (_is_allowed branch).
+    A Protocol that cannot mention ``httpx.Response`` cannot match the real
+    signature, so the exemption covers the hook module however it is divided —
+    contracts and production implementations included.
     """
-    hooks_file = tmp_path / "services" / "demo" / "src" / "demo" / "_test_hooks.py"
+    hooks_file = tmp_path / "services" / "demo" / "src" / "demo" / filename
     _write(hooks_file, "import httpx\n\ndef make_client(): pass\n")
 
     rule = HttpxRule()
     violations = rule.run([hooks_file])
     assert violations == []
+
+
+def test_httpx_rule_still_refuses_an_ordinary_module(tmp_path: Path) -> None:
+    """The exemption is by module, not by proximity to one."""
+    ordinary = tmp_path / "services" / "demo" / "src" / "demo" / "hooks_helper.py"
+    _write(ordinary, "import httpx\n\ndef make_client(): pass\n")
+
+    rule = HttpxRule()
+    violations = rule.run([ordinary])
+    assert [v.kind for v in violations] == ["httpx-direct-import"]
