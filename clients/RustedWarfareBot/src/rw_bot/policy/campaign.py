@@ -34,7 +34,6 @@ from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.assess import AirWatch
 from rw_bot.policy.budget import Budget
 from rw_bot.policy.combat import WAVE_SIZES, find_army, find_targets
-from rw_bot.policy.convert import Converter, TurretLadder
 from rw_bot.policy.counter import (
     FLEET_BLOOD,
     counter_composition,
@@ -63,10 +62,9 @@ from rw_bot.policy.intel import Intel
 from rw_bot.policy.ledger import Outlays
 from rw_bot.policy.lurk import Lurker
 from rw_bot.policy.match_report import MatchReport
-from rw_bot.policy.medic import BUNKER_TYPE, Medic
-from rw_bot.policy.navy import GUARD_TYPE, Shipyard
 from rw_bot.policy.nuker import Nuker
 from rw_bot.policy.production import wanted_producers
+from rw_bot.policy.quartermaster import Quartermaster
 from rw_bot.policy.raid import Raider
 from rw_bot.policy.recorder import Recorder
 from rw_bot.policy.runner import AFFORD_STALL_SAMPLES, DEFAULT_STALL_SAMPLES, OrderTracker
@@ -120,6 +118,7 @@ def play(
     strike: int = 0,
     medics: int = 0,
     navy: int = 0,
+    battery: int = 0,
     bunkers: int = 0,
     flame: int = 0,
     close: int = 0,
@@ -191,6 +190,8 @@ def play(
         strike: Rival army-value drop that opens the release window. See Doctrine.
         medics: Combat engineers kept alive via saving hires. See Doctrine.
         navy: Attack submarines kept alive on the water. See Doctrine.
+        battery: Artillery batteries stood on the shore, at most one per
+            match. See Doctrine.
         bunkers: Mobile turrets kept alive the same way. See Doctrine.
         flame: Flame turrets held by converting ground turrets. See Doctrine.
         close: Dominance multiple that releases and marches everything. See
@@ -233,7 +234,7 @@ def play(
     tracker = OrderTracker(plan, stall_samples, afford_samples)
     expander = Expander(catalogue, profiles, expand, aa_cover, cover)
     workforce = Workforce(EXPAND_RETRY_SAMPLES)
-    recorder = Recorder(trace)
+    recorder = Recorder(trace, profiles)
     scores = Scorekeeper(catalogue, profiles)
     # Every WATER-moving type name seen this match, the bloodied gate's
     # accumulating half ([[policy-exact-timing]], the naval wall).
@@ -260,13 +261,9 @@ def play(
     lurkers = Lurker()
     scatter = Decoys()
     momentum = Momentum()
-    medic = Medic()
-    bunker = Medic(BUNKER_TYPE)
-    submarines = Medic("attackSubmarine")
-    fleet_guard = Medic(GUARD_TYPE)
-    shipyard = Shipyard()
-    flamer = Converter()
-    gunner = TurretLadder()
+    quartermaster = Quartermaster(
+        medics=medics, navy=navy, bunkers=bunkers, flame=flame, guns=guns, battery=battery
+    )
     closer = Closer(close)
     # Sized by the doctrine; at zero the raid gate below never fires and the
     # raider is never consulted, so the size is safe to construct with.
@@ -410,14 +407,10 @@ def play(
                 channel,
                 nuker.advance(sample, catalogue, budget, free, workforce, nukes, committed_close),
             )
-            # The guard before the subs: an unescorted fleet is a free
-            # kill queue for the first gunship (navy96c, log 2026-08-10).
-            send_produces(channel, fleet_guard.hire(sample, budget, min(navy, 1)))
-            send_produces(channel, submarines.hire(sample, budget, navy))
-            send_produces(channel, medic.hire(sample, budget, medics))
-            send_produces(channel, bunker.hire(sample, budget, bunkers))
-            send_produces(channel, flamer.convert(sample, budget, flame))
-            send_produces(channel, gunner.convert(sample, budget, guns))
+            # The standing purchases, in the quartermaster's stated order:
+            # guard before subs, battery's fork last so its re-send wins a
+            # contested holder ([[policy-holding-ground]]).
+            send_produces(channel, quartermaster.produces(sample, catalogue, budget))
             # Defence saves toward the turret it was refused last tick, early
             # enough to bind the spenders below -- withheld here rather than
             # where defence claims (last), because a fresh budget every tick
@@ -451,13 +444,13 @@ def play(
                     air_seen=airwatch.seen(),
                 ),
             )
-            # The shipyard sends AFTER the expander, never before: the
-            # engine holds one order per unit and whoever sends last holds
-            # the builder. v3 learned this (navy96b) and v4 forgot it by
+            # The walks send AFTER the expander, never before: the engine
+            # holds one order per unit and whoever sends last holds the
+            # builder. v3 learned this (navy96b) and v4 forgot it by
             # moving the call above the expander block -- all 48 navy96d
             # walks exhausted with the builder re-tasked every tick while
             # navy96c's factories stood 24/26 (log 2026-08-10).
-            send_builds(channel, shipyard.establish(sample, catalogue, budget, navy > 0))
+            send_builds(channel, quartermaster.builds(sample, catalogue, budget))
             refused_now = sum(1 for claim in budget.ledger() if not claim["granted"])
             refused += refused_now
             # **The reasons are kept now, not just the count.** Every claim
