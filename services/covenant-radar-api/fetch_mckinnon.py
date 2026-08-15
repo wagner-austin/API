@@ -1,15 +1,21 @@
-"""Fetch McKinnon's summer_extremes source code and paper via Playwright stealth."""
+"""Fetch the McKinnon 2024 paper PDF via Playwright stealth.
+
+One-shot vendoring script for the reference material in mckinnon_sources/.
+It ran once; the PDF it produced is committed. It is kept so the provenance
+of that file is recorded as code rather than as prose.
+
+Only the paper is fetched. The two source files this also used to download --
+summer_extremes' utils.py and rank_trends_summer_extremes.py -- are gone: the
+second URL 404s, so what landed on disk was the string "404: Not Found", and
+the first was 47KB of research code that nothing here imported and that no
+gate could check, since cartopy and xarray are not dependencies of this
+service. The paper is the reference; the code was never the reference.
+"""
 
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
-
-# Source code from GitHub
-SOURCE_URLS = {
-    "utils.py": "https://raw.githubusercontent.com/karenamckinnon/summer_extremes/master/summer_extremes/utils.py",
-    "rank_trends.py": "https://raw.githubusercontent.com/karenamckinnon/summer_extremes/master/scripts/rank_trends_summer_extremes.py",
-}
 
 # PNAS paper PDF (open access, CC BY-NC-ND)
 PAPER_PDF_URL = "https://pmc.ncbi.nlm.nih.gov/articles/PMC11494304/pdf/pnas.2406143121.pdf"
@@ -26,16 +32,6 @@ def main() -> None:
         context = browser.new_context()
         page = context.new_page()
 
-        # Fetch source code (plain text)
-        for name, url in SOURCE_URLS.items():
-            print(f"Fetching {name} from {url}...")
-            page.goto(url, wait_until="networkidle", timeout=30000)
-            text = page.evaluate("() => document.body.innerText")
-            out_path = OUTPUT_DIR / name
-            out_path.write_text(text, encoding="utf-8")
-            print(f"  Saved {len(text)} chars to {out_path}")
-
-        # Fetch paper PDF (binary download via PMC)
         print(f"Fetching {PAPER_PDF_NAME} from PMC...")
         pdf_path = OUTPUT_DIR / PAPER_PDF_NAME
         with page.expect_download() as download_info:
