@@ -202,10 +202,10 @@ class _TrackingTranscriptCog(TranscriptCog):
 
 def _wrap_fake(
     interaction: _test_hooks.DiscordInteractionLike,
-) -> _test_hooks.InteractionProtoLike:
+) -> InteractionProto:
     """Fake wrap_interaction that returns a RecordingInteraction."""
     _ = interaction
-    result: _test_hooks.InteractionProtoLike = RecordingInteraction()
+    result: InteractionProto = RecordingInteraction()
     return result
 
 
