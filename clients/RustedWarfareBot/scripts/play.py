@@ -479,6 +479,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         strike=doctrine["strike"],
         medics=doctrine["medics"],
         navy=doctrine["navy"],
+        battery=doctrine["battery"],
         bunkers=doctrine["bunkers"],
         flame=doctrine["flame"],
         close=doctrine["close"],
