@@ -108,8 +108,6 @@ def _reset_test_hooks_impl(
     orig_load_settings = _test_hooks.load_settings
     orig_lora_output_dir = _test_hooks.lora_output_dir
     orig_shutil_which = _test_hooks.shutil_which
-    orig_guard_find_root = _test_hooks.guard_find_monorepo_root
-    orig_guard_load_orch = _test_hooks.guard_load_orchestrator
     orig_get_env = config_test_hooks.get_env
 
     # Set up fake factories
@@ -149,8 +147,6 @@ def _reset_test_hooks_impl(
     _test_hooks.load_settings = orig_load_settings
     _test_hooks.lora_output_dir = orig_lora_output_dir
     _test_hooks.shutil_which = orig_shutil_which
-    _test_hooks.guard_find_monorepo_root = orig_guard_find_root
-    _test_hooks.guard_load_orchestrator = orig_guard_load_orch
     config_test_hooks.get_env = orig_get_env
 
     # Reset all service hooks

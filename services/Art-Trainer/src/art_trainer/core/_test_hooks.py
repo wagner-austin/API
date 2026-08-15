@@ -136,57 +136,6 @@ class ShutilWhichProto(Protocol):
 
 
 # ============================================================================
-# Guard script hooks for testing
-# ============================================================================
-
-
-class FindMonorepoRootProto(Protocol):
-    """Protocol for _find_monorepo_root hook."""
-
-    def __call__(self, start: Path) -> Path:
-        """Find the monorepo root directory.
-
-        Args:
-            start: Starting directory.
-
-        Returns:
-            Path to monorepo root.
-        """
-        ...
-
-
-class RunForProjectProto(Protocol):
-    """Protocol for run_for_project hook."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guards for a project.
-
-        Args:
-            monorepo_root: Path to monorepo root.
-            project_root: Path to project root.
-
-        Returns:
-            Exit code.
-        """
-        ...
-
-
-class LoadOrchestratorProto(Protocol):
-    """Protocol for _load_orchestrator hook."""
-
-    def __call__(self, monorepo_root: Path) -> RunForProjectProto:
-        """Load the guard orchestrator.
-
-        Args:
-            monorepo_root: Path to monorepo root.
-
-        Returns:
-            Function to run guards for a project.
-        """
-        ...
-
-
-# ============================================================================
 # Default implementations
 # ============================================================================
 
@@ -235,24 +184,15 @@ load_settings: LoadSettingsProto = _default_load_settings
 lora_output_dir: LoraOutputDirProto = _default_lora_output_dir
 shutil_which: ShutilWhichProto = _default_shutil_which
 
-# Guard hooks - None means use default behavior (production implementation)
-guard_find_monorepo_root: FindMonorepoRootProto | None = None
-guard_load_orchestrator: LoadOrchestratorProto | None = None
-
 
 __all__ = [
-    "FindMonorepoRootProto",
     "KVStoreFactoryProto",
-    "LoadOrchestratorProto",
     "LoadSettingsProto",
     "LoraOutputDirProto",
     "RQConnectionFactoryProto",
     "RQQueueFactoryProto",
     "RQRetryFactoryProto",
-    "RunForProjectProto",
     "ShutilWhichProto",
-    "guard_find_monorepo_root",
-    "guard_load_orchestrator",
     "kv_store_factory",
     "load_settings",
     "lora_output_dir",
