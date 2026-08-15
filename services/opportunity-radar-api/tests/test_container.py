@@ -10,7 +10,6 @@ from opportunity_radar_api import _test_hooks
 from opportunity_radar_api.api.container import (
     ServiceContainer,
     _find_monorepo_root,
-    _find_monorepo_root_impl,
     create_production_container,
 )
 from opportunity_radar_api.config import OpportunityRadarSettings
@@ -58,8 +57,8 @@ def test_container_scan_services(fake_container: ServiceContainer) -> None:
     assert services[0].name == "test-service"
 
 
-def test_find_monorepo_root_impl_finds_libs_dir(tmp_path: Path) -> None:
-    """Test that _find_monorepo_root_impl finds directory with libs."""
+def test_real_find_monorepo_root_finds_libs_dir(tmp_path: Path) -> None:
+    """Test that _real_find_monorepo_root finds directory with libs."""
     # Create libs directory
     libs_dir = tmp_path / "libs"
     libs_dir.mkdir()
@@ -69,29 +68,27 @@ def test_find_monorepo_root_impl_finds_libs_dir(tmp_path: Path) -> None:
     nested.mkdir(parents=True)
 
     # Temporarily patch the file location
-    import opportunity_radar_api.api.container as container_module
 
-    original_file = container_module.__file__
+    original_file = _test_hooks.__file__
 
     try:
         # Mock __file__ to be in nested path
-        container_module.__file__ = str(nested / "container.py")
+        _test_hooks.__file__ = str(nested / "_test_hooks.py")
 
         # Find should work from nested path
-        result = _find_monorepo_root_impl()
+        result = _test_hooks._real_find_monorepo_root()
         assert result == tmp_path
     finally:
-        container_module.__file__ = original_file
+        _test_hooks.__file__ = original_file
 
 
-def test_find_monorepo_root_impl_raises_if_not_found(tmp_path: Path) -> None:
-    """Test that _find_monorepo_root_impl raises if libs not found."""
+def test_real_find_monorepo_root_raises_if_not_found(tmp_path: Path) -> None:
+    """Test that _real_find_monorepo_root raises if libs not found."""
     # Create a deeply nested path in tmp_path
     # We need to ensure no "libs" directory exists above tmp_path
     # To do this reliably, we check from the actual root level
-    import opportunity_radar_api.api.container as container_module
 
-    original_file = container_module.__file__
+    original_file = _test_hooks.__file__
 
     # Create path without libs
     nested = tmp_path / "some" / "path"
@@ -105,13 +102,13 @@ def test_find_monorepo_root_impl_raises_if_not_found(tmp_path: Path) -> None:
     fake_path = root / "nonexistent_test_path_xyz" / "container.py"
 
     try:
-        container_module.__file__ = str(fake_path)
+        _test_hooks.__file__ = str(fake_path)
 
         # Should raise RuntimeError since there's no libs above the root
         with pytest.raises(RuntimeError, match="Could not find monorepo root"):
-            _find_monorepo_root_impl()
+            _test_hooks._real_find_monorepo_root()
     finally:
-        container_module.__file__ = original_file
+        _test_hooks.__file__ = original_file
 
 
 def test_create_production_container_with_root(
@@ -180,28 +177,9 @@ def test_find_monorepo_root_uses_hook() -> None:
         _test_hooks.container_find_monorepo_root = original
 
 
-def test_find_monorepo_root_uses_impl_when_no_hook() -> None:
-    """Test _find_monorepo_root uses impl when no hook set."""
-    # Find actual monorepo root from test file location
-    test_file = Path(__file__).resolve()
-    current = test_file
-    while current.parent != current:
-        if (current / "libs").is_dir():
-            break
-        current = current.parent
-    else:
-        pytest.skip("Could not find monorepo root for test")
-
-    expected_root = current
-
-    original = _test_hooks.container_find_monorepo_root
-    _test_hooks.container_find_monorepo_root = None
-
-    try:
-        result = _find_monorepo_root()
-        assert result == expected_root
-    finally:
-        _test_hooks.container_find_monorepo_root = original
+def test_find_monorepo_root_hook_is_bound_to_the_real_search() -> None:
+    """The hook holds the real search, so the caller needs no fallback branch."""
+    assert _test_hooks.container_find_monorepo_root is _test_hooks._real_find_monorepo_root
 
 
 def test_create_production_container_with_github_scanning() -> None:

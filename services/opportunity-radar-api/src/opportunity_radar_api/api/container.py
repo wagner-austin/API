@@ -7,7 +7,6 @@ from pathlib import Path
 
 from platform_codebase import (
     CodebaseProfile,
-    GitHubClient,
     GitHubClientProtocol,
     LibInfo,
     ServiceInfo,
@@ -171,11 +170,9 @@ def create_production_container(
         from opportunity_radar_api import _test_hooks
 
         owner, repo = parse_github_repo(github_repo)
-        github_client: GitHubClientProtocol
-        if _test_hooks.container_github_client_factory is not None:
-            github_client = _test_hooks.container_github_client_factory(github_token)
-        else:
-            github_client = GitHubClient(github_token)
+        github_client: GitHubClientProtocol = _test_hooks.container_github_client_factory(
+            github_token
+        )
 
         def github_libs_scanner(root: Path) -> tuple[LibInfo, ...]:
             _ = root  # Unused when scanning via GitHub
@@ -219,32 +216,12 @@ def create_production_container(
     )
 
 
-def _find_monorepo_root_impl() -> Path:
-    """Find monorepo root by looking for libs directory.
-
-    Returns:
-        Path to monorepo root.
-
-    Raises:
-        RuntimeError: If monorepo root not found.
-    """
-    current = Path(__file__).resolve()
-    while True:
-        if (current / "libs").is_dir():
-            return current
-        if current.parent == current:
-            raise RuntimeError("Could not find monorepo root with 'libs' directory")
-        current = current.parent
-
-
 def _find_monorepo_root() -> Path:
-    """Find monorepo root, using hook if set.
+    """Find the monorepo root through the hook bound to the real search.
 
     Returns:
-        Path to monorepo root.
+        Path to the monorepo root.
     """
     from opportunity_radar_api import _test_hooks
 
-    if _test_hooks.container_find_monorepo_root is not None:
-        return _test_hooks.container_find_monorepo_root()
-    return _find_monorepo_root_impl()
+    return _test_hooks.container_find_monorepo_root()

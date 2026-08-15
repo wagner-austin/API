@@ -1,8 +1,8 @@
-"""Test hooks for dependency injection in tests.
+"""Test hooks for dependency injection.
 
-This module provides hook points that tests can override to inject fake
-implementations. Production code checks if hooks are None and uses
-production implementations if so.
+Every hook is bound to its real implementation here, so production code calls
+it directly with no conditional. Tests rebind a hook to a fake and restore it
+afterwards.
 """
 
 from __future__ import annotations
@@ -10,37 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-
-class FindMonorepoRootProto(Protocol):
-    """Protocol for find_monorepo_root hook."""
-
-    def __call__(self, start: Path) -> Path:
-        """Find monorepo root from start path."""
-        ...
-
-
-class RunForProjectProto(Protocol):
-    """Protocol for run_for_project function from orchestrator."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guard checks for a project."""
-        ...
-
-
-class LoadOrchestratorProto(Protocol):
-    """Protocol for load_orchestrator hook."""
-
-    def __call__(self, monorepo_root: Path) -> RunForProjectProto:
-        """Load the orchestrator module."""
-        ...
-
-
-class IsDirProto(Protocol):
-    """Protocol for is_dir check hook."""
-
-    def __call__(self, path: Path) -> bool:
-        """Check if path is a directory."""
-        ...
+from platform_codebase.github_scanner import GitHubClient
 
 
 class ContainerFindMonorepoRootProto(Protocol):
@@ -75,11 +45,25 @@ class GitHubClientProtocol(Protocol):
         ...
 
 
-# Guard hooks - None means use default behavior (production implementation)
-guard_find_monorepo_root: FindMonorepoRootProto | None = None
-guard_load_orchestrator: LoadOrchestratorProto | None = None
-guard_is_dir: IsDirProto | None = None
+def _real_find_monorepo_root() -> Path:
+    """Find the monorepo root by looking for a libs directory.
 
-# Container hooks - None means use default behavior (production implementation)
-container_find_monorepo_root: ContainerFindMonorepoRootProto | None = None
-container_github_client_factory: GitHubClientFactoryProto | None = None
+    Returns:
+        Path to the monorepo root.
+
+    Raises:
+        RuntimeError: If no ancestor directory contains 'libs'.
+    """
+    current = Path(__file__).resolve()
+    while True:
+        if (current / "libs").is_dir():
+            return current
+        if current.parent == current:
+            raise RuntimeError("Could not find monorepo root with 'libs' directory")
+        current = current.parent
+
+
+# Container hooks, bound to their real implementations so callers invoke
+# them directly. Tests rebind them to fakes and restore them afterwards.
+container_find_monorepo_root: ContainerFindMonorepoRootProto = _real_find_monorepo_root
+container_github_client_factory: GitHubClientFactoryProto = GitHubClient
