@@ -345,12 +345,6 @@ class HooksContainer:
     cli_set_env: CliSetEnvHook
     cli_get_now: CliGetNowHook
 
-    # Guard-script hooks. None means "use the production behaviour". These
-    # live on the container, not as module globals, so the same per-test
-    # reset that protects every other hook protects them too.
-    guard_find_monorepo_root: FindMonorepoRootProto | None
-    guard_load_orchestrator: LoadOrchestratorProto | None
-
     def reset(self) -> None:
         """Restore every hook to its production implementation.
 
@@ -430,7 +424,6 @@ def _prod_http_delete(url: str, headers: dict[str, str]) -> None:
 
 def _prod_load_outlook_tokens() -> OAuthTokens | None:
     """Production Outlook token loader."""
-    from pathlib import Path
 
     from platform_core.json_utils import (
         InvalidJsonError,
@@ -455,7 +448,6 @@ def _prod_load_outlook_tokens() -> OAuthTokens | None:
 
 def _prod_save_outlook_tokens(tokens: OAuthTokens) -> None:
     """Production Outlook token saver."""
-    from pathlib import Path
 
     from platform_core.json_utils import dump_json_str
 
@@ -469,7 +461,6 @@ def _prod_save_outlook_tokens(tokens: OAuthTokens) -> None:
 
 def _prod_load_outlook_config() -> OutlookOAuthConfig:
     """Production Outlook config loader."""
-    from pathlib import Path
 
     from platform_core.json_utils import (
         InvalidJsonError,
@@ -496,7 +487,6 @@ def _prod_load_outlook_config() -> OutlookOAuthConfig:
 
 def _prod_load_gmail_tokens() -> OAuthTokens | None:
     """Production Gmail token loader."""
-    from pathlib import Path
 
     from platform_core.json_utils import (
         InvalidJsonError,
@@ -521,7 +511,6 @@ def _prod_load_gmail_tokens() -> OAuthTokens | None:
 
 def _prod_save_gmail_tokens(tokens: OAuthTokens) -> None:
     """Production Gmail token saver."""
-    from pathlib import Path
 
     from platform_core.json_utils import dump_json_str
 
@@ -535,7 +524,6 @@ def _prod_save_gmail_tokens(tokens: OAuthTokens) -> None:
 
 def _prod_load_gmail_credentials() -> OAuthCredentials:
     """Production Gmail credentials loader."""
-    from pathlib import Path
 
     from platform_core.json_utils import (
         InvalidJsonError,
@@ -590,7 +578,6 @@ def _prod_current_time() -> int:
 
 def _prod_read_file(path: str) -> str:
     """Production file reader."""
-    from pathlib import Path
 
     return Path(path).read_text(encoding="utf-8")
 
@@ -604,14 +591,12 @@ def _prod_read_file_bytes(path: str) -> bytes:
     Returns:
         Raw bytes of the file.
     """
-    from pathlib import Path
 
     return Path(path).read_bytes()
 
 
 def _prod_write_file(path: str, content: str) -> None:
     """Production file writer."""
-    from pathlib import Path
 
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -620,7 +605,6 @@ def _prod_write_file(path: str, content: str) -> None:
 
 def _prod_file_exists(path: str) -> bool:
     """Production file exists check."""
-    from pathlib import Path
 
     return Path(path).exists()
 
@@ -754,8 +738,6 @@ def _init_production_hooks() -> None:
     hooks.cli_get_env = _prod_cli_get_env
     hooks.cli_set_env = _prod_cli_set_env
     hooks.cli_get_now = _prod_cli_get_now
-    hooks.guard_find_monorepo_root = None
-    hooks.guard_load_orchestrator = None
 
 
 # Initialize on module load
@@ -768,60 +750,6 @@ def reset_hooks() -> None:
     _cli_env_loaded = False
     _cli_env_cache = {}
     _init_production_hooks()
-
-
-# =============================================================================
-# Guard Script Hooks
-# =============================================================================
-
-
-class RunForProjectProto(Protocol):
-    """Protocol for run_for_project function from monorepo_guards."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guard checks for a project.
-
-        Args:
-            monorepo_root: Root directory of the monorepo.
-            project_root: Root directory of the project to check.
-
-        Returns:
-            Exit code (0 for success).
-        """
-        ...
-
-
-class FindMonorepoRootProto(Protocol):
-    """Protocol for finding the monorepo root directory."""
-
-    def __call__(self, start: Path) -> Path:
-        """Find monorepo root by searching upward for libs directory.
-
-        Args:
-            start: Starting directory for search.
-
-        Returns:
-            Path to monorepo root.
-        """
-        ...
-
-
-class LoadOrchestratorProto(Protocol):
-    """Protocol for loading the guard orchestrator."""
-
-    def __call__(self, monorepo_root: Path) -> RunForProjectProto:
-        """Load the orchestrator's run_for_project function.
-
-        Args:
-            monorepo_root: Root directory of the monorepo.
-
-        Returns:
-            The run_for_project function.
-        """
-        ...
-
-
-# The guard hooks now live on HooksContainer; see the class definition.
 
 
 # =============================================================================
