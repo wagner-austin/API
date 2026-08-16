@@ -188,13 +188,22 @@ class CausalLMDataset:
         self._pad_id = pad_id
         num_chunks = max(1, (len(self._ids) + max_len - 1) // max_len) if self._ids else 0
 
+        # The masked share is reported because the separator cannot tell a
+        # marker from the same characters occurring inside ordinary prose. A
+        # separator that collides with the corpus masks arbitrary spans of it,
+        # which is a different intervention from excluding the marker and would
+        # otherwise be invisible. A marker is a few tokens on a paragraph, so a
+        # healthy run reports a low single-digit percentage; anything larger
+        # means the separator is not discriminating.
+        masked_pct = (100.0 * masked_tokens / len(self._ids)) if self._ids else 0.0
         _logger.info(
-            "Tokenization completed files=%d lines=%d tokens=%d chunks=%d masked=%d",
+            "Tokenization completed files=%d lines=%d tokens=%d chunks=%d masked=%d (%.2f%%)",
             total_files,
             total_lines,
             len(self._ids),
             num_chunks,
             masked_tokens,
+            masked_pct,
             extra={
                 "category": "dataset",
                 "event": "tokenization_completed",
@@ -204,6 +213,7 @@ class CausalLMDataset:
                 "chunks": num_chunks,
                 "max_len": max_len,
                 "masked_tokens": masked_tokens,
+                "masked_pct": masked_pct,
             },
         )
 
