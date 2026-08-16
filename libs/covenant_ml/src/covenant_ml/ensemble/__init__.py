@@ -15,11 +15,7 @@ Example:
     ...     optimize_ensemble_weights,
     ...     compute_weighted_predictions,
     ...     make_default_optimization_config,
-    ...     use_real_scipy,
     ... )
-    >>> # Set up scipy at application startup
-    >>> use_real_scipy()
-    >>>
     >>> # Create OOF data from model predictions
     >>> oof_data = create_oof_data(model_predictions, labels)
     >>>
@@ -32,11 +28,7 @@ Example:
     >>> ensemble_pred = compute_weighted_predictions(oof_data, result['weights'])
 """
 
-from covenant_ml.ensemble.optimizer import (
-    optimize_ensemble_weights,
-    set_minimize_hook,
-    use_real_scipy,
-)
+from covenant_ml.ensemble.optimizer import optimize_ensemble_weights
 from covenant_ml.ensemble.regression_optimizer import (
     create_regression_equal_weights,
     extract_regression_prediction_matrix,
@@ -87,8 +79,6 @@ __all__ = [
     "make_default_regression_optimization_config",
     "optimize_ensemble_weights",
     "optimize_regression_ensemble_weights",
-    "set_minimize_hook",
-    "use_real_scipy",
     "validate_oof_data",
     "validate_regression_oof_data",
     "validate_weights",

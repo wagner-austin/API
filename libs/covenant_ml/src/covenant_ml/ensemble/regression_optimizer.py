@@ -16,7 +16,7 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
-from covenant_ml.ensemble.optimizer import _get_minimize
+from covenant_ml.ensemble import _hooks
 from covenant_ml.ensemble.regression_types import (
     RegressionEnsembleOOFData,
     RegressionOptimizationConfig,
@@ -341,7 +341,7 @@ def optimize_regression_ensemble_weights(
     )
 
     # Set up optimization
-    minimize_fn = _get_minimize()
+    minimize_fn = _hooks.minimize
 
     # Initial guess: equal weights
     x0: NDArray[np.float64] = np.full(n_models, 1.0 / n_models, dtype=np.float64)

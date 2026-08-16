@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from covenant_ml.ensemble.optimizer import set_minimize_hook, use_real_scipy
+from covenant_ml.ensemble import _hooks
 from covenant_ml.ensemble.regression_optimizer import (
     _compute_neg_mae,
     _compute_neg_r_squared,
@@ -490,7 +490,7 @@ class TestOptimizeRegressionEnsembleWeights:
 
     def test_with_fake_scipy_neg_rmse(self) -> None:
         """Optimization works with fake scipy and neg_rmse metric."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         oof_data = make_regression_oof_data(
             (("m1", (1.0, 2.0, 3.0)), ("m2", (1.5, 2.5, 3.5))),
@@ -518,7 +518,7 @@ class TestOptimizeRegressionEnsembleWeights:
 
     def test_with_fake_scipy_neg_mae(self) -> None:
         """Optimization works with neg_mae metric."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         oof_data = make_regression_oof_data(
             (("m1", (1.0, 2.0, 3.0)), ("m2", (1.5, 2.5, 3.5))),
@@ -533,7 +533,7 @@ class TestOptimizeRegressionEnsembleWeights:
 
     def test_with_fake_scipy_r_squared(self) -> None:
         """Optimization works with r_squared metric."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         oof_data = make_regression_oof_data(
             (("m1", (1.0, 2.0, 3.0)), ("m2", (1.5, 2.5, 3.5))),
@@ -547,7 +547,7 @@ class TestOptimizeRegressionEnsembleWeights:
 
     def test_with_real_scipy(self) -> None:
         """Optimization works with real scipy.optimize.minimize."""
-        use_real_scipy()
+        _hooks.minimize = _hooks._real_minimize
 
         # Create test data with enough samples for meaningful optimization
         n_samples = 50
@@ -582,7 +582,7 @@ class TestOptimizeRegressionEnsembleWeights:
 
     def test_three_models(self) -> None:
         """Optimization works with three models."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         oof_data = make_regression_oof_data(
             (
@@ -607,7 +607,7 @@ class TestOptimizeRegressionEnsembleWeights:
 
     def test_raises_on_invalid_oof_data(self) -> None:
         """Raises on invalid OOF data (single model)."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         oof_data = RegressionEnsembleOOFData(
             model_predictions=(_make_model_predictions("m1", (1.0, 2.0)),),
@@ -620,28 +620,9 @@ class TestOptimizeRegressionEnsembleWeights:
         with pytest.raises(ValueError, match="at least 2 models"):
             optimize_regression_ensemble_weights(oof_data, config)
 
-    def test_raises_when_hook_not_set(self) -> None:
-        """Raises when scipy hook not set."""
-        import covenant_ml.ensemble.optimizer as opt_module
-
-        original_hook = opt_module._minimize_hook
-        opt_module._minimize_hook = None
-
-        try:
-            oof_data = make_regression_oof_data(
-                (("m1", (1.0, 2.0)), ("m2", (1.5, 2.5))),
-                (1.2, 2.3),
-            )
-            config = _make_test_config("neg_rmse")
-
-            with pytest.raises(RuntimeError, match="Scipy minimize hook not set"):
-                optimize_regression_ensemble_weights(oof_data, config)
-        finally:
-            opt_module._minimize_hook = original_hook
-
     def test_initial_score_is_computed(self) -> None:
         """Initial score is computed from equal weights."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         oof_data = make_regression_oof_data(
             (("m1", (1.0, 2.0, 3.0)), ("m2", (1.5, 2.5, 3.5))),
@@ -675,7 +656,7 @@ class TestOptimizeRegressionEnsembleWeights:
                 success=True,
             )
 
-        set_minimize_hook(zero_minimize)
+        _hooks.minimize = zero_minimize
 
         oof_data = make_regression_oof_data(
             (("m1", (1.0, 2.0)), ("m2", (1.5, 2.5))),
@@ -691,7 +672,7 @@ class TestOptimizeRegressionEnsembleWeights:
 
     def test_result_values_are_finite(self) -> None:
         """All result values are finite."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         oof_data = make_regression_oof_data(
             (("m1", (1.0, 2.0)), ("m2", (1.5, 2.5))),

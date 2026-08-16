@@ -17,8 +17,8 @@ from covenant_ml.optimizer.strategies import (
     GridSearchOptimizer,
     GridTuple,
     create_grid_search_optimizer,
-    set_build_grid_hook,
 )
+from covenant_ml.optimizer.strategies import _hooks as strategy_hooks
 from covenant_ml.optimizer.types import OptimizationConfig, SearchSpace, TrialResult
 
 from .conftest import (
@@ -549,7 +549,7 @@ class TestGridSearchEmptyGrid:
         ) -> list[GridTuple]:
             return []
 
-        set_build_grid_hook(empty_grid_builder)
+        strategy_hooks.build_grid = empty_grid_builder
         try:
             optimizer = GridSearchOptimizer(grid_points=2)
             x = make_features(100, 10)
@@ -575,10 +575,10 @@ class TestGridSearchEmptyGrid:
             # best_value remains at initial value (inf for maximize)
             assert summary["best_value"] == float("-inf")
         finally:
-            set_build_grid_hook(None)
+            strategy_hooks.build_grid = strategy_hooks._real_build_grid
 
-    def test_hook_reset_restores_default(self) -> None:
-        """Setting hook to None restores default grid builder."""
+    def test_rebinding_back_restores_the_real_builder(self) -> None:
+        """Restoring the module's own builder puts the real grid back."""
 
         def empty_grid_builder(
             search_space: SearchSpace,
@@ -586,8 +586,8 @@ class TestGridSearchEmptyGrid:
         ) -> list[GridTuple]:
             return []
 
-        set_build_grid_hook(empty_grid_builder)
-        set_build_grid_hook(None)
+        strategy_hooks.build_grid = empty_grid_builder
+        strategy_hooks.build_grid = strategy_hooks._real_build_grid
 
         optimizer = GridSearchOptimizer(grid_points=2)
         x = make_features(100, 10)

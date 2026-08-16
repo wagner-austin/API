@@ -9,7 +9,6 @@ from __future__ import annotations
 import itertools
 import math
 import time
-from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -41,6 +40,8 @@ from ..types import (
     TrialResult,
     XGBoostSearchSpace,
 )
+from . import _hooks
+from ._hooks import BuildGridProtocol, GridTuple
 
 _log = get_logger(__name__)
 
@@ -48,43 +49,6 @@ _log = get_logger(__name__)
 # =============================================================================
 # Build Grid Hook (for dependency injection)
 # =============================================================================
-
-GridTuple = tuple[SampledIntParams, SampledFloatParams, SampledStringParams]
-
-
-class BuildGridProtocol(Protocol):
-    """Protocol for grid building function."""
-
-    def __call__(
-        self,
-        search_space: SearchSpace,
-        n_points: int,
-    ) -> list[GridTuple]: ...
-
-
-_build_grid_hook: BuildGridProtocol | None = None
-
-
-def set_build_grid_hook(hook: BuildGridProtocol | None) -> None:
-    """Set custom grid builder for testing.
-
-    Args:
-        hook: Custom grid builder or None to use default.
-    """
-    global _build_grid_hook
-    _build_grid_hook = hook
-
-
-def _get_build_grid_hook() -> BuildGridProtocol:
-    """Get current grid builder.
-
-    Returns:
-        Custom hook if set, otherwise default _build_grid.
-    """
-    if _build_grid_hook is not None:
-        return _build_grid_hook
-    return _build_grid
-
 
 # =============================================================================
 # Grid Point Generation
@@ -461,7 +425,7 @@ class GridSearchOptimizer:
         start_time = time.perf_counter()
 
         # Build the grid
-        grid = _get_build_grid_hook()(search_space, self._grid_points)
+        grid = _hooks.build_grid(search_space, self._grid_points)
         n_grid = len(grid)
 
         # Limit to n_trials if specified
@@ -593,5 +557,4 @@ __all__ = [
     "GridSearchOptimizer",
     "GridTuple",
     "create_grid_search_optimizer",
-    "set_build_grid_hook",
 ]

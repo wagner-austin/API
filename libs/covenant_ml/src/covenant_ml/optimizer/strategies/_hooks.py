@@ -1,4 +1,4 @@
-"""Optuna protocol types and the factories the TPE strategy builds from.
+"""The strategy package's injection seams and the protocol types they use.
 
 Strict typing only: no Any, no casts, no stubs.
 
@@ -16,6 +16,42 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Protocol
+
+from ..types import SampledFloatParams, SampledIntParams, SampledStringParams, SearchSpace
+
+GridTuple = tuple[SampledIntParams, SampledFloatParams, SampledStringParams]
+
+
+class BuildGridProtocol(Protocol):
+    """Protocol for grid building function."""
+
+    def __call__(
+        self,
+        search_space: SearchSpace,
+        n_points: int,
+    ) -> list[GridTuple]: ...
+
+
+def _real_build_grid(search_space: SearchSpace, n_points: int) -> list[GridTuple]:
+    """Build the parameter grid the search space calls for.
+
+    grid_search is imported on the call rather than on import, because that
+    module reads this one for the seam.
+
+    Args:
+        search_space: Space to enumerate.
+        n_points: Points per dimension.
+
+    Returns:
+        One tuple of sampled parameters per grid point.
+    """
+    from .grid_search import _build_grid
+
+    return _build_grid(search_space, n_points)
+
+
+# The grid builder, bound to the real one. Tests rebind this module attribute.
+build_grid: BuildGridProtocol = _real_build_grid
 
 
 class OptunaSamplerProtocol(Protocol):
@@ -160,6 +196,8 @@ optuna_factories: OptunaFactoriesProtocol = _real_optuna_factories
 
 
 __all__ = [
+    "BuildGridProtocol",
+    "GridTuple",
     "OptunaCreateStudyProtocol",
     "OptunaFactoriesProtocol",
     "OptunaMedianPrunerProtocol",
@@ -168,5 +206,6 @@ __all__ = [
     "OptunaStudyProtocol",
     "OptunaTPESamplerProtocol",
     "OptunaTrialProtocol",
+    "build_grid",
     "optuna_factories",
 ]

@@ -6,13 +6,16 @@ using out-of-fold predictions.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Protocol
-
 import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
+from covenant_ml.ensemble import _hooks
+from covenant_ml.ensemble._hooks import (
+    _ConstraintDict,
+    _OptimizeResultProtocol,
+    _OptionsDict,
+)
 from covenant_ml.ensemble.types import (
     EnsembleOOFData,
     EnsembleWeights,
@@ -27,80 +30,6 @@ from covenant_ml.ensemble.weighted import (
 from covenant_ml.metrics import compute_amex_metric
 
 _log = get_logger(__name__)
-
-# Type aliases for scipy minimize interface
-_ObjectiveFnType = Callable[[NDArray[np.float64]], float]
-_ConstraintDict = dict[str, str | _ObjectiveFnType]
-_OptionsDict = dict[str, int | float]
-
-
-class _OptimizeResultProtocol(Protocol):
-    """Protocol for scipy.optimize.OptimizeResult."""
-
-    x: NDArray[np.float64]
-    fun: float
-    nit: int
-    success: bool
-
-
-class _MinimizeFnProtocol(Protocol):
-    """Protocol for scipy.optimize.minimize function."""
-
-    def __call__(
-        self,
-        fun: _ObjectiveFnType,
-        x0: NDArray[np.float64],
-        method: str,
-        bounds: tuple[tuple[float, float], ...],
-        constraints: tuple[_ConstraintDict, ...],
-        options: _OptionsDict,
-    ) -> _OptimizeResultProtocol:
-        """Minimize a function."""
-        ...
-
-
-# Hook for scipy.optimize.minimize - set at startup
-_minimize_hook: _MinimizeFnProtocol | None = None
-
-
-def set_minimize_hook(hook: _MinimizeFnProtocol) -> None:
-    """Set the scipy minimize hook.
-
-    Called at application startup to inject the real scipy implementation.
-    Tests can inject a fake implementation.
-
-    Args:
-        hook: The minimize function to use.
-    """
-    global _minimize_hook
-    _minimize_hook = hook
-
-
-def use_real_scipy() -> None:
-    """Configure to use real scipy.optimize.minimize.
-
-    Call this at application startup.
-    """
-    scipy_opt = __import__("scipy.optimize", fromlist=["minimize"])
-    minimize_fn: _MinimizeFnProtocol = scipy_opt.minimize
-    set_minimize_hook(minimize_fn)
-
-
-def _get_minimize() -> _MinimizeFnProtocol:
-    """Get the minimize function.
-
-    Returns:
-        The configured minimize function.
-
-    Raises:
-        RuntimeError: If no hook has been set.
-    """
-    if _minimize_hook is None:
-        raise RuntimeError(
-            "Scipy minimize hook not set. Call use_real_scipy() at startup "
-            "or set_minimize_hook() with a fake for tests."
-        )
-    return _minimize_hook
 
 
 def _compute_ensemble_score(
@@ -193,7 +122,7 @@ def optimize_ensemble_weights(
     )
 
     # Set up optimization
-    minimize_fn = _get_minimize()
+    minimize_fn = _hooks.minimize
 
     # Initial guess: equal weights
     x0: NDArray[np.float64] = np.full(n_models, 1.0 / n_models, dtype=np.float64)
@@ -258,6 +187,4 @@ def optimize_ensemble_weights(
 
 __all__ = [
     "optimize_ensemble_weights",
-    "set_minimize_hook",
-    "use_real_scipy",
 ]

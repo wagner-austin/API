@@ -6,13 +6,11 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
+from covenant_ml.ensemble import _hooks
 from covenant_ml.ensemble.optimizer import (
     _compute_ensemble_score,
-    _get_minimize,
     _objective_function,
     optimize_ensemble_weights,
-    set_minimize_hook,
-    use_real_scipy,
 )
 from covenant_ml.ensemble.testing import fake_minimize
 from covenant_ml.ensemble.types import (
@@ -116,54 +114,30 @@ def _make_test_config() -> OptimizationConfig:
     )
 
 
-class TestSetMinimizeHook:
-    """Tests for set_minimize_hook function."""
+class TestMinimizeBinding:
+    """Tests for the solver the module binds."""
 
-    def test_sets_hook(self) -> None:
-        """set_minimize_hook sets the minimize function."""
-        # Set fake minimize as hook
-        set_minimize_hook(fake_minimize)
+    def test_the_seam_is_bound_to_scipy(self) -> None:
+        """Callers reach scipy with nothing wired first."""
+        assert _hooks.minimize is _hooks._real_minimize
 
-        # Should be able to get it back
-        minimize_fn = _get_minimize()
-        assert minimize_fn is fake_minimize
+    def test_the_bound_solver_delegates_to_scipy(self) -> None:
+        """The binding imports scipy and returns what its solver returned."""
 
+        def distance_from_quarter(weights: NDArray[np.float64]) -> float:
+            diffs: NDArray[np.float64] = weights - 0.25
+            return float(np.sum(diffs * diffs))
 
-class TestUseRealScipy:
-    """Tests for use_real_scipy function."""
-
-    def test_configures_real_scipy(self) -> None:
-        """use_real_scipy sets up the real scipy minimize."""
-        use_real_scipy()
-
-        # Should be able to get the minimize function
-        minimize_fn = _get_minimize()
-
-        # Verify it's actually from scipy
-        assert callable(minimize_fn)
-        assert minimize_fn.__module__ == "scipy.optimize._minimize"
-
-
-class TestGetMinimize:
-    """Tests for _get_minimize function."""
-
-    def test_raises_when_hook_not_set(self) -> None:
-        """_get_minimize raises RuntimeError when no hook is set."""
-        # Import the module to reset the hook
-        import covenant_ml.ensemble.optimizer as opt_module
-
-        # Save current hook
-        original_hook = opt_module._minimize_hook
-
-        try:
-            # Clear the hook
-            opt_module._minimize_hook = None
-
-            with pytest.raises(RuntimeError, match="Scipy minimize hook not set"):
-                _get_minimize()
-        finally:
-            # Restore the hook
-            opt_module._minimize_hook = original_hook
+        result = _hooks.minimize(
+            distance_from_quarter,
+            np.full(4, 0.5, dtype=np.float64),
+            "SLSQP",
+            tuple((0.0, 1.0) for _ in range(4)),
+            (),
+            {"maxiter": 50, "ftol": 1e-8},
+        )
+        assert result.success
+        assert result.x.shape == (4,)
 
 
 class TestComputeEnsembleScore:
@@ -222,7 +196,7 @@ class TestOptimizeEnsembleWeights:
     def test_with_fake_scipy(self) -> None:
         """optimize_ensemble_weights works with fake scipy."""
         # Set up fake minimize
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         # Create test data
         oof_data = _make_oof_data(
@@ -259,7 +233,7 @@ class TestOptimizeEnsembleWeights:
     def test_with_real_scipy(self) -> None:
         """optimize_ensemble_weights works with real scipy."""
         # Set up real scipy
-        use_real_scipy()
+        _hooks.minimize = _hooks._real_minimize
 
         # Create test data with more samples for meaningful optimization
         rng = np.random.default_rng(42)
@@ -302,7 +276,7 @@ class TestOptimizeEnsembleWeights:
 
     def test_raises_on_invalid_oof_data(self) -> None:
         """optimize_ensemble_weights raises on invalid OOF data."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         # Create invalid data (single model)
         oof_data = EnsembleOOFData(
@@ -316,29 +290,9 @@ class TestOptimizeEnsembleWeights:
         with pytest.raises(ValueError, match="at least 2 models"):
             optimize_ensemble_weights(oof_data, config)
 
-    def test_raises_when_hook_not_set(self) -> None:
-        """optimize_ensemble_weights raises when scipy hook not set."""
-        import covenant_ml.ensemble.optimizer as opt_module
-
-        # Save and clear hook
-        original_hook = opt_module._minimize_hook
-        opt_module._minimize_hook = None
-
-        try:
-            oof_data = _make_oof_data(
-                (("m1", (0.1, 0.9)), ("m2", (0.2, 0.8))),
-                (0, 1),
-            )
-            config = _make_test_config()
-
-            with pytest.raises(RuntimeError, match="Scipy minimize hook not set"):
-                optimize_ensemble_weights(oof_data, config)
-        finally:
-            opt_module._minimize_hook = original_hook
-
     def test_three_models(self) -> None:
         """optimize_ensemble_weights works with 3 models."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         oof_data = _make_oof_data(
             (
@@ -358,7 +312,7 @@ class TestOptimizeEnsembleWeights:
 
     def test_result_values_valid(self) -> None:
         """optimize_ensemble_weights returns valid values with correct structure."""
-        set_minimize_hook(fake_minimize)
+        _hooks.minimize = fake_minimize
 
         oof_data = _make_oof_data(
             (("m1", (0.1, 0.9)), ("m2", (0.2, 0.8))),
