@@ -234,12 +234,16 @@ class TestDefaultCreateCausalDataset:
             pad_id=1,
         )
 
-        # Verify dataset is created and returns a tensor
-        first_item: torch.Tensor = dataset[0]
-        # Verify tensor has expected shape (max_len)
-        assert first_item.size(0) == 64
-        # Verify it contains valid token IDs (non-negative integers)
-        assert first_item.min().item() >= 0
+        # The dataset yields (input_ids, labels); both are max_len long.
+        input_ids, labels = dataset[0]
+        assert input_ids.size(0) == 64
+        assert labels.size(0) == 64
+        # Valid token IDs, and with no separator configured every real token is
+        # a target. Trailing padding is excluded, so compare only the real span.
+        assert input_ids.min().item() >= 0
+        real = labels != -100
+        assert torch.equal(labels[real], input_ids[real])
+        assert bool(real.any().item())
 
 
 class TestDefaultCreateDataloader:
@@ -247,7 +251,6 @@ class TestDefaultCreateDataloader:
 
     def test_creates_dataloader_from_dataset(self, tmp_path: Path) -> None:
         """Test that _default_create_dataloader creates a DataLoader."""
-        import torch
 
         # Create a test file for the dataset
         file1 = tmp_path / "train.txt"
@@ -270,12 +273,13 @@ class TestDefaultCreateDataloader:
             pin_memory=False,
         )
 
-        # Verify dataloader works by getting first batch (tensor)
-        batch: torch.Tensor = next(iter(loader))
-        # Batch should have shape [batch_size, max_len]
-        assert batch.dim() == 2
-        # Second dimension should be max_len (64)
-        assert batch.size(1) == 64
+        # A batch is (input_ids, labels), each [batch_size, max_len].
+        batch = next(iter(loader))
+        assert len(batch) == 2
+        input_ids, labels = batch[0], batch[1]
+        assert input_ids.dim() == 2
+        assert input_ids.size(1) == 64
+        assert labels.shape == input_ids.shape
 
 
 class TestDefaultLoadHfModel:
@@ -488,6 +492,7 @@ class TestDefaultCreateTrainer:
             "early_stopping_patience": 3,
             "test_split_ratio": 0.1,
             "finetune_lr_cap": 1e-5,
+            "loss_mask_prefix_separator": None,
             "finetuning_strategy": "full",
             "hub_model_id": None,
             "lora": None,

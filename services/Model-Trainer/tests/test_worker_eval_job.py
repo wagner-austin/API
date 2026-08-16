@@ -133,6 +133,7 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
+        "loss_mask_prefix_separator": None,
         "precision": "fp32",
         "finetuning_strategy": "full",
         "hub_model_id": None,

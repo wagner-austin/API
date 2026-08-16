@@ -411,6 +411,7 @@ def encode_train_request_payload(payload: TrainRequestPayload) -> JSONObject:
         "early_stopping_patience": payload["early_stopping_patience"],
         "test_split_ratio": payload["test_split_ratio"],
         "finetune_lr_cap": payload["finetune_lr_cap"],
+        "loss_mask_prefix_separator": payload["loss_mask_prefix_separator"],
         "hub_model_id": payload["hub_model_id"],
         "finetuning_strategy": payload["finetuning_strategy"],
         "lora": lora_encoded,
@@ -586,6 +587,11 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
     early_stopping_patience = require_int(obj, "early_stopping_patience")
     test_split_ratio = require_float(obj, "test_split_ratio")
     finetune_lr_cap = require_float(obj, "finetune_lr_cap")
+    loss_mask_prefix_separator = optional_str(obj, "loss_mask_prefix_separator")
+    if loss_mask_prefix_separator == "":
+        raise JSONTypeError(
+            "Field 'loss_mask_prefix_separator' must not be empty; omit it to disable masking"
+        )
     hub_model_id = optional_str(obj, "hub_model_id")
     finetuning_strategy = _narrow_finetuning_strategy(require_str(obj, "finetuning_strategy"))
 
@@ -617,6 +623,7 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
         "early_stopping_patience": early_stopping_patience,
         "test_split_ratio": test_split_ratio,
         "finetune_lr_cap": finetune_lr_cap,
+        "loss_mask_prefix_separator": loss_mask_prefix_separator,
         "hub_model_id": hub_model_id,
         "finetuning_strategy": finetuning_strategy,
         "lora": lora,

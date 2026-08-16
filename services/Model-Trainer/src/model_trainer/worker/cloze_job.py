@@ -13,13 +13,22 @@ from __future__ import annotations
 from pathlib import Path
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
-from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
+from platform_core.json_utils import (
+    JSONValue,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+)
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import artifact_file_id_key, cloze_key
 from typing_extensions import TypedDict
 
 from model_trainer.core import _test_hooks
-from model_trainer.core.contracts.cloze import ClozeItem, decode_cloze_item
+from model_trainer.core.contracts.cloze import (
+    ClozeItem,
+    decode_cloze_item,
+    encode_cloze_item_outcome,
+)
 from model_trainer.core.contracts.queue import ClozeJobPayload
 from model_trainer.core.infra.paths import models_dir
 from model_trainer.core.services.model.cloze import score_cloze_items
@@ -28,13 +37,19 @@ from model_trainer.worker.manifest import as_device, as_model_family, load_manif
 
 
 class _ClozeCacheModel(TypedDict, total=False):
-    """Redis-cached shape of a cloze job's lifecycle and outcome."""
+    """Redis-cached shape of a cloze job's lifecycle and outcome.
+
+    ``outcomes`` carries the per-item records encoded by
+    :func:`encode_cloze_item_outcome`, so a reader can pair two runs scored on
+    the same item set instead of comparing two aggregate counts.
+    """
 
     status: str
     total: int | None
     correct: int | None
     accuracy: float | None
     chance: float | None
+    outcomes: list[JSONValue] | None
 
 
 def parse_items(raw: str) -> list[ClozeItem]:
@@ -151,12 +166,16 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
             max_seq_len=payload["max_seq_len"],
         )
 
+        encoded_outcomes: list[JSONValue] = [
+            encode_cloze_item_outcome(outcome) for outcome in result["outcomes"]
+        ]
         out: _ClozeCacheModel = {
             "status": "completed",
             "total": result["total"],
             "correct": result["correct"],
             "accuracy": result["accuracy"],
             "chance": result["chance"],
+            "outcomes": encoded_outcomes,
         }
     except Exception as e:
         out_failed: _ClozeCacheModel = {"status": "failed"}

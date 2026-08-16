@@ -116,9 +116,10 @@ def evaluate_char_lstm(
     eval_dir.mkdir(parents=True, exist_ok=True)
     with torch.no_grad():
         for batch in dataloader:
-            inputs = batch.to(device)
+            inputs = batch[0].to(device)
+            labels = batch[1].to(device)
             with autocast_ctx:
-                outputs = model.forward(input_ids=inputs, labels=inputs)
+                outputs = model.forward(input_ids=inputs, labels=labels)
             loss_t = outputs.loss
             batch_count: int = int(inputs.size(0))
             total_loss += float(loss_t.item()) * float(batch_count)

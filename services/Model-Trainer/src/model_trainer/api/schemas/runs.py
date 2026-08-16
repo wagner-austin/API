@@ -4,6 +4,8 @@ from typing import Literal, NotRequired
 
 from typing_extensions import TypedDict
 
+from model_trainer.core.contracts.cloze import ClozeItemOutcome
+
 
 class LoraConfigRequest(TypedDict, total=True):
     """API request schema for LoRA configuration.
@@ -115,6 +117,7 @@ class TrainRequest(TypedDict, total=True):
     early_stopping_patience: int
     test_split_ratio: float
     finetune_lr_cap: float
+    loss_mask_prefix_separator: str | None
     # HuggingFace LM backend fields
     hub_model_id: str | None
     finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]
@@ -194,6 +197,10 @@ class ClozeResponse(TypedDict, total=True):
     ``chance`` is the accuracy uniform guessing reaches on the same candidate
     counts. It is reported alongside ``accuracy`` because accuracy alone is not
     interpretable: a four-way item set floors at 25% before any knowledge.
+
+    ``outcomes`` carries one record per item once the job completes. Two runs
+    scored on the same item set can then be compared item by item, which an
+    aggregate count cannot support.
     """
 
     request_id: str
@@ -202,6 +209,7 @@ class ClozeResponse(TypedDict, total=True):
     correct: int | None
     accuracy: float | None
     chance: float | None
+    outcomes: list[ClozeItemOutcome] | None
 
 
 class GenerateRequest(TypedDict, total=True):

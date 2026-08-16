@@ -104,6 +104,10 @@ def process_eval_job(payload: EvalJobPayload) -> None:
             "early_stopping_patience": manifest["early_stopping_patience"],
             "test_split_ratio": manifest["test_split_ratio"],
             "finetune_lr_cap": manifest["finetune_lr_cap"],
+            # Evaluation reports perplexity over held-out text, and a masked
+            # prefix would silently change what that number covers. Masking is
+            # a training-time intervention only.
+            "loss_mask_prefix_separator": None,
             "finetuning_strategy": "full",
             "hub_model_id": None,
             "lora": None,

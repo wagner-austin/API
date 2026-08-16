@@ -26,7 +26,13 @@ from collections.abc import Sequence
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 
-from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem, render_candidates
+from model_trainer.core.contracts.cloze import (
+    ClozeEvalResult,
+    ClozeItem,
+    ClozeItemOutcome,
+    answer_wins_outright,
+    render_candidates,
+)
 from model_trainer.core.encoding import Encoder
 from model_trainer.core.types import LMModelProto
 
@@ -78,24 +84,6 @@ def sequence_nll(
     return mean_nll * float(predicted_tokens)
 
 
-def _answer_wins_outright(scores: Sequence[float]) -> bool:
-    """Report whether index 0 is the strict minimum of the scores.
-
-    A tie is not a win. Two renderings sharing the lowest score means the model
-    did not separate them, and counting that as correct would credit the answer
-    for a coin flip it never made. Requiring a strict minimum keeps the metric
-    from drifting upward on models that assign identical likelihoods.
-
-    Args:
-        scores: Total negative log-likelihoods, the answer's at index 0.
-
-    Returns:
-        True when index 0 holds the lowest score and no other index matches it.
-    """
-    best = scores[0]
-    return all(scores[index] > best for index in range(1, len(scores)))
-
-
 def score_cloze_items(
     *,
     items: Sequence[ClozeItem],
@@ -114,8 +102,9 @@ def score_cloze_items(
         max_seq_len: Token budget each rendering is truncated to.
 
     Returns:
-        Totals, the count the model got right, its accuracy, and the accuracy
-        uniform guessing would reach on the same candidate counts.
+        Totals, the count the model got right, its accuracy, the accuracy
+        uniform guessing would reach on the same candidate counts, and one
+        outcome per item carrying its per-candidate scores.
 
     Raises:
         AppError: With ``CLOZE_ITEMS_EMPTY`` when no items were supplied, or
@@ -138,6 +127,7 @@ def score_cloze_items(
 
     correct = 0
     chance_total = 0.0
+    outcomes: list[ClozeItemOutcome] = []
     with torch.no_grad():
         for item in items:
             renderings = render_candidates(item)
@@ -152,9 +142,17 @@ def score_cloze_items(
                 )
                 for rendering in renderings
             ]
-            if _answer_wins_outright(scores):
+            item_correct = answer_wins_outright(scores)
+            if item_correct:
                 correct += 1
             chance_total += 1.0 / float(len(renderings))
+            outcomes.append(
+                ClozeItemOutcome(
+                    item_id=item["item_id"],
+                    correct=item_correct,
+                    scores=scores,
+                )
+            )
 
     total = len(items)
     return ClozeEvalResult(
@@ -162,6 +160,7 @@ def score_cloze_items(
         correct=correct,
         accuracy=float(correct) / float(total),
         chance=chance_total / float(total),
+        outcomes=outcomes,
     )
 
 

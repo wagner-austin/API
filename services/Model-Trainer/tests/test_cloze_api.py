@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from platform_core.errors import AppError, ErrorCode, ModelTrainerErrorCode
 from platform_core.fastapi import install_exception_handlers_fastapi
-from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str, load_json_str
 from platform_core.trainer_keys import cloze_key
 from platform_workers.redis import RedisBytesProto, _RedisBytesClient
 from platform_workers.rq_harness import RQClientQueue, RQRetryLike
@@ -125,6 +125,54 @@ class TestClozeOrchestrator:
         assert out["accuracy"] == pytest.approx(0.75)
         assert out["chance"] == pytest.approx(0.25)
 
+    def test_get_returns_per_item_outcomes_in_order(self) -> None:
+        """Pairing two arms on the same item set needs the per-item records."""
+        orch, redis, _ = self._make_orchestrator()
+        cache: dict[str, JSONValue] = {
+            "status": "completed",
+            "total": 2,
+            "correct": 1,
+            "accuracy": 0.5,
+            "chance": 0.25,
+            "outcomes": [
+                {"item_id": "a", "correct": True, "scores": [1.0, 2.0]},
+                {"item_id": "b", "correct": False, "scores": [2.0, 1.0]},
+            ],
+        }
+        redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
+        out = orch.get_cloze("run123", "req123")
+        outcomes = out["outcomes"]
+        if outcomes is None:
+            raise AssertionError("expected outcomes to be decoded")
+        assert [o["item_id"] for o in outcomes] == ["a", "b"]
+        assert [o["correct"] for o in outcomes] == [True, False]
+        assert outcomes[0]["scores"] == [1.0, 2.0]
+
+    def test_get_rejects_outcomes_that_are_not_a_list(self) -> None:
+        orch, redis, _ = self._make_orchestrator()
+        cache: dict[str, JSONValue] = {"status": "completed", "outcomes": {"item_id": "a"}}
+        redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
+        with pytest.raises(AppError) as excinfo:
+            orch.get_cloze("run123", "req123")
+        err: AppError[ModelTrainerErrorCode] = excinfo.value
+        assert err.code == ModelTrainerErrorCode.DATA_NOT_FOUND
+        assert "outcomes" in err.message
+
+    def test_get_rejects_a_malformed_outcome_record(self) -> None:
+        """A bad record must fail loudly, not shorten the list on the way out."""
+        orch, redis, _ = self._make_orchestrator()
+        cache: dict[str, JSONValue] = {
+            "status": "completed",
+            "total": 1,
+            "correct": 1,
+            "accuracy": 1.0,
+            "chance": 0.25,
+            "outcomes": [{"item_id": "a", "correct": True, "scores": [2.0, 1.0]}],
+        }
+        redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
+        with pytest.raises(JSONTypeError, match="but its scores imply False"):
+            orch.get_cloze("run123", "req123")
+
     def test_get_tolerates_absent_metric_fields(self) -> None:
         orch, redis, _ = self._make_orchestrator()
         redis.set(cloze_key("run123", "req123"), dump_json_str({"status": "running"}))
@@ -214,6 +262,32 @@ class TestClozeRoutes:
         assert parsed["total"] == 4
         assert parsed["accuracy"] == pytest.approx(0.75)
         redis.assert_only_called({"set", "get"})
+
+    def test_get_cloze_returns_outcomes_in_the_body(self) -> None:
+        client, redis = self._make_client()
+        cache: dict[str, JSONValue] = {
+            "status": "completed",
+            "total": 1,
+            "correct": 1,
+            "accuracy": 1.0,
+            "chance": 0.25,
+            "outcomes": [{"item_id": "page::1", "correct": True, "scores": [1.0, 3.0]}],
+        }
+        redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
+        res = client.get("/runs/run123/cloze/req123", headers={"X-API-Key": "test-key"})
+        assert res.status_code == 200
+        parsed = load_json_str(res.text)
+        if not isinstance(parsed, dict):
+            raise AssertionError(f"expected dict body, got {type(parsed)}")
+        outcomes = parsed["outcomes"]
+        if not isinstance(outcomes, list):
+            raise AssertionError(f"expected outcomes list, got {type(outcomes)}")
+        first = outcomes[0]
+        if not isinstance(first, dict):
+            raise AssertionError(f"expected outcome dict, got {type(first)}")
+        assert first["item_id"] == "page::1"
+        assert first["correct"] is True
+        assert first["scores"] == [1.0, 3.0]
 
     def test_get_cloze_missing_returns_404(self) -> None:
         client, _ = self._make_client()

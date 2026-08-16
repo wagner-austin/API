@@ -18,7 +18,7 @@ never reproduced it.
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from typing import Protocol
 
 import torch
@@ -26,11 +26,15 @@ import torch
 
 class _Indexable(Protocol):
     def __len__(self: _Indexable) -> int: ...
-    def __getitem__(self: _Indexable, idx: int) -> torch.Tensor: ...
+    def __getitem__(self: _Indexable, idx: int) -> tuple[torch.Tensor, torch.Tensor]: ...
 
 
 class _TorchDLInst(Protocol):
-    def __iter__(self: _TorchDLInst) -> Generator[torch.Tensor, None, None]: ...
+    # torch's default_collate turns a batch of 2-tuples into a two-element
+    # sequence of stacked tensors, but whether that sequence is a list or a
+    # tuple has varied across releases. Consumers index it rather than unpack
+    # it, so `Sequence` is the honest annotation.
+    def __iter__(self: _TorchDLInst) -> Generator[Sequence[torch.Tensor], None, None]: ...
 
 
 class _TorchDLCtor(Protocol):
@@ -73,7 +77,7 @@ class DataLoader:
         # Ceiling division: (ds_len + batch_size - 1) // batch_size
         return (ds_len + self._bs - 1) // self._bs
 
-    def __iter__(self: DataLoader) -> Generator[torch.Tensor, None, None]:
+    def __iter__(self: DataLoader) -> Generator[Sequence[torch.Tensor], None, None]:
         tud = __import__("torch.utils.data", fromlist=["DataLoader"])
         torch_dataloader: _TorchDLCtor = tud.DataLoader
         loader = torch_dataloader(

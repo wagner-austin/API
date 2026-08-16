@@ -124,6 +124,7 @@ def _create_eval_manifest(run_id: str) -> _ManifestDict:
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
+        "loss_mask_prefix_separator": None,
         "early_stopped": False,
         "versions": {"torch": "0", "transformers": "0", "tokenizers": "0", "datasets": "0"},
         "system": {"cpu_count": 1, "platform": "x", "platform_release": "y", "machine": "z"},

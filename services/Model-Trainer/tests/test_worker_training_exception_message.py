@@ -63,6 +63,7 @@ def test_training_worker_sets_status_message_on_exception(tmp_path: Path) -> Non
             "early_stopping_patience": 5,
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
+            "loss_mask_prefix_separator": None,
             "precision": "auto",
             "hub_model_id": None,
             "finetuning_strategy": "full",

@@ -368,6 +368,7 @@ class TestQueueEncodingRoundTrip:
             "early_stopping_patience": 3,
             "test_split_ratio": 0.1,
             "finetune_lr_cap": 0.0,
+            "loss_mask_prefix_separator": None,
             "hub_model_id": "meta-llama/Llama-2-7b-hf",
             "finetuning_strategy": "lora",
             "lora": {
@@ -416,6 +417,7 @@ class TestQueueEncodingRoundTrip:
             "early_stopping_patience": 3,
             "test_split_ratio": 0.1,
             "finetune_lr_cap": 0.0,
+            "loss_mask_prefix_separator": None,
             "hub_model_id": "meta-llama/Llama-2-7b-hf",
             "finetuning_strategy": "lora",
             "lora": {
@@ -460,6 +462,7 @@ class TestQueueEncodingRoundTrip:
             "early_stopping_patience": 3,
             "test_split_ratio": 0.1,
             "finetune_lr_cap": 0.0,
+            "loss_mask_prefix_separator": None,
             "hub_model_id": "model",
             "finetuning_strategy": "lora",
             "lora": {
@@ -503,6 +506,7 @@ class TestQueueEncodingRoundTrip:
             "early_stopping_patience": 3,
             "test_split_ratio": 0.1,
             "finetune_lr_cap": 0.0,
+            "loss_mask_prefix_separator": None,
             "hub_model_id": "model",
             "finetuning_strategy": "lora",
             "lora": {
@@ -710,6 +714,7 @@ class TestTrainingJobWithGgufExport:
                 "early_stopping_patience": 5,
                 "test_split_ratio": 0.15,
                 "finetune_lr_cap": 5e-5,
+                "loss_mask_prefix_separator": None,
                 "precision": "fp32",
                 "hub_model_id": "meta-llama/Llama-2-7b-hf",
                 "finetuning_strategy": "lora",

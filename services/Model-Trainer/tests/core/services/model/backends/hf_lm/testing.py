@@ -239,6 +239,7 @@ def make_test_config(
         "early_stopping_patience": 3,
         "test_split_ratio": 0.1,
         "finetune_lr_cap": 0.0001,
+        "loss_mask_prefix_separator": None,
         "finetuning_strategy": finetuning_strategy,
         "hub_model_id": hub_model_id,
         "lora": None,
@@ -822,16 +823,18 @@ class FakeDataset(CausalLMDatasetProto):
         """Return number of samples."""
         return self._num_samples
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         """Get sample.
 
         Args:
             idx: Index.
 
         Returns:
-            Sample tensor.
+            Input ids and labels. The real dataset returns labels equal to the
+            inputs unless a prefix is masked, so this fake does the same.
         """
-        return torch.randint(0, 100, (128,))
+        ids = torch.randint(0, 100, (128,))
+        return (ids, ids)
 
 
 class FakeDataLoader(DataLoaderProto):
@@ -847,14 +850,20 @@ class FakeDataLoader(DataLoaderProto):
         self._dataset = dataset
         self._batch_size = batch_size
 
-    def __iter__(self) -> Generator[torch.Tensor, None, None]:
-        """Iterate over batches."""
+    def __iter__(self) -> Generator[Sequence[torch.Tensor], None, None]:
+        """Iterate over batches of (input_ids, labels).
+
+        Collates the same way torch's default_collate does for a dataset of
+        2-tuples: each position is stacked independently, so consumers index
+        the result rather than unpacking a single tensor.
+        """
         num_samples = len(self._dataset)
         for i in range(0, num_samples, self._batch_size):
-            batch = torch.stack(
-                [self._dataset[j] for j in range(i, min(i + self._batch_size, num_samples))]
+            items = [self._dataset[j] for j in range(i, min(i + self._batch_size, num_samples))]
+            yield (
+                torch.stack([item[0] for item in items]),
+                torch.stack([item[1] for item in items]),
             )
-            yield batch
 
 
 def make_score_config(

@@ -61,6 +61,7 @@ _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
         "early_stopping_patience",
         "test_split_ratio",
         "finetune_lr_cap",
+        "loss_mask_prefix_separator",
         # HuggingFace LM backend fields
         "hub_model_id",
         "finetuning_strategy",
@@ -104,6 +105,39 @@ def _decode_optional_bool(d: dict[str, JSONValue], field: str) -> bool | None:
             http_status=400,
         )
     return bool(raw)
+
+
+def _decode_loss_mask_prefix_separator(d: dict[str, JSONValue]) -> str | None:
+    """Decode the marker separator that splits a masked prefix from the body.
+
+    Args:
+        d: Parsed request body.
+
+    Returns:
+        The separator, or None when the request does not ask for masking.
+
+    Raises:
+        AppError: With ``INVALID_INPUT`` when the value is not a string, or is
+            the empty string. Empty would split nothing while the run's
+            manifest recorded that masking was requested, so the run would look
+            like a masked arm and behave like an unmasked one.
+    """
+    raw = d.get("loss_mask_prefix_separator")
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="loss_mask_prefix_separator must be a string",
+            http_status=400,
+        )
+    if raw == "":
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="loss_mask_prefix_separator must not be empty; omit it to disable masking",
+            http_status=422,
+        )
+    return raw
 
 
 def _narrow_model_family(
@@ -742,6 +776,11 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
         d.get("finetune_lr_cap"), "finetune_lr_cap", ge=0.0, default=5e-5
     )
 
+    # Marker separator for metadata-conditioned corpora. Absent means every
+    # token is a loss target; an empty string would mask nothing while claiming
+    # to mask, so it is rejected rather than silently normalised to None.
+    loss_mask_prefix_separator = _decode_loss_mask_prefix_separator(d)
+
     # Optional data loader knobs: accept or leave None; worker resolves defaults by device
     data_num_workers = _decode_optional_int_ge(d, "data_num_workers", ge=0)
     data_pin_memory = _decode_optional_bool(d, "data_pin_memory")
@@ -772,6 +811,7 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
         "early_stopping_patience": early_stopping_patience,
         "test_split_ratio": test_split_ratio,
         "finetune_lr_cap": finetune_lr_cap,
+        "loss_mask_prefix_separator": loss_mask_prefix_separator,
         "hub_model_id": hf_fields.hub_model_id,
         "finetuning_strategy": hf_fields.finetuning_strategy,
         "lora": hf_fields.lora,

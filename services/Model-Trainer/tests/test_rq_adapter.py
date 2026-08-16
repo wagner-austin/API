@@ -105,6 +105,7 @@ def test_rq_enqueuer_methods() -> None:
                 "early_stopping_patience": 0,
                 "test_split_ratio": 0.0,
                 "finetune_lr_cap": 0.0,
+                "loss_mask_prefix_separator": None,
                 "hub_model_id": None,
                 "finetuning_strategy": "full",
                 "lora": None,

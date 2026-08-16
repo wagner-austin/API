@@ -111,6 +111,7 @@ def build_cfg(req: TrainRequestPayload, corpus_path: str) -> ModelTrainConfig:
         "early_stopping_patience": req["early_stopping_patience"],
         "test_split_ratio": req["test_split_ratio"],
         "finetune_lr_cap": req["finetune_lr_cap"],
+        "loss_mask_prefix_separator": req["loss_mask_prefix_separator"],
         "finetuning_strategy": req["finetuning_strategy"],
         "hub_model_id": req["hub_model_id"],
         "lora": req["lora"],

@@ -120,6 +120,7 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
+        "loss_mask_prefix_separator": None,
         "precision": "fp32",
         "finetuning_strategy": "full",
         "hub_model_id": None,

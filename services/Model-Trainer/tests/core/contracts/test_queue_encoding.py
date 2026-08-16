@@ -290,6 +290,7 @@ class TestTrainRequestPayloadEncoding:
             "early_stopping_patience": 3,
             "test_split_ratio": 0.1,
             "finetune_lr_cap": 1e-4,
+            "loss_mask_prefix_separator": None,
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
@@ -310,6 +311,23 @@ class TestTrainRequestPayloadEncoding:
         assert decoded["lora"] is None
         assert decoded["quantization"] is None
         assert decoded["unsloth"] is None
+
+    def test_roundtrip_preserves_the_loss_mask_separator(self) -> None:
+        """Whitespace in the separator is significant, so it must survive the
+        queue hop byte for byte."""
+        payload = self._make_minimal_payload()
+        payload["loss_mask_prefix_separator"] = " | "
+        decoded = decode_train_request_payload(encode_train_request_payload(payload))
+        assert decoded["loss_mask_prefix_separator"] == " | "
+
+    def test_decode_rejects_an_empty_loss_mask_separator(self) -> None:
+        """An empty separator masks nothing while claiming a masked arm, so the
+        queue boundary rejects it exactly as the API edge does."""
+        payload = self._make_minimal_payload()
+        encoded = encode_train_request_payload(payload)
+        encoded["loss_mask_prefix_separator"] = ""
+        with pytest.raises(JSONTypeError, match="must not be empty"):
+            decode_train_request_payload(encoded)
 
     def test_encode_decode_roundtrip_with_lora(self) -> None:
         """Test roundtrip with LoRA config."""
@@ -550,6 +568,7 @@ class TestTrainJobPayloadEncoding:
             "early_stopping_patience": 3,
             "test_split_ratio": 0.1,
             "finetune_lr_cap": 1e-4,
+            "loss_mask_prefix_separator": None,
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,

@@ -131,6 +131,7 @@ def _make_cfg() -> ModelTrainConfig:
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
+        "loss_mask_prefix_separator": None,
         "precision": "fp32",
         "finetuning_strategy": "full",
         "hub_model_id": None,
@@ -161,9 +162,10 @@ def test_trainer_train_one_epoch_cancelled_early_triggers_return() -> None:
         def __len__(self: _DS) -> int:
             return 1
 
-        def __getitem__(self: _DS, idx: int) -> torch.Tensor:
+        def __getitem__(self: _DS, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
             vals: list[int] = [1, 1]
-            return torch.tensor(vals, dtype=torch.long)
+            ids = torch.tensor(vals, dtype=torch.long)
+            return (ids, ids)
 
     dl = DataLoader(_DS(), batch_size=1, shuffle=False)
 
@@ -204,9 +206,10 @@ def test_trainer_train_one_epoch_progress_and_heartbeat() -> None:
         def __len__(self: _DS10) -> int:
             return 10
 
-        def __getitem__(self: _DS10, idx: int) -> torch.Tensor:
+        def __getitem__(self: _DS10, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
             vals: list[int] = [1, 1]
-            return torch.tensor(vals, dtype=torch.long)
+            ids = torch.tensor(vals, dtype=torch.long)
+            return (ids, ids)
 
     dl = DataLoader(_DS10(), batch_size=1, shuffle=False)
     hb_calls: list[float] = []
@@ -261,9 +264,10 @@ def test_trainer_run_training_loop_breaks_on_cancelled() -> None:
         def __len__(self: _DS1) -> int:
             return 10  # More items to ensure loop would continue without cancel
 
-        def __getitem__(self: _DS1, i: int) -> torch.Tensor:
+        def __getitem__(self: _DS1, i: int) -> tuple[torch.Tensor, torch.Tensor]:
             vals: list[int] = [1, 1]
-            return torch.tensor(vals, dtype=torch.long)
+            ids = torch.tensor(vals, dtype=torch.long)
+            return (ids, ids)
 
     ds = _DS1()
 
@@ -357,6 +361,7 @@ def test_train_prepared_calls_save_when_not_cancelled(
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
+        "loss_mask_prefix_separator": None,
         "precision": "fp32",
         "finetuning_strategy": "full",
         "hub_model_id": None,
@@ -440,6 +445,7 @@ def test_train_prepared_skips_save_when_cancelled(
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
+        "loss_mask_prefix_separator": None,
         "precision": "fp32",
         "finetuning_strategy": "full",
         "hub_model_id": None,
@@ -469,7 +475,7 @@ def test_trainer_run_training_loop_progress_none_branch() -> None:
         def __len__(self: _DSEmpty) -> int:
             return 0
 
-        def __getitem__(self: _DSEmpty, idx: int) -> torch.Tensor:
+        def __getitem__(self: _DSEmpty, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
             raise AssertionError
 
     dl = DataLoader(_DSEmpty(), batch_size=1, shuffle=False)
@@ -507,9 +513,10 @@ def test_trainer_train_one_epoch_progress_none_inside_loop() -> None:
         def __len__(self: _DS1) -> int:
             return 1
 
-        def __getitem__(self: _DS1, idx: int) -> torch.Tensor:
+        def __getitem__(self: _DS1, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
             vals: list[int] = [1, 1]
-            return torch.tensor(vals, dtype=torch.long)
+            ids = torch.tensor(vals, dtype=torch.long)
+            return (ids, ids)
 
     class _Opt3(OptimizerProto):
         def zero_grad(self: _Opt3, *, set_to_none: bool = True) -> None:
@@ -551,7 +558,7 @@ def test_run_training_loop_progress_called_when_no_batches() -> None:
         def __len__(self: _DS) -> int:
             return 0
 
-        def __getitem__(self: _DS, idx: int) -> torch.Tensor:
+        def __getitem__(self: _DS, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
             raise AssertionError("should not be called")
 
     prog_calls: list[tuple[int, int, float, float, float]] = []
@@ -888,12 +895,13 @@ def test_train_one_epoch_fp16_scaler_paths() -> None:
     Note: Without actual CUDA, the scaler is disabled but the code paths still execute.
     """
 
-    class _DS(torch.utils.data.Dataset[torch.Tensor]):
+    class _DS(torch.utils.data.Dataset[tuple[torch.Tensor, torch.Tensor]]):
         def __len__(self: _DS) -> int:
             return 2
 
-        def __getitem__(self: _DS, idx: int) -> torch.Tensor:
-            return torch.randint(0, 4, (4,))
+        def __getitem__(self: _DS, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+            ids = torch.randint(0, 4, (4,))
+            return (ids, ids)
 
     dl = DataLoader(_DS(), batch_size=1, shuffle=False)
 
@@ -1028,6 +1036,7 @@ def test_apply_lr_cap_when_finetuning() -> None:
         "learning_rate": 1e-3,
         "pretrained_run_id": "base-run",
         "finetune_lr_cap": 5e-5,
+        "loss_mask_prefix_separator": None,
     }
 
     trainer = bt.BaseTrainer(
@@ -1052,6 +1061,7 @@ def test_apply_lr_cap_no_cap_when_not_finetuning() -> None:
         "learning_rate": 1e-3,
         "pretrained_run_id": None,
         "finetune_lr_cap": 5e-5,
+        "loss_mask_prefix_separator": None,
     }
 
     trainer = bt.BaseTrainer(
@@ -1076,9 +1086,10 @@ def test_early_stopping_triggers_after_patience_exceeded() -> None:
         def __len__(self: _DS) -> int:
             return 1
 
-        def __getitem__(self: _DS, idx: int) -> torch.Tensor:
+        def __getitem__(self: _DS, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
             vals: list[int] = [1, 1]
-            return torch.tensor(vals, dtype=torch.long)
+            ids = torch.tensor(vals, dtype=torch.long)
+            return (ids, ids)
 
     class _ConstantLossLM(_LM):
         """Model that returns same loss every forward pass to prevent improvement."""
@@ -1159,6 +1170,7 @@ def test_apply_lr_cap_no_log_when_lr_below_cap() -> None:
         "learning_rate": 1e-6,
         "pretrained_run_id": "base-run",
         "finetune_lr_cap": 5e-5,
+        "loss_mask_prefix_separator": None,
     }
 
     trainer = bt.BaseTrainer(

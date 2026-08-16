@@ -115,6 +115,7 @@ class TrainingManifest(TypedDict):
     early_stopping_patience: int
     test_split_ratio: float
     finetune_lr_cap: float
+    loss_mask_prefix_separator: str | None
     test_loss: float | None
     test_perplexity: float | None
     best_val_loss: float | None
@@ -152,6 +153,7 @@ class TrainingManifestConfig(TypedDict):
     early_stopping_patience: int
     test_split_ratio: float
     finetune_lr_cap: float
+    loss_mask_prefix_separator: str | None
 
 
 class TrainingManifestFull(TypedDict):
@@ -187,6 +189,7 @@ class TrainingManifestFull(TypedDict):
     early_stopping_patience: int
     test_split_ratio: float
     finetune_lr_cap: float
+    loss_mask_prefix_separator: str | None
     test_loss: float | None
     test_perplexity: float | None
     best_val_loss: float | None

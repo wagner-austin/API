@@ -4,7 +4,12 @@ import uuid
 from typing import Literal
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
-from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
+from platform_core.json_utils import (
+    JSONValue,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+)
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import cloze_key, generate_key, score_key
 from platform_workers.redis import RedisStrProto
@@ -18,6 +23,7 @@ from ..api.schemas.runs import (
     ScoreResponse,
 )
 from ..core.config.settings import Settings
+from ..core.contracts.cloze import ClozeItemOutcome, decode_cloze_item_outcome
 from ..core.contracts.queue import ClozeJobPayload, GenerateJobPayload, ScoreJobPayload
 from ..core.infra.redis_utils import get_with_retry, set_with_retry
 from ..core.services.queue.rq_adapter import RQEnqueuer
@@ -163,6 +169,7 @@ class InferenceOrchestrator:
             "correct": None,
             "accuracy": None,
             "chance": None,
+            "outcomes": None,
         }
 
     def get_cloze(self: InferenceOrchestrator, run_id: str, request_id: str) -> ClozeResponse:
@@ -199,6 +206,23 @@ class InferenceOrchestrator:
         correct_v = obj.get("correct")
         accuracy_v = obj.get("accuracy")
         chance_v = obj.get("chance")
+        outcomes_v = obj.get("outcomes")
+
+        # A cache entry written before the job finished carries no outcomes, so
+        # absence is a normal lifecycle state rather than corruption. Anything
+        # present, however, is decoded strictly: a malformed record must surface
+        # as an error rather than reach a caller as a silently shortened list.
+        outcomes: list[ClozeItemOutcome] | None = None
+        if outcomes_v is not None:
+            if not isinstance(outcomes_v, list):
+                raise AppError(
+                    ModelTrainerErrorCode.DATA_NOT_FOUND,
+                    "cloze cache outcomes is not a list",
+                    model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
+                )
+            outcomes = [
+                decode_cloze_item_outcome(narrow_json_to_dict(entry)) for entry in outcomes_v
+            ]
 
         return {
             "request_id": request_id,
@@ -207,6 +231,7 @@ class InferenceOrchestrator:
             "correct": correct_v if isinstance(correct_v, int) else None,
             "accuracy": float(accuracy_v) if isinstance(accuracy_v, int | float) else None,
             "chance": float(chance_v) if isinstance(chance_v, int | float) else None,
+            "outcomes": outcomes,
         }
 
     def get_score(self: InferenceOrchestrator, run_id: str, request_id: str) -> ScoreResponse:

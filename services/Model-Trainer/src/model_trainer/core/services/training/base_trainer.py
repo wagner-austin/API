@@ -442,6 +442,7 @@ class BaseTrainer:
                 max_len=self._prepared.max_seq_len,
                 eos_id=self._prepared.eos_id,
                 pad_id=self._prepared.pad_id,
+                loss_mask_prefix_separator=self._cfg["loss_mask_prefix_separator"],
             )
             return DataLoader(
                 dataset,
@@ -546,9 +547,10 @@ class BaseTrainer:
                     avg_ppl = float(math.exp(avg_loss)) if avg_loss < 20 else float("inf")
                     return ValidationMetrics(val_loss=avg_loss, val_ppl=avg_ppl)
 
-                inputs = batch.to(device_str)
+                inputs = batch[0].to(device_str)
+                labels = batch[1].to(device_str)
                 with autocast_ctx:
-                    outputs = model.forward(input_ids=inputs, labels=inputs)
+                    outputs = model.forward(input_ids=inputs, labels=labels)
                 total_loss += float(outputs.loss.item())
                 num_batches += 1
 
@@ -798,11 +800,12 @@ class BaseTrainer:
                 avg_grad_norm = total_grad_norm / max(1, grad_norm_count)
                 return last_loss, step, True, avg_grad_norm
 
-            inputs = batch.to(device)
+            inputs = batch[0].to(device)
+            labels = batch[1].to(device)
 
             # Forward pass with autocast (no-op for fp32)
             with autocast_ctx:
-                outputs = model.forward(input_ids=inputs, labels=inputs)
+                outputs = model.forward(input_ids=inputs, labels=labels)
                 loss_t = outputs.loss
 
             last_loss = float(loss_t.item())
@@ -968,6 +971,7 @@ class BaseTrainer:
             "early_stopping_patience": self._cfg["early_stopping_patience"],
             "test_split_ratio": self._cfg["test_split_ratio"],
             "finetune_lr_cap": self._cfg["finetune_lr_cap"],
+            "loss_mask_prefix_separator": self._cfg["loss_mask_prefix_separator"],
             "test_loss": test_loss,
             "test_perplexity": test_ppl,
             "best_val_loss": best_val_loss,
@@ -998,6 +1002,7 @@ class BaseTrainer:
             "early_stopping_patience": self._cfg["early_stopping_patience"],
             "test_split_ratio": self._cfg["test_split_ratio"],
             "finetune_lr_cap": self._cfg["finetune_lr_cap"],
+            "loss_mask_prefix_separator": self._cfg["loss_mask_prefix_separator"],
         }
 
         full: TrainingManifestFull = {
@@ -1027,6 +1032,7 @@ class BaseTrainer:
             "early_stopping_patience": manifest["early_stopping_patience"],
             "test_split_ratio": manifest["test_split_ratio"],
             "finetune_lr_cap": manifest["finetune_lr_cap"],
+            "loss_mask_prefix_separator": manifest["loss_mask_prefix_separator"],
             "test_loss": manifest["test_loss"],
             "test_perplexity": manifest["test_perplexity"],
             "best_val_loss": manifest["best_val_loss"],

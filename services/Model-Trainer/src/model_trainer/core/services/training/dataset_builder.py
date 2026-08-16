@@ -60,7 +60,58 @@ def split_corpus_files(cfg: DatasetConfig) -> tuple[list[str], list[str], list[s
     return train_files, val_files, test_files
 
 
+IGNORE_INDEX = -100
+
+
+def _split_line(
+    line: str,
+    tokenizer: Encoder,
+    separator: str | None,
+) -> tuple[list[int], list[int]]:
+    """Tokenize one corpus line, splitting off a masked prefix if configured.
+
+    Args:
+        line: The stripped corpus line.
+        tokenizer: Encoder used for both halves.
+        separator: Marker separator, or None to mask nothing. A line that does
+            not contain it is treated as having no prefix, because the corpus
+            legitimately mixes marked wiki paragraphs with unmarked dilution.
+
+    Returns:
+        Token ids of the prefix (to be excluded from the loss) and of the body.
+    """
+    if separator is None:
+        encoded: Encoded = tokenizer.encode(line)
+        return [], list(encoded.ids)
+
+    head, found, tail = line.partition(separator)
+    if found == "":
+        unmarked: Encoded = tokenizer.encode(line)
+        return [], list(unmarked.ids)
+
+    prefix: Encoded = tokenizer.encode(head + separator)
+    body: Encoded = tokenizer.encode(tail)
+    return list(prefix.ids), list(body.ids)
+
+
 class CausalLMDataset:
+    """Packs a corpus into fixed-length blocks of (input_ids, labels).
+
+    Labels normally equal the inputs. When ``loss_mask_prefix_separator`` is
+    set, the part of each line up to and including the first occurrence of that
+    separator is treated as metadata: it is still fed to the model as context,
+    but its label positions carry :data:`IGNORE_INDEX` so no gradient flows
+    from predicting it.
+
+    That distinction matters for corpus-marker experiments. Prepending a domain
+    marker to every paragraph and then training on the marker tokens is not the
+    same intervention as prepending it and excluding it from the loss, and the
+    two have been measured to differ. Splitting the line and tokenising the two
+    halves separately is what makes the boundary addressable at all -- encoding
+    the joined line gives no way to know where the marker's tokens end, because
+    BPE may merge across the seam.
+    """
+
     def __init__(
         self: CausalLMDataset,
         *,
@@ -69,6 +120,7 @@ class CausalLMDataset:
         max_len: int,
         eos_id: int,
         pad_id: int,
+        loss_mask_prefix_separator: str | None = None,
     ) -> None:
         total_files = len(files)
         _logger.info(
@@ -82,8 +134,10 @@ class CausalLMDataset:
         )
 
         self._ids: list[int] = []
+        self._labels: list[int] = []
         total_lines = 0
         files_processed = 0
+        masked_tokens = 0
 
         # Log progress every 10% of files or at least every 10 files
         log_interval = max(1, min(10, total_files // 10))
@@ -95,8 +149,16 @@ class CausalLMDataset:
                     s = line.strip()
                     if not s:
                         continue
-                    enc: Encoded = tokenizer.encode(s)
-                    self._ids.extend([*enc.ids, eos_id])
+                    prefix_ids, body_ids = _split_line(s, tokenizer, loss_mask_prefix_separator)
+                    self._ids.extend([*prefix_ids, *body_ids, eos_id])
+                    self._labels.extend(
+                        [
+                            *([IGNORE_INDEX] * len(prefix_ids)),
+                            *body_ids,
+                            eos_id,
+                        ]
+                    )
+                    masked_tokens += len(prefix_ids)
                     file_lines += 1
             total_lines += file_lines
             files_processed += 1
@@ -127,11 +189,12 @@ class CausalLMDataset:
         num_chunks = max(1, (len(self._ids) + max_len - 1) // max_len) if self._ids else 0
 
         _logger.info(
-            "Tokenization completed files=%d lines=%d tokens=%d chunks=%d",
+            "Tokenization completed files=%d lines=%d tokens=%d chunks=%d masked=%d",
             total_files,
             total_lines,
             len(self._ids),
             num_chunks,
+            masked_tokens,
             extra={
                 "category": "dataset",
                 "event": "tokenization_completed",
@@ -140,6 +203,7 @@ class CausalLMDataset:
                 "tokens": len(self._ids),
                 "chunks": num_chunks,
                 "max_len": max_len,
+                "masked_tokens": masked_tokens,
             },
         )
 
@@ -149,11 +213,28 @@ class CausalLMDataset:
         # Number of chunks, include partial trailing chunk
         return max(1, (len(self._ids) + self._max_len - 1) // self._max_len)
 
-    def __getitem__(self: CausalLMDataset, idx: int) -> torch.Tensor:
+    def __getitem__(self: CausalLMDataset, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return one block as (input_ids, labels).
+
+        Padding is excluded from the loss for the same reason a masked prefix
+        is: the model should not be scored on predicting filler. Only the final
+        block is ever padded.
+
+        Args:
+            idx: Block index.
+
+        Returns:
+            The block's input ids and its label ids.
+        """
         start = idx * self._max_len
         end = start + self._max_len
         chunk = self._ids[start:end]
+        labels = self._labels[start:end]
         if len(chunk) < self._max_len:
-            pad = [self._pad_id] * (self._max_len - len(chunk))
-            chunk = chunk + pad
-        return torch.tensor(chunk, dtype=torch.long)
+            missing = self._max_len - len(chunk)
+            chunk = chunk + [self._pad_id] * missing
+            labels = labels + [IGNORE_INDEX] * missing
+        return (
+            torch.tensor(chunk, dtype=torch.long),
+            torch.tensor(labels, dtype=torch.long),
+        )

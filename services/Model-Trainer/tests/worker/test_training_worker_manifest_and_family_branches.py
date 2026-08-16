@@ -37,6 +37,7 @@ def _base_manifest() -> _ManifestDict:
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
+        "loss_mask_prefix_separator": None,
         "early_stopped": False,
         "versions": {
             "torch": "0",

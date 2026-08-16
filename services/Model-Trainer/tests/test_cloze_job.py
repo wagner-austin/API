@@ -126,6 +126,7 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
         "early_stopping_patience": 5,
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
+        "loss_mask_prefix_separator": None,
         "precision": "fp32",
         "finetuning_strategy": "full",
         "hub_model_id": None,

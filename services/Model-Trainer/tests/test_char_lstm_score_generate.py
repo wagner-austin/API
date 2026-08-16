@@ -102,6 +102,7 @@ def _prepare_trained_model(settings: Settings, tmp_path: Path) -> tuple[Prepared
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
+        "loss_mask_prefix_separator": None,
         "precision": "fp32",
         "finetuning_strategy": "full",
         "hub_model_id": None,

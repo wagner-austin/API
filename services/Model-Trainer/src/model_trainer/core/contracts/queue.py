@@ -50,6 +50,7 @@ class TrainRequestPayload(TypedDict):
     early_stopping_patience: int
     test_split_ratio: float
     finetune_lr_cap: float
+    loss_mask_prefix_separator: str | None
     # HuggingFace LM backend fields
     hub_model_id: str | None
     finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]

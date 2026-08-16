@@ -75,6 +75,7 @@ def make_test_config(
         "early_stopping_patience": 3,
         "test_split_ratio": 0.1,
         "finetune_lr_cap": 0.0001,
+        "loss_mask_prefix_separator": None,
         "finetuning_strategy": "unsloth",
         "hub_model_id": "unsloth/llama-3-8b-bnb-4bit",
         "lora": lora,

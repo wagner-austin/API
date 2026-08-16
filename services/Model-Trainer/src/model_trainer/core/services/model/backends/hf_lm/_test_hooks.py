@@ -220,8 +220,8 @@ class CausalLMDatasetProto(Protocol):
         """Return number of samples."""
         ...
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        """Get sample at index."""
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """Get the sample at index as (input_ids, labels)."""
         ...
 
 
@@ -255,8 +255,8 @@ class CreateCausalDatasetFn(Protocol):
 class DataLoaderProto(Protocol):
     """Protocol for DataLoader instance (iterable over batches)."""
 
-    def __iter__(self) -> Generator[torch.Tensor, None, None]:
-        """Return iterator over batches."""
+    def __iter__(self) -> Generator[Sequence[torch.Tensor], None, None]:
+        """Return iterator over batches of (input_ids, labels)."""
         ...
 
 

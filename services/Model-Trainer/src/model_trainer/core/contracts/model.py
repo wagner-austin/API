@@ -143,6 +143,12 @@ class ModelTrainConfig(TypedDict):
     early_stopping_patience: int
     test_split_ratio: float
     finetune_lr_cap: float
+    # When set, the part of each corpus line up to and including the first
+    # occurrence of this string is fed to the model as context but excluded
+    # from the loss. Used for metadata-conditioned corpora, where the marker
+    # should inform prediction without being a prediction target. None means
+    # every token is a target.
+    loss_mask_prefix_separator: str | None
     # Pluggable fine-tuning strategy (like covenant_ml backends)
     finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]
     # Strategy-specific configuration (None = not used by current strategy)

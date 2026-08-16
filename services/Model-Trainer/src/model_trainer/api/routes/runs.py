@@ -351,6 +351,7 @@ class _RunsRoutes:
             "correct": out["correct"],
             "accuracy": out["accuracy"],
             "chance": out["chance"],
+            "outcomes": out["outcomes"],
         }
 
     def get_cloze(self: _RunsRoutes, run_id: str, request_id: str) -> ClozeResponse:
@@ -363,6 +364,7 @@ class _RunsRoutes:
             "correct": out["correct"],
             "accuracy": out["accuracy"],
             "chance": out["chance"],
+            "outcomes": out["outcomes"],
         }
 
     async def enqueue_score(self: _RunsRoutes, run_id: str, request: Request) -> ScoreResponse:

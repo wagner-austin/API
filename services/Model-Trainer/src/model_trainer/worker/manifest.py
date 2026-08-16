@@ -215,6 +215,10 @@ class _ManifestFields:
     early_stopping_patience: int
     test_split_ratio: float
     finetune_lr_cap: float
+    # None on runs trained before masking existed, and on every run that did
+    # not ask for it. Recorded so an arm's masking setting is auditable from
+    # its artifacts rather than only from the script that submitted it.
+    loss_mask_prefix_separator: str | None
     test_loss: float | None
     test_perplexity: float | None
     best_val_loss: float | None
@@ -246,6 +250,7 @@ class _ManifestFields:
         early_stopping_patience: int,
         test_split_ratio: float,
         finetune_lr_cap: float,
+        loss_mask_prefix_separator: str | None,
         test_loss: float | None,
         test_perplexity: float | None,
         best_val_loss: float | None,
@@ -274,6 +279,7 @@ class _ManifestFields:
         self.early_stopping_patience = early_stopping_patience
         self.test_split_ratio = test_split_ratio
         self.finetune_lr_cap = finetune_lr_cap
+        self.loss_mask_prefix_separator = loss_mask_prefix_separator
         self.test_loss = test_loss
         self.test_perplexity = test_perplexity
         self.best_val_loss = best_val_loss
@@ -306,6 +312,7 @@ def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
         early_stopped=require_bool(obj, "early_stopped"),
         git_commit=_optional_str(obj, "git_commit"),
         pretrained_run_id=_optional_str(obj, "pretrained_run_id"),
+        loss_mask_prefix_separator=_optional_str(obj, "loss_mask_prefix_separator"),
         test_loss=_optional_float(obj, "test_loss"),
         test_perplexity=_optional_float(obj, "test_perplexity"),
         best_val_loss=_optional_float(obj, "best_val_loss"),
@@ -386,6 +393,7 @@ def load_manifest_from_text(text: str) -> TrainingManifest:
         "early_stopping_patience": fields.early_stopping_patience,
         "test_split_ratio": fields.test_split_ratio,
         "finetune_lr_cap": fields.finetune_lr_cap,
+        "loss_mask_prefix_separator": fields.loss_mask_prefix_separator,
         "test_loss": fields.test_loss,
         "test_perplexity": fields.test_perplexity,
         "best_val_loss": fields.best_val_loss,

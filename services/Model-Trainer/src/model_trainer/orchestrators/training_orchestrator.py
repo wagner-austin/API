@@ -102,6 +102,7 @@ class TrainingOrchestrator:
             "early_stopping_patience": req["early_stopping_patience"],
             "test_split_ratio": req["test_split_ratio"],
             "finetune_lr_cap": req["finetune_lr_cap"],
+            "loss_mask_prefix_separator": req["loss_mask_prefix_separator"],
             "hub_model_id": req["hub_model_id"],
             "finetuning_strategy": req["finetuning_strategy"],
             "lora": req["lora"],
