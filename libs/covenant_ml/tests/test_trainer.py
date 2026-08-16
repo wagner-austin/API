@@ -11,7 +11,7 @@ import pytest
 from numpy.typing import NDArray
 
 from covenant_ml import save_model, train_model
-from covenant_ml.testing import make_train_config, set_cuda_hook
+from covenant_ml.testing import make_train_config, reset_cuda_hook, set_cuda_hook
 from covenant_ml.trainer import (
     DataSplits,
     _resolve_device,
@@ -237,7 +237,7 @@ def test_cuda_hook_forces_cpu_when_disabled() -> None:
         resolved = _resolve_device("auto", fake_module)
         assert resolved == "cpu"
     finally:
-        set_cuda_hook(None)
+        reset_cuda_hook()
 
 
 def test_cuda_hook_allows_cuda_request_when_supported() -> None:
@@ -248,7 +248,7 @@ def test_cuda_hook_allows_cuda_request_when_supported() -> None:
         resolved = _resolve_device("cuda", fake_module)
         assert resolved == "cuda"
     finally:
-        set_cuda_hook(None)
+        reset_cuda_hook()
 
 
 def test_train_model_produces_valid_probabilities() -> None:

@@ -6,7 +6,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from covenant_ml.testing import set_cuda_hook
+from covenant_ml.testing import reset_cuda_hook, set_cuda_hook
 from covenant_persistence import ConnectionProtocol
 from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 from fastapi import APIRouter, FastAPI
@@ -222,7 +222,7 @@ def _disable_cuda_impl() -> Generator[None, None, None]:
     """Disable CUDA in tests to avoid XGBoost GPU warnings."""
     set_cuda_hook(lambda: False)
     yield
-    set_cuda_hook(None)
+    reset_cuda_hook()
 
 
 def _reset_datadog_hooks_impl() -> Generator[None, None, None]:

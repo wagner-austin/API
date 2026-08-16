@@ -16,7 +16,7 @@ from typing import Literal, TypedDict
 from covenant_ml.types import BackendName
 from platform_core.logging import setup_rich_logging
 
-from scripts.amex._hooks import configure_real_scipy, get_console, get_project_root
+from scripts.amex._hooks import get_console, get_project_root
 from scripts.amex.pipeline import run_pipeline
 from scripts.amex.types import AMEXPipelineConfig
 
@@ -369,7 +369,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         Exit code (0 for success, non-zero for failure).
     """
     setup_rich_logging()
-    configure_real_scipy()
 
     raw_argv: Sequence[str] = sys.argv[1:] if argv is None else argv
     args = parse_args(raw_argv)

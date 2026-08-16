@@ -27,7 +27,6 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from scripts.amex._hooks import (
-    configure_real_scipy,
     get_console,
     get_ensemble_optimizer,
     get_registry,
@@ -507,7 +506,6 @@ def optimize_ensemble(
     console.write("Optimizing ensemble weights")
 
     # Configure scipy (in case it hasn't been done)
-    configure_real_scipy()
 
     # Build EnsembleOOFData
     model_preds: list[ModelOOFPredictions] = []

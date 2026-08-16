@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Literal
 
-from .trainer import set_cuda_available_hook
+from . import _hooks
+from ._hooks import CudaRuntimeAvailableProtocol
 from .types import (
     LightGBMConfig,
     LogRegConfig,
@@ -20,9 +20,19 @@ from .types import (
 )
 
 
-def set_cuda_hook(hook: Callable[[], bool] | None) -> None:
-    """Override CUDA availability detection for tests."""
-    set_cuda_available_hook(hook)
+def set_cuda_hook(hook: CudaRuntimeAvailableProtocol) -> None:
+    """Narrow CUDA availability for a test.
+
+    Args:
+        hook: Answer to use in place of the real one, typically one that
+            returns False so a GPU-less run resolves 'auto' to cpu.
+    """
+    _hooks.cuda_runtime_available = hook
+
+
+def reset_cuda_hook() -> None:
+    """Restore the real CUDA availability answer."""
+    _hooks.cuda_runtime_available = _hooks._real_cuda_runtime_available
 
 
 def make_train_config(
@@ -398,5 +408,6 @@ __all__ = [
     "make_random_forest_config",
     "make_train_config",
     "make_xgboost_regressor_config",
+    "reset_cuda_hook",
     "set_cuda_hook",
 ]

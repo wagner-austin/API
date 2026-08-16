@@ -18,11 +18,8 @@ from covenant_ml.datasets import (
     TimeSeriesDatasetConfig,
     create_timeseries_csv_loader,
 )
-from covenant_ml.ensemble.optimizer import (
-    _MinimizeFnProtocol,
-    set_minimize_hook,
-    use_real_scipy,
-)
+from covenant_ml.ensemble import _hooks as ensemble_hooks
+from covenant_ml.ensemble._hooks import _MinimizeFnProtocol
 from covenant_ml.ensemble.types import EnsembleOOFData, OptimizationConfig, OptimizationResult
 from covenant_ml.types import BackendName
 
@@ -316,21 +313,18 @@ def get_ensemble_optimizer() -> EnsembleOptimizerCallable:
 # =============================================================================
 
 
-def configure_real_scipy() -> None:
-    """Configure scipy.optimize.minimize for production use.
-
-    Call this at application startup to enable real scipy optimization.
-    """
-    use_real_scipy()
-
-
 def configure_minimize_hook(hook: _MinimizeFnProtocol) -> None:
     """Configure a custom minimize function for testing.
 
     Args:
         hook: The minimize function to use.
     """
-    set_minimize_hook(hook)
+    ensemble_hooks.minimize = hook
+
+
+def restore_real_minimize() -> None:
+    """Restore the real scipy solver covenant_ml binds."""
+    ensemble_hooks.minimize = ensemble_hooks._real_minimize
 
 
 __all__ = [
@@ -343,7 +337,6 @@ __all__ = [
     "RegistryProtocol",
     "TimeSeriesLoaderCallable",
     "configure_minimize_hook",
-    "configure_real_scipy",
     "console_hook",
     "ensemble_optimizer_hook",
     "get_console",
@@ -353,5 +346,6 @@ __all__ = [
     "get_timeseries_loader",
     "project_root_hook",
     "registry_hook",
+    "restore_real_minimize",
     "timeseries_loader_hook",
 ]

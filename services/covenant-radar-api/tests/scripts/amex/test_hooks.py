@@ -387,10 +387,10 @@ class TestRealImplementations:
             ModelOOFPredictions,
             make_default_optimization_config,
         )
-        from scripts.amex._hooks import _real_ensemble_optimizer, configure_real_scipy
+        from scripts.amex._hooks import _real_ensemble_optimizer, restore_real_minimize
 
-        # Ensure real scipy is configured
-        configure_real_scipy()
+        # Ensure the real solver is in place after any earlier fake
+        restore_real_minimize()
 
         # Create test data using tuples to avoid list[Any]
         preds1 = np.asarray((0.1, 0.9, 0.2, 0.8), dtype=np.float64)

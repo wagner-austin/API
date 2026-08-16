@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import Callable
-from collections.abc import Callable as TypingCallable
 from pathlib import Path
 from typing import Protocol
 
@@ -20,6 +19,7 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
+from . import _hooks
 from .metrics import (
     compute_all_metrics,
     compute_all_regression_metrics,
@@ -338,15 +338,6 @@ class _XGBRegressorModuleProto(Protocol):
     DMatrix: DMatrixFactory
 
 
-_cuda_available_hook: TypingCallable[[], bool] | None = None
-
-
-def set_cuda_available_hook(hook: TypingCallable[[], bool] | None) -> None:
-    """Set test hook for CUDA availability detection."""
-    global _cuda_available_hook
-    _cuda_available_hook = hook
-
-
 def _detect_cuda_available(xgb_mod: _XGBModuleProto) -> bool:
     """Detect whether XGBoost was built with CUDA/GPU support.
 
@@ -365,14 +356,19 @@ def _detect_cuda_available(xgb_mod: _XGBModuleProto) -> bool:
 
 
 def _cuda_is_available(xgb_mod: _XGBModuleProto) -> bool:
-    """Check CUDA availability with optional test hook.
+    """Check CUDA availability.
 
-    Combines build-time CUDA check with optional runtime test hook.
+    Combines the build-time check with the run-time answer, which production
+    binds to True and a test can narrow to False.
     Used by _resolve_device() for 'auto' mode device selection.
+
+    Args:
+        xgb_mod: The xgboost module to read build info from.
+
+    Returns:
+        True when the build supports CUDA and nothing rules it out at run time.
     """
-    if _cuda_available_hook is not None:
-        return bool(_cuda_available_hook()) and _detect_cuda_available(xgb_mod)
-    return _detect_cuda_available(xgb_mod)
+    return _hooks.cuda_runtime_available() and _detect_cuda_available(xgb_mod)
 
 
 def _resolve_device(requested: RequestedDevice, xgb_mod: _XGBModuleProto) -> ResolvedDevice:
