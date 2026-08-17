@@ -15,6 +15,7 @@ from tankpit_bot.runtime_logging import (
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_tanks import (
     _update_tank_position,
+    update_world_state_from_tank_exit,
 )
 from tankpit_bot.state import (
     set_self_rank,
@@ -221,6 +222,14 @@ def _dispatch_tank_announcements(ws: WorldService, decoded: protocol.BinaryMessa
                 was_silent=was_silent,
                 was_eliminated=was_eliminated,
             )
+            # 0x29 is the authoritative game departure (the "left the
+            # game" banner's source) -- not 0x58 tracking churn. Until
+            # 2026-08-14 this was diagnostic-only, and the registry
+            # ghost of a departed tank powered a ~75 s chase (flag
+            # s11-6: the 0x29 for Artax arrived at 23:39:17, the
+            # chase ran 23:41:43-23:43:03, and only a shot's err=3
+            # receipt ended it).
+            update_world_state_from_tank_exit(ws, tid)
             return True
         case {
             "msg_type": 0x2B,

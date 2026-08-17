@@ -17,7 +17,7 @@ from tankpit_bot.facts.provenance import make_provenance
 from tankpit_bot.facts.source import FactSource
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.state import remove_tank
+from tankpit_bot.state import depart_tank, remove_tank
 from tankpit_bot.state.tank_mutations import apply_tank_observation
 from tankpit_bot.state.types import WorldStateDict, make_self_state, make_tank_observation
 
@@ -253,6 +253,29 @@ def update_world_state_from_tank_remove(ws: WorldService, tank_id: int) -> None:
     # (see wiki [[shoot-event-format]] section "Global action queue").
     emit_diagnostic(diagnostic_kind="tank_removed", tank_id=tank_id)
     ws.world_state = remove_tank(ws.world_state, tank_id, browser.get_current_time_ms())
+
+
+def update_world_state_from_tank_exit(ws: WorldService, tank_id: int) -> None:
+    """Handle TankExit (0x29) — the authoritative game departure, which DELETES.
+
+    Not 0x58: TankRemove is per-client tracking churn and stays a
+    no-op ([[bot-behavior-contract]]); TankExit is the server's
+    room-wide "left the game / eliminated from the game" announcement
+    (the client banner's source). Ghost precedent (run arterial
+    2026-08-13 23:39-23:43, flag s11-6): the 0x29 for Artax arrived
+    at 23:39:17, was dropped as diagnostic-only, and the registry
+    ghost powered a ~75 s map-open/teleport/shoot chase until a
+    shot's err=3 receipt said the same thing the wire already had.
+    Deleting the entry releases any held lock through the existing
+    gone-from-registry pursuit path and drops the tank from every
+    threat list at once; a rejoin re-adds it on first observation.
+
+    Args:
+        ws: World service instance.
+        tank_id: The departed tank's id.
+    """
+    log.info("WORLD: TANK_EXIT: id=%d left the game - registry entry removed", tank_id)
+    ws.world_state = depart_tank(ws.world_state, tank_id)
 
 
 def _update_tank_position(
