@@ -23,6 +23,7 @@ class FakeCDPLogin:
         rate_limited: bool = False,
         login_error: str = "",
         include_practice_room: bool = True,
+        practice_troop: int = 2,
         emit_join_confirm: bool = True,
         emit_enter_response: bool = True,
         select_send_result: str = "SENT_4_BYTES via wss://tankpit.com/ws/",
@@ -34,6 +35,7 @@ class FakeCDPLogin:
         self._login_error = login_error
         self._account_login_started = False
         self._include_practice_room = include_practice_room
+        self._practice_troop = practice_troop
         self._emit_join_confirm = emit_join_confirm
         self._emit_enter_response = emit_enter_response
         self._select_send_result = select_send_result
@@ -44,6 +46,7 @@ class FakeCDPLogin:
         self.enter_room_called = False
         self.selected_room_id: str | None = None
         self.entered_room_id: str | None = None
+        self.entered_troop: int | None = None
 
     def _captured_payloads(self) -> list[JSONValue]:
         """Return the synthetic captured raw-message buffer."""
@@ -53,11 +56,8 @@ class FakeCDPLogin:
             ).decode("utf-8")
         ]
         if self._include_practice_room:
-            payloads.append(
-                base64.b64encode(
-                    encode_frame(b"+1|Practice|1|0,0,0,0,0,0,0|2|p|field01.gif|2026")
-                ).decode("utf-8")
-            )
+            entry = f"+1|Practice|1|0,0,0,0,0,0,0|{self._practice_troop}|p|field01.gif|2026"
+            payloads.append(base64.b64encode(encode_frame(entry.encode())).decode("utf-8"))
         if self._emit_join_confirm and self._selected_room is not None:
             confirm = f"={self._selected_room}|Sep. 25, 2012|Artax|4|9|9|9|9".encode()
             payloads.append(base64.b64encode(encode_frame(confirm)).decode("utf-8"))
@@ -97,6 +97,7 @@ class FakeCDPLogin:
             self.enter_room_called = True
             self._entered_room = parts[0].decode("utf-8")
             self.entered_room_id = self._entered_room
+            self.entered_troop = int(parts[1].decode("utf-8"))
             if self._enter_send_result is not None:
                 return {"result": {"value": self._enter_send_result}}
             return {"result": {"value": f"SENT_{len(framed)}_BYTES via wss://tankpit.com/ws/"}}

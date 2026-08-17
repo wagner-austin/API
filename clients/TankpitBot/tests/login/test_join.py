@@ -22,9 +22,11 @@ from tankpit_bot.browser.room_join import (
     _wait_for_join_confirm,
     _wait_for_room_id,
     join_room,
+    resolve_room_troop,
 )
 from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.sniffer.world_service import WorldService
+from tests.conftest import FakeEnv
 from tests.login.conftest import (
     FakeCDPLogin,
     FakeCDPLoginNonDictResult,
@@ -71,6 +73,79 @@ def test_join_room_success() -> None:
     assert cdp.selected_room_id == "1"
     assert cdp.enter_room_called is True
     assert cdp.entered_room_id == "1"
+
+
+def test_join_room_first_time_entry_chooses_a_troop() -> None:
+    """A ``default_troop == -1`` room still joins: the bot picks a color.
+
+    The 2026-08-13 Arterial failure: an account with no tank on the
+    room gets ``-1`` in the lobby entry (the UI answers it with a
+    color picker), and the join must substitute a chosen troop in the
+    enter request instead of stalling at a picker it never clicks.
+    """
+    page = FakePageLogin(start_url="https://tankpit.com/play")
+    cdp = FakeCDPLogin(practice_troop=-1)
+
+    result = join_room(page, cdp, WorldService())
+
+    assert result is True
+    assert cdp.enter_room_called is True
+    assert cdp.entered_room_id == "1"
+
+
+def test_join_room_env_troop_overrides_the_account_default(fake_env: FakeEnv) -> None:
+    """An explicit ``TANKPIT_TROOP`` picks WHICH of the account's tanks to play.
+
+    Fleet ruling 2026-08-14 (same-team allies): accounts hold one tank
+    per color per map, and arterial's account default is orange while
+    the fleet plays blue -- the enter request must carry the
+    configured color, not the lobby's ``default_troop``.
+    """
+    fake_env.set("TANKPIT_TROOP", "2")
+    page = FakePageLogin(start_url="https://tankpit.com/play")
+    cdp = FakeCDPLogin(practice_troop=3)
+
+    result = join_room(page, cdp, WorldService())
+
+    assert result is True
+    assert cdp.entered_troop == 2
+
+
+def test_join_room_first_time_entry_honours_env_troop(fake_env: FakeEnv) -> None:
+    """A first-time entry (``default_troop == -1``) uses the configured color."""
+    fake_env.set("TANKPIT_TROOP", "3")
+    page = FakePageLogin(start_url="https://tankpit.com/play")
+    cdp = FakeCDPLogin(practice_troop=-1)
+
+    result = join_room(page, cdp, WorldService())
+
+    assert result is True
+    assert cdp.entered_troop == 3
+
+
+def test_resolve_room_troop_unset_is_none() -> None:
+    """Unset ``TANKPIT_TROOP`` means no explicit color was configured.
+
+    The join flow then follows the account's default tank, or blue on
+    a first-time entry -- the resolver only reports what the operator
+    asked for.
+    """
+    assert resolve_room_troop() is None
+
+
+def test_resolve_room_troop_honours_the_env_selector(fake_env: FakeEnv) -> None:
+    """``TANKPIT_TROOP`` selects the color; out-of-range values raise.
+
+    An explicit color OVERRIDES the account's default tank (fleet
+    ruling 2026-08-14: accounts hold one tank per color per map, and
+    the enter request's troop byte picks which one to play).
+    """
+    fake_env.set("TANKPIT_TROOP", "3")
+    assert resolve_room_troop() == 3
+
+    fake_env.set("TANKPIT_TROOP", "4")
+    with pytest.raises(ValueError, match="TANKPIT_TROOP"):
+        resolve_room_troop()
 
 
 def test_join_room_returns_false_when_target_room_missing() -> None:
@@ -380,6 +455,25 @@ def test_wait_for_room_id_returns_none_when_missing() -> None:
     """Room-ID waiting returns None when the target room never appears."""
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin(include_practice_room=False)
+
+    assert _wait_for_room_id(page, cdp, WorldService(), "Practice") is None
+
+
+def test_room_discovery_timeout_diagnostic_tolerates_empty_frames() -> None:
+    """The timeout dump skips undecodable frames and still reports.
+
+    The 2026-08-13 arterial fresh-login lobby exposed one non-target
+    room and the diagnostic dump is the discriminator between a parse
+    rejection and a capture race — it must never crash on an empty
+    captured frame while producing the report.
+    """
+    page = FakePageLogin(start_url="https://tankpit.com/play")
+    cdp = _RawMessageCDP(
+        [
+            _frame_payload(b""),
+            _frame_payload(b"+5|World (Desert)|2|d|2|n|desert.gif|2026"),
+        ]
+    )
 
     assert _wait_for_room_id(page, cdp, WorldService(), "Practice") is None
 
