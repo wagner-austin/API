@@ -259,6 +259,53 @@ class TestGreetingThroughDecide:
         assert decision["updated_ai_state"]["combat_target_id"] == 50
         assert decision["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
 
+    def test_decide_greets_on_a_collect_owned_arrival_tick(self) -> None:
+        """The COLLECT owner's decision carries the greeting too.
+
+        The arrival tick after a greet-approach teleport is
+        collect-owned by construction: the teleport burned the fuel
+        that hunt-only-when-full requires, so the first face-to-face
+        decisions are refuels. Run bot-20260814-204750 proved the
+        hunt-only attach mute: artax stood 5 tiles from "123" for
+        12 seconds, made two collect-owned decisions, and never said
+        hello. Low fuel + a fuel container keeps this tick
+        collect-owned; the human in view must still draw the HELLO.
+        """
+        from tankpit_bot.bot.ai_strategy import decide
+        from tests.bot.ai._support import make_container
+
+        ws = WorldService()
+        human = make_tank_state(
+            tank_id=50,
+            x=105,
+            y=100,
+            team=2,
+            rank=4,
+            name="Yuppler",
+            is_self=False,
+            is_bot=False,
+            damage_state=0,
+            timestamp_ms=100000,
+            last_wire_seen_ms=100000,
+            last_position_update_ms=100000,
+            last_viewport_observation_ms=100000,
+        )
+        world, self_state = make_world(
+            fuel=400,
+            tanks={"50": human},
+            containers={"103,100": make_container(103, 100, 200, True)},
+        )
+        ai_state = make_scanned_ai_state()
+        inventory = make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
+
+        assert decision["behavior"]["mode"] == "COLLECT"
+        assert decision["secondary_command"] == make_chat_command(
+            CHAT_HELLO, self_state["x"], self_state["y"]
+        )
+        assert decision["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
+
     def test_decide_stays_silent_when_locking_a_practice_bot(self) -> None:
         """The same acquisition against a practice bot attaches nothing."""
         from tankpit_bot.bot.ai_strategy import decide
@@ -301,35 +348,39 @@ def test_greets_the_nearest_of_two_viewport_humans() -> None:
     assert result["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
 
 
-def test_far_off_viewport_human_is_greeted_anyway() -> None:
-    """Chat is global: a map-fresh human across the field gets the HELLO.
+def test_far_off_viewport_human_is_not_greeted_yet() -> None:
+    """REVERSED 2026-08-14 (arrival law): the hello waits for arrival.
 
-    User ruling 2026-07-31, verbatim: "hello can run anytime... as
-    long as the other player is on the map logged in. you dont have
-    to be near them." The stand-off VISIT keeps its own latch and
-    proximity machinery; the hello never waits for it.
+    User ruling, verbatim: "he's supposed to say hello AFTER
+    teleporting to the human, when he's ready to engage, not way
+    before" — superseding the 2026-07-31 greet-from-anywhere rule
+    (artax HELLO'd Arterial from across the map, then teleported in
+    much later). A human outside the visible viewport keeps their
+    ungreeted latch; the tick after the bot lands in front of them,
+    the hello fires.
     """
     ctx = _ctx({"50": _tank(50, "Yuppler", x=240, y=30)})
     decision = _decision(combat_target_id=-1)
 
     result = attach_human_greeting(ctx, decision)
 
-    assert result["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
-    assert result["secondary_command"] == make_chat_command(
-        CHAT_HELLO, ctx.self_state["x"], ctx.self_state["y"]
-    )
+    assert result["updated_ai_state"]["greeted_tank_ids"] == {}
+    assert result["secondary_command"] is None
 
 
-def test_position_unsynced_human_is_greeted_anyway() -> None:
-    """A logged-in human whose position has not synced still gets the HELLO.
+def test_position_unsynced_human_is_not_greeted_yet() -> None:
+    """A human still at the login-roster (0,0) default is not in view.
 
-    The (0,0) sentinel gates targeting and the stand-off visit (both
-    need real coordinates), never the chat — they are in the game the
-    moment their identity broadcast lands.
+    The arrival law (2026-08-14) folds the old position-unsynced
+    special case away: no real coordinates means they cannot be in
+    the visible viewport, so the hello simply waits for the first
+    face-to-face tick like every other greeting.
     """
     ctx = _ctx({"50": _tank(50, "Yuppler", x=0, y=0)})
+
     decision = _decision(combat_target_id=-1)
 
     result = attach_human_greeting(ctx, decision)
 
-    assert result["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
+    assert result["updated_ai_state"]["greeted_tank_ids"] == {}
+    assert result["secondary_command"] is None
