@@ -99,7 +99,14 @@ def is_room_info_text(text: str) -> bool:
         return False
     if not parts[2].isdigit():
         return False
-    if not parts[4].isdigit():
+    # default_troop is -1 for a room this ACCOUNT has no tank on yet
+    # (first-time entry requires choosing a color). Measured live
+    # 2026-08-13: the fresh Arterial account's Practice entry arrived
+    # as `+1|Practice|1|0,0,0,0,0,0,0|-1|p|field01.gif|2026` and the
+    # digits-only test here silently rejected it, which surfaced as
+    # "room list never exposed Practice" on every fresh login.
+    troop = parts[4]
+    if not (troop.isdigit() or (troop.startswith("-") and troop[1:].isdigit())):
         return False
     if not parts[6].endswith(".gif"):
         return False
