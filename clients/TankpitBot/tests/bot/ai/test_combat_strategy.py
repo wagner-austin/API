@@ -9,15 +9,18 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.combat_landing import SHOT_RANGE_TILES
 from tankpit_bot.bot.ai.combat_strategy import (
     engage_target,
+    frame_target_shift,
     has_combat_shot,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.protocol.commands import SCOPE_NORTH
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
     WorldStateDict,
     make_tank_state,
+    make_viewport_state,
 )
 from tests.bot.ai._combat_fixtures import _enemy_threat
 from tests.bot.ai._support import (
@@ -224,6 +227,106 @@ class TestHasCombatShot:
         target = _enemy_threat(x=109, y=100)  # distance=9
 
         assert has_combat_shot(ctx, target) is False
+
+
+class TestFrameTargetShift:
+    """The visibility law at the shoot chokepoint (flag s11-2, 2026-08-13).
+
+    A shot only resolves inside the visible viewport, and the server
+    refuses to homing-track an enemy close enough that a viewport
+    shift would reveal them -- so a target within one anchor-law
+    shift but outside the window gets the free framing shift, never
+    the clamped ground-fire miss (artax fired six ``weapon=0``
+    singles at the window edge while Arterial sat one row above it,
+    returning 90/window).
+    """
+
+    def _ctx_with_target(self, tx: int, ty: int) -> tuple[DecideCtx, EnemyThreatDict]:
+        """Build a ctx (self at (100,100), window (92,92)-(107,107)) and a target.
+
+        Args:
+            tx: Target X.
+            ty: Target Y.
+
+        Returns:
+            Decision context and the matching enemy threat.
+        """
+        ws = WorldService()
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=tx,
+                y=ty,
+                team=2,
+                rank=1,
+                name="EdgeSitter",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+            ws=ws,
+        )
+        target = _enemy_threat(x=tx, y=ty, name="EdgeSitter")
+        return ctx, target
+
+    def test_one_row_off_window_target_is_framed_not_shot(self) -> None:
+        """Flag s11-2 exactly: the enemy one row above the window gets
+        the free framing shift, not the doomed edge-clamped single."""
+        ctx, target = self._ctx_with_target(100, 91)
+
+        decision = engage_target(ctx, target)
+
+        assert decision["command"]["cmd_type"] == "scope_shift"
+        assert decision["command"]["direction"] == SCOPE_NORTH
+        assert decision["behavior"]["reason_kind"] == "combat_frame_shift"
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+    def test_far_target_keeps_the_clamped_homing_snipe(self) -> None:
+        """Beyond one shift's reach the server's seeker genuinely
+        tracks, so the clamped snipe remains the right dispatch."""
+        ctx, target = self._ctx_with_target(100, 80)
+
+        decision = engage_target(ctx, target)
+
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["command"]["target_x"] == 100
+        assert decision["command"]["target_y"] == 92
+
+    def test_stale_viewport_record_declines_the_shift(self) -> None:
+        """A viewport record that excludes the bot is stale or not yet
+        established (the origin arrives with the landing 0x5A) --
+        framing against it would aim at garbage, same guard as the
+        clamp."""
+        ctx, target = self._ctx_with_target(100, 91)
+        ctx.world["viewport"] = make_viewport_state(left=0, top=0, width=16, height=16)
+
+        assert frame_target_shift(ctx, target) is None
+
+    def test_unmovable_window_declines_the_shift(self) -> None:
+        """A window the anchor law cannot move toward the target
+        (already pinned to the tank on the approach axis) answers
+        None instead of dispatching a no-op shift forever."""
+        ctx, target = self._ctx_with_target(112, 100)
+        # A narrowed 10-wide record whose left edge sits ON the tank:
+        # an eastward shift pins left = tank_x, which IS the current
+        # origin, so the anchored window equals the current window.
+        ctx.world["viewport"] = make_viewport_state(left=100, top=92, width=10, height=16)
+
+        assert frame_target_shift(ctx, target) is None
 
 
 class TestFindCombatPickup:

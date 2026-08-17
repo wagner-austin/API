@@ -187,6 +187,46 @@ class TestPursuitHomingCapVsHumans:
         assert decision["behavior"]["reason_kind"] == "find_target"
 
 
+class TestPursuitFramesNearTargets:
+    """A shift-revealable cached position is framed, never sniped.
+
+    The visibility law (flag s11-2, 2026-08-13): within one anchor-law
+    shift the server refuses to homing-track ("close enough that a
+    viewport shift would reveal them" -- confirmed live by artax's six
+    ``weapon=0`` edge misses at Arterial one row off-window), so
+    pursuit fire there is a structural miss that would also wrongly
+    spend the human homing budget. The free framing shift comes first.
+    """
+
+    def _near_ctx(self) -> DecideCtx:
+        """Build an engaged pursuit ctx with the target one row off-window."""
+        ws = WorldService()
+        tanks: dict[str, TankStateDict] = {"50": make_pursuit_target(x=100, y=91, name="Yuppler")}
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "mode": "HUNT",
+                "mode_state": "ENGAGE",
+                "mode_started_ms": 90000,
+                "combat_target_id": 50,
+                "combat_target_x": 100,
+                "combat_target_y": 91,
+                "last_shot_target_id": 50,
+            }
+        )
+        return DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+
+    def test_near_pursuit_frames_and_keeps_the_homing_budget(self) -> None:
+        decision = decide_hunt_mode(self._near_ctx())
+
+        assert decision["command"]["cmd_type"] == "scope_shift"
+        assert decision["behavior"]["reason_kind"] == "combat_frame_shift"
+        # The budget stamp belongs to a fired pursuit homing only --
+        # a framing shift must leave this departure's shot unspent.
+        assert decision["updated_ai_state"]["pursuit_shot_ms"] == 0
+
+
 def test_hunt_close_re_teleports_when_lock_was_never_engaged() -> None:
     """CLOSE state re-teleports when lock was set but no shot ever fired at it.
 

@@ -157,7 +157,7 @@ class TestDecideTeleportToFarTarget:
                 name="red-14",
                 is_self=False,
                 is_bot=False,
-                damage_state=0,
+                damage_state=3,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,

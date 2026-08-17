@@ -399,9 +399,12 @@ class TestCombatTeleportGuards:
         result = teleport_to_target(ctx, _enemy_threat(x=104, y=100, name="BehindRock"))
 
         if result is None:
-            raise AssertionError("expected close teleport decision")
-        assert result["command"]["cmd_type"] == "teleport"
-        assert result["behavior"]["reason_kind"] == "teleport_target"
+            raise AssertionError("expected close decision")
+        # At Manhattan 4 the close WALKS (WALK_CLOSE_TILES re-priced
+        # to 8 from measured speed, HUD flag 16 2026-08-13) -- the
+        # intent is unchanged: get adjacent for the clear line.
+        assert result["command"]["cmd_type"] == "move"
+        assert result["behavior"]["reason_kind"] == "walk_to_target"
 
     def test_engaged_target_behind_terrain_recloses_for_a_clear_shot(self) -> None:
         """Mid-fight, an occluded line re-closes instead of arcing homings.
@@ -453,8 +456,10 @@ class TestCombatTeleportGuards:
         result = close_target(ctx, _enemy_threat(x=104, y=100, name="BehindRock"))
 
         if result is None:
-            raise AssertionError("expected re-close teleport decision")
-        assert result["command"]["cmd_type"] == "teleport"
+            raise AssertionError("expected re-close decision")
+        # The 4-tile re-close WALKS under the re-priced bound (HUD
+        # flag 16, 2026-08-13); the clear-shot intent is unchanged.
+        assert result["command"]["cmd_type"] == "move"
 
     def test_blocked_line_short_close_walks_instead_of_teleporting(self) -> None:
         """A 2-tile re-close with a blocked line is a walk, not a teleport.
@@ -504,14 +509,19 @@ class TestCombatTeleportGuards:
         assert result["updated_ai_state"]["combat_target_id"] == 50
 
     def test_blocked_line_long_close_still_teleports(self) -> None:
-        """Beyond the walk break-even the blocked-line close pays the teleport."""
+        """Beyond the walk break-even the blocked-line close pays the teleport.
+
+        The enemy stands at Manhattan 10 -- past the re-priced
+        ``WALK_CLOSE_TILES`` bound of 8 (HUD flag 16, 2026-08-13), so
+        the paid teleport is still the right close.
+        """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
-                x=106,
+                x=110,
                 y=100,
                 team=2,
                 rank=1,
@@ -523,7 +533,7 @@ class TestCombatTeleportGuards:
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
-        terrain = InMemoryTerrainMap({(103, 100): InMemoryTerrainMap.ROCK})
+        terrain = InMemoryTerrainMap({(105, 100): InMemoryTerrainMap.ROCK})
         ctx = DecideCtx(
             world,
             self_state,
@@ -535,7 +545,7 @@ class TestCombatTeleportGuards:
             ws=ws,
         )
 
-        result = teleport_to_target(ctx, _enemy_threat(x=106, y=100, name="FarEnemy"))
+        result = teleport_to_target(ctx, _enemy_threat(x=110, y=100, name="FarEnemy"))
 
         if result is None:
             raise AssertionError("expected teleport decision")
