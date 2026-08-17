@@ -152,12 +152,16 @@ def test_teammate_scan_reveals_for_the_whole_color() -> None:
 
 
 def test_other_tank_blocks_interior_and_destination() -> None:
-    """Living tanks block routing; dead tanks do not.
+    """Tank bodies block routing — alive or corpse.
 
     A click on an ADJACENT occupied tile is the zero-tile pure
     refusal: the first step is already blocked, nothing walks, and
     the bare code 1 answers (live 2026-08-02 20:58:45 — the one
-    code-1 of twelve with no echo).
+    code-1 of twelve with no echo). A CORPSE blocks identically
+    (run bot-20260813-204615, HUD flag 3: seven pure refusals
+    through a wire-restated corpse sprite corking a one-exit pocket
+    — the 2026-08-04 "dead tanks do not block" claim this test
+    briefly pinned is falsified; see state/occupancy.py).
     """
     world = _world_with_tank()
     world["tanks"][11] = make_sim_tank(11, 1, 1, 11, 10, 500)
@@ -170,8 +174,9 @@ def test_other_tank_blocks_interior_and_destination() -> None:
     assert len(detoured["path"]) == 4
     world["tanks"][9]["x"], world["tanks"][9]["y"] = 10, 10
     world["tanks"][11]["alive"] = False
-    through = process_move(world, InMemoryTerrainMap(), 9, 12, 10)
-    assert through["path"] == "ee"
+    around_corpse = process_move(world, InMemoryTerrainMap(), 9, 12, 10)
+    assert around_corpse["kind"] == "moved"
+    assert len(around_corpse["path"]) == 4
 
 
 def _corridor_terrain() -> InMemoryTerrainMap:

@@ -187,13 +187,18 @@ def test_pressing_any_other_key_is_refused() -> None:
 
 
 def test_the_production_enforcer_verifies_autoscroll_off_over_the_seam() -> None:
-    """The real press-and-verify dance runs against the sim's channel."""
+    """The real direct-send enforcement runs against the sim's channel.
+
+    The link plays both page and CDP roles, exactly as it does for the
+    production bot's command dispatch: the enforcer's ``A0`` rides the
+    same websocket-send seam and the sim server's echo verifies it.
+    """
     link = _link()
     link.open_lobby()
     deliver_batch([], link.server.handshake(), link)
     ws = _drain(link)
 
-    ensure_autoscroll_off(link, link.wire_log, ws)
+    ensure_autoscroll_off(link, link, link.wire_log, ws)
 
     assert link.autoscroll_enabled is False
 

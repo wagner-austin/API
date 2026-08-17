@@ -282,41 +282,31 @@ def _install_lake_terrain(fake_fs: FakeFileSystem) -> None:
     _test_hooks.load_terrain_map = load_lake_terrain
 
 
-def test_ferry_session_scouts_boards_and_drains_the_water_larder(
+def test_ferry_session_boards_and_drains_the_water_larder(
     fake_fs: FakeFileSystem,
 ) -> None:
     """``--ferry`` soaks the full F5 chain through the production bot.
 
-    Asserted from the events stream and the final world so a session
-    that never touches the water cannot pass: free scope pans reveal
-    the ferry ([[viewport-shift-protocol]]), the larder hop boards
-    it, the ride drains the container, and the client ends richer
-    than its 400-fuel spawn.
+    Asserted from the final world so a session that never touches the
+    water cannot pass: a ferry belief forms, the larder hop boards
+    the ferry, the ride drains the water container, and the client
+    ends richer than its 400-fuel spawn.
 
-    Re-scoped 2026-08-07 ([[quad-sweep-doctrine]]): the pans are now
-    the quad sweep's quadrant shifts — with extras stocked the sweep's
-    recon covers the lake before the larder ever declines, so the
-    dedicated ``ferry_scope_scout`` (which exists to pan when nothing
-    else has) is correctly never needed here. The scout's own firing
-    conditions stay pinned by ``tests/bot/ai/test_scope_scout.py``;
-    what this soak guards is the CHAIN: free pan -> ferry belief ->
-    boarding hop -> drained water larder.
+    Re-scoped 2026-08-13 with the recon reorder (known stock preempts
+    scanning, HUD flags 8/9/14): the soak no longer requires a scope
+    pan. In the sim the belief arrives from the drift law's 0x4A
+    broadcast before any pan is needed, and the larder boards
+    directly — the fastest correct chain. Live discovery when no
+    broadcast serves the belief stays covered where it lives: the
+    ferry scout's firing conditions in
+    ``tests/bot/ai/test_scope_scout.py`` (it pans on the larder's
+    water-locked ``no_landing`` decline), and the sweep's own pins in
+    ``tests/bot/ai/test_quad_sweep.py``.
     """
     _install_lake_terrain(fake_fs)
     exit_code = main(["--ferry", "--rounds", "60", "--stamp", "20260801-000001"])
     assert exit_code == 0
     files = fake_fs.get_written_files()
-    events_path = next(path for path in files if path.endswith("latest.sim.events.jsonl"))
-
-    def _event_kind_seen(kind: str) -> bool:
-        for line in files[events_path].splitlines():
-            if not line:
-                continue
-            if narrow_json_to_dict(load_json_str(line)).get("diagnostic_kind") == kind:
-                return True
-        return False
-
-    assert _event_kind_seen("scope_shift_sent") is True
     world_path = next(path for path in files if "sim-20260801-000001.world.json" in path)
     world_doc = narrow_json_to_dict(load_json_str(files[world_path]))
     containers = [narrow_json_to_dict(c) for c in narrow_json_to_list(world_doc["containers"])]
