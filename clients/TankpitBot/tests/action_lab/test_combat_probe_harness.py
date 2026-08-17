@@ -285,7 +285,7 @@ def test_engage_single_target_records_shots() -> None:
     def _on_wait() -> None:
         probe.world.got_our_shot_response = True
         probe.world.got_confirmed_hit = True
-        probe.world.killed_tank_ids.add(50)
+        probe.world.killed_tank_ids[50] = 999
 
     probe._fake_page = ClockAdvancingPage(clock, on_wait=_on_wait)
 
@@ -351,7 +351,7 @@ def test_engage_single_target_detects_flee() -> None:
                 timestamp_ms=1000,
             )
         elif shot_count >= 2:
-            probe.world.killed_tank_ids.add(50)
+            probe.world.killed_tank_ids[50] = 999
 
     probe._fake_page = ClockAdvancingPage(clock, on_wait=_on_wait)
     probe.world.got_our_shot_response = True
