@@ -7,6 +7,7 @@ it selects between are
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.block_harvest import plan_block_harvest_leg
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.collect_hops import (
     larder_harvest,
@@ -16,6 +17,7 @@ from tankpit_bot.bot.ai.collect_mode_outcomes import (
     _desync_rescan_decision,
     _escape_under_fire_decision,
     _exhausted_collect_outcome,
+    _mine_reveal_scan_decision,
     _scan_on_landing_decision,
 )
 from tankpit_bot.bot.ai.collect_pickups import (
@@ -28,7 +30,7 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.equipment_search import describe_container_search
 from tankpit_bot.bot.ai.forage import plan_forage_search
-from tankpit_bot.bot.ai.quad_sweep import plan_block_harvest_leg, plan_quad_sweep
+from tankpit_bot.bot.ai.quad_sweep import plan_quad_sweep
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
@@ -55,10 +57,6 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
        this gate, the cascade picks up whatever 0x5A enumerated first
        and only later discovers (via the forage step below) extra
        containers radar would have shown up front.
-    2b. Quad sweep ([[quad-sweep-doctrine]], 2026-08-06): with extras
-       stocked and the 31x31 block substantially unscanned, the
-       atomic 4-shift/4-radar recon fires before any pickup --
-       movement mid-sweep re-anchors later quadrants off the grid.
     3. Pick up the best equipment in the current viewport.
     4. Pick up the best fuel in the current viewport (skipped at cap).
     4b. Block harvest ([[quad-sweep-doctrine]]): frame a swept-block
@@ -71,6 +69,13 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
        container (``min(volume, deficit) / cost``, profitable hops
        only). Larder hops hold a resource lock on the target and
        never spend the landing radar.
+    5b. Quad sweep ([[quad-sweep-doctrine]], reordered 2026-08-13 —
+       HUD flags 8/9/14, known stock preempts scanning): with extras
+       stocked and the 31x31 block substantially unscanned, the
+       opposite-corners recon fires once every collection branch
+       above declined. A mid-sweep reveal is collected next tick and
+       the movement aborts the remainder, so the sweep scans until
+       found, not four windows by ritual.
     6. Forage: radar when the viewport has unscanned tiles, or walk
        toward an unscanned tile so the next free radar covers it.
     7. Hop: teleport to the best-value fuel dot when nothing
@@ -108,14 +113,6 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     if locked_decision is not None:
         return locked_decision
 
-    # Atomic quad sweep ([[quad-sweep-doctrine]]): with extras stocked
-    # and the block substantially unscanned, the 4-shift/4-radar recon
-    # runs BEFORE any pickup -- movement mid-sweep slides later
-    # quadrant windows off the grid, so pickups wait the ~8 ticks.
-    sweep_decision = plan_quad_sweep(ctx, base_state)
-    if sweep_decision is not None:
-        return sweep_decision
-
     equip_decision = select_and_pickup_equipment(ctx, base_state)
     if equip_decision is not None:
         return equip_decision
@@ -144,6 +141,16 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     pursuit_decision = _known_stock_pursuit(ctx, base_state)
     if pursuit_decision is not None:
         return pursuit_decision
+
+    # Quad sweep ([[quad-sweep-doctrine]], reordered 2026-08-13, HUD
+    # flags 8/9/14): recon runs only when every collection branch
+    # above declined -- known stock preempts scanning structurally.
+    # A mid-sweep reveal is collected next tick; the movement aborts
+    # the sweep's remainder via the anchor latch, making the sweep an
+    # incremental scan-until-found.
+    sweep_decision = plan_quad_sweep(ctx, base_state)
+    if sweep_decision is not None:
+        return sweep_decision
 
     forage_decision = plan_forage_search(
         ctx,
@@ -217,7 +224,7 @@ def _sense_and_safety_gates(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> tuple[TickDecisionDict | None, AIStateDict]:
-    """Run the pre-pursuit gates: landing scan, escape, desync rescan.
+    """Run the pre-pursuit gates: landing scan, escape, mine reveal, desync.
 
     Landing scan gates BEFORE lock continuation (reordered 2026-07-30,
     flag s4-3): the user policy is "always radar right on landing,
@@ -225,8 +232,9 @@ def _sense_and_safety_gates(
     keeps its lock -- running the lock first walked blind into the
     unobserved minefield three ticks straight. Clean suppressed
     landings still latch silently and fall through to the lock. The
-    under-fire escape and the desync rescan follow in that order:
-    survival beats resync, resync beats pursuit.
+    under-fire escape, the own-mine-hit reveal scan (user ruling
+    2026-08-13, flag 2), and the desync rescan follow in that order:
+    survival beats reveal, reveal beats resync, resync beats pursuit.
 
     Args:
         ctx: Decision context.
@@ -244,6 +252,10 @@ def _sense_and_safety_gates(
     under_fire = _escape_under_fire_decision(ctx, base_state)
     if under_fire is not None:
         return under_fire, base_state
+
+    mine_reveal = _mine_reveal_scan_decision(ctx, base_state)
+    if mine_reveal is not None:
+        return mine_reveal, base_state
 
     return _desync_rescan_decision(ctx, base_state), base_state
 

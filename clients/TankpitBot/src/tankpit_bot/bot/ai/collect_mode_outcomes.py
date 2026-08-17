@@ -37,7 +37,7 @@ from tankpit_bot.bot.ai.resource_search import (
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import make_radar_command
+from tankpit_bot.bot.types import make_hold_command, make_radar_command
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -87,6 +87,28 @@ def _exhausted_collect_outcome(
         SessionExitError: When the session has no productive action.
     """
     if ctx.fuel > ctx.config["fuel_low_threshold"]:
+        if ctx.config["role"] == "gatherer":
+            # A gatherer CANNOT hunt by role, not by shortage
+            # ([[fleet-coordination]]) -- an exhausted cascade is
+            # "done here", never "marooned". Hold one window as a
+            # COLLECT-owned no-op; containers respawn, the map
+            # refreshes, and the next tick's cascade relocates.
+            emit_ai(
+                "gatherer collect exhausted at (%d,%d) fuel=%d, holding one window",
+                ctx.self_state["x"],
+                ctx.self_state["y"],
+                ctx.fuel,
+            )
+            return make_decision(
+                make_hold_command(),
+                "COLLECT",
+                COLLECT_SCORE,
+                ctx.self_state["x"],
+                ctx.self_state["y"],
+                "gatherer_hold",
+                base_state,
+                ctx.equip,
+            )
         if hunt_entry_permitted(ctx):
             emit_ai(
                 "collect exhausted at (%d,%d) fuel=%d combat-ready, yielding to hunt",
@@ -285,6 +307,51 @@ def _desync_rescan_decision(
         0,
         0,
         "desync_rescan",
+        base_state,
+        ctx.equip,
+    )
+
+
+def _mine_reveal_scan_decision(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Return a radar decision while an own-mine hit awaits its reveal.
+
+    A walk-over detonation proves UNREVEALED hostile mines on the
+    working ground (user ruling 2026-08-13, flag 2). One scan turns
+    them into composed-terrain blockers the planner routes around and
+    the clearance arms can shoot; without it the field stays invisible
+    and every later walk risks another 45. Deliberately NOT gated on
+    the radar-spend coverage economics: coverage says these tiles were
+    scanned, but the mines were planted (or missed) SINCE — the hit
+    itself is the evidence the coverage is stale, the same shape as
+    the code=4 disproof. The latch clears on any radar response, so
+    exactly one scan answers each hit. Note the free-radar footprint
+    (radius 2 at recruit ranks) is centred on the tank — precisely
+    where a walk-over ring sits.
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state for the produced command.
+
+    Returns:
+        The ``mine_hit_reveal_scan`` radar decision, or ``None`` when
+        no hit is pending.
+    """
+    if not ctx.ws.mine_reveal_pending():
+        return None
+    emit_ai(
+        "own-tile mine hit unanswered - radar reveal before further movement (extras=%d)",
+        ctx.inventory["extra_radars"]["count"],
+    )
+    return make_decision(
+        make_radar_command(),
+        "COLLECT",
+        COLLECT_SCORE,
+        0,
+        0,
+        "mine_hit_reveal_scan",
         base_state,
         ctx.equip,
     )
