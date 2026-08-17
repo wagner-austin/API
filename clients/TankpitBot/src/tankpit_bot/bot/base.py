@@ -15,8 +15,8 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import (
-    AutoscrollPageProtocol,
     CDPSessionProtocol,
+    GamePageProtocol,
     PageProtocol,
 )
 from tankpit_bot.bot.ai.types import (
@@ -44,8 +44,8 @@ from tankpit_bot.browser.lifecycle import (
 )
 from tankpit_bot.browser.live_view import LiveViewService
 from tankpit_bot.browser.session_storage import (
-    STORAGE_STATE_PATH,
     load_storage_state,
+    resolve_storage_state_path,
     save_storage_state,
 )
 from tankpit_bot.bus.frame_bus import FrameBus, FrameBusProtocol
@@ -143,12 +143,11 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
             command_service=command_service,
             world=world,
         )
-        # Narrower than the full page: the only two things the bot does
-        # with it are the autoscroll toggle dance and the account-stats
-        # panel read, both of which press-and-poll. Naming what is
-        # actually called is what lets the simulator BE the page
-        # ([[session-state-deglobalisation]]).
-        self._page: AutoscrollPageProtocol | None = None
+        # Narrower than the full page: event-loop pumping for the
+        # poll-and-read flows plus the keyboard the key probe presses.
+        # Naming what is actually called is what lets the simulator BE
+        # the page ([[session-state-deglobalisation]]).
+        self._page: GamePageProtocol | None = None
         # One-shot latch for the in-game autoscroll enforcement; the
         # tick loop flips it on the first spawned tick.
         self._autoscroll_enforced: bool = False
@@ -264,7 +263,11 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         self._cdp_message_buffer = []
 
         launch_args = _chrome_stream_display_args()
-        storage_state_path = load_storage_state(STORAGE_STATE_PATH)
+        # Keyed by login identity so a fleet child selecting a
+        # different account can never resume another account's session
+        # (the 2026-08-13 arterial-as-artax incident).
+        storage_cache = resolve_storage_state_path(self._prefer_account)
+        storage_state_path = load_storage_state(storage_cache)
         with _test_hooks.sync_playwright() as playwright:
             browser = playwright.chromium.launch(
                 headless=self._headless,
@@ -303,7 +306,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
             # skips the tankpit login flow entirely and rejoins in
             # seconds instead of the ~5-10 s cold navigate + credential
             # sequence.
-            save_storage_state(context, STORAGE_STATE_PATH)
+            save_storage_state(context, storage_cache)
 
             self._cdp_service.log_websocket_urls()
             self._static_key = gather_intel(page, cdp)

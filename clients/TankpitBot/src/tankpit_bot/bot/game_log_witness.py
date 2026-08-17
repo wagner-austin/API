@@ -21,7 +21,7 @@ mixin adds behaviour without taking ownership of the session's state
 
 from __future__ import annotations
 
-from tankpit_bot._test_hooks import AutoscrollPageProtocol, CDPSessionProtocol
+from tankpit_bot._test_hooks import CDPSessionProtocol, GamePageProtocol
 from tankpit_bot.bot.account_stats_capture import capture_account_stats
 from tankpit_bot.browser.dom_scraper import GameLogEntry, GameLogScraper
 from tankpit_bot.browser.game_log import (
@@ -44,7 +44,7 @@ class GameLogWitnessMixin:
     _game_log_scraper: GameLogScraper | None
     _game_log_witness: list[GameLogEntryWithTimestamp]
     _cdp: CDPSessionProtocol | None
-    _page: AutoscrollPageProtocol | None
+    _page: GamePageProtocol | None
     world: WorldService
     _account_stats_captured: bool
     _account_stats_attempts: int
