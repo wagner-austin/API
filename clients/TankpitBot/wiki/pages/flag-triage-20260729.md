@@ -288,6 +288,27 @@ Open sub-questions, deliberately not guessed at:[^sweep0803]
    did); the first cut's corpse-blocks assumption would have walled
    off tiles on those restock routes after every kill. No
    deactivation timestamp is needed for occupancy.
+
+   **RE-REVERSED 2026-08-13 (run bot-20260813-204615, HUD flag 3):
+   corpses DO block, and the dissolution's own miner could not see
+   the proof class.** The bot killed orange-6 at (33,189) from
+   (34,189) — static rock on every other neighbor, so the corpse
+   tile was the pocket's ONLY exit — and seven consecutive pickups
+   through it closed code 1 within 14 s of the kill. The owed
+   capture measure ran the same night and is decisive: all seven are
+   PURE refusals (`mine_cant_go_choreography.py`: zero 0x47 echoes —
+   the first step was already blocked), 0x2E restated tank 532 at
+   (33,189) with the dead-corpse sprite (direction=32) at 20:49:35,
+   :55 and :59, and NO mine record exists anywhere in the pocket in
+   the window. The 2026-08-04 miner's blocking-proof pattern
+   required a partial-walk ECHO stopping adjacent to the corpse — a
+   bot ALREADY standing adjacent draws a bare receipt, invisible to
+   that classifier — and its six "clean crossings" fixed corpse
+   tiles from the victim's last wire position, which displaced and
+   ranged kills falsify. ``is_tank_body_present`` counts corpses
+   again (the wire restates a standing corpse's position, so the
+   ordinary viewport-freshness gate bounds it) and the sim's
+   ``_blocked_by_world`` matches.
 3. ~~`combat_landing._is_dynamically_occupied` still re-derives tank
    occupancy locally~~ **RESOLVED 2026-08-04**: the landing choosers
    now thread `now_ms` and both ad-hoc occupied checks

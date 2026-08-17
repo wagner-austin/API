@@ -1,0 +1,168 @@
+---
+title: Fleet Coordination
+tags: [fleet, architecture, coordination]
+related:
+  - "[[bot-behavior-contract]]"
+  - "[[bot-service-architecture]]"
+  - "[[tank-freshness-model]]"
+source_paths:
+  - "src/tankpit_bot/fleetshare"
+  - "src/tankpit_bot/bot/tick_body.py"
+  - "src/tankpit_bot/bot/ai/threat_primitives.py"
+source_git_blobs:
+  # `src/tankpit_bot/fleetshare` is deliberately absent: the module is
+  # still untracked in HEAD, so there is no blob to pin. git-blob-hash-pin
+  # exempts untracked paths by design. Pin it in the commit that lands it.
+  "src/tankpit_bot/bot/tick_body.py": ac244e843d87921e805d77bfe6cffefcd7bbe9fa
+  "src/tankpit_bot/bot/ai/threat_primitives.py": c77f4825643181c2a3059e157a030a414b898ea6
+fact_checked: "2026-08-14"
+confidence: high
+hubs: [architecture]
+---
+
+# Fleet coordination: the shared knowledge layer
+
+*Established 2026-08-14 (fleet ruling: same-team allies; "a proper
+lift that allows for single tank running, or multi tanks running,
+with fighters and with a potential info gatherer").*
+
+Same-team bots exchange beliefs through the run-directory filesystem —
+the channel the fleet page already reads — so a **single tank runs
+identically with zero siblings** and a **fleet coordinates with no
+manager process required**. There is no network dependency and no
+broker: presence of a fresh sibling file IS membership.
+
+## The exchange
+
+Every tick, after the HUD mirror, each bot:
+
+1. **Publishes** its knowledge offer: `fleetshare.report.build_fleet_report`
+   assembles fresh beliefs and `write_fleet_report` **atomically
+   replaces** `knowledge.json` beside `hud.json` in the bot's run
+   directory (`runs/bot/<instance>/`, or `runs/bot/` for the sole-bot
+   namespace). Atomicity (temp file + `os.replace`, the
+   `replace_text` hook) is what makes the reader's strict
+   decode-and-raise sound: a torn read is impossible, so a malformed
+   file is a genuine bug.
+2. **Merges** siblings: `fleetshare.merge.read_team_reports` lists
+   `runs/bot/*/knowledge.json` plus the sole-namespace file, skips its
+   own, drops reports older than `FLEET_REPORT_TTL_MS` (10 s — a dead
+   bot's last file ages out instead of steering the living) and other
+   teams' reports (knowledge sharing is an alliance), then
+   `merge_fleet_reports` applies the content.
+
+The exchange starts with the first entered tick — before the session
+has an established self there is nothing attributable to offer
+(`build_fleet_report` returns `None`).
+
+## The report (`FleetReportDict`)
+
+| Field | Meaning |
+|---|---|
+| `instance`, `team`, `tank_id`, `role`, `x`, `y` | Reporter identity and position |
+| `engaged_target_id` | The reporter's held combat lock (-1 none) — the focus-fire signal |
+| `written_ms` | Write stamp; drives the reader's freshness TTL |
+| `enemies` | Sightings with the reporter's own `last_position_update_ms` as `observed_ms` (within 30 s), excluding allies, corpses, unplaced and stale tanks |
+| `containers` | The container atlas, excluding locally failed-pickup marks (a disproof is the reporter's own verdict, not knowledge) |
+| `scanned` | The live scan map: tiles under radar coverage within the forage coverage TTL (180 s) — the worldview's negative space, so siblings stop paying radars for ground a teammate cleared |
+| `removed` | The reporter's container tombstone map (bounded by the container share horizon, 60 s) — consumption propagation, so one bot's pickup stops the whole fleet chasing the ghost |
+
+Codecs: `fleetshare.codecs` — full `require_*` validation on decode.
+
+## Merge laws
+
+- **Remote knowledge only adds or refreshes; own wire is the higher
+  trust tier.** An enemy sighting applies only when FRESHER than the
+  local registry entry; a container sighting rides
+  `merge_container_sighting` with the same freshness law and never
+  removes local beliefs. A local `failed_pickups` mark survives any
+  remote refresh.
+- **Merged sightings can never provoke a phantom shot.** They enter
+  via `apply_tank_observation` with fact source `fleet_report`,
+  `storage_source="world_state"`, `is_wire_sourced=False`: the
+  viewport-observation gate that authorizes firing never advances,
+  so merged enemies are acquirable (map-like) but not fireable until
+  this bot's own viewport confirms them.
+- **Tombstones (negative knowledge, 2026-08-14 first live fleet
+  run):** every local container removal — code-4 disproof, emptied
+  pickup, unreachable, radar-stated-empty — stamps
+  `ws.container_disproofs[tile] = now`, and the merge admits a remote
+  sighting only when OBSERVED AFTER the disproof. Without this,
+  deletions don't propagate: a teammate that still believes in a dead
+  container re-imports it every exchange, and the pickup loop never
+  converges (run arterial 19:20: (102,85) disproved three times in
+  five seconds, re-imported between each — the "Empty container /
+  Nothing detected here" alternation the user watched live). A
+  genuinely respawned container passes naturally: its fresh
+  observation postdates the disproof.
+- **Shared scan coverage (2026-08-14, user ruling "share the
+  worldview"):** teammates' live coverage merges into
+  `scanned_tiles` via `merge_scanned_coverage`, newest stamp per
+  tile winning and own fresher coverage never regressed. The forage
+  and sweep gates already read `scanned_tiles`, so scanner division
+  of labor needs no behavioral surgery: a tile a sibling scanned is
+  covered here too. Mines need no fleet row — reveals are
+  team-scoped in the game itself ([[walk-mechanics]]), so teammates'
+  radar reveals already arrive on each bot's own wire.
+- **Coverage steps WALK, never teleport** (user free-radar doctrine:
+  "scan, walk, walk, scan — to scan a whole viewport with the free
+  radar"): forage dispatches `plan_viewport_walk`, a pure-walk
+  movement primitive with no teleport fallback and no mine-flip — a
+  free radar reveals ground for nothing, so no coverage step is
+  worth a 45+ fuel hop (run arterial 19:30 paid two forage teleports
+  on a zero-extras recruit). An unwalkable best position means the
+  viewport is done for free-scan coverage and the search hop
+  relocates.
+- **Removal propagation (2026-08-14, user: "does it update the
+  equipment for everyone when one of them takes the discovered
+  equipment?"):** the report's `removed` ledger carries the
+  reporter's tombstones; a receiver drops any local belief OBSERVED
+  BEFORE a teammate's removal and inherits the tombstone — so
+  consumption spreads transitively within one exchange. A local
+  belief fresher than the removal survives as a possible respawn.
+  Verified live in run pair bot-20260814-2047xx: each bot merged 4
+  removals from its sibling.
+- **Fleet kills are not OUR kills:** every 0x41 deactivation enters
+  the dead-tank registry (`killed_tank_ids`, killer-agnostic — never
+  target a corpse), but `session_kill_count` (scorecard +
+  `session_kills` wind-down trigger) advances only when the 0x41
+  names this tank as killer. The wire queue carries victim → killer
+  for exactly this split. Solo sessions made the two numbers
+  indistinguishable; the first fleet firefight falsified it
+  (arterial banked artax's two kills on zero shots fired,
+  bot-20260814-204751).
+- **Focus fire:** teammates' `engaged_target_id`s land in
+  `ws.fleet_engaged_target_ids` (REPLACED wholesale per merge — a
+  disengaging or silent teammate stops steering within one exchange).
+  The threat sort (`_threat_sort_key_for`) ranks fleet-engaged ids
+  first *inside* a priority tier, so fighters converge on one enemy
+  without outranking the human-priority doctrine.
+
+## Roles (`FleetRole`, `TANKPIT_ROLE`)
+
+- **fighter** (default): the full HUNT/COLLECT doctrine.
+- **gatherer**: never hunts — the router's `_select_owner_mode`
+  returns COLLECT unconditionally, `hunt_entry_permitted` is the
+  doctrinal backstop (every yield-to-hunt gesture funnels through
+  it), and an exhausted collect cascade returns a COLLECT-owned
+  `gatherer_hold` no-op instead of the fighter's
+  `no_productive_collect` exit — "cannot hunt" is the role, never
+  "marooned". The gatherer lives in the collect cascade (scan, sweep,
+  search hop, map-for-dots), roaming the map and publishing what it
+  finds for the fighters of its color.
+
+## Color assignment
+
+`TANKPIT_TROOP`, when set, **overrides the account's lobby
+`default_troop`** — accounts hold one tank per color per map and the
+room-enter request's troop byte picks which one to play (the server
+enforces the 5-minute recolor cooldown). Unset: the account default,
+or blue on a first-time entry. The fleet plays blue
+(`.env TANKPIT_TROOP=2`).
+
+## Deliberately deferred
+
+Mine-reveal sharing, pre-engagement target brokering (a fleet-manager
+endpoint designating one focus target before any shots exist), and
+any push-style transport. The filesystem exchange is the foundation
+they would build on.

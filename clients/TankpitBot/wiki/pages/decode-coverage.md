@@ -446,7 +446,7 @@ message type added to the module without a wiki claim fails the build.[^guard]
       "id": "msg-tank-exit",
       "code": "tankpit_bot.protocol.constants:MSG_TANK_EXIT",
       "value": 41,
-      "means": "0x29 tank left the viewport"
+      "means": "0x29 TankExit: tank left or was eliminated from the game (room-wide; deletes the registry entry since 2026-08-14)"
     },
     {
       "id": "msg-tank-info",
