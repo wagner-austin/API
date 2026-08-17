@@ -111,6 +111,48 @@ class TestNullableHookRule:
 
         assert NullableHookRule().run([path]) == []
 
+    def test_scans_a_module_that_defines_a_hook_setter(self, tmp_path: Path) -> None:
+        """A module is a hooks module if its API says so, whatever its name.
+
+        covenant_ml's optuna_tpe.py held a nullable hook, a set_optuna_tpe_hook
+        and a getter that raised, and the file-name test alone never saw it.
+        """
+        path = _write(
+            tmp_path / "optuna_tpe.py",
+            "_optuna_hook: OptunaFactoriesProto | None = None\n\n\n"
+            "def set_optuna_tpe_hook(hook: OptunaFactoriesProto | None) -> None:\n"
+            "    global _optuna_hook\n"
+            "    _optuna_hook = hook\n",
+        )
+
+        violations = NullableHookRule().run([path])
+
+        assert [v.kind for v in violations] == ["nullable-hook-declaration"]
+
+    def test_scans_a_module_that_defines_a_use_real_function(self, tmp_path: Path) -> None:
+        """The use_real_* startup wiring marks a module the same way."""
+        path = _write(
+            tmp_path / "optimizer.py",
+            "_minimize_hook: MinimizeProto | None = None\n\n\n"
+            "def use_real_scipy() -> None:\n"
+            "    pass\n",
+        )
+
+        assert len(NullableHookRule().run([path])) == 1
+
+    def test_a_plain_module_with_neither_is_still_skipped(self, tmp_path: Path) -> None:
+        """Defining ordinary functions does not make a module a hooks module."""
+        path = _write(
+            tmp_path / "service.py",
+            "value: SomeProto | None = None\n\n\n"
+            "def set_up() -> None:\n"
+            "    pass\n\n\n"
+            "def use_the_thing() -> None:\n"
+            "    pass\n",
+        )
+
+        assert NullableHookRule().run([path]) == []
+
     def test_accepts_an_optional_callback_on_a_fake(self, tmp_path: Path) -> None:
         """Per-instance state in a fake is not a hook declaration.
 

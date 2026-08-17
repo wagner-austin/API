@@ -40,17 +40,44 @@ from typing import ClassVar
 from monorepo_guards import Violation
 
 
-def _is_hooks_module(path: Path) -> bool:
-    """Report whether a path is a dependency-injection hooks module.
+def _declares_hook_api(tree: ast.AST) -> bool:
+    """Report whether a module advertises itself as holding hooks.
+
+    A module that defines ``set_<name>_hook`` or ``use_real_<name>`` is a
+    hooks module whatever it is called. covenant_ml's optuna_tpe.py was
+    exactly that -- a nullable hook, a setter, and a getter that raised --
+    and the file-name test alone never saw it.
+
+    Args:
+        tree: Parsed module.
+
+    Returns:
+        True when the module defines a hook setter or a use-real function.
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if node.name.startswith("set_") and node.name.endswith("_hook"):
+            return True
+        if node.name.startswith("use_real_"):
+            return True
+    return False
+
+
+def _is_hooks_module(path: Path, tree: ast.AST) -> bool:
+    """Report whether a module is a dependency-injection hooks module.
 
     Args:
         path: File to test.
+        tree: Parsed module, read when the name is not decisive.
 
     Returns:
-        True when the file name marks it as a hooks module.
+        True when the file name or the module's own API marks it as one.
     """
     stem = path.stem
-    return stem.endswith("_hooks") or stem.endswith("_hooks_guard")
+    if stem.endswith("_hooks") or stem.endswith("_hooks_guard"):
+        return True
+    return _declares_hook_api(tree)
 
 
 def _local_protocol_names(tree: ast.AST) -> frozenset[str]:
@@ -225,9 +252,9 @@ class NullableHookRule:
         """
         out: list[Violation] = []
         for path in files:
-            if not _is_hooks_module(path):
-                continue
             tree = ast.parse(path.read_text(encoding="utf-8", errors="strict"), filename=str(path))
+            if not _is_hooks_module(path, tree):
+                continue
             out.extend(self._scan(path, tree))
         return out
 
