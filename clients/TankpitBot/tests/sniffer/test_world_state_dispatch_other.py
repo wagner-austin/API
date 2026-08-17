@@ -326,17 +326,47 @@ class TestChatConsentRecording:
         assert ws.chat_seen_tank_ids == set()
 
 
-class TestRecentPickupLedgerLookup:
-    """The drain-receipt discriminator's ledger scan."""
+class TestOwnGainStamp:
+    """The drain-receipt discriminator's own-gain window."""
 
-    def test_stale_entries_and_other_tiles_do_not_match(self) -> None:
-        """Only a fresh signature covering the tile counts."""
-        from tankpit_bot.sniffer.world_state_dispatch_containers import was_recent_pickup_at
+    def test_gain_inside_the_window_counts_and_stale_does_not(self) -> None:
+        """Only a gain at/after the dispatch moment is a drain receipt.
 
+        Replaces the deleted tile-record discriminator
+        (``was_recent_pickup_at``), which also matched the removal
+        broadcast riding an already-empty click and any sibling bot's
+        drain -- run arterial 2026-08-13 classified 23/23 stale
+        empties as own drains and the rescan gate never fired.
+        """
         ws = WorldService()
-        ws.recent_pickup_signatures[((150, 150, 0),)] = 90000
-        ws.recent_pickup_signatures[((10, 10, 5),)] = 100000
+        assert ws.own_gain_since(90000) is False
+        ws.record_own_gain(95000)
+        assert ws.own_gain_since(90000) is True
+        assert ws.own_gain_since(95000) is True
+        assert ws.own_gain_since(96000) is False
+        # An unknown dispatch moment (started_ms <= 0) never reads as
+        # an own drain -- the conservative branch is the rescan.
+        assert ws.own_gain_since(0) is False
 
-        assert was_recent_pickup_at(ws, 150, 150, 100000) is False
-        assert was_recent_pickup_at(ws, 150, 150, 90100) is True
-        assert was_recent_pickup_at(ws, 60, 60, 100000) is False
+
+class TestOwnMineHitWindow:
+    """The cant_go discriminator's detonation window."""
+
+    def test_hit_inside_the_window_counts_and_stale_does_not(self) -> None:
+        """Only a detonation at/after the dispatch moment excuses a cant_go.
+
+        Flag 6 (run arterial 2026-08-13 22:25:45): the detonation that
+        halted the walk arrived DURING the collect action, so the
+        cant_go was the partial-walk refusal of the interrupted
+        remainder, not a verdict on the container. A detonation from
+        before the dispatch proves nothing about this walk.
+        """
+        ws = WorldService()
+        assert ws.own_mine_hit_since(90000) is False
+        ws.last_own_mine_hit_ms = 95000
+        assert ws.own_mine_hit_since(90000) is True
+        assert ws.own_mine_hit_since(95000) is True
+        assert ws.own_mine_hit_since(96000) is False
+        # An unknown dispatch moment (started_ms <= 0) never excuses
+        # the rejection -- the conservative branch blames the tile.
+        assert ws.own_mine_hit_since(0) is False

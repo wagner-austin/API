@@ -101,11 +101,18 @@ class TestDispatchTankMessages:
             "tank_id": 42,
         }
 
-    def test_dispatch_tank_exit_does_not_remove_tank(self) -> None:
-        """0x29 TankExit is announcement-only; tank stays in world state.
+    def test_dispatch_tank_exit_deletes_the_registry_entry(self) -> None:
+        """0x29 TankExit deletes the tank -- the authoritative departure.
 
-        The actual removal arrives separately via 0x58 TankRemove or
-        container tank_leave. JS Vf only prints a log line.
+        Reversed 2026-08-14 (flag s11-6): the old pin ("announcement
+        -only; JS Vf only prints a log line") described the CLIENT's
+        rendering, not what the bot should do with the information.
+        0x29 is the room-wide "left the game / eliminated" signal --
+        run arterial 2026-08-13 received it for Artax at 23:39:17,
+        dropped it, and chased the registry ghost for ~75 s until a
+        shot's err=3 receipt said the same thing. Deletion releases
+        any held lock via the gone-from-registry pursuit path; 0x58
+        TankRemove (tracking churn) stays a no-op.
         """
         from tankpit_bot.protocol import TankEntryDict, TankExitDict
 
@@ -124,7 +131,23 @@ class TestDispatchTankMessages:
             was_eliminated=True,
         )
         dispatch_world_state_update(ws, exit_msg)
-        assert "77" in ws.world_state["tanks"]
+        assert "77" not in ws.world_state["tanks"]
+
+    def test_dispatch_tank_exit_for_an_untracked_id_is_a_no_op(self) -> None:
+        """A 0x29 for a tank the registry never held changes nothing."""
+        from tankpit_bot.protocol import TankExitDict
+
+        ws = WorldService()
+        before = ws.world_state
+        exit_msg = TankExitDict(
+            msg_type=0x29,
+            team=2,
+            tank_id=999,
+            was_silent=True,
+            was_eliminated=False,
+        )
+        dispatch_world_state_update(ws, exit_msg)
+        assert ws.world_state is before
 
     def test_dispatch_tunneled_terrain_update_sets_terrain_tile(self) -> None:
         """Test 0x4A terrain updates modify world terrain state."""

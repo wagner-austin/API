@@ -323,7 +323,10 @@ class TestDispatchProtocolMovement:
         # Death tile preserved on the tank state.
         assert tank["x"] == 100
         assert tank["y"] == 100
-        assert drain_killed_tank_ids(ws) == {700}
+        # The killer travels with the victim so the tick layer can
+        # attribute the kill (fleet 2026-08-14: a bare victim set let
+        # arterial's scorecard bank artax's kills).
+        assert drain_killed_tank_ids(ws) == {700: 1}
 
 
 class TestDispatchMoveResponseUpdatesSelf:
