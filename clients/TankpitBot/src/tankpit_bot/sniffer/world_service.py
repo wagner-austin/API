@@ -132,7 +132,13 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # not see purple-9 off-viewport). ``None`` when no shoot is
         # pending or the delta has already been consumed.
         self.pending_shot_inventory_snapshot: InventoryState | None = None
-        self.killed_tank_ids: set[int] = set()
+        # Undrained 0x41 deactivations, victim -> killer. The killer id
+        # travels with the victim because the two consumers diverge:
+        # the dead-tank registry takes every victim, but the session
+        # kill count takes only victims THIS tank killed (fleet run
+        # 2026-08-14: arterial banked artax's two kills with zero
+        # shots fired when this was a bare victim set).
+        self.killed_tank_ids: dict[int, int] = {}
         self.teleport_landed: bool = False
         self.radar_scan_complete: bool = False
         self.map_data_processed: bool = False
@@ -173,6 +179,10 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # Cleared by the next radar response, which reconciles the
         # viewport authoritatively.
         self.container_desync_ms: int = 0
+        # Last wire-announced gain of our own (fuel-total announce or
+        # an inventory count rising) -- the code=4 drain-vs-stale
+        # discriminator reads it (world_service_beliefs).
+        self.last_own_gain_ms: int = 0
         self.failed_scan_viewports: dict[str, int] = {}
         self.last_command_error: int = -1
         # Last promotion-progress bar value seen on a self 0x2E, so the
@@ -191,6 +201,27 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # are mine-immune by the displacement law), then resume
         # walking.
         self.last_own_mine_hit_ms: int = 0
+        # Own-mine-hit reveal-scan latch: set by the walk-over stamp,
+        # cleared by the radar response (world_service_radar), read by
+        # COLLECT's mine-reveal gate.
+        self.mine_reveal_pending_ms: int = 0
+        # Container tombstones ([[fleet-coordination]] negative
+        # knowledge): {coord key: disproof wall-clock ms} stamped by
+        # every local removal (code-4 disproof, emptied pickup,
+        # unreachable). The fleet merge admits a remote sighting only
+        # when OBSERVED AFTER the disproof -- without this, a
+        # teammate that still believes in a dead container re-imports
+        # it every exchange and the pickup loop never converges (run
+        # arterial 2026-08-14 19:20: (102,85) disproved three times
+        # in five seconds, re-imported between each).
+        self.container_disproofs: dict[str, int] = {}
+        # Teammates' held combat locks from the fleet knowledge
+        # exchange ([[fleet-coordination]]): {target_id: freshest
+        # report written_ms}. REPLACED wholesale by each merge pass,
+        # so a teammate that disengages or goes silent stops steering
+        # acquisition within one exchange. Threat ranking prefers
+        # these ids inside a priority tier (focus fire).
+        self.fleet_engaged_target_ids: dict[int, int] = {}
         # ContainerPickup de-duplication. The server broadcasts each
         # 0x43 pickup TWICE within ~200 ms (one to the picker, one to
         # the world view) -- empirical 43.9% duplicate rate across 13
