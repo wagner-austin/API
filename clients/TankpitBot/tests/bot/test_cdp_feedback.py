@@ -21,17 +21,65 @@ class TestBotCombatFeedback:
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """_merge_protocol_kills adds Deactivation kills to AI killed_tank_ids."""
+        """Kills land in the dead registry; none count without an identity.
+
+        No established self means no kill is attributable to us — the
+        registry (never target a corpse) still takes every victim, but
+        the scorecard counter must stay untouched.
+        """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_combat_feedback import _merge_protocol_kills
 
         ws = WorldService()
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
-        mark_tank_killed(ws, 50)
-        mark_tank_killed(ws, 60)
+        mark_tank_killed(ws, 50, 1301)
+        mark_tank_killed(ws, 60, 1301)
         new_state = _merge_protocol_kills(bot.world, bot._ai_state)
         assert "50" in new_state["killed_tank_ids"]
         assert "60" in new_state["killed_tank_ids"]
+        assert new_state["session_kill_count"] == 0
+
+    def test_merge_protocol_kills_counts_only_own_kills(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """Only victims whose 0x41 names US advance the session kill count.
+
+        The 2026-08-14 fleet run falsified the bare victim set: arterial
+        (tank 2731) fired zero shots and its scorecard still banked
+        artax's two kills (both ``killed by 1301``). A teammate's kill
+        belongs in the dead registry — never in our count, never in the
+        ``session_kills`` wind-down trigger.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_combat_feedback import _merge_protocol_kills
+        from tankpit_bot.state.types import WorldStateDict, make_self_state
+
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        ws.world_state = WorldStateDict(
+            **{
+                **ws.world_state,
+                "self_state": make_self_state(
+                    tank_id=2731,
+                    x=100,
+                    y=100,
+                    team=2,
+                    rank=1,
+                    fuel=900,
+                    leaderboard_position=0,
+                ),
+            }
+        )
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        mark_tank_killed(ws, 50, 2731)
+        mark_tank_killed(ws, 60, 1301)
+
+        new_state = _merge_protocol_kills(bot.world, bot._ai_state)
+
+        assert "50" in new_state["killed_tank_ids"]
+        assert "60" in new_state["killed_tank_ids"]
+        assert new_state["session_kill_count"] == 1
 
     def test_merge_protocol_kills_clears_combat_target_keeps_shot_target(
         self,
@@ -57,7 +105,7 @@ class TestBotCombatFeedback:
         bot._ai_state["combat_target_x"] = 71
         bot._ai_state["combat_target_y"] = 53
 
-        mark_tank_killed(ws, 50)
+        mark_tank_killed(ws, 50, 999)
         new_state = _merge_protocol_kills(bot.world, bot._ai_state)
 
         assert new_state["last_shot_target_id"] == 50
