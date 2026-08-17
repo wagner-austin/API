@@ -31,28 +31,58 @@ def test_split_corpus_no_files_raises(tmp_path: Path) -> None:
         split_corpus_files(cfg)
 
 
-def test_split_corpus_few_files_edge_case(tmp_path: Path) -> None:
-    """Test split when test_n + val_n >= n (not enough files for all splits)."""
-    # Create 2 files - not enough for full 3-way split with high ratios
+def test_split_corpus_two_files_gives_train_priority_then_validation(tmp_path: Path) -> None:
+    """Two files and ratios summing past the corpus: train and validation win.
+
+    Asserted as the exact three splits rather than as "at least one holdout is
+    populated", because a split that duplicates a file across sets and a split
+    that partitions them both satisfy the looser statement.
+    """
     (tmp_path / "a.txt").write_text("a", encoding="utf-8")
     (tmp_path / "b.txt").write_text("b", encoding="utf-8")
     cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.5, test_split_ratio=0.5)
-    train, val, test = split_corpus_files(cfg)
-    # With 2 files and high ratios, all splits should be populated
-    assert train  # non-empty
-    assert val or test  # at least one holdout split populated
-    total = len(train) + len(val) + len(test)
-    assert total == 2 or total == 4  # exact count: 2 files, possibly duplicated
+
+    files = list_text_files(str(tmp_path))
+    assert split_corpus_files(cfg) == ([files[0]], [files[1]], [])
 
 
-def test_split_corpus_single_file_reused(tmp_path: Path) -> None:
-    """Test split with only 1 file returns same file for all splits (line 44)."""
+def test_split_corpus_single_file_returns_it_as_all_three_splits(tmp_path: Path) -> None:
+    """Pins a KNOWN DEFECT, not intended behaviour. Do not read this as a spec.
+
+    The split is by file, so a one-file corpus cannot produce a holdout
+    disjoint from training -- and instead of saying so, this returns the same
+    file as train, validation and test. Nothing fails. The run's manifest then
+    reports validation and test losses that are training-set losses,
+    indistinguishable in the output from real ones, and early stopping and
+    best-checkpoint selection run against data the model trained on.
+
+    The assertion is written as the exact identity so that a fix flips this
+    test red rather than leaving it quietly passing on new behaviour. The
+    single-file corpus is this service's prevailing convention -- 91 corpus
+    fixtures across the suite, plus the corpus-ablation experiments -- so
+    correcting it is a contract change, not a local edit, and is tracked
+    separately.
+    """
     (tmp_path / "only.txt").write_text("content", encoding="utf-8")
     cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.5, test_split_ratio=0.5)
-    train, val, test = split_corpus_files(cfg)
-    # With only 1 file, it should be reused for all splits
-    assert train == val == test
-    assert len(train) == 1
+
+    files = list_text_files(str(tmp_path))
+    assert split_corpus_files(cfg) == (files, files, files)
+
+
+def test_split_corpus_single_file_is_allowed_when_no_holdout_is_asked_for(
+    tmp_path: Path,
+) -> None:
+    """Training on one file without a holdout is a supported request.
+
+    The trainer builds no validation loader for an empty split, so this is the
+    configuration a caller uses when the evaluation lives outside the run.
+    """
+    (tmp_path / "only.txt").write_text("content", encoding="utf-8")
+    cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.0, test_split_ratio=0.0)
+
+    files = list_text_files(str(tmp_path))
+    assert split_corpus_files(cfg) == (files, [], [])
 
 
 def test_split_corpus_three_files_edge(tmp_path: Path) -> None:
