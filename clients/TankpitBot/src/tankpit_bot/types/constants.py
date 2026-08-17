@@ -107,6 +107,7 @@ ContainerRefreshKind = Literal[
     "radar_known_resources",
     "viewport_patch",
     "world_state",
+    "fleet_report",
 ]
 """Specific confirmation path that most recently refreshed a container."""
 
