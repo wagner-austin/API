@@ -25,7 +25,7 @@ libs/cleargbm/
 │   └── guard.py             # monorepo guard runner
 ├── src/cleargbm/
 │   ├── __init__.py          # empty; consumers import from ensemble/types
-│   ├── _rust.py             # Protocol-typed __import__("cleargbm_rs.cleargbm_rs")
+│   ├── _rust.py             # Protocol-typed __import__("cleargbm_rs")
 │   ├── ensemble.py          # public API: train_gradient_boosting, predict_proba, predict_raw
 │   ├── types.py             # re-export barrel for _types_*
 │   ├── _types_json.py       # JSONValue + narrow_json_to_* validators
@@ -64,7 +64,7 @@ class _TrainProto(Protocol):
         feature_names: list[str],
     ) -> PyGbmModelProto: ...
 
-_native_mod = __import__("cleargbm_rs.cleargbm_rs", fromlist=["cleargbm_rs"])
+_native_mod = __import__("cleargbm_rs")
 train_gradient_boosting_rs: _TrainProto = _native_mod.train_gradient_boosting_rs
 ```
 
@@ -72,7 +72,7 @@ This pattern satisfies the workspace's strict-typing rules (`disallow_any_expr`,
 
 ## What the Rust core does
 
-Everything performance-critical. Full list of primitives exposed at `cleargbm_rs.cleargbm_rs`:
+Everything performance-critical. Full list of primitives exposed at `cleargbm_rs`:
 
 - `train_gradient_boosting_rs` — single-call full training loop (binning → boosting → early stopping)
 - `predict_proba_model_rs` — batch probability prediction
@@ -110,7 +110,7 @@ The primary consumer today is [`covenant_ml`](../../covenant_ml/) via its `Clear
 libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py
   ├── imports: cleargbm.ensemble.train_gradient_boosting, predict_proba
   ├── imports: cleargbm.types.GradientBoostingConfig
-  └── imports: cleargbm_rs.cleargbm_rs.py_gbm_model_{to_json,from_json,feature_importances,n_trees}_rs
+  └── imports: cleargbm_rs.py_gbm_model_{to_json,from_json,feature_importances,n_trees}_rs
 ```
 
 `covenant_ml.explainers.cleargbm_shap` also depends on `cleargbm.types` (via a JSON-decode shim that translates Rust-side model JSON into the Python-side `GradientBoostingModel` TypedDict shape that SHAP's tree walker consumes).

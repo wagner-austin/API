@@ -52,7 +52,7 @@ proba = predict_proba(model, x_test)
 For JSON persistence and feature importance, call the module-level functions on `cleargbm_rs`:
 
 ```python
-import cleargbm_rs.cleargbm_rs as native
+import cleargbm_rs as native
 
 json_str = native.py_gbm_model_to_json_rs(model)
 restored = native.py_gbm_model_from_json_rs(json_str)
@@ -70,7 +70,7 @@ Everything else is private (`_rust`, `_types_*`, `_hooks_guard`) or lives in `cl
 
 ## Design
 
-**Strict typing.** No `Any`, no `cast`, no `type: ignore`. TypedDicts with encode/decode + `require_*` validation everywhere. The dynamic `__import__("cleargbm_rs.cleargbm_rs")` is pinned to Protocol types in `cleargbm._rust` so mypy sees precise signatures.
+**Strict typing.** No `Any`, no `cast`, no `type: ignore`. TypedDicts with encode/decode + `require_*` validation everywhere. The dynamic `__import__("cleargbm_rs")` is pinned to Protocol types in `cleargbm._rust` so mypy sees precise signatures.
 
 **Rust is authoritative.** The Rust core stores training data column-first, builds histograms in Rust, finds splits in Rust, constructs trees in Rust, predicts in Rust. Python is a thin API surface, not a computation layer.
 

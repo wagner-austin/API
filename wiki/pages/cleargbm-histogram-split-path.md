@@ -21,7 +21,7 @@ source_git_blobs:
   "libs/cleargbm_rs/src/tree/histograms.rs": 681166b919d3f740b0564516ae68cbf8b139b2e5
   "libs/cleargbm_rs/src/losses/derivatives.rs": 398e2a3ad3cd564d76f0361626e105d2ad9c2e6f
   "libs/cleargbm_rs/src/losses/sigmoid_arr.rs": e73feb1e3d0604709332eb3885539d27062e006b
-  "libs/cleargbm/src/cleargbm/_rust.py": 29fb9d5d5bc96129757d2545fda52d9c6467f33c
+  "libs/cleargbm/src/cleargbm/_rust.py": 17d203e55d6c4018df0306b8aa6e84c47cd73da8
   "libs/cleargbm/src/cleargbm/ensemble.py": c60640610f62458f20e017392104ba5a219a6b11
   "libs/cleargbm/docs/VALIDATION_REPORT_2026-07-20.md": c601efb92c2f596c97e60fdddade03d9dc1fa379
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md": 3f95cc90aaf624a9f250c4b5f892c570ac27c4df
@@ -66,7 +66,7 @@ The pre-refactor histogram Rust adapter received a strided column-slice from a 2
 
 ---
 
-[^1]: `libs/cleargbm/src/cleargbm/ensemble.py::train_gradient_boosting` line 148 calls `_validate_training_inputs`; line 149 marshals config via `_config_to_rust_dict`; line 151 dispatches to `train_gradient_boosting_rs` which resolves to `cleargbm_rs.cleargbm_rs.train_gradient_boosting_rs`.
+[^1]: `libs/cleargbm/src/cleargbm/ensemble.py::train_gradient_boosting` line 148 calls `_validate_training_inputs`; line 149 marshals config via `_config_to_rust_dict`; line 151 dispatches to `train_gradient_boosting_rs` which resolves to `cleargbm_rs.train_gradient_boosting_rs`.
 [^2]: `libs/cleargbm/docs/VALIDATION_REPORT_2026-07-20.md` — check 5 (O(K) empirical, ratio 0.92× across 10k → 1M samples at K=64). Measured on the then-Python `find_best_split_from_histogram`; the Rust implementation shares the algorithm.
 [^3]: `libs/cleargbm_rs/src/binning/feature_bins.rs::precompute_feature_bins` — called once per training run at the start of `train_gradient_boosting`; feature bins are threaded through the tree-building loop for every tree.
 [^4]: `libs/cleargbm_rs/src/tree/builder.rs` — builds histogram for smaller child, calls `subtract_histogram(parent, smaller)` to derive the larger sibling.
@@ -74,7 +74,7 @@ The pre-refactor histogram Rust adapter received a strided column-slice from a 2
 [^6]: `libs/cleargbm_rs/src/losses/derivatives.rs::binary_log_loss_gradients` — `result[i] = y_pred[i] - y_float`; `::binary_log_loss_hessians` — `p_clipped * (1.0 - p_clipped)`.
 [^7]: `libs/cleargbm_rs/src/losses/initial_prediction.rs::binary_log_loss_initial_prediction` — `(p_positive / (1.0 - p_positive)).ln()`.
 [^8]: `libs/cleargbm_rs/src/losses/sigmoid_arr.rs` — clips to `[-500.0, 500.0]` before `1 / (1 + exp(-x))`.
-[^9]: `libs/cleargbm/src/cleargbm/_rust.py` line 177 — `_native_mod = __import__("cleargbm_rs.cleargbm_rs", fromlist=["cleargbm_rs"])`; line 179 pins `train_gradient_boosting_rs: _TrainProto = _native_mod.train_gradient_boosting_rs`.
+[^9]: `libs/cleargbm/src/cleargbm/_rust.py` line 177 — `_native_mod: types.ModuleType = __import__("cleargbm_rs")`; line 179 pins `train_gradient_boosting_rs: _TrainProto = _native_mod.train_gradient_boosting_rs`. The extension was reached as `cleargbm_rs.cleargbm_rs` until 2026-08-17, when maturin's `python-source` and the hand-written forwarder above it were removed (commit ea7835d2); it is now the top-level module.
 [^10]: `libs/cleargbm_rs/src/split/mod.rs::_compute_split_gain` — applies `reg_lambda` to `H_L`, `H_R`, and `H_total` in the gain formula per the standard XGBoost / LightGBM form.
 [^11]: `libs/cleargbm_rs/src/tree/builder.rs:283,337,360` [synthesis] — every consumer of `config.reg_alpha()` in the crate is a `compute_leaf_value(g_sum, h_sum, config.reg_alpha(), config.reg_lambda())` call at those three sites. A crate-wide grep for `reg_alpha` across `libs/cleargbm_rs/src/` (2026-07-31) returns only these leaf-value calls plus config plumbing (`training/config.rs` field + validation, `pyo3_module/training_fns.rs` dict read, `training/serde_impl.rs` round-trip, tests) — no occurrence inside `split/mod.rs` or any gain computation.
 [^12]: LightGBM upstream, [`src/treelearner/feature_histogram.hpp`](https://github.com/microsoft/LightGBM/blob/master/src/treelearner/feature_histogram.hpp) — `GetSplitGains` is templated on `USE_L1` (`:759`) and dispatches to `GetLeafGainGivenOutput<USE_L1>` (`:792`); the L1 soft-threshold `ThresholdL1(double s, double l1)` is defined at `:711` and applied in the leaf-output formula at `:724` (`-ThresholdL1(sum_gradients, l1) / (sum_hessians + l2)`). Call sites in `src/treelearner/feature_histogram.cpp:222,324,503,654`. Verified 2026-07-31 against the local checkout at `~/PROJECTS/LightGBM`; cited by URL because that repository is outside this workspace root and so cannot appear in `source_paths`.
