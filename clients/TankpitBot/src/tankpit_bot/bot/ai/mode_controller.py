@@ -7,7 +7,7 @@ the substate derivations. The entry/exit predicates it consults are
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.quad_sweep import anchored_window_origin
+from tankpit_bot.bot.ai.block_harvest import anchored_window_origin
 from tankpit_bot.bot.ai.scoring_types import make_behavior_score
 from tankpit_bot.bot.ai.tactics import compute_desired_equipment
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -359,10 +359,17 @@ def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
         "quad_sweep_radar",
     ):
         return "SENSE"
-    if reason in ("search_collect_local", "ferry_scope_scout"):
+    if reason in (
+        "search_collect_local",
+        "ferry_scope_scout",
+        "gatherer_hold",
+        "forage_frontier_walk",
+    ):
         # The free viewport pan is a SEARCH beat: the tick looks at
         # water it cannot yet believe in, exactly like a local search
         # looks at ground ([[viewport-shift-protocol]] scope scout).
+        # The gatherer's exhausted hold is the same beat between
+        # searches -- waiting one window for the world to change.
         return "SEARCH"
     if command_type in ("pickup_fuel", "pickup_equipment"):
         return "PICKUP"
