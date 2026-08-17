@@ -69,16 +69,19 @@ class TestIsTankBodyPresent:
         """The bot is not blocked by its own body."""
         assert is_tank_body_present(_tank(is_self=True), _NOW_MS) is False
 
-    def test_corpse_does_not_occupy_its_tile(self) -> None:
-        """A deactivated tank never blocks -- corpses are walkable.
+    def test_corpse_occupies_its_tile_while_it_stands(self) -> None:
+        """A wire-fresh corpse blocks like a body.
 
-        Archive-disproven 2026-08-04: six 0x47 echoes of the bot
-        walking ONTO fresh corpse tiles 2-10 s after its own kills,
-        zero blocked crossings. Kills drop no loot -- the crossings
-        are ordinary post-kill restock collection routes, so counting
-        corpses would veto the bot's own restock walks.
+        Falsifies the 2026-08-04 "corpses are walkable" dissolution
+        with run bot-20260813-204615's exact-window receipts (HUD
+        flag 3): seven consecutive pure code-1 refusals through a
+        corpse sprite corking a one-exit pocket, wire-restated at its
+        death tile the whole window, no mines anywhere near. The old
+        archive miner's blocking-proof pattern required a
+        partial-walk ECHO, so an adjacent-standing bot's bare
+        refusals were invisible to it.
         """
-        assert is_tank_body_present(_tank(liveness="deactivated"), _NOW_MS) is False
+        assert is_tank_body_present(_tank(liveness="deactivated"), _NOW_MS) is True
 
     def test_stale_viewport_observation_does_not_occupy(self) -> None:
         """Past the presence TTL the tank may have walked away."""

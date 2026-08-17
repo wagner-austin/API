@@ -8,7 +8,7 @@ import pytest
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot.facts.provenance import make_provenance
-from tankpit_bot.state.container_mutations import add_mine
+from tankpit_bot.state.mine_mutations import add_mine
 from tankpit_bot.state.projections.world import (
     mine_fact,
     self_fact,
