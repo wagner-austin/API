@@ -51,6 +51,7 @@ FactSource = Literal[
     "wire_0x64_fuel_total",
     "dom_registry_scrape",
     "client_side_inference",
+    "fleet_report",
 ]
 """Channel a fact was observed on (or inferred from)."""
 
@@ -76,6 +77,7 @@ _FACT_SOURCE_BY_NAME: dict[str, FactSource] = {
     "wire_0x5A_viewport_patch": "wire_0x5A_viewport_patch",
     "wire_0x64_fuel_total": "wire_0x64_fuel_total",
     "dom_registry_scrape": "dom_registry_scrape",
+    "fleet_report": "fleet_report",
     "client_side_inference": "client_side_inference",
 }
 
