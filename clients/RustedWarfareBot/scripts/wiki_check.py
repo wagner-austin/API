@@ -8,7 +8,10 @@ had accumulated silently, and the same script had to be re-run from a
 transcript the next day. A discipline that lives in a session is not a
 discipline ([[policy-loop]] says the same about run procedure).
 
-Six checks, all mechanical, all fatal: every ``source_paths`` entry
+Seven checks, all mechanical, all fatal: every page opens with
+frontmatter carrying a title (the healing page shipped without any and
+nothing noticed for two weeks -- an unpinnable page is unverifiable by
+the schema's own terms), every ``source_paths`` entry
 resolves (line anchors in bounds, URLs skipped), every ``source_git_blobs``
 path exists, every ``[[wikilink]]`` lands on a page or hub, every footnote
 is both used and defined, every page is linked from at least one hub, and
@@ -155,7 +158,10 @@ def run_checks(root: Path) -> tuple[str, ...]:
     found: list[str] = []
     for page in pages:
         text = page.read_text(encoding="utf-8")
-        found.extend(_check_sources(page.name, _frontmatter(text), root))
+        matter = _frontmatter(text)
+        if "title:" not in matter:
+            found.append(f"{page.name}: no frontmatter title; the page is unpinnable")
+        found.extend(_check_sources(page.name, matter, root))
         found.extend(_check_links(page.name, text, slugs))
     found.extend(_check_navigation(root, pages, hubs))
     return tuple(found)

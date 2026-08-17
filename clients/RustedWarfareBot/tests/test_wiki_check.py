@@ -102,10 +102,14 @@ def test_an_index_without_a_total_is_a_violation(tmp_path: Path) -> None:
     assert found == ("index.md: no content-page total found",)
 
 
-def test_a_page_without_frontmatter_is_checked_for_links_only(tmp_path: Path) -> None:
+def test_a_page_without_frontmatter_is_unpinnable(tmp_path: Path) -> None:
+    """The healing page shipped bare and nothing noticed for two weeks: a
+    page with no frontmatter has no title, no sources, and no build pin,
+    which the schema's own terms call unverifiable -- so it is now a
+    violation rather than a silent pass."""
     _clean_tree(tmp_path)
     _write(tmp_path, "wiki/pages/beta.md", "# Beta\n\nNo frontmatter, links to [[alpha]].\n")
-    assert run_checks(tmp_path) == ()
+    assert run_checks(tmp_path) == ("beta.md: no frontmatter title; the page is unpinnable",)
 
 
 def test_a_bad_argument_count_prints_usage(capsys: pytest.CaptureFixture[str]) -> None:
