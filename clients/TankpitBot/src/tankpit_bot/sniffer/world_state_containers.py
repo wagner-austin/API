@@ -53,6 +53,10 @@ def update_world_state_from_fuel_total(
         # every positive-residual divergence was an unentered gain).
         announced = fuel_total - ws.fuel_book["last_fuel"]
         record_fuel_entry(book=ws.fuel_book, kind="pickup", lo=announced, hi=announced)
+        if announced > 0:
+            # The wire just credited US fuel -- the code=4
+            # drain-vs-stale discriminator reads this stamp.
+            ws.record_own_gain(ts)
     confirm_incoming_damage(ws.damage_book, delta, ts)
     verdict = record_fuel_reading(book=ws.fuel_book, fuel_total=fuel_total)
     if verdict is not None and not verdict["balanced"]:
@@ -90,6 +94,10 @@ def update_world_state_from_container_pickup(
     """
     ts = _test_hooks.get_current_time_ms()
     ws.world_state = pickup_container(ws.world_state, x, y, ts, remaining_volume)
+    if remaining_volume <= 0:
+        # Emptied: tombstone the tile so a teammate's OLDER sighting
+        # cannot re-import the dead belief ([[fleet-coordination]]).
+        ws.container_disproofs[f"{x},{y}"] = ts
     rank = ws.world_state["self_state"]["rank"] if ws.world_state["self_state"] is not None else 8
     record_fuel_entry(book=ws.fuel_book, kind="pickup", lo=0, hi=fuel_capacity(rank))
     if remaining_volume <= 0:
@@ -119,6 +127,9 @@ def remove_container_at(ws: WorldService, x: int, y: int) -> None:
     if key not in ws.world_state["containers"]:
         return
     ws.world_state = remove_container(ws.world_state, x, y, ws.world_state["timestamp_ms"])
+    # Tombstone the disproof so the fleet merge cannot re-import a
+    # teammate's older belief in the tile ([[fleet-coordination]]).
+    ws.container_disproofs[key] = _test_hooks.get_current_time_ms()
     log.info("Removed unreachable container at (%d, %d)", x, y)
 
 

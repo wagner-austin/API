@@ -98,6 +98,13 @@ def update_world_state_from_radar(
         ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
 
     for c in containers:
+        if c["volume"] == 0:
+            # Radar states empty fuel authoritatively -- the mutation
+            # below removes any tracked belief, and the tombstone
+            # keeps the fleet merge from re-importing a teammate's
+            # older sighting of the drained tile
+            # ([[fleet-coordination]] negative knowledge).
+            ws.container_disproofs[f"{c['x']},{c['y']}"] = ts
         ws.world_state = update_container_from_radar(
             ws.world_state,
             c["x"],
