@@ -168,11 +168,14 @@ def _blocked_by_world(world: SimWorldDict, mover: SimTankDict, x: int, y: int) -
         occupies the tile.
     """
     for tank in world["tanks"].values():
-        if (
-            tank["alive"]
-            and tank["tank_id"] != mover["tank_id"]
-            and (tank["x"], tank["y"]) == (x, y)
-        ):
+        if tank["tank_id"] != mover["tank_id"] and (tank["x"], tank["y"]) == (x, y):
+            # Alive or corpse: a body blocks while it stands. The
+            # ``alive`` gate here briefly mirrored the 2026-08-04
+            # "corpses don't block" archive claim; run
+            # bot-20260813-204615 falsified it with exact-window
+            # receipts (seven pure code-1 refusals through a
+            # wire-restated corpse sprite corking a one-exit pocket
+            # -- see state/occupancy.py for the full measurement).
             return True
     key = tile_key(x, y)
     mine = world["mines"].get(key)
