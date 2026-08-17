@@ -15,7 +15,8 @@ from tankpit_bot.bot.ai.humans import (
 )
 from tankpit_bot.bot.ai.threat_primitives import (
     _is_enemy,
-    _threat_sort_key,
+    _threat_sort_key_for,
+    fleet_assist_ids,
     human_combat_consented,
     manhattan_distance,
 )
@@ -137,7 +138,7 @@ def analyze_threats(
             )
         )
 
-    threats.sort(key=_threat_sort_key)
+    threats.sort(key=_threat_sort_key_for("", fleet_assist_ids(ws)))
     return threats
 
 

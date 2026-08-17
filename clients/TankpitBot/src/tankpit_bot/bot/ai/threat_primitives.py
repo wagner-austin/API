@@ -171,46 +171,51 @@ def _finish_priority(damage_state: int) -> int:
     return damage_state
 
 
+def fleet_assist_ids(ws: WorldService) -> frozenset[int]:
+    """Return teammates' engaged target ids for the focus-fire rank.
+
+    The merge pass REPLACES ``fleet_engaged_target_ids`` wholesale
+    from fresh reports only, so membership alone is the freshness
+    guarantee ([[fleet-coordination]]).
+
+    Args:
+        ws: The session's world service.
+
+    Returns:
+        Tank ids at least one same-team sibling holds a combat lock on.
+    """
+    return frozenset(ws.fleet_engaged_target_ids)
+
+
 def _threat_sort_key_for(
     priority_target_name: str,
-) -> Callable[[EnemyThreatDict], tuple[int, int, int, int]]:
-    """Build the threat sort key with a configured priority account.
+    fleet_engaged_ids: frozenset[int],
+) -> Callable[[EnemyThreatDict], tuple[int, int, int, int, int]]:
+    """Build the threat sort key with the priority account and fleet assist.
 
     Args:
         priority_target_name: Account name that outranks even other
             humans (case-insensitive), or ``""`` for none.
+        fleet_engaged_ids: Tank ids teammates currently hold combat
+            locks on ([[fleet-coordination]] focus fire) — inside a
+            priority tier these rank first, so same-team fighters
+            converge on one enemy instead of splitting fire.
 
     Returns:
-        Sort-key callable ordering by (tier, distance, finish, age).
+        Sort-key callable ordering by (tier, fleet assist, distance,
+        finish, age).
     """
 
-    def _key(threat: EnemyThreatDict) -> tuple[int, int, int, int]:
+    def _key(threat: EnemyThreatDict) -> tuple[int, int, int, int, int]:
         return (
             threat_priority_tier(threat["name"], priority_target_name),
+            0 if threat["tank_id"] in fleet_engaged_ids else 1,
             threat["distance"],
             _finish_priority(threat["damage_state"]),
             -threat["timestamp_ms"],
         )
 
     return _key
-
-
-def _threat_sort_key(threat: EnemyThreatDict) -> tuple[int, int, int, int]:
-    """Sort key: human tier, then distance, finish-off priority, freshness.
-
-    Human-classified enemies outrank every practice bot regardless of
-    distance (user doctrine 2026-07-28: farm bots normally, but any
-    human who logs in becomes the priority). Within a tier, closer
-    threats come first; among equal distance, more damaged enemies
-    come first (easier to finish off); then recently confirmed tanks.
-
-    Args:
-        threat: Enemy threat to compute sort key for.
-
-    Returns:
-        Tuple of (human_tier, distance, finish_priority, -timestamp_ms).
-    """
-    return _threat_sort_key_for("")(threat)
 
 
 def find_closest_threat(

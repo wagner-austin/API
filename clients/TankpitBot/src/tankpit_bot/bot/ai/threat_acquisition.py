@@ -17,6 +17,7 @@ from tankpit_bot.bot.ai.humans import (
 from tankpit_bot.bot.ai.threat_primitives import (
     _is_enemy,
     _threat_sort_key_for,
+    fleet_assist_ids,
     human_combat_consented,
     make_enemy_threat_from_tank,
     manhattan_distance,
@@ -206,7 +207,7 @@ def find_acquisition_target(
             continue
         candidates.append(make_enemy_threat_from_tank(tank, dist))
 
-    candidates.sort(key=_threat_sort_key_for(priority_target_name))
+    candidates.sort(key=_threat_sort_key_for(priority_target_name, fleet_assist_ids(ws)))
     winner = candidates[0] if candidates else None
     emit_diagnostic(
         diagnostic_kind="acquisition_candidates",
@@ -365,7 +366,7 @@ def find_relay_travel_target(
             )
         )
 
-    candidates.sort(key=_threat_sort_key_for(priority_target_name))
+    candidates.sort(key=_threat_sort_key_for(priority_target_name, fleet_assist_ids(ws)))
     return candidates[0] if candidates else None
 
 
