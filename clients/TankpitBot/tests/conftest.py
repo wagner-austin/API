@@ -142,7 +142,6 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.append_text = _test_hooks._real_append_text
     _test_hooks.path_exists = _test_hooks._real_path_exists
     _test_hooks.remove_file = _test_hooks._real_remove_file
-    _test_hooks.find_best_static_byte = None
     _test_hooks.sync_playwright = None
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
     _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
@@ -178,7 +177,6 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.append_text = _test_hooks._real_append_text
     _test_hooks.path_exists = _test_hooks._real_path_exists
     _test_hooks.remove_file = _test_hooks._real_remove_file
-    _test_hooks.find_best_static_byte = None
     _test_hooks.sync_playwright = None
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
     _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map

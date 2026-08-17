@@ -1,8 +1,13 @@
-"""Tests for static key functionality."""
+"""Tests for static key functionality.
+
+The brute-force discovery pair (``extract_xor_first_bytes`` /
+``find_best_static_byte``) and its tests were removed 2026-08-17 —
+the functions' only callers were these tests, and the hook slot that
+supposedly let tests inject the discovery was read by nothing.
+"""
 
 from __future__ import annotations
 
-import base64
 from pathlib import Path
 
 import pytest
@@ -11,117 +16,10 @@ from platform_core.json_utils import JSONValue
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.browser import (
-    extract_xor_first_bytes,
-    find_best_static_byte,
     load_static_key,
     save_static_key,
 )
-from tankpit_bot.types import CapturedMessage
 from tests.no_op_keyboard import NoOpKeyboard
-
-# =============================================================================
-# Static Key Helper Function Tests
-# =============================================================================
-
-
-def test_extract_xor_first_bytes_empty_list() -> None:
-    """Test extract_xor_first_bytes with empty messages."""
-    result = extract_xor_first_bytes([])
-    assert result == []
-
-
-def test_extract_xor_first_bytes_skips_sent_messages() -> None:
-    """Test extract_xor_first_bytes skips sent messages."""
-    # Create a sent message
-    payload = bytes([0x00, 0x04, 0x2E, 0x55])  # length=4, type=0x2E, data=0x55
-    msg = CapturedMessage(
-        timestamp_ms=1000,
-        direction="sent",
-        payload=base64.b64encode(payload).decode(),
-        ws_url="wss://test.com",
-    )
-    result = extract_xor_first_bytes([msg])
-    assert result == []
-
-
-def test_extract_xor_first_bytes_skips_short_payloads() -> None:
-    """Test extract_xor_first_bytes skips payloads < 4 bytes."""
-    # Create a short message (less than 4 bytes)
-    payload = bytes([0x00, 0x01, 0x2E])  # only 3 bytes
-    msg = CapturedMessage(
-        timestamp_ms=1000,
-        direction="received",
-        payload=base64.b64encode(payload).decode(),
-        ws_url="wss://test.com",
-    )
-    result = extract_xor_first_bytes([msg])
-    assert result == []
-
-
-def test_extract_xor_first_bytes_skips_text_messages() -> None:
-    """Test extract_xor_first_bytes skips text message types."""
-    # Create a text message (type 0x2B is in TEXT_MESSAGE_TYPES)
-    payload = bytes([0x00, 0x04, 0x2B, 0xAB])  # type=0x2B (text)
-    msg = CapturedMessage(
-        timestamp_ms=1000,
-        direction="received",
-        payload=base64.b64encode(payload).decode(),
-        ws_url="wss://test.com",
-    )
-    result = extract_xor_first_bytes([msg])
-    assert result == []
-
-
-def test_extract_xor_first_bytes_extracts_binary_messages() -> None:
-    """Test extract_xor_first_bytes extracts bytes from binary messages."""
-    # Create binary messages (type 0x2E is container)
-    payload1 = bytes([0x00, 0x05, 0x2E, 0x55, 0x00])  # data byte = 0x55
-    payload2 = bytes([0x00, 0x06, 0x2E, 0xAA, 0x00, 0x00])  # data byte = 0xAA
-    msg1 = CapturedMessage(
-        timestamp_ms=1000,
-        direction="received",
-        payload=base64.b64encode(payload1).decode(),
-        ws_url="wss://test.com",
-    )
-    msg2 = CapturedMessage(
-        timestamp_ms=1001,
-        direction="received",
-        payload=base64.b64encode(payload2).decode(),
-        ws_url="wss://test.com",
-    )
-    result = extract_xor_first_bytes([msg1, msg2])
-    assert result == [0x55, 0xAA]
-
-
-def test_find_best_static_byte_returns_tuple() -> None:
-    """Test find_best_static_byte returns (best_byte, match_count) tuple."""
-    # With empty data, any value works - result is (0, 0) since nothing matches
-    result = find_best_static_byte([], ord("a"))
-    assert type(result) is tuple
-    assert len(result) == 2
-    assert result == (0, 0)
-
-
-def test_find_best_static_byte_finds_best_match() -> None:
-    """Test find_best_static_byte finds the byte with most signature matches."""
-    # Create data that would produce known signatures when XOR'd correctly
-    # Known signature 0x01 is position_update
-    # If magic[0]='a' (97), static[0]=X, data byte=Y
-    # decoded = Y ^ (X ^ 97)
-    # For decoded=0x01, we need Y ^ (X ^ 97) = 0x01
-
-    # Set magic[0]='a' (97)
-    magic_first = ord("a")
-    # If static[0]=0x00, then table[0] = 0x00 ^ 97 = 97
-    # For decoded=0x01, data = 0x01 ^ 97 = 96
-    raw_bytes = [96]  # This should decode to 0x01 when static[0]=0
-
-    best_static, count = find_best_static_byte(raw_bytes, magic_first)
-    # The algorithm brute-forces to find which static[0] produces known signatures
-    # Since 0x01 is a known signature, we expect some coverage
-    assert count >= 0
-    assert 0 <= best_static <= 255
-
 
 # =============================================================================
 # Static Key Load/Save Tests
