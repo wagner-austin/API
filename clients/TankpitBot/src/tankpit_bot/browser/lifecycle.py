@@ -7,6 +7,10 @@ probes via composition instead of inheritance.
 
 from __future__ import annotations
 
+import sys
+import threading
+import traceback
+
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
@@ -25,12 +29,38 @@ _TEARDOWN_WATCHDOG_SECONDS = 30.0
 _TEARDOWN_HANG_EXIT_CODE = 75
 
 
+def _thread_stacks_snapshot() -> str:
+    """Render every live thread's current stack for the hang autopsy.
+
+    The watchdog fires on its own timer thread while the thread that
+    called ``browser.close()`` is the one that is stuck, so the
+    snapshot must cross threads: ``sys._current_frames`` hands over
+    each live thread's innermost frame, and the formatted stacks name
+    the exact call the teardown is wedged in. Both 240 s fleet runs on
+    2026-08-14 ended in a 30 s close hang with identical logs and no
+    surviving evidence — this snapshot is what turns the next
+    occurrence into a diagnosis instead of another mystery exit 75.
+
+    Returns:
+        One section per live thread — its name, ident, and formatted
+        stack — joined into a single loggable string.
+    """
+    names = {thread.ident: thread.name for thread in threading.enumerate()}
+    sections: list[str] = []
+    for ident, frame in sys._current_frames().items():
+        name = names.get(ident, "unnamed")
+        stack = "".join(traceback.format_stack(frame))
+        sections.append(f"--- thread {name!r} (ident={ident}) ---\n{stack}")
+    return "\n".join(sections)
+
+
 def _handle_teardown_hang() -> None:
     """Force the process to exit after a hung browser teardown."""
     log.error(
         "Teardown exceeded %.0fs; forcing process exit (artifacts were saved before cleanup)",
         _TEARDOWN_WATCHDOG_SECONDS,
     )
+    log.error("Thread stacks at the moment of the hang:\n%s", _thread_stacks_snapshot())
     _test_hooks.force_exit(_TEARDOWN_HANG_EXIT_CODE)
 
 
