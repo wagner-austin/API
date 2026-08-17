@@ -215,10 +215,15 @@ def test_stats_reduces_the_transcript(spawner: FakeSpawner) -> None:
 
 
 def test_stats_before_any_output_is_unavailable(spawner: FakeSpawner) -> None:
-    """A missing transcript is a state, not an error; ghosts still 404."""
+    """A missing transcript is a state, not an error; ghosts still 404.
+
+    ABSENCE specifically: only FileNotFoundError means "not started yet";
+    a permission or disk failure is not that state and propagates (the
+    2026-08-17 exceptions audit -- the broad OSError fallback made a disk
+    error read as a match that never began)."""
 
     def raise_missing(path: Path) -> tuple[str, ...]:
-        raise OSError(f"no transcript at {path}")
+        raise FileNotFoundError(f"no transcript at {path}")
 
     original_read = _test_hooks.read_text_lines
     _test_hooks.read_text_lines = raise_missing

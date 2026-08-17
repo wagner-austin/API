@@ -116,19 +116,26 @@ def _ensure(
         (_price(name, catalogue), name) for name in producers - set(pending) - {target}
     ]
     candidates = [name for _, name in sorted(reachable)]
+    # Backtracking, with the evidence kept: a candidate's failure is not
+    # swallowed on the way to the next -- its reason rides to the terminal
+    # error, so "none reachable" names why each path was refused instead of
+    # discarding every diagnosis but the count.
+    refusals: list[str] = []
     for candidate in candidates:
         try:
             _ensure(candidate, tree, available, catalogue, plan, (*pending, target))
-        except ExpansionError:
+        except ExpansionError as error:
+            refusals.append(f"{candidate}: {error}")
             continue
         plan.append(target)
         available.add(target)
         return
 
+    reasons = f" ({'; '.join(refusals)})" if refusals else ""
     raise ExpansionError(
         _UNREACHABLE,
         f"{target!r} needs one of {sorted(producers)}, and none of those can be "
-        "reached from what the player owns",
+        f"reached from what the player owns{reasons}",
     )
 
 

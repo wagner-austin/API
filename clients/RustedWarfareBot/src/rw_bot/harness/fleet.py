@@ -322,7 +322,11 @@ class FleetManager:
             raise FleetError(_UNKNOWN, f"unknown instance {instance!r}")
         try:
             lines = _test_hooks.read_text_lines(transcript_path(instance))
-        except OSError:
+        except FileNotFoundError:
+            # Absence IS the answer: the child has not written yet, which is
+            # the state ``available=False`` exists to report, and it recurs
+            # every poll until the first write. Only absence -- a permission
+            # or disk failure is not "not started yet" and propagates.
             return FleetStats(available=False, finished=False, verdict="", report=[])
         report_lines: list[str] = []
         for index, line in enumerate(lines):
