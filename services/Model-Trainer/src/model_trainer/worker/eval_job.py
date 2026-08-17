@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
-from platform_core.trainer_keys import artifact_file_id_key, eval_key
+from platform_core.trainer_keys import eval_key
 from typing_extensions import TypedDict
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import EvalJobPayload
-from model_trainer.core.infra.paths import model_eval_dir, models_dir
-from model_trainer.worker.job_utils import redis_client, setup_job_logging
+from model_trainer.core.infra.paths import model_eval_dir
+from model_trainer.worker.job_utils import (
+    materialize_run_artifacts,
+    redis_client,
+    setup_job_logging,
+)
 from model_trainer.worker.manifest import (
     as_device,
     as_model_family,
@@ -44,34 +46,15 @@ def process_eval_job(payload: EvalJobPayload) -> None:
     running: _EvalCacheModel = {"status": "running", "split": split}
     r.set(eval_key(run_id), dump_json_str(running))
 
-    artifacts_root = settings["app"]["artifacts_root"]
-    manifest_path = Path(artifacts_root) / "models" / run_id / "manifest.json"
-    models_root = models_dir(settings)
-
     try:
-        file_id = r.get(artifact_file_id_key(run_id))
-        if not isinstance(file_id, str) or file_id.strip() == "":
-            raise AppError(
-                ModelTrainerErrorCode.DATA_NOT_FOUND,
-                "artifact pointer not found for eval",
-                model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
-            )
-
-        api_url = settings["app"]["data_bank_api_url"]
-        api_key = settings["app"]["data_bank_api_key"]
-        store = _test_hooks.artifact_store_factory(api_url, api_key)
-        expected_root = f"model-{run_id}"
-        out_root = store.download_artifact(
-            file_id.strip(), dest_dir=models_root, request_id=run_id, expected_root=expected_root
-        )
-        normalized = models_root / run_id
-        if normalized.exists():
-            raise AppError(
-                ModelTrainerErrorCode.DATA_NOT_FOUND,
-                f"destination already exists: {normalized}",
-                model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
-            )
-        out_root.rename(normalized)
+        # This used to download unconditionally and then fail with
+        # "destination already exists" whenever the directory was present,
+        # so evaluating a run that any other job had already fetched -- cloze,
+        # score, generate, continued training -- was an error rather than a
+        # cache hit. Sharing the helper makes an existing directory the fast
+        # path it should always have been.
+        normalized = materialize_run_artifacts(settings, r, run_id, purpose="eval")
+        manifest_path = normalized / "manifest.json"
 
         if not manifest_path.exists():
             raise AppError(

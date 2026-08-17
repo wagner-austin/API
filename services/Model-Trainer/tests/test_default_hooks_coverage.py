@@ -10,12 +10,15 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import httpx
+import pytest
 from platform_workers.rq_harness import RQClientQueue, RQRetryLike
 from platform_workers.testing import FakeRedisBytesClient
 
 from model_trainer.core._test_hooks import (
+    ArtifactStoreProto,
     CorpusFetcherProto,
     ServiceContainerProto,
+    _default_artifact_store,
     _default_corpus_fetcher_factory,
     _default_cuda_is_available,
     _default_httpx_client_factory,
@@ -96,6 +99,39 @@ def test_default_corpus_fetcher_factory(tmp_path: Path) -> None:
     # Fetcher protocol is satisfied - call a method to verify
     method = fetcher.fetch
     assert method == method  # type check
+
+
+def test_default_artifact_store_builds_a_real_store(tmp_path: Path) -> None:
+    """The production hook must construct a working ArtifactStore.
+
+    Every job that needs a finished run's weights reaches them through this
+    factory, and after the five duplicated fetch blocks were replaced by one
+    shared helper nothing else exercised it. It is the seam between the workers
+    and the data bank, so it is worth asserting directly rather than only
+    through whichever job happened to touch it.
+    """
+    from platform_core.data_bank_client import DataBankClientError
+
+    store: ArtifactStoreProto = _default_artifact_store(
+        "http://127.0.0.1:1",
+        "test-key",
+        timeout_seconds=1.0,
+    )
+
+    # Called exactly as materialize_run_artifacts calls it, against a port
+    # nothing listens on. A real client attempts the transfer and reports a
+    # transport failure; a stub would return a path. This asserts the factory
+    # produced something that actually talks to the data bank, and pins the
+    # keyword names the workers pass.
+    dest = tmp_path / "models"
+    dest.mkdir()
+    with pytest.raises(DataBankClientError, match="transport error"):
+        store.download_artifact(
+            "some-file-id",
+            dest_dir=dest,
+            request_id="run-x",
+            expected_root="model-run-x",
+        )
 
 
 def test_default_rq_queue_returns_queue() -> None:

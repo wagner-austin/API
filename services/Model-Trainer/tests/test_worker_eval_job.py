@@ -331,8 +331,18 @@ def test_eval_job_missing_manifest(tmp_path: Path, settings_factory: _SettingsFa
     fake.assert_only_called({"set", "get"})
 
 
-def test_eval_job_destination_exists(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
-    """Cover line 632: RuntimeError when destination already exists."""
+def test_eval_job_reuses_artifacts_another_job_already_fetched(
+    tmp_path: Path, settings_factory: _SettingsFactory
+) -> None:
+    """An already-present directory is a cache hit, not an error.
+
+    eval_job used to download unconditionally and then raise "destination
+    already exists" whenever the directory was there, so evaluating a run that
+    cloze, score, generate or continued training had already materialized was
+    an error. The previous version of this test asserted that raise -- it was
+    written to cover a line rather than to state a requirement, and it pinned
+    the defect in place.
+    """
     fake = _FakeRedis()
     _test_hooks.kv_store_factory = lambda url: fake
 
@@ -362,10 +372,13 @@ def test_eval_job_destination_exists(tmp_path: Path, settings_factory: _Settings
     (model_dir / "weights.bin").write_bytes(b"\x00mock")
     _create_model_tarball(model_dir, tar_path, name)
 
-    # Pre-create the destination directory to trigger the RuntimeError
+    # Another job already materialized this run, exactly as happens in
+    # production once anything has touched it.
     models_root = artifacts / "models"
     models_root.mkdir(parents=True, exist_ok=True)
     (models_root / run_id).mkdir()
+
+    downloads: list[str] = []
 
     class _FakeStore:
         def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
@@ -394,6 +407,7 @@ def test_eval_job_destination_exists(tmp_path: Path, settings_factory: _Settings
             request_id: str,
             expected_root: str,
         ) -> Path:
+            downloads.append(file_id)
             out = dest_dir / expected_root
             out.mkdir(parents=True, exist_ok=True)
             with tarfile.open(str(tar_path), "r") as tf:
@@ -412,8 +426,13 @@ def test_eval_job_destination_exists(tmp_path: Path, settings_factory: _Settings
         "split": "validation",
         "path_override": None,
     }
-    with pytest.raises(AppError, match="destination already exists"):
+    # The directory is present but holds no manifest, so the job gets as far as
+    # the manifest check rather than failing on the directory's existence.
+    with pytest.raises(AppError, match="manifest missing"):
         process_eval_job(payload)
+
+    # And it never re-fetched what was already on disk.
+    assert downloads == []
     fake.assert_only_called({"set", "get"})
 
 

@@ -5,14 +5,17 @@ from __future__ import annotations
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
-from platform_core.trainer_keys import artifact_file_id_key, generate_key
+from platform_core.trainer_keys import generate_key
 from typing_extensions import TypedDict
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.model import GenerateConfig
 from model_trainer.core.contracts.queue import GenerateJobPayload
-from model_trainer.core.infra.paths import models_dir
-from model_trainer.worker.job_utils import redis_client, setup_job_logging
+from model_trainer.worker.job_utils import (
+    materialize_run_artifacts,
+    redis_client,
+    setup_job_logging,
+)
 from model_trainer.worker.manifest import as_model_family, load_manifest_from_text
 
 
@@ -37,29 +40,7 @@ def process_generate_job(payload: GenerateJobPayload) -> None:
     r.set(generate_key(run_id, request_id), dump_json_str(running))
 
     try:
-        file_id = r.get(artifact_file_id_key(run_id))
-        if not isinstance(file_id, str) or file_id.strip() == "":
-            raise AppError(
-                ModelTrainerErrorCode.DATA_NOT_FOUND,
-                "artifact pointer not found for generate",
-                model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
-            )
-
-        api_url = settings["app"]["data_bank_api_url"]
-        api_key = settings["app"]["data_bank_api_key"]
-        store = _test_hooks.artifact_store_factory(api_url, api_key)
-        models_root = models_dir(settings)
-        expected_root = f"model-{run_id}"
-        normalized = models_root / run_id
-
-        if not normalized.exists():
-            out_root = store.download_artifact(
-                file_id.strip(),
-                dest_dir=models_root,
-                request_id=run_id,
-                expected_root=expected_root,
-            )
-            out_root.rename(normalized)
+        normalized = materialize_run_artifacts(settings, r, run_id, purpose="generate")
 
         manifest_path = normalized / "manifest.json"
         if not manifest_path.exists():
