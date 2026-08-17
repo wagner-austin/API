@@ -27,8 +27,9 @@ Claims about engine internals are pinned to a game build (`game_version` frontma
 ## Build
 
 ```bash
-make check          # lint + test + agent-selftest (the gate)
+make check          # lint + sources + test + agent-selftest (the gate)
 make lint           # guard + ruff + mypy over src, tests, scripts
+make sources        # wiki provenance and navigation: anchors, links, counts
 make test           # pytest + coverage, 100% statements and branches
 make agent          # compile + jar the javaagent with the game's own JDK
 make agent-selftest # patch the real jar, verified by the JVM's bytecode verifier
@@ -41,12 +42,20 @@ the gate rather than inside a live engine.
 ## Playing
 
 ```bash
-make play    # one headless match: agent starts it, the planner plays it
-make sweep   # a batch of matches in parallel, one scorecard per match
-make watch   # a real window on a champion match (Impossible by default)
-make host    # bot-hosted LAN game a human can join (sparring; shelved)
-make income  # the economy probe behind the measured credits/s figures
+make play     # one headless match: agent starts it, the planner plays it
+make sweep    # a batch of matches in parallel, one scorecard per match
+make door     # match-service HTTP door, detached (dashboard on :27501)
+make fleet-up # start any missing match workers, detached
+make watch    # a real window on a champion match (Impossible by default)
+make host     # bot-hosted LAN game a human can join (sparring; shelved)
+make income   # the economy probe behind the measured credits/s figures
 ```
+
+Panels run through the **match service** (`wiki/pages/harness-match-service.md`):
+a Postgres-backed queue with leased game clones and ports, detached workers,
+a live dashboard, and a retry verb — submit with `scripts/submit_batch.py`,
+score with `scripts/margin.py`, search doctrine spaces with `scripts/search.py`.
+The whole crash recovery is `make door` + `make fleet-up`; queue rows survive.
 
 A match is shaped by a **doctrine** file (`doctrines/*.doctrine`) — goals,
 wave mass, and one flag per behaviour, every field required so an arm differs
@@ -92,7 +101,8 @@ src/rw_bot/       Python planner
   control/          the socket channel to a running agent
   mechanics/        catalogue, combat profiles, build tree — the game's facts
   policy/           the decisions: plan, economy, combat, dispatch, doctrine
-  harness/          sweep runner, frozen trees, boot-log decoding
+  harness/          sweep runner, frozen trees, boot-log decoding, search, margin
+  service/          the match service: queue, worker, door, submission
 scripts/          entry points and operational scripts, linted and covered like src
 doctrines/        gameplay styles, one file per arm
 sweeps/           batch definitions, one file per experiment
