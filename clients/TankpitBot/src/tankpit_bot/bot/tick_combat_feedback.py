@@ -70,6 +70,15 @@ log = get_logger(__name__)
 def _merge_protocol_kills(ws: WorldService, ai_state: AIStateDict) -> AIStateDict:
     """Merge Deactivation kills from protocol into AI killed_tank_ids.
 
+    Every victim enters ``killed_tank_ids`` — the dead-tank registry
+    keeps the bot off corpses no matter who made them — but
+    ``session_kill_count`` (the scorecard and the ``session_kills``
+    wind-down trigger) advances only for victims whose 0x41 names THIS
+    tank as the killer. Solo sessions made the two indistinguishable;
+    the 2026-08-14 fleet run falsified that: arterial's scorecard
+    banked artax's two kills (both ``killed by 1301``) on zero shots
+    fired.
+
     Args:
         ws: The session's world service, holding the kill queue.
         ai_state: Current AI state.
@@ -80,11 +89,19 @@ def _merge_protocol_kills(ws: WorldService, ai_state: AIStateDict) -> AIStateDic
     new_kills = drain_killed_tank_ids(ws)
     if not new_kills:
         return ai_state
+    self_state = ws.world_state["self_state"]
+    # An unattributable kill (no established identity yet — e.g. a
+    # spectated 0x41 during entry) still lands in the dead registry;
+    # it can never be OUR kill, -1 is not a wire tank id.
+    own_tank_id = -1 if self_state is None else self_state["tank_id"]
     now = get_current_time_ms()
     merged = dict(ai_state["killed_tank_ids"])
-    for tank_id in new_kills:
+    own_kill_count = 0
+    for tank_id, killer_id in new_kills.items():
         merged[str(tank_id)] = now
-        emit_ai("kill registered (tank_id=%d)", tank_id)
+        if killer_id == own_tank_id:
+            own_kill_count += 1
+            emit_ai("kill registered (tank_id=%d)", tank_id)
     # The shot-target fields are NOT cleared here: when the killed tank
     # is the pending shot's target, ``_get_combat_feedback`` must still
     # see the target id to resolve the shot as ``kill_confirmed`` (a
@@ -96,7 +113,7 @@ def _merge_protocol_kills(ws: WorldService, ai_state: AIStateDict) -> AIStateDic
         **{
             **ai_state,
             "killed_tank_ids": merged,
-            "session_kill_count": ai_state["session_kill_count"] + len(new_kills),
+            "session_kill_count": ai_state["session_kill_count"] + own_kill_count,
             "combat_target_id": -1 if target_was_killed else ai_state["combat_target_id"],
             "combat_target_x": 0 if target_was_killed else ai_state["combat_target_x"],
             "combat_target_y": 0 if target_was_killed else ai_state["combat_target_y"],
@@ -187,11 +204,6 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             **{**bot._ai_state, "session_hit_count": bot._ai_state["session_hit_count"] + 1}
         )
 
-    def _inc_miss() -> None:
-        bot._ai_state = AIStateDict(
-            **{**bot._ai_state, "session_miss_count": bot._ai_state["session_miss_count"] + 1}
-        )
-
     duration_ms = get_current_time_ms() - bot._ai_state["last_shoot_ms"]
     if got_hit:
         # Distinguish intended-target hit from incidental hit (e.g.
@@ -254,16 +266,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         _inc_hit()
         return "hit"
     if got_response:
-        # No tile-occupied hit, no ammo debit, and a wire response did
-        # arrive -- the shot genuinely missed.
-        emit_shoot_miss(
-            bot.world.ledger,
-            duration_ms=duration_ms,
-            target_id=target_id,
-            target_name=target_name,
-        )
-        _inc_miss()
-        return "miss"
+        return _classify_confirmed_miss(bot, target_id, target_name, duration_ms)
     if peek_command_error(bot.world) in _SHOT_REJECTING_COMMAND_ERRORS:
         error_code = check_and_clear_command_error(bot.world)
         emit_shoot_command_rejected(
@@ -283,6 +286,74 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             _disprove_target_by_friendly_fire(bot, target_id, target_name)
         return "rejected"
     return ""
+
+
+def _classify_confirmed_miss(
+    bot: Bot, target_id: int, target_name: str, duration_ms: int
+) -> CombatFeedback:
+    """Book a wire-confirmed miss: ledger, session count, divert block.
+
+    No tile-occupied hit, no ammo debit, and a wire response did
+    arrive -- the shot genuinely missed. A missed OPPORTUNITY divert
+    (firefight doctrine 2026-08-14) additionally blocks the divert
+    id: the engage path's stationary-miss handling only ever judges
+    the main lock, so without the block a shielded or afterimage
+    divert target would be re-selected every tick -- an
+    uncorrectable free-shot livelock that also starves the main
+    fight.
+
+    Args:
+        bot: Bot instance.
+        target_id: The missed shot's target id.
+        target_name: The missed shot's target name.
+        duration_ms: Dispatch-to-feedback wall-clock ms.
+
+    Returns:
+        The literal ``"miss"``.
+    """
+    emit_shoot_miss(
+        bot.world.ledger,
+        duration_ms=duration_ms,
+        target_id=target_id,
+        target_name=target_name,
+    )
+    bot._ai_state = AIStateDict(
+        **{**bot._ai_state, "session_miss_count": bot._ai_state["session_miss_count"] + 1}
+    )
+    if target_id != bot._ai_state["combat_target_id"]:
+        _block_missed_divert_target(bot, target_id, target_name)
+    return "miss"
+
+
+def _block_missed_divert_target(bot: Bot, target_id: int, target_name: str) -> None:
+    """Block an opportunity-divert target whose shot came back a miss.
+
+    A consumption-miss against a visible, position-confirmed enemy
+    means the tank is not killable right now (corpse from an
+    unwitnessed kill, or shields) -- the same verdict the engage
+    path's stationary-miss block renders for the main lock. Diverted
+    shots bypass that path (their feedback is scoped away from the
+    lock by design), so the block lands here in the feedback layer.
+    The held combat lock is untouched.
+
+    Args:
+        bot: Bot instance.
+        target_id: The missed divert's target id.
+        target_name: The missed divert's target name (log receipt).
+    """
+    blocked = dict(bot._ai_state["blocked_combat_targets"])
+    blocked[str(target_id)] = get_current_time_ms()
+    bot._ai_state = AIStateDict(**{**bot._ai_state, "blocked_combat_targets": blocked})
+    log.info(
+        "AI: opportunity shot at %s (id=%d) missed - divert target blocked, lock held",
+        target_name,
+        target_id,
+    )
+    emit_diagnostic(
+        diagnostic_kind="divert_target_blocked",
+        target_id=target_id,
+        target_name=target_name,
+    )
 
 
 def _disprove_target_by_friendly_fire(bot: Bot, target_id: int, target_name: str) -> None:
