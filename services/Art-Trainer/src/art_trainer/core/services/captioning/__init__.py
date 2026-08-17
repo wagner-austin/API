@@ -31,7 +31,7 @@ from .backends import (
     reset_caption_registry,
 )
 from .blip_adapter import caption_image, caption_images
-from .blip_model import BlipCaptioner, create_blip_caption_generator, setup_blip_caption_hook
+from .blip_model import BlipCaptioner
 
 __all__ = [
     "BlipCaptioner",
@@ -42,8 +42,6 @@ __all__ = [
     "CaptionConfig",
     "caption_image",
     "caption_images",
-    "create_blip_caption_generator",
     "get_caption_registry",
     "reset_caption_registry",
-    "setup_blip_caption_hook",
 ]

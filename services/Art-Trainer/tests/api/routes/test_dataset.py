@@ -12,40 +12,14 @@ from platform_core.json_utils import JSONObject, load_json_str, require_int, req
 from art_trainer.api.main import create_app
 from art_trainer.core import _test_hooks
 from art_trainer.core.config.settings import Settings
-from art_trainer.core.services.captioning import _test_hooks as captioning_test_hooks
 from art_trainer.core.services.captioning._test_hooks import CaptionConfigDict
 from art_trainer.core.services.captioning.backends import (
+    CaptionBackend,
     CaptionBackendType,
+    CaptionConfig,
+    get_caption_registry,
     reset_caption_registry,
 )
-
-
-class FakeCaptionGenerator:
-    """Fake caption generator for tests."""
-
-    calls: list[tuple[Path, str]]
-
-    def __init__(self, caption: str = "standing") -> None:
-        """Initialize fake caption generator.
-
-        Args:
-            caption: Caption to return.
-        """
-        self.calls = []
-        self._caption = caption
-
-    def __call__(self, image_path: Path, trigger_word: str) -> str:
-        """Generate a fake caption.
-
-        Args:
-            image_path: Path to image file.
-            trigger_word: Trigger word.
-
-        Returns:
-            Fake caption string.
-        """
-        self.calls.append((image_path, trigger_word))
-        return f"{trigger_word} {self._caption}"
 
 
 def _make_test_settings(tmp_path: Path) -> Settings:
@@ -162,9 +136,23 @@ def test_dataset_upload_with_auto_caption(tmp_path: Path) -> None:
 
     _test_hooks.load_settings = load_settings
 
-    # Set up fake caption generator
-    fake_generator = FakeCaptionGenerator("smiling")
-    captioning_test_hooks.Hooks.caption_generator = fake_generator
+    # Auto-caption goes through the registry now, like every other path
+    reset_caption_registry()
+    fake_backend = FakeCaptionBackend("smiling", "blip")
+
+    def fake_backend_factory(config: CaptionConfig) -> CaptionBackend:
+        """Return the fake regardless of the config the route builds.
+
+        Args:
+            config: Caption configuration, unused.
+
+        Returns:
+            The fake backend.
+        """
+        del config
+        return fake_backend
+
+    get_caption_registry().register("blip", fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)
@@ -193,7 +181,7 @@ def test_dataset_upload_with_auto_caption(tmp_path: Path) -> None:
     assert image_count == 2
     # find_images finds .jpg and .JPG separately, so caption_count may differ
     assert caption_count >= 2
-    assert len(fake_generator.calls) >= 2
+    assert len(fake_backend.calls) >= 2
 
 
 def test_dataset_upload_skips_non_image_files(tmp_path: Path) -> None:
@@ -436,7 +424,7 @@ def test_dataset_caption_success_with_blip(tmp_path: Path) -> None:
         del config  # Unused, return shared instance
         return fake_backend
 
-    captioning_test_hooks.Hooks.caption_backend_factory = fake_backend_factory
+    get_caption_registry().register("blip", fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)
@@ -514,7 +502,7 @@ def test_dataset_caption_skips_existing_captions(tmp_path: Path) -> None:
         del config  # Unused, return shared instance
         return fake_backend
 
-    captioning_test_hooks.Hooks.caption_backend_factory = fake_backend_factory
+    get_caption_registry().register("blip", fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)
@@ -680,7 +668,7 @@ def test_dataset_caption_with_gemini_backend(tmp_path: Path) -> None:
         received_configs.append(config)
         return fake_backend
 
-    captioning_test_hooks.Hooks.caption_backend_factory = fake_backend_factory
+    get_caption_registry().register("gemini", fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)
@@ -749,7 +737,7 @@ def test_dataset_caption_with_openai_backend(tmp_path: Path) -> None:
         received_configs.append(config)
         return fake_backend
 
-    captioning_test_hooks.Hooks.caption_backend_factory = fake_backend_factory
+    get_caption_registry().register("openai", fake_backend_factory)
 
     app = create_app(settings)
     client = TestClient(app)

@@ -345,54 +345,6 @@ class BlipCaptioner:
         return f"{trigger_word}, {caption}"
 
 
-def create_blip_caption_generator(model_name: str) -> _CaptionGeneratorFn:
-    """Create a caption generator function for use as a hook.
-
-    Args:
-        model_name: HuggingFace model name.
-
-    Returns:
-        Caption generator function compatible with the captioning hook.
-    """
-    captioner = BlipCaptioner.get_instance(model_name)
-
-    def caption_generator(image_path: Path, trigger_word: str) -> str:
-        return captioner.caption(image_path, trigger_word)
-
-    return caption_generator
-
-
-class _CaptionGeneratorFn(Protocol):
-    """Protocol for caption generator function."""
-
-    def __call__(self, image_path: Path, trigger_word: str) -> str:
-        """Generate caption for an image.
-
-        Args:
-            image_path: Path to image.
-            trigger_word: Trigger word to prepend.
-
-        Returns:
-            Generated caption.
-        """
-        ...
-
-
-def setup_blip_caption_hook(model_name: str) -> None:
-    """Set up the BLIP caption hook for production use.
-
-    Call this function at API/worker startup to enable BLIP captioning.
-
-    Args:
-        model_name: HuggingFace model name (e.g., "Salesforce/blip-image-captioning-large").
-    """
-    from art_trainer.core.services.captioning import _test_hooks
-
-    _test_hooks.Hooks.caption_generator = create_blip_caption_generator(model_name)
-
-
 __all__ = [
     "BlipCaptioner",
-    "create_blip_caption_generator",
-    "setup_blip_caption_hook",
 ]

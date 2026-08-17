@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from art_trainer.core.services.captioning import _test_hooks
+from art_trainer.core.services.captioning.backends import CaptionBackendType
 from art_trainer.core.services.captioning.blip_adapter import (
     IMAGE_EXTENSIONS,
     caption_image,
@@ -15,8 +13,8 @@ from art_trainer.core.services.captioning.blip_adapter import (
 )
 
 
-class FakeCaptionGenerator:
-    """Fake caption generator for tests."""
+class FakeCaptionBackend:
+    """Fake caption backend for tests."""
 
     calls: list[tuple[Path, str]]
 
@@ -29,7 +27,7 @@ class FakeCaptionGenerator:
         self.calls = []
         self._caption = caption
 
-    def __call__(self, image_path: Path, trigger_word: str) -> str:
+    def caption(self, image_path: Path, trigger_word: str) -> str:
         """Generate a fake caption.
 
         Args:
@@ -42,6 +40,15 @@ class FakeCaptionGenerator:
         self.calls.append((image_path, trigger_word))
         return f"{trigger_word} {self._caption}"
 
+    @property
+    def backend_type(self) -> CaptionBackendType:
+        """Identify which backend this stands in for.
+
+        Returns:
+            Always "blip", since this adapter's caller asks for BLIP.
+        """
+        return "blip"
+
 
 def test_image_extensions() -> None:
     """Test IMAGE_EXTENSIONS contains expected formats."""
@@ -52,29 +59,16 @@ def test_image_extensions() -> None:
     assert ".bmp" in IMAGE_EXTENSIONS
 
 
-def test_caption_image_hook_not_set(tmp_path: Path) -> None:
-    """Test caption_image raises error when hook not set."""
-    _test_hooks.Hooks.caption_generator = None
-    image_path = tmp_path / "test.jpg"
-    image_path.touch()
-
-    with pytest.raises(RuntimeError) as exc_info:
-        caption_image(image_path, "sks person", tmp_path)
-
-    assert "caption_generator hook not set" in str(exc_info.value)
-
-
 def test_caption_image_success(tmp_path: Path) -> None:
     """Test caption_image generates caption and saves file."""
-    fake_generator = FakeCaptionGenerator("in a park")
-    _test_hooks.Hooks.caption_generator = fake_generator
+    fake_backend = FakeCaptionBackend("in a park")
 
     image_path = tmp_path / "photo.jpg"
     image_path.touch()
     output_dir = tmp_path / "output"
     output_dir.mkdir()
 
-    result = caption_image(image_path, "sks person", output_dir)
+    result = caption_image(image_path, "sks person", output_dir, fake_backend)
 
     assert result["image_name"] == "photo.jpg"
     assert result["caption"] == "sks person in a park"
@@ -86,14 +80,13 @@ def test_caption_image_success(tmp_path: Path) -> None:
     assert caption_file.read_text(encoding="utf-8") == "sks person in a park"
 
     # Verify generator was called correctly
-    assert len(fake_generator.calls) == 1
-    assert fake_generator.calls[0] == (image_path, "sks person")
+    assert len(fake_backend.calls) == 1
+    assert fake_backend.calls[0] == (image_path, "sks person")
 
 
 def test_caption_images_multiple(tmp_path: Path) -> None:
     """Test caption_images processes multiple images."""
-    fake_generator = FakeCaptionGenerator("smiling")
-    _test_hooks.Hooks.caption_generator = fake_generator
+    fake_backend = FakeCaptionBackend("smiling")
 
     # Create test images
     image1 = tmp_path / "img1.jpg"
@@ -104,12 +97,12 @@ def test_caption_images_multiple(tmp_path: Path) -> None:
     output_dir = tmp_path / "output"
     output_dir.mkdir()
 
-    results = caption_images([image1, image2], "sks person", output_dir)
+    results = caption_images([image1, image2], "sks person", output_dir, fake_backend)
 
     assert len(results) == 2
     assert results[0]["image_name"] == "img1.jpg"
     assert results[1]["image_name"] == "img2.png"
-    assert len(fake_generator.calls) == 2
+    assert len(fake_backend.calls) == 2
 
 
 def test_find_images_empty_directory(tmp_path: Path) -> None:

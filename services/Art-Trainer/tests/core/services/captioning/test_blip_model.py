@@ -11,8 +11,6 @@ from PIL import Image
 from art_trainer.core.services.captioning import _test_hooks
 from art_trainer.core.services.captioning.blip_model import (
     BlipCaptioner,
-    create_blip_caption_generator,
-    setup_blip_caption_hook,
 )
 
 
@@ -84,39 +82,6 @@ def test_blip_captioner_caption_generates_text(tmp_path: Path) -> None:
     assert caption.startswith("sks, ")
     # Caption should have more content after trigger
     assert len(caption) > len("sks, ")
-
-
-def test_create_blip_caption_generator(tmp_path: Path) -> None:
-    """Test create_blip_caption_generator returns callable."""
-    model_name = "Salesforce/blip-image-captioning-base"
-    generator = create_blip_caption_generator(model_name)
-
-    image_path = _create_test_image(tmp_path)
-    caption = generator(image_path, "test_trigger")
-
-    assert caption.startswith("test_trigger, ")
-    assert len(caption) > len("test_trigger, ")
-
-
-def test_setup_blip_caption_hook(tmp_path: Path) -> None:
-    """Test setup_blip_caption_hook sets the hook correctly."""
-    model_name = "Salesforce/blip-image-captioning-base"
-
-    # Hook should be None initially
-    assert _test_hooks.Hooks.caption_generator is None
-
-    setup_blip_caption_hook(model_name)
-
-    # Hook should now be set - verify by using it
-    hook = _test_hooks.Hooks.caption_generator
-    if hook is None:
-        raise AssertionError("Expected hook to be set after setup_blip_caption_hook")
-
-    # Hook should work
-    image_path = _create_test_image(tmp_path)
-    caption = hook(image_path, "hook_trigger")
-
-    assert caption.startswith("hook_trigger, ")
 
 
 def test_blip_captioner_lazy_loads_model(tmp_path: Path) -> None:

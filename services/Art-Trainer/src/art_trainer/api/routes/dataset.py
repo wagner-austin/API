@@ -102,8 +102,17 @@ class _DatasetRoutes:
         # Generate captions if requested
         caption_count = 0
         if auto_caption and image_count > 0:
+            # BLIP is what the parameter advertises; the model comes from
+            # settings, which is the same place the /caption route's callers
+            # take it from.
+            blip_config: CaptionConfig = {
+                "backend": "blip",
+                "model_name": settings["app"]["blip_model_name"],
+                "api_key": "",
+            }
+            backend = get_caption_registry().get_backend(blip_config)
             image_paths = find_images(ds_dir)
-            results = caption_images(image_paths, trigger_word, ds_dir)
+            results = caption_images(image_paths, trigger_word, ds_dir, backend)
             caption_count = len(results)
 
         # Build response

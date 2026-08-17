@@ -373,15 +373,11 @@ class Hooks:
     reset_hooks() puts the real implementations back.
 
     Attributes:
-        caption_generator: Hook for BLIP caption generation.
-        caption_backend_factory: Hook for caption backend creation in registry.
         gemini_client_factory: Hook for Gemini client creation.
         gemini_part_factory: Hook for Gemini Part creation.
         openai_client_factory: Hook for OpenAI client creation.
     """
 
-    caption_generator: CaptionGenerator | None = None
-    caption_backend_factory: CaptionBackendFactory | None = None
     gemini_client_factory: GeminiClientFactory = _default_gemini_client_factory
     gemini_part_factory: GeminiPartFactory = _DefaultGeminiPartFactory()
     openai_client_factory: OpenAIClientFactory = _default_openai_client_factory
@@ -389,8 +385,6 @@ class Hooks:
 
 def reset_hooks() -> None:
     """Restore every hook to the implementation the container binds."""
-    Hooks.caption_generator = None
-    Hooks.caption_backend_factory = None
     Hooks.gemini_client_factory = _default_gemini_client_factory
     Hooks.gemini_part_factory = _DefaultGeminiPartFactory()
     Hooks.openai_client_factory = _default_openai_client_factory

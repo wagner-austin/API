@@ -69,17 +69,100 @@ class CaptionConfig(TypedDict, total=True):
     api_key: str
 
 
+class CaptionBackendFactoryProtocol(Protocol):
+    """Protocol for a factory that builds one caption backend."""
+
+    def __call__(self, config: CaptionConfig) -> CaptionBackend:
+        """Build the backend the config names.
+
+        Args:
+            config: Caption configuration.
+
+        Returns:
+            Caption backend instance.
+        """
+        ...
+
+
+def _create_blip_backend(config: CaptionConfig) -> CaptionBackend:
+    """Create the BLIP backend.
+
+    Args:
+        config: Caption configuration; only model_name is used.
+
+    Returns:
+        BLIP caption backend.
+    """
+    from art_trainer.core.services.captioning.blip_model import BlipCaptioner
+
+    return _BlipBackendAdapter(BlipCaptioner.get_instance(config["model_name"]))
+
+
+def _create_gemini_backend(config: CaptionConfig) -> CaptionBackend:
+    """Create the Gemini backend.
+
+    Args:
+        config: Caption configuration.
+
+    Returns:
+        Gemini caption backend.
+    """
+    from art_trainer.core.services.captioning.gemini_backend import GeminiCaptioner
+
+    return GeminiCaptioner(config["model_name"], config["api_key"])
+
+
+def _create_openai_backend(config: CaptionConfig) -> CaptionBackend:
+    """Create the OpenAI backend.
+
+    Args:
+        config: Caption configuration.
+
+    Returns:
+        OpenAI caption backend.
+    """
+    from art_trainer.core.services.captioning.openai_backend import OpenAICaptioner
+
+    return OpenAICaptioner(config["model_name"], config["api_key"])
+
+
 class CaptionBackendRegistry:
     """Registry for caption backends.
 
-    Manages creation and caching of caption backend instances.
+    Holds one factory per backend type and caches what they build. A test
+    substitutes a backend by registering its factory, which is why there is
+    no hook here to short-circuit the lookup.
     """
 
     _backends: dict[str, CaptionBackend]
+    _factories: dict[CaptionBackendType, CaptionBackendFactoryProtocol]
 
     def __init__(self) -> None:
-        """Initialize empty registry."""
+        """Initialize with the real factory for every backend type."""
         self._backends = {}
+        self._factories = {
+            "blip": _create_blip_backend,
+            "gemini": _create_gemini_backend,
+            "openai": _create_openai_backend,
+        }
+
+    def register(
+        self, backend_type: CaptionBackendType, factory: CaptionBackendFactoryProtocol
+    ) -> None:
+        """Replace the factory for one backend type.
+
+        Any instance this registry already cached for that type is dropped,
+        so the next get_backend call goes through the new factory.
+
+        Args:
+            backend_type: Type whose factory to replace.
+            factory: Factory to use from now on.
+        """
+        self._factories[backend_type] = factory
+        prefix = f"{backend_type}:"
+        self._backends = {
+            key: value for key, value in self._backends.items() if not key.startswith(prefix)
+        }
 
     def get_backend(self, config: CaptionConfig) -> CaptionBackend:
         """Get or create a caption backend.
@@ -89,80 +172,14 @@ class CaptionBackendRegistry:
 
         Returns:
             Caption backend instance.
-
-        Raises:
-            ValueError: If backend type is not supported.
         """
-        from art_trainer.core.services.captioning._test_hooks import Hooks
-
-        backend_type = config["backend"]
-        cache_key = f"{backend_type}:{config['model_name']}"
-
-        if cache_key in self._backends:
-            return self._backends[cache_key]
-
-        backend: CaptionBackend
-
-        # Check for test hook first
-        if Hooks.caption_backend_factory is not None:
-            from art_trainer.core.services.captioning._test_hooks import CaptionConfigDict
-
-            hook_config: CaptionConfigDict = {
-                "backend": config["backend"],
-                "model_name": config["model_name"],
-                "api_key": config["api_key"],
-            }
-            backend = Hooks.caption_backend_factory(hook_config)
-        elif backend_type == "blip":
-            backend = self._create_blip_backend(config["model_name"])
-        elif backend_type == "gemini":
-            backend = self._create_gemini_backend(config["model_name"], config["api_key"])
-        else:
-            backend = self._create_openai_backend(config["model_name"], config["api_key"])
-
+        cache_key = f"{config['backend']}:{config['model_name']}"
+        cached = self._backends.get(cache_key)
+        if cached is not None:
+            return cached
+        backend = self._factories[config["backend"]](config)
         self._backends[cache_key] = backend
         return backend
-
-    def _create_blip_backend(self, model_name: str) -> CaptionBackend:
-        """Create BLIP backend.
-
-        Args:
-            model_name: HuggingFace model name.
-
-        Returns:
-            BLIP caption backend.
-        """
-        from art_trainer.core.services.captioning.blip_model import BlipCaptioner
-
-        return _BlipBackendAdapter(BlipCaptioner.get_instance(model_name))
-
-    def _create_gemini_backend(self, model_name: str, api_key: str) -> CaptionBackend:
-        """Create Gemini backend.
-
-        Args:
-            model_name: Gemini model name (e.g., "gemini-pro-vision").
-            api_key: Gemini API key.
-
-        Returns:
-            Gemini caption backend.
-        """
-        from art_trainer.core.services.captioning.gemini_backend import GeminiCaptioner
-
-        return GeminiCaptioner(model_name, api_key)
-
-    def _create_openai_backend(self, model_name: str, api_key: str) -> CaptionBackend:
-        """Create OpenAI backend.
-
-        Args:
-            model_name: OpenAI model name (e.g., "gpt-4-vision-preview").
-            api_key: OpenAI API key.
-
-        Returns:
-            OpenAI caption backend.
-        """
-        from art_trainer.core.services.captioning.openai_backend import OpenAICaptioner
-
-        return OpenAICaptioner(model_name, api_key)
 
 
 class _BlipCaptionerProto(Protocol):
@@ -239,6 +256,7 @@ def reset_caption_registry() -> None:
 __all__ = [
     "CaptionBackend",
     "CaptionBackendError",
+    "CaptionBackendFactoryProtocol",
     "CaptionBackendRegistry",
     "CaptionBackendType",
     "CaptionConfig",
