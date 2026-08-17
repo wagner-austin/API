@@ -31,6 +31,7 @@ from model_trainer.worker.job_utils import (
     emit_config_event,
     emit_progress_metrics,
     load_tokenizer_for_training,
+    materialize_run_artifacts,
     redis_client,
     setup_env,
     setup_job_logging,
@@ -450,7 +451,13 @@ def _execute_training(
 
     pretrained_run_id = cfg["pretrained_run_id"]
     if pretrained_run_id is not None:
-        pretrained_dir = str(model_dir(settings, pretrained_run_id))
+        # The source run's artifacts were uploaded and then deleted from local
+        # disk by the cleanup service, so reading model_dir() straight off disk
+        # failed for every completed run. Fetch them back the same way the five
+        # inference job types already do.
+        pretrained_dir = str(
+            materialize_run_artifacts(settings, r, pretrained_run_id, purpose="continued training")
+        )
         log.info(
             "Loading pretrained model run_id=%s pretrained_run_id=%s pretrained_dir=%s",
             run_id,

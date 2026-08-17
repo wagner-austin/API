@@ -20,7 +20,7 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 from platform_core.logging import get_logger
-from platform_core.trainer_keys import artifact_file_id_key, cloze_key
+from platform_core.trainer_keys import cloze_key
 from typing_extensions import TypedDict
 
 from model_trainer.core import _test_hooks
@@ -30,9 +30,12 @@ from model_trainer.core.contracts.cloze import (
     encode_cloze_item_outcome,
 )
 from model_trainer.core.contracts.queue import ClozeJobPayload
-from model_trainer.core.infra.paths import models_dir
 from model_trainer.core.services.model.cloze import score_cloze_items
-from model_trainer.worker.job_utils import redis_client, setup_job_logging
+from model_trainer.worker.job_utils import (
+    materialize_run_artifacts,
+    redis_client,
+    setup_job_logging,
+)
 from model_trainer.worker.manifest import as_device, as_model_family, load_manifest_from_text
 
 
@@ -109,28 +112,9 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
     r.set(cloze_key(run_id, request_id), dump_json_str(running))
 
     try:
-        file_id = r.get(artifact_file_id_key(run_id))
-        if not isinstance(file_id, str) or file_id.strip() == "":
-            raise AppError(
-                ModelTrainerErrorCode.DATA_NOT_FOUND,
-                "artifact pointer not found for cloze evaluation",
-                model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
-            )
-
+        normalized = materialize_run_artifacts(settings, r, run_id, purpose="cloze evaluation")
         api_url = settings["app"]["data_bank_api_url"]
         api_key = settings["app"]["data_bank_api_key"]
-        store = _test_hooks.artifact_store_factory(api_url, api_key)
-        models_root = models_dir(settings)
-        normalized = models_root / run_id
-
-        if not normalized.exists():
-            out_root = store.download_artifact(
-                file_id.strip(),
-                dest_dir=models_root,
-                request_id=run_id,
-                expected_root=f"model-{run_id}",
-            )
-            out_root.rename(normalized)
 
         manifest_path = normalized / "manifest.json"
         if not manifest_path.exists():

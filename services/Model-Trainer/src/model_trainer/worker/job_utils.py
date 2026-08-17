@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
+from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import default_events_channel
 from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.queues import TRAINER_QUEUE
+from platform_core.trainer_keys import artifact_file_id_key
 from platform_core.trainer_metrics_events import (
     encode_trainer_metrics_event,
     make_completed_metrics_event,
@@ -29,6 +32,7 @@ from model_trainer.core.contracts.compute import LocalCPUProvider
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import TrainRequestPayload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
+from model_trainer.core.infra.paths import models_dir
 from model_trainer.core.logging.types import LOGGING_EXTRA_FIELDS
 from model_trainer.core.services.tokenizer.loader import load_tokenizer_from_dir
 
@@ -38,6 +42,67 @@ EVENTS_CHANNEL = default_events_channel("trainer")
 def redis_client(settings: Settings) -> RedisStrProto:
     """Create Redis client from settings."""
     return _test_hooks.kv_store_factory(settings["redis"]["url"])
+
+
+def materialize_run_artifacts(
+    settings: Settings,
+    redis: RedisStrProto,
+    run_id: str,
+    *,
+    purpose: str,
+) -> Path:
+    """Return the local directory holding a completed run's artifacts.
+
+    A finished run's artifacts are uploaded to the artifact store and then
+    deleted from local disk by ``ArtifactCleanupService``, so for any run that
+    is not the one currently training, "already on disk" is the exception
+    rather than the rule. Every consumer therefore has to be able to fetch them
+    back, and five job types each grew their own copy of that fetch. This is
+    the single copy; ``train_job`` had no copy at all, which is why continuing
+    training from a ``pretrained_run_id`` failed with a missing-metadata error
+    for every completed source run.
+
+    Args:
+        settings: Service settings carrying the artifact-store credentials.
+        redis: Client holding the run's artifact pointer.
+        run_id: Run whose artifacts are needed.
+        purpose: What needs them, used only in the not-found message.
+
+    Returns:
+        Directory containing the run's artifacts.
+
+    Raises:
+        AppError: With ``DATA_NOT_FOUND`` when the artifacts are absent locally
+            and the run has no artifact pointer, which together mean there is
+            nowhere left to get them from.
+    """
+    models_root = models_dir(settings)
+    normalized = models_root / run_id
+    if normalized.exists():
+        # Already on disk, so the pointer is irrelevant -- requiring it here
+        # would fail a run whose artifacts are present but whose upload
+        # pointer was never written.
+        return normalized
+
+    file_id = redis.get(artifact_file_id_key(run_id))
+    if not isinstance(file_id, str) or file_id.strip() == "":
+        raise AppError(
+            ModelTrainerErrorCode.DATA_NOT_FOUND,
+            f"artifact pointer not found for {purpose} (run_id={run_id})",
+            model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
+        )
+
+    api_url = settings["app"]["data_bank_api_url"]
+    api_key = settings["app"]["data_bank_api_key"]
+    store = _test_hooks.artifact_store_factory(api_url, api_key)
+    out_root = store.download_artifact(
+        file_id.strip(),
+        dest_dir=models_root,
+        request_id=run_id,
+        expected_root=f"model-{run_id}",
+    )
+    out_root.rename(normalized)
+    return normalized
 
 
 def publish_metrics(r: RedisStrProto, message: str) -> None:
