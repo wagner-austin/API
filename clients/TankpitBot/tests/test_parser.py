@@ -107,6 +107,27 @@ def test_is_room_info_text_accepts_valid_room_payload() -> None:
     assert is_room_info_text(text) is True
 
 
+def test_is_room_info_text_accepts_first_time_room_entry() -> None:
+    """A ``default_troop == -1`` entry (no tank on this room yet) parses.
+
+    The exact wire line from the fresh Arterial account's lobby
+    (2026-08-13 21:23): the digits-only troop test rejected it, so
+    every fresh login died with "room list never exposed Practice"
+    while the entry sat in the capture.
+    """
+    text = "1|Practice|1|0,0,0,0,0,0,0|-1|p|field01.gif|2026"
+
+    assert is_room_info_text(text) is True
+    assert parse_room_info(text)["default_troop"] == -1
+
+
+def test_is_room_info_text_rejects_non_numeric_troop() -> None:
+    """A troop field that is neither an integer nor ``-1`` still rejects."""
+    text = "1|Practice|1|0,0,0,0,0,0,0|-x|p|field01.gif|2026"
+
+    assert is_room_info_text(text) is False
+
+
 def test_is_room_info_text_rejects_manual_map_click_payload() -> None:
     """Manual map-click action payloads are not treated as ROOM_LIST data."""
     text = "1|2|118|101|manual-click"

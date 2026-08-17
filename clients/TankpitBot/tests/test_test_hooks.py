@@ -138,3 +138,48 @@ def test_real_load_terrain_map_returns_terrain_map() -> None:
     viewport = result.render_viewport(128, 128, 4, 4)
     assert len(viewport) == 4
     assert len(viewport[0]) == 4
+
+
+def test_real_replace_text_swaps_content_atomically(tmp_path: Path) -> None:
+    """The replace lands the new content and leaves no staging file."""
+    from tankpit_bot._test_hooks import _real_replace_text
+
+    target = tmp_path / "knowledge.json"
+    target.write_text("old", encoding="utf-8")
+
+    _real_replace_text(target, "new")
+
+    assert target.read_text(encoding="utf-8") == "new"
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_real_replace_text_creates_parent_directories(tmp_path: Path) -> None:
+    """A fresh instance directory is created on first write."""
+    from tankpit_bot._test_hooks import _real_replace_text
+
+    target = tmp_path / "arterial" / "knowledge.json"
+
+    _real_replace_text(target, "first")
+
+    assert target.read_text(encoding="utf-8") == "first"
+
+
+def test_real_replace_text_drops_the_beat_under_reader_contention(tmp_path: Path) -> None:
+    """Windows destination-open law: the previous content stays current.
+
+    CPython opens files without FILE_SHARE_DELETE, so ``os.replace``
+    onto a destination a reader holds open raises PermissionError.
+    The contract for heartbeat files (the fleet knowledge exchange):
+    drop this beat -- old complete content stays, staging is cleaned,
+    the next tick's write refreshes.
+    """
+    from tankpit_bot._test_hooks import _real_replace_text
+
+    target = tmp_path / "knowledge.json"
+    target.write_text("old", encoding="utf-8")
+
+    with target.open("r", encoding="utf-8"):
+        _real_replace_text(target, "new")
+
+    assert target.read_text(encoding="utf-8") == "old"
+    assert list(tmp_path.glob("*.tmp")) == []
