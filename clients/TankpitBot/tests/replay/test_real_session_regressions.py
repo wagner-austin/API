@@ -154,20 +154,20 @@ def test_viewport_enemy_shoot_rejection_loop_replays_as_a_restock() -> None:
     assert result["total_ticks"] == 9
     assert result["total_messages"] == 59
     assert behavior_counts == Counter({"COLLECT": 9})
-    # Re-pinned 2026-08-06 twice: first the measured-speed walk
-    # pricing (_FUEL_GAIN_PER_WALK_TILE 25 -> 3) turned the re-radar
-    # loop into 8 fuel pickups; then the quad sweep landed
-    # ([[quad-sweep-doctrine]]) and the same extras-stocked wire input
-    # routes into block recon BEFORE any pickup. In replay the sweep
-    # can never finish: synthetic radar dispatches draw no recorded
-    # response, so coverage never accrues and every tick stays a
-    # sweep-sense radar. The fixture keeps guarding decision-routing
-    # determinism; the route changed with the policy, not the replay
-    # machinery.
-    assert command_counts == Counter({"radar": 9})
+    # Re-pinned 2026-08-06 twice (walk pricing turned the re-radar
+    # loop into 8 fuel pickups; then the sweep-first cascade turned
+    # every tick back into a sweep-sense radar that replay could
+    # never satisfy), and again 2026-08-13 with the recon reorder
+    # (HUD flags 8/9/14): known stock preempts scanning, so the
+    # landing scan's reveals are DRUNK -- 8 pickups after the one
+    # scan, which is what "replays as a restock" always meant. The
+    # fixture keeps guarding decision-routing determinism; the route
+    # changed with the policy, not the replay machinery.
+    assert command_counts == Counter({"pickup_fuel": 8, "radar": 1})
     assert traces[0]["behavior_reason"] == "scan_on_landing"
     assert all(trace["ai_mode"] == "COLLECT" for trace in traces)
-    assert {trace["ai_mode_state"] for trace in traces} == {"SENSE"}
+    # The scan tick is SENSE; the eight restock pickups are PICKUP.
+    assert {trace["ai_mode_state"] for trace in traces} == {"PICKUP", "SENSE"}
     assert all(trace["combat_target_id"] == -1 for trace in traces)
 
 

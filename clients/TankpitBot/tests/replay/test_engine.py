@@ -368,7 +368,7 @@ class TestProcessTickBatch:
     def test_merges_kills_into_ai_state(self) -> None:
         """_process_tick_batch merges killed tank IDs from protocol."""
         ws = _inject_self_state(100, 120, 500)
-        ws.killed_tank_ids.add(42)
+        ws.killed_tank_ids[42] = 999
         ai_state = make_initial_ai_state()
         result = _process_tick_batch(ws, [], _REPLAY_TABLE, ai_state, 0, 5000)
         updated_ai = result[0]
