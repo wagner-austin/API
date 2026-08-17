@@ -1,11 +1,8 @@
-"""Misc runtime hooks: argv, static-key discovery, replay dispatch.
+"""Misc runtime hooks: clock, argv, watchdog, signals, forced exit.
 
-Three small, otherwise-orphaned process-level hooks live here so they
-do not require their own modules:
-
-* ``get_argv`` -- ``sys.argv`` accessor (tests substitute a fixed list).
-* ``find_best_static_byte`` -- optional override that lets tests inject
-  the XOR static-byte discovery without invoking the real algorithm.
+Small, otherwise-orphaned process-level hooks live here so they do
+not require their own modules — e.g. ``get_argv`` (tests substitute a
+fixed list) and ``get_current_time_ms`` (scenario clocks).
 """
 
 from __future__ import annotations
@@ -34,29 +31,6 @@ def _real_get_current_time_ms() -> int:
 #: attribute via save-and-restore so the scenario's clock is the
 #: only ms-source in the system.
 get_current_time_ms: Callable[[], int] = _real_get_current_time_ms
-
-
-class FindBestStaticByteProtocol(Protocol):
-    """Protocol for finding the best static key byte.
-
-    Matches browser.find_best_static_byte signature.
-    """
-
-    def __call__(self, raw_first_bytes: list[int], magic_first_byte: int) -> tuple[int, int]:
-        """Find the static key's first byte that maximizes known signature matches.
-
-        Args:
-            raw_first_bytes: First XOR-encoded bytes from binary messages.
-            magic_first_byte: ASCII value of magic key's first character.
-
-        Returns:
-            Tuple of (best_static_byte, match_count).
-        """
-        ...
-
-
-find_best_static_byte: FindBestStaticByteProtocol | None = None
-"""Default is None - browser.py uses its own implementation when None."""
 
 
 def _real_get_argv() -> list[str]:
@@ -155,11 +129,9 @@ force_exit: Callable[[int], None] = os._exit
 
 
 __all__ = [
-    "FindBestStaticByteProtocol",
     "InstallSignalHandlersProtocol",
     "StartWatchdogProtocol",
     "_real_get_current_time_ms",
-    "find_best_static_byte",
     "force_exit",
     "get_argv",
     "get_current_time_ms",
