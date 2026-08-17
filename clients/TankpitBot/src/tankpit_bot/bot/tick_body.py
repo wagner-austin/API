@@ -34,6 +34,12 @@ from tankpit_bot.browser.page_client_snapshot import (
     PageClientSnapshotDict,
     capture_page_client_snapshot,
 )
+from tankpit_bot.fleetshare import (
+    build_fleet_report,
+    merge_fleet_reports,
+    read_team_reports,
+    write_fleet_report,
+)
 from tankpit_bot.ledger.decision import latest_decision_event_id
 from tankpit_bot.ledger.mode_transition import emit_mode_transition
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
@@ -232,6 +238,53 @@ def _tick_once(bot: Bot) -> None:
         bot_run_dir(resolve_bot_instance()) / "hud.json",
         dump_json_str(render_overlay_payload(overlay)),
     )
+    _exchange_fleet_knowledge(bot)
+
+
+def _exchange_fleet_knowledge(bot: Bot) -> None:
+    """Run one fleet knowledge exchange: publish, then merge siblings.
+
+    The shared knowledge layer ([[fleet-coordination]], fleet ruling
+    2026-08-14): each tick the bot atomically replaces its own
+    ``knowledge.json`` and merges the fresh SAME-TEAM reports of its
+    siblings. Rides the run-directory channel the HUD mirror above
+    already uses, so a single tank exchanges with an empty fleet at
+    the cost of one file write, and a fleet coordinates with no
+    manager process required. Before the session has an established
+    self there is nothing attributable to offer and no team to merge
+    for, so the exchange starts with the first entered tick.
+
+    Args:
+        bot: Bot instance.
+    """
+    now_ms = get_current_time_ms()
+    instance = resolve_bot_instance()
+    report = build_fleet_report(
+        bot.world,
+        instance=instance,
+        role=bot._ai_state["config"]["role"],
+        engaged_target_id=bot._ai_state["combat_target_id"],
+        now_ms=now_ms,
+    )
+    if report is None:
+        return
+    write_fleet_report(report)
+    reports = read_team_reports(instance, report["team"], now_ms)
+    summary = merge_fleet_reports(
+        bot.world,
+        reports,
+        own_tank_id=report["tank_id"],
+        own_team=report["team"],
+    )
+    if summary["reports"] > 0:
+        emit_diagnostic(
+            diagnostic_kind="fleet_knowledge_merged",
+            reports=summary["reports"],
+            enemies=summary["enemies"],
+            containers=summary["containers"],
+            removed=summary["removed"],
+            scanned=summary["scanned"],
+        )
 
 
 def _check_respawn_deadline(bot: Bot) -> None:
@@ -301,7 +354,7 @@ def _enforce_autoscroll_once(bot: Bot) -> None:
     """
     if bot._autoscroll_enforced or bot._page is None:
         return
-    browser_hooks.ensure_autoscroll_off(bot._page, bot._messages, bot.world)
+    browser_hooks.ensure_autoscroll_off(bot._page, bot._require_cdp(), bot._messages, bot.world)
     bot._autoscroll_enforced = True
 
 
