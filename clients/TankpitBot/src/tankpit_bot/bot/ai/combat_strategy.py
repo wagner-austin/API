@@ -9,6 +9,10 @@ lock. The approach stages that call INTO this module live in
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.block_harvest import (
+    WINDOW_LAST,
+    frame_direction,
+)
 from tankpit_bot.bot.ai.combat_landing import (
     SHOT_RANGE_TILES,
 )
@@ -32,6 +36,7 @@ from tankpit_bot.bot.types import (
     BotCommand,
     make_pickup_equipment_command,
     make_pickup_fuel_command,
+    make_scope_shift_command,
     make_shoot_command,
 )
 from tankpit_bot.inventory import inventory_counts
@@ -80,6 +85,69 @@ def _clamp_aim_into_viewport(ctx: DecideCtx, aim_x: int, aim_y: int) -> tuple[in
     if not (left <= self_x <= right and top <= self_y <= bottom):
         return (aim_x, aim_y)
     return (max(left, min(right, aim_x)), max(top, min(bottom, aim_y)))
+
+
+def frame_target_shift(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | None:
+    """Frame a shift-revealable off-viewport target with a free scope shift.
+
+    The visibility law the decision layer was missing (flag s11-2,
+    2026-08-13, both bots): a shot can only resolve inside the visible
+    viewport, and the server refuses to homing-track an enemy close
+    enough that a viewport shift would reveal them — so a shot at a
+    target within one shift's reach but outside the window is a
+    structural miss (``weapon=0`` ground fire at the clamped edge
+    tile; artax fired six in a row at Arterial one row above the
+    window while eating 90/window back). The 2026-07-03 aim clamp was
+    a DISPATCH-layer legality fix built for the far-pursuit snipe; it
+    silently converted these near-off-window decisions into doomed
+    ground fire instead of teaching the decision layer the law. The
+    law now lives here: within one anchor-law shift
+    (Chebyshev <= :data:`~tankpit_bot.bot.ai.block_harvest.WINDOW_LAST`)
+    the free shift frames the target and the next tick fires a REAL
+    shot; beyond it the clamp's homing snipe genuinely tracks and
+    remains the right tool.
+
+    Args:
+        ctx: Decision context.
+        target: Locked combat target at its registry position.
+
+    Returns:
+        The framing scope-shift decision, or ``None`` when the shift
+        does not apply: stale viewport record (excludes the bot), the
+        target already visible, the target beyond one shift's reach,
+        or window geometry the shift cannot improve.
+    """
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    if not (left <= sx <= right and top <= sy <= bottom):
+        return None
+    tx, ty = target["x"], target["y"]
+    if left <= tx <= right and top <= ty <= bottom:
+        return None
+    if max(abs(tx - sx), abs(ty - sy)) > WINDOW_LAST:
+        return None
+    direction = frame_direction((left, top, right, bottom), sx, sy, tx, ty)
+    if direction is None:
+        return None
+    emit_ai(
+        "%s at (%d,%d) is outside the window but one shift away - "
+        "framing dir=%d instead of a dead shot",
+        target["name"],
+        tx,
+        ty,
+        direction,
+    )
+    return make_decision(
+        make_scope_shift_command(direction),
+        "HUNT",
+        800,
+        tx,
+        ty,
+        "combat_frame_shift",
+        _set_combat_target(ctx.base, target),
+        ctx.equip,
+        reason_context={"target_name": target["name"], "direction": direction},
+    )
 
 
 def has_combat_shot(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
@@ -203,7 +271,17 @@ def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     Returns:
         Combat engage decision, including miss-driven refresh behavior.
     """
-    if ctx.combat_feedback == "rejected":
+    # Feedback is a PER-SHOT receipt keyed to ``last_shot_target_id``
+    # (the ammo-consumption ledger, contract 2026-07-02). An
+    # opportunity divert moves that key to whoever the last shot
+    # addressed, so feedback belonging to a divert must never drive
+    # THIS target's miss/rejection consequences -- a diverted miss
+    # blocking the main lock as an "afterimage" would end a live
+    # fight over someone else's corpse.
+    feedback = (
+        ctx.combat_feedback if ctx.ai_state["last_shot_target_id"] == target["tank_id"] else ""
+    )
+    if feedback == "rejected":
         # The server refused the previous dispatch outright (0x52
         # code 0/3/8) -- no ShootEvent, no ammo delta. With the aim
         # clamp below every dispatch is viewport-legal, so a residual
@@ -219,7 +297,7 @@ def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         )
         return block_combat_target_and_replan(ctx, target)
 
-    if ctx.combat_feedback == "miss":
+    if feedback == "miss":
         last_shot_at = (ctx.ai_state["combat_target_x"], ctx.ai_state["combat_target_y"])
         target_stationary = (target["x"], target["y"]) == last_shot_at
         dist = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
@@ -300,6 +378,13 @@ def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
             dist,
         )
 
+    shift = frame_target_shift(ctx, target)
+    if shift is not None:
+        # The visibility law at the chokepoint (flag s11-2): every
+        # shoot path funnels through here, so a near-off-window
+        # target is framed by ONE free shift and shot for real next
+        # tick instead of clamped into weapon=0 ground fire.
+        return shift
     aim_x, aim_y = _clamp_aim_into_viewport(ctx, target["x"], target["y"])
     if (aim_x, aim_y) != (target["x"], target["y"]):
         emit_ai(
@@ -339,6 +424,7 @@ def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
 
 __all__ = [
     "engage_target",
+    "frame_target_shift",
     "has_cardinal_combat_shot",
     "has_combat_shot",
 ]
