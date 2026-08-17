@@ -355,3 +355,70 @@ class TestHandleTeardownHang:
             assert calls == [75]
         finally:
             _test_hooks.force_exit = original
+
+    def test_logs_thread_stacks_before_exit(self, caplog: pytest.LogCaptureFixture) -> None:
+        """The hang autopsy lands in the log before the forced exit.
+
+        The dumped stack of the calling thread must contain this very
+        test's frame — real frames, not a placeholder — so the next
+        live hang shows exactly which call ``browser.close()`` wedged
+        in.
+        """
+        from tankpit_bot import _test_hooks
+
+        calls: list[int] = []
+        original = _test_hooks.force_exit
+        _test_hooks.force_exit = lambda code: calls.append(code)
+        try:
+            with caplog.at_level(logging.ERROR):
+                _handle_teardown_hang()
+        finally:
+            _test_hooks.force_exit = original
+
+        assert calls == [75]
+        dumps = [
+            record.message
+            for record in caplog.records
+            if "Thread stacks at the moment of the hang" in record.message
+        ]
+        assert len(dumps) == 1
+        assert "test_logs_thread_stacks_before_exit" in dumps[0]
+
+
+class TestThreadStacksSnapshot:
+    def test_captures_a_parked_sibling_thread(self) -> None:
+        """The snapshot crosses threads — the watchdog's whole reason to exist.
+
+        A live teardown hang has the MAIN thread stuck inside
+        ``browser.close()`` while the watchdog timer thread takes the
+        snapshot, so the snapshot must show OTHER threads' frames, not
+        just its caller's. A named sibling parked on an ``Event`` stands
+        in for the wedged closer: its name and its parked function must
+        both appear.
+        """
+        import threading
+
+        from tankpit_bot.browser.lifecycle import _thread_stacks_snapshot
+
+        parked = threading.Event()
+        release = threading.Event()
+
+        def _wedged_close_stand_in() -> None:
+            parked.set()
+            release.wait()
+
+        sibling = threading.Thread(
+            target=_wedged_close_stand_in,
+            name="teardown-stand-in",
+            daemon=True,
+        )
+        sibling.start()
+        assert parked.wait(timeout=5.0)
+        try:
+            snapshot = _thread_stacks_snapshot()
+        finally:
+            release.set()
+            sibling.join(timeout=5.0)
+
+        assert "teardown-stand-in" in snapshot
+        assert "_wedged_close_stand_in" in snapshot

@@ -1,23 +1,29 @@
 """Tests for :mod:`tankpit_bot.browser.autoscroll`.
 
-Covers the ack scanner's frame-walk edge cases and the press-verify
-dance in all three shapes: setting was OFF (round trip), setting was
-ON (single corrective press), and the two loud failures (no ack,
-stuck ON).
+Covers the ack scanner's frame-walk edge cases and the direct-send
+enforcement in every shape: acked OFF, slow ack re-sent, no ack after
+every send, the ``A1``-to-an-``A0``-request drift, and a failed send.
+The instrument is the plaintext ``A0`` settings command over the
+websocket, NOT a keypress -- hotkey maps are per-account server state
+and a fresh account's default binds ``a`` to a scope pan (2026-08-13,
+arterial: both presses emitted ``03 5a 06``).
 """
 
 from __future__ import annotations
 
 import base64
 import logging
+import re
+from collections.abc import Callable
 
 import pytest
+from platform_core.json_utils import JSONObject
 
 from tankpit_bot.browser.autoscroll import (
     _read_autoscroll_ack,
     ensure_autoscroll_off,
 )
-from tankpit_bot.protocol.framing import FramingError
+from tankpit_bot.protocol.framing import FramingError, decode_frame
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types.message import CapturedMessage
@@ -66,27 +72,49 @@ def _received(payload: str) -> CapturedMessage:
     )
 
 
-class _FakeKeyboard:
-    """Keyboard fake that appends a scripted ack frame per press."""
+class _FakeSendCDP:
+    """CDP fake that answers websocket sends with scripted acks.
 
-    def __init__(self, messages: list[CapturedMessage], acks: list[bytes | None]) -> None:
+    Each ``A0`` send pops the next scripted entry: an ack body appended
+    to the shared capture buffer as a received frame, ``None`` for a
+    send the server never answers, or a status string starting with
+    anything but ``SENT_`` to model a failed send.
+    """
+
+    def __init__(self, messages: list[CapturedMessage], acks: list[bytes | str | None]) -> None:
         self.messages = messages
         self.acks = acks
-        self.presses: list[str] = []
+        self.sent_bodies: list[bytes] = []
 
-    def press(self, key: str, *, delay: float | None = None) -> None:
-        del delay
-        self.presses.append(key)
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Handle the injected websocket-send evaluation."""
+        assert method == "Runtime.evaluate"
+        assert params is not None
+        expression = str(params["expression"])
+        match = re.search(r"atob\('([^']+)'\)", expression)
+        assert match is not None, "expected a websocket send expression"
+        body, remaining = decode_frame(base64.b64decode(match.group(1)))
+        assert remaining == b""
+        self.sent_bodies.append(body)
         ack = self.acks.pop(0)
+        if isinstance(ack, str):
+            return {"result": {"value": ack}}
         if ack is not None:
             self.messages.append(_received(_frame(ack)))
+        return {"result": {"value": "SENT_4_BYTES via wss://test/ws/"}}
+
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        """Ignore event registration -- no live events in this fake."""
+        del event, handler
+
+    def detach(self) -> None:
+        """Nothing to detach in this fake."""
 
 
 class _FakePage:
-    """Page fake exposing the keyboard + a no-op settle wait."""
+    """Page fake exposing a no-op settle wait."""
 
-    def __init__(self, keyboard: _FakeKeyboard) -> None:
-        self.keyboard = keyboard
+    def __init__(self) -> None:
         self.waits: list[float] = []
 
     def wait_for_timeout(self, timeout_ms: float) -> None:
@@ -96,10 +124,8 @@ class _FakePage:
 class _SpawningPage(_FakePage):
     """Page fake whose Nth settle wait "spawns" the tank on the wire."""
 
-    def __init__(
-        self, keyboard: _FakeKeyboard, ws: WorldService, *, spawn_after_waits: int
-    ) -> None:
-        super().__init__(keyboard)
+    def __init__(self, ws: WorldService, *, spawn_after_waits: int) -> None:
+        super().__init__()
         self._spawn_after_waits = spawn_after_waits
         self._ws = ws
 
@@ -113,7 +139,7 @@ class TestReadAutoscrollAck:
     """Frame-walk contract for the plaintext ack scanner."""
 
     def test_finds_the_ack_after_the_start_index(self) -> None:
-        """An ``A1`` body after the press index decodes as enabled."""
+        """An ``A1`` body after the send index decodes as enabled."""
         messages = [_received(_frame(b"A0")), _received(_frame(b"A1"))]
 
         assert _read_autoscroll_ack(messages, 1) is True
@@ -164,117 +190,121 @@ class TestReadAutoscrollAck:
 
         assert _read_autoscroll_ack([_received(payload)], 0) is False
 
+    def test_takes_the_last_ack_in_the_window(self) -> None:
+        """With several acks the LATEST states the current truth."""
+        messages = [_received(_frame(b"A1")), _received(_frame(b"A0"))]
+
+        assert _read_autoscroll_ack(messages, 0) is False
+
 
 class TestEnsureAutoscrollOff:
-    """The press-verify dance in every shape."""
+    """The direct ``A0`` send in every shape."""
 
     def setup_method(self) -> None:
-        """Seed a spawned tank -- the toggle only works in-game."""
+        """Seed a spawned tank -- the command only works in-game."""
         self.ws = _spawned_world()
 
-    def test_setting_was_on_single_press_corrects(self) -> None:
-        """Ack ``A0`` after the first press means the toggle is fixed."""
+    def test_single_send_acked_off(self, caplog: pytest.LogCaptureFixture) -> None:
+        """One ``A0`` send, one ``A0`` echo: verified OFF."""
         messages: list[CapturedMessage] = []
-        keyboard = _FakeKeyboard(messages, [b"A0"])
-        page = _FakePage(keyboard)
-
-        ensure_autoscroll_off(page, messages, self.ws)
-
-        assert keyboard.presses == ["a"]
-        assert page.waits == [1500.0]
-
-    def test_setting_was_off_round_trips_back_off(
-        self,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """Ack ``A1`` then ``A0`` proves off -> on -> off, and says which.
-
-        The two verified-OFF lines describe opposite session starts --
-        one where the setting was already off and the probe press had to
-        be undone, one where it was on and a single press corrected it.
-        They are the only record of which happened, because both end with
-        autoscroll off and neither touches state a later assertion could
-        read.
-
-        Without the early return this path logs BOTH, so the run log
-        claims the setting was on at session start AND that it was off.
-        The viewport model depends on autoscroll having been off
-        throughout, and this line is the evidence a post-mortem uses to
-        decide whether the window origins in the capture can be trusted.
-        """
-        messages: list[CapturedMessage] = []
-        keyboard = _FakeKeyboard(messages, [b"A1", b"A0"])
-        page = _FakePage(keyboard)
+        cdp = _FakeSendCDP(messages, [b"A0"])
+        page = _FakePage()
 
         with caplog.at_level(logging.INFO):
-            ensure_autoscroll_off(page, messages, self.ws)
+            ensure_autoscroll_off(page, cdp, messages, self.ws)
 
-        assert keyboard.presses == ["a", "a"]
-        verdicts = [r.message for r in caplog.records if "Autoscroll verified OFF" in r.message]
-        assert verdicts == ["Autoscroll verified OFF (was off; press-verify round trip)"]
+        assert cdp.sent_bodies == [b"A0"]
+        assert page.waits == [1500.0]
+        assert any("Autoscroll verified OFF" in r.message for r in caplog.records)
 
-    def test_missing_ack_raises(self) -> None:
-        """No ack after a press is a hard failure, never a guess."""
+    def test_slow_ack_is_resent_and_verified(self) -> None:
+        """An unanswered send re-sends; the command is absolute.
+
+        The re-send requests the same state, so unlike the old key
+        toggle there is no parity to corrupt -- two sends landing is
+        exactly as OFF as one.
+        """
         messages: list[CapturedMessage] = []
-        keyboard = _FakeKeyboard(messages, [None])
-        page = _FakePage(keyboard)
+        cdp = _FakeSendCDP(messages, [None, b"A0"])
+        page = _FakePage()
 
-        with pytest.raises(RuntimeError, match="toggle unverified"):
-            ensure_autoscroll_off(page, messages, self.ws)
+        ensure_autoscroll_off(page, cdp, messages, self.ws)
 
-    def test_stuck_on_raises(self) -> None:
-        """Two consecutive ``A1`` acks mean the protocol drifted."""
+        assert cdp.sent_bodies == [b"A0", b"A0"]
+
+    def test_no_ack_after_every_send_raises(self) -> None:
+        """Three unanswered sends is a hard failure, never a guess."""
         messages: list[CapturedMessage] = []
-        keyboard = _FakeKeyboard(messages, [b"A1", b"A1"])
-        page = _FakePage(keyboard)
+        cdp = _FakeSendCDP(messages, [None, None, None])
+        page = _FakePage()
 
-        with pytest.raises(RuntimeError, match="stuck ON"):
-            ensure_autoscroll_off(page, messages, self.ws)
+        with pytest.raises(RuntimeError, match="setting unverified"):
+            ensure_autoscroll_off(page, cdp, messages, self.ws)
+
+        assert cdp.sent_bodies == [b"A0", b"A0", b"A0"]
+
+    def test_enabled_ack_to_an_off_request_raises(self) -> None:
+        """``A1`` echoed to an ``A0`` request means the protocol drifted."""
+        messages: list[CapturedMessage] = []
+        cdp = _FakeSendCDP(messages, [b"A1"])
+        page = _FakePage()
+
+        with pytest.raises(RuntimeError, match="protocol drifted"):
+            ensure_autoscroll_off(page, cdp, messages, self.ws)
+
+    def test_failed_send_raises(self) -> None:
+        """A send the browser refuses fails loud immediately."""
+        messages: list[CapturedMessage] = []
+        cdp = _FakeSendCDP(messages, ["WEBSOCKET_NOT_OPEN: 3"])
+        page = _FakePage()
+
+        with pytest.raises(RuntimeError, match="send failed"):
+            ensure_autoscroll_off(page, cdp, messages, self.ws)
 
 
 def test_real_hook_delegates_to_the_module() -> None:
-    """The ``_test_hooks`` seam's real implementation runs the dance."""
+    """The ``_test_hooks`` seam's real implementation runs the enforcement."""
     from tankpit_bot.browser._test_hooks import _real_ensure_autoscroll_off
 
     ws = _spawned_world()
     messages: list[CapturedMessage] = []
-    keyboard = _FakeKeyboard(messages, [b"A0"])
-    page = _FakePage(keyboard)
+    cdp = _FakeSendCDP(messages, [b"A0"])
+    page = _FakePage()
 
-    _real_ensure_autoscroll_off(page, messages, ws)
+    _real_ensure_autoscroll_off(page, cdp, messages, ws)
 
-    assert keyboard.presses == ["a"]
+    assert cdp.sent_bodies == [b"A0"]
 
 
 class TestInGameGate:
-    """The spawn gate in front of the first toggle press."""
+    """The spawn gate in front of the first send."""
 
-    def test_waits_for_spawn_then_presses(self) -> None:
-        """The dance polls until ``self_state`` appears, then toggles.
+    def test_waits_for_spawn_then_sends(self) -> None:
+        """The enforcement polls until ``self_state`` appears, then sends.
 
         User ruling 2026-07-29: "you cant enable or disable autoscroll
-        til the bot is in the game" -- the 23:08 live firing pressed on
+        til the bot is in the game" -- the 23:08 live firing acted on
         the entry screen and correctly failed loud. The wait pumps the
         page loop; here the third poll "spawns" the tank.
         """
         ws = WorldService()
         messages: list[CapturedMessage] = []
-        keyboard = _FakeKeyboard(messages, [b"A0"])
-        page = _SpawningPage(keyboard, ws, spawn_after_waits=3)
+        cdp = _FakeSendCDP(messages, [b"A0"])
+        page = _SpawningPage(ws, spawn_after_waits=3)
 
-        ensure_autoscroll_off(page, messages, ws)
+        ensure_autoscroll_off(page, cdp, messages, ws)
 
-        assert keyboard.presses == ["a"]
+        assert cdp.sent_bodies == [b"A0"]
         assert len(page.waits) >= 3
 
     def test_never_spawning_raises_within_budget(self) -> None:
-        """A tank that never spawns fails loud instead of blind-pressing."""
+        """A tank that never spawns fails loud instead of blind-sending."""
         ws = WorldService()
         messages: list[CapturedMessage] = []
-        keyboard = _FakeKeyboard(messages, [b"A0"])
-        page = _FakePage(keyboard)
+        cdp = _FakeSendCDP(messages, [b"A0"])
+        page = _FakePage()
 
         with pytest.raises(RuntimeError, match="never spawned"):
-            ensure_autoscroll_off(page, messages, ws)
+            ensure_autoscroll_off(page, cdp, messages, ws)
 
-        assert keyboard.presses == []
+        assert cdp.sent_bodies == []

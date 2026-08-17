@@ -14,15 +14,15 @@ from pathlib import Path
 import pytest
 
 from tankpit_bot.browser.session_storage import (
-    STORAGE_STATE_PATH,
     StorageStateCacheError,
     load_storage_state,
+    resolve_storage_state_path,
     save_storage_state,
 )
-from tests.conftest import FakeFileSystem
+from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes.base import FakeBrowserContext
 
-_STORAGE_PATH = Path("runs/state/tankpit.storage.json")
+_STORAGE_PATH = Path("runs/state/tankpit.guest.storage.json")
 
 
 class TestLoadStorageState:
@@ -96,9 +96,61 @@ class TestSaveStorageState:
         assert result == str(_STORAGE_PATH)
 
 
-class TestStorageStatePathDefault:
-    """Contract for the ``STORAGE_STATE_PATH`` constant."""
+class TestResolveStorageStatePath:
+    """Contract for ``resolve_storage_state_path``.
 
-    def test_default_points_at_runs_state_directory(self) -> None:
-        """The canonical location lives under ``runs/state/`` next to run logs."""
-        assert Path("runs/state/tankpit.storage.json") == STORAGE_STATE_PATH
+    The cache is keyed by LOGIN IDENTITY — the 2026-08-13 incident
+    where a fleet child spawned as Arterial resumed the shared jar's
+    Artax session (no login flow ran at all) is the failure this
+    keying prevents. Guest sessions share the ``guest`` identity.
+    """
+
+    def test_guest_preference_never_consults_accounts(
+        self, fake_fs: FakeFileSystem, fake_env: FakeEnv
+    ) -> None:
+        """``prefer_account=False`` is always the guest identity.
+
+        Even with a selector set: a guest session carries no account
+        cookies, so account resolution must not run (a bad selector
+        would otherwise fail a guest launch for no reason).
+        """
+        _ = fake_fs
+        fake_env.set("TANKPIT_ACCOUNT", "NoSuchAccount")
+
+        assert resolve_storage_state_path(False) == Path("runs/state/tankpit.guest.storage.json")
+
+    def test_no_accounts_configured_is_guest(
+        self, fake_fs: FakeFileSystem, fake_env: FakeEnv
+    ) -> None:
+        """Account preference without any configured account is guest."""
+        _ = fake_fs, fake_env
+
+        assert resolve_storage_state_path(True) == Path("runs/state/tankpit.guest.storage.json")
+
+    def test_resolved_account_keys_the_path(
+        self, fake_fs: FakeFileSystem, fake_env: FakeEnv
+    ) -> None:
+        """The selected account's username names the cache, sanitized.
+
+        Two different selections yield two different files — the
+        property the shared jar violated.
+        """
+        _ = fake_fs
+        fake_env.set("TANKPIT_USERNAME", "Artax")
+        fake_env.set("TANKPIT_PASSWORD", "secret")
+
+        assert resolve_storage_state_path(True) == Path("runs/state/tankpit.artax.storage.json")
+
+        fake_env.set("TANKPIT_USERNAME", "O'Brien 2")
+
+        assert resolve_storage_state_path(True) == Path("runs/state/tankpit.o-brien-2.storage.json")
+
+    def test_unsanitizable_username_is_guest(
+        self, fake_fs: FakeFileSystem, fake_env: FakeEnv
+    ) -> None:
+        """A username that sanitizes to nothing falls to the guest identity."""
+        _ = fake_fs
+        fake_env.set("TANKPIT_USERNAME", "")
+        fake_env.set("TANKPIT_PASSWORD", "secret")
+
+        assert resolve_storage_state_path(True) == Path("runs/state/tankpit.guest.storage.json")
