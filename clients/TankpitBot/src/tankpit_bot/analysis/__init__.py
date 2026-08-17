@@ -1,11 +1,13 @@
 """Typed archive analysis: one owner for the capture-scan pipeline.
 
-Forty scripts under ``analysis_scripts/`` mine the ``runs/`` archive.
-Before this package each of them re-implemented the same pipeline
-privately — 30 re-wrote the session load, 26 the XOR bring-up, and 10
-forked the frame walk that :mod:`tankpit_bot.protocol.framing` has
-owned since the protocol layer was written. Eight of those ten forks
-were textually distinct versions of identical arithmetic.
+The forty one-shot miners that once lived under ``analysis_scripts/``
+(retired 2026-08-17 — ungated, 8,543 strict-mypy errors from the bar;
+recoverable from git history, findings recorded in the wiki) each
+re-implemented this same pipeline privately — 30 re-wrote the session
+load, 26 the XOR bring-up, and 10 forked the frame walk that
+:mod:`tankpit_bot.protocol.framing` has owned since the protocol
+layer was written. Eight of those ten forks were textually distinct
+versions of identical arithmetic.
 
 This package is the single owner of that pipeline. It composes modules
 that already exist rather than restating them, and it is inside ``src``

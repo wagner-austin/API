@@ -252,7 +252,7 @@ See [[server-push-gating]] for the run design.
 [^8]: archive sweep 2026-07-24: `analysis_scripts/mine_bot_policy.py`
 (production decode recipe — frame split → XOR → `decode_message`)
 over every `runs/**/capture_session.json`; results snapshot
-`analysis_scripts/bot_policy_sweep_2026-07-24.json` (246 sessions,
+`wiki/sources/bot_policy_sweep_2026-07-24.json` (246 sessions,
 750 session-minutes, 0 decode errors). Re-run the script to re-derive
 every number in this section. STANDING instrument since the same day:
 the policy is executable in `sim/bot_policy.py` and the

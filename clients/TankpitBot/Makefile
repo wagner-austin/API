@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service fleet analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service fleet analyze analyze-timing queue-probe download-fields decode analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -54,7 +54,6 @@ help:
 	@Write-Host ""
 	@Write-Host "Offline tools:" -ForegroundColor Yellow
 	@Write-Host "  make decode                      replay a capture through real decoders"
-	@Write-Host "  make discover                    extract commands from JS client"
 	@Write-Host "  make analyze-viewport            analyze viewport bounds in captures"
 	@Write-Host ""
 
@@ -361,11 +360,6 @@ decode:
 	@Write-Host ""
 	@Write-Host "==> decode" -ForegroundColor Cyan
 	poetry run python -m scripts.decode
-
-discover:
-	@Write-Host ""
-	@Write-Host "==> discover commands" -ForegroundColor Cyan
-	poetry run python discover_commands.py
 
 analyze-viewport:
 	@Write-Host ""
