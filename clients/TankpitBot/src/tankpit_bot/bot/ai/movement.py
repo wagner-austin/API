@@ -92,6 +92,43 @@ def walk_or_teleport(
     return _walk_or_teleport_without_terrain(ctx, tx, ty, pickup_kind=pickup_kind)
 
 
+def plan_viewport_walk(ctx: DecideCtx, tx: int, ty: int) -> BotCommand | None:
+    """Plan a PURE WALK to an in-viewport tile -- never a teleport.
+
+    The free-radar coverage doctrine (user ruling 2026-08-14: "when a
+    tank has zero radars, it should use free radar by scanning, then
+    walking, then walking then scanning, to scan a whole viewport"):
+    a coverage step is only worth walking distance -- a teleport
+    fallback spends 45+ fuel to reach ground a free radar reveals for
+    nothing (run arterial 19:30:57 paid two forage teleports on a
+    zero-extras recruit). No mine-flip either: the walk-over flip
+    doctrine covers container/target approaches, not coverage steps.
+
+    Args:
+        ctx: Decision context.
+        tx: In-viewport destination X.
+        ty: In-viewport destination Y.
+
+    Returns:
+        A move command bounded at the first surface transition, or
+        ``None`` when the tile is move-failed, outside the viewport,
+        or unreachable by walking -- the caller treats that as
+        "this viewport is done for free-scan coverage".
+    """
+    if ctx.ws.is_move_target_failed(tx, ty, ctx.timestamp_ms):
+        emit_ai("skipping failed move target (%d,%d)", tx, ty)
+        return None
+    if not is_pickup_target_actionable(ctx, tx, ty):
+        return None
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    terrain = ctx.terrain
+    if terrain is None:
+        return _direct_move_command(ctx, tx, ty)
+    if is_move_reachable_in_viewport(ctx.world, terrain, sx, sy, tx, ty):
+        return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty)
+    return None
+
+
 def _mine_flip_teleport(ctx: DecideCtx, tx: int, ty: int) -> BotCommand | None:
     """Build the post-mine-hit teleport approach to a destination.
 
@@ -523,5 +560,6 @@ def _teleport_fallback_command(
 
 __all__ = [
     "is_pickup_target_actionable",
+    "plan_viewport_walk",
     "walk_or_teleport",
 ]

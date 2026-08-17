@@ -36,7 +36,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     radar_spend_worthwhile,
 )
-from tankpit_bot.bot.ai.movement import walk_or_teleport
+from tankpit_bot.bot.ai.movement import plan_viewport_walk
 from tankpit_bot.bot.ai.scoring_types import BehaviorMode
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -44,10 +44,107 @@ from tankpit_bot.bot.types import make_radar_command
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.scan_coverage import (
     free_radar_new_coverage,
+    is_tile_covered,
     is_viewport_fully_covered,
     select_best_free_radar_position,
 )
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+
+_FRONTIER_BAND_DEPTH = 8
+"""How far past a viewport edge the frontier scorer looks.
+
+Half a window: walking to the chosen edge slides the anchored window
+about that far, so the band it scores is exactly the fresh ground the
+next scan-walk-scan cycle will work."""
+
+
+def _frontier_walk_target(
+    ctx: DecideCtx,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+) -> tuple[int, int] | None:
+    """Pick the viewport-edge tile facing the most unscanned ground.
+
+    The zero-extras lawnmower's continuation (user doctrine
+    2026-08-14): score the four bands just beyond the window's edges
+    by uncovered-tile count and walk toward the richest one -- the
+    tank-anchored window slides along, and the in-viewport
+    scan-walk-scan loop resumes on the fresh ground.
+
+    Args:
+        ctx: Decision context.
+        left: Viewport left bound.
+        top: Viewport top bound.
+        right: Viewport right bound.
+        bottom: Viewport bottom bound.
+
+    Returns:
+        The edge tile to walk toward, or ``None`` when every adjacent
+        band is already covered (the search hop relocates instead).
+    """
+    scanned = ctx.world["scanned_tiles"]
+    now_ms = ctx.timestamp_ms
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    bands: list[tuple[int, tuple[int, int]]] = []
+    east = range(right + 1, min(right + _FRONTIER_BAND_DEPTH, 255) + 1)
+    west = range(max(left - _FRONTIER_BAND_DEPTH, 0), left)
+    south = range(bottom + 1, min(bottom + _FRONTIER_BAND_DEPTH, 255) + 1)
+    north = range(max(top - _FRONTIER_BAND_DEPTH, 0), top)
+    bands.append(
+        (
+            sum(
+                1
+                for x in east
+                for y in range(top, bottom + 1)
+                if not is_tile_covered(scanned, x, y, now_ms)
+            ),
+            (right, sy),
+        )
+    )
+    bands.append(
+        (
+            sum(
+                1
+                for x in west
+                for y in range(top, bottom + 1)
+                if not is_tile_covered(scanned, x, y, now_ms)
+            ),
+            (left, sy),
+        )
+    )
+    bands.append(
+        (
+            sum(
+                1
+                for x in range(left, right + 1)
+                for y in south
+                if not is_tile_covered(scanned, x, y, now_ms)
+            ),
+            (sx, bottom),
+        )
+    )
+    bands.append(
+        (
+            sum(
+                1
+                for x in range(left, right + 1)
+                for y in north
+                if not is_tile_covered(scanned, x, y, now_ms)
+            ),
+            (sx, top),
+        )
+    )
+    best_count, best_edge = max(bands, key=_band_score)
+    if best_count == 0:
+        return None
+    return best_edge
+
+
+def _band_score(band: tuple[int, tuple[int, int]]) -> int:
+    """Return the uncovered-tile count a frontier band carries."""
+    return band[0]
 
 
 def select_forage_target(ctx: DecideCtx) -> tuple[int, int] | None:
@@ -209,9 +306,52 @@ def plan_forage_search(
 
     target = select_forage_target(ctx)
     if target is None:
-        return None
+        # Only the zero-extras path reaches an exhausted selector: a
+        # stocked forager either fired the radar above (spend worthy,
+        # coverage incomplete) or ended foraging at the economics
+        # gate -- worthy-but-fully-covered is a contradiction, since
+        # the spend floor counts the same uncovered tiles coverage
+        # does.
+        #
+        # Frontier walk (user free-radar doctrine 2026-08-14: "scan
+        # unique 5x5 areas until the viewport is fully scanned, then
+        # move to the NEXT VIEWPORT OVER"): the window is anchored to
+        # the tank, so a zero-extras scanner continues its lawnmower
+        # by WALKING toward the least-scanned adjacent band -- the
+        # window slides with it and the scan-walk-scan loop resumes
+        # on fresh ground. No teleport: relocation by hop is the
+        # search hop's job, and it only gets the tick when every
+        # adjacent band is already covered.
+        frontier = _frontier_walk_target(ctx, left, top, right, bottom)
+        if frontier is None:
+            return None
+        frontier_x, frontier_y = frontier
+        command = plan_viewport_walk(ctx, frontier_x, frontier_y)
+        if command is None:
+            return None
+        emit_ai(
+            "forage frontier walk toward (%d,%d) mode=%s",
+            frontier_x,
+            frontier_y,
+            behavior_mode,
+        )
+        return make_decision(
+            command,
+            behavior_mode,
+            score,
+            frontier_x,
+            frontier_y,
+            "forage_frontier_walk",
+            clear_resource_target(ai_state),
+            ctx.equip,
+        )
     target_x, target_y = target
-    command = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
+    # Coverage steps WALK, never teleport (user ruling 2026-08-14):
+    # a free radar reveals ground for nothing, so no coverage step is
+    # worth a 45+ fuel hop. An unwalkable best position means this
+    # viewport is done for free-scan coverage -- yield to the search
+    # hop, which relocates to a genuinely fresh viewport.
+    command = plan_viewport_walk(ctx, target_x, target_y)
     if command is None:
         return None
     emit_ai("forage walk to unscanned tile (%d,%d) mode=%s", target_x, target_y, behavior_mode)
