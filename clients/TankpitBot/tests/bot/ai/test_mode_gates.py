@@ -278,3 +278,39 @@ def test_weapon_resume_slack_relaxes_the_entry_bar() -> None:
         assert should_enter_hunt(_make_ctx(fuel=1200, dual_count=24, radar_count=30)) is False
     finally:
         _test_hooks.get_env = original
+
+
+class TestGathererRoleGate:
+    """A gatherer's ticks never permit hunting ([[fleet-coordination]])."""
+
+    def test_gatherer_inventory_never_permits_hunt(self) -> None:
+        """Full stock notwithstanding, the gatherer role bars HUNT entry.
+
+        Fleet ruling 2026-08-14: the gatherer roams and publishes for
+        the fighters of its color; every yield-to-hunt gesture funnels
+        through this predicate, so this single bar disables them all.
+        """
+        from tankpit_bot.bot.ai.context import DecideCtx
+        from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
+        from tankpit_bot.bot.ai.types import AIConfigDict, AIStateDict
+
+        ctx = _make_ctx()
+        assert hunt_entry_permitted(ctx) is True
+
+        gatherer_state = AIStateDict(
+            **{
+                **ctx.ai_state,
+                "config": AIConfigDict(**{**ctx.config, "role": "gatherer"}),
+            }
+        )
+        gatherer_ctx = DecideCtx(
+            ctx.world,
+            ctx.self_state,
+            gatherer_state,
+            ctx.inventory,
+            ctx.timestamp_ms,
+            None,
+            "",
+            ws=ctx.ws,
+        )
+        assert hunt_entry_permitted(gatherer_ctx) is False

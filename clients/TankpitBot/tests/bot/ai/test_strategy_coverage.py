@@ -226,3 +226,69 @@ class TestHuntOnlyWhenFull:
         decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
         assert decision["behavior"]["mode"] == "COLLECT"
+
+
+class TestGathererRouting:
+    """A gatherer's ticks belong to COLLECT, never HUNT."""
+
+    def setup_method(self) -> None:
+        """Reset world state."""
+        self.ws = WorldService()
+        self.ws.update_world_state_from_position(100, 100)
+
+    def _gatherer_state(self) -> AIStateDict:
+        from tankpit_bot.bot.ai.types import AIConfigDict
+
+        base = _scanned_ai_state()
+        return AIStateDict(
+            **{**base, "config": AIConfigDict(**{**base["config"], "role": "gatherer"})}
+        )
+
+    def test_full_stock_gatherer_never_hunts_the_adjacent_enemy(self) -> None:
+        """The same fixture that hunts as a fighter collects as a
+        gatherer (fleet ruling 2026-08-14: the gatherer roams and
+        publishes for the fighters of its color)."""
+        ws = self.ws
+        containers = {"105,105": _c(105, 105, 0, False)}
+        from tankpit_bot.state.types import make_tank_state
+
+        enemy: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=101,
+                y=100,
+                team=2,
+                rank=1,
+                name="red-5",
+                is_self=False,
+                is_bot=False,
+                damage_state=3,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = _make_world(fuel=1100, containers=containers, tanks=enemy)
+
+        decision = decide(
+            world, self_state, self._gatherer_state(), _make_inventory(), 100000, None, ws=ws
+        )
+
+        assert decision["behavior"]["mode"] == "COLLECT"
+
+    def test_exhausted_gatherer_holds_instead_of_hunting(self) -> None:
+        """Nothing left to collect: the gatherer holds one window --
+        containers respawn and the next cascade relocates -- instead
+        of yielding the tick to the hunt owner."""
+        ws = self.ws
+        world, self_state = _make_world(fuel=1100)
+        # A fresh map open (cooldown running) with an empty dot atlas:
+        # even the map-for-dots relocation declines, so the cascade is
+        # genuinely exhausted.
+        state = AIStateDict(**{**self._gatherer_state(), "last_map_open_ms": 99000})
+
+        decision = decide(world, self_state, state, _make_inventory(), 100000, None, ws=ws)
+
+        assert decision["command"]["cmd_type"] == "hold"
+        assert decision["behavior"]["mode"] == "COLLECT"

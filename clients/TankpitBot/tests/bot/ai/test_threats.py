@@ -481,3 +481,41 @@ class TestFindAcquisitionTarget:
         if result is None:
             raise AssertionError("expected the affordable diagonal enemy")
         assert result["tank_id"] == 20
+
+
+class TestFleetAssistRanking:
+    """Teammates' engaged targets outrank distance inside a tier."""
+
+    def test_fleet_engaged_enemy_ranks_before_a_nearer_one(self) -> None:
+        """Focus fire ([[fleet-coordination]]): the ally's target wins.
+
+        Both enemies are practice bots (same tier); the nearer one
+        would win on distance, but a same-team sibling holds a lock
+        on the farther one, so acquisition converges on it.
+        """
+        ws = WorldService()
+        ws.fleet_engaged_target_ids = {60: 99000}
+        world = _world(
+            {
+                "50": _tank("50", x=103, y=100, team=2, name="red-1"),
+                "60": _tank("60", x=108, y=100, team=2, name="red-2"),
+            }
+        )
+
+        threats = analyze_threats(ws, world, _self_at(), now_ms=0)
+
+        assert [threat["tank_id"] for threat in threats] == [60, 50]
+
+    def test_no_fleet_locks_keeps_distance_order(self) -> None:
+        """With an empty assist set the nearest enemy leads."""
+        ws = WorldService()
+        world = _world(
+            {
+                "50": _tank("50", x=103, y=100, team=2, name="red-1"),
+                "60": _tank("60", x=108, y=100, team=2, name="red-2"),
+            }
+        )
+
+        threats = analyze_threats(ws, world, _self_at(), now_ms=0)
+
+        assert [threat["tank_id"] for threat in threats] == [50, 60]
