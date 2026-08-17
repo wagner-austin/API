@@ -11,15 +11,18 @@ Submodules:
 """
 
 from tankpit_bot.state.container_mutations import (
-    add_mine,
-    add_mine_from_radar,
     apply_tile_cache_update,
-    apply_tile_overlay_update,
     increment_container_failed_pickups,
+    merge_container_sighting,
     pickup_container,
     remove_container,
-    remove_mine,
     update_container_from_radar,
+)
+from tankpit_bot.state.mine_mutations import (
+    add_mine,
+    add_mine_from_radar,
+    apply_tile_overlay_update,
+    remove_mine,
 )
 from tankpit_bot.state.renderer import (
     render_world_ascii,
@@ -36,6 +39,7 @@ from tankpit_bot.state.self_mutations import (
 from tankpit_bot.state.tank_mutations import (
     apply_tank_observation,
     deactivate_tank,
+    depart_tank,
     remove_tank,
     set_tank_last_aim,
 )
@@ -96,6 +100,7 @@ __all__ = [
     "decode_terrain_tile",
     "decode_viewport_state",
     "decode_world_state",
+    "depart_tank",
     "encode_container_state",
     "encode_mine_state",
     "encode_self_state",
@@ -111,6 +116,7 @@ __all__ = [
     "make_tank_state",
     "make_terrain_tile",
     "make_viewport_state",
+    "merge_container_sighting",
     "parse_coord_key",
     "pickup_container",
     "record_scanned_tiles",
