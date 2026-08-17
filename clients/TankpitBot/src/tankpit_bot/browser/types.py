@@ -68,7 +68,6 @@ class GameNotJoinedError(BrowserError):
 
 
 __all__ = [
-    "KNOWN_PROTOCOL_SIGNATURES",
     "STATIC_KEY_LENGTH",
     "TEXT_MESSAGE_TYPES",
     "BrowserError",

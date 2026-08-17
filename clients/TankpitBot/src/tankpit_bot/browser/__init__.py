@@ -43,8 +43,6 @@ from tankpit_bot.browser.fuel_probe import (
     probe_all,
 )
 from tankpit_bot.browser.key_discovery import (
-    extract_xor_first_bytes,
-    find_best_static_byte,
     load_static_key,
     save_static_key,
 )
@@ -57,7 +55,6 @@ from tankpit_bot.browser.login import (
 )
 from tankpit_bot.browser.session import BrowserSession
 from tankpit_bot.browser.types import (
-    KNOWN_PROTOCOL_SIGNATURES,
     STATIC_KEY_LENGTH,
     TEXT_MESSAGE_TYPES,
     BrowserError,
@@ -66,7 +63,6 @@ from tankpit_bot.browser.types import (
 )
 
 __all__ = [
-    "KNOWN_PROTOCOL_SIGNATURES",
     "STATIC_KEY_LENGTH",
     "TEXT_MESSAGE_TYPES",
     "Account",
@@ -91,8 +87,6 @@ __all__ = [
     "encode_account",
     "encode_account_list",
     "encode_game_log_entry",
-    "extract_xor_first_bytes",
-    "find_best_static_byte",
     "get_current_time_ms",
     "handle_account_login",
     "handle_guest_login",
