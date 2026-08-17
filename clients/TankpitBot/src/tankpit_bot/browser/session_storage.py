@@ -31,13 +31,53 @@ from platform_core.json_utils import dump_json_str, load_json_str
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import BrowserContextProtocol
+from tankpit_bot.browser.accounts import resolve_account
 
-STORAGE_STATE_PATH: Path = Path("runs/state/tankpit.storage.json")
-"""Canonical location for the bot's Playwright storage-state cache.
+_STORAGE_STATE_DIR: Path = Path("runs/state")
+"""Directory holding the per-identity storage-state caches.
 
-The bot writes here after ``wait_for_game_ready`` and reads here on
-the next launch. The directory is created on demand by
-:func:`save_storage_state`."""
+Created on demand by :func:`save_storage_state`."""
+
+
+def resolve_storage_state_path(prefer_account: bool) -> Path:
+    """Return the storage-state cache path for the session's login identity.
+
+    The cache MUST be keyed by who the cookies belong to. A single
+    shared file made every instance resume whatever account logged in
+    first: on 2026-08-13 a fleet child spawned with
+    ``TANKPIT_ACCOUNT=Arterial`` found the shared jar holding Artax's
+    session, skipped the credential flow entirely (its log shows a
+    straight ``Navigated to /play`` with no login), joined as a second
+    Artax, and the server cut its socket two seconds later. Keying the
+    path by the RESOLVED account makes the cache self-consistent: a
+    child selecting a different account finds no cache and runs the
+    real login.
+
+    Args:
+        prefer_account: The session's account-vs-guest preference
+            (``resolve_prefer_account()``); guest sessions share the
+            ``guest`` identity.
+
+    Returns:
+        ``runs/state/tankpit.<identity>.storage.json`` where identity
+        is the resolved account username (lowered, sanitized to the
+        instance-name grammar) or ``guest``.
+
+    Raises:
+        AccountNotFoundError: If ``TANKPIT_ACCOUNT`` names an account
+            that does not exist — the same error the login flow would
+            raise later, surfaced before a wrong jar can be read.
+    """
+    identity = "guest"
+    if prefer_account:
+        account = resolve_account()
+        if account is not None:
+            cleaned = "".join(
+                ch if ch.isascii() and (ch.isalnum() or ch in "-_") else "-"
+                for ch in account["username"].lower()
+            )
+            identity = cleaned or "guest"
+    return _STORAGE_STATE_DIR / f"tankpit.{identity}.storage.json"
 
 
 class StorageStateCacheError(ValueError):
@@ -119,8 +159,8 @@ def save_storage_state(context: BrowserContextProtocol, path: Path) -> None:
 
 
 __all__ = [
-    "STORAGE_STATE_PATH",
     "StorageStateCacheError",
     "load_storage_state",
+    "resolve_storage_state_path",
     "save_storage_state",
 ]
