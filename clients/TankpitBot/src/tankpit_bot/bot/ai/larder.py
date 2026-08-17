@@ -29,7 +29,7 @@ from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.state.types import ContainerStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
-_WALK_DOMINANT_RANGE = 2
+WALK_DOMINANT_RANGE = 2
 """Manhattan distance at or below which walking beats a larder hop.
 
 A 2-tile walk costs 2 ticks and zero fuel; the teleport costs the same
@@ -72,7 +72,7 @@ class FuelLarderSelectionDict(TypedDict):
         cost: Teleport cost to the winning landing (0 when none).
         candidates: Believed fuel containers that entered scoring.
         too_close: Candidates inside the walk-dominant range
-            (:data:`_WALK_DOMINANT_RANGE`) -- travel there is the walk
+            (:data:`WALK_DOMINANT_RANGE`) -- travel there is the walk
             step's business, never a teleport's.
         no_landing: Candidates with no legal landing tile.
         reserve_blocked: Candidates still below the fuel reserve
@@ -131,7 +131,7 @@ def _is_walk_territory(
     Movement law (user 2026-07-30, flag s9-2/3): same-viewport
     destinations are WALKED -- an in-viewport larder teleport pays a
     map open + jump + displacement risk for ground a few walk ticks
-    serve. Off-viewport but within :data:`_WALK_DOMINANT_RANGE` is
+    serve. Off-viewport but within :data:`WALK_DOMINANT_RANGE` is
     equally walk territory (a tank at its viewport edge two tiles
     from off-frame stock). The larder is cross-viewport machinery.
 
@@ -157,7 +157,7 @@ def _is_walk_territory(
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     if left <= container["x"] <= right and top <= container["y"] <= bottom:
         return True
-    return abs(container["x"] - sx) + abs(container["y"] - sy) <= _WALK_DOMINANT_RANGE
+    return abs(container["x"] - sx) + abs(container["y"] - sy) <= WALK_DOMINANT_RANGE
 
 
 def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
@@ -167,7 +167,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     landing pickup (F16: the transaction must clear the reserve, not
     the transit), net profitability (``min(volume, deficit)`` must exceed
     the hop cost), the walk-dominant range
-    (:data:`_WALK_DOMINANT_RANGE` -- near containers are the walk
+    (:data:`WALK_DOMINANT_RANGE` -- near containers are the walk
     step's business), and the dreg floor (:data:`_LARDER_MIN_GAIN`,
     waived for deficit-completing gains and at desperation fuel).
     Belief freshness is NOT gated: container belief expires only on
@@ -272,6 +272,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
 
 
 __all__ = [
+    "WALK_DOMINANT_RANGE",
     "FuelLarderSelectionDict",
     "select_fuel_larder_hop",
 ]

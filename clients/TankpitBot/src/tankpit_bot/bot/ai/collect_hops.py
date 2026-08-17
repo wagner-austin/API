@@ -17,7 +17,7 @@ from tankpit_bot.bot.ai.context import DecideCtx, make_decision, set_resource_ta
 from tankpit_bot.bot.ai.equipment_search import find_all_tracked_equipment
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.intent import release_collect_plan
-from tankpit_bot.bot.ai.larder import select_fuel_larder_hop
+from tankpit_bot.bot.ai.larder import WALK_DOMINANT_RANGE, select_fuel_larder_hop
 from tankpit_bot.bot.ai.mode_gates import (
     hunt_entry_permitted,
     weapon_reserves_below_break,
@@ -181,12 +181,17 @@ def hop_toward_equipment(
             no_landing += 1
             continue
         landing_x, landing_y = landing
-        if (landing_x, landing_y) == (sx, sy):
-            # A teleport that does not move the tank is never travel
-            # (s8-2, [[flag-triage-20260729]]: the escape landing
-            # re-derived a hop TO THE TILE THE TANK STOOD ON and
-            # burned a map-open tick). Ground the tank already owns
-            # belongs to the pickup steps.
+        if abs(landing_x - sx) + abs(landing_y - sy) <= WALK_DOMINANT_RANGE:
+            # A teleport inside the walk-dominant range is never
+            # travel. Distance 0 was s8-2 ([[flag-triage-20260729]]:
+            # the escape landing re-derived a hop TO THE TILE THE
+            # TANK STOOD ON and burned a map-open tick); HUD flag 1
+            # (2026-08-13 20:47) extended it -- under fire the hop
+            # lane paid a map open plus a cost-6 teleport for a
+            # container ONE TILE away that the ordinary pickup served
+            # four seconds later. Ground within walking reach belongs
+            # to the pickup steps and the clearance shot, exactly as
+            # the larder's walk-territory rule already says for fuel.
             own_ground += 1
             continue
         cost = teleport_cost(sx, sy, landing_x, landing_y)
