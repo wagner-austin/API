@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.ai.types import AIConfigDict, make_default_ai_config
+from tankpit_bot.fleetshare.role import resolve_fleet_role
 
 DEFAULT_TARGET_URL = "https://tankpit.com/"
 """Canonical tankpit URL used when ``TANKPIT_URL`` is unset or empty."""
@@ -186,5 +187,6 @@ def env_ai_config() -> AIConfigDict:
             "priority_target_name": resolve_priority_target(),
             "human_target_min_rank": min_rank,
             "human_target_max_rank": max_rank,
+            "role": resolve_fleet_role(),
         }
     )

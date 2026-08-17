@@ -101,7 +101,14 @@ def decide(
                 derive_collect_mode_state(collect_decision),
                 timestamp_ms,
             )
-            return apply_dispatch_counters(_latch_pans(ctx, owned))
+            # The greeting rides EVERY owned decision, not just hunt's.
+            # The arrival tick after a greet-approach teleport is
+            # collect-owned by construction — the teleport burned the
+            # fuel that hunt-only-when-full requires — so a hunt-only
+            # attach could never say hello on arrival (run
+            # bot-20260814-204750: 12 s face-to-face with "123", two
+            # collect-owned decisions, zero hellos).
+            return apply_dispatch_counters(_latch_pans(ctx, attach_human_greeting(ctx, owned)))
         if ctx.ai_state["wind_down"]:
             # Winding down and nothing left to collect: ending early
             # and clean beats idling out the clock or re-engaging.
@@ -225,6 +232,12 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
         SessionExitError: ``session_complete`` when winding down and
             fully stocked — the clean exit.
     """
+    if ctx.config["role"] == "gatherer":
+        # A gatherer never hunts ([[fleet-coordination]], fleet ruling
+        # 2026-08-14): its ticks belong to the COLLECT cascade — scan,
+        # sweep, hop — roaming the map and publishing what it finds
+        # for the fighters of its color.
+        return "COLLECT"
     if ctx.ai_state["wind_down"]:
         target = ctx.world["tanks"].get(str(ctx.ai_state["combat_target_id"]))
         finishing_kill = (
