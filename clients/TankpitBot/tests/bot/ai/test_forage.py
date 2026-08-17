@@ -302,8 +302,12 @@ class TestForageSearch:
         assert decision["command"]["cmd_type"] == "move"
         assert decision["behavior"]["reason_kind"] == "forage_sweep"
 
-    def test_returns_none_when_viewport_fully_covered_with_no_radar(self) -> None:
-        """No unscanned tiles AND radar unaffordable returns None for teleport-out."""
+    def test_covered_viewport_at_zero_extras_continues_the_lawnmower(self) -> None:
+        """REVERSED 2026-08-14 (user free-radar doctrine): a covered
+        viewport at zero extras used to yield None for a teleport-out;
+        it now frontier-walks toward the adjacent unscanned band so
+        the anchored window slides and the free-radar loop continues
+        -- teleports never serve coverage."""
         ctx = _ctx(radars=0, scanned_tiles=_full_viewport_coverage(100000))
 
         decision = plan_forage_search(
@@ -313,7 +317,9 @@ class TestForageSearch:
             behavior_mode="COLLECT",
         )
 
-        assert decision is None
+        if decision is None:
+            raise AssertionError("expected a frontier walk")
+        assert decision["behavior"]["reason_kind"] == "forage_frontier_walk"
 
     def test_returns_none_when_walk_falls_back_to_unaffordable_teleport(self) -> None:
         """A rock-walled tile reachable only by teleport that exceeds available fuel yields None.
@@ -336,6 +342,62 @@ class TestForageSearch:
             scanned_tiles=coverage,
             terrain=terrain,
         )
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT",
+        )
+
+        assert decision is None
+
+
+class TestFrontierWalk:
+    """The zero-extras lawnmower continues into the next viewport over."""
+
+    def test_covered_viewport_walks_toward_the_unscanned_band(self) -> None:
+        """User doctrine 2026-08-14: viewport done -> walk to the edge
+        facing the most unscanned ground; the anchored window slides
+        and the scan-walk-scan loop resumes -- no teleport, ever."""
+        ctx = _ctx(radars=0, scanned_tiles=_full_viewport_coverage(100000))
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT",
+        )
+
+        if decision is None:
+            raise AssertionError("expected a frontier walk")
+        assert decision["behavior"]["reason_kind"] == "forage_frontier_walk"
+        assert decision["command"]["cmd_type"] == "move"
+
+    def test_fully_scanned_surroundings_yield_to_the_search_hop(self) -> None:
+        """Every adjacent band covered too: relocation is the hop's job."""
+        coverage = _full_viewport_coverage(100000)
+        from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+
+        left, top, right, bottom = viewport_visible_bounds(_ctx(radars=0).world["viewport"])
+        for x in range(max(left - 8, 0), min(right + 8, 255) + 1):
+            for y in range(max(top - 8, 0), min(bottom + 8, 255) + 1):
+                coverage[f"{x},{y}"] = 100000
+        ctx = _ctx(radars=0, scanned_tiles=coverage)
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT",
+        )
+
+        assert decision is None
+
+    def test_stocked_covered_viewport_never_frontier_walks(self) -> None:
+        """With extras the scan reaches the whole viewport from
+        anywhere -- relocation stays the hop's job, not a walk's."""
+        ctx = _ctx(radars=5, scanned_tiles=_full_viewport_coverage(100000))
 
         decision = plan_forage_search(
             ctx,

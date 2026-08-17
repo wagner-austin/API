@@ -369,3 +369,70 @@ class TestWalkOrTeleport:
             raise AssertionError("expected fallback to a non-failed candidate")
         picked_x, picked_y, _command = result
         assert (picked_x, picked_y) != (first_x, first_y)
+
+
+class TestPlanViewportWalk:
+    """The pure-walk coverage primitive: never a teleport."""
+
+    def _ctx(self, terrain: InMemoryTerrainMap | None = None) -> DecideCtx:
+        ws = WorldService()
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        return DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+            ws=ws,
+        )
+
+    def test_move_failed_target_declines(self) -> None:
+        from tankpit_bot.bot.ai.movement import plan_viewport_walk
+
+        ctx = self._ctx()
+        ctx.ws.mark_move_target_failed(104, 100, 100000)
+
+        assert plan_viewport_walk(ctx, 104, 100) is None
+
+    def test_out_of_viewport_target_declines(self) -> None:
+        """A coverage step never leaves the window (that is the search
+        hop's job) -- and it certainly never teleports there."""
+        from tankpit_bot.bot.ai.movement import plan_viewport_walk
+
+        ctx = self._ctx()
+
+        assert plan_viewport_walk(ctx, 130, 100) is None
+
+    def test_unwalkable_target_declines_instead_of_teleporting(self) -> None:
+        """Water between tank and tile: walk_or_teleport would fall
+        back to a 45+ fuel hop; the coverage primitive says the
+        viewport is done for free-scan instead (user free-radar
+        doctrine 2026-08-14)."""
+        from tankpit_bot.bot.ai.movement import plan_viewport_walk
+
+        terrain = InMemoryTerrainMap.from_passable_set({(100, 100), (104, 100)})
+        ctx = self._ctx(terrain)
+
+        assert plan_viewport_walk(ctx, 104, 100) is None
+
+    def test_walkable_target_moves(self) -> None:
+        from tankpit_bot.bot.ai.movement import plan_viewport_walk
+
+        ctx = self._ctx(InMemoryTerrainMap())
+        command = plan_viewport_walk(ctx, 104, 100)
+
+        if command is None:
+            raise AssertionError("expected a move command")
+        assert command["cmd_type"] == "move"
+
+    def test_without_terrain_the_direct_move_stands(self) -> None:
+        from tankpit_bot.bot.ai.movement import plan_viewport_walk
+
+        ctx = self._ctx()
+        command = plan_viewport_walk(ctx, 104, 100)
+
+        if command is None:
+            raise AssertionError("expected a move command")
+        assert command["cmd_type"] == "move"

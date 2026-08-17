@@ -100,13 +100,15 @@ def test_fuel_larder_hop_beats_discovery_and_holds_the_lock() -> None:
     assert updated["suppress_landing_scan"] is True
 
 
-def test_virgin_block_sweeps_before_the_larder_hop() -> None:
-    """With extras stocked and the block unscanned, the sweep leads.
+def test_known_larder_stock_outranks_the_virgin_block_sweep() -> None:
+    """A profitable remembered container beats recon, block virgin or not.
 
-    The [[quad-sweep-doctrine]] cycle (2026-08-06): recon the 31x31
-    around the tank for four free-standing extras BEFORE paying
-    teleport fuel for remembered stock -- the block may hold closer
-    containers, and the exit hop comes only when it is squeezed dry.
+    Reordered 2026-08-13 (HUD flags 8/9/14, user ruling: known stock
+    preempts scanning). The pre-flip pin asserted the OPPOSITE --
+    "recon the 31x31 BEFORE paying teleport fuel for remembered
+    stock" -- and live play showed what that buys: four scans and ~8
+    ticks spent confirming information the world state already held,
+    while a 700-volume container sat tracked and profitable.
     """
     ctx = _collect_ctx(
         fuel=700,
@@ -119,13 +121,11 @@ def test_virgin_block_sweeps_before_the_larder_hop() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    # The sweep opens by scanning the still-fresh CURRENT window, then
-    # steers to the quadrants on later ticks.
-    assert decision["behavior"]["reason_kind"] == "quad_sweep_radar"
-    assert decision["command"]["cmd_type"] == "radar"
+    assert decision["behavior"]["reason_kind"] == "fuel_hop"
+    assert decision["command"]["cmd_type"] == "teleport"
     updated = decision["updated_ai_state"]
-    assert updated["sweep_anchor_x"] == 100
-    assert updated["sweep_anchor_y"] == 100
+    assert updated["resource_target_x"] == 140
+    assert updated["resource_target_y"] == 100
 
 
 def test_equipment_hop_holds_the_lock_and_suppresses_the_scan() -> None:
@@ -218,13 +218,40 @@ def test_fresh_viewport_without_the_flag_still_radars_on_landing() -> None:
     assert decision["command"]["cmd_type"] == "radar"
 
 
+def test_in_window_equipment_outranks_the_virgin_block_sweep() -> None:
+    """A revealed in-window container is taken, never scanned past.
+
+    The flag-9 shape (2026-08-13): a mine-hit radar revealed in-window
+    equipment, and the old sweep-first cascade answered with a full
+    quad sweep before any pickup. Reordered, the pickup branch owns
+    the tick whenever the window holds wanted stock -- however virgin
+    the surrounding block is.
+    """
+    equipment = make_container_state(
+        x=105, y=100, is_fuel=False, volume=0, timestamp_ms=100000, failed_pickups=0
+    )
+    ctx = _collect_ctx(
+        fuel=700,
+        scanned=False,
+        containers={"105,100": equipment},
+        inventory=make_inventory(dual_count=3),
+    )
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected collect decision")
+    assert decision["command"]["cmd_type"] == "pickup_equipment"
+
+
 def test_unprofitable_larder_hands_the_tick_to_discovery() -> None:
     """A sliver container far away does not stop the tick from scanning.
 
-    Re-pinned 2026-08-06: with extras stocked and the block virgin the
-    scanning tick is now the quad sweep's first shift rather than a
-    bare forage radar ([[quad-sweep-doctrine]]) -- the contract this
-    test guards (the sliver does NOT win the tick) is unchanged.
+    Re-pinned 2026-08-13 with the sweep's cascade reorder: the sliver
+    still loses the tick, and with every collection branch declining
+    the sweep now opens with its NW steering shift (the fresh-window
+    radar branch is gone -- HUD flags 4/5). The contract this test
+    guards (the sliver does NOT win the tick) is unchanged.
     """
     ctx = _collect_ctx(
         fuel=400,
@@ -237,8 +264,8 @@ def test_unprofitable_larder_hands_the_tick_to_discovery() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason_kind"] == "quad_sweep_radar"
-    assert decision["command"]["cmd_type"] == "radar"
+    assert decision["behavior"]["reason_kind"] == "quad_sweep_shift"
+    assert decision["command"]["cmd_type"] == "scope_shift"
 
 
 def test_displaced_harvest_landing_unsuppresses_the_radar() -> None:

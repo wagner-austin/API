@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
-from tankpit_bot.bot.ai.mine_clearance import find_mine_clearance_shot
+from tankpit_bot.bot.ai.mine_clearance import (
+    find_mine_clearance_shot,
+)
 from tankpit_bot.state import (
     SelfStateDict,
     WorldStateDict,
@@ -16,6 +19,36 @@ from tankpit_bot.state.types import (
     make_viewport_state,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+
+def _find_shot(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    terrain: TerrainMapProtocol | None,
+    *,
+    fuel_deficit: int = 1100,
+) -> tuple[int, int] | None:
+    """Call the planner with a full-tank-of-headroom deficit by default.
+
+    The wide default keeps the access-geometry tests reading about
+    geometry; the gain-pricing tests pass their own deficit.
+
+    Args:
+        world: World under test.
+        self_state: Bot state under test.
+        terrain: Terrain view under test.
+        fuel_deficit: Fuel headroom to price clamped transfers with.
+
+    Returns:
+        The planner's aim.
+    """
+    return find_mine_clearance_shot(
+        world,
+        self_state,
+        terrain,
+        fuel_deficit=fuel_deficit,
+        fuel_gain_per_walk_tile=3,
+    )
 
 
 def _composed(base: InMemoryTerrainMap, hostile_keys: frozenset[str]) -> FerryAwareTerrain:
@@ -90,7 +123,7 @@ def test_single_covered_container_with_clear_line_is_the_aim() -> None:
     world, self_state = _world_with_self()
     _add_covered_container(world, 104, 100)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (104, 100)
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) == (104, 100)
 
 
 def test_no_covered_containers_returns_none() -> None:
@@ -99,7 +132,7 @@ def test_no_covered_containers_returns_none() -> None:
     world["containers"]["104,100"] = make_container_state(x=104, y=100, is_fuel=True, volume=500)
     world["mines"]["106,100"] = make_mine_state(x=106, y=100, mine_type=0, tank_id=-1, team=1)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) is None
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) is None
 
 
 def test_friendly_mine_on_container_is_not_a_target() -> None:
@@ -107,7 +140,7 @@ def test_friendly_mine_on_container_is_not_a_target() -> None:
     world, self_state = _world_with_self()
     _add_covered_container(world, 104, 100, team=2)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) is None
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) is None
 
 
 def test_rock_in_the_shot_line_disqualifies_the_aim() -> None:
@@ -116,7 +149,7 @@ def test_rock_in_the_shot_line_disqualifies_the_aim() -> None:
     _add_covered_container(world, 104, 100)
     terrain = InMemoryTerrainMap({(102, 100): InMemoryTerrainMap.ROCK})
 
-    assert find_mine_clearance_shot(world, self_state, terrain) is None
+    assert _find_shot(world, self_state, terrain) is None
 
 
 def test_intermediate_mines_do_not_occlude_the_shot() -> None:
@@ -131,7 +164,7 @@ def test_intermediate_mines_do_not_occlude_the_shot() -> None:
     world["mines"]["102,100"] = make_mine_state(x=102, y=100, mine_type=0, tank_id=-1, team=1)
     world["mines"]["103,100"] = make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=1)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (103, 100)
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) == (103, 100)
 
 
 def test_out_of_viewport_covered_container_is_skipped() -> None:
@@ -139,7 +172,7 @@ def test_out_of_viewport_covered_container_is_skipped() -> None:
     world, self_state = _world_with_self()
     _add_covered_container(world, 130, 100)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) is None
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) is None
 
 
 def test_private_prefers_the_aim_exposing_the_most_containers() -> None:
@@ -154,7 +187,7 @@ def test_private_prefers_the_aim_exposing_the_most_containers() -> None:
     _add_covered_container(world, 107, 104)
     _add_covered_container(world, 106, 105)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (106, 104)
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) == (106, 104)
 
 
 def test_recruit_scores_single_tile_blast_and_takes_the_nearest() -> None:
@@ -164,7 +197,7 @@ def test_recruit_scores_single_tile_blast_and_takes_the_nearest() -> None:
     _add_covered_container(world, 106, 104)
     _add_covered_container(world, 107, 104)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (102, 100)
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) == (102, 100)
 
 
 def test_dreg_fuel_under_mines_is_not_worth_the_shot() -> None:
@@ -183,7 +216,7 @@ def test_dreg_fuel_under_mines_is_not_worth_the_shot() -> None:
     )
     world["mines"]["104,100"] = make_mine_state(x=104, y=100, mine_type=0, tank_id=-1, team=1)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) is None
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) is None
 
 
 def test_rich_fuel_under_mines_still_draws_the_shot() -> None:
@@ -197,7 +230,7 @@ def test_rich_fuel_under_mines_still_draws_the_shot() -> None:
     )
     world["mines"]["104,100"] = make_mine_state(x=104, y=100, mine_type=0, tank_id=-1, team=1)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (104, 100)
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) == (104, 100)
 
 
 def test_blast_clips_at_the_map_edge() -> None:
@@ -207,7 +240,7 @@ def test_blast_clips_at_the_map_edge() -> None:
     self_state["x"], self_state["y"] = 4, 4
     _add_covered_container(world, 0, 0)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (0, 0)
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) == (0, 0)
 
 
 def _session4_pocket() -> tuple[WorldStateDict, SelfStateDict, FerryAwareTerrain]:
@@ -264,7 +297,7 @@ def test_water_locked_equipment_with_mined_flanks_draws_the_unlock_shot() -> Non
     """
     world, self_state, terrain = _session4_pocket()
 
-    assert find_mine_clearance_shot(world, self_state, terrain) == (58, 94)
+    assert _find_shot(world, self_state, terrain) == (58, 94)
 
 
 def test_pure_water_lock_without_mines_draws_no_shot() -> None:
@@ -281,14 +314,14 @@ def test_pure_water_lock_without_mines_draws_no_shot() -> None:
         }
     )
 
-    assert find_mine_clearance_shot(world, self_state, terrain_all_water) is None
+    assert _find_shot(world, self_state, terrain_all_water) is None
 
 
 def test_blocked_arm_needs_terrain() -> None:
     """Without terrain, attainability is unanswerable — no blocked aim."""
     world, self_state, _ = _session4_pocket()
 
-    assert find_mine_clearance_shot(world, self_state, None) is None
+    assert _find_shot(world, self_state, None) is None
 
 
 def test_los_blocked_flank_mines_defer_the_unlock_shot() -> None:
@@ -310,7 +343,7 @@ def test_los_blocked_flank_mines_defer_the_unlock_shot() -> None:
         frozenset({"58,94", "59,95"}),
     )
 
-    assert find_mine_clearance_shot(world, self_state, terrain) is None
+    assert _find_shot(world, self_state, terrain) is None
 
 
 def test_recruit_single_tile_blast_still_opens_the_aim_tile() -> None:
@@ -318,7 +351,7 @@ def test_recruit_single_tile_blast_still_opens_the_aim_tile() -> None:
     world, self_state, terrain = _session4_pocket()
     self_state["rank"] = 0
 
-    aim = find_mine_clearance_shot(world, self_state, terrain)
+    aim = _find_shot(world, self_state, terrain)
 
     assert aim in {(58, 94), (59, 95)}
 
@@ -335,7 +368,7 @@ def test_recruit_covered_flank_aim_opens_nothing_and_is_skipped() -> None:
     _add_covered_container(world, 104, 100)
     world["mines"]["105,100"] = make_mine_state(x=105, y=100, mine_type=0, tank_id=-1, team=1)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (104, 100)
+    assert _find_shot(world, self_state, InMemoryTerrainMap()) == (104, 100)
 
 
 def test_edge_of_viewport_container_with_out_of_view_mine_waits() -> None:
@@ -357,7 +390,7 @@ def test_edge_of_viewport_container_with_out_of_view_mine_waits() -> None:
         frozenset({"68,94"}),
     )
 
-    assert find_mine_clearance_shot(world, self_state, terrain) is None
+    assert _find_shot(world, self_state, terrain) is None
 
 
 class TestServiceClearanceAim:

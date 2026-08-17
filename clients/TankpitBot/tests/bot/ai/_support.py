@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_initial_ai_state,
@@ -19,6 +20,7 @@ from tankpit_bot.state.types import (
     make_tank_state,
     make_viewport_state,
 )
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 def consent_human(ws: WorldService, tank_id: int) -> None:
@@ -342,4 +344,65 @@ def make_container(
         volume=volume,
         is_fuel=is_fuel,
         timestamp_ms=timestamp_ms,
+    )
+
+
+def make_sweep_ctx(
+    *,
+    now_ms: int,
+    fuel: int = 900,
+    scanned: bool = False,
+    block_scanned: bool | None = None,
+    containers: dict[str, ContainerStateDict] | None = None,
+    inventory: InventoryState | None = None,
+    ai_state: AIStateDict | None = None,
+    terrain: InMemoryTerrainMap | None = None,
+    viewport_origin: tuple[int, int] | None = None,
+    self_x: int = 100,
+    self_y: int = 100,
+) -> DecideCtx:
+    """Build a decision context for sweep and block-harvest tests.
+
+    Shared by ``test_quad_sweep`` and ``test_block_harvest`` so the
+    two halves of the doctrine are exercised against the same world
+    shape.
+
+    Args:
+        now_ms: Decision timestamp in milliseconds.
+        fuel: Self fuel.
+        scanned: Whether the current window's tiles are covered.
+        block_scanned: Block-wide coverage override (None follows
+            ``scanned``).
+        containers: Container map keyed ``"x,y"``.
+        inventory: Inventory override (defaults to at-cap).
+        ai_state: AI-state override (defaults to a scanned state).
+        terrain: Terrain override (defaults to all-passable).
+        viewport_origin: Window origin override.
+        self_x: Self X.
+        self_y: Self Y.
+
+    Returns:
+        The assembled decision context.
+    """
+    ws = WorldService()
+    world, self_state = make_world(
+        self_x=self_x,
+        self_y=self_y,
+        fuel=fuel,
+        scanned=scanned,
+        block_scanned=block_scanned,
+        containers=containers,
+    )
+    if viewport_origin is not None:
+        world["viewport"]["left"] = viewport_origin[0]
+        world["viewport"]["top"] = viewport_origin[1]
+    return DecideCtx(
+        world,
+        self_state,
+        ai_state if ai_state is not None else make_scanned_ai_state(),
+        inventory if inventory is not None else make_inventory(),
+        now_ms,
+        terrain if terrain is not None else InMemoryTerrainMap(),
+        "",
+        ws=ws,
     )

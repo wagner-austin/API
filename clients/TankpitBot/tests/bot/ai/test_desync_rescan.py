@@ -293,3 +293,59 @@ class TestDisplacedLandingScanEconomics:
         assert decision is None
         assert updated["last_landing_scan_viewport"] != ""
         assert updated["suppress_landing_scan"] is False
+
+
+class TestMineRevealScan:
+    """The own-mine-hit reveal gate (user ruling 2026-08-13, flag 2)."""
+
+    def test_pending_mine_hit_outranks_pursuit_with_one_radar(self) -> None:
+        """A walk-over hit produces one reveal radar before any pickup.
+
+        The old behavior scanned only at the FLIP teleport's landing,
+        so the field that hit the tank stayed invisible and later
+        walks risked another 45 (run arterial 2026-08-13, flags 2/9:
+        chained cant_go and mine hits with the free radar never
+        spent on the ground that proved dangerous).
+        """
+        ws = WorldService()
+        world, self_state = make_world(
+            scanned=True,
+            fuel=800,
+            containers={
+                "105,105": make_container_state(
+                    x=105,
+                    y=105,
+                    is_fuel=True,
+                    volume=700,
+                    timestamp_ms=100000,
+                    failed_pickups=0,
+                )
+            },
+        )
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "mode": "COLLECT",
+                "mode_state": "APPROACH",
+                "mode_started_ms": 90000,
+            }
+        )
+        ws.mark_mine_reveal_pending(99000)
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+
+        decision = decide_collect_mode(ctx)
+
+        if decision is None:
+            raise AssertionError("expected collect decision")
+        assert decision["behavior"]["reason_kind"] == "mine_hit_reveal_scan"
+        assert decision["command"]["cmd_type"] == "radar"
+
+    def test_radar_response_clears_the_latch(self) -> None:
+        """Any radar response answers the hit -- one scan per hit."""
+        ws = WorldService()
+        ws.mark_mine_reveal_pending(99000)
+        assert ws.mine_reveal_pending() is True
+
+        ws.mark_radar_scan_complete()
+
+        assert ws.mine_reveal_pending() is False

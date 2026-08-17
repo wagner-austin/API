@@ -22,10 +22,12 @@ def test_pickup_refused_when_clamped_gain_not_worth_the_walk() -> None:
     """A distant cap-clamped sliver is refused: the 2026-07-06 waste class.
 
     Private (rank 1, cap 1100) at fuel 1096: headroom 4, so a
-    386-volume container transfers only 4. At a 2-tile walk the
-    threshold is ``3 * 2 = 6 > 4`` -- not worth it, refuse. (The
-    per-tile price is the MEASURED-walking-speed derivation of
-    2026-08-06, not the falsified one-tick-per-tile premise.)
+    386-volume container transfers only 4 -- below the minimum-sip
+    floor and the walk pricing both. (The per-tile price is the
+    MEASURED-walking-speed derivation of 2026-08-06, not the
+    falsified one-tick-per-tile premise.) Inventory is kept below
+    hunt-ready: a readiness-COMPLETING top-off waives the floor by
+    design and has its own pin below.
     """
 
     ws = WorldService()
@@ -33,7 +35,7 @@ def test_pickup_refused_when_clamped_gain_not_worth_the_walk() -> None:
     self_state = SelfStateDict(**{**base_self, "rank": 1})
     world = base_world
     world["self_state"] = self_state
-    inventory = make_inventory()
+    inventory = make_inventory(dual_count=3)
     ctx = DecideCtx(
         world,
         self_state,
@@ -54,6 +56,42 @@ def test_pickup_refused_when_clamped_gain_not_worth_the_walk() -> None:
     )
 
     assert pickup_not_worth_walk(ctx, container) is True
+
+
+def test_readiness_completing_topoff_waives_the_sip_floor() -> None:
+    """A tiny sip that fills fuel to cap dispatches when hunt-ready.
+
+    The hunt-only-when-full contract needs fuel exactly at cap, so
+    the minimum-sip floor (HUD flag 3, 2026-08-13) must never strand
+    an otherwise hunt-ready tank at 1096/1100 beside live fuel --
+    the 4-fuel top-off is the LAST readiness requirement, mirroring
+    the larder's deficit-completing waiver.
+    """
+    ws = WorldService()
+    base_world, base_self = make_world(fuel=1096)
+    self_state = SelfStateDict(**{**base_self, "rank": 1})
+    world = base_world
+    world["self_state"] = self_state
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(),
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
+    container = make_container_state(
+        x=102,
+        y=100,
+        is_fuel=True,
+        volume=386,
+        timestamp_ms=100000,
+        failed_pickups=0,
+    )
+
+    assert pickup_not_worth_walk(ctx, container) is False
 
 
 def test_adjacent_clamped_sliver_is_worth_taking() -> None:
@@ -220,14 +258,14 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
 
     Wire the 2026-07-06 waste class end-to-end: private at fuel 1092
     (headroom 8) with a single visible 386-volume fuel container 3
-    tiles east -- effective gain 8 against a ``3 * 3 = 9``
-    threshold (measured-speed pricing, 2026-08-06). The at-cap gate
-    passes (fuel below cap), the fuel
-    target is selected successfully, but ``pickup_not_worth_walk``
-    fires and the planner returns None instead of dispatching. The
-    container is left untouched -- not blacklisted -- so a later
-    tick with more headroom (or from an adjacent tile) can still
-    consume it.
+    tiles east -- effective gain 8 falls below the minimum-sip floor
+    and the walk pricing. The at-cap gate passes (fuel below cap),
+    the fuel target is selected successfully, but
+    ``pickup_not_worth_walk`` fires and the planner returns None
+    instead of dispatching. The container is left untouched -- not
+    blacklisted -- so a later tick with more headroom (or from an
+    adjacent tile) can still consume it. Inventory sits below
+    hunt-ready; the readiness-completing waiver has its own pin.
     """
 
     ws = WorldService()
@@ -256,7 +294,7 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
             "mode_started_ms": 90000,
         }
     )
-    inventory = make_inventory()
+    inventory = make_inventory(dual_count=3)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = select_and_pickup_fuel(ctx, ctx.base)

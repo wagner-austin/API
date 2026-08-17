@@ -8,7 +8,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.physics.capacity import inventory_capacity
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.state.types import make_container_state
+from tankpit_bot.state.types import WorldStateDict, make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -152,6 +152,15 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     # stranding requires fuel below the raw short-hop cost.
     ws = WorldService()
     world, self_state = make_world(fuel=30, scanned=True)
+    # "Genuinely boxed in" must also mean no frontier: the 2026-08-14
+    # lawnmower continuation walks toward any unscanned adjacent band,
+    # which genuinely rescues this state -- so the boxed-in pin needs
+    # the surroundings covered wall to wall.
+    padded = dict(world["scanned_tiles"])
+    for x in range(84, 116):
+        for y in range(84, 116):
+            padded[f"{x},{y}"] = 100000
+    world = WorldStateDict(**{**world, "scanned_tiles": padded})
     base_state = make_scanned_ai_state()
     ai_state = AIStateDict(
         **{
@@ -191,6 +200,15 @@ def test_collect_mode_raises_when_fully_boxed_in() -> None:
     # Fuel below the short-hop cost so no teleport is affordable.
     ws = WorldService()
     world, self_state = make_world(fuel=30, scanned=True)
+    # "Genuinely boxed in" must also mean no frontier: the 2026-08-14
+    # lawnmower continuation walks toward any unscanned adjacent band,
+    # which genuinely rescues this state -- so the boxed-in pin needs
+    # the surroundings covered wall to wall.
+    padded = dict(world["scanned_tiles"])
+    for x in range(84, 116):
+        for y in range(84, 116):
+            padded[f"{x},{y}"] = 100000
+    world = WorldStateDict(**{**world, "scanned_tiles": padded})
     base_state = make_scanned_ai_state()
     ai_state = AIStateDict(
         **{
