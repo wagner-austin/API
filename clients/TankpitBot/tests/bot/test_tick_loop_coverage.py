@@ -212,6 +212,7 @@ class TestDrainReceipt:
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
         from tankpit_bot.state.types import WorldStateDict, make_container_state
 
+        started_ms = get_current_time_ms()
         ws = WorldService()
         ws.update_world_state_from_position(100, 100)
         ws.world_state = WorldStateDict(
@@ -232,14 +233,20 @@ class TestDrainReceipt:
                         y=150,
                         is_fuel=True,
                         volume=400,
-                        timestamp_ms=get_current_time_ms(),
+                        timestamp_ms=started_ms,
                         failed_pickups=0,
                     )
                 },
             }
         )
-        # The pickup broadcast for the tile fired within the click.
-        ws.recent_pickup_signatures[((150, 150, 0),)] = get_current_time_ms()
+        # The wire credited US a gain within the click -- the
+        # corrected discriminator (2026-08-13): a tile-record test
+        # also matched the removal broadcast riding an already-empty
+        # click, so 23/23 stale empties classified as own drains and
+        # the rescan gate never fired (run arterial). Wire order is
+        # dispatch -> gain -> code=4, so the gain is stamped at/after
+        # the action's ``started_ms``.
+        ws.record_own_gain(get_current_time_ms())
         bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "MOVING"
@@ -247,7 +254,7 @@ class TestDrainReceipt:
             kind="collect",
             target_x=150,
             target_y=150,
-            started_ms=get_current_time_ms(),
+            started_ms=started_ms,
             outcome="pending",
         )
         ws.last_command_error = 4
@@ -256,6 +263,104 @@ class TestDrainReceipt:
 
         assert result is False
         assert ws.container_desync_ms == 0
+
+
+class TestDetonationInterruptedWalk:
+    """A cant_go riding a walk-over detonation never blames the container."""
+
+    def _make_world_with_container(self) -> WorldService:
+        """Build a session holding one full equipment-container belief."""
+        from tankpit_bot.state.types import WorldStateDict, make_container_state
+
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        ws.world_state = WorldStateDict(
+            **{
+                **ws.world_state,
+                "self_state": make_self_state(
+                    tank_id=1,
+                    x=100,
+                    y=100,
+                    team=1,
+                    rank=0,
+                    fuel=1000,
+                    leaderboard_position=0,
+                ),
+                "containers": {
+                    "103,147": make_container_state(
+                        x=103,
+                        y=147,
+                        is_fuel=False,
+                        volume=0,
+                        timestamp_ms=get_current_time_ms(),
+                        failed_pickups=0,
+                    )
+                },
+            }
+        )
+        return ws
+
+    def test_cant_go_with_detonation_in_window_keeps_container_clean(
+        self, fake_env: FakeEnv
+    ) -> None:
+        """Flag 6 (run arterial 2026-08-13 22:25:45): the detonation on
+        (103,143) halted the walk to equipment at (103,147), the server
+        refused the remainder with code=1, and the failed_pickups
+        increment demoted the innocent (and reachable) container -- the
+        replan paid a 60-fuel teleport to different equipment four
+        tiles further away.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+
+        started_ms = get_current_time_ms()
+        ws = self._make_world_with_container()
+        # Wire order: dispatch -> walk -> detonation on own tile ->
+        # cant_go for the refused remainder, all inside the window.
+        ws.last_own_mine_hit_ms = get_current_time_ms()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "MOVING"
+        action = InFlightActionDict(
+            kind="collect",
+            target_x=103,
+            target_y=147,
+            started_ms=started_ms,
+            outcome="pending",
+        )
+        ws.last_command_error = 1
+
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is False
+        container = ws.world_state["containers"]["103,147"]
+        assert container["failed_pickups"] == 0
+
+    def test_cant_go_without_detonation_still_blames_the_container(self, fake_env: FakeEnv) -> None:
+        """A cant_go with no detonation in the window is a genuine
+        terrain refusal and keeps the failed-pickup mark (the
+        2026-07-06 semantic split's code-0/1 arm)."""
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+
+        ws = self._make_world_with_container()
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "MOVING"
+        action = InFlightActionDict(
+            kind="collect",
+            target_x=103,
+            target_y=147,
+            started_ms=get_current_time_ms(),
+            outcome="pending",
+        )
+        ws.last_command_error = 1
+
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is False
+        container = ws.world_state["containers"]["103,147"]
+        assert container["failed_pickups"] == 1
 
 
 class TestTeleportPreconditionReceipt:

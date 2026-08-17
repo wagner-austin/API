@@ -77,7 +77,7 @@ def _stub_autoscroll_hook() -> tuple[AutoscrollEnforcerProtocol, list[int]]:
         Tuple of (original hook, recorded call count list) for
         save-and-restore in the caller's ``finally``.
     """
-    from tankpit_bot._test_hooks import AutoscrollPageProtocol
+    from tankpit_bot._test_hooks import CDPSessionProtocol, PageWaitProtocol
     from tankpit_bot.browser import _test_hooks as browser_hooks
     from tankpit_bot.types.message import CapturedMessage
 
@@ -85,9 +85,12 @@ def _stub_autoscroll_hook() -> tuple[AutoscrollEnforcerProtocol, list[int]]:
     original = browser_hooks.ensure_autoscroll_off
 
     def _recorder(
-        page: AutoscrollPageProtocol, messages: list[CapturedMessage], ws: WorldService
+        page: PageWaitProtocol,
+        cdp: CDPSessionProtocol,
+        messages: list[CapturedMessage],
+        ws: WorldService,
     ) -> None:
-        del page, messages, ws
+        del page, cdp, messages, ws
         calls.append(1)
 
     browser_hooks.ensure_autoscroll_off = _recorder

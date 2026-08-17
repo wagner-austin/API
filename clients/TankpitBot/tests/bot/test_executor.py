@@ -52,8 +52,12 @@ class TestApplyEquipment:
         apply_equipment(bot, [2, 5])
         # slot 1: not desired, enabled -> disable -> toggle (1 CDP)
         # slot 2: desired, disabled, has stock -> enable -> toggle (1 CDP)
+        # slot 3: not desired, enabled -> disable -> toggle (1 CDP)
+        #   (missiles are MANAGED since 2026-08-13 -- a fresh account
+        #   spawns with them server-enabled and the doctrine never
+        #   fires them)
         # slot 4: not desired, enabled -> disable -> toggle (1 CDP)
-        assert fake_cdp._sent_methods.count("Runtime.evaluate") == 3
+        assert fake_cdp._sent_methods.count("Runtime.evaluate") == 4
 
     def test_disables_undesired_slots(self, fake_env: FakeEnv) -> None:
         """Disables combat slots not in desired list."""
@@ -61,17 +65,18 @@ class TestApplyEquipment:
         # Set all slots to enabled so we can test disabling
         update_inventory_from_toggle(bot.world, [True, True, True, True, True])
         apply_equipment(bot, [5])
-        # Should disable slots 1, 2, 4 (3 CDP calls)
-        assert fake_cdp._sent_methods.count("Runtime.evaluate") == 3
+        # Should disable slots 1, 2, 3, 4 (4 CDP calls)
+        assert fake_cdp._sent_methods.count("Runtime.evaluate") == 4
 
     def test_skips_already_correct_state(self, fake_env: FakeEnv) -> None:
         """No toggles when equipment already matches desired state."""
         bot, fake_cdp = _make_bot(fake_env)
-        # Set inventory to match: 1=off, 2=on, 4=off, 5=on
-        update_inventory_from_toggle(bot.world, [False, True, True, False, True])
+        # Set inventory to match: 1=off, 2=on, 3=off, 4=off, 5=on
+        update_inventory_from_toggle(bot.world, [False, True, False, False, True])
         apply_equipment(bot, [2, 5])
         # slot 1: not in desired, already disabled -> no toggle
         # slot 2: in desired, already enabled -> no toggle
+        # slot 3: not in desired, already disabled -> no toggle
         # slot 4: not in desired, already disabled -> no toggle
         assert len(fake_cdp._sent_methods) == 0
 
@@ -112,8 +117,8 @@ class TestExecute:
             desired_equipment=[5],
         )
         execute(bot, decision, _make_snapshot())
-        # Equipment toggles (disable 1, 2, 4) + move command
-        assert len(fake_cdp._sent_methods) == 4
+        # Equipment toggles (disable 1, 2, 3, 4) + move command
+        assert len(fake_cdp._sent_methods) == 5
 
     def test_execute_hold_records_no_decision(self, fake_env: FakeEnv) -> None:
         """A hold decision produces no ledger decision record."""

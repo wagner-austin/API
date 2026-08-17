@@ -105,7 +105,7 @@ class TestBotAIIntegration:
         and aborts on read 2, keeping the tick shallow; the second
         tick must not re-enforce.
         """
-        from tankpit_bot._test_hooks import AutoscrollPageProtocol
+        from tankpit_bot._test_hooks import CDPSessionProtocol, PageWaitProtocol
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_body import _tick_once
         from tankpit_bot.state.types import WorldStateDict
@@ -159,11 +159,12 @@ class TestBotAIIntegration:
         calls: list[int] = []
 
         def _recorder(
-            page: AutoscrollPageProtocol,
+            page: PageWaitProtocol,
+            cdp: CDPSessionProtocol,
             messages: list[CapturedMessage],
             ws: WorldService,
         ) -> None:
-            del page, messages, ws
+            del page, cdp, messages, ws
             calls.append(1)
 
         original = browser_hooks.ensure_autoscroll_off
@@ -172,6 +173,7 @@ class TestBotAIIntegration:
             bot = SpawnedOnceBot("https://test.tankpit.com/", headless=True)
             session = FakeCDPSession()
             bot._page = FakePage(session)
+            bot._cdp = session
 
             _tick_once(bot)
             assert calls == [1]

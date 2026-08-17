@@ -59,23 +59,21 @@ def test_fuel_probe_replay_enters_collect_mode(
     assert "COLLECT" in modes
 
 
-def test_fuel_probe_replay_routes_the_stocked_session_into_the_quad_sweep(
+def test_fuel_probe_replay_routes_the_stocked_session_into_collection(
     fuel_probe_session: ReplaySession,
 ) -> None:
-    """Replay routes the extras-stocked wire input into quad-sweep recon.
+    """Replay routes the stocked wire input into known-stock pickups.
 
-    Re-pinned 2026-08-06 ([[quad-sweep-doctrine]]): the recorded
-    session's wire restocks extras early, and the new COLLECT cascade
-    then spends ticks on the atomic block sweep BEFORE any pickup.
-    The pre-doctrine pin (an ``equipment@`` resource target) cannot
-    recur in replay: synthetic commands never perturb the recorded
-    stream, so the sweep's scope shifts are answered by nothing and
-    the pickup phase stays out of reach. The invariant kept here is
-    decision ROUTING: the sweep engages (scope-shift dispatches) and
-    every tick stays in COLLECT.
+    Re-pinned 2026-08-06 (sweep-first: every tick became a scope
+    shift replay could never answer) and again 2026-08-13 with the
+    recon reorder (HUD flags 8/9/14, known stock preempts scanning):
+    the recorded session's containers are now COLLECTED -- pickup
+    dispatches engage -- instead of being scanned past. The invariant
+    kept here is decision ROUTING: pickups fire on the recorded stock
+    and every tick stays in COLLECT.
     """
     commands = {cmd for _tick, cmd in fuel_probe_session.all_dispatched}
-    assert any(cmd.startswith("scope(") for cmd in commands)
+    assert any(cmd.startswith("pickup_") for cmd in commands)
     assert all(t.ai_mode in ("UNSET", "COLLECT") for t in fuel_probe_session.ticks)
 
 
