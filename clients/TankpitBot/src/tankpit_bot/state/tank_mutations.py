@@ -434,10 +434,47 @@ def remove_tank(
     return state
 
 
+def depart_tank(
+    state: WorldStateDict,
+    tank_id: int,
+) -> WorldStateDict:
+    """Delete a tank the 0x29 TankExit announced has left the game.
+
+    0x29 is NOT 0x58: TankRemove is per-client tracking churn
+    (deliberately a no-op above), while TankExit is the server's
+    room-wide announcement that the tank LEFT or was ELIMINATED --
+    the same signal that renders the "left the game" client banner.
+    Ghost precedent (run arterial 2026-08-13 23:39-23:43, flag
+    s11-6): the 0x29 for Artax arrived at 23:39:17, was dropped as a
+    diagnostic-only event, and the registry ghost then powered a
+    ~75 s map-open/teleport/shoot chase until a shot's err=3
+    friendly-fire receipt said the same thing the wire already had.
+    Deleting the entry ends every downstream pursuit at once:
+    ``analyze_threats`` and ``find_locked_target_pursuit`` both read
+    the registry, so the lock releases through the existing
+    gone-from-registry path, and a rejoin (same id, fresh session)
+    re-adds the tank via its first observation.
+
+    Args:
+        state: Current world state.
+        tank_id: Tank ID the server announced the exit for.
+
+    Returns:
+        World state without the departed tank's registry entry (the
+        input state unchanged when the id was not tracked).
+    """
+    key = str(tank_id)
+    if key not in state["tanks"]:
+        return state
+    remaining = {tid: tank for tid, tank in state["tanks"].items() if tid != key}
+    return WorldStateDict(**{**state, "tanks": remaining})
+
+
 __all__ = [
     "MAP_POSITION_DEFER_MS",
     "apply_tank_observation",
     "deactivate_tank",
+    "depart_tank",
     "remove_tank",
     "set_tank_last_aim",
 ]
