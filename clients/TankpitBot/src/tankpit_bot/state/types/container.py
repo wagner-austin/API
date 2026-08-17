@@ -38,6 +38,7 @@ _FACT_SOURCE_BY_REFRESH_KIND: dict[ContainerRefreshKind, FactSource] = {
     "radar_known_resources": "wire_0x4F_radar_response",
     "viewport_patch": "wire_0x5A_viewport_patch",
     "world_state": "wire_0x4C_map_data",
+    "fleet_report": "fleet_report",
 }
 
 
