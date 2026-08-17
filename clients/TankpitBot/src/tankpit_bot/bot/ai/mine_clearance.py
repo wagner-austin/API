@@ -223,18 +223,59 @@ def find_service_clearance_aim(
     return best
 
 
+def _fuel_clearance_worthwhile(
+    container: ContainerStateDict,
+    self_state: SelfStateDict,
+    *,
+    fuel_deficit: int,
+    fuel_gain_per_walk_tile: int,
+) -> bool:
+    """Return True when exposing a fuel container would pay its shot.
+
+    Prices the ACTUAL transfer, not the container's volume: the
+    server clamps a pickup to ``min(volume, deficit)``, so an
+    852-volume container at deficit 18 buys an 18-fuel sip — run
+    bot-20260813-195231 (HUD flag 4) spent two clearance shots
+    exposing exactly such containers, then refused them every tick as
+    "not worth the walk". A clearance shot must clear the same
+    worth-the-walk rate the exposed pickup will face, plus the
+    absolute dreg floor (:data:`_MIN_CLEARANCE_FUEL_VOLUME`).
+
+    Args:
+        container: The candidate fuel container.
+        self_state: The bot's own state (position).
+        fuel_deficit: Current fuel headroom (``capacity - fuel``).
+        fuel_gain_per_walk_tile: The shared walk-pricing rate.
+
+    Returns:
+        True when the clamped transfer clears both floors.
+    """
+    effective_gain = min(container["volume"], fuel_deficit)
+    if effective_gain < _MIN_CLEARANCE_FUEL_VOLUME:
+        return False
+    walk_tiles = abs(container["x"] - self_state["x"]) + abs(container["y"] - self_state["y"])
+    return effective_gain >= fuel_gain_per_walk_tile * walk_tiles
+
+
 def _denied_containers(
     world: WorldStateDict,
+    self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None,
     hostile: dict[str, MineStateDict],
+    *,
+    fuel_deficit: int,
+    fuel_gain_per_walk_tile: int,
 ) -> tuple[list[tuple[ContainerStateDict, bool, bool]], set[tuple[int, int]]]:
     """Collect mine-denied containers in view and their candidate aims.
 
     Args:
         world: Current world state.
+        self_state: The bot's own state (position for gain pricing).
         terrain: Composed decision terrain; ``None`` disables the
             blocked-landing arm.
         hostile: Hostile mines indexed by ``"x,y"``.
+        fuel_deficit: Current fuel headroom (``capacity - fuel``).
+        fuel_gain_per_walk_tile: The shared walk-pricing rate.
 
     Returns:
         The (container, covered, blocked) triples for every worthwhile
@@ -248,7 +289,12 @@ def _denied_containers(
     for container_key, container in world["containers"].items():
         if not (left <= container["x"] <= right and top <= container["y"] <= bottom):
             continue
-        if container["is_fuel"] and container["volume"] < _MIN_CLEARANCE_FUEL_VOLUME:
+        if container["is_fuel"] and not _fuel_clearance_worthwhile(
+            container,
+            self_state,
+            fuel_deficit=fuel_deficit,
+            fuel_gain_per_walk_tile=fuel_gain_per_walk_tile,
+        ):
             continue
         covered = container_key in hostile
         blocked = terrain is not None and (
@@ -269,6 +315,9 @@ def find_mine_clearance_shot(
     world: WorldStateDict,
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None,
+    *,
+    fuel_deficit: int,
+    fuel_gain_per_walk_tile: int,
 ) -> tuple[int, int] | None:
     """Pick the mine whose clearance shot restores the most access.
 
@@ -281,20 +330,31 @@ def find_mine_clearance_shot(
     blocks occlude; water, mines, tanks, and containers never do).
     Aims are scored by how many denied containers the blast provably
     reopens — one free single can unlock several pickups at once —
-    with ties broken toward the nearest aim.
+    with ties broken toward the nearest aim. Fuel worth is priced by
+    the CLAMPED transfer (:func:`_fuel_clearance_worthwhile`), so a
+    near-cap tank never buys a shot for a sip it will then refuse.
 
     Args:
         world: Current world state.
         self_state: The bot's own state (position and rank).
         terrain: Composed decision terrain; ``None`` trusts wire
             patches alone and disables the blocked-landing arm.
+        fuel_deficit: Current fuel headroom (``capacity - fuel``).
+        fuel_gain_per_walk_tile: The shared walk-pricing rate.
 
     Returns:
         The best ``(x, y)`` aim tile, or ``None`` when no denied
         container in view has a shot that reopens it.
     """
     hostile = hostile_mines(world)
-    denied, aim_candidates = _denied_containers(world, terrain, hostile)
+    denied, aim_candidates = _denied_containers(
+        world,
+        self_state,
+        terrain,
+        hostile,
+        fuel_deficit=fuel_deficit,
+        fuel_gain_per_walk_tile=fuel_gain_per_walk_tile,
+    )
     best: tuple[int, int] | None = None
     best_key: tuple[int, int, int, int] | None = None
     for aim_x, aim_y in aim_candidates:
@@ -383,8 +443,85 @@ def find_corridor_clearance_shot(
     return None
 
 
+def _walk_candidate_distance(entry: tuple[int, ContainerStateDict]) -> int:
+    """Return the Manhattan distance a ranked walk-clearance entry carries."""
+    return entry[0]
+
+
+def find_walk_clearance_shot(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    terrain: TerrainMapProtocol | None,
+    *,
+    equipment_wanted: bool,
+    fuel_deficit: int,
+    fuel_gain_per_walk_tile: int,
+) -> tuple[int, int] | None:
+    """Pick the corridor mine whose shot opens a walk to wanted stock.
+
+    The COLLECT walk arm of the general trigger (HUD flags 3 and 6,
+    2026-08-13): corridor clearance existed only on the combat close
+    (:func:`find_corridor_clearance_shot` via ``combat_close``), so a
+    wanted in-viewport container whose WALK was mine-corked fell
+    through to the hop lanes and paid a teleport — run
+    bot-20260813-195231 teleported 42 fuel onto (51,135) after
+    shooting the mines COVERING containers but never the ones
+    blocking its path. A clearance single is free apart from the
+    tick, so when the straight corridor to the nearest wanted
+    container carries a shootable hostile mine, the shot fires and
+    next tick's walk-pickup serves the container for walk fuel alone.
+
+    Args:
+        world: Current world state.
+        self_state: The bot's own state.
+        terrain: Composed decision terrain; ``None`` trusts wire
+            patches alone.
+        equipment_wanted: Whether any equipment slot can still absorb.
+        fuel_deficit: Current fuel headroom (``capacity - fuel``).
+        fuel_gain_per_walk_tile: The shared walk-pricing rate.
+
+    Returns:
+        The nearest wanted container's first shootable corridor mine,
+        or ``None`` when no wanted in-viewport container has a
+        mine-corked straight corridor.
+    """
+    left, top, right, bottom = viewport_visible_bounds(world["viewport"])
+    sx, sy = self_state["x"], self_state["y"]
+    ranked: list[tuple[int, ContainerStateDict]] = []
+    for container in world["containers"].values():
+        cx, cy = container["x"], container["y"]
+        if not (left <= cx <= right and top <= cy <= bottom):
+            continue
+        if (cx, cy) == (sx, sy):
+            continue
+        if container["is_fuel"]:
+            if not _fuel_clearance_worthwhile(
+                container,
+                self_state,
+                fuel_deficit=fuel_deficit,
+                fuel_gain_per_walk_tile=fuel_gain_per_walk_tile,
+            ):
+                continue
+        elif not equipment_wanted:
+            continue
+        ranked.append((abs(cx - sx) + abs(cy - sy), container))
+    ranked.sort(key=_walk_candidate_distance)
+    for _distance, container in ranked:
+        aim = find_corridor_clearance_shot(
+            world,
+            self_state,
+            terrain,
+            container["x"],
+            container["y"],
+        )
+        if aim is not None:
+            return aim
+    return None
+
+
 __all__ = [
     "find_corridor_clearance_shot",
     "find_mine_clearance_shot",
     "find_service_clearance_aim",
+    "find_walk_clearance_shot",
 ]

@@ -14,7 +14,11 @@ from tankpit_bot.bot.ai.equipment_search import (
     find_equipment_candidates,
     find_fuel_candidates,
 )
-from tankpit_bot.bot.ai.mine_clearance import find_mine_clearance_shot
+from tankpit_bot.bot.ai.mine_clearance import (
+    find_mine_clearance_shot,
+    find_walk_clearance_shot,
+)
+from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -124,10 +128,31 @@ def mine_clearance_decision(
         base_state: AI state for the produced command.
 
     Returns:
-        Shoot decision at the covered container, or ``None`` when no
-        covered container in view has a clear line.
+        Shoot decision at the covered container, at the mine denying
+        its landing, or at the first corridor mine corking the walk
+        to wanted stock (HUD flags 3/6, 2026-08-13) — ``None`` when
+        no such shot exists.
     """
-    aim = find_mine_clearance_shot(ctx.filtered, ctx.self_state, ctx.terrain)
+    fuel_deficit = fuel_capacity(ctx.self_state["rank"]) - ctx.fuel
+    aim = find_mine_clearance_shot(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.terrain,
+        fuel_deficit=fuel_deficit,
+        fuel_gain_per_walk_tile=_FUEL_GAIN_PER_WALK_TILE,
+    )
+    if aim is None:
+        aim = find_walk_clearance_shot(
+            ctx.filtered,
+            ctx.self_state,
+            ctx.terrain,
+            equipment_wanted=(
+                equipment_pickup_refusal(inventory_counts(ctx.inventory), ctx.self_state["rank"])
+                is None
+            ),
+            fuel_deficit=fuel_deficit,
+            fuel_gain_per_walk_tile=_FUEL_GAIN_PER_WALK_TILE,
+        )
     if aim is None:
         return None
     aim_x, aim_y = aim
@@ -164,6 +189,20 @@ def mine_clearance_decision(
         ctx.equip,
     )
 
+
+_MIN_FUEL_SIP_GAIN = 25
+"""Smallest clamped transfer a fuel pickup dispatch is worth.
+
+Below this the pickup is choreography churn, not restocking: every
+dispatch costs a ~2 s tick and the transfer choreography another,
+so a sub-25 sip spends ~4 s moving less fuel than half a shot costs.
+Live receipt (HUD flag 3, run bot-20260813-195231 19:58): each
+6-fuel clearance-shot cost re-opened a 6-fuel deficit and the
+adjacent container was re-sipped between every shot -- shoot -6,
+drink +6, alternating for the whole clearance sequence. The floor is
+waived when the sip completes hunt readiness (fuel is the LAST bar,
+so topping to cap of any size stays legal — the hunt-only-when-full
+contract requires it)."""
 
 _FUEL_GAIN_PER_WALK_TILE = 3
 """Minimum effective fuel gained per tile of walking for a pickup to pay.
@@ -206,15 +245,29 @@ def pickup_not_worth_walk(
         container: The candidate fuel container.
 
     Returns:
-        True when ``min(volume, headroom)`` falls below
-        ``_FUEL_GAIN_PER_WALK_TILE`` per tile of Manhattan walk.
+        True when ``min(volume, headroom)`` falls below the walk
+        pricing or the minimum-sip floor, unless the sip completes
+        hunt readiness.
     """
     headroom = fuel_capacity(ctx.self_state["rank"]) - ctx.fuel
     effective_gain = min(container["volume"], headroom)
     walk_tiles = abs(container["x"] - ctx.self_state["x"]) + abs(
         container["y"] - ctx.self_state["y"]
     )
-    return effective_gain < _FUEL_GAIN_PER_WALK_TILE * walk_tiles
+    # The minimum-sip floor (HUD flag 3, 2026-08-13): near cap, every
+    # 6-fuel shot cost re-opened a 6-fuel deficit and the adjacent
+    # container got re-sipped between every clearance shot -- shoot
+    # -6, drink +6, four seconds a round trip. A sip below the floor
+    # is dispatch churn, not restocking -- UNLESS it is the last
+    # requirement before hunting (the hunt-only-when-full contract
+    # needs fuel exactly at cap, so a readiness-completing top-off of
+    # any size stays legal, mirroring the larder's deficit-completing
+    # waiver).
+    completes_hunt_readiness = effective_gain == headroom and hunt_entry_permitted(ctx)
+    if completes_hunt_readiness:
+        return False
+    floor = max(_MIN_FUEL_SIP_GAIN, _FUEL_GAIN_PER_WALK_TILE * walk_tiles)
+    return effective_gain < floor
 
 
 def _first_walkworthy_fuel(
