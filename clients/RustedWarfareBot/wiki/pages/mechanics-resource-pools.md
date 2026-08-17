@@ -22,7 +22,7 @@ source_paths:
   - ".game/assets/tilesets/misc.tsx:6"
   - ".game/assets/translations/Strings.properties:557"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-25"
+fact_checked: 2026-08-17
 confidence: high
 hubs: [game-mechanics, engine-internals]
 ---
@@ -83,7 +83,7 @@ Pools were chosen by distance from the base and nothing else, and that was too l
 
 **And now the other half.** The engine precomputes connected components per movement layer, so reachability is a comparison rather than a search, and the planner rejects a pool whose land component the builder's does not match ([[mechanics-movement-layers]]). On this map that is not a corner case: twelve of the forty-six pools sit in six island components no land unit can walk to, and distance-only selection would have aimed a builder at one of them as soon as the near ground filled.
 
-Extractors are also never upgraded. The catalogue prices a T2 and T3 tier for each, and the engine treats an upgrade as a distinct action from a build; nothing in the order path exercises it yet ([[building-structures]]).
+Extractor upgrades, once absent from the order path, now run every match: the income walk converts extractors up their tiers through produce-on-self orders, funded by the budget's saving pattern ([[policy-economy]]; `upgrade:extractorT2` appears on ordinary scorecards). The tier fork above T3 remains deliberately unwalked ([[mechanics-unit-value]]).
 
 And the fog filter over pools has never filtered anything, because fog is disabled on this map. That is now reported on every map scan rather than assumed, so a run where it starts mattering will say so ([[perception-visibility]]).
 

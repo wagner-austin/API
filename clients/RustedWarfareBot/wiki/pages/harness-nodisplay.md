@@ -13,7 +13,7 @@ source_paths:
   - "wiki/sources/m1-sandbox/sandbox-crash.log"
   - ".game/fallback64.bat"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-25"
+fact_checked: 2026-08-17
 confidence: high
 hubs: [headless-harness]
 ---
@@ -58,11 +58,11 @@ Every run rewrites `preferences.ini` in the directory it launches from — the e
 
 Starting a skirmish headless was the first question here, and `-sandbox` closed it: the engine loads `maps/skirmish/[z;p10]Crossing Large (10p).tmx` with no human, the same default the single-player menu wires to that button.[^13] It needs an explicit `-width`/`-height`, because the 10x10 display `-nodisplay` selects on its own fails once in-game UI renders ([[agent-render-callback-noop]]). The route this section originally proposed — driving the libRocket script bindings — turned out to be unnecessary for starting a game, though the same surface later supplied the order path and `Root.hostStart(boolean)` ([[issuing-orders]]).
 
-Two remain, each with a concrete test ([[engine-name-oracle]]).
+One remains, with a concrete test ([[engine-name-oracle]]).
 
 Clean self-termination has not been observed — the 35-second run was killed externally.[^2] The test: run a mission that can end, and check the process exit code.
 
-Faster-than-realtime ticking has not been attempted. The engine exposes `slower` and `faster` as bindable key actions, so a speed control exists; whether it is reachable without the UI is unknown.[^15] The test: locate the speed setter via the boot-log class mapping ([[engine-name-oracle]]) and call it from the agent.
+Faster-than-realtime ticking closed too: the agent's `fastForward=` argument multiplies the simulation clock, and every panel since the exact-timing era runs at 10x ([[policy-exact-timing]], [[harness-match-service]]). The `slower`/`faster` key bindings this section originally pointed at were never needed.[^15]
 
 [^1]: `.game/fallback64.bat` — `jvm64\bin\java -Xmx1000M -Dfile.encoding=UTF-8 -Djava.library.path=. -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -width 800 -height 600`. JVM version from `.game/jvm64/bin/java.exe -version` → "openjdk version 13 2019-09-17".
 [^2]: `wiki/sources/m0-probe/nodisplay-boot.log:309` — "----- Game init finished in:1322.0735 ms". The process was still alive at the 35 s kill. Build pinned at `wiki/sources/m0-probe/nodisplay-boot.log:12` — "Game Version: 1.15".

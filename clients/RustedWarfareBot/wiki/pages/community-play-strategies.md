@@ -13,7 +13,7 @@ sources:
   - "https://www.chaptercheats.com/cheat/pc/388370/rusted-warfare/hint/136775 (Text Walk Through)"
   - "https://steamcommunity.com/sharedfiles/filedetails/?id=3124371498 (How to win)"
 game_version: "community guides, various patches; claims unverified against 1.15 (code 176, build #28)"
-fact_checked: "2026-07-29"
+fact_checked: 2026-08-17
 confidence: low
 hubs: [game-mechanics, bot-architecture]
 ---
@@ -238,7 +238,8 @@ dip 2,450). Every arm still loses; what moved and what did not:[^8]
   2,050-9,100 — the fortification line kills 6-7k of their army
   *reliably*, which is the precondition the momentum strike window was
   shelved for ("no wave dies on our line" — [[policy-exact-timing]]). The
-  strike arm on top of this line is the next measurement.[^9]
+  strike arm was later measured on the champion at Impossible and closed:
+  -104 mean survival in the hands screen (imp-hands84, log 2026-08-08).[^9]
 - **Strike on the wall — NOT refuted; the run measured something else**
   (flame-strike, strike 5000, seed 12345): wiped 2,253, dip 2,050,
   marches 0. Corrected reading (the first version of this entry blamed
@@ -254,9 +255,11 @@ dip 2,450). Every arm still loses; what moved and what did not:[^8]
   of ~1,100 samples sit inside this noise band. Two consequences: every
   single-run comparison above carries that band, and the *consistency*
   claims (dips clustering 6-7k across varied conditions) are the robust
-  ones. Strike itself remains unmeasured on the champion; it also needs
-  ``rush 1`` to convert a release into a march — released units without
-  visible targets stand still ([[policy-exact-timing]], [[policy-combat]]).
+  ones. Strike was subsequently measured on the champion and closed at -104
+  (strike5, imp-hands84, log 2026-08-08); the mechanical note stands — it
+  needs ``rush 1`` to convert a release into a march, released units
+  without visible targets stand still ([[policy-exact-timing]],
+  [[policy-combat]]).
 - **The walking wall, refuted on the champion** (flame-creep, creep 50,
   seed 12345): wiped 2,769, dip 3,500 against the champion's 3,938 /
   6,200. Eleven thousand credits of advancing turrets and repair bays

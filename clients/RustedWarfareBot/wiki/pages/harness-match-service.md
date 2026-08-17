@@ -10,7 +10,7 @@ source_paths:
   - "../../libs/platform_workers/src/platform_workers/rq_harness.py"
   - "../../services/covenant-radar-api/docker-compose.yml"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-08-07"
+fact_checked: 2026-08-17
 confidence: high
 hubs: [headless-harness]
 ---
@@ -140,6 +140,11 @@ transaction -- ``FOR UPDATE SKIP LOCKED`` on jobs, and on leases the
 insert itself arbitrates; see the race below -- worker.py's
 claim-lease-play-finish loop over the unchanged harness seams), submitted
 through ``scripts.submit_batch`` and drained by ``scripts.match_worker``,
+whose loop exits after two consecutive empty polls by design -- a worker
+is a match player, not a daemon, so an idle fleet costs nothing. The
+operational consequence, learned across three restarts (logs 2026-08-14
+and -15): re-run ``make fleet-up`` after every submission that follows a
+drain, because the workers that finished the last batch are gone,
 against ``platform-postgres`` on the covenant compose stack. Rows carry the
 harness's own encoded config/match/job payloads and decode back through the
 same codecs a sweep file does; artifacts file exactly where sweeps file
