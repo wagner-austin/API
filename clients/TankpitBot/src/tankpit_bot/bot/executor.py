@@ -41,7 +41,14 @@ from tankpit_bot.state.types.coord import coord_key
 
 # Combat equipment slots that get toggled based on behavior mode.
 # Slot 5 (radar) is handled separately — always enabled when desired + stocked.
-_COMBAT_SLOTS: list[int] = [1, 2, 4]
+# Slot 3 (missiles) joined 2026-08-13: it was never MANAGED, so the
+# server's per-account default persisted — a fresh account (arterial)
+# spawned with missiles ENABLED while artax's older account state had
+# them off, and an enabled missile slot is consumed on occluded shots
+# (missiles fire over obstacles, [[game-rules]]). The doctrine never
+# desires slot 3, so managing it means always-disabled — uniform
+# across accounts.
+_COMBAT_SLOTS: list[int] = [1, 2, 3, 4]
 
 # Wire command type -> ledger action kind. ``hold`` dispatches nothing
 # and is deliberately absent -- it produces no attempt to correlate.
