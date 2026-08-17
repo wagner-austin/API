@@ -15,7 +15,7 @@ source_paths:
   - "agent/src/rwbot/agent/Targets.java"
   - "agent/src/rwbot/agent/ClassFilePatcher.java"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-25"
+fact_checked: 2026-08-17
 confidence: high
 hubs: [bot-architecture, headless-harness]
 ---

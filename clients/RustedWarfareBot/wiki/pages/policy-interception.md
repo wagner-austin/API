@@ -10,7 +10,7 @@ source_paths:
   - "src/rw_bot/policy/dispatch.py"
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:1189"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-29"
+fact_checked: 2026-08-17
 confidence: high
 hubs: [bot-architecture]
 ---

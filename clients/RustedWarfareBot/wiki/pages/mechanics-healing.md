@@ -11,7 +11,8 @@ source_paths:
   - "wiki/sources/m0-probe/printunits.log"
   - "wiki/sources/m17-community/namu-units.txt"
 game_version: "1.15 (code 176, build #28)"
-confidence: medium
+fact_checked: 2026-08-17
+
 hubs: [game-mechanics]
 ---
 

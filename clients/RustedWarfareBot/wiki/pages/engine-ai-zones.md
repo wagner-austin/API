@@ -26,7 +26,7 @@ source_paths:
   - "wiki/sources/m15-ai-zones/zone-dump-330s.txt"
   - "wiki/sources/m16-enums/enum-names.txt"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-26"
+fact_checked: 2026-08-17
 confidence: medium
 hubs: [engine-internals, game-mechanics]
 ---

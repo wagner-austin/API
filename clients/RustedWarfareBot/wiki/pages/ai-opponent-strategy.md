@@ -20,7 +20,7 @@ source_paths:
   - "wiki/sources/m14-ai/attack-group-staging.txt:73"
   - "wiki/sources/m13-expand/idle-after-plan.txt"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-26"
+fact_checked: 2026-08-17
 confidence: medium
 hubs: [engine-internals, bot-architecture]
 ---

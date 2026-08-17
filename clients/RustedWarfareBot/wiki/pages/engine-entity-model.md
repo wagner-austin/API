@@ -14,7 +14,7 @@ source_paths:
   - "wiki/sources/m4-entities/player-class.txt:18"
   - "wiki/sources/m4-entities/live-graph-search.txt:9"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-25"
+fact_checked: 2026-08-17
 confidence: high
 hubs: [engine-internals, game-mechanics]
 ---

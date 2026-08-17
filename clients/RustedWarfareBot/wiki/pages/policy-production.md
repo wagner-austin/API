@@ -17,7 +17,7 @@ source_paths:
   - "wiki/sources/m21-losses/where-units-die.txt"
   - "wiki/sources/m22-workers/worker-ceiling-ab.txt"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-26"
+fact_checked: 2026-08-17
 confidence: high
 hubs: [bot-architecture]
 ---

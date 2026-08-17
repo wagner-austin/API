@@ -14,7 +14,7 @@ source_paths:
   - "src/rw_bot/mechanics/combat_profile.py"
   - "src/rw_bot/mechanics/upgrades.py"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-27"
+fact_checked: 2026-08-17
 confidence: high
 hubs: [engine-internals, bot-architecture]
 ---

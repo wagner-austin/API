@@ -20,7 +20,7 @@ source_paths:
   - "src/rw_bot/policy/spending.py"
   - "scripts/play.py"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-27"
+fact_checked: 2026-08-17
 confidence: high
 hubs: [bot-architecture, game-mechanics]
 ---

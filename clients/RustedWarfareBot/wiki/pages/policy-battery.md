@@ -20,7 +20,7 @@ source_git_blobs:
   "src/rw_bot/policy/quartermaster.py": "2e82e5dc22e984e1096bad96dacfc2a4aaab86d0"
   "src/rw_bot/policy/convert.py": "6930c93a62cba09ebade77e6cbfa17516831ee8b"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-14
+fact_checked: 2026-08-17
 confidence: high
 hubs: [bot-architecture]
 ---
