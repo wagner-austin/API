@@ -32,6 +32,7 @@ from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
     PathStepDict,
 )
+from tankpit_bot.fleetshare.codecs import require_fleet_role
 from tankpit_bot.types.modes import (
     AI_MODES,
     AIMode,
@@ -281,6 +282,7 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "priority_target_name": config["priority_target_name"],
         "human_target_min_rank": config["human_target_min_rank"],
         "human_target_max_rank": config["human_target_max_rank"],
+        "role": config["role"],
     }
 
 
@@ -340,6 +342,7 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         priority_target_name=require_str(data, "priority_target_name"),
         human_target_min_rank=require_int(data, "human_target_min_rank"),
         human_target_max_rank=require_int(data, "human_target_max_rank"),
+        role=require_fleet_role(data, "role"),
     )
 
 

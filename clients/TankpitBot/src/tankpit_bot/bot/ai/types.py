@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing_extensions import TypedDict
 
+from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.types.modes import (
     AIMode,
     AIModeState,
@@ -98,6 +99,7 @@ class AIConfigDict(TypedDict):
     priority_target_name: str
     human_target_min_rank: int
     human_target_max_rank: int
+    role: FleetRole
 
 
 def make_default_ai_config() -> AIConfigDict:
@@ -122,6 +124,7 @@ def make_default_ai_config() -> AIConfigDict:
         priority_target_name="",
         human_target_min_rank=1,
         human_target_max_rank=8,
+        role="fighter",
     )
 
 

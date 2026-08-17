@@ -278,6 +278,12 @@ def hunt_entry_permitted(ctx: DecideCtx) -> bool:
     """
     from tankpit_bot.bot.config import resolve_weapon_resume_slack
 
+    if ctx.config["role"] == "gatherer":
+        # The doctrinal backstop of the router's role gate
+        # ([[fleet-coordination]]): a gatherer's ticks NEVER permit
+        # hunting, whatever its inventory says — every yield-to-hunt
+        # gesture funnels through this predicate.
+        return False
     rank = ctx.self_state["rank"]
     cap = inventory_capacity(rank)
     weapon_floor = max(0, cap - resolve_weapon_resume_slack())
