@@ -1,22 +1,19 @@
-"""One-shot HELLO greeting for any human known to be on the map.
+"""One-shot HELLO greeting on arrival in front of a human.
 
-User ruling 2026-07-31 (superseding the 2026-07-30 encounter trigger):
-"hello can run anytime... as long as the other player is on the map
-logged in. you dont have to be near them." Chat is global, so the
-HELLO fires for any map-fresh enemy human the bot has not yet
-greeted, wherever they are — the stand-off GREET VISIT ("we want to
-see them") is a separate obligation with its own latch
-(``visited_tank_ids``, ``hunt_acquire._greeting_approach``). The two
-were briefly one latch, and the first human-opponent sim soak proved
-that wrong: an early long-range HELLO burned the shared latch and the
-visit never happened.
+User ruling 2026-08-14 (superseding the 2026-07-31 greet-from-anywhere
+rule, which itself superseded the 2026-07-30 encounter trigger):
+"he's supposed to say hello AFTER teleporting to the human, when he's
+ready to engage, not way before." The HELLO is the face-to-face
+opener of an engagement — it fires on the tick the human stands in
+the bot's visible viewport, once per id. The stand-off GREET VISIT
+("we want to see them") keeps its own latch (``visited_tank_ids``,
+``hunt_acquire._greeting_approach``); the two were briefly one latch
+and the first human-opponent sim soak proved that wrong.
 
-"On the map logged in" is approximated by map freshness (the registry
-``timestamp_ms`` within the map-open cooldown — 0x4C map opens and
-the global 0x2E sync refresh it for every tank actually in the game).
-A departed player can linger in MapData (the Yuppler-ghost finding,
-2026-07-30), so a hello may occasionally go to a ghost — one wasted
-chat, bounded by the latch.
+Map freshness still bounds the scan (registry ``timestamp_ms`` within
+the map-open cooldown), and the viewport gate makes the Yuppler-ghost
+class of wasted hellos (2026-07-30: departed players lingering in
+MapData) structurally rare — a ghost is never IN the viewport.
 
 Flood-mute discipline ([[chat-messages]], sniff-20260729-214411: after
 8 rapid sends the server silently swallowed chat for the rest of the
@@ -36,17 +33,68 @@ from tankpit_bot.runtime_logging import (
     emit_ai,
     emit_diagnostic,
 )
+from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+
+
+def _nearest_ungreeted_viewport_human(
+    ctx: DecideCtx,
+    state: AIStateDict,
+) -> tuple[int, str]:
+    """Find the nearest map-fresh enemy human in view awaiting a hello.
+
+    The ARRIVAL gate (user ruling 2026-08-14, superseding the
+    2026-07-31 greet-from-anywhere rule): the hello is the
+    face-to-face opener, so a candidate must stand in the visible
+    viewport — the tick after the teleport that closed on them, when
+    the bot is genuinely ready to engage.
+
+    Args:
+        ctx: Decision context (registry lookup + self position).
+        state: The decision's updated AI state (greeted latch map).
+
+    Returns:
+        ``(tank_id, name)`` of the greeting target, or ``(-1, "")``
+        when no candidate qualifies this tick.
+    """
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    target_id = -1
+    target_name = ""
+    best_dist = 0
+    for tank in ctx.world["tanks"].values():
+        if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
+            continue
+        if tank["liveness"] != "alive":
+            continue
+        if not is_human_name(tank["name"]):
+            continue
+        if not (left <= tank["x"] <= right and top <= tank["y"] <= bottom):
+            continue
+        if str(tank["tank_id"]) in state["greeted_tank_ids"]:
+            continue
+        if ctx.timestamp_ms - tank["timestamp_ms"] > ctx.config["map_open_cooldown_ms"]:
+            continue
+        dist = abs(tank["x"] - sx) + abs(tank["y"] - sy)
+        if target_id == -1 or dist < best_dist:
+            target_id = tank["tank_id"]
+            target_name = tank["name"]
+            best_dist = dist
+    return (target_id, target_name)
 
 
 def attach_human_greeting(ctx: DecideCtx, decision: TickDecisionDict) -> TickDecisionDict:
     """Attach a one-shot HELLO when an ungreeted human is on the map.
 
     Scans the registry for alive, map-fresh enemy humans not yet in
-    the per-id greeted map and greets the nearest one —
-    distance never gates the hello (chat is global), it only breaks
-    ties when several humans are ungreeted at once. The greeting never
-    displaces a planned secondary command — those ticks skip, and the
-    unchanged latch retries on the next tick.
+    the per-id greeted map, IN THE VISIBLE VIEWPORT, and greets the
+    nearest one. The viewport gate is the arrival law (user ruling
+    2026-08-14: "he's supposed to say hello AFTER teleporting to the
+    human, when he's ready to engage, not way before" — superseding
+    the 2026-07-31 greet-from-anywhere ruling): the hello is the
+    face-to-face opener of an engagement, so it fires on the tick the
+    bot stands in front of them, not from across the map. The
+    greeting never displaces a planned secondary command — those
+    ticks skip, and the unchanged latch retries on the next tick.
 
     Args:
         ctx: Decision context (registry lookup + self position).
@@ -59,34 +107,7 @@ def attach_human_greeting(ctx: DecideCtx, decision: TickDecisionDict) -> TickDec
     state = decision["updated_ai_state"]
     if decision["secondary_command"] is not None:
         return decision
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    target_id = -1
-    target_name = ""
-    best_dist = 0
-    for tank in ctx.world["tanks"].values():
-        if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
-            continue
-        if tank["liveness"] != "alive":
-            continue
-        if not is_human_name(tank["name"]):
-            continue
-        # Deliberately NO position gate here. User ruling 2026-07-31:
-        # "hello can run anytime... as long as the other player is on
-        # the map logged in. you dont have to be near them." A human
-        # still at the login-roster (0, 0) default gets the HELLO the
-        # moment their identity broadcast lands; the distance below
-        # only orders who is greeted first, and every ungreeted human
-        # is greeted eventually. has_known_position gates targeting
-        # and the stand-off visit, never the chat.
-        if str(tank["tank_id"]) in state["greeted_tank_ids"]:
-            continue
-        if ctx.timestamp_ms - tank["timestamp_ms"] > ctx.config["map_open_cooldown_ms"]:
-            continue
-        dist = abs(tank["x"] - sx) + abs(tank["y"] - sy)
-        if target_id == -1 or dist < best_dist:
-            target_id = tank["tank_id"]
-            target_name = tank["name"]
-            best_dist = dist
+    target_id, target_name = _nearest_ungreeted_viewport_human(ctx, state)
     if target_id == -1:
         return decision
     emit_ai("greeting human %s (id=%d) with HELLO", target_name, target_id)
