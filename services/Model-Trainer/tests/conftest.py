@@ -97,7 +97,7 @@ def _reset_test_hooks_impl(
     # JSON hooks
     orig_dump_json_str = _test_hooks.dump_json_str
     # Orchestrator hooks
-    orig_tokenizer_enqueue_hook = _test_hooks.tokenizer_enqueue_hook
+    orig_tokenizer_enqueue = _test_hooks.tokenizer_enqueue
     # GPT2 backend hooks
     orig_load_prepared_gpt2_from_handle = _test_hooks.load_prepared_gpt2_from_handle
     # Platform core config hooks
@@ -170,7 +170,7 @@ def _reset_test_hooks_impl(
     # JSON hooks
     _test_hooks.dump_json_str = orig_dump_json_str
     # Orchestrator hooks
-    _test_hooks.tokenizer_enqueue_hook = orig_tokenizer_enqueue_hook
+    _test_hooks.tokenizer_enqueue = orig_tokenizer_enqueue
     # GPT2 backend hooks
     _test_hooks.load_prepared_gpt2_from_handle = orig_load_prepared_gpt2_from_handle
     # Platform core config hooks

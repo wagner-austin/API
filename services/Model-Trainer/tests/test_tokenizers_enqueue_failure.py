@@ -19,13 +19,13 @@ def test_tokenizers_enqueue_returns_none_results_in_500() -> None:
 
     _test_hooks.kv_store_factory = _fake_kv_factory
 
-    # Use hook to make orchestrator return None
+    # Rebind the seam to report the enqueue as failed
     def _enqueue_returns_none(
         orchestrator: TokenizerOrchestratorProto, req: TokenizerTrainRequest
     ) -> TokenizerTrainResponse | None:
         return None
 
-    _test_hooks.tokenizer_enqueue_hook = _enqueue_returns_none
+    _test_hooks.tokenizer_enqueue = _enqueue_returns_none
 
     app = create_app(load_settings())
     client = TestClient(app, raise_server_exceptions=False)

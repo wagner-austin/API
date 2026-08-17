@@ -818,10 +818,11 @@ class TokenizerOrchestratorProto(Protocol):
 
 
 class TokenizerEnqueueHookProto(Protocol):
-    """Protocol for tokenizer enqueue hook.
+    """Protocol for the tokenizer enqueue seam.
 
-    When set, this hook is called in place of normal enqueue_training logic.
-    Return None to simulate orchestrator failure that triggers API 500.
+    None is a real answer here, not an unset hook: the orchestrator returns
+    None when the enqueue fails, and the route turns that into a 500. A test
+    rebinds this to return None on demand to reach that path.
     """
 
     def __call__(
@@ -831,8 +832,24 @@ class TokenizerEnqueueHookProto(Protocol):
     ) -> TokenizerTrainResponse | None: ...
 
 
-# Tokenizer orchestrator hook - None means use default behavior
-tokenizer_enqueue_hook: TokenizerEnqueueHookProto | None = None
+def _default_tokenizer_enqueue(
+    orchestrator: TokenizerOrchestratorProto,
+    req: TokenizerTrainRequest,
+) -> TokenizerTrainResponse | None:
+    """Enqueue tokenizer training through the orchestrator.
+
+    Args:
+        orchestrator: Orchestrator to enqueue through.
+        req: Validated training request.
+
+    Returns:
+        The enqueue response, or None if the enqueue failed.
+    """
+    return orchestrator.enqueue_training(req)
+
+
+# Hook for the tokenizer enqueue. Tests rebind it to reach the failure path.
+tokenizer_enqueue: TokenizerEnqueueHookProto = _default_tokenizer_enqueue
 
 
 # ============================================================================

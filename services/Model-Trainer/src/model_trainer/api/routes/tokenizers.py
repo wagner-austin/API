@@ -38,9 +38,7 @@ def build_router(container: ServiceContainer) -> APIRouter:
             "vocab_size": req["vocab_size"],
         }
         _logger.info("tokenizers enqueue", extra=extra)
-        # Allow test hook to override orchestrator behavior
-        hook = _test_hooks.tokenizer_enqueue_hook
-        out = hook(orchestrator, req) if hook is not None else orchestrator.enqueue_training(req)
+        out = _test_hooks.tokenizer_enqueue(orchestrator, req)
         if out is None:
             raise AppError(
                 ModelTrainerErrorCode.TOKENIZER_TRAIN_FAILED,
