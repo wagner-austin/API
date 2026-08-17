@@ -126,7 +126,6 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 

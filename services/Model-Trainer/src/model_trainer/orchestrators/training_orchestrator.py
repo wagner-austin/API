@@ -107,7 +107,6 @@ class TrainingOrchestrator:
             "finetuning_strategy": req["finetuning_strategy"],
             "lora": req["lora"],
             "quantization": req["quantization"],
-            "unsloth": req["unsloth"],
             "gguf_export": req["gguf_export"],
         }
         payload: TrainJobPayload = {

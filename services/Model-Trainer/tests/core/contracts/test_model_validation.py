@@ -9,12 +9,9 @@ from model_trainer.core.contracts.model_validation import (
     _decode_lora_config,
     _decode_optional_lora_config,
     _decode_optional_quantization_config,
-    _decode_optional_unsloth_config,
     _decode_quantization_config,
-    _decode_unsloth_config,
     encode_lora_config,
     encode_quantization_config,
-    encode_unsloth_config,
 )
 
 
@@ -345,71 +342,6 @@ class TestEncodeQuantizationConfig:
         assert encoded == original
 
 
-class TestDecodeUnslothConfig:
-    """Tests for _decode_unsloth_config."""
-
-    def test_valid_unsloth_config(self) -> None:
-        """Test decoding a valid Unsloth config."""
-        data: JSONObject = {"enabled": True, "max_seq_length": 2048, "dtype": "float16"}
-        result = _decode_unsloth_config(data)
-        assert result["enabled"] is True
-        assert result["max_seq_length"] == 2048
-        assert result["dtype"] == "float16"
-
-    def test_null_dtype(self) -> None:
-        """Test that null dtype is accepted."""
-        data: JSONObject = {"enabled": True, "max_seq_length": 2048, "dtype": None}
-        result = _decode_unsloth_config(data)
-        assert result["dtype"] is None
-
-    def test_bfloat16_dtype(self) -> None:
-        """Test that bfloat16 dtype is accepted."""
-        data: JSONObject = {"enabled": True, "max_seq_length": 2048, "dtype": "bfloat16"}
-        result = _decode_unsloth_config(data)
-        assert result["dtype"] == "bfloat16"
-
-    def test_missing_enabled_raises(self) -> None:
-        """Test that missing enabled raises TypeError."""
-        data: JSONObject = {"max_seq_length": 2048, "dtype": None}
-        with pytest.raises(TypeError, match="Missing required field 'enabled'"):
-            _decode_unsloth_config(data)
-
-    def test_invalid_max_seq_length_raises(self) -> None:
-        """Test that non-int max_seq_length raises TypeError."""
-        data: JSONObject = {"enabled": True, "max_seq_length": "2048", "dtype": None}
-        with pytest.raises(TypeError, match="Field 'max_seq_length' must be an integer"):
-            _decode_unsloth_config(data)
-
-    def test_max_seq_length_less_than_one_raises(self) -> None:
-        """Test that max_seq_length < 1 raises ValueError."""
-        data: JSONObject = {"enabled": True, "max_seq_length": 0, "dtype": None}
-        with pytest.raises(ValueError, match="max_seq_length must be >= 1"):
-            _decode_unsloth_config(data)
-
-    def test_invalid_dtype_raises(self) -> None:
-        """Test that invalid dtype raises ValueError."""
-        data: JSONObject = {"enabled": True, "max_seq_length": 2048, "dtype": "float32"}
-        with pytest.raises(ValueError, match="dtype must be"):
-            _decode_unsloth_config(data)
-
-    def test_non_string_dtype_raises(self) -> None:
-        """Test that non-string/non-null dtype raises TypeError."""
-        data: JSONObject = {"enabled": True, "max_seq_length": 2048, "dtype": 16}
-        with pytest.raises(TypeError, match="dtype must be string or null"):
-            _decode_unsloth_config(data)
-
-
-class TestEncodeUnslothConfig:
-    """Tests for encode_unsloth_config."""
-
-    def test_encode_roundtrip(self) -> None:
-        """Test encoding and decoding produces same values."""
-        original: JSONObject = {"enabled": True, "max_seq_length": 2048, "dtype": "float16"}
-        decoded = _decode_unsloth_config(original)
-        encoded = encode_unsloth_config(decoded)
-        assert encoded == original
-
-
 class TestDecodeOptionalConfigs:
     """Tests for optional config decoders."""
 
@@ -471,27 +403,3 @@ class TestDecodeOptionalConfigs:
         data: JSONObject = {"quantization": [1, 2, 3]}
         with pytest.raises(TypeError, match="quantization must be dict or null"):
             _decode_optional_quantization_config(data)
-
-    def test_optional_unsloth_none(self) -> None:
-        """Test that missing unsloth key returns None."""
-        data: JSONObject = {"other": "value"}
-        result = _decode_optional_unsloth_config(data)
-        assert result is None
-
-    def test_optional_unsloth_valid(self) -> None:
-        """Test that valid unsloth dict is decoded."""
-        unsloth_obj: JSONObject = {
-            "enabled": True,
-            "max_seq_length": 2048,
-            "dtype": "float16",
-        }
-        data: JSONObject = {"unsloth": unsloth_obj}
-        result = _decode_optional_unsloth_config(data)
-        expected = _decode_unsloth_config(unsloth_obj)
-        assert result == expected
-
-    def test_optional_unsloth_invalid_type_raises(self) -> None:
-        """Test that non-dict unsloth raises TypeError."""
-        data: JSONObject = {"unsloth": 123}
-        with pytest.raises(TypeError, match="unsloth must be dict or null"):
-            _decode_optional_unsloth_config(data)

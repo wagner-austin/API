@@ -1,7 +1,7 @@
 """Tests for queue_encoding module.
 
 Tests encode/decode functions for LoraConfig, QuantizationConfig,
-UnslothConfig, and TrainRequestPayload with full branch coverage.
+and TrainRequestPayload with full branch coverage.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 from model_trainer.core.contracts.model import (
     LoraConfig,
     QuantizationConfig,
-    UnslothConfig,
 )
 from model_trainer.core.contracts.queue import TrainJobPayload, TrainRequestPayload
 from model_trainer.core.contracts.queue_encoding import (
@@ -20,12 +19,10 @@ from model_trainer.core.contracts.queue_encoding import (
     decode_quantization_config,
     decode_train_job_payload,
     decode_train_request_payload,
-    decode_unsloth_config,
     encode_lora_config,
     encode_quantization_config,
     encode_train_job_payload,
     encode_train_request_payload,
-    encode_unsloth_config,
 )
 
 
@@ -210,59 +207,6 @@ class TestQuantizationConfigEncoding:
             )
 
 
-class TestUnslothConfigEncoding:
-    """Tests for UnslothConfig encode/decode functions."""
-
-    def test_encode_unsloth_config_roundtrip_with_dtype(self) -> None:
-        """Test roundtrip with explicit dtype."""
-        config: UnslothConfig = {
-            "enabled": True,
-            "max_seq_length": 2048,
-            "dtype": "float16",
-        }
-        encoded = encode_unsloth_config(config)
-        decoded = decode_unsloth_config(encoded)
-
-        assert decoded["enabled"] is True
-        assert decoded["max_seq_length"] == 2048
-        assert decoded["dtype"] == "float16"
-
-    def test_encode_unsloth_config_roundtrip_with_none_dtype(self) -> None:
-        """Test roundtrip with None dtype (auto-detect)."""
-        config: UnslothConfig = {
-            "enabled": True,
-            "max_seq_length": 4096,
-            "dtype": None,
-        }
-        encoded = encode_unsloth_config(config)
-        decoded = decode_unsloth_config(encoded)
-
-        assert decoded["enabled"] is True
-        assert decoded["max_seq_length"] == 4096
-        assert decoded["dtype"] is None
-
-    def test_decode_unsloth_config_all_dtypes(self) -> None:
-        """Test decoding all valid dtype values including None."""
-        for dtype in ("float16", "bfloat16", None):
-            encoded: JSONObject = {
-                "enabled": True,
-                "max_seq_length": 2048,
-                "dtype": dtype,
-            }
-            decoded = decode_unsloth_config(encoded)
-            assert decoded["dtype"] == dtype
-
-    def test_decode_unsloth_config_invalid_dtype_type(self) -> None:
-        """Test that non-string dtype raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match=r"dtype.*must be a string or null"):
-            decode_unsloth_config({"enabled": True, "max_seq_length": 2048, "dtype": 123})
-
-    def test_decode_unsloth_config_invalid_dtype_value(self) -> None:
-        """Test that invalid dtype value raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match=r"dtype.*must be 'float16', 'bfloat16', or null"):
-            decode_unsloth_config({"enabled": True, "max_seq_length": 2048, "dtype": "float64"})
-
-
 class TestTrainRequestPayloadEncoding:
     """Tests for TrainRequestPayload encode/decode functions."""
 
@@ -295,7 +239,6 @@ class TestTrainRequestPayloadEncoding:
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         }
 
@@ -310,7 +253,6 @@ class TestTrainRequestPayloadEncoding:
         assert decoded["finetuning_strategy"] == "full"
         assert decoded["lora"] is None
         assert decoded["quantization"] is None
-        assert decoded["unsloth"] is None
 
     def test_roundtrip_preserves_the_loss_mask_separator(self) -> None:
         """Whitespace in the separator is significant, so it must survive the
@@ -386,34 +328,6 @@ class TestTrainRequestPayloadEncoding:
             "bnb_4bit_quant_type": "nf4",
         }
 
-    def test_encode_decode_roundtrip_with_unsloth(self) -> None:
-        """Test roundtrip with unsloth config."""
-        payload = self._make_minimal_payload()
-        payload["finetuning_strategy"] = "unsloth"
-        payload["lora"] = {
-            "enabled": True,
-            "r": 8,
-            "lora_alpha": 16,
-            "lora_dropout": 0.0,
-            "target_modules": ("q_proj",),
-            "bias": "none",
-        }
-        payload["unsloth"] = {
-            "enabled": True,
-            "max_seq_length": 4096,
-            "dtype": "bfloat16",
-        }
-
-        encoded = encode_train_request_payload(payload)
-        decoded = decode_train_request_payload(encoded)
-
-        unsloth = decoded["unsloth"]
-        assert unsloth == {
-            "enabled": True,
-            "max_seq_length": 4096,
-            "dtype": "bfloat16",
-        }
-
     def test_decode_all_model_families(self) -> None:
         """Test decoding all valid model family values."""
         for family in ("gpt2", "llama", "qwen", "char_lstm", "hf_lm"):
@@ -476,7 +390,7 @@ class TestTrainRequestPayloadEncoding:
 
     def test_decode_all_finetuning_strategies(self) -> None:
         """Test decoding all valid finetuning strategy values."""
-        for strategy in ("full", "lora", "qlora", "unsloth"):
+        for strategy in ("full", "lora", "qlora"):
             encoded = encode_train_request_payload(self._make_minimal_payload())
             encoded["finetuning_strategy"] = strategy
             decoded = decode_train_request_payload(encoded)
@@ -516,13 +430,6 @@ class TestTrainRequestPayloadEncoding:
         encoded = encode_train_request_payload(self._make_minimal_payload())
         encoded["quantization"] = []
         with pytest.raises(JSONTypeError, match=r"quantization.*must be an object or null"):
-            decode_train_request_payload(encoded)
-
-    def test_decode_unsloth_not_dict(self) -> None:
-        """Test that non-dict unsloth field raises JSONTypeError."""
-        encoded = encode_train_request_payload(self._make_minimal_payload())
-        encoded["unsloth"] = 123
-        with pytest.raises(JSONTypeError, match=r"unsloth.*must be an object or null"):
             decode_train_request_payload(encoded)
 
     def test_encode_preserves_all_fields(self) -> None:
@@ -573,7 +480,6 @@ class TestTrainJobPayloadEncoding:
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         }
 

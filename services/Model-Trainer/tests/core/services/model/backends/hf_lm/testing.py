@@ -244,7 +244,6 @@ def make_test_config(
         "hub_model_id": hub_model_id,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 

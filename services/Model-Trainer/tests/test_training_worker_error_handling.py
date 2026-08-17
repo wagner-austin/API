@@ -101,7 +101,6 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }
@@ -193,7 +192,6 @@ def test_process_train_job_logs_redis_error_on_handle_error(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }

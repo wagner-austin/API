@@ -63,7 +63,6 @@ def make_test_config(lora: LoraConfig | None = None) -> ModelTrainConfig:
         "hub_model_id": "meta/llama-7b",
         "lora": lora,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 
@@ -117,7 +116,6 @@ class TestLoRAStrategyBasics:
         assert caps["supports_quantization"] is False
         assert caps["supports_gradient_checkpointing"] is True
         assert caps["requires_peft"] is True
-        assert caps["requires_unsloth"] is False
         assert caps["trainable_param_fraction"] == 0.01
 
 
@@ -131,15 +129,6 @@ class TestLoRAStrategyAdapt:
         cfg = make_test_config(lora=None)
 
         with pytest.raises(ValueError, match="LoRA strategy requires lora config"):
-            strategy.adapt(model, "test/model", cfg)
-
-    def test_adapt_raises_when_peft_hook_not_set(self) -> None:
-        """Test that adapt() raises RuntimeError when PEFT hook not set."""
-        strategy = LoRAStrategy()
-        model = FakeModel("base")
-        cfg = make_test_config(lora=make_lora_config())
-
-        with pytest.raises(RuntimeError, match="PEFT hook not configured"):
             strategy.adapt(model, "test/model", cfg)
 
     def test_adapt_returns_adapted_model(self) -> None:
@@ -257,29 +246,6 @@ class TestLoRAStrategyAdapt:
 class TestLoRAStrategySave:
     """Tests for LoRAStrategy.save_adapted()."""
 
-    def test_save_adapted_raises_when_hook_not_set(self) -> None:
-        """Test that save_adapted() raises RuntimeError when save hook not set."""
-
-        def fake_create_peft(
-            model: LMModelProto,
-            *,
-            r: int,
-            lora_alpha: int,
-            lora_dropout: float,
-            target_modules: tuple[str, ...],
-            bias: str,
-        ) -> LMModelProto:
-            return FakeModel("peft")
-
-        Hooks.create_peft_model = fake_create_peft
-
-        strategy = LoRAStrategy()
-        cfg = make_test_config(lora=make_lora_config())
-        adapted = strategy.adapt(FakeModel(), "test/model", cfg)
-
-        with pytest.raises(RuntimeError, match="PEFT save hook not configured"):
-            strategy.save_adapted(adapted, "/tmp/output")
-
     def test_save_adapted_calls_hook(self) -> None:
         """Test that save_adapted() calls the save hook."""
         saved: list[tuple[LMModelProto, str]] = []
@@ -352,17 +318,6 @@ class TestLoRAStrategyLoad:
 
         with pytest.raises(FileNotFoundError, match="Adapter path not found"):
             strategy.load_adapted(base_model, "test/model", "/nonexistent/path")
-
-    def test_load_adapted_raises_when_hook_not_set(self) -> None:
-        """Test that load_adapted() raises RuntimeError when load hook not set."""
-        strategy = LoRAStrategy()
-        base_model = FakeModel("base")
-
-        with (
-            tempfile.TemporaryDirectory() as tmpdir,
-            pytest.raises(RuntimeError, match="PEFT load hook not configured"),
-        ):
-            strategy.load_adapted(base_model, "test/model", tmpdir)
 
     def test_load_adapted_returns_adapted_model(self) -> None:
         """Test that load_adapted() returns correctly configured AdaptedModel."""

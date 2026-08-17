@@ -136,7 +136,6 @@ def test_unavailable_backend_all_methods_raise() -> None:
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     s = load_settings()

@@ -88,7 +88,6 @@ def test_gpt2_prepare_from_artifact(tmp_path: Path, settings_factory: _SettingsF
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     prepared = prepare_gpt2_with_handle(tok_handle, cfg)
@@ -148,7 +147,6 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 
@@ -246,7 +244,6 @@ def test_gpt2_prepare_raises_when_tokenizer_none() -> None:
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     with pytest.raises(ValueError, match="tokenizer is required for gpt2 backend"):
@@ -282,7 +279,6 @@ def test_gpt2_prepare_raises_when_tokenizer_id_none() -> None:
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     with pytest.raises(ValueError, match="tokenizer_id is required for gpt2 backend"):
@@ -326,7 +322,6 @@ def test_gpt2_evaluate_raises_when_tokenizer_id_none(
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     with pytest.raises(ValueError, match="tokenizer_id is required for gpt2 backend"):

@@ -490,7 +490,6 @@ def test_training_worker_loads_pretrained_model(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }
@@ -706,7 +705,6 @@ def test_training_worker_hf_lm_with_tokenizer_id_none(
                 bias="none",
             ),
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }
@@ -900,7 +898,6 @@ def test_continued_training_downloads_artifacts_when_absent_locally(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }

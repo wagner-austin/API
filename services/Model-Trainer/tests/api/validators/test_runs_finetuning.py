@@ -90,37 +90,6 @@ class TestFinetuningStrategy:
         assert out["finetuning_strategy"] == "qlora"
         assert out["lora"] is not None and out["quantization"] is not None
 
-    def test_strategy_unsloth_requires_lora_config(self) -> None:
-        """Test unsloth strategy requires lora config."""
-        payload = _base_hf_lm_payload()
-        payload["finetuning_strategy"] = "unsloth"
-        with pytest.raises(AppError) as exc:
-            _ = _decode_train_request(payload)
-        err: AppError[ErrorCode] = exc.value
-        assert err.http_status == 400
-        assert "lora config is required" in str(err.message)
-
-    def test_strategy_unsloth_requires_unsloth_config(self) -> None:
-        """Test unsloth strategy requires unsloth config."""
-        payload = _base_hf_lm_payload()
-        payload["finetuning_strategy"] = "unsloth"
-        payload["lora"] = {"r": 16}
-        with pytest.raises(AppError) as exc:
-            _ = _decode_train_request(payload)
-        err: AppError[ErrorCode] = exc.value
-        assert err.http_status == 400
-        assert "unsloth config is required" in str(err.message)
-
-    def test_strategy_unsloth_with_configs(self) -> None:
-        """Test unsloth strategy with valid configs."""
-        payload = _base_hf_lm_payload()
-        payload["finetuning_strategy"] = "unsloth"
-        payload["lora"] = {"r": 16}
-        payload["unsloth"] = {"max_seq_length": 2048}
-        out = _decode_train_request(payload)
-        assert out["finetuning_strategy"] == "unsloth"
-        assert out["lora"] is not None and out["unsloth"] is not None
-
     def test_strategy_invalid_value(self) -> None:
         """Test invalid finetuning_strategy value."""
         payload = _base_hf_lm_payload()

@@ -95,7 +95,6 @@ def process_eval_job(payload: EvalJobPayload) -> None:
             "hub_model_id": None,
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         }
 

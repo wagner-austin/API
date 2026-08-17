@@ -1,7 +1,7 @@
 """HuggingFace Language Model backend.
 
 This backend loads pretrained models from HuggingFace Hub via hub_model_id
-and applies finetuning strategies (full, lora, qlora, unsloth).
+and applies finetuning strategies (full, lora, qlora).
 
 Note: Imports are done at function call time to avoid circular imports
 with BaseTrainer. Use direct imports from submodules when needed:

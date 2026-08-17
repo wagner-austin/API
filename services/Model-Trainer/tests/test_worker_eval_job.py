@@ -139,7 +139,6 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     tok_handle = BPEBackend().load(str(tok_dir / "tokenizer.json"))

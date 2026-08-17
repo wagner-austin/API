@@ -99,7 +99,7 @@ class TestRequireFineTuningStrategy:
 
     def test_returns_all_valid_strategies(self) -> None:
         """Test that all valid strategy names are accepted."""
-        for strategy in ("full", "lora", "qlora", "unsloth"):
+        for strategy in ("full", "lora", "qlora"):
             cfg = make_test_config(finetuning_strategy=strategy)
             result = _require_finetuning_strategy(cfg)
             assert result == strategy

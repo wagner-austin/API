@@ -346,7 +346,7 @@ def hf_lm_backend_funcs() -> BackendFuncs:
     """Get function references for HuggingFace LM backend.
 
     This backend loads pretrained models from HuggingFace Hub via hub_model_id
-    and applies finetuning strategies (full, lora, qlora, unsloth).
+    and applies finetuning strategies (full, lora, qlora).
     """
     from .backends.hf_lm.evaluate import evaluate_hf_lm
     from .backends.hf_lm.generate import generate_hf_lm

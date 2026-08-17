@@ -70,7 +70,6 @@ class LoRAStrategy:
             supports_quantization=False,
             supports_gradient_checkpointing=True,
             requires_peft=True,
-            requires_unsloth=False,
             trainable_param_fraction=0.01,  # Approximate: varies by rank
         )
 
@@ -92,18 +91,11 @@ class LoRAStrategy:
 
         Raises:
             ValueError: If LoRA config is missing.
-            RuntimeError: If PEFT library hook is not set.
         """
         lora_cfg = _require_lora_config(cfg)
 
-        if Hooks.create_peft_model is None:
-            raise RuntimeError(
-                "PEFT hook not configured. Set Hooks.create_peft_model to use LoRA strategy."
-            )
-
         # Enable gradient checkpointing for memory efficiency if available
-        if Hooks.enable_gradient_checkpointing is not None:
-            Hooks.enable_gradient_checkpointing(model)
+        Hooks.enable_gradient_checkpointing(model)
 
         peft_model = Hooks.create_peft_model(
             model,
@@ -136,11 +128,7 @@ class LoRAStrategy:
             out_dir: Output directory path.
 
         Raises:
-            RuntimeError: If PEFT save hook is not set.
         """
-        if Hooks.save_peft_model is None:
-            raise RuntimeError("PEFT save hook not configured. Set Hooks.save_peft_model.")
-
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         Hooks.save_peft_model(adapted.model, out_dir)
 
@@ -162,13 +150,9 @@ class LoRAStrategy:
 
         Raises:
             FileNotFoundError: If adapter_path does not exist.
-            RuntimeError: If PEFT load hook is not set.
         """
         if not Path(adapter_path).exists():
             raise FileNotFoundError(f"Adapter path not found: {adapter_path}")
-
-        if Hooks.load_peft_model is None:
-            raise RuntimeError("PEFT load hook not configured. Set Hooks.load_peft_model.")
 
         loaded_model = Hooks.load_peft_model(base_model, adapter_path)
 

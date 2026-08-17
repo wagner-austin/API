@@ -1,7 +1,7 @@
 """HuggingFace LM model preparation with finetuning strategy support.
 
 Loads pretrained models from HuggingFace Hub and applies the configured
-finetuning strategy (full, lora, qlora, unsloth).
+finetuning strategy (full, lora, qlora).
 """
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ def prepare_hf_lm_with_handle(
     """Prepare a HuggingFace LM model for training.
 
     Loads a pretrained model from HuggingFace Hub and applies the configured
-    finetuning strategy (full, lora, qlora, unsloth).
+    finetuning strategy (full, lora, qlora).
 
     The tokenizer parameter is optional for HF LM models because the tokenizer
     is loaded from hub_model_id. The parameter is accepted for protocol

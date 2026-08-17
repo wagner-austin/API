@@ -47,7 +47,6 @@ class FullFineTuneStrategy:
             supports_quantization=False,
             supports_gradient_checkpointing=True,
             requires_peft=False,
-            requires_unsloth=False,
             trainable_param_fraction=1.0,
         )
 
@@ -71,8 +70,7 @@ class FullFineTuneStrategy:
             AdaptedModel wrapping the original model.
         """
         # Enable gradient checkpointing for memory efficiency if hook is set
-        if Hooks.enable_gradient_checkpointing is not None:
-            Hooks.enable_gradient_checkpointing(model)
+        Hooks.enable_gradient_checkpointing(model)
 
         return AdaptedModel(
             model=model,
@@ -125,8 +123,6 @@ class FullFineTuneStrategy:
 
         # For full fine-tuning, we load the entire model from the checkpoint
         # The base_model is not used - we load fresh from adapter_path
-        if Hooks.load_full_model is None:
-            raise RuntimeError("Full model loader hook not configured. Set Hooks.load_full_model.")
         loaded_model = Hooks.load_full_model(adapter_path)
 
         return AdaptedModel(

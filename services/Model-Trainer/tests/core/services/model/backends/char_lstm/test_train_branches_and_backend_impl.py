@@ -137,7 +137,6 @@ def _make_cfg() -> ModelTrainConfig:
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 
@@ -367,7 +366,6 @@ def test_train_prepared_calls_save_when_not_cancelled(
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 
@@ -451,7 +449,6 @@ def test_train_prepared_skips_save_when_cancelled(
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 

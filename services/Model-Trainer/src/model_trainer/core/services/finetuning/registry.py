@@ -124,7 +124,6 @@ def default_registry() -> FineTuningRegistry:
         - full: Train all parameters (no adapters)
         - lora: LoRA via PEFT library
         - qlora: Quantized LoRA (4-bit + LoRA)
-        - unsloth: Unsloth-optimized LoRA
 
     Returns:
         Registry with all strategies registered.
@@ -154,14 +153,6 @@ def default_registry() -> FineTuningRegistry:
     )
     create_qlora_strategy: StrategyFactory = qlora_mod.create_qlora_strategy
     reg.register("qlora", StrategyRegistration(create_qlora_strategy))
-
-    # Unsloth strategy
-    unsloth_mod = __import__(
-        "model_trainer.core.services.finetuning.strategies.unsloth",
-        fromlist=["create_unsloth_strategy"],
-    )
-    create_unsloth_strategy: StrategyFactory = unsloth_mod.create_unsloth_strategy
-    reg.register("unsloth", StrategyRegistration(create_unsloth_strategy))
 
     return reg
 

@@ -108,7 +108,6 @@ def test_orchestrator_unsupported_model_raises() -> None:
         "finetuning_strategy": "full",
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     with pytest.raises(AppError):

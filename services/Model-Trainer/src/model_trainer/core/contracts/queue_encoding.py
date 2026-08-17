@@ -2,7 +2,7 @@
 
 This module provides type-safe serialization and deserialization of
 TrainRequestPayload and its nested TypedDicts (LoraConfig, QuantizationConfig,
-UnslothConfig) for RQ job queue communication.
+QuantizationConfig) for RQ job queue communication.
 
 All encode functions convert TypedDicts to JSONObject (dict[str, JSONValue]).
 All decode functions validate and convert JSONObject back to TypedDicts using
@@ -25,7 +25,7 @@ from platform_core.json_utils import (
     require_str,
 )
 
-from .model import GgufExportConfig, LoraConfig, QuantizationConfig, UnslothConfig
+from .model import GgufExportConfig, LoraConfig, QuantizationConfig
 from .queue import ClozeJobPayload, TrainJobPayload, TrainRequestPayload
 
 
@@ -162,59 +162,6 @@ def decode_quantization_config(obj: JSONObject) -> QuantizationConfig:
     }
 
 
-def encode_unsloth_config(config: UnslothConfig) -> JSONObject:
-    """Encode UnslothConfig TypedDict to JSONObject for serialization.
-
-    Args:
-        config: Unsloth configuration to encode.
-
-    Returns:
-        JSON-serializable dictionary with all Unsloth fields.
-    """
-    return {
-        "enabled": config["enabled"],
-        "max_seq_length": config["max_seq_length"],
-        "dtype": config["dtype"],
-    }
-
-
-def decode_unsloth_config(obj: JSONObject) -> UnslothConfig:
-    """Decode JSONObject to UnslothConfig with full validation.
-
-    Args:
-        obj: JSON object to decode.
-
-    Returns:
-        Validated UnslothConfig TypedDict.
-
-    Raises:
-        JSONTypeError: If required fields are missing or have wrong types.
-    """
-    enabled = require_bool(obj, "enabled")
-    max_seq_length = require_int(obj, "max_seq_length")
-
-    dtype_raw = obj.get("dtype")
-    dtype: Literal["float16", "bfloat16"] | None
-    if dtype_raw is None:
-        dtype = None
-    elif not isinstance(dtype_raw, str):
-        raise JSONTypeError(
-            f"Field 'dtype' must be a string or null, got {type(dtype_raw).__name__}"
-        )
-    elif dtype_raw not in ("float16", "bfloat16"):
-        raise JSONTypeError(
-            f"Field 'dtype' must be 'float16', 'bfloat16', or null, got '{dtype_raw}'"
-        )
-    else:
-        dtype = "bfloat16" if dtype_raw == "bfloat16" else "float16"
-
-    return {
-        "enabled": enabled,
-        "max_seq_length": max_seq_length,
-        "dtype": dtype,
-    }
-
-
 def encode_gguf_export_config(config: GgufExportConfig) -> JSONObject:
     """Encode GgufExportConfig TypedDict to JSONObject for serialization.
 
@@ -316,28 +263,6 @@ def _decode_optional_quantization(obj: JSONObject) -> QuantizationConfig | None:
     )
 
 
-def _decode_optional_unsloth(obj: JSONObject) -> UnslothConfig | None:
-    """Decode optional unsloth config from JSONObject.
-
-    Args:
-        obj: Parent JSON object containing optional 'unsloth' field.
-
-    Returns:
-        Decoded UnslothConfig or None if field is null/missing.
-
-    Raises:
-        JSONTypeError: If field has wrong type.
-    """
-    unsloth_raw = obj.get("unsloth")
-    if unsloth_raw is None:
-        return None
-    if isinstance(unsloth_raw, dict):
-        return decode_unsloth_config(unsloth_raw)
-    raise JSONTypeError(
-        f"Field 'unsloth' must be an object or null, got {type(unsloth_raw).__name__}"
-    )
-
-
 def _decode_optional_gguf_export(obj: JSONObject) -> GgufExportConfig | None:
     """Decode optional gguf_export config from JSONObject.
 
@@ -363,7 +288,7 @@ def _decode_optional_gguf_export(obj: JSONObject) -> GgufExportConfig | None:
 def encode_train_request_payload(payload: TrainRequestPayload) -> JSONObject:
     """Encode TrainRequestPayload TypedDict to JSONObject for RQ serialization.
 
-    Converts nested LoraConfig, QuantizationConfig, and UnslothConfig TypedDicts
+    Converts nested LoraConfig and QuantizationConfig TypedDicts
     to plain JSON-serializable dictionaries.
 
     Args:
@@ -379,9 +304,6 @@ def encode_train_request_payload(payload: TrainRequestPayload) -> JSONObject:
         encode_quantization_config(payload["quantization"])
         if payload["quantization"] is not None
         else None
-    )
-    unsloth_encoded: JSONValue = (
-        encode_unsloth_config(payload["unsloth"]) if payload["unsloth"] is not None else None
     )
     gguf_export_encoded: JSONValue = (
         encode_gguf_export_config(payload["gguf_export"])
@@ -416,7 +338,6 @@ def encode_train_request_payload(payload: TrainRequestPayload) -> JSONObject:
         "finetuning_strategy": payload["finetuning_strategy"],
         "lora": lora_encoded,
         "quantization": quantization_encoded,
-        "unsloth": unsloth_encoded,
         "gguf_export": gguf_export_encoded,
     }
 
@@ -516,7 +437,7 @@ def _narrow_precision(raw: str) -> Literal["fp32", "fp16", "bf16", "auto"]:
     raise JSONTypeError(f"Field 'precision' must be 'fp32', 'fp16', 'bf16', or 'auto', got '{raw}'")
 
 
-def _narrow_finetuning_strategy(raw: str) -> Literal["full", "lora", "qlora", "unsloth"]:
+def _narrow_finetuning_strategy(raw: str) -> Literal["full", "lora", "qlora"]:
     """Narrow finetuning strategy string to Literal type with validation.
 
     Args:
@@ -534,10 +455,8 @@ def _narrow_finetuning_strategy(raw: str) -> Literal["full", "lora", "qlora", "u
         return "lora"
     if raw == "qlora":
         return "qlora"
-    if raw == "unsloth":
-        return "unsloth"
     raise JSONTypeError(
-        f"Field 'finetuning_strategy' must be 'full', 'lora', 'qlora', or 'unsloth', got '{raw}'"
+        f"Field 'finetuning_strategy' must be 'full', 'lora', or 'qlora', got '{raw}'"
     )
 
 
@@ -545,7 +464,7 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
     """Decode JSONObject to TrainRequestPayload with full validation.
 
     Validates all fields and decodes nested LoraConfig, QuantizationConfig,
-    and UnslothConfig from JSON objects.
+    from JSON objects.
 
     Args:
         obj: JSON object to decode.
@@ -598,7 +517,6 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
     # Decode nested configs via helper functions
     lora = _decode_optional_lora(obj)
     quantization = _decode_optional_quantization(obj)
-    unsloth = _decode_optional_unsloth(obj)
     gguf_export = _decode_optional_gguf_export(obj)
 
     return {
@@ -628,7 +546,6 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
         "finetuning_strategy": finetuning_strategy,
         "lora": lora,
         "quantization": quantization,
-        "unsloth": unsloth,
         "gguf_export": gguf_export,
     }
 
@@ -730,12 +647,10 @@ __all__ = [
     "decode_quantization_config",
     "decode_train_job_payload",
     "decode_train_request_payload",
-    "decode_unsloth_config",
     "encode_cloze_job_payload",
     "encode_gguf_export_config",
     "encode_lora_config",
     "encode_quantization_config",
     "encode_train_job_payload",
     "encode_train_request_payload",
-    "encode_unsloth_config",
 ]

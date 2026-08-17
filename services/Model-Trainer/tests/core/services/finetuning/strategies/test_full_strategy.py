@@ -50,7 +50,6 @@ def make_test_config() -> ModelTrainConfig:
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 
@@ -78,7 +77,6 @@ class TestFullFineTuneStrategyBasics:
         assert caps["supports_quantization"] is False
         assert caps["supports_gradient_checkpointing"] is True
         assert caps["requires_peft"] is False
-        assert caps["requires_unsloth"] is False
         assert caps["trainable_param_fraction"] == 1.0
 
 
@@ -156,17 +154,6 @@ class TestFullFineTuneStrategyLoad:
 
         with pytest.raises(FileNotFoundError, match="Model path not found"):
             strategy.load_adapted(base_model, "test/model", "/nonexistent/path")
-
-    def test_load_adapted_raises_when_hook_not_set(self) -> None:
-        """Test that load_adapted() raises RuntimeError when hook not set."""
-        strategy = FullFineTuneStrategy()
-        base_model = FakeModel("base")
-
-        with (
-            tempfile.TemporaryDirectory() as tmpdir,
-            pytest.raises(RuntimeError, match="Full model loader hook not configured"),
-        ):
-            strategy.load_adapted(base_model, "test/model", tmpdir)
 
     def test_load_adapted_returns_adapted_model(self) -> None:
         """Test that load_adapted() returns correctly configured AdaptedModel."""

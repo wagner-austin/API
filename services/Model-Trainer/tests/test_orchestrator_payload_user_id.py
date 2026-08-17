@@ -81,7 +81,6 @@ def test_orchestrator_threads_user_id() -> None:
         "finetuning_strategy": "full",
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     out = orch.enqueue_training(req)

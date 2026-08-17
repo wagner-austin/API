@@ -401,7 +401,6 @@ def test_training_worker_spm_artifact_and_completed(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }

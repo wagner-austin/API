@@ -497,7 +497,6 @@ class TestDefaultCreateTrainer:
             "hub_model_id": None,
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         }
 

@@ -80,7 +80,6 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "hub_model_id": None,
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     )
@@ -113,7 +112,6 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "hub_model_id": None,
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     )

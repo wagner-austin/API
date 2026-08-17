@@ -89,11 +89,6 @@ class TestValidateStrategyName:
         result = _validate_strategy_name("qlora")
         assert result == "qlora"
 
-    def test_validates_unsloth(self) -> None:
-        """Test validation of 'unsloth' strategy."""
-        result = _validate_strategy_name("unsloth")
-        assert result == "unsloth"
-
     def test_raises_for_invalid_strategy(self) -> None:
         """Test that ValueError is raised for invalid strategy."""
         with pytest.raises(ValueError, match="Invalid strategy name 'invalid'"):
@@ -120,12 +115,6 @@ class TestRequireStrategyName:
         obj: JSONObject = {"strategy_name": "qlora"}
         result = _require_strategy_name(obj, "strategy_name")
         assert result == "qlora"
-
-    def test_extracts_unsloth_strategy(self) -> None:
-        """Test extraction of 'unsloth' strategy name from JSON object."""
-        obj: JSONObject = {"strategy_name": "unsloth"}
-        result = _require_strategy_name(obj, "strategy_name")
-        assert result == "unsloth"
 
     def test_raises_for_missing_field(self) -> None:
         """Test that JSONTypeError is raised for missing field."""

@@ -161,85 +161,6 @@ class PeftModelLoader(Protocol):
         ...
 
 
-class QuantizedModelLoader(Protocol):
-    """Protocol for loading models with quantization."""
-
-    def __call__(
-        self,
-        model_id: str,
-        *,
-        load_in_4bit: bool,
-        load_in_8bit: bool,
-        bnb_4bit_compute_dtype: str,
-        bnb_4bit_quant_type: str,
-    ) -> LMModelProto:
-        """Load a model with quantization config.
-
-        Args:
-            model_id: HuggingFace model ID.
-            load_in_4bit: Enable 4-bit quantization.
-            load_in_8bit: Enable 8-bit quantization.
-            bnb_4bit_compute_dtype: Compute dtype for 4-bit.
-            bnb_4bit_quant_type: Quantization type (nf4/fp4).
-
-        Returns:
-            Quantized model.
-        """
-        ...
-
-
-class UnslothModelLoader(Protocol):
-    """Protocol for loading models with Unsloth optimization."""
-
-    def __call__(
-        self,
-        model_id: str,
-        *,
-        max_seq_length: int,
-        dtype: str | None,
-        load_in_4bit: bool,
-    ) -> LMModelProto:
-        """Load a model with Unsloth optimization.
-
-        Args:
-            model_id: HuggingFace model ID.
-            max_seq_length: Maximum sequence length.
-            dtype: Data type (float16/bfloat16) or None for auto.
-            load_in_4bit: Enable 4-bit quantization.
-
-        Returns:
-            Unsloth-optimized model.
-        """
-        ...
-
-
-class UnslothPeftApplier(Protocol):
-    """Protocol for applying Unsloth's optimized LoRA."""
-
-    def __call__(
-        self,
-        model: LMModelProto,
-        *,
-        r: int,
-        lora_alpha: int,
-        lora_dropout: float,
-        target_modules: tuple[str, ...],
-    ) -> LMModelProto:
-        """Apply Unsloth's optimized LoRA adapters.
-
-        Args:
-            model: Unsloth-loaded model.
-            r: LoRA rank.
-            lora_alpha: LoRA scaling factor.
-            lora_dropout: Dropout probability.
-            target_modules: Module names to apply LoRA.
-
-        Returns:
-            Model with Unsloth LoRA adapters.
-        """
-        ...
-
-
 class GradientCheckpointEnabler(Protocol):
     """Protocol for enabling gradient checkpointing on a model."""
 
@@ -265,44 +186,6 @@ class FullModelLoader(Protocol):
             Loaded model instance.
         """
         ...
-
-
-class Hooks:
-    """Container for test hooks.
-
-    Production code sets these to real implementations.
-    Tests set these to fakes for isolation.
-    """
-
-    create_peft_model: PeftModelCreator | None = None
-    save_peft_model: PeftModelSaver | None = None
-    load_peft_model: PeftModelLoader | None = None
-    load_quantized_model: QuantizedModelLoader | None = None
-    load_unsloth_model: UnslothModelLoader | None = None
-    apply_unsloth_peft: UnslothPeftApplier | None = None
-    enable_gradient_checkpointing: GradientCheckpointEnabler | None = None
-    load_full_model: FullModelLoader | None = None
-
-    @classmethod
-    def reset(cls) -> None:
-        """Restore every hook to its default.
-
-        The restoration `reset_hooks()` performs, exposed as a classmethod so
-        an autouse fixture can name the container it protects.
-        """
-        reset_hooks()
-
-
-def reset_hooks() -> None:
-    """Reset all hooks to None (for test cleanup)."""
-    Hooks.create_peft_model = None
-    Hooks.save_peft_model = None
-    Hooks.load_peft_model = None
-    Hooks.load_quantized_model = None
-    Hooks.load_unsloth_model = None
-    Hooks.apply_unsloth_peft = None
-    Hooks.enable_gradient_checkpointing = None
-    Hooks.load_full_model = None
 
 
 def _default_create_peft_model(
@@ -393,18 +276,38 @@ def _default_load_full_model(model_path: str) -> LMModelProto:
     return loaded_model
 
 
-def init_production_hooks() -> None:
-    """Initialize hooks with production implementations.
+class Hooks:
+    """Container for fine-tuning hooks, each bound to its real implementation.
 
-    Call this at application startup to wire real implementations.
+    Production calls these without wiring anything first. Tests assign a fake
+    and call reset() afterwards, which puts the real implementation back.
     """
+
+    create_peft_model: PeftModelCreator = _default_create_peft_model
+    save_peft_model: PeftModelSaver = _default_save_peft_model
+    load_peft_model: PeftModelLoader = _default_load_peft_model
+    enable_gradient_checkpointing: GradientCheckpointEnabler = (
+        _default_enable_gradient_checkpointing
+    )
+    load_full_model: FullModelLoader = _default_load_full_model
+
+    @classmethod
+    def reset(cls) -> None:
+        """Restore every hook to its real implementation.
+
+        The restoration `reset_hooks()` performs, exposed as a classmethod so
+        an autouse fixture can name the container it protects.
+        """
+        reset_hooks()
+
+
+def reset_hooks() -> None:
+    """Restore every hook to the production implementation it is bound to."""
     Hooks.create_peft_model = _default_create_peft_model
     Hooks.save_peft_model = _default_save_peft_model
     Hooks.load_peft_model = _default_load_peft_model
     Hooks.enable_gradient_checkpointing = _default_enable_gradient_checkpointing
     Hooks.load_full_model = _default_load_full_model
-    # Note: QLoRA and Unsloth hooks are left as None - they require
-    # bitsandbytes and unsloth packages which may not be installed
 
 
 __all__ = [
@@ -414,9 +317,5 @@ __all__ = [
     "PeftModelCreator",
     "PeftModelLoader",
     "PeftModelSaver",
-    "QuantizedModelLoader",
-    "UnslothModelLoader",
-    "UnslothPeftApplier",
-    "init_production_hooks",
     "reset_hooks",
 ]

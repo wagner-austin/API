@@ -69,7 +69,6 @@ def test_training_worker_sets_status_message_on_exception(tmp_path: Path) -> Non
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }

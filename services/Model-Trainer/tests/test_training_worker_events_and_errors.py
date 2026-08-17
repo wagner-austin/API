@@ -96,7 +96,6 @@ def test_emit_metrics_helpers_publish() -> None:
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     # Does not raise - metrics events (no failed event - handled by job_events)
@@ -154,7 +153,6 @@ def test_process_train_job_sets_status_message_on_exception(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }

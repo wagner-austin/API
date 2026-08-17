@@ -80,30 +80,6 @@ class TestAdaptedModel:
         assert lora_config is lora_cfg
         assert lora_config["bias"] == "lora_only"
 
-    def test_create_unsloth_adapted_model(self) -> None:
-        """Test creating AdaptedModel for Unsloth fine-tuning."""
-        model = FakeModel("unsloth-peft")
-        lora_cfg: LoraConfig = {
-            "enabled": True,
-            "r": 32,
-            "lora_alpha": 64,
-            "lora_dropout": 0.0,
-            "target_modules": ("q_proj", "v_proj", "o_proj"),
-            "bias": "all",
-        }
-        adapted = AdaptedModel(
-            model=model,
-            base_model_id="unsloth/llama-3-8b-bnb-4bit",
-            strategy_name="unsloth",
-            is_peft_model=True,
-            lora_config=lora_cfg,
-        )
-        assert adapted.strategy_name == "unsloth"
-        assert adapted.is_peft_model is True
-        lora_config = adapted.lora_config
-        assert lora_config is lora_cfg
-        assert lora_config["r"] == 32
-
     def test_adapted_model_attributes_are_mutable(self) -> None:
         """Test that AdaptedModel attributes can be updated."""
         model = FakeModel("original")
@@ -153,13 +129,11 @@ class TestStrategyCapabilities:
             "supports_quantization": False,
             "supports_gradient_checkpointing": True,
             "requires_peft": False,
-            "requires_unsloth": False,
             "trainable_param_fraction": 1.0,
         }
         assert caps["supports_quantization"] is False
         assert caps["supports_gradient_checkpointing"] is True
         assert caps["requires_peft"] is False
-        assert caps["requires_unsloth"] is False
         assert caps["trainable_param_fraction"] == 1.0
 
     def test_lora_strategy_capabilities(self) -> None:
@@ -168,7 +142,6 @@ class TestStrategyCapabilities:
             "supports_quantization": False,
             "supports_gradient_checkpointing": True,
             "requires_peft": True,
-            "requires_unsloth": False,
             "trainable_param_fraction": 0.01,
         }
         assert caps["requires_peft"] is True
@@ -180,23 +153,10 @@ class TestStrategyCapabilities:
             "supports_quantization": True,
             "supports_gradient_checkpointing": True,
             "requires_peft": True,
-            "requires_unsloth": False,
             "trainable_param_fraction": 0.01,
         }
         assert caps["supports_quantization"] is True
         assert caps["requires_peft"] is True
-
-    def test_unsloth_strategy_capabilities(self) -> None:
-        """Test capabilities for Unsloth strategy."""
-        caps: StrategyCapabilities = {
-            "supports_quantization": True,
-            "supports_gradient_checkpointing": True,
-            "requires_peft": False,
-            "requires_unsloth": True,
-            "trainable_param_fraction": 0.01,
-        }
-        assert caps["requires_unsloth"] is True
-        assert caps["requires_peft"] is False
 
 
 class TestStrategyName:
@@ -207,18 +167,15 @@ class TestStrategyName:
         name_full: StrategyName = "full"
         name_lora: StrategyName = "lora"
         name_qlora: StrategyName = "qlora"
-        name_unsloth: StrategyName = "unsloth"
 
         assert name_full == "full"
         assert name_lora == "lora"
         assert name_qlora == "qlora"
-        assert name_unsloth == "unsloth"
 
     def test_strategy_names_in_list(self) -> None:
         """Test strategy names can be collected in a list."""
-        names: list[StrategyName] = ["full", "lora", "qlora", "unsloth"]
-        assert len(names) == 4
+        names: list[StrategyName] = ["full", "lora", "qlora"]
+        assert len(names) == 3
         assert "full" in names
         assert "lora" in names
         assert "qlora" in names
-        assert "unsloth" in names

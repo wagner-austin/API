@@ -163,7 +163,6 @@ def test_training_cancellation_with_redis(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
         },
     }
 

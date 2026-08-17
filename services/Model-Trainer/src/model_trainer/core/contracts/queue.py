@@ -8,7 +8,6 @@ from model_trainer.core.contracts.model import (
     GgufExportConfig,
     LoraConfig,
     QuantizationConfig,
-    UnslothConfig,
 )
 
 
@@ -17,16 +16,15 @@ class TrainRequestPayload(TypedDict):
 
     This TypedDict is serialized to JSON for the job queue. It contains all
     fields needed to configure a training run, including optional HuggingFace
-    LM backend configuration for LoRA/Unsloth fine-tuning.
+    LM backend configuration for LoRA fine-tuning.
 
     Attributes:
         model_family: Model architecture. 'hf_lm' for HuggingFace models.
         tokenizer_id: Tokenizer ID. None for hf_lm (uses HF tokenizer).
         hub_model_id: HuggingFace model ID (required for hf_lm).
-        finetuning_strategy: Fine-tuning strategy (full, lora, qlora, unsloth).
-        lora: LoRA configuration (for lora/qlora/unsloth strategies).
+        finetuning_strategy: Fine-tuning strategy (full, lora, qlora).
+        lora: LoRA configuration (for lora/qlora strategies).
         quantization: Quantization config (for qlora strategy).
-        unsloth: Unsloth configuration (for unsloth strategy).
     """
 
     model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"]
@@ -53,10 +51,9 @@ class TrainRequestPayload(TypedDict):
     loss_mask_prefix_separator: str | None
     # HuggingFace LM backend fields
     hub_model_id: str | None
-    finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]
+    finetuning_strategy: Literal["full", "lora", "qlora"]
     lora: LoraConfig | None
     quantization: QuantizationConfig | None
-    unsloth: UnslothConfig | None
     gguf_export: GgufExportConfig | None
 
 

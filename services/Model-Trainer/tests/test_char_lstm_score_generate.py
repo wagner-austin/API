@@ -108,7 +108,6 @@ def _prepare_trained_model(settings: Settings, tmp_path: Path) -> tuple[Prepared
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())

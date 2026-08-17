@@ -1,6 +1,6 @@
 """Fine-tuning strategy services.
 
-Pluggable strategies for model fine-tuning: full, lora, qlora, unsloth.
+Pluggable strategies for model fine-tuning: full, lora, qlora.
 """
 
 from model_trainer.core.services.finetuning.registry import (

@@ -424,7 +424,6 @@ def test_training_cancel_race_avoids_upload(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }

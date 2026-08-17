@@ -669,7 +669,6 @@ class TestQueueEncodingGgufExportInvalidType:
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": "invalid_string",  # Should be dict or None
         }
         with pytest.raises(JSONTypeError):

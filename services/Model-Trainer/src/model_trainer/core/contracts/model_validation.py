@@ -19,7 +19,6 @@ from platform_core.json_utils import (
 from model_trainer.core.contracts.model import (
     LoraConfig,
     QuantizationConfig,
-    UnslothConfig,
 )
 
 # =============================================================================
@@ -173,61 +172,7 @@ def encode_quantization_config(cfg: QuantizationConfig) -> JSONObject:
 
 
 # =============================================================================
-# UnslothConfig validation and encoding
 # =============================================================================
-
-
-def _decode_unsloth_config(data: JSONObject) -> UnslothConfig:
-    """Decode raw JSON object to UnslothConfig.
-
-    Args:
-        data: Raw JSON dictionary.
-
-    Returns:
-        Validated UnslothConfig TypedDict.
-
-    Raises:
-        TypeError: If field types are incorrect.
-        ValueError: If field values are invalid.
-    """
-    enabled = require_bool(data, "enabled")
-
-    max_seq_length = require_int(data, "max_seq_length")
-    if max_seq_length < 1:
-        raise ValueError("unsloth.max_seq_length must be >= 1")
-
-    dtype_raw: JSONValue = data.get("dtype")
-    if dtype_raw is None:
-        dtype_value: Literal["float16", "bfloat16"] | None = None
-    elif isinstance(dtype_raw, str):
-        if dtype_raw not in ("float16", "bfloat16"):
-            raise ValueError("unsloth.dtype must be 'float16', 'bfloat16', or null")
-        dtype_value = "float16" if dtype_raw == "float16" else "bfloat16"
-    else:
-        raise TypeError("unsloth.dtype must be string or null")
-
-    return UnslothConfig(
-        enabled=enabled,
-        max_seq_length=max_seq_length,
-        dtype=dtype_value,
-    )
-
-
-def encode_unsloth_config(cfg: UnslothConfig) -> JSONObject:
-    """Encode UnslothConfig to JSON-serializable dict.
-
-    Args:
-        cfg: UnslothConfig TypedDict.
-
-    Returns:
-        Dictionary suitable for JSON serialization.
-    """
-    result: JSONObject = {
-        "enabled": cfg["enabled"],
-        "max_seq_length": cfg["max_seq_length"],
-        "dtype": cfg["dtype"],
-    }
-    return result
 
 
 # =============================================================================
@@ -279,36 +224,12 @@ def _decode_optional_quantization_config(
     return _decode_quantization_config(quant_raw)
 
 
-def _decode_optional_unsloth_config(data: JSONObject) -> UnslothConfig | None:
-    """Decode optional Unsloth config from parent config.
-
-    Args:
-        data: Parent config dict that may contain 'unsloth' key.
-
-    Returns:
-        Validated UnslothConfig or None if not present.
-
-    Raises:
-        TypeError: If unsloth is present but not a dict.
-        ValueError: If unsloth dict has invalid values.
-    """
-    unsloth_raw: JSONValue = data.get("unsloth")
-    if unsloth_raw is None:
-        return None
-    if not isinstance(unsloth_raw, dict):
-        raise TypeError("unsloth must be dict or null")
-    return _decode_unsloth_config(unsloth_raw)
-
-
 __all__ = [
     "JSONObject",
     "_decode_lora_config",
     "_decode_optional_lora_config",
     "_decode_optional_quantization_config",
-    "_decode_optional_unsloth_config",
     "_decode_quantization_config",
-    "_decode_unsloth_config",
     "encode_lora_config",
     "encode_quantization_config",
-    "encode_unsloth_config",
 ]

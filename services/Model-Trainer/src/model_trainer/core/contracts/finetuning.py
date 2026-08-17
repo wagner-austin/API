@@ -1,7 +1,7 @@
 """Protocols and types for pluggable fine-tuning strategies.
 
 Follows the covenant_ml pattern of Protocol + Registry for extensibility.
-Strategies adapt models for efficient fine-tuning (LoRA, QLoRA, Unsloth, Full).
+Strategies adapt models for efficient fine-tuning (LoRA, QLoRA, Full).
 
 Strict typing: no Any, cast, type: ignore, .pyi, or stubs.
 """
@@ -17,7 +17,7 @@ from model_trainer.core.contracts.model import (
 from model_trainer.core.types import LMModelProto
 
 # Strategy name as a literal type for strict typing
-StrategyName = Literal["full", "lora", "qlora", "unsloth"]
+StrategyName = Literal["full", "lora", "qlora"]
 
 
 class StrategyCapabilities(TypedDict):
@@ -29,7 +29,6 @@ class StrategyCapabilities(TypedDict):
     supports_quantization: bool
     supports_gradient_checkpointing: bool
     requires_peft: bool
-    requires_unsloth: bool
     trainable_param_fraction: float  # Approximate fraction of params trained (1.0 = all)
 
 
@@ -88,7 +87,6 @@ class FineTuningStrategy(Protocol):
         - FullFineTuneStrategy: Train all parameters (no adapters)
         - LoRAStrategy: Low-rank adaptation via PEFT
         - QLoRAStrategy: Quantized LoRA (4-bit base + LoRA)
-        - UnslothStrategy: Unsloth-optimized LoRA (2x-5x faster)
     """
 
     def name(self: FineTuningStrategy) -> StrategyName:

@@ -111,7 +111,6 @@ def test_training_worker_failed_event_publish_branch(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }

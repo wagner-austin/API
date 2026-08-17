@@ -35,7 +35,6 @@ class FakeStrategy:
             "supports_quantization": False,
             "supports_gradient_checkpointing": True,
             "requires_peft": False,
-            "requires_unsloth": False,
             "trainable_param_fraction": 1.0,
         }
 
@@ -117,7 +116,6 @@ class TestStrategyRegistration:
         assert caps["supports_quantization"] is False
         assert caps["supports_gradient_checkpointing"] is True
         assert caps["requires_peft"] is False
-        assert caps["requires_unsloth"] is False
         assert caps["trainable_param_fraction"] == 1.0
 
 
@@ -143,11 +141,10 @@ class TestFineTuningRegistry:
         # Register in non-alphabetical order
         reg.register("lora", StrategyRegistration(create_fake_strategy))
         reg.register("full", StrategyRegistration(create_fake_strategy))
-        reg.register("unsloth", StrategyRegistration(create_fake_strategy))
         reg.register("qlora", StrategyRegistration(create_fake_strategy))
 
         names = reg.list_strategies()
-        assert names == ["full", "lora", "qlora", "unsloth"]
+        assert names == ["full", "lora", "qlora"]
 
     def test_get_returns_strategy_instance(self) -> None:
         """Test that get() returns a strategy instance."""
@@ -224,15 +221,14 @@ class TestDefaultRegistry:
     """Tests for the default_registry() function."""
 
     def test_default_registry_contains_all_strategies(self) -> None:
-        """Test that default registry has all four strategies."""
+        """Test that default registry has all three strategies."""
         reg = default_registry()
         names = reg.list_strategies()
 
         assert "full" in names
         assert "lora" in names
         assert "qlora" in names
-        assert "unsloth" in names
-        assert len(names) == 4
+        assert len(names) == 3
 
     def test_default_registry_full_strategy(self) -> None:
         """Test that full strategy is correctly registered."""
@@ -242,7 +238,6 @@ class TestDefaultRegistry:
         assert strategy.name() == "full"
         caps = strategy.capabilities()
         assert caps["requires_peft"] is False
-        assert caps["requires_unsloth"] is False
         assert caps["trainable_param_fraction"] == 1.0
 
     def test_default_registry_lora_strategy(self) -> None:
@@ -253,7 +248,6 @@ class TestDefaultRegistry:
         assert strategy.name() == "lora"
         caps = strategy.capabilities()
         assert caps["requires_peft"] is True
-        assert caps["requires_unsloth"] is False
 
     def test_default_registry_qlora_strategy(self) -> None:
         """Test that qlora strategy is correctly registered."""
@@ -264,16 +258,6 @@ class TestDefaultRegistry:
         caps = strategy.capabilities()
         assert caps["requires_peft"] is True
         assert caps["supports_quantization"] is True
-
-    def test_default_registry_unsloth_strategy(self) -> None:
-        """Test that unsloth strategy is correctly registered."""
-        reg = default_registry()
-        strategy = reg.get("unsloth")
-
-        assert strategy.name() == "unsloth"
-        caps = strategy.capabilities()
-        assert caps["requires_unsloth"] is True
-        assert caps["requires_peft"] is False
 
     def test_default_registry_returns_new_instance(self) -> None:
         """Test that default_registry() returns new registry each time."""

@@ -706,33 +706,6 @@ def test_default_gpu_reset_peak_memory_stats_cuda_unavailable() -> None:
 # ============================================================================
 
 
-def test_finetuning_init_production_hooks() -> None:
-    """Test init_production_hooks sets all expected hooks."""
-    from model_trainer.core.services.finetuning.strategies._test_hooks import (
-        Hooks,
-        init_production_hooks,
-        reset_hooks,
-    )
-
-    # Reset hooks first to ensure clean state
-    reset_hooks()
-    assert Hooks.create_peft_model is None
-    assert Hooks.save_peft_model is None
-
-    # Initialize production hooks
-    init_production_hooks()
-
-    # Verify all hooks are set - use callable check for stronger assertion
-    assert callable(Hooks.create_peft_model)
-    assert callable(Hooks.save_peft_model)
-    assert callable(Hooks.load_peft_model)
-    assert callable(Hooks.enable_gradient_checkpointing)
-    assert callable(Hooks.load_full_model)
-
-    # Clean up
-    reset_hooks()
-
-
 def test_default_enable_gradient_checkpointing() -> None:
     """Test _default_enable_gradient_checkpointing calls the method on model."""
     from model_trainer.core.services.finetuning.strategies._test_hooks import (

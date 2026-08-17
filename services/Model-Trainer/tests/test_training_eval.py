@@ -136,7 +136,6 @@ def test_training_and_eval_tiny(
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 
@@ -309,7 +308,6 @@ def test_cancel_during_eval_returns_partial_results(
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
 

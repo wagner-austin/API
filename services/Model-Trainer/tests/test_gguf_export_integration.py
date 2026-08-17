@@ -380,7 +380,6 @@ class TestQueueEncodingRoundTrip:
                 "bias": "none",
             },
             "quantization": None,
-            "unsloth": None,
             "gguf_export": {
                 "enabled": True,
                 "output_type": "f16",
@@ -429,7 +428,6 @@ class TestQueueEncodingRoundTrip:
                 "bias": "none",
             },
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         }
 
@@ -474,7 +472,6 @@ class TestQueueEncodingRoundTrip:
                 "bias": "none",
             },
             "quantization": None,
-            "unsloth": None,
             "gguf_export": {"enabled": True, "output_type": "f32"},
         }
         encoded = encode_train_request_payload(payload)
@@ -518,7 +515,6 @@ class TestQueueEncodingRoundTrip:
                 "bias": "none",
             },
             "quantization": None,
-            "unsloth": None,
             "gguf_export": {"enabled": True, "output_type": "q8_0"},
         }
         encoded = encode_train_request_payload(payload)
@@ -727,7 +723,6 @@ class TestTrainingJobWithGgufExport:
                     bias="none",
                 ),
                 "quantization": None,
-                "unsloth": None,
                 "gguf_export": {"enabled": True, "output_type": "f16"},
             },
         }

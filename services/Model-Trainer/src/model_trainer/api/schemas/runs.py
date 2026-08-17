@@ -48,27 +48,11 @@ class QuantizationConfigRequest(TypedDict, total=True):
     bnb_4bit_quant_type: Literal["nf4", "fp4"]
 
 
-class UnslothConfigRequest(TypedDict, total=True):
-    """API request schema for Unsloth configuration.
-
-    Maps to core UnslothConfig TypedDict.
-
-    Attributes:
-        enabled: Whether Unsloth optimization is enabled.
-        max_seq_length: Maximum sequence length for Unsloth.
-        dtype: Data type for Unsloth (None for auto-detect).
-    """
-
-    enabled: bool
-    max_seq_length: int
-    dtype: Literal["float16", "bfloat16"] | None
-
-
 class GgufExportConfigRequest(TypedDict, total=True):
     """API request schema for GGUF export configuration.
 
     Maps to core GgufExportConfig TypedDict. GGUF export is only valid
-    for LoRA-based fine-tuning strategies (lora, qlora, unsloth).
+    for LoRA-based fine-tuning strategies (lora, qlora).
 
     Attributes:
         enabled: Whether GGUF export is enabled after training.
@@ -83,15 +67,14 @@ class TrainRequest(TypedDict, total=True):
     """Request to start model training.
 
     Supports both legacy backends (gpt2, char_lstm) and the new hf_lm backend
-    for HuggingFace models with optional LoRA/Unsloth fine-tuning.
+    for HuggingFace models with optional LoRA fine-tuning.
 
     Attributes:
         model_family: Model architecture. Use 'hf_lm' for HuggingFace models.
         hub_model_id: HuggingFace model ID (required when model_family='hf_lm').
-        finetuning_strategy: Strategy for fine-tuning (full, lora, qlora, unsloth).
-        lora: LoRA configuration (required for lora/qlora/unsloth strategies).
+        finetuning_strategy: Strategy for fine-tuning (full, lora, qlora).
+        lora: LoRA configuration (required for lora/qlora strategies).
         quantization: Quantization config (required for qlora strategy).
-        unsloth: Unsloth configuration (required for unsloth strategy).
     """
 
     model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"]
@@ -120,10 +103,9 @@ class TrainRequest(TypedDict, total=True):
     loss_mask_prefix_separator: str | None
     # HuggingFace LM backend fields
     hub_model_id: str | None
-    finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]
+    finetuning_strategy: Literal["full", "lora", "qlora"]
     lora: LoraConfigRequest | None
     quantization: QuantizationConfigRequest | None
-    unsloth: UnslothConfigRequest | None
     gguf_export: GgufExportConfigRequest | None
 
 

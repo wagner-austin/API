@@ -132,7 +132,6 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     handle = BPEBackend().load(str(tok_dir / "tokenizer.json"))

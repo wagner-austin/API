@@ -47,7 +47,7 @@ class HFLMMetadata(TypedDict):
 
 
 # Valid strategy names as a set for validation
-_VALID_STRATEGY_NAMES: frozenset[str] = frozenset(["full", "lora", "qlora", "unsloth"])
+_VALID_STRATEGY_NAMES: frozenset[str] = frozenset(["full", "lora", "qlora"])
 
 
 def _validate_strategy_name(value: str) -> StrategyName:
@@ -68,8 +68,6 @@ def _validate_strategy_name(value: str) -> StrategyName:
         return "lora"
     if value == "qlora":
         return "qlora"
-    if value == "unsloth":
-        return "unsloth"
     valid = ", ".join(sorted(_VALID_STRATEGY_NAMES))
     raise ValueError(f"Invalid strategy name '{value}', must be one of [{valid}]")
 
@@ -115,8 +113,6 @@ def _require_strategy_name(obj: JSONObject, key: str) -> StrategyName:
         return "lora"
     if value == "qlora":
         return "qlora"
-    if value == "unsloth":
-        return "unsloth"
     valid = ", ".join(sorted(_VALID_STRATEGY_NAMES))
     raise JSONTypeError(f"Field '{key}' must be one of [{valid}], got '{value}'")
 

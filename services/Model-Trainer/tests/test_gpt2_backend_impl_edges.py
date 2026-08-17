@@ -84,7 +84,6 @@ def test_gpt2_backend_impl_name_and_type_errors(
         "hub_model_id": None,
         "lora": None,
         "quantization": None,
-        "unsloth": None,
         "gguf_export": None,
     }
     backend = create_gpt2_backend(LocalTextDatasetBuilder())

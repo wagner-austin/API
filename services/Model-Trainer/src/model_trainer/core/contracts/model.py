@@ -84,18 +84,6 @@ class QuantizationConfig(TypedDict):
     bnb_4bit_quant_type: Literal["nf4", "fp4"]
 
 
-class UnslothConfig(TypedDict):
-    """Configuration for Unsloth optimization.
-
-    Unsloth provides 2x-5x faster fine-tuning through optimized kernels
-    and memory-efficient implementations for supported model architectures.
-    """
-
-    enabled: bool
-    max_seq_length: int
-    dtype: Literal["float16", "bfloat16"] | None  # None = auto-detect
-
-
 class GgufExportConfig(TypedDict):
     """Configuration for GGUF export of LoRA adapters.
 
@@ -116,7 +104,7 @@ class ModelTrainConfig(TypedDict):
 
     Single unified config type used by all backends.
     The 'hf_lm' backend supports any HuggingFace causal LM model with
-    optional LoRA/Unsloth fine-tuning strategies.
+    optional LoRA fine-tuning strategies.
 
     For hf_lm models, tokenizer_id is optional (None) because the tokenizer
     is loaded from hub_model_id. For other backends, tokenizer_id is required.
@@ -150,12 +138,11 @@ class ModelTrainConfig(TypedDict):
     # every token is a target.
     loss_mask_prefix_separator: str | None
     # Pluggable fine-tuning strategy (like covenant_ml backends)
-    finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]
+    finetuning_strategy: Literal["full", "lora", "qlora"]
     # Strategy-specific configuration (None = not used by current strategy)
     hub_model_id: str | None  # HuggingFace model ID for pretrained loading
-    lora: LoraConfig | None  # Config for lora/qlora/unsloth strategies
+    lora: LoraConfig | None  # Config for lora/qlora strategies
     quantization: QuantizationConfig | None  # Config for qlora strategy
-    unsloth: UnslothConfig | None  # Config for unsloth strategy
     gguf_export: GgufExportConfig | None  # Config for GGUF export (lora strategies only)
 
 

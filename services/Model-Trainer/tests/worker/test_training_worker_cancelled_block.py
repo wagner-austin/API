@@ -360,7 +360,6 @@ def test_process_train_job_cancelled_block(
             "finetuning_strategy": "full",
             "lora": None,
             "quantization": None,
-            "unsloth": None,
             "gguf_export": None,
         },
     }

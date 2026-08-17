@@ -22,7 +22,6 @@ from ..schemas.runs import (
     QuantizationConfigRequest,
     ScoreRequest,
     TrainRequest,
-    UnslothConfigRequest,
 )
 
 _MODEL_FAMILIES: frozenset[str] = frozenset({"gpt2", "llama", "qwen", "char_lstm", "hf_lm"})
@@ -31,11 +30,10 @@ _DEVICES: frozenset[str] = frozenset({"cpu", "cuda", "auto"})
 _PRECISIONS: frozenset[str] = frozenset({"fp32", "fp16", "bf16", "auto"})
 _SPLITS: frozenset[str] = frozenset({"validation", "test"})
 _DETAIL_LEVELS: frozenset[str] = frozenset({"summary", "per_char"})
-_FINETUNING_STRATEGIES: frozenset[str] = frozenset({"full", "lora", "qlora", "unsloth"})
+_FINETUNING_STRATEGIES: frozenset[str] = frozenset({"full", "lora", "qlora"})
 _LORA_BIASES: frozenset[str] = frozenset({"none", "all", "lora_only"})
 _QUANT_COMPUTE_DTYPES: frozenset[str] = frozenset({"float16", "bfloat16", "float32"})
 _QUANT_TYPES: frozenset[str] = frozenset({"nf4", "fp4"})
-_UNSLOTH_DTYPES: frozenset[str] = frozenset({"float16", "bfloat16"})
 _GGUF_OUTPUT_TYPES: frozenset[str] = frozenset({"f32", "f16", "bf16", "q8_0"})
 _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
     {
@@ -67,7 +65,6 @@ _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
         "finetuning_strategy",
         "lora",
         "quantization",
-        "unsloth",
         "gguf_export",
     }
 )
@@ -165,7 +162,7 @@ def _narrow_model_family(
 
 def _narrow_finetuning_strategy(
     raw: str | None,
-) -> Literal["full", "lora", "qlora", "unsloth"]:
+) -> Literal["full", "lora", "qlora"]:
     """Narrow finetuning strategy string to Literal type.
 
     Args:
@@ -179,8 +176,6 @@ def _narrow_finetuning_strategy(
         return "lora"
     if val == "qlora":
         return "qlora"
-    if val == "unsloth":
-        return "unsloth"
     return "full"
 
 
@@ -230,22 +225,6 @@ def _narrow_quant_type(raw: str) -> Literal["nf4", "fp4"]:
     if raw == "fp4":
         return "fp4"
     return "nf4"
-
-
-def _narrow_unsloth_dtype(raw: str | None) -> Literal["float16", "bfloat16"] | None:
-    """Narrow Unsloth dtype to Literal type or None.
-
-    Args:
-        raw: Raw dtype string from request, or None for auto.
-
-    Returns:
-        Narrowed Literal type or None for auto-detect.
-    """
-    if raw is None:
-        return None
-    if raw == "bfloat16":
-        return "bfloat16"
-    return "float16"
 
 
 def _narrow_gguf_output_type(raw: str) -> Literal["f32", "f16", "bf16", "q8_0"]:
@@ -424,54 +403,6 @@ def _decode_quantization_config(d: dict[str, JSONValue]) -> QuantizationConfigRe
     }
 
 
-def _decode_unsloth_config(d: dict[str, JSONValue]) -> UnslothConfigRequest:
-    """Decode and validate Unsloth configuration from JSON dict.
-
-    Args:
-        d: Raw dictionary with Unsloth config fields.
-
-    Returns:
-        Validated UnslothConfigRequest TypedDict.
-
-    Raises:
-        AppError: If required fields are missing or invalid.
-    """
-    enabled_raw = d.get("enabled")
-    if enabled_raw is None:
-        enabled = True
-    elif not isinstance(enabled_raw, bool):
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message="unsloth.enabled must be a boolean",
-            http_status=400,
-        )
-    else:
-        enabled = enabled_raw
-
-    max_seq_length = validate_int_range(
-        d.get("max_seq_length"), "unsloth.max_seq_length", ge=128, le=8192, default=2048
-    )
-
-    dtype_raw = d.get("dtype")
-    if dtype_raw is None:
-        dtype: Literal["float16", "bfloat16"] | None = _narrow_unsloth_dtype(None)
-    elif not isinstance(dtype_raw, str):
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message="unsloth.dtype must be a string or null",
-            http_status=400,
-        )
-    else:
-        _ = validate_optional_literal(dtype_raw, "unsloth.dtype", _UNSLOTH_DTYPES)
-        dtype = _narrow_unsloth_dtype(dtype_raw)
-
-    return {
-        "enabled": enabled,
-        "max_seq_length": max_seq_length,
-        "dtype": dtype,
-    }
-
-
 def _decode_optional_lora(d: dict[str, JSONValue]) -> LoraConfigRequest | None:
     """Decode optional LoRA config from dict."""
     lora_raw = d.get("lora")
@@ -498,20 +429,6 @@ def _decode_optional_quantization(d: dict[str, JSONValue]) -> QuantizationConfig
             http_status=400,
         )
     return _decode_quantization_config(quantization_raw)
-
-
-def _decode_optional_unsloth(d: dict[str, JSONValue]) -> UnslothConfigRequest | None:
-    """Decode optional Unsloth config from dict."""
-    unsloth_raw = d.get("unsloth")
-    if unsloth_raw is None:
-        return None
-    if not isinstance(unsloth_raw, dict):
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message="unsloth must be an object",
-            http_status=400,
-        )
-    return _decode_unsloth_config(unsloth_raw)
 
 
 def _decode_gguf_export_config(d: dict[str, JSONValue]) -> GgufExportConfigRequest:
@@ -570,10 +487,9 @@ def _decode_optional_gguf_export(d: dict[str, JSONValue]) -> GgufExportConfigReq
 def _validate_hf_lm_cross_fields(
     model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
     hub_model_id: str | None,
-    finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"],
+    finetuning_strategy: Literal["full", "lora", "qlora"],
     lora: LoraConfigRequest | None,
     quantization: QuantizationConfigRequest | None,
-    unsloth: UnslothConfigRequest | None,
     gguf_export: GgufExportConfigRequest | None,
 ) -> None:
     """Validate cross-field requirements for HF LM backend."""
@@ -583,7 +499,7 @@ def _validate_hf_lm_cross_fields(
             message="hub_model_id is required when model_family is 'hf_lm'",
             http_status=400,
         )
-    if finetuning_strategy in ("lora", "qlora", "unsloth") and lora is None:
+    if finetuning_strategy in ("lora", "qlora") and lora is None:
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message=f"lora config is required for finetuning_strategy '{finetuning_strategy}'",
@@ -595,16 +511,10 @@ def _validate_hf_lm_cross_fields(
             message="quantization config is required for finetuning_strategy 'qlora'",
             http_status=400,
         )
-    if finetuning_strategy == "unsloth" and unsloth is None:
+    if gguf_export is not None and finetuning_strategy not in ("lora", "qlora"):
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
-            message="unsloth config is required for finetuning_strategy 'unsloth'",
-            http_status=400,
-        )
-    if gguf_export is not None and finetuning_strategy not in ("lora", "qlora", "unsloth"):
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message="gguf_export requires finetuning_strategy lora, qlora, or unsloth",
+            message="gguf_export requires finetuning_strategy lora or qlora",
             http_status=400,
         )
 
@@ -613,26 +523,23 @@ class _HfLmFields:
     """Container for decoded HF LM backend fields."""
 
     hub_model_id: str | None
-    finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]
+    finetuning_strategy: Literal["full", "lora", "qlora"]
     lora: LoraConfigRequest | None
     quantization: QuantizationConfigRequest | None
-    unsloth: UnslothConfigRequest | None
     gguf_export: GgufExportConfigRequest | None
 
     def __init__(
         self,
         hub_model_id: str | None,
-        finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"],
+        finetuning_strategy: Literal["full", "lora", "qlora"],
         lora: LoraConfigRequest | None,
         quantization: QuantizationConfigRequest | None,
-        unsloth: UnslothConfigRequest | None,
         gguf_export: GgufExportConfigRequest | None,
     ) -> None:
         self.hub_model_id = hub_model_id
         self.finetuning_strategy = finetuning_strategy
         self.lora = lora
         self.quantization = quantization
-        self.unsloth = unsloth
         self.gguf_export = gguf_export
 
 
@@ -664,11 +571,10 @@ def _decode_hf_lm_fields(
 
     lora = _decode_optional_lora(d)
     quantization = _decode_optional_quantization(d)
-    unsloth = _decode_optional_unsloth(d)
     gguf_export = _decode_optional_gguf_export(d)
 
     _validate_hf_lm_cross_fields(
-        model_family, hub_model_id, finetuning_strategy, lora, quantization, unsloth, gguf_export
+        model_family, hub_model_id, finetuning_strategy, lora, quantization, gguf_export
     )
 
     return _HfLmFields(
@@ -676,7 +582,6 @@ def _decode_hf_lm_fields(
         finetuning_strategy=finetuning_strategy,
         lora=lora,
         quantization=quantization,
-        unsloth=unsloth,
         gguf_export=gguf_export,
     )
 
@@ -816,7 +721,6 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
         "finetuning_strategy": hf_fields.finetuning_strategy,
         "lora": hf_fields.lora,
         "quantization": hf_fields.quantization,
-        "unsloth": hf_fields.unsloth,
         "gguf_export": hf_fields.gguf_export,
     }
 
