@@ -255,13 +255,24 @@ def _provenance_violations(
     """
     violations: list[str] = []
     source_paths = matter["lists"].get("source_paths", [])
+    blob_pins = matter["maps"].get("source_git_blobs", {})
     for source in source_paths:
         if source.startswith(URL_PREFIXES):
             continue
         target = _LINE_LOCATOR.sub("", source)
-        if not (project_root / target).exists():
-            violations.append(f"{page}: source_paths entry '{source}' does not exist")
-    for anchored, blob in matter["maps"].get("source_git_blobs", {}).items():
+        if (project_root / target).exists():
+            continue
+        if source in blob_pins:
+            # A RETIRED source: the file left the working tree but its
+            # exact content stays addressable by the pinned blob id
+            # (``git cat-file blob <hash>``), which is what the pin was
+            # recorded for. Deleting a one-shot measurement script must
+            # not orphan the page that cites it — the pin IS the
+            # provenance. First case: the analysis_scripts retirement,
+            # 2026-08-17 (board task f0c3a532).
+            continue
+        violations.append(f"{page}: source_paths entry '{source}' does not exist")
+    for anchored, blob in blob_pins.items():
         if anchored not in source_paths:
             violations.append(f"{page}: source_git_blobs key '{anchored}' is not in source_paths")
         if _BLOB_HASH.match(blob) is None:

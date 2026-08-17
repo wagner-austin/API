@@ -256,17 +256,38 @@ class TestFrontmatter:
 class TestProvenance:
     """Declared sources must exist; anchors must be well-formed."""
 
-    def test_vanished_source_path_is_a_violation(
+    def test_vanished_unpinned_source_path_is_a_violation(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """A ``source_paths`` entry with no file on disk is reported."""
+        """A missing ``source_paths`` entry WITHOUT a blob pin is reported.
+
+        No pin means no way to recover the cited content — the claim's
+        provenance genuinely vanished.
+        """
         _green_tree(tmp_path)
         page = GREEN_FRONTMATTER.replace('- "src/fixture.py"', '- "src/deleted.py"')
-        page = page.replace('"src/fixture.py": ', '"src/deleted.py": ')
+        page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
+        page = page.replace("source_git_blobs:\n", "")
         (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
         count, out = _capture(tmp_path, capsys)
         assert count == 1
         assert "source_paths entry 'src/deleted.py' does not exist" in out
+
+    def test_vanished_blob_pinned_source_is_a_retired_source(self, tmp_path: Path) -> None:
+        """A missing entry WITH a blob pin passes — the pin IS the provenance.
+
+        Reversed 2026-08-17 (the analysis_scripts retirement, board
+        task f0c3a532): a one-shot measurement script may leave the
+        working tree, and the page citing it stays verifiable through
+        ``git cat-file blob <pinned hash>``. The old rule demanded the
+        path exist forever, which would have forced either keeping dead
+        ungated code or orphaning the measurement record.
+        """
+        _green_tree(tmp_path)
+        page = GREEN_FRONTMATTER.replace('- "src/fixture.py"', '- "src/deleted.py"')
+        page = page.replace('"src/fixture.py": ', '"src/deleted.py": ')
+        (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
+        assert run_wiki_rules(tmp_path) == 0
 
     def test_line_locator_suffix_is_stripped(self, tmp_path: Path) -> None:
         """``file.md:42`` checks the file, not the literal string."""
