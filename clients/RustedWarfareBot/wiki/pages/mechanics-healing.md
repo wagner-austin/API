@@ -1,3 +1,20 @@
+---
+title: "Healing: Repair Bays, Combat Engineers, and the Verification Tiers"
+tags: [mechanics, healing, decompile, community]
+related:
+  - "[[community-play-strategies]]"
+  - "[[mechanics-unit-catalogue]]"
+  - "[[policy-holding-ground]]"
+source_paths:
+  - "runs/decompiled/com/corrodinggames/rts/game/units/d/r.java"
+  - "runs/legion.out"
+  - "wiki/sources/m0-probe/printunits.log"
+  - "wiki/sources/m17-community/namu-units.txt"
+game_version: "1.15 (code 176, build #28)"
+confidence: medium
+hubs: [game-mechanics]
+---
+
 # Healing: what repairs units, how fast, and what is still inferred
 
 The community meta the Impossible campaign keeps rediscovering is built on
