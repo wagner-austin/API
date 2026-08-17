@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from tankpit_bot._test_hooks import AutoscrollPageProtocol
+from tankpit_bot._test_hooks import CDPSessionProtocol, PageWaitProtocol
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import CapturedMessage
 
@@ -27,7 +27,8 @@ class AutoscrollEnforcerProtocol(Protocol):
 
     def __call__(
         self,
-        page: AutoscrollPageProtocol,
+        page: PageWaitProtocol,
+        cdp: CDPSessionProtocol,
         messages: list[CapturedMessage],
         ws: WorldService,
     ) -> None:
@@ -35,6 +36,7 @@ class AutoscrollEnforcerProtocol(Protocol):
 
         Args:
             page: Live game page.
+            cdp: Active CDP session carrying the game websocket.
             messages: Capture buffer shared with the CDP service.
             ws: The session's world service; the spawn wait reads it.
         """
@@ -42,7 +44,8 @@ class AutoscrollEnforcerProtocol(Protocol):
 
 
 def _real_ensure_autoscroll_off(
-    page: AutoscrollPageProtocol,
+    page: PageWaitProtocol,
+    cdp: CDPSessionProtocol,
     messages: list[CapturedMessage],
     ws: WorldService,
 ) -> None:
@@ -53,12 +56,13 @@ def _real_ensure_autoscroll_off(
 
     Args:
         page: Live game page.
+        cdp: Active CDP session carrying the game websocket.
         messages: Capture buffer shared with the CDP service.
         ws: The session's world service; the spawn wait reads it.
     """
     from tankpit_bot.browser.autoscroll import ensure_autoscroll_off as _impl
 
-    _impl(page, messages, ws)
+    _impl(page, cdp, messages, ws)
 
 
 #: The autoscroll-off dance. Tests replace this attribute via

@@ -9,30 +9,42 @@ accident (the 2026-07-24 key probe left it ON for a day; user ruling
 2026-07-29: "we need to make sure autoscroll is always off otherwise
 it throws the bot off. its a toggle... sometimes it resets to on").
 
-There is no read-only query on the wire -- the only instrument is the
-``a`` key toggle and the server's plaintext ``"A0"``/``"A1"`` ack --
-so enforcement is a press-and-verify dance: press once and read the
-ack; landing on ``A1`` proves the setting WAS off, so press again and
-require the ``A0`` ack back. Either path ends wire-verified OFF. A
-missing ack is a hard failure -- an unverified toggle must never be
-guessed at (probe precedent, 2026-07-25).
+The instrument is the ``A{enabled}`` settings command
+([[client-commands]]): the client emits the plaintext two-byte text
+``"A0"``/``"A1"`` stating the DESIRED state — absolute, not a blind
+toggle — and the server acks by echoing it back plaintext. The
+enforcement therefore sends ``A0`` directly over the captured
+websocket and requires the ``A0`` echo: idempotent (re-sending
+requests the same state), no toggle parity to track, and no
+dependence on page focus or key handling.
 
-The toggle only works IN-GAME (user ruling 2026-07-29: "you cant
+It used to press the ``a`` KEY instead, which broke on the first
+fresh account (2026-08-13, arterial): hotkey maps are PER-ACCOUNT
+server state (the ``H`` command), and a fresh account's default binds
+``a`` to a scope pan — the capture shows both presses emitting
+``03 5a 06`` (scope shift, direction 6 = west), never the autoscroll
+command. Fresh accounts may also START with autoscroll enabled
+(user, 2026-08-13); the absolute ``A0`` handles either starting
+state by construction.
+
+The command only works IN-GAME (user ruling 2026-07-29: "you cant
 enable or disable autoscroll til the bot is in the game btw") -- a
-press on the entry screen acks nothing, which is exactly how the
+send on the entry screen acks nothing, which is exactly how the
 first live firing failed at 23:08 ("game ready" is still pre-spawn).
-The dance therefore waits for the wire to establish ``self_state``
-(the tank's position broadcast proves the tank is in the game) before
-the first press.
+The enforcement therefore waits for the wire to establish
+``self_state`` (the tank's position broadcast proves the tank is in
+the game) before the first send.
 """
 
 from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot._test_hooks import AutoscrollPageProtocol
+from tankpit_bot._test_hooks import CDPSessionProtocol, PageWaitProtocol
+from tankpit_bot.browser.cdp_utils import send_websocket_bytes
 from tankpit_bot.capture.frames import split_payload_frames
 from tankpit_bot.protocol.decoders.text import try_decode_plaintext_ack
+from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types.message import CapturedMessage
 
@@ -40,7 +52,18 @@ log = get_logger(__name__)
 
 
 _TOGGLE_SETTLE_MS = 1500
-"""Wait after the key press for the server ack to land in the capture."""
+"""Wait after the command send for the server ack to land in the capture."""
+
+_SEND_ATTEMPTS = 3
+"""Sends to spend before declaring the setting unverifiable.
+
+One send suffices on a healthy socket; the command is absolute, so a
+re-send after a slow ack requests the same state and cannot skew
+anything.
+"""
+
+_AUTOSCROLL_OFF_COMMAND = b"A0"
+"""The plaintext settings command requesting autoscroll OFF."""
 
 _IN_GAME_POLL_MS = 500
 """Poll interval while waiting for the wire to prove the tank spawned."""
@@ -50,7 +73,7 @@ _IN_GAME_WAIT_BUDGET_MS = 30_000
 after this long is a broken session, not a slow one."""
 
 
-def _wait_until_in_game(page: AutoscrollPageProtocol, ws: WorldService) -> None:
+def _wait_until_in_game(page: PageWaitProtocol, ws: WorldService) -> None:
     """Block until the wire establishes ``self_state`` (tank spawned).
 
     Args:
@@ -60,8 +83,8 @@ def _wait_until_in_game(page: AutoscrollPageProtocol, ws: WorldService) -> None:
 
     Raises:
         RuntimeError: When no position broadcast arrives within the
-            budget -- the toggle would silently ack nothing pre-spawn,
-            and an unverified toggle must never be guessed at.
+            budget -- the command would silently ack nothing pre-spawn,
+            and an unverified setting must never be guessed at.
     """
     waited_ms = 0
     while waited_ms < _IN_GAME_WAIT_BUDGET_MS:
@@ -81,74 +104,70 @@ def _read_autoscroll_ack(messages: list[CapturedMessage], start_index: int) -> b
 
     Args:
         messages: Capture buffer shared with the CDP service.
-        start_index: Buffer length at the moment of the key press.
+        start_index: Buffer length at the moment of the send.
 
     Returns:
-        The acked enabled flag, or ``None`` when no ack has arrived.
+        The LAST acked enabled flag in the window, or ``None`` when no
+        ack has arrived. Last, not first: every ack states the
+        RESULTING state, so the latest one is always the current truth.
 
     Raises:
         FramingError: If a live payload is corrupt. This used to
             re-derive the frame walk inline and drop a torn tail with a
             silent ``break`` ([[session-state-deglobalisation]]).
     """
+    latest: bool | None = None
     for captured in messages[start_index:]:
         if captured["direction"] != "received":
             continue
         for body in split_payload_frames(captured["payload"]):
             ack = try_decode_plaintext_ack(body)
             if ack is not None and ack["msg_type"] == "autoscroll_ack":
-                return ack["enabled"]
-    return None
-
-
-def _press_and_read(page: AutoscrollPageProtocol, messages: list[CapturedMessage]) -> bool:
-    """Press ``a`` once and return the wire-verified new state.
-
-    Args:
-        page: Live game page.
-        messages: Capture buffer shared with the CDP service.
-
-    Returns:
-        The acked enabled flag after the toggle.
-
-    Raises:
-        RuntimeError: When no ack arrives -- the toggle is unverified
-            and the session must not continue on a guess.
-    """
-    start_index = len(messages)
-    page.keyboard.press("a")
-    page.wait_for_timeout(float(_TOGGLE_SETTLE_MS))
-    enabled = _read_autoscroll_ack(messages, start_index)
-    if enabled is None:
-        raise RuntimeError("no autoscroll ack after the 'a' press; toggle unverified")
-    return enabled
+                latest = ack["enabled"]
+    return latest
 
 
 def ensure_autoscroll_off(
-    page: AutoscrollPageProtocol, messages: list[CapturedMessage], ws: WorldService
+    page: PageWaitProtocol,
+    cdp: CDPSessionProtocol,
+    messages: list[CapturedMessage],
+    ws: WorldService,
 ) -> None:
     """Leave the session with autoscroll wire-verified OFF.
 
     Args:
-        page: Live game page.
+        page: Live game page (waits pump the event loop).
+        cdp: Active CDP session carrying the game websocket.
         messages: Capture buffer shared with the CDP service.
         ws: The session's world service; the spawn wait reads it.
 
     Raises:
-        RuntimeError: When the tank never spawns, an ack is missing,
-            or the second press fails to land on ``A0`` -- the toggle
-            protocol drifted and the session must not run on a skewed
-            viewport model.
+        RuntimeError: When the tank never spawns, the send fails, no
+            ack arrives after :data:`_SEND_ATTEMPTS` sends, or the
+            server acks ``A1`` to an ``A0`` request -- the protocol
+            drifted and the session must not run on a skewed viewport
+            model.
     """
     _wait_until_in_game(page, ws)
-    enabled = _press_and_read(page, messages)
-    if enabled:
-        # The setting WAS off; the probe press turned it on -- undo.
-        if _press_and_read(page, messages):
-            raise RuntimeError("autoscroll stuck ON after corrective press")
-        log.info("Autoscroll verified OFF (was off; press-verify round trip)")
-        return
-    log.info("Autoscroll verified OFF (was ON at session start -- corrected)")
+    start_index = len(messages)
+    for attempt in range(_SEND_ATTEMPTS):
+        result = send_websocket_bytes(
+            cdp, encode_frame(_AUTOSCROLL_OFF_COMMAND), label="autoscroll_off"
+        )
+        if not result.startswith("SENT_"):
+            raise RuntimeError(f"autoscroll A0 send failed: {result}")
+        page.wait_for_timeout(float(_TOGGLE_SETTLE_MS))
+        enabled = _read_autoscroll_ack(messages, start_index)
+        if enabled is False:
+            log.info("Autoscroll verified OFF (A0 acked)")
+            return
+        if enabled is True:
+            raise RuntimeError("server acked autoscroll ON after an A0 request; protocol drifted")
+        log.info(
+            "Autoscroll A0 send %d drew no ack yet - re-sending",
+            attempt + 1,
+        )
+    raise RuntimeError(f"no autoscroll ack after {_SEND_ATTEMPTS} A0 sends; setting unverified")
 
 
 __all__ = [
