@@ -14,13 +14,20 @@ from tankpit_bot.facts.source import (
 )
 
 
-def test_fact_sources_cover_the_twenty_two_channels() -> None:
-    """The source set is 20 wire channels + 1 DOM scrape + inference."""
-    assert len(FACT_SOURCES) == 22
+def test_fact_sources_cover_the_twenty_three_channels() -> None:
+    """20 wire channels + DOM scrape + inference + the fleet report.
+
+    ``fleet_report`` joined 2026-08-14 ([[fleet-coordination]]): a
+    teammate's published belief merged through the observation
+    pathway — an observation source, but not a wire channel of this
+    session.
+    """
+    assert len(FACT_SOURCES) == 23
     wire = [name for name in FACT_SOURCES if name.startswith("wire_")]
     assert len(wire) == 20
     assert "dom_registry_scrape" in FACT_SOURCES
     assert "client_side_inference" in FACT_SOURCES
+    assert "fleet_report" in FACT_SOURCES
 
 
 @pytest.mark.parametrize("name", FACT_SOURCES)
