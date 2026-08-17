@@ -50,7 +50,6 @@ from tankpit_bot.sniffer.world_state_containers import (
     increment_container_failed_pickups,
     remove_container_at,
 )
-from tankpit_bot.sniffer.world_state_dispatch_containers import was_recent_pickup_at
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_full_signal
 
 # The 0x52 codes themselves are the canonical ``SUPERVISOR_ERROR_*``
@@ -268,84 +267,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
     _emit_command_error_sync(kind, tx, ty, error_code)
     _emit_command_rejected_outcome(bot, kind, tx, ty, elapsed_ms, error_code)
     if kind == "collect":
-        # Semantic split (Bug 0.3, 2026-07-06): "failed pickup" and
-        # "blacklist this container forever" are not the same event.
-        #
-        # * ``code=5`` ("Tank full"): the server's CLAMP RECEIPT — it
-        #   arrives ALONGSIDE the successful clamped transfer of the
-        #   same single click (bot-20260726-101949: one pickup_fuel,
-        #   then 0x44 391->1100, 0x44 +0, code 5 in one batch; the
-        #   10-kill run's 15 code-5s matched its 15 clamped_transfer
-        #   outcomes 1:1). Not a refusal and not a race — the pickup
-        #   SUCCEEDED and the container keeps the remainder.
-        #   Blacklisting a still-full container is wrong -- the next
-        #   tick with headroom can consume it.
-        # * ``code=4`` ("Empty container"): the container is drained.
-        #   Delete the belief outright -- the volume the planner acted
-        #   on is contradicted by the server. (Until 2026-07-19 this
-        #   removal was done by the DOM game-log consumer one or two
-        #   ticks later; the wire code is the same signal, earlier.)
-        # * ``code=7`` ("Inventory full"): user mechanic 2026-07-18 --
-        #   containers "fill whatever is empty. you will only get a
-        #   full inventory message if all your items are full." The
-        #   container is fine; the TANK is full. Reconcile every slot
-        #   belief up to capacity (the rejection is an authoritative
-        #   absolute inventory statement) and do NOT blacklist.
-        #   Pre-fix (through 2026-07-18) this blacklisted a perfectly
-        #   good container per rejection.
-        # * ``code=0`` ("You can't do this"): illegal geometry.
-        #   Blacklist per position.
-        #
-        # Pre-fix (through 2026-07-06): all four codes incremented
-        # failed_pickups, so the 22:37 fuel-loop's four consecutive
-        # partial-transfer + code=5 events blacklisted four still-full
-        # fuel containers.
-        if error_code == SUPERVISOR_ERROR_TANK_FULL:
-            emit_sync(
-                "container at (%d,%d) rejected code=5 (tank full) -- "
-                "not blacklisting, container is not empty",
-                tx,
-                ty,
-            )
-        elif error_code == SUPERVISOR_ERROR_INVENTORY_FULL:
-            update_inventory_from_full_signal(bot.world)
-            emit_sync(
-                "container at (%d,%d) rejected code=7 (inventory full) -- "
-                "reconciled all slots to capacity, container kept",
-                tx,
-                ty,
-            )
-        elif error_code == SUPERVISOR_ERROR_EMPTY_CONTAINER:
-            remove_container_at(bot.world, tx, ty)
-            if was_recent_pickup_at(bot.world, tx, ty, get_current_time_ms()):
-                # Drain receipt (flag s9-4): the code=4 rode our own
-                # successful pickup -- the ContainerPickup broadcast
-                # for this tile fired within the click. Nothing about
-                # memory is wrong; the belief removal is the whole
-                # correction.
-                emit_sync(
-                    "container at (%d,%d) rejected code=4 (empty) -- drain "
-                    "receipt of own pickup, belief removed",
-                    tx,
-                    ty,
-                )
-            else:
-                # A genuinely vanished container: no pickup broadcast
-                # ever fired for the tile, so the belief the planner
-                # acted on was stale (user ruling 2026-07-30: "if one
-                # item is stale or out of sync then its worth a radar.
-                # not, 3 items") -- the collect cascade answers the
-                # latch, subject to the radar-spend economics.
-                bot.world.mark_container_desync(get_current_time_ms())
-                emit_sync(
-                    "container at (%d,%d) rejected code=4 (empty) -- belief "
-                    "removed, container memory marked desynced",
-                    tx,
-                    ty,
-                )
-        else:
-            increment_container_failed_pickups(bot.world, tx, ty)
-            emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
+        _resolve_collect_rejection(bot, tx, ty, error_code, started_ms)
     if kind in ("move", "teleport"):
         _mark_movement_failure(bot.world, kind, error_code, tx, ty)
     if error_code == SUPERVISOR_ERROR_CANT_GO and kind in ("move", "collect", "teleport"):
@@ -359,6 +281,125 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         bot.world.record_movement_rejection(get_current_time_ms())
     bot._transition("IDLE", in_flight_action=make_no_action())
     return True
+
+
+def _resolve_collect_rejection(
+    bot: Bot, tx: int, ty: int, error_code: int, started_ms: int
+) -> None:
+    """Apply one collect 0x52 close's verdict to the container belief.
+
+    Semantic split (Bug 0.3, 2026-07-06): "failed pickup" and
+    "blacklist this container forever" are not the same event.
+
+    * ``code=5`` ("Tank full"): the server's CLAMP RECEIPT — it
+      arrives ALONGSIDE the successful clamped transfer of the
+      same single click (bot-20260726-101949: one pickup_fuel,
+      then 0x44 391->1100, 0x44 +0, code 5 in one batch; the
+      10-kill run's 15 code-5s matched its 15 clamped_transfer
+      outcomes 1:1). Not a refusal and not a race — the pickup
+      SUCCEEDED and the container keeps the remainder.
+      Blacklisting a still-full container is wrong -- the next
+      tick with headroom can consume it.
+    * ``code=4`` ("Empty container"): the container is drained.
+      Delete the belief outright -- the volume the planner acted
+      on is contradicted by the server. (Until 2026-07-19 this
+      removal was done by the DOM game-log consumer one or two
+      ticks later; the wire code is the same signal, earlier.)
+    * ``code=7`` ("Inventory full"): user mechanic 2026-07-18 --
+      containers "fill whatever is empty. you will only get a
+      full inventory message if all your items are full." The
+      container is fine; the TANK is full. Reconcile every slot
+      belief up to capacity (the rejection is an authoritative
+      absolute inventory statement) and do NOT blacklist.
+      Pre-fix (through 2026-07-18) this blacklisted a perfectly
+      good container per rejection.
+    * ``code=1`` ("You can't go there!") riding an own-tile
+      detonation: an interrupted walk, not a container verdict
+      (flag 6, 2026-08-13) -- no mark.
+    * ``code=0`` ("You can't do this"): illegal geometry.
+      Blacklist per position.
+
+    Pre-fix (through 2026-07-06): all four codes incremented
+    failed_pickups, so the 22:37 fuel-loop's four consecutive
+    partial-transfer + code=5 events blacklisted four still-full
+    fuel containers.
+
+    Args:
+        bot: Bot instance.
+        tx: The collect's target X.
+        ty: The collect's target Y.
+        error_code: The 0x52 code the server answered.
+        started_ms: The collect's dispatch moment (window start for
+            the own-gain and own-mine-hit discriminators).
+    """
+    if error_code == SUPERVISOR_ERROR_TANK_FULL:
+        emit_sync(
+            "container at (%d,%d) rejected code=5 (tank full) -- "
+            "not blacklisting, container is not empty",
+            tx,
+            ty,
+        )
+    elif error_code == SUPERVISOR_ERROR_INVENTORY_FULL:
+        update_inventory_from_full_signal(bot.world)
+        emit_sync(
+            "container at (%d,%d) rejected code=7 (inventory full) -- "
+            "reconciled all slots to capacity, container kept",
+            tx,
+            ty,
+        )
+    elif error_code == SUPERVISOR_ERROR_EMPTY_CONTAINER:
+        remove_container_at(bot.world, tx, ty)
+        if bot.world.own_gain_since(started_ms):
+            # Drain receipt (flag s9-4, discriminator corrected
+            # 2026-08-13): the click GAINED something (a fuel
+            # announce or an inventory rise since dispatch) before
+            # its code=4 close -- our own pickup drained the
+            # container. The old tile-record test
+            # (``was_recent_pickup_at``) also matched the removal
+            # broadcast that rides an ALREADY-EMPTY click and any
+            # sibling bot's drain, so a co-farmed room classified
+            # 23 of 23 stale empties as own drains (run arterial
+            # 2026-08-13) and the desync rescan never fired.
+            emit_sync(
+                "container at (%d,%d) rejected code=4 (empty) -- drain "
+                "receipt of own pickup, belief removed",
+                tx,
+                ty,
+            )
+        else:
+            # A genuinely vanished container: no pickup broadcast
+            # ever fired for the tile, so the belief the planner
+            # acted on was stale (user ruling 2026-07-30: "if one
+            # item is stale or out of sync then its worth a radar.
+            # not, 3 items") -- the collect cascade answers the
+            # latch, subject to the radar-spend economics.
+            bot.world.mark_container_desync(get_current_time_ms())
+            emit_sync(
+                "container at (%d,%d) rejected code=4 (empty) -- belief "
+                "removed, container memory marked desynced",
+                tx,
+                ty,
+            )
+    elif error_code == SUPERVISOR_ERROR_CANT_GO and bot.world.own_mine_hit_since(started_ms):
+        # Detonation-interrupted walk (flag 6, 2026-08-13): a
+        # code=1 whose window contains an own-tile detonation is
+        # the partial-walk law refusing the REMAINDER of a walk
+        # the mine halted -- not a verdict on the container. Run
+        # arterial 22:25:45: the detonation on (103,143) halted
+        # the walk to equipment at (103,147), the failed_pickups
+        # increment demoted the innocent (and reachable) target,
+        # and the replan paid a 60-fuel teleport to different
+        # equipment four tiles further away. The container stays
+        # clean; the mine-reveal scan and the walk-over teleport
+        # flip own the re-approach.
+        emit_sync(
+            "collect to (%d,%d) halted by own-mine detonation mid-walk -- container not blamed",
+            tx,
+            ty,
+        )
+    else:
+        increment_container_failed_pickups(bot.world, tx, ty)
+        emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
 
 
 def _emit_command_rejected_outcome(
