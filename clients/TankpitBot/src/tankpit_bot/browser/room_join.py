@@ -30,6 +30,7 @@ from tankpit_bot.protocol.lobby import (
     serialize_room_select_request,
 )
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.types.constants import TEAM_BLUE
 
 log = get_logger(__name__)
 
@@ -37,6 +38,40 @@ _ROOM_DISCOVERY_TIMEOUT_MS = 10000
 _JOIN_CONFIRM_TIMEOUT_MS = 10000
 _ROOM_ENTER_TIMEOUT_MS = 10000
 _JOIN_POLL_INTERVAL_MS = 100.0
+
+
+def resolve_room_troop() -> int | None:
+    """Resolve the explicitly configured tank color, or ``None`` when unset.
+
+    ``TANKPIT_TROOP`` names the color this bot must play (0=red,
+    1=purple, 2=blue, 3=orange). Accounts hold one tank PER COLOR per
+    map ([[game-rules]]), so the join flow uses this to pick which of
+    the account's tanks to enter with — overriding the lobby's
+    ``default_troop`` when they differ (fleet ruling 2026-08-14:
+    same-team allies; arterial's account holds an orange tank but the
+    fleet plays blue). The server enforces the 5-minute recolor
+    cooldown after a logout; the override simply states the color.
+
+    Lives here rather than in ``bot/config.py`` with the other env
+    resolvers because its only consumer is the join flow and
+    ``browser`` sits below ``bot`` in the layering.
+
+    Returns:
+        The configured troop code, or ``None`` when the env is unset
+        (the join flow then follows the account's default, or blue on
+        a first-time entry).
+
+    Raises:
+        ValueError: If ``TANKPIT_TROOP`` is set but not an integer in
+            [0, 3].
+    """
+    raw = _test_hooks.get_env("TANKPIT_TROOP")
+    if raw is None or raw == "":
+        return None
+    value = int(raw)
+    if not 0 <= value <= 3:
+        raise ValueError(f"TANKPIT_TROOP must be in [0, 3], got {value}")
+    return value
 
 
 def _collect_room_entries(cdp: CDPSessionProtocol) -> list[RoomInfo]:
@@ -134,6 +169,7 @@ def _wait_for_room_entry(
         Matching room entry, or ``None`` if the room never appears.
     """
     waited_ms = 0
+    entries: list[RoomInfo] = []
     while waited_ms < _ROOM_DISCOVERY_TIMEOUT_MS:
         entries = _collect_room_entries(cdp)
         _register_room_entries(ws, entries)
@@ -142,6 +178,32 @@ def _wait_for_room_entry(
             return room_entry
         page.wait_for_timeout(_JOIN_POLL_INTERVAL_MS)
         waited_ms += int(_JOIN_POLL_INTERVAL_MS)
+    # The 2026-08-13 arterial fresh-login failure was undiagnosable
+    # from "room list never exposed Practice" alone -- whether the
+    # lobby sent NOTHING (socket/timing) or sent a list without the
+    # room (account-state divergence) are different bugs. State what
+    # was actually seen. Second sighting the same night sharpened it:
+    # the user could SEE Practice in the lobby UI while the decode
+    # held one entry, so the split between "+ bodies that PARSED" and
+    # "+ bodies the validator REJECTED" below is the discriminator
+    # between an is_room_info_text shape mismatch and a capture that
+    # attached after the early entries passed.
+    seen = ", ".join(f"{entry['room_id']}={entry['name']}" for entry in entries) or "none"
+    payloads = get_captured_raw_messages(cdp)
+    frames: list[str] = []
+    for payload in payloads[:20]:
+        body = decode_captured_body(payload)
+        if not body:
+            continue
+        frames.append(repr(body[:110]))
+    log.info(
+        "Room discovery timed out after %dms; parsed rooms: %s; captured frames: %d; "
+        "first frames:%s",
+        _ROOM_DISCOVERY_TIMEOUT_MS,
+        seen,
+        len(payloads),
+        "".join(f"\n  {frame}" for frame in frames),
+    )
     return None
 
 
@@ -266,6 +328,47 @@ def _wait_for_enter_response(
     return False
 
 
+def _resolve_entry_troop(room_id: str, default_troop: int) -> int:
+    """Resolve the troop byte the room-enter request will carry.
+
+    An explicit ``TANKPIT_TROOP`` names the color this bot plays
+    (fleet ruling 2026-08-14: same-team allies) -- it overrides the
+    account's lobby default, since accounts hold one tank per color
+    per map and the enter request's troop byte picks which one to
+    play. The server enforces the 5-minute recolor cooldown; the bot
+    just states the color. ``default_troop == -1`` marks a room this
+    account has NO TANK on yet (measured 2026-08-13, the fresh
+    Arterial account): the lobby UI answers it with a color picker,
+    and the picker's output is this same troop byte -- so the bot
+    chooses blue here instead of stalling at a UI it never clicks.
+
+    Args:
+        room_id: The room being entered (log receipt).
+        default_troop: The lobby entry's ``default_troop`` field.
+
+    Returns:
+        The troop code the enter request carries.
+    """
+    configured = resolve_room_troop()
+    if configured is not None:
+        if 0 <= default_troop != configured:
+            log.info(
+                "Room %s: TANKPIT_TROOP=%d overrides the account default color %d",
+                room_id,
+                configured,
+                default_troop,
+            )
+        return configured
+    if default_troop < 0:
+        log.info(
+            "First entry into room %s for this account (no tank yet): choosing troop %d",
+            room_id,
+            TEAM_BLUE,
+        )
+        return TEAM_BLUE
+    return default_troop
+
+
 def join_room(
     page: RoomJoinPageProtocol,
     cdp: CDPSessionProtocol,
@@ -289,6 +392,7 @@ def join_room(
         log.info("Room select failed: room list never exposed %s", room_name)
         return False
     room_id = room_entry["room_id"]
+    troop = _resolve_entry_troop(room_id, room_entry["default_troop"])
     join_confirm_start = len(get_captured_raw_messages(cdp))
     select_request: RoomSelectRequestDict = {"room_id": room_id}
     select_result = send_websocket_bytes(cdp, serialize_room_select_request(select_request))
@@ -313,7 +417,7 @@ def join_room(
     codec = ProtocolCodec(static_key, magic)
     enter_request: RoomEnterRequestDict = {
         "room_id": room_id,
-        "troop": room_entry["default_troop"],
+        "troop": troop,
         "preview_x": ROOM_ENTRY_DEFAULT_X,
         "preview_y": ROOM_ENTRY_DEFAULT_Y,
         "metadata": metadata,
@@ -326,7 +430,7 @@ def join_room(
     log.info(
         "Enter game: room=%s troop=%d -> %s",
         room_id,
-        room_entry["default_troop"],
+        troop,
         enter_result,
     )
     if not enter_result.startswith("SENT_"):
