@@ -286,7 +286,7 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
                 )
                 log.info("SELF DEACTIVATED: killed by %d", kid)
                 return True
-            mark_tank_killed(ws, vid)
+            mark_tank_killed(ws, vid, kid)
             ws.world_state = deactivate_tank(ws.world_state, vid, browser.get_current_time_ms())
             emit_diagnostic(
                 diagnostic_kind="tank_deactivated",

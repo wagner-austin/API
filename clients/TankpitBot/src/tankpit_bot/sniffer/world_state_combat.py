@@ -180,27 +180,29 @@ def _decrement_ammo_for_weapon(ws: WorldService, weapon_byte: int) -> None:
     log.info("AMMO: %s consumed by hit (%d -> %d)", item_key, current["count"], new_count)
 
 
-def mark_tank_killed(ws: WorldService, tank_id: int) -> None:
+def mark_tank_killed(ws: WorldService, tank_id: int, killer_id: int) -> None:
     """Record a tank as killed via Deactivation protocol message.
 
     Args:
         ws: World service instance.
         tank_id: The killed tank's ID.
+        killer_id: The 0x41 killer's tank ID — kept with the victim so
+            the drain consumers can tell our kills from the room's.
     """
-    ws.killed_tank_ids.add(tank_id)
+    ws.killed_tank_ids[tank_id] = killer_id
 
 
-def drain_killed_tank_ids(ws: WorldService) -> set[int]:
+def drain_killed_tank_ids(ws: WorldService) -> dict[int, int]:
     """Get and clear all killed tank IDs since last drain.
 
     Args:
         ws: World service instance.
 
     Returns:
-        Set of tank IDs that were killed.
+        Mapping of victim tank ID to killer tank ID.
     """
     result = ws.killed_tank_ids
-    ws.killed_tank_ids = set()
+    ws.killed_tank_ids = {}
     return result
 
 
