@@ -225,8 +225,16 @@ class SyncPlaywrightFactoryProtocol(Protocol):
         ...
 
 
-class AutoscrollKeyProtocol(Protocol):
-    """The single keyboard member the autoscroll toggle dance uses."""
+class PageKeyboardProtocol(Protocol):
+    """The single keyboard member the key probe presses.
+
+    Named for its one remaining consumer: the autoscroll enforcement
+    stopped pressing keys 2026-08-13 (hotkey maps are per-account, so
+    a keypress is not a reliable command instrument — see
+    ``browser/autoscroll.py``); ``action_lab/key_probe.py`` still
+    presses physical keys deliberately, because capturing what a key
+    EMITS is its whole purpose.
+    """
 
     def press(self, key: str, *, delay: float | None = None) -> None:
         """Press a keyboard key."""
@@ -249,12 +257,17 @@ class PageWaitProtocol(Protocol):
         ...
 
 
-class AutoscrollPageProtocol(PageWaitProtocol, Protocol):
-    """The slice of the page surface the autoscroll dance needs."""
+class GamePageProtocol(PageWaitProtocol, Protocol):
+    """The page surface a live game session holds.
+
+    The bot's ``_page`` type: event-loop pumping for every
+    poll-and-read flow (the inherited wait) plus the keyboard the key
+    probe presses.
+    """
 
     @property
-    def keyboard(self) -> AutoscrollKeyProtocol:
-        """Keyboard interface for the ``a`` toggle press."""
+    def keyboard(self) -> PageKeyboardProtocol:
+        """Keyboard interface for deliberate key presses (key probe)."""
         ...
 
 
@@ -268,12 +281,12 @@ class RoomJoinPageProtocol(PageWaitProtocol, Protocol):
 
 
 __all__ = [
-    "AutoscrollKeyProtocol",
-    "AutoscrollPageProtocol",
     "BrowserContextProtocol",
     "BrowserProtocol",
     "BrowserTypeLaunchProtocol",
     "BrowserTypeProtocol",
+    "GamePageProtocol",
+    "PageKeyboardProtocol",
     "PageWaitProtocol",
     "PlaywrightProtocol",
     "RoomJoinPageProtocol",

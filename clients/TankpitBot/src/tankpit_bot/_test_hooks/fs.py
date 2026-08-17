@@ -8,8 +8,13 @@ access out of the test loop.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Protocol
+
+from platform_core.logging import get_logger
+
+_fs_log = get_logger(__name__)
 
 
 class WriteTextProtocol(Protocol):
@@ -113,6 +118,56 @@ class GlobPathsProtocol(Protocol):
         ...
 
 
+class ReplaceTextProtocol(Protocol):
+    """Protocol for atomically replacing a file's text content."""
+
+    def __call__(self, path: Path, content: str) -> None:
+        """Write text and atomically move it into place.
+
+        Readers of ``path`` see either the previous complete content
+        or the new complete content, never a partial write — the
+        invariant the fleet knowledge exchange relies on to make its
+        strict decode-and-raise semantics sound.
+
+        Args:
+            path: Final file path.
+            content: Text content to write.
+        """
+        ...
+
+
+def _real_replace_text(path: Path, content: str) -> None:
+    """Real implementation: write a per-process temp file, then os.replace().
+
+    The staging name carries the pid so concurrent writers of the
+    same destination never collide on the temp file. On Windows,
+    ``os.replace`` raises ``PermissionError`` while a READER holds
+    the destination open (CPython opens files without
+    ``FILE_SHARE_DELETE``) — for the heartbeat-style files this hook
+    serves (the fleet knowledge exchange rewrites every tick), the
+    contention law is: DROP this beat. The previous complete content
+    stays current, the staging file is removed, and the next tick's
+    write refreshes — readers still never observe a torn file, which
+    is the contract.
+
+    Args:
+        path: Final file path.
+        content: Text content to write.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staging = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    staging.write_text(content, encoding="utf-8")
+    try:
+        staging.replace(path)
+    except PermissionError:
+        _fs_log.info(
+            "replace_text contention on %s: destination held open by a "
+            "reader; beat dropped, previous content stays current",
+            path,
+        )
+        staging.unlink(missing_ok=True)
+
+
 def _real_write_text(path: Path, content: str) -> None:
     """Real implementation using Path.write_text().
 
@@ -197,6 +252,7 @@ def _real_glob_paths(directory: Path, pattern: str) -> list[Path]:
     return sorted(directory.glob(pattern))
 
 
+replace_text: ReplaceTextProtocol = _real_replace_text
 write_text: WriteTextProtocol = _real_write_text
 write_bytes: WriteBytesProtocol = _real_write_bytes
 read_text: ReadTextProtocol = _real_read_text
@@ -212,6 +268,7 @@ __all__ = [
     "PathExistsProtocol",
     "ReadTextProtocol",
     "RemoveFileProtocol",
+    "ReplaceTextProtocol",
     "WriteBytesProtocol",
     "WriteTextProtocol",
     "append_text",
@@ -219,6 +276,7 @@ __all__ = [
     "path_exists",
     "read_text",
     "remove_file",
+    "replace_text",
     "write_bytes",
     "write_text",
 ]
