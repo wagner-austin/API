@@ -251,10 +251,13 @@ class TestSessionRunnerStateMachine:
         rejection_messages: list[str] = []
 
         def try_concurrent_start() -> None:
-            try:
+            # pytest.raises works on any thread: if start() does NOT
+            # raise, the Failed escapes into this worker thread and
+            # rejection_messages stays empty, failing the main-thread
+            # assertion below — same detection, no silent except.
+            with pytest.raises(SessionAlreadyRunningError) as excinfo:
                 runner.start()
-            except SessionAlreadyRunningError as exc:
-                rejection_messages.append(str(exc))
+            rejection_messages.append(str(excinfo.value))
 
         def block_until_second_start_attempted() -> None:
             import threading as _threading

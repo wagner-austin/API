@@ -165,6 +165,10 @@ def make_app(
         try:
             session_seconds, session_kills = _parse_session_bounds(body)
         except (JSONTypeError, ValueError) as error:
+            # Client error, surfaced in BOTH channels: the 400 body for
+            # the caller, the server log for whoever is watching the
+            # service (a phone-flow typo is otherwise invisible here).
+            log.info("start rejected: bad session bounds: %s", error)
             return web.Response(status=400, text=f"bad session bounds: {error}")
         if runner.is_running():
             return web.Response(status=409, text="session already running")

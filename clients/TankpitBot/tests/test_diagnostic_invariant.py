@@ -79,10 +79,12 @@ def test_no_text_format_diagnostic_log_lines_remain() -> None:
     """
     violations: list[str] = []
     for path in _scan_paths():
-        try:
-            source = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
+        # Every .py in src/ is UTF-8 by repo standard; a decode error
+        # here must FAIL the test, not silently exempt the file from
+        # the invariant (the old `except UnicodeDecodeError: continue`
+        # was one of the three silent excepts the 2026-08-17 inert
+        # exceptions-guard finding surfaced in this package).
+        source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
         for lineno, literal in _iter_log_info_string_literals(tree):
             for banned in _BANNED_DIAGNOSTIC_SUBSTRINGS:
