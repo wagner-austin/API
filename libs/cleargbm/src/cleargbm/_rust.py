@@ -1,7 +1,7 @@
 """Protocol-typed accessors onto the ``cleargbm_rs`` native extension.
 
-The compiled Rust extension lives at ``cleargbm_rs.cleargbm_rs`` (a ``.pyd``
-loaded from the ``cleargbm_rs`` wheel). This module imports it exactly once,
+``cleargbm_rs`` is the compiled Rust extension itself (a ``.pyd``), built by
+maturin as a top-level module. This module imports it exactly once,
 pins each callable to a ``Protocol`` type so mypy sees precise signatures
 instead of ``Any`` leaking from the dynamic ``__import__``, and re-exports the
 callables the rest of ``cleargbm`` uses.

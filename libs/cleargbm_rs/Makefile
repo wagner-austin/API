@@ -29,12 +29,12 @@ python-lint:
 	if ((Test-Path ".\\scripts\\guard.py") -or (Test-Path ".\\scripts\\guard\\__main__.py")) { .venv\Scripts\python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }
 	.venv\Scripts\ruff check . --fix
 	.venv\Scripts\ruff format .
-	.venv\Scripts\mypy python tests scripts
+	.venv\Scripts\mypy tests scripts
 
 # Python tests with coverage
 python-test:
 	@if (-not (Test-Path ".venv")) { uv venv; uv pip install -e ".[dev]" }
-	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("python","scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; .venv\Scripts\pytest -n auto -v @covArgs
+	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; .venv\Scripts\pytest -n auto -v @covArgs
 
 # Lint: Rust + Python (guard runs during python-lint)
 lint: rust-lint python-lint

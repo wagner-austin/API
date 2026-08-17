@@ -69,7 +69,7 @@ class _ToJsonProto(Protocol):
         ...
 
 
-_native_mod: types.ModuleType = __import__("cleargbm_rs.cleargbm_rs", fromlist=["cleargbm_rs"])
+_native_mod: types.ModuleType = __import__("cleargbm_rs")
 _py_gbm_model_to_json: _ToJsonProto = _native_mod.py_gbm_model_to_json_rs
 
 # -----------------------------------------------------------------------------

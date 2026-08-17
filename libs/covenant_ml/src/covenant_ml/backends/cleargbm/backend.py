@@ -45,11 +45,10 @@ _log = get_logger(__name__)
 # Native model access — Protocol-typed getattr onto the Rust extension
 # =============================================================================
 #
-# The cleargbm_rs Python package re-exports Rust-backed functions as stubs that
-# raise ImportError at the top-level; the real implementations live in the
-# .pyd submodule at ``cleargbm_rs.cleargbm_rs``. We import that submodule
-# directly and pin each function to a Protocol type so mypy sees precise
-# signatures instead of Any leaking from the dynamic __import__.
+# ``cleargbm_rs`` IS the compiled extension -- maturin builds it as the
+# top-level module, with no Python package in front of it. We import it and pin
+# each function to a Protocol type so mypy sees precise signatures instead of
+# Any leaking from the dynamic __import__.
 
 
 class _PyGbmModelProto(Protocol):
@@ -119,7 +118,7 @@ class _NTreesProto(Protocol):
         ...
 
 
-_native_mod: types.ModuleType = __import__("cleargbm_rs.cleargbm_rs", fromlist=["cleargbm_rs"])
+_native_mod: types.ModuleType = __import__("cleargbm_rs")
 
 _py_gbm_model_to_json: _ToJsonProto = _native_mod.py_gbm_model_to_json_rs
 _py_gbm_model_from_json: _FromJsonProto = _native_mod.py_gbm_model_from_json_rs
