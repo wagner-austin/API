@@ -79,6 +79,13 @@ def is_already_engaged(ctx: DecideCtx) -> bool:
     a kill -- and the planner should produce the initial close
     teleport rather than fire from afar.
 
+    Engagement only persists across CONSECUTIVE lock shots by
+    construction: ``ctx.base`` resets ``last_shot_target_id`` every
+    tick, so any interrupting decision (a collect pickup, a map open,
+    a firefight opportunity divert) drops back to pre-engagement and
+    the in-view check in ``teleport_to_target`` makes the re-entry a
+    free same-tile shot in the common case.
+
     Args:
         ctx: Decision context.
 

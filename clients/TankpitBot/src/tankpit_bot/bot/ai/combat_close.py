@@ -8,6 +8,7 @@ it back.
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.combat_opportunity import opportunity_shot_decision
 from tankpit_bot.bot.ai.combat_prep import refuel_for_hunt
 from tankpit_bot.bot.ai.combat_strategy import (
     engage_target,
@@ -41,7 +42,21 @@ from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
-WALK_CLOSE_TILES = 3
+WALK_CLOSE_TILES = 8
+"""Manhattan distance under which closing on a target WALKS.
+
+Re-priced 2026-08-13 (HUD flag 16: "why didn't it just walk back to
+the enemy? a teleport is 2 ticks and more fuel per tile") from the
+MEASURED walking speed -- 15 cardinal tiles in 3.30 s (2026-08-06),
+~0.22 s per tile at ~1 fuel per tile -- replacing the falsified
+~2 s-per-tile premise that set the old bound of 3. A walk is one
+move dispatch (~2 s tick) plus the server's leg, so at 8 tiles it
+costs ~3.8 s and 8 fuel against the teleport's ~4 s (map-open
+precondition plus the hop) and ``floor(6 x euclid)`` ~= 34 fuel:
+the walk wins on fuel everywhere and on time out to ~9 tiles. The
+bound stays inside the corridor-clearance guard's reach (known
+mines are shot before the first step); hidden-mine arrest risk is
+what keeps it at 8 rather than the full time-breakeven."""
 
 
 def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
@@ -91,12 +106,12 @@ def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionD
         )
     close_distance = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
     if close_distance <= WALK_CLOSE_TILES:
-        # Short closes WALK (user timing law + flag 1 of run
-        # bot-20260730-011x: "i think it should ahve waked back
-        # instead of teleporting"): a walk costs ~2 s per tile and no
-        # fuel, while a mid-fight teleport costs ~4 s plus fuel plus
-        # the map-open precondition tick the last shot closed. Three
-        # walk tiles break even on time and win on everything else.
+        # Short closes WALK (user rulings: flag 1 of run
+        # bot-20260730-011x "i think it should ahve waked back
+        # instead of teleporting", re-priced by HUD flag 16
+        # 2026-08-13): at the measured ~0.22 s/tile the walk beats
+        # the teleport's map-open + hop on time out to ~9 tiles and
+        # costs a sixth of the fuel -- see WALK_CLOSE_TILES.
         walk_candidates = _combat_landing_candidates(ctx, target)
         if walk_candidates:
             walk_x, walk_y = walk_candidates[0]
@@ -286,6 +301,16 @@ def close_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         Close-range combat decision: a shot when already in cardinal position,
         a teleport when affordable, or a blocked-target replanning decision.
     """
+    # Firefight doctrine (user ruling 2026-08-14: "you have a main
+    # target ofc, but you should also return fire to anyone else
+    # engaging and take kill shots ... when someone is in the lowest
+    # or second lowest damage state"): before serving the main
+    # target, one shot may divert to a visible finisher or an active
+    # attacker. The lock is untouched -- next tick the main fight
+    # resumes (in view, the re-entry is a free same-tile shot).
+    opportunity = opportunity_shot_decision(ctx, target["tank_id"])
+    if opportunity is not None:
+        return opportunity
     if has_cardinal_combat_shot(ctx.self_state, target) or (
         has_combat_shot(ctx, target) and has_clear_shot_line(ctx, target)
     ):

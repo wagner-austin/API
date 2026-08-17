@@ -15,11 +15,12 @@ from tankpit_bot.bot.ai.combat_break import (
     assess_engagement_break,
 )
 from tankpit_bot.bot.ai.combat_close import teleport_to_target
+from tankpit_bot.bot.ai.combat_opportunity import opportunity_shot_decision
 from tankpit_bot.bot.ai.combat_prep import (
     open_map_for_target,
     refuel_for_hunt,
 )
-from tankpit_bot.bot.ai.combat_strategy import engage_target
+from tankpit_bot.bot.ai.combat_strategy import engage_target, frame_target_shift
 from tankpit_bot.bot.ai.combat_target import (
     block_combat_target_and_replan,
     get_locked_target,
@@ -166,6 +167,23 @@ def pursuit_fire(ctx: DecideCtx, pursuit: EnemyThreatDict) -> TickDecisionDict:
         Engage decision (stamping the pursuit-shot window), or the
         map-chase decision when either gate blocks the shot.
     """
+    opportunity = opportunity_shot_decision(ctx, pursuit["tank_id"])
+    if opportunity is not None:
+        # Firefight doctrine (2026-08-14): a visible finisher or an
+        # active attacker outranks a shot at a DEPARTED target's
+        # cached position -- return fire to whoever is actually here,
+        # then resume the chase.
+        return opportunity
+    shift = frame_target_shift(ctx, pursuit)
+    if shift is not None:
+        # Visibility law (flag s11-2): a cached position within one
+        # scope shift's reach is exactly the zone where the server
+        # refuses to homing-track ("close enough that a viewport
+        # shift would reveal them"), so a pursuit shot here is a dead
+        # weapon=0 miss AND would wrongly spend the human homing
+        # budget. The free shift frames the target instead — checked
+        # BEFORE the trace wall and the budget stamp.
+        return shift
     if not pursuit_trace_is_live(ctx.filtered, pursuit["tank_id"], ctx.timestamp_ms):
         emit_ai(
             "homing trace on %s expired - chasing via map instead of a dead shot",
