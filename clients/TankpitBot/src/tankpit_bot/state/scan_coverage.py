@@ -36,7 +36,7 @@ the TTL expires; they never become reachable by walking.
 from __future__ import annotations
 
 from tankpit_bot.physics.capacity import free_radar_radius
-from tankpit_bot.state.types import WorldStateDict
+from tankpit_bot.state.types import WorldStateDict, coord_key
 
 # A swept tile is re-foraged after this interval -- long enough to push
 # the sweep across the viewport before doubling back, short enough that
@@ -425,6 +425,51 @@ def is_viewport_scanned_within(
     return True
 
 
+def merge_scanned_coverage(
+    state: WorldStateDict,
+    tiles: list[tuple[int, int, int]],
+) -> tuple[WorldStateDict, int]:
+    """Merge teammate-reported coverage, newest stamp per tile winning.
+
+    The shared scan map ([[fleet-coordination]]): a sibling's live
+    radar coverage marks ground as known here too, so the forage and
+    sweep gates stop paying radars for tiles a teammate already
+    cleared. Own fresher coverage is never regressed.
+
+    Args:
+        state: Current world state.
+        tiles: ``(x, y, observed_ms)`` rows from teammates' reports.
+
+    Returns:
+        ``(state, merged)`` -- the (possibly new) world state and how
+        many tiles actually advanced.
+    """
+    updated: dict[str, int] = {}
+    for tile_x, tile_y, observed_ms in tiles:
+        key = coord_key(tile_x, tile_y)
+        current = state["scanned_tiles"].get(key, 0)
+        pending = updated.get(key, 0)
+        if observed_ms > current and observed_ms > pending:
+            updated[key] = observed_ms
+    if not updated:
+        return (state, 0)
+    merged_tiles = dict(state["scanned_tiles"])
+    merged_tiles.update(updated)
+    return (
+        WorldStateDict(
+            self_state=state["self_state"],
+            tanks=state["tanks"],
+            containers=state["containers"],
+            mines=state["mines"],
+            terrain=state["terrain"],
+            viewport=state["viewport"],
+            scanned_tiles=merged_tiles,
+            timestamp_ms=state["timestamp_ms"],
+        ),
+        len(updated),
+    )
+
+
 def record_scanned_tiles(
     state: WorldStateDict,
     scanned: list[tuple[int, int]],
@@ -475,6 +520,7 @@ __all__ = [
     "is_viewport_fully_covered",
     "is_viewport_scanned_within",
     "is_viewport_untouched",
+    "merge_scanned_coverage",
     "record_scanned_tiles",
     "select_best_free_radar_position",
     "tile_key",
