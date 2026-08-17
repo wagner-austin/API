@@ -55,7 +55,25 @@ class RQEnqueuer:
         return _test_hooks.rq_connection_factory(self.redis_url)
 
     def enqueue_train(self: RQEnqueuer, payload: TrainJobPayload) -> str:
-        """Enqueue a training job to the RQ queue.
+        """Enqueue a training job to the RQ queue, with retries disabled.
+
+        Training is the one job type here that must not be retried
+        automatically, and the reason is a measured incident rather than a
+        preference. Under the shared policy a failed train job was requeued
+        after ``retry_intervals_sec``, while the run's status had already
+        become ``failed`` -- a state the run contract calls terminal. An
+        operator who read that status and resubmitted got two jobs for one
+        experiment, and the retry surfaced hours later at the head of the
+        queue and trained from epoch one for its full duration. Four such
+        duplicates once occupied a single GPU ahead of the work that was
+        actually wanted.
+
+        The retry could not have helped in any case. A training run fails on
+        a corrupted CUDA context, an out-of-memory device or a rejected
+        configuration, none of which a second attempt resolves; and unlike
+        the short inference jobs on this queue, one attempt costs hours. The
+        inference and tokenizer paths keep the retry policy, where it is
+        cheap and the failures are transient.
 
         Args:
             payload: Training job payload containing run_id, user_id, and request.
@@ -65,9 +83,6 @@ class RQEnqueuer:
         """
         conn = self._connection()
         q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
-        retry = _test_hooks.rq_retry_factory(
-            max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
-        )
         payload_json = encode_train_job_payload(payload)
         job: RQJobLike = q.enqueue(
             "model_trainer.worker.train_job.process_train_job",
@@ -75,7 +90,7 @@ class RQEnqueuer:
             job_timeout=self.settings.job_timeout_sec,
             result_ttl=self.settings.result_ttl_sec,
             failure_ttl=self.settings.failure_ttl_sec,
-            retry=retry,
+            retry=None,
             description=f"train:{payload['run_id']}",
         )
         return job.get_id()

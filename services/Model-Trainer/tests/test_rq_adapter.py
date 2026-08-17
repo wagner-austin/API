@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Generator
+
+import pytest
 from platform_workers.redis import RedisBytesProto, _RedisBytesClient
 from platform_workers.rq_harness import RQClientQueue, RQJobLike, RQRetryLike
 from platform_workers.testing import FakeJob, FakeRedisBytesClient, FakeRetry
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.queue import (
+    ClozeJobPayload,
     EvalJobPayload,
     TokenizerTrainPayload,
     TrainJobPayload,
@@ -20,10 +24,17 @@ _KwargsDict = dict[str, int | str | None]
 
 
 class _TrackingQueue(RQClientQueue):
-    """Queue that tracks enqueue calls for test assertions."""
+    """Queue that tracks enqueue calls for test assertions.
+
+    ``last_retry`` is held separately from ``last`` because the retry policy
+    is not a JSON scalar. It is recorded at all because it was previously the
+    one enqueue argument no test could see, and a train job silently carrying
+    a retry is what let a failed run requeue itself behind an operator's back.
+    """
 
     def __init__(self) -> None:
         self.last: tuple[str, _JsonValue, _KwargsDict] | None = None
+        self.last_retry: RQRetryLike | None = None
 
     def enqueue(
         self,
@@ -44,8 +55,151 @@ class _TrackingQueue(RQClientQueue):
             "description": description,
         }
         self.last = (func_ref, payload, kwargs)
+        self.last_retry = retry
         desc_str = description if description is not None else "job"
         return FakeJob(f"id:{desc_str}")
+
+
+class _Fakes:
+    """The queue a test enqueues into, and every retry the adapter built.
+
+    Attributes:
+        queue: Tracking queue receiving each enqueue call.
+        retries: Retry objects the adapter asked the factory for, in order.
+            An empty list after an enqueue means that job type never
+            requested a retry policy at all.
+    """
+
+    def __init__(self, queue: _TrackingQueue, retries: list[RQRetryLike]) -> None:
+        self.queue = queue
+        self.retries = retries
+
+
+def _make_rq_fakes() -> Generator[_Fakes, None, None]:
+    """Bind the RQ seams to fakes for one test and restore them afterwards.
+
+    Yields:
+        The tracking queue and the list of retries the adapter constructed.
+    """
+    fake_queue = _TrackingQueue()
+    retries: list[RQRetryLike] = []
+
+    def _fake_rq_queue(name: str, connection: _RedisBytesClient) -> RQClientQueue:
+        return fake_queue
+
+    def _fake_rq_retry(*, max_retries: int, intervals: list[int]) -> RQRetryLike:
+        retry = FakeRetry(max=max_retries, interval=intervals)
+        retries.append(retry)
+        return retry
+
+    def _fake_redis_raw_for_rq(url: str) -> RedisBytesProto:
+        return FakeRedisBytesClient()
+
+    orig_queue = _test_hooks.rq_queue_factory
+    orig_retry = _test_hooks.rq_retry_factory
+    orig_conn = _test_hooks.rq_connection_factory
+
+    _test_hooks.rq_queue_factory = _fake_rq_queue
+    _test_hooks.rq_retry_factory = _fake_rq_retry
+    _test_hooks.rq_connection_factory = _fake_redis_raw_for_rq
+    try:
+        yield _Fakes(fake_queue, retries)
+    finally:
+        _test_hooks.rq_queue_factory = orig_queue
+        _test_hooks.rq_retry_factory = orig_retry
+        _test_hooks.rq_connection_factory = orig_conn
+
+
+rq_fakes = pytest.fixture(_make_rq_fakes)
+
+
+def _settings() -> RQSettings:
+    """Build settings whose retry policy is distinguishable from no policy.
+
+    Returns:
+        Settings with a non-zero retry budget, so a job that carries the
+        policy and a job that carries none cannot be confused.
+    """
+    return RQSettings(
+        job_timeout_sec=60,
+        result_ttl_sec=120,
+        failure_ttl_sec=180,
+        retry_max=3,
+        retry_intervals=[1, 2, 3],
+    )
+
+
+def _train_payload() -> TrainJobPayload:
+    """Build a minimal but complete training payload.
+
+    Returns:
+        A payload the adapter can encode without any field missing.
+    """
+    return {
+        "run_id": "run-1",
+        "request": {
+            "model_family": "gpt2",
+            "model_size": "s",
+            "max_seq_len": 16,
+            "num_epochs": 1,
+            "batch_size": 1,
+            "learning_rate": 1e-3,
+            "corpus_file_id": "deadbeef",
+            "tokenizer_id": "tok",
+            "holdout_fraction": 0.01,
+            "seed": 42,
+            "pretrained_run_id": None,
+            "freeze_embed": False,
+            "gradient_clipping": 1.0,
+            "optimizer": "adamw",
+            "device": "cpu",
+            "precision": "auto",
+            "data_num_workers": None,
+            "data_pin_memory": None,
+            "early_stopping_patience": 0,
+            "test_split_ratio": 0.0,
+            "finetune_lr_cap": 0.0,
+            "loss_mask_prefix_separator": None,
+            "hub_model_id": None,
+            "finetuning_strategy": "full",
+            "lora": None,
+            "quantization": None,
+            "gguf_export": None,
+        },
+        "user_id": 1,
+    }
+
+
+def test_a_train_job_is_enqueued_with_no_retry_policy(rq_fakes: _Fakes) -> None:
+    """A failed training run must stay failed rather than requeue itself.
+
+    The adapter must not even ask for a retry object, so the assertion is on
+    the factory having gone uncalled as well as on the argument being None.
+    """
+    enq = RQEnqueuer(redis_url="redis://localhost/0", settings=_settings())
+
+    enq.enqueue_train(_train_payload())
+
+    assert rq_fakes.queue.last_retry is None
+    assert rq_fakes.retries == []
+
+
+def test_an_inference_job_keeps_the_retry_policy(rq_fakes: _Fakes) -> None:
+    """Retries stay where they are cheap and the failures are transient.
+
+    The retry handed to the queue must be the one the adapter built from
+    settings, so the identity is asserted rather than its mere presence.
+    """
+    enq = RQEnqueuer(redis_url="redis://localhost/0", settings=_settings())
+
+    enq.enqueue_cloze(
+        ClozeJobPayload(
+            run_id="run-1", request_id="req-1", items_file_id="deadbeef", max_seq_len=16
+        )
+    )
+
+    assert len(rq_fakes.retries) == 1
+    assert rq_fakes.queue.last_retry is rq_fakes.retries[0]
 
 
 def test_rq_enqueuer_methods() -> None:
