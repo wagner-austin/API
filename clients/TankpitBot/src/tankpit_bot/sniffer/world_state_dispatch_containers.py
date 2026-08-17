@@ -96,35 +96,6 @@ def _dispatch_mine_detonation(
     return True
 
 
-def was_recent_pickup_at(ws: WorldService, x: int, y: int, now_ms: int) -> bool:
-    """Return True when a pickup broadcast just fired for this tile.
-
-    The code=4 drain-receipt discriminator (flag s9-4, 2026-07-30): a
-    pickup that DRAINS a container produces a ContainerPickup
-    broadcast for the tile followed by the 0x52 code=4 in the same
-    click -- that is a receipt of our own success, not a memory
-    desync. A genuinely vanished container (someone else took it
-    before we arrived) produces no pickup broadcast at all.
-
-    Args:
-        ws: World service carrying the recent-pickup ledger.
-        x: Container tile X.
-        y: Container tile Y.
-        now_ms: Current wall-clock ms.
-
-    Returns:
-        True when a pickup record for the tile is inside the ledger's
-        retention window.
-    """
-    cutoff = now_ms - 2 * PICKUP_DEDUP_WINDOW_MS
-    for signature, seen_ms in ws.recent_pickup_signatures.items():
-        if seen_ms < cutoff:
-            continue
-        if any(record[0] == x and record[1] == y for record in signature):
-            return True
-    return False
-
-
 def _is_duplicate_pickup_broadcast(
     ws: WorldService,
     pickups: tuple[ContainerPickupRecordDict, ...],
@@ -205,6 +176,7 @@ def _note_own_mine_hit(ws: WorldService, positions: list[tuple[int, int]]) -> No
     if (self_state["x"], self_state["y"]) not in positions:
         return
     ws.last_own_mine_hit_ms = browser.get_current_time_ms()
+    ws.mark_mine_reveal_pending(ws.last_own_mine_hit_ms)
     emit_world(
         "MINE_WALKOVER: detonation on own tile (%d,%d) - next approach teleports",
         self_state["x"],
@@ -325,5 +297,4 @@ def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessag
 
 __all__ = [
     "PICKUP_DEDUP_WINDOW_MS",
-    "was_recent_pickup_at",
 ]

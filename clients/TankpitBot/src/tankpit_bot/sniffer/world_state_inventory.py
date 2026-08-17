@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
+from tankpit_bot import _test_hooks
 from tankpit_bot.inventory import (
     InventoryChange,
     InventoryItem,
@@ -74,6 +75,11 @@ def _apply_inventory_state(ws: WorldService, new_state: InventoryState) -> list[
     old = ws.inventory_state
     ws.inventory_state = new_state
     changes = diff_inventory(old, ws.inventory_state)
+    if any(change["delta"] > 0 for change in changes):
+        # An equipment count rose -- the wire just credited US items.
+        # The code=4 drain-vs-stale discriminator reads this stamp
+        # (world_service_beliefs.record_own_gain).
+        ws.record_own_gain(_test_hooks.get_current_time_ms())
     _log_inventory_changes(changes)
     _emit_inventory_sample(ws, changes)
     return changes

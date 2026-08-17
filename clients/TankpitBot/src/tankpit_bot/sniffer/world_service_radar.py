@@ -31,6 +31,7 @@ class WorldServiceRadarMixin:
     pending_radar_uses_extra: bool
     pending_radar_empty_delta_ms: int
     container_desync_ms: int
+    mine_reveal_pending_ms: int
 
     def mark_radar_scan_complete(self) -> None:
         """Record that the server completed a radar scan.
@@ -45,6 +46,9 @@ class WorldServiceRadarMixin:
         """
         self.radar_scan_complete = True
         self.container_desync_ms = 0
+        # The same one-scan-per-latch rule covers the own-mine-hit
+        # reveal: any radar response answers it.
+        self.mine_reveal_pending_ms = 0
 
     def check_and_clear_radar_scan_complete(self) -> bool:
         """Check if a radar scan completed since last check, then clear.
