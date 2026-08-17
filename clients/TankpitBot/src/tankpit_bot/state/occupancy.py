@@ -60,21 +60,27 @@ def is_tank_body_present(tank: TankStateDict, now_ms: int) -> bool:
       moving the recorded tile); that imprecision is inherent to 2 s
       observation granularity and recorded as F6 open work.
 
-    * **Alive.** Corpses do NOT block walking -- archive-disproven
-      2026-08-04 (`analysis_scripts/mine_corpse_blocking.py`): six
-      clean 0x47 echoes of the bot walking ONTO a fresh corpse tile
-      2-10 s after its own kill, inside the 22 s corpse window, zero
-      blocked crossings. Kills drop NO loot (user contract
-      2026-08-04); the crossings are ordinary post-kill restock
-      collection routes through the current viewport that happen to
-      pass the corpse tile -- incidental, which makes them unbiased
-      evidence. The first cut of this module counted deactivated
-      tanks ("a corpse stands where it died"), which would have
-      walled off tiles on those restock routes for up to the
-      presence TTL after every kill. The ~22 s corpse window governs
-      the tank's RESPAWN choreography ([[deactivation-format]]), not
-      tile passability; the sim server's ``_blocked_by_world``
-      always gated on ``alive`` and now the client matches it.
+    Liveness is deliberately NOT a condition: **a corpse stands where
+    it died and blocks like a body.** The 2026-08-04 archive measure
+    ("six clean walks onto corpse tiles, zero blocked crossings")
+    briefly gated this on ``liveness == "alive"``; run
+    bot-20260813-204615 falsified it with exact-window wire receipts
+    (HUD flag 3): the bot killed orange-6 at (33,189) from (34,189)
+    -- static rock on every other neighbor -- and SEVEN consecutive
+    pickups through that tile closed ``0x52 code=1`` as PURE refusals
+    (no 0x47 echo: the first step was already blocked) while 0x2E
+    kept restating tank 532 at (33,189) with the dead-corpse sprite
+    (direction=32) and no mine stood anywhere in the pocket. The old
+    miner could not see this class: its blocking-proof pattern
+    required a partial-walk ECHO stopping adjacent to the corpse, and
+    a bot already standing adjacent gets a bare receipt -- its six
+    "clean crossings" (corpse tiles fixed from the victim's last wire
+    position, which displaced and ranged kills falsify) are the
+    suspect measurement, recorded in [[flag-triage-20260729]]. The
+    wire itself keeps the belief honest: the corpse's position is
+    restated for as long as it stands, so the same viewport-freshness
+    gate that bounds live bodies bounds corpses, and reactivation
+    flips ``liveness`` back with a fresh position either way.
 
     Args:
         tank: Tank registry entry to test.
@@ -85,8 +91,6 @@ def is_tank_body_present(tank: TankStateDict, now_ms: int) -> bool:
         ``(tank["x"], tank["y"])`` for movement planning.
     """
     if tank["is_self"]:
-        return False
-    if tank["liveness"] != "alive":
         return False
     if not has_known_position(tank):
         return False
