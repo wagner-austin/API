@@ -34,7 +34,7 @@ POSITIVE_LABEL = "failed"
 GROUP_COLUMN = "company_name"
 
 
-class _SeriesProto(Protocol):
+class SeriesProto(Protocol):
     """Protocol for the polars ``Series`` members this module reads."""
 
     def to_list(self) -> list[str]:
@@ -46,7 +46,7 @@ class _SeriesProto(Protocol):
         ...
 
 
-class _DataFrameProto(Protocol):
+class DataFrameProto(Protocol):
     """Protocol for the polars ``DataFrame`` members this module reads."""
 
     @property
@@ -58,7 +58,7 @@ class _DataFrameProto(Protocol):
         """
         ...
 
-    def select(self, columns: list[str]) -> _DataFrameProto:
+    def select(self, columns: list[str]) -> DataFrameProto:
         """Project the frame down to the named columns.
 
         Args:
@@ -69,7 +69,7 @@ class _DataFrameProto(Protocol):
         """
         ...
 
-    def get_column(self, name: str) -> _SeriesProto:
+    def get_column(self, name: str) -> SeriesProto:
         """Return one column.
 
         Args:
@@ -97,10 +97,10 @@ class _DataFrameProto(Protocol):
         ...
 
 
-class _ReadCsvProto(Protocol):
+class ReadCsvProto(Protocol):
     """Protocol for ``polars.read_csv``."""
 
-    def __call__(self, source: Path) -> _DataFrameProto:
+    def __call__(self, source: Path) -> DataFrameProto:
         """Read a CSV file into a frame.
 
         Args:
@@ -112,14 +112,14 @@ class _ReadCsvProto(Protocol):
         ...
 
 
-def _load_read_csv() -> _ReadCsvProto:
+def load_read_csv() -> ReadCsvProto:
     """Resolve ``polars.read_csv`` as a Protocol-typed callable.
 
     Returns:
         The CSV reader.
     """
     module = __import__("polars", fromlist=["read_csv"])
-    read_csv: _ReadCsvProto = module.read_csv
+    read_csv: ReadCsvProto = module.read_csv
     return read_csv
 
 
@@ -194,7 +194,7 @@ def load_bankruptcy_dataset(csv_path: Path) -> LoadedDataset:
         ValueError: If the CSV is missing the label or grouping column, which
             would otherwise produce a silently mislabelled benchmark.
     """
-    read_csv = _load_read_csv()
+    read_csv = load_read_csv()
     frame = read_csv(csv_path)
     columns = frame.columns
 
@@ -232,8 +232,12 @@ __all__ = [
     "IDENTIFIER_COLUMNS",
     "LABEL_COLUMN",
     "POSITIVE_LABEL",
+    "DataFrameProto",
     "LoadedDataset",
+    "ReadCsvProto",
+    "SeriesProto",
     "encode_group_codes",
     "file_sha256",
     "load_bankruptcy_dataset",
+    "load_read_csv",
 ]

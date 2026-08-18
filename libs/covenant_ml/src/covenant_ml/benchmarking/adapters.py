@@ -32,7 +32,7 @@ from .protocols import DataSplit, TrainedModelProto
 from .types import BenchmarkConfig, BenchmarkModelName
 
 
-class _BoosterProto(Protocol):
+class LGBMBoosterProto(Protocol):
     """Protocol for the LightGBM ``Booster`` members this package reads."""
 
     def dump_model(self) -> dict[str, JSONValue]:
@@ -56,7 +56,7 @@ class _BoosterProto(Protocol):
         ...
 
 
-class _LGBMClassifierProto(Protocol):
+class LGBMClassifierProto(Protocol):
     """Protocol for the LightGBM classifier members this package uses."""
 
     def fit(self, x: NDArray[np.float64], y: NDArray[np.int64]) -> None:
@@ -80,7 +80,7 @@ class _LGBMClassifierProto(Protocol):
         ...
 
     @property
-    def booster_(self) -> _BoosterProto:
+    def booster_(self) -> LGBMBoosterProto:
         """Return the underlying fitted booster.
 
         Returns:
@@ -107,7 +107,7 @@ class _LGBMClassifierCtor(Protocol):
         n_jobs: int,
         random_state: int,
         verbose: int,
-    ) -> _LGBMClassifierProto: ...
+    ) -> LGBMClassifierProto: ...
 
 
 def _load_lightgbm_ctor() -> _LGBMClassifierCtor:
@@ -157,7 +157,7 @@ class ClearGbmTrainedModel:
 class LightGbmTrainedModel:
     """A fitted LightGBM ensemble, exposed through the benchmark's Protocol."""
 
-    def __init__(self, classifier: _LGBMClassifierProto) -> None:
+    def __init__(self, classifier: LGBMClassifierProto) -> None:
         """Capture the fitted classifier.
 
         Args:
@@ -309,6 +309,8 @@ class LightGbmTrainer:
 __all__ = [
     "ClearGbmTrainedModel",
     "ClearGbmTrainer",
+    "LGBMBoosterProto",
+    "LGBMClassifierProto",
     "LightGbmTrainedModel",
     "LightGbmTrainer",
 ]
