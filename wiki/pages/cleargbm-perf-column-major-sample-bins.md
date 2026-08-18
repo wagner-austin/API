@@ -56,7 +56,7 @@ Phase E measured the combined column-major + uint8 + unrolled-accumulator lift a
 The variance figure (10× lower variance vs the pre-refactor hook path[^11]) means this measurement is genuinely load-bearing — regressions of even 10% show up cleanly in a re-run.
 
 [^1]: `libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md` § "Speed" — cleargbm 6.88s ± 0.13s, LightGBM 0.87s ± 0.09s.
-[^2]: `libs/cleargbm_rs/src/binning/feature_bins.rs:22` — `sample_bins: Vec<Vec<usize>>`; docstring `Shape: [n_samples][n_features]`.
+[^2]: (historical, pre-Phase-E) `libs/cleargbm_rs/src/binning/feature_bins.rs:22` — `sample_bins: Vec<Vec<usize>>`; docstring `Shape: [n_samples][n_features]`. This is the layout the page proposed replacing; the shipped code is a flat `Vec<u8>` at `:33`.
 [^3]: `libs/cleargbm_rs/src/binning/feature_bins.rs:105-117` — `for row in x { let mut row_bins = Vec::with_capacity(bin_edges.len()); for (feat_idx, be) in bin_edges.iter().enumerate() { ... row_bins.push(...) } sample_bins.push(row_bins); }`.
 [^4]: `libs/cleargbm_rs/src/histogram/mod.rs:48` — `pub bins: &'a [u8]` on `HistogramRequest`. (Pre-Phase-E this page cited a `build_histogram(..., bins: &[usize], ...)` free-function signature; the request-struct form with a `u8` slice is what exists today.)
 [^5]: `libs/cleargbm_rs/src/binning/feature_bins.rs` — the row-major `sample_bins(&self) -> &[Vec<usize>]` accessor this page proposed retiring is gone; the flat accessor at `:58` returns `&self.sample_bins` as `&[u8]`.
