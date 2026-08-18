@@ -41,6 +41,8 @@ wiki/
 2. **Hubs** (`hubs/*.md`, ~30-50 lines each) — topic navigation. Each hub holds **inclusion links** to content pages, one per line: `[Title](../pages/<slug>.md) -- one-line description`. A content page can appear in multiple hubs (polyhierarchy).
 3. **Content pages** (`pages/*.md`, 30-80 lines each) — atomic facts, one concept per page. Cite primary sources for every claim.
 
+**Frontmatter belongs to tier 3 only.** Content pages carry the frontmatter block below; `index.md` and every hub carry none, and open directly with their `# Heading`, which *is* their title. This is enforced, not merely preferred: wiki-mcp's `decodeHubEntry` and `decodeIndexEntry` set `frontmatter: {}` and hash the entire raw file as the body, and wiki-search's chunker rejects any hub or `index.md` that opens with `---`. A frontmatter block on a hub is therefore indexed as body prose and read by nothing.
+
 ### Why this architecture (Karpathy LLM-wiki + IWE knowledge graph pattern)
 
 - **vs memory files:** flat index, no cross-referencing, no citations, no staleness tracking. The wiki replaces them as the single source of truth for game mechanics, protocol, and architecture.
@@ -63,7 +65,7 @@ All lowercase, kebab-case, no special characters. No prefix needed (single game,
 
 ## Frontmatter
 
-Every page opens with YAML frontmatter:
+Every content page in `pages/` opens with YAML frontmatter. Hubs and `index.md` do not — see the tier rule above. ("Every page" here used to read as every file in the wiki, which is how 13 hubs in the personal wiki acquired a `title:` duplicating their own heading.)
 
 ```yaml
 ---
