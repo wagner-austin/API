@@ -37,6 +37,7 @@ Skip: hobby services (`grandma-api`, `github-stats-api`, `procart-api`) unless c
 | [DiscordBot](clients/DiscordBot) | Discord bot integrating all platform services |
 | [TankpitBot](clients/TankpitBot) | Tankpit.com WebSocket protocol reverse-engineering and game bot |
 | [RustedWarfareBot](clients/RustedWarfareBot) | Headless Rusted Warfare client — JVM agent + Python planner, no screen scraping |
+| [NavProbe](clients/NavProbe) | Reproducibility instrument for simulated navigation — seeded rollouts, canonical digests, determinism verdicts across MJX and MuJoCo-Warp |
 
 ## Shared Libraries
 
