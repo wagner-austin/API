@@ -171,6 +171,12 @@ tmpclaude-*
 # on 55432 because the MCPs stack owns 5432), so it is per-machine by definition.
 docker-compose.override.yml
 
-# Derived vector index for the wiki (hnsw.index + metadata), rebuilt from the
+# Derived vector index for a wiki (hnsw.index + metadata), rebuilt from the
 # wiki content on demand. No chroma store is tracked anywhere in this repo.
-wiki/.chroma/
+#
+# Unanchored on purpose. The previous pattern was "wiki/.chroma/", and a
+# pattern with an embedded slash is anchored to this file's directory, so it
+# only ever matched the root wiki and never the per-client ones under
+# clients/*/wiki/. Three client stores escaped it and one of them reached a
+# commit, which is 419KB of binary index rewritten on every reindex.
+.chroma/
