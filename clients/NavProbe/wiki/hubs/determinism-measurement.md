@@ -1,0 +1,18 @@
+# Determinism Measurement
+
+What "reproducible" means for a batched simulator, what has actually been measured, and under which conditions. This hub covers the published determinism regimes, the gap between what was measured and what gets assumed from it, and every trial this instrument has run.
+
+A determinism result is only meaningful with its conditions attached — seed, step count, repetitions, batch width, and backend. Pages here carry a `measured_with` block; one that does not is unverified.
+
+Read one page first: Warp ships an explicit determinism control and MuJoCo-Warp **cannot compile under it**, so everything below characterises the only mode a user can actually run. Given that, the short version: on the GPU, reproducibility **within** a backend holds while contacts only join bodies to the floor, and fails once a handful of bodies touch each other; and the CPU and CUDA backends **do not agree with each other** — starting at the step the scene's first contact is solved, which is a fact about the trajectory rather than about the simulator. Rendered observations have their own hub, [Rendered Observations](rendered-observations.md).
+
+[MJX's batched step reproduces bit for bit on CPU across batch widths](../pages/mjx-batched-step-reproduces-on-cpu.md) -- 5 repetitions at seven batch widths, all identical; the instrument's positive control
+[MJX reproduces bit for bit on CUDA, including across fresh processes](../pages/mjx-cuda-batched-step-reproduces.md) -- widths 1 to 4096, plus three independent GPU processes agreeing through files
+[MJX determinism holds within a backend and does not cross between them](../pages/mjx-determinism-does-not-cross-backends.md) -- CPU and CUDA agree for 57 steps and then part; the divergence point moves with batch width
+[On CPU, a rollout survives a change of OS and of jax version](../pages/cpu-determinism-survives-os-and-version-change.md) -- the control that makes the backend comparison interpretable
+[Cross-backend divergence begins at the first contact solve, not before](../pages/backend-divergence-begins-at-first-contact.md) -- two unrelated compiler stacks part at the same step, because that is the step the ball lands
+[GPU non-determinism in MuJoCo-Warp needs mutually-contacting bodies, not many contacts](../pages/warp-gpu-determinism-fails-on-coupled-bodies.md) -- 64 contacts across 32 floor-resting bodies reproduce; 14 contacts among 6 touching bodies do not
+[The GPU's last-bit disagreement amplifies to macroscopic scale in contact-rich scenes](../pages/gpu-nondeterminism-amplifies-to-macroscopic-scale.md) -- eight orders of magnitude in two seconds, from the last bit to half the container; the CPU control is exactly zero
+[MuJoCo-Warp cannot compile under either of Warp's deterministic modes](../pages/mjwarp-cannot-compile-under-warp-deterministic-mode.md) -- Warp ships the fix and one function blocks it, so every measurement here is of the only mode available
+[The coupled-body determinism threshold does not move with SM count](../pages/coupled-body-threshold-does-not-move-with-sm-count.md) -- 46 SMs and 84 SMs place the boundary at the same five bodies, falsifying the occupancy explanation and making the published counts portable across Ampere
+[The CPU control is bit-identical across AMD and Intel](../pages/cpu-determinism-is-bit-portable-across-x86-vendors.md) -- ten scenes, two vendors, 10/10 matching digests; the reference every GPU claim is stated against is a portable artefact, not a per-machine one
