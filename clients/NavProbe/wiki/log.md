@@ -2,6 +2,12 @@
 
 Append-only. Log structural operations (new hubs, decomposition, audits, cleanups) and every measurement run. Routine page edits don't need a log entry — git history covers those. Newest first.
 
+## [2026-08-18] measurement | the vector-width axis is CLOSED — pre-AVX2 host matches, 10/10
+Pages updated: cpu-determinism-is-bit-portable-across-x86-vendors (fourth host; claim now spans every vector width the software can execute on)
+Notes: emerald (AMD A10-7800 Steamroller, AMD64 Family 21 Model 48) reported **AVX true, AVX2 false, AVX512F false** and `all_deterministic: true`, with **10/10 digests identical** to the lavender/pendragon/sedona baseline. The CPU control is now bit-identical across two vendors and three vector widths: AVX-512, AVX2-without-AVX-512, and AVX-without-AVX2.
+**This axis is closed, not sampled.** Per the AVX-floor page, MuJoCo's shipped binary will not import below AVX, so no processor exists that could extend it further. The two load-bearing hosts are sedona (AVX-512 fused off by Intel on consumer 12th-gen) and emerald (a 2014 microarchitecture predating AVX2) — a two-generation spread in vector hardware that moved not one bit.
+Unblocking note: emerald had no SSH listener because of my own earlier standing instruction, written when Win10 EOL made an imminent Ubuntu reimage look certain. The operator's Windows 11 upgrade removed that deadline and I did not lift the instruction, so it sat as the sole blocker on the last experiment for roughly a day. Reversed, listener installed austinpc-scoped and key-only, sweep run remotely. The lesson is that a standing DO-NOT needs an expiry condition stated alongside it, or it outlives its reason silently.
+
 ## [2026-08-17] measurement | the CPU control also holds across vector widths, and a hardware floor is recorded
 Pages written: mujoco-requires-avx-so-pre-avx-hosts-are-ineligible
 Pages updated: cpu-determinism-is-bit-portable-across-x86-vendors (third host; claim broadened from vendors to vendors AND vector widths)
