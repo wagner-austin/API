@@ -165,10 +165,13 @@ class _FakeRQWorkerInternal:
         self.connection = connection
         self.work_called = False
         self.with_scheduler: bool | None = None
+        self.max_jobs: int | None = None
 
-    def work(self, *, with_scheduler: bool) -> None:
+    def work(self, *, with_scheduler: bool, max_jobs: int | None) -> bool:
         self.work_called = True
         self.with_scheduler = with_scheduler
+        self.max_jobs = max_jobs
+        return True
 
 
 class FakeRQModule:

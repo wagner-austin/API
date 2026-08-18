@@ -30,9 +30,14 @@ class _RQQueueLike(Protocol):
 
 
 class _RQWorkerLike(Protocol):
-    """Protocol for RQ Worker-like objects."""
+    """Protocol for RQ Worker-like objects.
 
-    def work(self, *, with_scheduler: bool) -> None: ...
+    ``max_jobs`` mirrors rq's ``Worker.work(max_jobs=...)``: the worker exits
+    after performing that many jobs, or runs indefinitely when None. The
+    return value mirrors rq's: True if the worker performed at least one job.
+    """
+
+    def work(self, *, with_scheduler: bool, max_jobs: int | None) -> bool: ...
 
 
 class _RQJobInternal(Protocol):
@@ -67,7 +72,7 @@ class _RQQueueInternal(Protocol):
 class _RQWorkerInternal(Protocol):
     """Protocol for internal RQ SimpleWorker."""
 
-    def work(self, *, with_scheduler: bool) -> None: ...
+    def work(self, *, with_scheduler: bool, max_jobs: int | None) -> bool: ...
 
 
 class RQRetryLike(Protocol):
@@ -218,8 +223,8 @@ def _rq_simple_worker(
         def __init__(self, inner: _RQWorkerInternal) -> None:
             self._inner = inner
 
-        def work(self, *, with_scheduler: bool) -> None:
-            self._inner.work(with_scheduler=with_scheduler)
+        def work(self, *, with_scheduler: bool, max_jobs: int | None) -> bool:
+            return self._inner.work(with_scheduler=with_scheduler, max_jobs=max_jobs)
 
     return _Worker(worker)
 
@@ -235,6 +240,20 @@ def get_current_job() -> CurrentJobProto | None:
     return get_job_fn()
 
 
+def _start_worker(config: WorkerConfig, *, max_jobs: int | None) -> None:
+    """Build the queue and worker for ``config`` and enter the work loop.
+
+    Args:
+        config: Worker configuration naming the Redis URL and queue.
+        max_jobs: Number of jobs after which the worker exits, or None to
+            run indefinitely. Passed through to rq's ``Worker.work``.
+    """
+    conn = redis_raw_for_rq(config["redis_url"])
+    q = _rq_queue_raw(config["queue_name"], connection=conn)
+    worker = _rq_simple_worker([q], connection=conn)
+    worker.work(with_scheduler=True, max_jobs=max_jobs)
+
+
 def run_rq_worker(config: WorkerConfig) -> None:
     """Start an RQ worker bound to the configured queue and Redis connection.
 
@@ -242,10 +261,21 @@ def run_rq_worker(config: WorkerConfig) -> None:
     It relies on the runtime RQ library; in tests, factories can be patched to
     provide strict fakes.
     """
-    conn = redis_raw_for_rq(config["redis_url"])
-    q = _rq_queue_raw(config["queue_name"], connection=conn)
-    worker = _rq_simple_worker([q], connection=conn)
-    worker.work(with_scheduler=True)
+    _start_worker(config, max_jobs=None)
+
+
+def run_single_job_rq_worker(config: WorkerConfig) -> None:
+    """Start an RQ worker that performs exactly one job and then exits.
+
+    For workers whose jobs bind process-lifetime resources that cannot be
+    reset in-process — a CUDA context above all: one asynchronous CUDA fault
+    poisons the context for every subsequent call in the process and pins its
+    GPU memory until process exit. Exiting after each job hands the container
+    supervisor (``restart: unless-stopped``) a clean restart, so every job
+    gets a fresh process and a fresh context. Blocks while the queue is empty
+    exactly like ``run_rq_worker``; the recycle happens only after a job runs.
+    """
+    _start_worker(config, max_jobs=1)
 
 
 class FetchedJobProto(Protocol):
@@ -328,4 +358,5 @@ __all__ = [
     "rq_queue",
     "rq_retry",
     "run_rq_worker",
+    "run_single_job_rq_worker",
 ]

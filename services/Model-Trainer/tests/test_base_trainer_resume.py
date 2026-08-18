@@ -488,9 +488,7 @@ def test_resume_with_all_epochs_complete_skips_the_loop(
     }
     # The optimizer state must match a real AdamW over this model's
     # parameters; torch refuses a state dict with foreign param groups.
-    optimizer_state = AdamW(
-        prepared.model.parameters(), lr=cfg["learning_rate"]
-    ).state_dict()
+    optimizer_state = AdamW(prepared.model.parameters(), lr=cfg["learning_rate"]).state_dict()
     _ = save_training_checkpoint(
         settings_with_paths,
         TrainingCheckpoint(

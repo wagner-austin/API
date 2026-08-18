@@ -10,6 +10,7 @@ from platform_workers.rq_harness import (
     rq_queue,
     rq_retry,
     run_rq_worker,
+    run_single_job_rq_worker,
 )
 from platform_workers.testing import (
     FakeRedisBytesClient,
@@ -23,22 +24,23 @@ from platform_workers.testing import (
 )
 
 
-def test_run_rq_worker_invokes_worker() -> None:
-    """Test run_rq_worker creates queue and worker then calls work()."""
-    # Set up the redis bytes module hook
+def _install_tracking_rq_module() -> list[tuple[bool, int | None]]:
+    """Install redis + rq module hooks with a work()-tracking worker.
+
+    Returns:
+        The list that receives one (with_scheduler, max_jobs) tuple per
+        work() invocation.
+    """
     redis_hook, _redis_module = make_fake_load_redis_bytes_module()
     hooks.load_redis_bytes_module = redis_hook
 
-    # Set up the rq module hook - we need to track work() calls
-    # Create a custom worker class that tracks calls
-    work_calls: list[bool] = []
+    work_calls: list[tuple[bool, int | None]] = []
 
     class _TrackingWorker(_FakeRQWorkerInternal):
-        def work(self, *, with_scheduler: bool) -> None:
-            work_calls.append(with_scheduler)
-            super().work(with_scheduler=with_scheduler)
+        def work(self, *, with_scheduler: bool, max_jobs: int | None) -> bool:
+            work_calls.append((with_scheduler, max_jobs))
+            return super().work(with_scheduler=with_scheduler, max_jobs=max_jobs)
 
-    # Create a custom RQ module with our tracking worker
     class _TrackingRQModule(FakeRQModule):
         def __init__(self) -> None:
             super().__init__(current_job=None)
@@ -50,6 +52,12 @@ def test_run_rq_worker_invokes_worker() -> None:
         return tracking_module
 
     hooks.load_rq_module = _hook
+    return work_calls
+
+
+def test_run_rq_worker_invokes_worker() -> None:
+    """Test run_rq_worker calls work() with scheduler and no job limit."""
+    work_calls = _install_tracking_rq_module()
 
     cfg: WorkerConfig = {
         "redis_url": "redis://x",
@@ -57,7 +65,20 @@ def test_run_rq_worker_invokes_worker() -> None:
         "events_channel": "turkic:events",
     }
     run_rq_worker(cfg)
-    assert work_calls == [True]
+    assert work_calls == [(True, None)]
+
+
+def test_run_single_job_rq_worker_limits_to_one_job() -> None:
+    """Test run_single_job_rq_worker calls work() with max_jobs=1."""
+    work_calls = _install_tracking_rq_module()
+
+    cfg: WorkerConfig = {
+        "redis_url": "redis://x",
+        "queue_name": "trainer",
+        "events_channel": "trainer:events",
+    }
+    run_single_job_rq_worker(cfg)
+    assert work_calls == [(True, 1)]
 
 
 def test_rq_queue_enqueue_wrapper() -> None:
@@ -82,8 +103,8 @@ def test_rq_worker_work_wrapper() -> None:
     conn = FakeRedisBytesClient()
     q: rh._RQQueueInternal = _FakeRQQueueInternal("test", connection=conn)
     worker = rh._rq_simple_worker([q], connection=conn)
-    worker.work(with_scheduler=True)
-    # If we got here without error, the worker.work() was called successfully
+    did_work = worker.work(with_scheduler=True, max_jobs=None)
+    assert did_work is True
 
 
 def test_get_current_job_returns_none_outside_worker() -> None:

@@ -27,7 +27,8 @@ def test_rq_runtime_imports_queue_and_worker() -> None:
     assert raw_queue.name == "turkic"
 
     # Verify worker.work() can be called
-    worker.work(with_scheduler=True)
+    did_work = worker.work(with_scheduler=True, max_jobs=None)
+    assert did_work is True
 
 
 def test_public_rq_queue_factory() -> None:

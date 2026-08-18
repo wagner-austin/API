@@ -128,11 +128,13 @@ def test_main_builds_config_from_env_when_not_provided() -> None:
     assert runner.configs[0]["queue_name"] == TRAINER_QUEUE
 
 
-def test_worker_runner_hook_is_bound_to_the_real_rq_runner() -> None:
-    """The hook holds the production runner, so no fallback branch is needed."""
-    from platform_workers.rq_harness import run_rq_worker
+def test_worker_runner_hook_is_bound_to_the_single_job_rq_runner() -> None:
+    """The hook holds the single-job runner: one job per process, so each
+    training run gets a fresh CUDA context and a poisoned context cannot
+    cascade into later jobs or pin GPU memory past its own run."""
+    from platform_workers.rq_harness import run_single_job_rq_worker
 
-    assert _test_hooks.worker_runner is run_rq_worker
+    assert _test_hooks.worker_runner is run_single_job_rq_worker
 
 
 def test_main_uses_test_runner_when_set() -> None:
