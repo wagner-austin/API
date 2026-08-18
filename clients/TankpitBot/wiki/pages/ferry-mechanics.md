@@ -51,7 +51,7 @@ click again to reach your destination land tile. it takes two
 actions because you have to embark and disembark."[^4]
 
 Planner consequence: **pickup dispatches route on the CURRENT surface**
-(`SurfaceRouteTerrain` gate at `src/tankpit_bot/bot/ai/movement.py:288`,
+(`SurfaceRouteTerrain` gate at `src/tankpit_bot/bot/ai/movement.py:325`,
 `SurfaceRouteTerrain(terrain, water=riding)` — the PLANNER's movement
 module, not the sim's `sim/movement.py` referenced elsewhere on this
 page) — plain ground when

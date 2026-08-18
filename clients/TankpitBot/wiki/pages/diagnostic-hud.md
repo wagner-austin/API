@@ -108,4 +108,4 @@ spot in the event stream:
     `FlagCaptureService`, with `FLAG_RING_SIZE = 8` at `:46`;
     binding-vs-fetch rationale measured 2026-07-29 in
     `src/tankpit_bot/browser/live_view.py` module docs.
-[^4]: `src/tankpit_bot/runtime_logging.py:45` — `RUNTIME_CONTEXT_KEYS: frozenset[str] = frozenset({"tick_n", "bot_state", "in_flight_action_kind"})`, the context stamped onto every emitted diagnostic (field docs at `:57-67`). The flag's own fields come from `src/tankpit_bot/browser/flag_capture.py:100-105`: `emit_diagnostic(diagnostic_kind="human_flag", flag_seq=..., clicked_at_ms=..., recent_ticks=...)`.
+[^4]: `src/tankpit_bot/runtime_context.py:26` — `RUNTIME_CONTEXT_KEYS: frozenset[str] = frozenset({"tick_n", "bot_state", "in_flight_action_kind"})`, the context stamped onto every emitted diagnostic (field docs at `:57-67`). The flag's own fields come from `src/tankpit_bot/browser/flag_capture.py:100-105`: `emit_diagnostic(diagnostic_kind="human_flag", flag_seq=..., clicked_at_ms=..., recent_ticks=...)`.
