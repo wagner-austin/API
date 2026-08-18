@@ -2,6 +2,10 @@
 title: JAX has no CUDA backend on native Windows
 tags: [platform, jax, cuda, constraint]
 related: ["[[mjx-batched-step-reproduces-on-cpu]]", "[[python-311-caps-scientific-stack]]"]
+source_paths:
+  - "src/navprobe/adapters/mjx_bindings.py"
+source_git_blobs:
+  "src/navprobe/adapters/mjx_bindings.py": "7c30f87ec36dafc29bb627b33a91fe62578f853b"
 provenance:
   - "jax 0.10.2"
   - "PyPI"
@@ -43,5 +47,5 @@ It also bounds what the CPU results were ever allowed to claim. Presenting the C
 [^2]: https://docs.jax.dev/en/latest/installation.html — `[observed]` — `python -c "import jax; print(jax.devices())"` printed `[CpuDevice(id=0)]` with `jax` 0.10.2 / `jaxlib` 0.10.2 `cp311-win_amd64`.
 [^3]: `wiki/log.md:28` (the sweep entry comparing sedona against this host's RTX 3090 Ti) — `[observed]` — `nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv` returned `NVIDIA GeForce RTX 3090 Ti, 591.86, 24564 MiB`.
 [^4]: `[observed]` — on native Windows, `warp.init()` prints `Devices: "cpu" : "Intel64 ..."` and `"cuda:0" : "NVIDIA GeForce RTX 3090 Ti" (24 GiB, sm_86, mempool enabled)` with `CUDA Toolkit 12.9, Driver 13.1`; `warp.get_devices()` returns `['cpu', 'cuda:0']`. Both `warp-lang` 1.16.0 and `mujoco-warp` 3.11.0 install from PyPI into the Windows venv.
-[^5]: src/navprobe/adapters/mjx.py:1 module import path — `[observed]` — importing `mujoco.mjx` 3.11.0 emits `Failed to import warp: No module named 'warp'` and `Failed to import mujoco_warp: No module named 'warp'` to stderr, then proceeds on the JAX backend.
+[^5]: `src/navprobe/adapters/mjx_bindings.py:285` — the `__import__(MJX_MODULE, ...)` call inside `load_mjx` (L279), with `MJX_MODULE = "mujoco.mjx"` at L34 — `[observed]` — importing `mujoco.mjx` 3.11.0 emits `Failed to import warp: No module named 'warp'` and `Failed to import mujoco_warp: No module named 'warp'` to stderr, then proceeds on the JAX backend.
 [^6]: https://docs.jax.dev/en/latest/installation.html — `[observed]` — inside WSL2 Ubuntu: `nvidia-smi` reports the same RTX 3090 Ti, and `python -c "import jax; print(jax.__version__, jax.devices(), jax.default_backend())"` prints `0.11.0 [CudaDevice(id=0)] gpu`.
