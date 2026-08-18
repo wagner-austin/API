@@ -5,6 +5,9 @@ related: ["[[mjwarp-cannot-compile-under-warp-deterministic-mode]]", "[[warp-gpu
 source_paths:
   - "scripts/apply_tactile_alias_patch.py"
   - "scripts/det_compile_test.py"
+source_git_blobs:
+  "scripts/apply_tactile_alias_patch.py": "b244ed872f85a1e71b69c2e686e33f81810915f7"
+  "scripts/det_compile_test.py": "36ab97032303159839966c2c7afb356e78845488"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"

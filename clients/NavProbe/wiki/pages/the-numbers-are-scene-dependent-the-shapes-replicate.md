@@ -6,7 +6,7 @@ source_paths:
   - "wiki/log.md"
   - "src/navprobe/scenes.py"
 source_git_blobs:
-  "wiki/log.md": "78cc77e9d2366cb295c552b9e1fb2a56fd9e4b69"
+  "wiki/log.md": "f3c0a73fa31ad15007d5cbda28d1234e790d9fb3"
   "src/navprobe/scenes.py": "4a05c692fbd2740bd717f015e7725fa8175fc207"
 fact_checked: 2026-08-14
 confidence: high
