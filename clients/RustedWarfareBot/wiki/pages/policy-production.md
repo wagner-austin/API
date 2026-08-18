@@ -16,6 +16,13 @@ source_paths:
   - "wiki/sources/m20-one-tick/multi-builder-ab.txt"
   - "wiki/sources/m21-losses/where-units-die.txt"
   - "wiki/sources/m22-workers/worker-ceiling-ab.txt"
+source_git_blobs:
+  "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
+  "src/rw_bot/policy/campaign.py": "ae3700f5a5c413b05f2909de398d1154d8262b2f"
+  "scripts/play.py": "c95267440b13b56f48a32def2a00b99e2f9efe72"
+  "wiki/sources/m20-one-tick/multi-builder-ab.txt": "f4bebb002c2360618983acaf73bc6d1dace5ad31"
+  "wiki/sources/m21-losses/where-units-die.txt": "280848152bf106e667622974a0477c521f3c3801"
+  "wiki/sources/m22-workers/worker-ceiling-ab.txt": "d21b022d56bab638533e62826c239975125c2e3d"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

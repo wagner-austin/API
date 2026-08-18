@@ -25,6 +25,10 @@ source_paths:
   - "wiki/sources/m15-ai-zones/zone-dump.txt"
   - "wiki/sources/m15-ai-zones/zone-dump-330s.txt"
   - "wiki/sources/m16-enums/enum-names.txt"
+source_git_blobs:
+  "wiki/sources/m15-ai-zones/zone-dump.txt": "dbfff06d71e2e199976a8bd8727e163aa7d451f9"
+  "wiki/sources/m15-ai-zones/zone-dump-330s.txt": "cbf8ad157b2d0d752aee3997745800351f25b62c"
+  "wiki/sources/m16-enums/enum-names.txt": "919c505b3f4d41a4c8dc599a37653ddbfb4e5e1e"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: medium

@@ -13,6 +13,10 @@ source_paths:
   - "wiki/sources/m4-entities/entity-count-loop.txt:37"
   - "wiki/sources/m4-entities/player-class.txt:18"
   - "wiki/sources/m4-entities/live-graph-search.txt:9"
+source_git_blobs:
+  "wiki/sources/m4-entities/entity-count-loop.txt": "a4888d9e10b2ff23b6953fa83f7d15f5d7c77894"
+  "wiki/sources/m4-entities/player-class.txt": "43069ba5b31ce9c2cc99f61ae6f898d7086108fe"
+  "wiki/sources/m4-entities/live-graph-search.txt": "987e249a0abbeb7f92323921fe465571321c89bc"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

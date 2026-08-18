@@ -14,6 +14,11 @@ source_paths:
   - "wiki/sources/m15-ai-zones/zone-dump.txt"
   - "wiki/sources/m15-ai-zones/zone-dump-330s.txt"
   - "runs/decompiled/com/corrodinggames/rts/game/i.java:547"
+source_git_blobs:
+  "agent/src/rwbot/agent/AiZones.java": "89eef6146f1285b7b4199a5a61bc9abc53dde468"
+  "agent/src/rwbot/agent/AgentOptions.java": "f114137a92ec0a489848c6d978575bbad26ffbe4"
+  "wiki/sources/m15-ai-zones/zone-dump.txt": "dbfff06d71e2e199976a8bd8727e163aa7d451f9"
+  "wiki/sources/m15-ai-zones/zone-dump-330s.txt": "cbf8ad157b2d0d752aee3997745800351f25b62c"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

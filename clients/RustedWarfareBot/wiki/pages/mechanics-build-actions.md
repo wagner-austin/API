@@ -19,6 +19,10 @@ source_paths:
   - "wiki/sources/m12-produce/produce-run.log"
   - "agent/src/rwbot/agent/BuildOptions.java"
   - "agent/src/rwbot/agent/Orders.java"
+source_git_blobs:
+  "wiki/sources/m12-produce/produce-run.log": "9e6dbf9b8d9f7867ed36868664fdfd7210f46a79"
+  "agent/src/rwbot/agent/BuildOptions.java": "0d5a8a58756ee70bab724662c398ec09c225edbb"
+  "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

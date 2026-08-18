@@ -23,6 +23,13 @@ source_paths:
   - "src/rw_bot/control/channel.py"
   - "src/rw_bot/wire/ndjson.py"
   - "src/rw_bot/wire/state.py"
+source_git_blobs:
+  "wiki/sources/m6-wire/world-sample.ndjson": "b07f259208d477629c7d45d438b1d304c36d76de"
+  "agent/src/rwbot/agent/BuildOptions.java": "0d5a8a58756ee70bab724662c398ec09c225edbb"
+  "agent/src/rwbot/agent/StateStream.java": "0005edda5cc880aa718832ae0ed7c745e4dc4a52"
+  "src/rw_bot/control/channel.py": "e5c4521155fea78be4e037ca2e9f631d3a8b8443"
+  "src/rw_bot/wire/ndjson.py": "188d5ecd49442155a37cc61e726f27cdffdd06bc"
+  "src/rw_bot/wire/state.py": "3dbc0ef8e704d7542b9c4cb3be5049091213d077"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

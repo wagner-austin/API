@@ -15,6 +15,13 @@ source_paths:
   - "agent/src/rwbot/agent/BuildTree.java"
   - "src/rw_bot/mechanics/build_tree.py"
   - "src/rw_bot/policy/expand.py"
+source_git_blobs:
+  "wiki/sources/m11-pools/type-flags.ndjson": "f1d519832e75306a2497669e479224b26e731f3a"
+  "wiki/sources/m13-expand/expanded-run.log": "007708cb30f8e0d2602f07ed3b27eb90ce1357b9"
+  "wiki/sources/m13-expand/idle-after-plan.txt": "dce97ba64dd0c0e37bb6cc4fd3c3385a9f45691f"
+  "agent/src/rwbot/agent/BuildTree.java": "fd944f19bf4ed44829c7c9c49c00b1c18d7099c6"
+  "src/rw_bot/mechanics/build_tree.py": "d352b3a2a36ad178c1710d3131a4fe03b208c7c7"
+  "src/rw_bot/policy/expand.py": "cc87dd3928a7167ded3a8349f35b13ee4520ffd5"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

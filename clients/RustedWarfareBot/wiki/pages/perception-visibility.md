@@ -15,6 +15,10 @@ source_paths:
   - "wiki/sources/m9-perception/perception-widened.txt:5"
   - "wiki/sources/m11-pools/pool-build-run.log:402"
   - "agent/src/rwbot/agent/Perception.java"
+source_git_blobs:
+  "wiki/sources/m9-perception/perception-widened.txt": "8cc28b29812e235e24cecd7835059404a41970fc"
+  "wiki/sources/m11-pools/pool-build-run.log": "d661b6813fdcc17b1cdc08da7fc390fe22ce67b6"
+  "agent/src/rwbot/agent/Perception.java": "78629ad554596a6fd28fbd245c37a57a6b1e4743"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: medium

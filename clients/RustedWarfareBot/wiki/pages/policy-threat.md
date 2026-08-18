@@ -18,6 +18,13 @@ source_paths:
   - "src/rw_bot/policy/threat.py"
   - "src/rw_bot/policy/build_order.py"
   - "agent/src/rwbot/agent/Perception.java"
+source_git_blobs:
+  "wiki/sources/m6-wire/world-sample.ndjson": "b07f259208d477629c7d45d438b1d304c36d76de"
+  "wiki/sources/m14-threat/threat-survey.txt": "2ec77e81fc8d8751a0ae32e8965a3da8d0e0807d"
+  "wiki/sources/m18-reach/attack-range.txt": "473274e62d337bdad4342210f921112b2c1cd72c"
+  "src/rw_bot/policy/threat.py": "0c81fc3abc464da9e16197c55cd718f450ea2ff9"
+  "src/rw_bot/policy/build_order.py": "e07a055e86b45ac976c4eab4cea48cfe0f860c3c"
+  "agent/src/rwbot/agent/Perception.java": "78629ad554596a6fd28fbd245c37a57a6b1e4743"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

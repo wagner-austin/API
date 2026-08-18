@@ -9,6 +9,8 @@ source_paths:
   - ".game/fallback64.bat"
   - ".game/preferences.ini"
   - "wiki/sources/m0-probe/nodisplay-boot.log:27"
+source_git_blobs:
+  "wiki/sources/m0-probe/nodisplay-boot.log": "c41e035d12ee89b66455389031be9fef55cf0b44"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

@@ -11,6 +11,10 @@ source_paths:
   - "src/rw_bot/policy/recorder.py"
   - "src/rw_bot/harness/sweep.py"
   - "runs/traces"
+source_git_blobs:
+  "src/rw_bot/policy/trace.py": "18789b61934efeb623eb921215cba4e6f53c60fa"
+  "src/rw_bot/policy/recorder.py": "274d44e2c5b1176069c6720defaee018ed6afb5b"
+  "src/rw_bot/harness/sweep.py": "2f4275d603abb31bbaf1411fe712984c5e2b34d7"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

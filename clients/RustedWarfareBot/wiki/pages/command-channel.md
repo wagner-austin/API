@@ -15,6 +15,14 @@ source_paths:
   - "agent/src/rwbot/agent/CommandRecord.java"
   - "src/rw_bot/control/channel.py"
   - "src/rw_bot/wire/command.py"
+source_git_blobs:
+  "wiki/sources/m7-channel/planner-drove-a-live-game.txt": "c588f77122b962a0dfb8800700f80958a128f08a"
+  "wiki/sources/m7-channel/world-sample-with-ids.ndjson": "7c45f231f3ef47323cc6cf5d24bb1f5bc64d4b98"
+  "wiki/sources/m7-channel/scriptengine-drain.txt": "f05e845cb2dc38e6556f36c16e965c5ee5f97838"
+  "agent/src/rwbot/agent/CommandChannel.java": "ee59475700ceb5a39ee1301ed27018e6f166aca0"
+  "agent/src/rwbot/agent/CommandRecord.java": "bd4fc2f5ee3af50a3ba83cfe1370e18f82ec72ce"
+  "src/rw_bot/control/channel.py": "e5c4521155fea78be4e037ca2e9f631d3a8b8443"
+  "src/rw_bot/wire/command.py": "21f360c4728171fa52373d892483317f7c95b7c9"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

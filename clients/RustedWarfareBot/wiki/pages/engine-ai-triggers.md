@@ -19,6 +19,8 @@ source_paths:
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:1620"
   - "runs/decompiled/com/corrodinggames/rts/game/n.java:1088"
   - "wiki/sources/m15-ai-zones/zone-dump.txt"
+source_git_blobs:
+  "wiki/sources/m15-ai-zones/zone-dump.txt": "dbfff06d71e2e199976a8bd8727e163aa7d451f9"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: medium

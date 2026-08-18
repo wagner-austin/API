@@ -15,6 +15,10 @@ source_paths:
   - "wiki/sources/m7-mobility/mobility-predicate.txt:9"
   - "wiki/sources/m7-mobility/mobility-predicate.txt:15"
   - "src/rw_bot/mechanics/catalogue.py"
+source_git_blobs:
+  "wiki/sources/m0-probe/printunits.log": "d5ef7237bc6cc175a0e75014b1dafd521806a1e0"
+  "wiki/sources/m7-mobility/mobility-predicate.txt": "7d656f52db560155a5b13e352bc9e629e5c69d57"
+  "src/rw_bot/mechanics/catalogue.py": "9a079803d1cde17f271a3106c0e9449c0a91a562"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

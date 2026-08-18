@@ -19,6 +19,11 @@ source_paths:
   - "wiki/sources/m14-ai/attack-group-staging.txt:49"
   - "wiki/sources/m14-ai/attack-group-staging.txt:73"
   - "wiki/sources/m13-expand/idle-after-plan.txt"
+source_git_blobs:
+  "wiki/sources/m14-ai/ai-state-dump.txt": "f4d084483aea81ad5c2b6da6fd5ce3a3ed624b33"
+  "wiki/sources/m14-ai/unit-mix.txt": "305482556469e14257f708b9cae2a6f17bd25629"
+  "wiki/sources/m14-ai/attack-group-staging.txt": "1296ada19d19c337fc2b91e073a1f99a7600e07e"
+  "wiki/sources/m13-expand/idle-after-plan.txt": "dce97ba64dd0c0e37bb6cc4fd3c3385a9f45691f"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: medium

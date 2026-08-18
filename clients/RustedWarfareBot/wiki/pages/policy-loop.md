@@ -25,6 +25,20 @@ source_paths:
   - "src/rw_bot/policy/campaign.py"
   - "src/rw_bot/policy/budget.py"
   - "scripts/play.py"
+source_git_blobs:
+  "wiki/sources/m9-policy/plan-completed.txt": "b6f1fad82d73c97f2766ba2612c9b4e8c7b20d7b"
+  "wiki/sources/m9-policy/plan-stalled-on-laboratory.txt": "42b0264abde9c5f1be10ae3eabd436d2485fd3d0"
+  "wiki/sources/m9-policy/engine-refused-the-laboratory.txt": "88891e856780548f80c6165cf10e4146e36359ff"
+  "wiki/sources/m9-policy/visible-includes-opponents.ndjson": "c8404de03d2eaa122169110db186d75eac2c83e3"
+  "wiki/sources/m11-pools/pool-build-run.log": "d661b6813fdcc17b1cdc08da7fc390fe22ce67b6"
+  "wiki/sources/m11-pools/builder-travel-timing.txt": "c73ead926dfb2d281ba4ec591f56d6545ce2e948"
+  "wiki/sources/m12-produce/produce-timing.txt": "fe366f914e87811134a45ac1f7fe0ac041f3a711"
+  "wiki/sources/m12-produce/produce-run.log": "9e6dbf9b8d9f7867ed36868664fdfd7210f46a79"
+  "src/rw_bot/policy/build_order.py": "e07a055e86b45ac976c4eab4cea48cfe0f860c3c"
+  "src/rw_bot/policy/runner.py": "749de3dbe47cc72f97571d57ee21677c4eb4fba6"
+  "src/rw_bot/policy/campaign.py": "ae3700f5a5c413b05f2909de398d1154d8262b2f"
+  "src/rw_bot/policy/budget.py": "06e3cb9d18cf4b87be4d309da6b5a9b52a0c226f"
+  "scripts/play.py": "c95267440b13b56f48a32def2a00b99e2f9efe72"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

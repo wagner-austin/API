@@ -20,6 +20,16 @@ source_paths:
   - "wiki/sources/m28-holding/diag-post-worker-fix.ndjson"
   - "src/rw_bot/mechanics/income.py"
   - "scripts/income.py"
+source_git_blobs:
+  "wiki/sources/m19-income/measured-rates.txt": "5c8cf24d3a18e8844b8a8dfca6b8dcc3dc38b2b5"
+  "wiki/sources/m19-income/income-windows.ndjson": "6ac6751249e68b8f8c162c80da456c1a9c8d656b"
+  "wiki/sources/m19-income/economy-run.txt": "c97cf41d0a9cb028f2efd76a96d1de5178281271"
+  "wiki/sources/m15-production/before-after.txt": "a141155176d9ceb1631fbf3d3004244fc252261b"
+  "src/rw_bot/policy/economy.py": "b6205482ac60aaf60685866bbdae89beaf268170"
+  "src/rw_bot/policy/ledger.py": "20d0641969fd6c7f69e9f469270f3294752ea7c3"
+  "wiki/sources/m28-holding/diag-post-worker-fix.ndjson": "f294e4c69824a7661d702a2bc66aa33bd9d395f6"
+  "src/rw_bot/mechanics/income.py": "a5cb0fdc641c0aa91be35b5a906f27f2335443e7"
+  "scripts/income.py": "ab8278b76cf578a585a139f1815d74cb82200812"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

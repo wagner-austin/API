@@ -9,6 +9,9 @@ related:
 source_paths:
   - "wiki/sources/m11-pools/type-flags.ndjson"
   - "wiki/sources/m0-probe/printunits.log"
+source_git_blobs:
+  "wiki/sources/m11-pools/type-flags.ndjson": "f1d519832e75306a2497669e479224b26e731f3a"
+  "wiki/sources/m0-probe/printunits.log": "d5ef7237bc6cc175a0e75014b1dafd521806a1e0"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

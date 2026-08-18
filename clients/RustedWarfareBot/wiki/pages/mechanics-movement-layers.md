@@ -15,6 +15,11 @@ source_paths:
   - "wiki/sources/m17-movement/reachability.txt"
   - "wiki/sources/m6-wire/world-sample.ndjson"
   - "src/rw_bot/policy/build_order.py"
+source_git_blobs:
+  "wiki/sources/m16-enums/enum-names.txt": "919c505b3f4d41a4c8dc599a37653ddbfb4e5e1e"
+  "wiki/sources/m17-movement/reachability.txt": "6e1637370797ebac09c7e3f6429318c57a99ed67"
+  "wiki/sources/m6-wire/world-sample.ndjson": "b07f259208d477629c7d45d438b1d304c36d76de"
+  "src/rw_bot/policy/build_order.py": "e07a055e86b45ac976c4eab4cea48cfe0f860c3c"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

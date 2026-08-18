@@ -8,6 +8,9 @@ related:
 source_paths:
   - "src/rw_bot/policy/intel.py"
   - "src/rw_bot/policy/scouting.py"
+source_git_blobs:
+  "src/rw_bot/policy/intel.py": "0ada8eb09e075de8cfa872aaaae2bb08be5f18c8"
+  "src/rw_bot/policy/scouting.py": "52ecbbdfa7ae26f0a892204a9fd5e71c646ac0c2"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

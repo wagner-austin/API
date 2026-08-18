@@ -13,6 +13,14 @@ source_paths:
   - "wiki/sources/m8-build/build-succeeded.txt:20"
   - "wiki/sources/m8-build/buildable-type-names.txt"
   - "agent/src/rwbot/agent/Orders.java"
+source_git_blobs:
+  "wiki/sources/m8-build/placement-setter.txt": "4d2604ee8e85ccafcf01fc09370802bdabc4d42b"
+  "wiki/sources/m8-build/waypoint-validator.txt": "5445542aa1a61e25f913cea92c853051d0216100"
+  "wiki/sources/m8-build/build-action-lookup.txt": "a4d157cf481abecc3d9e659387d1b5bbcd8611ce"
+  "wiki/sources/m8-build/build-rejected-selector-zero.txt": "901a8300156e03ff2db9fa06229d4dda3fc93c03"
+  "wiki/sources/m8-build/build-succeeded.txt": "8e81f717d133995332ddcfde4b4728f82b7c6ab9"
+  "wiki/sources/m8-build/buildable-type-names.txt": "92138d74643c4b62bdcd61a17cff55400135c5d4"
+  "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

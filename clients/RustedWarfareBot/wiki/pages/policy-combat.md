@@ -17,6 +17,16 @@ source_paths:
   - "src/rw_bot/policy/combat.py"
   - "src/rw_bot/policy/production.py"
   - "src/rw_bot/policy/campaign.py"
+source_git_blobs:
+  "wiki/sources/m15-production/before-after.txt": "a141155176d9ceb1631fbf3d3004244fc252261b"
+  "wiki/sources/m15-production/sustained-run.log": "259d966dc1a8164be5252977c78bda56dd0a38c5"
+  "wiki/sources/m15-production/target-churn.txt": "441a9b23b29cb6195a9f4c7cd0fe4075d2731de3"
+  "wiki/sources/m15-production/committed-run.log": "79995a9896181a7382a4285b315b85c1670b2fec"
+  "wiki/sources/m13-expand/idle-after-plan.txt": "dce97ba64dd0c0e37bb6cc4fd3c3385a9f45691f"
+  "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
+  "src/rw_bot/policy/combat.py": "8afff52d08a953cafe435d3543c337652cab3f47"
+  "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
+  "src/rw_bot/policy/campaign.py": "ae3700f5a5c413b05f2909de398d1154d8262b2f"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

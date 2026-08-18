@@ -18,6 +18,15 @@ source_paths:
   - "wiki/sources/m5-order/order-accepted-building-did-not-move.txt:4"
   - "wiki/sources/m5-order/controller-delegate.txt:2"
   - "agent/src/rwbot/agent/Orders.java"
+source_git_blobs:
+  "wiki/sources/m5-order/controller-create-and-enqueue.txt": "18815aa9d9c842a0c3b601c8e5715aefadf2ffa5"
+  "wiki/sources/m5-order/command-setters.txt": "e247646034cf7f799dd54727bb62c467987cebaa"
+  "wiki/sources/m5-order/builtin-ai-order-idiom.txt": "33c9371d82229e8e97780cd2b3d02677660a6fc5"
+  "wiki/sources/m5-order/scriptengine-update.txt": "f05e845cb2dc38e6556f36c16e965c5ee5f97838"
+  "wiki/sources/m5-order/order-accepted-unit-moved.txt": "85762fee6bec1f4c46c4e3138f6eb5eb74fab6d4"
+  "wiki/sources/m5-order/order-accepted-building-did-not-move.txt": "3e5e3d2fae35db1c7049ef093ebf0ae05014cd07"
+  "wiki/sources/m5-order/controller-delegate.txt": "41b96807c1b2713e381aeaf5f098776f385a8972"
+  "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

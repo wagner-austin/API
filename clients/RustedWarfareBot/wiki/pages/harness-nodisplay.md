@@ -12,6 +12,11 @@ source_paths:
   - "wiki/sources/m0-probe/printunits.log:1511"
   - "wiki/sources/m1-sandbox/sandbox-crash.log"
   - ".game/fallback64.bat"
+source_git_blobs:
+  "wiki/sources/m0-probe/nodisplay-boot.log": "c41e035d12ee89b66455389031be9fef55cf0b44"
+  "wiki/sources/m0-probe/main-strings.txt": "131aaed18b4a86d01cf5e30e051c1960095f0513"
+  "wiki/sources/m0-probe/printunits.log": "d5ef7237bc6cc175a0e75014b1dafd521806a1e0"
+  "wiki/sources/m1-sandbox/sandbox-crash.log": "56467c3a446f8b65321cec8302847fd0f795f589"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

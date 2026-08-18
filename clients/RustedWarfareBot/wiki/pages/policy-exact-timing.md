@@ -13,6 +13,10 @@ source_paths:
   - "runs/sweeps/mltrace24b"
   - "runs/sweeps/vh-nocover24"
   - "runs/sweeps/hard-nocover24"
+source_git_blobs:
+  "agent/src/rwbot/agent/SplitRandom.java": "bbbb6c4fbfc93a305affeaa94f2fd27e2f7e6f7f"
+  "agent/src/rwbot/agent/MatchSetup.java": "65ef3427962b26ec9efa88471a0ac3e597d0ed18"
+  "scripts/play.py": "c95267440b13b56f48a32def2a00b99e2f9efe72"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

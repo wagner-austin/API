@@ -13,6 +13,12 @@ source_paths:
   - "src/rw_bot/harness/runner.py"
   - "scripts/sweep.py"
   - "Makefile"
+source_git_blobs:
+  "src/rw_bot/harness/sweep.py": "2f4275d603abb31bbaf1411fe712984c5e2b34d7"
+  "src/rw_bot/harness/clone.py": "76ba47a7394e9c418d0bb3ea5520debeb1516ec2"
+  "src/rw_bot/harness/runner.py": "ace02192fa040da0cadc67d3b486300ab03112c5"
+  "scripts/sweep.py": "8e99b999502b279e76b928e656f9e0261ad2680a"
+  "Makefile": "6e0479235e4fa25248944732f3dfa69705981883"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

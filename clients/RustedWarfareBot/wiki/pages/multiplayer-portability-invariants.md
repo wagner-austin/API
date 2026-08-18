@@ -12,6 +12,9 @@ source_paths:
   - "wiki/sources/m5-order/controller-create-and-enqueue.txt:1"
   - "wiki/sources/m5-order/controller-create-and-enqueue.txt:8"
   - ".game/preferences.ini"
+source_git_blobs:
+  "wiki/sources/m0-probe/nodisplay-boot.log": "c41e035d12ee89b66455389031be9fef55cf0b44"
+  "wiki/sources/m5-order/controller-create-and-enqueue.txt": "18815aa9d9c842a0c3b601c8e5715aefadf2ffa5"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

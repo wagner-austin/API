@@ -13,6 +13,12 @@ source_paths:
   - "src/rw_bot/mechanics/catalogue.py"
   - "src/rw_bot/mechanics/combat_profile.py"
   - "src/rw_bot/mechanics/upgrades.py"
+source_git_blobs:
+  "wiki/sources/m0-probe/printunits.log": "d5ef7237bc6cc175a0e75014b1dafd521806a1e0"
+  "wiki/sources/m11-pools/type-flags.ndjson": "f1d519832e75306a2497669e479224b26e731f3a"
+  "src/rw_bot/mechanics/catalogue.py": "9a079803d1cde17f271a3106c0e9449c0a91a562"
+  "src/rw_bot/mechanics/combat_profile.py": "4de76d4850ace0fd0cdcb25c121ff7ad7a299698"
+  "src/rw_bot/mechanics/upgrades.py": "cb442808ca3d6d3a20203e4ad4b6b87ec06c3213"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

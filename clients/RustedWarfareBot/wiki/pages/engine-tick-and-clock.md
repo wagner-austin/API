@@ -19,6 +19,13 @@ source_paths:
   - "wiki/sources/m4-commands/engine-tick-decompiled.txt:17"
   - "agent/src/rwbot/agent/EngineHandle.java"
   - "agent/src/rwbot/agent/Snapshot.java"
+source_git_blobs:
+  "wiki/sources/m3-discovery/gameengine-tick-method.txt": "80f5706a1014ecdaaafaedabc8e2bc0fa9cc5db5"
+  "wiki/sources/m3-discovery/engine-snapshots.log": "f0374daf127cc904bc70342c09268ca843e6ae84"
+  "wiki/sources/m4-entities/entity-count-loop.txt": "a4888d9e10b2ff23b6953fa83f7d15f5d7c77894"
+  "wiki/sources/m4-commands/engine-tick-decompiled.txt": "7c4736f603a0642c2d447acf68f383dc056a6c0c"
+  "agent/src/rwbot/agent/EngineHandle.java": "7d16c004154d4f95909de8c9471773d67bb2c1af"
+  "agent/src/rwbot/agent/Snapshot.java": "b32c4332297db0c559c71fc99ec7537cfbe54cb0"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

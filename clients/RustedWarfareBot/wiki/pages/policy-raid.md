@@ -8,6 +8,8 @@ related:
   - "[[community-play-strategies]]"
 source_paths:
   - "src/rw_bot/policy/raid.py"
+source_git_blobs:
+  "src/rw_bot/policy/raid.py": "4d6240b22965277824d1476c7dc8957b0310e74f"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

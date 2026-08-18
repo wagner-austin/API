@@ -21,6 +21,13 @@ source_paths:
   - ".game/assets/units/extractor/extractor_common.ini:25"
   - ".game/assets/tilesets/misc.tsx:6"
   - ".game/assets/translations/Strings.properties:557"
+source_git_blobs:
+  "wiki/sources/m11-pools/type-flags.ndjson": "f1d519832e75306a2497669e479224b26e731f3a"
+  "wiki/sources/m11-pools/pool-build-run.log": "d661b6813fdcc17b1cdc08da7fc390fe22ce67b6"
+  "wiki/sources/m6-wire/world-sample.ndjson": "b07f259208d477629c7d45d438b1d304c36d76de"
+  "wiki/sources/m11-pools/builder-travel-timing.txt": "c73ead926dfb2d281ba4ec591f56d6545ce2e948"
+  "src/rw_bot/policy/build_order.py": "e07a055e86b45ac976c4eab4cea48cfe0f860c3c"
+  "agent/src/rwbot/agent/MapTiles.java": "cacf4bfc7ff02bb68ee5f843cd3436aade34dd81"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

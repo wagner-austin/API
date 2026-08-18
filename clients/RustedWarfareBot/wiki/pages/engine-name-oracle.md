@@ -9,6 +9,10 @@ source_paths:
   - "wiki/sources/m0-probe/nodisplay-boot.log:45"
   - "wiki/sources/m0-probe/jar-classes.txt:380"
   - "wiki/sources/m16-enums/enum-names.txt"
+source_git_blobs:
+  "wiki/sources/m0-probe/nodisplay-boot.log": "c41e035d12ee89b66455389031be9fef55cf0b44"
+  "wiki/sources/m0-probe/jar-classes.txt": "ff1afd0e174df4a07930aad57b22cb14eca511ec"
+  "wiki/sources/m16-enums/enum-names.txt": "919c505b3f4d41a4c8dc599a37653ddbfb4e5e1e"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high
