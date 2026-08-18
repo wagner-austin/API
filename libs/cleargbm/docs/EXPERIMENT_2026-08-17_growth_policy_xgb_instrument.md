@@ -6,7 +6,24 @@ ClearGBM on the authoritative benchmark workload?
 **Instrument:** XGBoost 3.1.2 implements both growth policies, so the leaf-wise effect can
 be measured with everything else held constant — same code, same splits, same constraint
 semantics — before any Rust is written. Script:
-`libs/cleargbm/scripts/experiment_growth_policy_xgb_instrument.py`.
+`libs/covenant_ml/scripts/experiment_growth_policy_xgb_instrument.py`.
+
+**Where the code lives, and why not here.** The scripts were originally written under
+`libs/cleargbm/scripts/`, which could not have run them: that package depends only on
+`numpy` and `cleargbm_rs`, so `xgboost`, `lightgbm` and `scikit-learn` are all absent from
+its environment, and the dataset path they read resolves only from `libs/covenant_ml`.
+They now live in `libs/covenant_ml`, which carries all three vendors plus the dataset, and
+the measurement logic sits in the `covenant_ml.growth_policy` package where it is unit
+tested; the scripts are thin entry points over it. Re-run with:
+
+```
+cd libs/covenant_ml
+poetry run python -m scripts.experiment_growth_policy_xgb_instrument
+```
+
+The group-disjoint partition is pinned by a regression test that reimplements the original
+expression and asserts index-for-index equality at seeds 42/43/44/7/1234, so the split
+behind every figure below cannot drift silently.
 
 ## Protocol
 
@@ -59,8 +76,11 @@ semantics — before any Rust is written. Script:
 ## Dataset-variety follow-up (same night): the lever does not engage on small data
 
 The same three arms were run on two additional on-disk datasets
-(`scripts/experiment_growth_policy_multi_dataset.py`, stratified random 70/30, seeds
-42/43/44):
+(`libs/covenant_ml/scripts/experiment_growth_policy_multi_dataset.py`, stratified random
+70/30, seeds 42/43/44). That script originally hardcoded an absolute
+`C:\Users\...\data\external` path, which made it unrunnable on any other machine; the
+external data root is now a `--external-root` argument defaulting to a repository-relative
+path:
 
 | dataset | shape | positive | depthwise d6 | lossguide L31 | lossguide L47 | mean leaves |
 |---|---|---|---|---|---|---|
