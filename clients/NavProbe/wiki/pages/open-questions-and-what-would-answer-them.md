@@ -17,11 +17,11 @@ Every measurement page states its own limits. This is the consolidated view: wha
 
 Ordered by value, not by effort.
 
-## 1. Is `_sensor_tactile` the only blocker?
+## 1. Is `_sensor_tactile` the only blocker? — ANSWERED 2026-08-18: yes
 
-Warp's deterministic modes would make most of this wiki's findings a *setting* rather than a property, and MuJoCo-Warp cannot compile under them ([[mjwarp-cannot-compile-under-warp-deterministic-mode]]). Compilation stops at the first rejected function, so a fix there may simply reveal the next one.
+Warp's deterministic modes would make most of this wiki's findings a *setting* rather than a property, and MuJoCo-Warp cannot compile under them ([[mjwarp-cannot-compile-under-warp-deterministic-mode]]). Compilation stops at the first rejected function, so a fix there could have revealed the next one.
 
-**What would answer it:** patch `_sensor_tactile` locally to stop mixing `max` and `add` reductions on one array — separate accumulators, or a second pass — and recompile. Either it builds, in which case the whole determinism story changes, or the next blocker names itself.
+**It did not.** With the withdrawn upstream PR #1591's three-line alias patch applied, every module in the touching-row pipeline compiles cold and steps under BOTH `RUN_TO_RUN` and `GPU_TO_GPU` ([[tactile-alias-patch-clears-warp-deterministic-compile]]). The solver kernels this wiki attributes the non-determinism to were already deterministic-mode-clean. What replaces this question is the GPU verdict: does `RUN_TO_RUN` make the coupled-body scenes reproducible on `cuda:0`, and at what throughput cost? That run is staged (`scripts/apply_tactile_alias_patch.py` + `scripts/det_compile_test.py`) and waits only for the RTX 3090 Ti to come off a Model-Trainer job.
 
 **Upstream is answering a stronger version of this question by another route.** As of 2026-08-18 `google-deepmind/mujoco_warp` carries an unmerged three-PR stack (#1422, #1425, #1533, none merged) that builds an opt-in `opt.deterministic` stepping mode at the MJWarp level — sorted contacts, count-based row allocation, serial sensor scans — rather than through Warp's codegen mode. PR #1533's description enumerates every remaining order-sensitive accumulation in the pipeline, which is, in effect, upstream's own list of "the next blockers". An independent third party also filed and withdrew (CLA failure, 16 minutes) an issue + fix pair for exactly the `_sensor_tactile` mix (#1590/#1591) on 2026-08-18. The local-patch experiment is still worth running: it tests Warp's codegen mode, which the upstream stack deliberately bypasses.
 
