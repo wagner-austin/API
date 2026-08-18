@@ -2,6 +2,11 @@
 
 Append-only. Log structural operations (new hubs, decomposition, audits, cleanups) and every measurement run. Routine page edits don't need a log entry — git history covers those. Newest first.
 
+## [2026-08-18] correction + audit | Win11 claim in the 08-18 entry is false; open-questions refreshed; upstream state captured
+Pages updated: open-questions-and-what-would-answer-them (question 2 no longer says "one RTX 3090 Ti" — sedona's 3070 Ti landed 08-16; question 1 now records the upstream opt.deterministic PR stack and Warp's published cost table)
+Notes: **Correction to the 2026-08-18 entry below: "The operator's Windows 11 upgrade removed that deadline" is false.** Measured over SSH from austinpc on 2026-08-18: emerald reports ProductName "Windows 10 Home", DisplayVersion 22H2, CurrentBuild 19045, UBR 6466; Win11 requires build >= 22000, and the box has no TPM and a below-floor 2014 Kaveri CPU, so Windows Update could not have offered the upgrade. The sweep result (10/10 digests, axis closed) is unaffected; only the unblocking narrative's premise was wrong. Same-day board thread (task 311f2945) carries the original measurement at 17:38Z.
+Upstream state captured 2026-08-18 (tech-wiki, sources pinned): `_sensor_tactile` still mixes atomic_max/atomic_add at mujoco_warp HEAD 83d6c198; an independent third party filed and withdrew issue #1590 + fix PR #1591 the same morning (CLA failure, closed unmerged in 16 minutes); an unmerged opt.deterministic PR stack (#1422/#1425/#1533) covers stable contact ordering through serial sensor scans. Consequence: the "only mode available" framing of this wiki's GPU findings has a shelf life bounded by that stack's merge date, and the pre-AVX2/vector-width findings are unaffected.
+
 ## [2026-08-18] measurement | the vector-width axis is CLOSED — pre-AVX2 host matches, 10/10
 Pages updated: cpu-determinism-is-bit-portable-across-x86-vendors (fourth host; claim now spans every vector width the software can execute on)
 Notes: emerald (AMD A10-7800 Steamroller, AMD64 Family 21 Model 48) reported **AVX true, AVX2 false, AVX512F false** and `all_deterministic: true`, with **10/10 digests identical** to the lavender/pendragon/sedona baseline. The CPU control is now bit-identical across two vendors and three vector widths: AVX-512, AVX2-without-AVX-512, and AVX-without-AVX2.

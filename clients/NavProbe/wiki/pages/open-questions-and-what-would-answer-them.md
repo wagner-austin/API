@@ -6,7 +6,7 @@ source_paths:
   - "wiki/log.md"
 source_git_blobs:
   "wiki/log.md": "78cc77e9d2366cb295c552b9e1fb2a56fd9e4b69"
-fact_checked: 2026-08-14
+fact_checked: 2026-08-18
 confidence: high
 hubs: [instrument-design]
 ---
@@ -23,13 +23,15 @@ Warp's deterministic modes would make most of this wiki's findings a *setting* r
 
 **What would answer it:** patch `_sensor_tactile` locally to stop mixing `max` and `add` reductions on one array — separate accumulators, or a second pass — and recompile. Either it builds, in which case the whole determinism story changes, or the next blocker names itself.
 
-**Also unmeasured:** the throughput cost of deterministic atomics, because nothing compiled and so nothing was timed.
+**Upstream is answering a stronger version of this question by another route.** As of 2026-08-18 `google-deepmind/mujoco_warp` carries an unmerged three-PR stack (#1422, #1425, #1533, none merged) that builds an opt-in `opt.deterministic` stepping mode at the MJWarp level — sorted contacts, count-based row allocation, serial sensor scans — rather than through Warp's codegen mode. PR #1533's description enumerates every remaining order-sensitive accumulation in the pipeline, which is, in effect, upstream's own list of "the next blockers". An independent third party also filed and withdrew (CLA failure, 16 minutes) an issue + fix pair for exactly the `_sensor_tactile` mix (#1590/#1591) on 2026-08-18. The local-patch experiment is still worth running: it tests Warp's codegen mode, which the upstream stack deliberately bypasses.
+
+**Also unmeasured:** the throughput cost of deterministic atomics, because nothing compiled and so nothing was timed. Warp 1.15's own documentation publishes a cost table (RTX 4090: deterministic sort-and-reduce is up to 7.6x *faster* than atomics at high contention, ~13x slower at low contention), which bounds the expectation but does not measure MJWarp.
 
 ## 2. Do the findings hold on another GPU architecture?
 
-Everything GPU-side was measured on one RTX 3090 Ti (Ampere, sm_86). A threshold that is a warp-scheduling artefact should move on a different architecture; one that is algorithmic should not.
+Everything GPU-side was measured on two Ampere sm_86 devices: the RTX 3090 Ti (84 SMs) and, since 2026-08-16, sedona's RTX 3070 Ti Laptop (46 SMs), where the coupled-body threshold did not move ([[coupled-body-threshold-does-not-move-with-sm-count]]). That falsifies the occupancy explanation *within* an architecture but says nothing about cross-architecture codegen: both devices compile to the same sm_86 target. A threshold that is a codegen or warp-scheduling artefact could still move on a different architecture; one that is algorithmic should not.
 
-**What would answer it:** run the same sweep on an Ada or Hopper card. The instrument needs no change — it already ran unmodified across Windows and WSL2 — and the machines do not need to share a process or even a filesystem: each records an observation or a trial, and a third process compares the files ([[the-numbers-are-scene-dependent-the-shapes-replicate]] explains why the figures rather than the shapes are what to watch).
+**What would answer it:** run the same sweep on a non-Ampere card (the pending sm_75 GTX 1630 purchase, or any Ada/Hopper device). The instrument needs no change — it already ran unmodified across Windows and WSL2 — and the machines do not need to share a process or even a filesystem: each records an observation or a trial, and a third process compares the files ([[the-numbers-are-scene-dependent-the-shapes-replicate]] explains why the figures rather than the shapes are what to watch).
 
 **Cheaper partial answer available first:** MJWarp exposes `Model.block_dim`. Varying it on *this* hardware tests the scheduling hypothesis without another card, and has not been done.
 
