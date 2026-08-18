@@ -1,10 +1,18 @@
 ---
 title: MuJoCo-Warp is a second vendor, not a second MJX
 tags: [architecture, adapters, warp, typing]
-related: [[mujoco-untyped-requires-protocol-boundary]], [[vmap-requires-every-leaf-batched]]
-sources: [mujoco-warp 3.11.0, src/navprobe/adapters/mjx_warp_bindings.py, src/navprobe/adapters/mujoco_bindings.py]
+related: ["[[mujoco-untyped-requires-protocol-boundary]]", "[[vmap-requires-every-leaf-batched]]"]
+source_paths:
+  - "src/navprobe/adapters/mjx_warp_bindings.py"
+  - "src/navprobe/adapters/mujoco_bindings.py"
+source_git_blobs:
+  "src/navprobe/adapters/mjx_warp_bindings.py": "5b35d7fedcd8f51cf9fcdb0dc88f7f2ae5a471cc"
+  "src/navprobe/adapters/mujoco_bindings.py": "4c271831d631dd97a50a9a6129fd7d1abf367aa2"
+provenance:
+  - "mujoco-warp 3.11.0"
 fact_checked: 2026-08-13
 confidence: high
+hubs: [simulator-adapters]
 ---
 
 # MuJoCo-Warp is a second vendor, not a second MJX

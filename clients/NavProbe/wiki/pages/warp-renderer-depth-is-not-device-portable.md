@@ -1,8 +1,14 @@
 ---
 title: The MJX-Warp batch renderer's depth output is not portable across devices
 tags: [warp, rendering, determinism, measurement, finding, depth]
-related: [[backend-divergence-begins-at-first-contact]], [[mjx-determinism-does-not-cross-backends]], [[warp-rendered-stream-is-reproducible-within-a-device]]
-sources: [mujoco-warp 3.11.0, warp-lang 1.16.0, src/navprobe/adapters/mjx_warp_render.py]
+related: ["[[backend-divergence-begins-at-first-contact]]", "[[mjx-determinism-does-not-cross-backends]]", "[[warp-rendered-stream-is-reproducible-within-a-device]]"]
+source_paths:
+  - "src/navprobe/adapters/mjx_warp_render.py"
+source_git_blobs:
+  "src/navprobe/adapters/mjx_warp_render.py": "898c44998cd0d22b65901c73453c940b081c50ac"
+provenance:
+  - "mujoco-warp 3.11.0"
+  - "warp-lang 1.16.0"
 fact_checked: 2026-08-13
 confidence: high
 measured_with:
@@ -15,6 +21,7 @@ measured_with:
   world_count: 2
   initial_offsets: [0.013, -0.027]
   step_count: 200
+hubs: [rendered-observations]
 ---
 
 # The MJX-Warp batch renderer's depth output is not portable across devices

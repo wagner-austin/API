@@ -1,8 +1,10 @@
 ---
 title: The GPU's last-bit disagreement amplifies to macroscopic scale in contact-rich scenes
 tags: [warp, determinism, measurement, finding, chaos, gpu]
-related: [[warp-gpu-determinism-fails-on-coupled-bodies]], [[backend-divergence-begins-at-first-contact]]
-sources: [mujoco-warp 3.11.0, warp-lang 1.16.0]
+related: ["[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[backend-divergence-begins-at-first-contact]]"]
+provenance:
+  - "mujoco-warp 3.11.0"
+  - "warp-lang 1.16.0"
 fact_checked: 2026-08-14
 confidence: high
 measured_with:
@@ -15,6 +17,7 @@ measured_with:
   step_count: 400 (2.0 s simulated)
   world_count: 2
   repetitions: 8, same process
+hubs: [determinism-measurement]
 ---
 
 # The GPU's last-bit disagreement amplifies to macroscopic scale in contact-rich scenes

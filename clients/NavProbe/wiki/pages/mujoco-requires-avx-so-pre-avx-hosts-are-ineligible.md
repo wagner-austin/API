@@ -1,8 +1,11 @@
 ---
 title: MuJoCo's shipped binary requires AVX, so a pre-AVX host cannot be a measurement node at all
 tags: [cpu, avx, platform, constraint, finding, mujoco, hardware-selection]
-related: [[cpu-determinism-is-bit-portable-across-x86-vendors]], [[measurement-fleet-is-reachable-by-ssh-alias]], [[python-311-caps-scientific-stack]]
-sources: [mujoco 3.11.0, warp-lang 1.16.0, numpy 2.4.6]
+related: ["[[cpu-determinism-is-bit-portable-across-x86-vendors]]", "[[measurement-fleet-is-reachable-by-ssh-alias]]", "[[python-311-caps-scientific-stack]]"]
+provenance:
+  - "mujoco 3.11.0"
+  - "warp-lang 1.16.0"
+  - "numpy 2.4.6"
 fact_checked: 2026-08-17
 confidence: high
 measured_with:
@@ -10,6 +13,7 @@ measured_with:
   host: surfacego — Intel Pentium, AVX absent
   installed: warp-lang 1.16.0, mujoco 3.11.0, mujoco-warp 3.11.0, numpy 2.4.6
   vcredist: present (vcruntime140.dll, vcruntime140_1.dll, msvcp140.dll all on disk)
+hubs: [platform-constraints]
 ---
 
 # MuJoCo's shipped binary requires AVX, so a pre-AVX host cannot be a measurement node at all

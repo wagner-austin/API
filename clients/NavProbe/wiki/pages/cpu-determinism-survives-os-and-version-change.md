@@ -1,8 +1,15 @@
 ---
 title: On CPU, a rollout survives a change of OS and of jax version
 tags: [mjx, determinism, measurement, portability]
-related: [[mjx-determinism-does-not-cross-backends]], [[mjx-batched-step-reproduces-on-cpu]]
-sources: [mujoco-mjx 3.11.0, jax 0.10.2, jax 0.11.0, src/navprobe/crossprocess.py]
+related: ["[[mjx-determinism-does-not-cross-backends]]", "[[mjx-batched-step-reproduces-on-cpu]]"]
+source_paths:
+  - "src/navprobe/crossprocess.py"
+source_git_blobs:
+  "src/navprobe/crossprocess.py": "2d5bfcb44bd8f37f3f2814edccb76f3b444775ee"
+provenance:
+  - "mujoco-mjx 3.11.0"
+  - "jax 0.10.2"
+  - "jax 0.11.0"
 fact_checked: 2026-08-13
 confidence: high
 measured_with:
@@ -16,6 +23,7 @@ measured_with:
   repetitions: 3
   world_count: 4
   perturbation: 0.05
+hubs: [determinism-measurement]
 ---
 
 # On CPU, a rollout survives a change of OS and of jax version

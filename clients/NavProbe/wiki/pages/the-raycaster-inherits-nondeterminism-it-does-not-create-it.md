@@ -1,8 +1,10 @@
 ---
 title: The raycaster inherits non-determinism, it does not create any
 tags: [warp, rendering, determinism, measurement, gpu]
-related: [[warp-renderer-depth-is-not-device-portable]], [[warp-gpu-determinism-fails-on-coupled-bodies]], [[warp-rendered-stream-is-reproducible-within-a-device]]
-sources: [mujoco-warp 3.11.0, warp-lang 1.16.0]
+related: ["[[warp-renderer-depth-is-not-device-portable]]", "[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[warp-rendered-stream-is-reproducible-within-a-device]]"]
+provenance:
+  - "mujoco-warp 3.11.0"
+  - "warp-lang 1.16.0"
 fact_checked: 2026-08-14
 confidence: high
 measured_with:
@@ -15,6 +17,7 @@ measured_with:
   world_count: 2
   settle_steps: 0 and 120
   repetitions: 12 renders of one frozen state, same process
+hubs: [rendered-observations]
 ---
 
 # The raycaster inherits non-determinism, it does not create any

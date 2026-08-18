@@ -1,8 +1,11 @@
 ---
 title: GPU non-determinism in MuJoCo-Warp needs mutually-contacting bodies, not many contacts
 tags: [warp, determinism, measurement, finding, contact, gpu]
-related: [[backend-divergence-begins-at-first-contact]], [[warp-rendered-stream-is-reproducible-within-a-device]], [[mjx-cuda-batched-step-reproduces]]
-sources: [mujoco-warp 3.11.0, warp-lang 1.16.0, MJWarp documentation]
+related: ["[[backend-divergence-begins-at-first-contact]]", "[[warp-rendered-stream-is-reproducible-within-a-device]]", "[[mjx-cuda-batched-step-reproduces]]"]
+provenance:
+  - "mujoco-warp 3.11.0"
+  - "warp-lang 1.16.0"
+  - "MJWarp documentation"
 fact_checked: 2026-08-14
 confidence: high
 measured_with:
@@ -16,6 +19,7 @@ measured_with:
   world_count: 2
   repetitions: 12 per condition, same process
   harnesses: standalone script (identical worlds) and navprobe.sweep (per-world perturbation 0.01)
+hubs: [determinism-measurement]
 ---
 
 # GPU non-determinism in MuJoCo-Warp needs mutually-contacting bodies, not many contacts

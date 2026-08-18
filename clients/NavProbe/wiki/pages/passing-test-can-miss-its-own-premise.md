@@ -1,10 +1,16 @@
 ---
 title: A test can encode the right intent and check the wrong case
 tags: [testing, coverage, false-confidence]
-related: [[digest-fold-requires-length-prefix]]
-sources: [tests/test_digest.py, src/navprobe/digest.py]
+related: ["[[digest-fold-requires-length-prefix]]"]
+source_paths:
+  - "tests/test_digest.py"
+  - "src/navprobe/digest.py"
+source_git_blobs:
+  "tests/test_digest.py": "13b3727c5fa8c3732fc7c506c303db6bcca3813d"
+  "src/navprobe/digest.py": "f8406a5a00711f6d5d7896db5f491a28a9808ef4"
 fact_checked: 2026-08-13
 confidence: high
+hubs: [instrument-design]
 ---
 
 # A test can encode the right intent and check the wrong case

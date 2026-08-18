@@ -1,10 +1,18 @@
 ---
 title: Bit-equality is a leading indicator, and needs a magnitude beside it
 tags: [architecture, determinism, measurement-design]
-related: [[gpu-nondeterminism-amplifies-to-macroscopic-scale]], [[a-scene-is-a-value-not-a-string-literal]]
-sources: [src/navprobe/dispersion.py, src/navprobe/canonical.py, tests/test_dispersion.py]
+related: ["[[gpu-nondeterminism-amplifies-to-macroscopic-scale]]", "[[a-scene-is-a-value-not-a-string-literal]]"]
+source_paths:
+  - "src/navprobe/dispersion.py"
+  - "src/navprobe/canonical.py"
+  - "tests/test_dispersion.py"
+source_git_blobs:
+  "src/navprobe/dispersion.py": "3c2f9b092175813dc16798b15be58968ac1a334f"
+  "src/navprobe/canonical.py": "e766888d77755cf4e32080e97de2b16cb45184ba"
+  "tests/test_dispersion.py": "257a715abf3d960df87827ad98c662cac62615c7"
 fact_checked: 2026-08-14
 confidence: high
+hubs: [instrument-design]
 ---
 
 # Bit-equality is a leading indicator, and needs a magnitude beside it

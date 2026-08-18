@@ -1,8 +1,13 @@
 ---
 title: MJX's batched step reproduces bit for bit on CPU across batch widths
 tags: [mjx, determinism, measurement, batching]
-related: [[jax-cuda-unavailable-on-windows]], [[vmap-requires-every-leaf-batched]]
-sources: [mujoco-mjx 3.11.0, src/navprobe/adapters/mjx.py]
+related: ["[[jax-cuda-unavailable-on-windows]]", "[[vmap-requires-every-leaf-batched]]"]
+source_paths:
+  - "src/navprobe/adapters/mjx.py"
+source_git_blobs:
+  "src/navprobe/adapters/mjx.py": "539e5fce071b6caf91eba05cf6f6e65bc8e0433d"
+provenance:
+  - "mujoco-mjx 3.11.0"
 fact_checked: 2026-08-13
 confidence: high
 measured_with:
@@ -15,6 +20,7 @@ measured_with:
   repetitions: 5
   world_counts: [1, 2, 4, 8, 16, 32, 64]
   perturbation: 0.05
+hubs: [determinism-measurement]
 ---
 
 # MJX's batched step reproduces bit for bit on CPU across batch widths

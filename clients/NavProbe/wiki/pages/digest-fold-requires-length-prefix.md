@@ -1,10 +1,18 @@
 ---
 title: Digest folding requires a length prefix per element
 tags: [determinism, hashing, injectivity, defect]
-related: [[passing-test-can-miss-its-own-premise]]
-sources: [src/navprobe/digest.py, src/navprobe/canonical.py, tests/test_digest.py]
+related: ["[[passing-test-can-miss-its-own-premise]]"]
+source_paths:
+  - "src/navprobe/digest.py"
+  - "src/navprobe/canonical.py"
+  - "tests/test_digest.py"
+source_git_blobs:
+  "src/navprobe/digest.py": "f8406a5a00711f6d5d7896db5f491a28a9808ef4"
+  "src/navprobe/canonical.py": "e766888d77755cf4e32080e97de2b16cb45184ba"
+  "tests/test_digest.py": "13b3727c5fa8c3732fc7c506c303db6bcca3813d"
 fact_checked: 2026-08-13
 confidence: high
+hubs: [instrument-design]
 ---
 
 # Digest folding requires a length prefix per element

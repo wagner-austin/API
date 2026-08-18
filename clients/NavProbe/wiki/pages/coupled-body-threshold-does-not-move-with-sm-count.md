@@ -1,8 +1,10 @@
 ---
 title: The coupled-body determinism threshold does not move with SM count
 tags: [warp, determinism, measurement, finding, gpu, occupancy, negative-result]
-related: [[warp-gpu-determinism-fails-on-coupled-bodies]], [[mjwarp-cannot-compile-under-warp-deterministic-mode]], [[the-numbers-are-scene-dependent-the-shapes-replicate]], [[measurement-fleet-is-reachable-by-ssh-alias]]
-sources: [mujoco-warp 3.11.0, warp-lang 1.16.0]
+related: ["[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[mjwarp-cannot-compile-under-warp-deterministic-mode]]", "[[the-numbers-are-scene-dependent-the-shapes-replicate]]", "[[measurement-fleet-is-reachable-by-ssh-alias]]"]
+provenance:
+  - "mujoco-warp 3.11.0"
+  - "warp-lang 1.16.0"
 fact_checked: 2026-08-16
 confidence: high
 measured_with:
@@ -20,8 +22,9 @@ measured_with:
   world_count: 2
   perturbation: 0.01
   constraint_capacity: 8192
-  body_counts: [2, 4, 5, 6, 8, 32] touching / [2, 8, 16, 32] separated
-  spacing: 0.055 (touching) and 0.070 (separated), radius 0.03, timestep 0.005
+  body_counts: "[2, 4, 5, 6, 8, 32] touching / [2, 8, 16, 32] separated"
+  spacing: "0.055 (touching) and 0.070 (separated), radius 0.03, timestep 0.005"
+hubs: [determinism-measurement]
 ---
 
 # The coupled-body determinism threshold does not move with SM count

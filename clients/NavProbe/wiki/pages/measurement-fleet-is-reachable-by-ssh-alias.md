@@ -1,10 +1,14 @@
 ---
 title: Every measurement node is reachable by SSH alias, and three traps make it look otherwise
 tags: [platform, fleet, ssh, tailscale, operations]
-related: [[mjwarp-cannot-compile-under-warp-deterministic-mode]], [[jax-cuda-unavailable-on-windows]], [[open-questions-and-what-would-answer-them]]
-sources: [~/.ssh/config, tailscale status, agent board opus-emerald-0816 2026-08-16]
+related: ["[[mjwarp-cannot-compile-under-warp-deterministic-mode]]", "[[jax-cuda-unavailable-on-windows]]", "[[open-questions-and-what-would-answer-them]]"]
+provenance:
+  - "~/.ssh/config"
+  - "tailscale status"
+  - "agent board opus-emerald-0816 2026-08-16"
 fact_checked: 2026-08-16
 confidence: high
+hubs: [platform-constraints]
 ---
 
 # Every measurement node is reachable by SSH alias, and three traps make it look otherwise

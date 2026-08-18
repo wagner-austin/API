@@ -1,10 +1,18 @@
 ---
 title: A scene is a value, so a result can cite it instead of describing it
 tags: [architecture, reproducibility, scenes]
-related: [[warp-gpu-determinism-fails-on-coupled-bodies]], [[bit-equality-is-a-leading-indicator]]
-sources: [src/navprobe/scenes.py, src/navprobe/codecs/scene.py, tests/test_scenes.py]
+related: ["[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[bit-equality-is-a-leading-indicator]]"]
+source_paths:
+  - "src/navprobe/scenes.py"
+  - "src/navprobe/codecs/scene.py"
+  - "tests/test_scenes.py"
+source_git_blobs:
+  "src/navprobe/scenes.py": "4a05c692fbd2740bd717f015e7725fa8175fc207"
+  "src/navprobe/codecs/scene.py": "504db991c0bc1338aec434e53abe9f029940c0a2"
+  "tests/test_scenes.py": "ebeb6878130073a665c2414a61c88d38bcce52eb"
 fact_checked: 2026-08-14
 confidence: high
+hubs: [instrument-design]
 ---
 
 # A scene is a value, so a result can cite it instead of describing it

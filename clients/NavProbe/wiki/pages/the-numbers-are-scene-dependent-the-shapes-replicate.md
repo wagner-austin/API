@@ -1,10 +1,16 @@
 ---
 title: The numbers here are scene-dependent; the shapes are what replicate
 tags: [methodology, reproducibility, measurement-design]
-related: [[warp-gpu-determinism-fails-on-coupled-bodies]], [[warp-renderer-depth-is-not-device-portable]], [[a-scene-is-a-value-not-a-string-literal]]
-sources: [wiki/log.md, src/navprobe/scenes.py]
+related: ["[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[warp-renderer-depth-is-not-device-portable]]", "[[a-scene-is-a-value-not-a-string-literal]]"]
+source_paths:
+  - "wiki/log.md"
+  - "src/navprobe/scenes.py"
+source_git_blobs:
+  "wiki/log.md": "a06233146b645b97d0fb243cc906189745b55f1e"
+  "src/navprobe/scenes.py": "4a05c692fbd2740bd717f015e7725fa8175fc207"
 fact_checked: 2026-08-14
 confidence: high
+hubs: [instrument-design]
 ---
 
 # The numbers here are scene-dependent; the shapes are what replicate

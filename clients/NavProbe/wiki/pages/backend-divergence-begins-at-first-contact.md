@@ -1,8 +1,12 @@
 ---
 title: Cross-backend divergence begins at the first contact solve, not before
 tags: [mjx, warp, determinism, measurement, finding, contact]
-related: [[mjx-determinism-does-not-cross-backends]], [[warp-renderer-depth-is-not-device-portable]]
-sources: [mujoco-mjx 3.11.0, mujoco-warp 3.11.0, jax 0.11.0, warp-lang 1.16.0]
+related: ["[[mjx-determinism-does-not-cross-backends]]", "[[warp-renderer-depth-is-not-device-portable]]"]
+provenance:
+  - "mujoco-mjx 3.11.0"
+  - "mujoco-warp 3.11.0"
+  - "jax 0.11.0"
+  - "warp-lang 1.16.0"
 fact_checked: 2026-08-13
 confidence: high
 measured_with:
@@ -15,6 +19,7 @@ measured_with:
   seed: 7 (MJX) and fixed offsets 0.013 / -0.027 (Warp)
   step_count: 200
   world_counts: [1, 2, 4, 8, 16, 64]
+hubs: [determinism-measurement]
 ---
 
 # Cross-backend divergence begins at the first contact solve, not before

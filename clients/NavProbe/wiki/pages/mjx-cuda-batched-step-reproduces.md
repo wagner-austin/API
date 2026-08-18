@@ -1,8 +1,14 @@
 ---
 title: MJX reproduces bit for bit on CUDA, including across fresh processes
 tags: [mjx, determinism, measurement, cuda, batching]
-related: [[mjx-batched-step-reproduces-on-cpu]], [[mjx-determinism-does-not-cross-backends]], [[jax-cuda-unavailable-on-windows]]
-sources: [mujoco-mjx 3.11.0, jax 0.11.0, src/navprobe/crossprocess.py]
+related: ["[[mjx-batched-step-reproduces-on-cpu]]", "[[mjx-determinism-does-not-cross-backends]]", "[[jax-cuda-unavailable-on-windows]]"]
+source_paths:
+  - "src/navprobe/crossprocess.py"
+source_git_blobs:
+  "src/navprobe/crossprocess.py": "2d5bfcb44bd8f37f3f2814edccb76f3b444775ee"
+provenance:
+  - "mujoco-mjx 3.11.0"
+  - "jax 0.11.0"
 fact_checked: 2026-08-13
 confidence: high
 measured_with:
@@ -16,6 +22,7 @@ measured_with:
   repetitions: 5
   world_counts: [1, 2, 4, 8, 16, 32, 64, 128, 256, 1024, 4096]
   perturbation: 0.05
+hubs: [determinism-measurement]
 ---
 
 # MJX reproduces bit for bit on CUDA, including across fresh processes

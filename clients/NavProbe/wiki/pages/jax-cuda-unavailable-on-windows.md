@@ -1,10 +1,13 @@
 ---
 title: JAX has no CUDA backend on native Windows
 tags: [platform, jax, cuda, constraint]
-related: [[mjx-batched-step-reproduces-on-cpu]], [[python-311-caps-scientific-stack]]
-sources: [jax 0.10.2, PyPI]
+related: ["[[mjx-batched-step-reproduces-on-cpu]]", "[[python-311-caps-scientific-stack]]"]
+provenance:
+  - "jax 0.10.2"
+  - "PyPI"
 fact_checked: 2026-08-13
 confidence: high
+hubs: [platform-constraints]
 ---
 
 # JAX has no CUDA backend on native Windows

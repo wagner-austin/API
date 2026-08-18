@@ -1,10 +1,16 @@
 ---
 title: Python 3.11 caps jax, numpy and scipy below their latest releases
 tags: [platform, dependencies, constraint]
-related: [[jax-cuda-unavailable-on-windows]]
-sources: [PyPI, pyproject.toml]
+related: ["[[jax-cuda-unavailable-on-windows]]"]
+source_paths:
+  - "pyproject.toml"
+source_git_blobs:
+  "pyproject.toml": "d40eeea34b2d837f383843f48e8b001a0fe35c45"
+provenance:
+  - "PyPI"
 fact_checked: 2026-08-13
 confidence: high
+hubs: [platform-constraints]
 ---
 
 # Python 3.11 caps jax, numpy and scipy below their latest releases

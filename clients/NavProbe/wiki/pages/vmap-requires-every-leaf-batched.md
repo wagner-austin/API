@@ -1,10 +1,17 @@
 ---
 title: vmap requires every pytree leaf to carry a batch axis
 tags: [jax, mjx, batching, adapters]
-related: [[mujoco-untyped-requires-protocol-boundary]], [[mjx-batched-step-reproduces-on-cpu]]
-sources: [mujoco-mjx 3.11.0, jax 0.10.2, src/navprobe/adapters/mjx.py]
+related: ["[[mujoco-untyped-requires-protocol-boundary]]", "[[mjx-batched-step-reproduces-on-cpu]]"]
+source_paths:
+  - "src/navprobe/adapters/mjx.py"
+source_git_blobs:
+  "src/navprobe/adapters/mjx.py": "539e5fce071b6caf91eba05cf6f6e65bc8e0433d"
+provenance:
+  - "mujoco-mjx 3.11.0"
+  - "jax 0.10.2"
 fact_checked: 2026-08-13
 confidence: high
+hubs: [simulator-adapters]
 ---
 
 # vmap requires every pytree leaf to carry a batch axis

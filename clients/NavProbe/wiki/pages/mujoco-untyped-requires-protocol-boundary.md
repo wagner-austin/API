@@ -1,10 +1,17 @@
 ---
 title: MuJoCo ships no type marker, so its surface is declared as Protocols
 tags: [typing, mjx, adapters, drift]
-related: [[vmap-requires-every-leaf-batched]]
-sources: [mujoco 3.11.0, jax 0.10.2, src/navprobe/adapters/mjx_bindings.py]
+related: ["[[vmap-requires-every-leaf-batched]]"]
+source_paths:
+  - "src/navprobe/adapters/mjx_bindings.py"
+source_git_blobs:
+  "src/navprobe/adapters/mjx_bindings.py": "7c30f87ec36dafc29bb627b33a91fe62578f853b"
+provenance:
+  - "mujoco 3.11.0"
+  - "jax 0.10.2"
 fact_checked: 2026-08-13
 confidence: high
+hubs: [simulator-adapters]
 ---
 
 # MuJoCo ships no type marker, so its surface is declared as Protocols

@@ -1,8 +1,14 @@
 ---
 title: MJX determinism holds within a backend and does not cross between them
 tags: [mjx, determinism, measurement, cuda, portability, finding]
-related: [[mjx-cuda-batched-step-reproduces]], [[mjx-batched-step-reproduces-on-cpu]], [[cpu-determinism-survives-os-and-version-change]]
-sources: [mujoco-mjx 3.11.0, jax 0.11.0, src/navprobe/crossprocess.py]
+related: ["[[mjx-cuda-batched-step-reproduces]]", "[[mjx-batched-step-reproduces-on-cpu]]", "[[cpu-determinism-survives-os-and-version-change]]"]
+source_paths:
+  - "src/navprobe/crossprocess.py"
+source_git_blobs:
+  "src/navprobe/crossprocess.py": "2d5bfcb44bd8f37f3f2814edccb76f3b444775ee"
+provenance:
+  - "mujoco-mjx 3.11.0"
+  - "jax 0.11.0"
 fact_checked: 2026-08-13
 confidence: high
 measured_with:
@@ -16,6 +22,7 @@ measured_with:
   repetitions: 3
   world_counts: [1, 2, 4, 8, 16, 64]
   perturbation: 0.05
+hubs: [determinism-measurement]
 ---
 
 # MJX determinism holds within a backend and does not cross between them

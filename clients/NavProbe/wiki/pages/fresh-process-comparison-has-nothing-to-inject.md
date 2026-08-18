@@ -1,10 +1,18 @@
 ---
 title: A cross-process comparison is a free function because nothing is left to inject
 tags: [architecture, dependency-injection, persistence]
-related: [[cpu-determinism-survives-os-and-version-change]], [[mjx-determinism-does-not-cross-backends]]
-sources: [src/navprobe/crossprocess.py, src/navprobe/storage.py, tests/test_crossprocess.py]
+related: ["[[cpu-determinism-survives-os-and-version-change]]", "[[mjx-determinism-does-not-cross-backends]]"]
+source_paths:
+  - "src/navprobe/crossprocess.py"
+  - "src/navprobe/storage.py"
+  - "tests/test_crossprocess.py"
+source_git_blobs:
+  "src/navprobe/crossprocess.py": "2d5bfcb44bd8f37f3f2814edccb76f3b444775ee"
+  "src/navprobe/storage.py": "2dd7c40bb146a6e47e69e257635005110a28db96"
+  "tests/test_crossprocess.py": "5afebcd7cfe6c5dc0cbe344643d82814438a14ea"
 fact_checked: 2026-08-13
 confidence: high
+hubs: [instrument-design]
 ---
 
 # A cross-process comparison is a free function because nothing is left to inject

@@ -1,8 +1,10 @@
 ---
 title: MuJoCo-Warp cannot compile under either of Warp's deterministic modes
 tags: [warp, determinism, finding, upstream, blocker]
-related: [[warp-gpu-determinism-fails-on-coupled-bodies]], [[gpu-nondeterminism-amplifies-to-macroscopic-scale]], [[warp-renderer-depth-is-not-device-portable]]
-sources: [mujoco-warp 3.11.0, warp-lang 1.16.0]
+related: ["[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[gpu-nondeterminism-amplifies-to-macroscopic-scale]]", "[[warp-renderer-depth-is-not-device-portable]]"]
+provenance:
+  - "mujoco-warp 3.11.0"
+  - "warp-lang 1.16.0"
 fact_checked: 2026-08-15
 confidence: high
 measured_with:
@@ -15,6 +17,7 @@ measured_with:
   modes_attempted: [NOT_GUARANTEED, RUN_TO_RUN, GPU_TO_GPU]
   model: single row of spheres from navprobe.scenes, nsensor = 0
   replication: independent venv, kernel cache deleted before each run
+hubs: [determinism-measurement]
 ---
 
 # MuJoCo-Warp cannot compile under either of Warp's deterministic modes

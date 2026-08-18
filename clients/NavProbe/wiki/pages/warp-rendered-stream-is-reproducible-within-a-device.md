@@ -1,8 +1,14 @@
 ---
 title: The rendered stream reproduces exactly within a single device
 tags: [warp, rendering, determinism, measurement]
-related: [[warp-renderer-depth-is-not-device-portable]], [[mjx-cuda-batched-step-reproduces]]
-sources: [mujoco-warp 3.11.0, warp-lang 1.16.0, tests/adapters/test_mjx_warp_render.py]
+related: ["[[warp-renderer-depth-is-not-device-portable]]", "[[mjx-cuda-batched-step-reproduces]]"]
+source_paths:
+  - "tests/adapters/test_mjx_warp_render.py"
+source_git_blobs:
+  "tests/adapters/test_mjx_warp_render.py": "2848fe1f9a8bcdbda294de393ead433ff06551b5"
+provenance:
+  - "mujoco-warp 3.11.0"
+  - "warp-lang 1.16.0"
 fact_checked: 2026-08-13
 confidence: high
 measured_with:
@@ -17,6 +23,7 @@ measured_with:
   repetitions: 3
   world_counts: [1, 2, 4]
   channels: [rgb, depth, both]
+hubs: [rendered-observations]
 ---
 
 # The rendered stream reproduces exactly within a single device

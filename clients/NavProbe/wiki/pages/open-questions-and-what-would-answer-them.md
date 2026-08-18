@@ -1,10 +1,14 @@
 ---
 title: Open questions, and what would answer each one
 tags: [methodology, roadmap, open-questions]
-related: [[the-numbers-are-scene-dependent-the-shapes-replicate]], [[mjwarp-cannot-compile-under-warp-deterministic-mode]], [[warp-gpu-determinism-fails-on-coupled-bodies]]
-sources: [wiki/log.md]
+related: ["[[the-numbers-are-scene-dependent-the-shapes-replicate]]", "[[mjwarp-cannot-compile-under-warp-deterministic-mode]]", "[[warp-gpu-determinism-fails-on-coupled-bodies]]"]
+source_paths:
+  - "wiki/log.md"
+source_git_blobs:
+  "wiki/log.md": "a06233146b645b97d0fb243cc906189745b55f1e"
 fact_checked: 2026-08-14
 confidence: high
+hubs: [instrument-design]
 ---
 
 # Open questions, and what would answer each one
