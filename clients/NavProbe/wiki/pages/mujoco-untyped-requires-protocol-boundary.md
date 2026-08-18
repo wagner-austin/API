@@ -46,10 +46,10 @@ Calling beats reading here. It checks presence, spelling, and behaviour in one a
 
 One vendor claim is checked rather than assumed: that `jit` does not change the result. The adapter measures the compiled path, so if compiling altered the numbers, every verdict would describe a different computation from the one the caller believes was measured.[^7]
 
-[^1]: `[observed]` — `ls <venv>/Lib/site-packages/{mujoco,jax,jaxlib}/py.typed`: absent for `mujoco`, present for `jax` and `jaxlib`. Also absent at `mujoco/mjx/py.typed`.
+[^1]: `src/navprobe/adapters/mujoco_bindings.py:12` (the boundary rationale recording that mujoco ships no py.typed marker) — `[observed]` — `ls <venv>/Lib/site-packages/{mujoco,jax,jaxlib}/py.typed`: absent for `mujoco`, present for `jax` and `jaxlib`. Also absent at `mujoco/mjx/py.typed`.
 [^2]: `clients/TankpitBot/src/tankpit_bot/_pillow.py` L77 — `image_module: PillowImageModuleProtocol = __import__("PIL.Image", fromlist=["open", "new"])`.
 [^3]: `src/navprobe/adapters/mjx_bindings.py` L209-220, `MjxModuleProtocol` — declares exactly `put_model`, `make_data`, `step`.
 [^4]: `src/navprobe/adapters/mjx_bindings.py` L253-288 — `StepVmapProtocol` and `StateVmapProtocol`; loaded at L383 `load_jax_step_transforms` and L393 `load_jax_state_transforms`.
 [^5]: `tests/adapters/test_mjx_bindings.py::TestDeclaredKeywordNames` — one test per declared function, each a keyword call driven to an asserted result.
-[^6]: `[observed]` — each keyword form invoked against `mujoco` 3.11.0 / `mujoco-mjx` 3.11.0 / `jax` 0.10.2; all returned without `TypeError`.
+[^6]: src/navprobe/adapters/mujoco_bindings.py:1 keyword surfaces — `[observed]` — each keyword form invoked against `mujoco` 3.11.0 / `mujoco-mjx` 3.11.0 / `jax` 0.10.2; all returned without `TypeError`.
 [^7]: `tests/adapters/test_mjx_bindings.py::TestJitPreservesResults::test_compiled_and_eager_batched_steps_agree`.

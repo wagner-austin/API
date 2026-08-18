@@ -66,5 +66,5 @@ One camera, one resolution, three batch widths, on a scene with a single body an
 
 The open case is a rendered rollout whose *physics* is irreproducible, which is what any scene above the coupled-body threshold would be. The raycaster itself is clean under a frozen state ([[the-raycaster-inherits-nondeterminism-it-does-not-create-it]]), but whether a rendered trial's divergence tracks the state divergence exactly has not been measured.
 
-[^1]: `[observed]` — `record_trial` on each device at world counts 1, 2 and 4 with `TrialSpec(seed=7, step_count=60, repetitions=3)`, channel `both`; every recording reported `deterministic=true` and a distinct `reference_digest`.
+[^1]: src/navprobe/crossprocess.py:82 `record_trial` — `[observed]` — `record_trial` on each device at world counts 1, 2 and 4 with `TrialSpec(seed=7, step_count=60, repetitions=3)`, channel `both`; every recording reported `deterministic=true` and a distinct `reference_digest`.
 [^2]: `tests/adapters/test_mjx_warp_render.py::TestRenderedContent` — `test_the_rendered_image_changes_as_the_scene_moves`, `test_worlds_within_a_batch_render_differently`, `test_the_image_is_not_uniform`; and `TestRenderedTrial::test_depth_alone_is_reproducible` / `::test_colour_alone_is_reproducible`.

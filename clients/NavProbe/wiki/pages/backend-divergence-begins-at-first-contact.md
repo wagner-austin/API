@@ -66,4 +66,4 @@ A plausible reading is that XLA selects a different kernel or vectorisation stra
 
 [^1]: `[observed]` — MJX CPU vs CUDA at widths 2-64 reported `first_divergent_step = 57` (see [[mjx-determinism-does-not-cross-backends]]). A 200-step MuJoCo-Warp rollout compared per step across `cuda:0` and `cpu` reported `first differing step: 57`, with 143 of 200 steps differing thereafter.
 [^2]: `[observed]` — height trace of world 0 from the 200-step Warp rollout: Δz holds at roughly −0.0135 to −0.0140 through step 56, then −0.00666450 at step 57, −0.00259060 at 58, −0.00039173 at 59, and turns positive at 60. Minimum height 0.08495498 against a resting height of 0.1.
-[^3]: `[observed]` — MJX recordings at `world_count = 1` compared across backends reported `first_divergent_step = 19`; at that step the height trace is still in free fall.
+[^3]: src/navprobe/crossprocess.py:136 `compare_recordings` — `[observed]` — MJX recordings at `world_count = 1` compared across backends reported `first_divergent_step = 19`; at that step the height trace is still in free fall.

@@ -61,4 +61,4 @@ Build an `MjxSimulatorFactory` per width, hand it to `ProbeService`, and run a t
 
 [^1]: `src/navprobe/adapters/mjx.py` L183-210, `MjxSimulatorFactory.__init__` — compiles MJCF, places the model, and builds `jit(vmap(step, in_axes=(None, 0)))` once; each `__call__` returns a simulator with its own batched state.
 [^2]: `tests/adapters/test_mjx.py::TestTrialAgainstMjx::test_batch_width_changes_the_reference_digest` — pins that two widths produce different digests.
-[^3]: `[observed]` — sweep over `world_counts` with `TrialSpec(seed=7, step_count=200, repetitions=5)`, `perturbation=0.05`, on `mujoco-mjx 3.11.0` / `jax 0.10.2` CPU; output is the table above.
+[^3]: src/navprobe/sweep.py:51 `run_scene_sweep` — `[observed]` — sweep over `world_counts` with `TrialSpec(seed=7, step_count=200, repetitions=5)`, `perturbation=0.05`, on `mujoco-mjx 3.11.0` / `jax 0.10.2` CPU; output is the table above.

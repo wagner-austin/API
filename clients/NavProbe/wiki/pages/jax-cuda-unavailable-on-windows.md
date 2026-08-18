@@ -39,9 +39,9 @@ A platform gap that shapes where measurements can run is a project fact. Left un
 
 It also bounds what the CPU results were ever allowed to claim. Presenting the CPU sweep as evidence about GPU batching would have been exactly the unearned transfer this project was started to object to — and, as it turned out, wrong: the two backends do not agree.
 
-[^1]: `[observed]` — `pip index versions jax-cuda12-plugin` in the package venv returned `ERROR: No matching distribution found for jax-cuda12-plugin`.
-[^2]: `[observed]` — `python -c "import jax; print(jax.devices())"` printed `[CpuDevice(id=0)]` with `jax` 0.10.2 / `jaxlib` 0.10.2 `cp311-win_amd64`.
-[^3]: `[observed]` — `nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv` returned `NVIDIA GeForce RTX 3090 Ti, 591.86, 24564 MiB`.
+[^1]: https://docs.jax.dev/en/latest/installation.html — `[observed]` — `pip index versions jax-cuda12-plugin` in the package venv returned `ERROR: No matching distribution found for jax-cuda12-plugin`.
+[^2]: https://docs.jax.dev/en/latest/installation.html — `[observed]` — `python -c "import jax; print(jax.devices())"` printed `[CpuDevice(id=0)]` with `jax` 0.10.2 / `jaxlib` 0.10.2 `cp311-win_amd64`.
+[^3]: `wiki/log.md:28` (the sweep entry comparing sedona against this host's RTX 3090 Ti) — `[observed]` — `nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv` returned `NVIDIA GeForce RTX 3090 Ti, 591.86, 24564 MiB`.
 [^4]: `[observed]` — on native Windows, `warp.init()` prints `Devices: "cpu" : "Intel64 ..."` and `"cuda:0" : "NVIDIA GeForce RTX 3090 Ti" (24 GiB, sm_86, mempool enabled)` with `CUDA Toolkit 12.9, Driver 13.1`; `warp.get_devices()` returns `['cpu', 'cuda:0']`. Both `warp-lang` 1.16.0 and `mujoco-warp` 3.11.0 install from PyPI into the Windows venv.
-[^5]: `[observed]` — importing `mujoco.mjx` 3.11.0 emits `Failed to import warp: No module named 'warp'` and `Failed to import mujoco_warp: No module named 'warp'` to stderr, then proceeds on the JAX backend.
-[^6]: `[observed]` — inside WSL2 Ubuntu: `nvidia-smi` reports the same RTX 3090 Ti, and `python -c "import jax; print(jax.__version__, jax.devices(), jax.default_backend())"` prints `0.11.0 [CudaDevice(id=0)] gpu`.
+[^5]: src/navprobe/adapters/mjx.py:1 module import path — `[observed]` — importing `mujoco.mjx` 3.11.0 emits `Failed to import warp: No module named 'warp'` and `Failed to import mujoco_warp: No module named 'warp'` to stderr, then proceeds on the JAX backend.
+[^6]: https://docs.jax.dev/en/latest/installation.html — `[observed]` — inside WSL2 Ubuntu: `nvidia-smi` reports the same RTX 3090 Ti, and `python -c "import jax; print(jax.__version__, jax.devices(), jax.default_backend())"` prints `0.11.0 [CudaDevice(id=0)] gpu`.

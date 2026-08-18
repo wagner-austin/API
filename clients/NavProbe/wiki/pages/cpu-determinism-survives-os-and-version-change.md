@@ -61,5 +61,5 @@ Two minor JAX releases and two operating systems, on one model, one seed and one
 
 It also covers only the contact-sparse scene. A configuration above the coupled-body threshold is not bit-reproducible even against itself on GPU, and whether CPU portability survives there is unmeasured.
 
-[^1]: `[observed]` — `record_trial` run in each environment writing to `win-cpu` and `wsl-cpu`; `compare_recordings(win-cpu, wsl-cpu, 0)` reported `digests_match=true`, `first_divergent_step=none`, `compared_step_count=200`. Both trial summaries carry the full 64-character digest quoted above.
+[^1]: src/navprobe/crossprocess.py:82 `record_trial`, :136 `compare_recordings` — `[observed]` — `record_trial` run in each environment writing to `win-cpu` and `wsl-cpu`; `compare_recordings(win-cpu, wsl-cpu, 0)` reported `digests_match=true`, `first_divergent_step=none`, `compared_step_count=200`. Both trial summaries carry the full 64-character digest quoted above.
 [^2]: `src/navprobe/crossprocess.py` — `record_trial` persists every repetition and the summary; `compare_recordings` loads two recordings and compares a repetition. No simulator is constructed on the comparison side.

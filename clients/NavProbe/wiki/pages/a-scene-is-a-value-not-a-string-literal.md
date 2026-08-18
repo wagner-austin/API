@@ -53,6 +53,6 @@ The scene codec encodes floats through `float.hex` rather than `str`.[^3] The ro
 Without it, an invalid spec fails somewhere inside MuJoCo's compiler with a message about XML.
 
 [^1]: `src/navprobe/scenes.py` — `SceneSpec` is declared in `navprobe.records`; `build_scene`, `bodies_touch`, `layer_count` and `row_scene` live here.
-[^2]: `[observed]` — the same row family measured by a standalone script (identical worlds) reproduced at 5 bodies and failed at 6; measured by `navprobe.sweep.run_scene_sweep` through `navprobe.adapters.mjx_warp_state` with `perturbation=0.01`, it reproduced at 4 and failed from 5.
+[^2]: src/navprobe/sweep.py:51 `run_scene_sweep` — `[observed]` — the same row family measured by a standalone script (identical worlds) reproduced at 5 bodies and failed at 6; measured by `navprobe.sweep.run_scene_sweep` through `navprobe.adapters.mjx_warp_state` with `perturbation=0.01`, it reproduced at 4 and failed from 5.
 [^3]: `src/navprobe/codecs/scene.py` — `encode_float_field` / `require_positive_float_field`; `tests/codecs/test_scene.py::TestFloatFields::test_round_trips_a_value_with_no_exact_decimal_form`.
 [^4]: `src/navprobe/scenes.py` — `build_scene` calls `require_scene` before emitting anything; `tests/test_scenes.py::TestBuildScene::test_validates_before_building`.

@@ -59,4 +59,4 @@ So the complete picture for rendering:
 
 One camera, one resolution, one scene family, one GPU. Only the raycaster's own reproducibility was isolated; shadows, textures and multiple cameras were left at the adapter's settings and not varied. A renderer feature that introduced its own accumulation — an accumulating light pass, for instance — would not be covered by this measurement.
 
-[^1]: `[observed]` — for each row, the state was advanced by the listed settle steps, its `qpos` copied to the host, and then re-asserted before each of twelve renders through a freshly created render context; colour and depth buffers were digested per render and the distinct-digest counts reported.
+[^1]: src/navprobe/adapters/mjx_warp_render.py:194-199 qpos copy and re-assign — `[observed]` — for each row, the state was advanced by the listed settle steps, its `qpos` copied to the host, and then re-asserted before each of twelve renders through a freshly created render context; colour and depth buffers were digested per render and the distinct-digest counts reported.
