@@ -608,17 +608,6 @@ def process_train_job(payload_raw: JSONObject) -> None:
         user_id=user_id,
         queue_name=TRAINER_QUEUE,
     )
-    threads = setup_env(settings)
-
-    req = payload["request"]
-    fid = str(req["corpus_file_id"]).strip()
-    fetcher = _test_hooks.corpus_fetcher_factory(
-        settings["app"]["data_bank_api_url"],
-        settings["app"]["data_bank_api_key"],
-        Path(settings["app"]["data_root"]) / "corpus_cache",
-    )
-    resolved_corpus = str(fetcher.fetch(fid))
-    cfg = build_cfg(req, resolved_corpus)
 
     def _hb(ts: float) -> None:
         r.set(heartbeat_key(run_id), str(ts))
@@ -627,7 +616,20 @@ def process_train_job(payload_raw: JSONObject) -> None:
         val = r.get(cancel_key(run_id))
         return bool(val == "1")
 
+    req = payload["request"]
+    # The guard opens before corpus resolution, not just before training: a
+    # fetch or config failure must record the run as failed exactly like a
+    # training failure, or the job store advertises "running" forever.
     try:
+        threads = setup_env(settings)
+        fid = str(req["corpus_file_id"]).strip()
+        fetcher = _test_hooks.corpus_fetcher_factory(
+            settings["app"]["data_bank_api_url"],
+            settings["app"]["data_bank_api_key"],
+            Path(settings["app"]["data_root"]) / "corpus_cache",
+        )
+        resolved_corpus = str(fetcher.fetch(fid))
+        cfg = build_cfg(req, resolved_corpus)
         _execute_training(
             settings,
             r,
