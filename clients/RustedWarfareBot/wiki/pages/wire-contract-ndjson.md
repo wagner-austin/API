@@ -97,6 +97,6 @@ A JSONL stream is itself a corpus. Decoding is a pure function of the lines it i
 [^8]: `src/rw_bot/control/channel.py` — `_complete_or_none` reads the opening record's counts and waits for `1 + visible + pools + options` lines before decoding.
 [^9]: `wiki/sources/m6-wire/world-sample.ndjson:67` and `:72` — the Command Center's first option (`builder`, `"placed":false`) and the Builder's `landFactory` (`"placed":true`); `agent/src/rwbot/agent/BuildOptions.java` is the producer, and the predicate that reads as "makes something" is `a.s.g()`, false on `a.v` (build a structure) and true on `a.l` (produce a unit).
 [^10]: `src/rw_bot/wire/command.py` — `encode_produce` emits `kind`, `unit_id` and `type` and no coordinate; `encode_build` carries `x` and `y`.
-[^4]: `agent/src/rwbot/agent/StateStream.java` — the producer, with the flatness constraint and its rationale in the class javadoc; the render-on-game-thread and await are in `Premain.writeSample`.
+[^4]: `agent/src/rwbot/agent/StateStream.java:31` — the producer, with the flatness constraint and its rationale in the class javadoc; the render-on-game-thread and await are in `Premain.writeSample`.
 [^5]: `src/rw_bot/wire/ndjson.py` — the strict reader, with the `disallow_any_expr` constraint recorded in the module docstring and one traceable code per rejection (`RW-NDJSON-001` … `-006`).
 [^6]: `src/rw_bot/wire/state.py` — `decode_samples` folds records into samples and enforces the declared count (`RW-WIRE-003`); `encode_sample` round-trips, which is what makes a decoded corpus re-emittable as a fixture.

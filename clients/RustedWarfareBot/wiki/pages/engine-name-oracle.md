@@ -83,5 +83,5 @@ The narration names subsystems, not methods. Knowing `GameEngine` is `game.i` do
 [^8]: https://github.com/TapeRTS/Tape — repository description "Rusted Warfare RTS mappings, free to use for everyone", CC0, with per-version directories (0.80, 1.09, 1.12b). Last pushed 2023-02-19; no 1.15 directory. Retrieved 2026-07-25.
 [^9]: [synthesis] — conclusion drawn from the printed mapping at `wiki/sources/m0-probe/nodisplay-boot.log:45` plus the subsystem narration at `:60`–`:186`; no separate source.
 [^10]: `wiki/sources/m0-probe/nodisplay-boot.log:12` — "Game Version: 1.15", with "Build Number: #28" at `:11` and "Game Code: 176" at `:13`.
-[^11]: `runs/decompiled/com/corrodinggames/rts/game/a/j.java` shows `enum j { a, b, c; }`, while `javap -p -c` on the same class emits `ldc // String Pre`, `// String Prepare` and `// String Active` from its `<clinit>`.
+[^11]: `runs/decompiled/com/corrodinggames/rts/game/a/j.java:6` shows `enum j { a, b, c; }`, while `javap -p -c` on the same class emits `ldc // String Pre`, `// String Prepare` and `// String Active` from its `<clinit>`.
 [^12]: `wiki/sources/m16-enums/enum-names.txt` — 53 enums with their constants, and the one-line command that regenerates the file from the jar.

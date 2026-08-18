@@ -80,8 +80,8 @@ The first version printed enum fields as their class, which lost exactly the val
 That turned out to matter beyond this probe. The engine's enums are obfuscated in their *field* names only — the constant name strings survive in the bytecode — so the zone state and kind read as `Pre`/`Prepare`/`Active` and `Main`/`ResourceOutpost`/`ForwardOutpost` rather than as `a`, `b`, `c`. Following that thread out of the probe produced a general naming oracle for the whole jar ([[engine-name-oracle]]).
 
 [^1]: `runs/decompiled/com/corrodinggames/rts/game/i.java:547` — `this.bs = new e(0); this.bs.v = "Player";` followed by `for (int i2 = 1; i2 < 8; ++i2) { new com.corrodinggames.rts.game.a.a(i2); }`. Only the second class carries a zone list.
-[^2]: `agent/src/rwbot/agent/AgentOptions.java` — the `aiZones` accessor and its rationale; `OptionChecks` asserts that it defaults off, parses, and rejects a non-boolean.
-[^3]: `agent/src/rwbot/agent/AiZones.java` — the whole probe, including the ownership walk and the base-class match.
+[^2]: `agent/src/rwbot/agent/AgentOptions.java:26` — the `aiZones` accessor and its rationale; `OptionChecks` asserts that it defaults off, parses, and rejects a non-boolean.
+[^3]: `agent/src/rwbot/agent/AiZones.java:39` — the whole probe, including the ownership walk and the base-class match.
 [^4]: `wiki/sources/m15-ai-zones/zone-dump.txt` — the distilled dump, and the header recording the exact agent options that produced it.
 [^5]: `wiki/sources/m15-ai-zones/zone-dump-330s.txt` — `Q=37 A=3 h=true seaGroup=false` at 330 seconds, against the `A=5 seaGroup=true` groups present from the first sample.
-[^6]: `agent/src/rwbot/agent/ObjectView.java` — the enum branch of `summarise`, and the comment recording why it does not breach the no-engine-`toString` rule. `DiscoveryChecks` asserts a constant renders by name.
+[^6]: `agent/src/rwbot/agent/ObjectView.java:198` — the enum branch of `summarise`, and the comment recording why it does not breach the no-engine-`toString` rule. `DiscoveryChecks` asserts a constant renders by name.

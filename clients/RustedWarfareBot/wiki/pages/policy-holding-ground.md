@@ -261,8 +261,8 @@ An opponent at tier 3 therefore earns **3.75x per extractor** what this bot earn
 Two things are not yet established, and both are cheap: what raises a player's tech level -- no asset declares it as a grant, and the only framework reference is a map-scripting filter -- and whether the opponents actually field tier-2 types. The second is now answered by every match, because what the opponents are fielding is a reported figure.
 
 [^1]: `wiki/sources/m25-duration/full-length-matches.txt` — four seeds before and after the builder fix, played four at a time ([[harness-parallel-matches]]).
-[^2]: See [[mechanics-unit-value]] for the value table and `.game/assets/units/extractor*/` for the generation rates: 8, 12, 20 and 30 credits per second across the tiers.
+[^2]: See [[mechanics-unit-value]] § "The table" for the value table and `.game/assets/units/extractor*/` for the generation rates: 8, 12, 20 and 30 credits per second across the tiers.
 [^3]: `wiki/sources/m26-upgrades/structure-offers.txt` — `scripts/upgrade_probe.py` played the real opening and then asked the engine, rather than reading the build tree.
 [^4]: `wiki/sources/m27-aggression/attack-vs-turtle.txt` — six matches in one batch, the arms differing only in the wave ladder argument.
-[^6]: `runs/sweeps/duel-hard-defence/` against `runs/sweeps/duel-hard/` — twelve seeds each, differing only in which structures `undefended` offers.
+[^6]: `runs/sweeps/duel-hard-defence/` against `runs/sweeps/duel-hard/` per `wiki/log.md:751` — twelve seeds each, differing only in which structures `undefended` offers.
 [^5]: `wiki/sources/m28-holding/extractor-survival.txt`, with the two readers that produced it beside it. Read from the per-sample traces the twelve Hard duels already wrote (`runs/traces/duel-s*.ndjson`), so it cost no runs — the distinction [[policy-trace]] exists to make, finally asked of a batch that had it.

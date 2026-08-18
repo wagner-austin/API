@@ -80,8 +80,8 @@ Six orders for six plan entries, no waste: three extractors and the inserted fac
 It plans what to build, not what to do. A completed plan leaves the bot idle, and idle is measured rather than assumed: over five minutes after the plan finished, it took no damage, lost nothing, banked credits from 8,539 to 21,164, and watched visible enemy units go from 54 to 126.[^6] It survived because nothing reached it, not because it defended anything.
 
 [^1]: `src/rw_bot/policy/expand.py` — `expand` folds goals into a plan against the tree and what is owned; `RW-EXPAND-001` is the refusal when a goal cannot be reached.
-[^2]: `agent/src/rwbot/agent/BuildTree.java` — every registered type is asked for its action list at `BASE_TECH_LEVEL`, and each action for the type it makes; the records ride in the same dump as the placement flags because both are one pass over one registry.
-[^3]: `wiki/sources/m11-pools/type-flags.ndjson` — the `buildedge` records for producer `builder`, thirteen of them, matching the thirteen options unit 214 reports in `wiki/sources/m6-wire/world-sample.ndjson`.
-[^4]: `wiki/sources/m11-pools/type-flags.ndjson` [synthesis] — no `buildedge` record anywhere in the dump carries `"produces":"laboratory"`.
+[^2]: `agent/src/rwbot/agent/BuildTree.java:36` — every registered type is asked for its action list at `BASE_TECH_LEVEL`, and each action for the type it makes; the records ride in the same dump as the placement flags because both are one pass over one registry.
+[^3]: `wiki/sources/m11-pools/type-flags.ndjson:347` — the `buildedge` records for producer `builder`, thirteen of them, matching the thirteen options unit 214 reports in `wiki/sources/m6-wire/world-sample.ndjson`.
+[^4]: `wiki/sources/m11-pools/type-flags.ndjson:1-660` (whole dump scanned for the negative) [synthesis] — no `buildedge` record anywhere in the dump carries `"produces":"laboratory"`.
 [^5]: `wiki/sources/m13-expand/expanded-run.log:410`–`:418` — three `build extractorT1`, one `build landFactory`, then two `produce c_tank by 267`, the factory the plan had just finished building.
 [^6]: `wiki/sources/m13-expand/idle-after-plan.txt` — 800 samples of observation after a completed plan, with the credit and enemy-count series.

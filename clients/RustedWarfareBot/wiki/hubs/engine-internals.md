@@ -16,6 +16,8 @@ Every page here is pinned to a specific game build. An obfuscated class name is 
 
 [Command Channel](../pages/command-channel.md) -- orders originate in Python: one loopback socket, id-addressed units, and the backpressure rule that protects the tick
 
+[Unit value table](../pages/mechanics-unit-value.md) -- per-type worth derived from the live type registry dump, with the arithmetic error that was nearly acted on recorded beside it
+[Economy policy](../pages/policy-economy.md) -- reserve sizing against the room settings object whose b() dumps startingCredits, and what refusals actually signal
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 [Perception: Visible Entities, Economy and Health](../pages/perception-visibility.md) -- `am.d(n)` is the engine's per-player fog test; credits, team and hit-point fields
 [Resource Pools and the Placement Rule](../pages/mechanics-resource-pools.md) -- credits come from a tileset property: `res_pool` tiles, the `placeOnlyOnResPool` flag, and where an extractor may stand

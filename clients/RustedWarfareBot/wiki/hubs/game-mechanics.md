@@ -10,6 +10,7 @@ The game is its own oracle here. `-printunits` emits a complete stat catalogue o
 
 [The Policy Loop](../pages/policy-loop.md) -- the bot plays: pure decisions from observed state, one order per plan slot, and a scorecard
 
+[Community play strategies](../pages/community-play-strategies.md) -- what the community guides prescribe (tech-first, defence, flame timing), rerun as measured verdicts through the harness sweeps
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 
 [Engine Entity Model](../pages/engine-entity-model.md) -- what a unit actually is in the engine: base class, master list, trees, owning player, starting credits

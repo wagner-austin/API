@@ -67,9 +67,9 @@ Nothing in that sequence was a constant. The subject came from the sample, the d
 
 A planner that issues one order is not a player. There is no goal, no scoring, and no loop that reconsiders — the probe orders once and then watches.[^7] What exists now is the substrate a policy would run on: perceive, decide, act, observe the result, all in Python and all against a live match ([[runtime-split-java-agent-python-brain]]).
 
-[^1]: `agent/src/rwbot/agent/CommandChannel.java` — a `ServerSocket` bound to the loopback address, accepting one planner at a time, with a reader thread inbound and a writer thread outbound.
+[^1]: `agent/src/rwbot/agent/CommandChannel.java:9` — a `ServerSocket` bound to the loopback address, accepting one planner at a time, with a reader thread inbound and a writer thread outbound.
 [^2]: `wiki/sources/m7-channel/world-sample-with-ids.ndjson:2` — `{"kind":"entity","frame":854,"index":0,"id":213,"type":"commandCenter",...}`, with the builder at `:3` and the off-map placeholder at `:4`.
-[^3]: `agent/src/rwbot/agent/CommandChannel.java` — `offer` drops the oldest entry and reports the drop when the outbox is full; `SelfTest.checkChannelBackpressure` asserts the queue stays bounded at its depth rather than trusting the comment.
+[^3]: `agent/src/rwbot/agent/CommandChannel.java:169` — `offer` drops the oldest entry and reports the drop when the outbox is full; `SelfTest.checkChannelBackpressure` asserts the queue stays bounded at its depth rather than trusting the comment.
 [^4]: `wiki/sources/m7-channel/scriptengine-drain.txt:2` — `if (!mainScriptThreadMarked) { mainScriptThreadMarked = true; isMainScriptThread.set(true); }`, with the queue drained under `synchronized (arrayList)` at `:8`.
 [^5]: `src/rw_bot/wire/command.py` — `move_order` and `build_order` validate before construction; `encode_build` rejects a type name containing a quote, backslash or newline. `agent/src/rwbot/agent/CommandRecord.java` rejects the same shapes on arrival, including a move carrying a build type.
 [^6]: `wiki/sources/m7-channel/planner-drove-a-live-game.txt:4` — `id=214 builder at (4250.0, 2610.0)`, within the sample opened at `:1`.

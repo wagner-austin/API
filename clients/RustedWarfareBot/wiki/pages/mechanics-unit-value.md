@@ -22,7 +22,7 @@ source_git_blobs:
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high
-hubs: [engine-internals, bot-architecture]
+hubs: [engine-internals, bot-architecture, game-mechanics]
 ---
 
 # What a Credit Buys
@@ -100,10 +100,10 @@ A tank army attacking a defended position absorbs unanswered fire for the whole 
 
 **`c_artillery` is the only reach the bot has.** Its 290 out-ranges every turret except the two artillery ones. It is also the most fragile unit in the game at 16 hp per 100 credits, which is why fielding it *alone* lost decisively — an all-artillery army has nothing to absorb a charge. Screening it is a composition question, and until the production policy learned to hold a ratio there was no way to ask for one.[^4]
 
-[^1]: `wiki/sources/m11-pools/type-flags.ndjson` — one pass over the live type registry emitting `unittype`, `unitcombat` and `buildedge` records. See [[mechanics-combat-profile]].
+[^1]: `wiki/sources/m11-pools/type-flags.ndjson:1` — one pass over the live type registry emitting `unittype`, `unitcombat` and `buildedge` records. See [[mechanics-combat-profile]].
 [^2]: `src/rw_bot/mechanics/catalogue.py`, `_damage` — the engine writes either `12` or `12 (total:24.0)`.
 [^3]: `wiki/sources/m21-losses/where-units-die.txt`.
-[^4]: See [[policy-production]].
+[^4]: See [[policy-production]] § "Buying throughput with the money that was buying income".
 [^5]: `.game/assets/units/extractor/` — `extractor.ini`, `extractorT2.ini`, `extractorT3.ini`, `extractorT3_overclocked.ini`, `extractorT3_reinforced.ini`. Each `[action_*]` block carries `convertTo` and its own `price`; `[core]` carries the build `price` and `generation_resources: credits=N`. The same figures appear in `wiki/sources/m0-probe/printunits.log` as `Price:` and `T<n> Upgrade Price:`.
 [^6]: `wiki/sources/m26-upgrades/structure-offers.txt` — the capture has the builder offering `extractorT1` and nothing above it. See [[mechanics-build-tree]].
-[^7]: See [[policy-holding-ground]] for the refusal counts and the full-length scorecards.
+[^7]: See [[policy-holding-ground]] § "What a full-length match actually does" for the refusal counts and the full-length scorecards.

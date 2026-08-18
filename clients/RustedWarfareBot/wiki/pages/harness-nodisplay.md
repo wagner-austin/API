@@ -69,7 +69,7 @@ Clean self-termination has not been observed — the 35-second run was killed ex
 
 Faster-than-realtime ticking closed too: the agent's `fastForward=` argument multiplies the simulation clock, and every panel since the exact-timing era runs at 10x ([[policy-exact-timing]], [[harness-match-service]]). The `slower`/`faster` key bindings this section originally pointed at were never needed.[^15]
 
-[^1]: `.game/fallback64.bat` — `jvm64\bin\java -Xmx1000M -Dfile.encoding=UTF-8 -Djava.library.path=. -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -width 800 -height 600`. JVM version from `.game/jvm64/bin/java.exe -version` → "openjdk version 13 2019-09-17".
+[^1]: `.game/fallback64.bat:2` — `jvm64\bin\java -Xmx1000M -Dfile.encoding=UTF-8 -Djava.library.path=. -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -width 800 -height 600`. JVM version from `.game/jvm64/bin/java.exe -version` → "openjdk version 13 2019-09-17".
 [^2]: `wiki/sources/m0-probe/nodisplay-boot.log:309` — "----- Game init finished in:1322.0735 ms". The process was still alive at the 35 s kill. Build pinned at `wiki/sources/m0-probe/nodisplay-boot.log:12` — "Game Version: 1.15".
 [^3]: `wiki/sources/m0-probe/nodisplay-boot.log:310` — "ai_debug(3):firstRun: no command center found".
 [^4]: `wiki/sources/m0-probe/nodisplay-boot.log:336` — "MissionEngine:triggerLog:firstActivation: move at:8154 for teamId:1 to targetId:6 (#units:4)".

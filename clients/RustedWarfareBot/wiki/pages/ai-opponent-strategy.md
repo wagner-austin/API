@@ -111,9 +111,9 @@ The load-bearing piece our cover24 turtle never had is the **repair bay**
 — unhealed turrets are turrets bought twice. Community material, low
 confidence until measured ([[policy-holding-ground]]).
 
-## What is not established here
+## Open questions, and what would answer each
 
-Which types each mix admits, and their weights, live in the mix subclasses and are not read yet — so "weighted-random over admitted types" is the shape without the contents. The difficulty settings are not traced either, so whether delay, staging radius and the 17-second bound vary by difficulty is unknown. Both are code-reading tasks, not run tasks.
+Which types each mix admits, and at what weights: the answer lives in the mix subclasses under `runs/decompiled/com/corrodinggames/rts/game/a/`, and reading them would turn "weighted-random over admitted types" from a shape into contents. Whether delay, staging radius and the 17-second bound vary by difficulty: the difficulty settings object holds that, and tracing it is a code read, not a run.
 
 Nothing on this page has been confirmed by watching the AI do it. The strongest available check is cheap and not yet done: a run that logs an opponent's unit count and engagement timing against these constants.
 
@@ -130,4 +130,4 @@ Nothing on this page has been confirmed by watching the AI do it. The strongest 
 [^11]: `wiki/sources/m13-expand/idle-after-plan.txt` — 800 samples past a completed plan: owned units unchanged at 9, credits 8,539 → 21,164, visible enemy units 54 → 126.
 [^12]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:1726`–`1748` — `as()` counts units passing `!am.bV && am.cN == null && !am.u() && c(am.bX) && j(am)`, then `n2 = (int)(Math.random() * n3)` picks the index. `at()` at `:1750` is the same draw returning a position. The group consumes it at `g.java:457` — `this.w = this.R.as()`.
 [^13]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:1881` — `j(am) = am.cg() || !c(am.bX)`; `units/am.java:1108` — base `cg()` returns `true`; the only override, `units/custom/j.java:4333`, returns the type template flag `this.y.m`. No visibility term anywhere in the chain.
-[^14]: `runs/decompiled/com/corrodinggames/rts/game/a/g.java:423`–`444` — `am2 = this.k.g()` (the zone's intruder), then `this.w = am2; this.p = 500.0f; ... this.a("defending base")`, taken before the attack branch.
+[^14]: `runs/decompiled/com/corrodinggames/rts/game/a/g.java:423`–`444` — `am2 = this.k.g()` (the zone's intruder), then `this.w = am2`, `this.p` assigned `500.0f`, then `this.a("defending base")`, taken before the attack branch.

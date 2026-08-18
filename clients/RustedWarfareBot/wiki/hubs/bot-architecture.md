@@ -28,6 +28,7 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [Intel and Scouting — Remembering the Fog, Carefully](../pages/policy-intel-and-scouting.md) -- the sighting memory and the scout circuit, with v1's refutation and the two fixes it forced
 [The Raid — Remembered Income as an Objective](../pages/policy-raid.md) -- a first-wave party attack-moved at the frontier remembered extractor; ghosts reported back to the memory
 
+[Combat profile mechanics](../pages/mechanics-combat-profile.md) -- the unitcombat records and TypeFlags.combatOf, the per-type damage surface the bot reads instead of re-deriving
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 [The Build Tree, and Planning From Goals](../pages/mechanics-build-tree.md) -- goals in, executable plan out: prerequisites derived rather than hand-written
 [Threat: Choosing Ground the Builder Survives](../pages/policy-threat.md) -- pools are chosen by who can shoot the walk there, with hostility read from the engine's alliance test rather than from ownership

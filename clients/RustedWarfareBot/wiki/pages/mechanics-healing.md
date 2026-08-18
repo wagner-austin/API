@@ -68,17 +68,14 @@ The builder's own description: "Constructs and repairs buildings. Can not
 attack."[^3] Unit healing is not in its vocabulary, which is why the medic
 channel exists at all.
 
-## Not verified in this page
+## Open questions, and what would answer each
 
-The engineer auto-heal question above; the repair bay's `q()` exclusion;
-whether healing draws credits (the community treats it as free, and no
-ledger line has ever shown a heal charge); stacking behaviour of multiple
-bays; and every healing figure for modded or naval units.
+Whether the engineer auto-heals nearby units: the eligibility walk in `a(am)` at the cited `r.java` decompile would answer it. Whether the repair bay's `q()` excludes itself: the same file, same method family. Whether healing draws credits: every archived ledger to date shows no heal charge, so the community's healing-is-free reading matches the evidence in hand, and a spend line appearing against a heal would overturn it. Stacking of multiple bays and healing figures for modded or naval units: a targeted probe run per case through the existing harness.
 
-[^1]: `runs/decompiled/com/corrodinggames/rts/game/units/d/r.java` — `y()`
+[^1]: `runs/decompiled/com/corrodinggames/rts/game/units/d/r.java:104` — `y()`
     at the 230 return, `c(am)` at the 0.2f return, the timer block inside
     `a(float)`, `a(am)` for eligibility.
-[^2]: `runs/legion.out` — spend ledger line `produce:combatEngineer asked
+[^2]: `runs/legion.out:73` — spend ledger line `produce:combatEngineer asked
     181 got 0` (log 2026-07-31).
 [^3]: `wiki/sources/m0-probe/printunits.log` — the Combat Engineer and
     Builder stat blocks.

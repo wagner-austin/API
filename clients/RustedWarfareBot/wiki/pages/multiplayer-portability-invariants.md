@@ -61,7 +61,7 @@ There is also a non-technical boundary. Self-hosted play against the built-in AI
 [^2]: `wiki/sources/m0-probe/nodisplay-boot.log:183` — "--Now loading:CommandController", emitted during engine init; the menu map load does not begin until `:261` ("--- Loading map ---").
 [^3]: `.game/preferences.ini`, `[settings]` — `networkPort:5123` with `udpInMultiplayer:false` [synthesis]. A single configurable port with UDP off by default is consistent with a TCP command relay; it does not by itself prove the lockstep model.
 [^4]: `clients/TankpitBot/wiki/pages/executor-rejection-loops.md` in the api monorepo, §"Resolution 2026-07-21 — the class is CLOSED: executor is pure dispatch", and §"Symptom" for the 2026-07-06 20:47:31 deadlock; the single-owner terrain rule is at `clients/TankpitBot/wiki/pages/terrain-composition.md`.
-[^5]: [synthesis] — follows from the lockstep model, which the dispatch path now confirms; see [^7] and [^8].
+[^5]: `wiki/sources/m5-order/controller-create-and-enqueue.txt:1` [synthesis] — follows from the lockstep model, which the dispatch path now confirms; see [^7] and [^8].
 [^7]: `wiki/sources/m5-order/controller-create-and-enqueue.txt:8` — `e2.d = l2.by;` inside `public e b(n n2)`, stamping every command with the engine's millisecond clock at construction.
 [^8]: `wiki/sources/m5-order/controller-create-and-enqueue.txt:1` — `b(n)` branches on `l2.bX.B`, calling the server-side check `e2.l()` and adding to one list on one arm, adding directly to another list on the other.
 [^6]: `wiki/sources/m0-probe/nodisplay-boot.log:265` — "Setting up team fog.." during map load, preceded by "--Now loading:Precalculating map fog" at `:187`.

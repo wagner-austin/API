@@ -52,7 +52,7 @@ The distinction matters for the planner rather than for pedantry. Decimating aga
 
 Three snapshots of the live engine ten seconds apart give the rates directly.[^4][^5] `by` advanced 9,994 then 9,999 over two ten-second intervals — a millisecond clock.[^4][^5] `bx` advanced 2,993 then 2,998 across the same intervals, which is 299.8 per second.[^4][^5]
 
-Rate alone could not distinguish a simulation tick from a rendered frame, and the render loop is frame-rate limited in exactly this range ([[agent-render-callback-noop]]). The bytecode settles it: `bx` is incremented inside the engine's own update method, not the container's render path, so ~300 Hz is the rate at which `a(float)` is invoked.[^1] Whether the container calls it once per frame or steps it several times per frame to a fixed timestep is not established here.
+Rate alone could not distinguish a simulation tick from a rendered frame, and the render loop is frame-rate limited in exactly this range ([[agent-render-callback-noop]]). The bytecode settles it: `bx` is incremented inside the engine's own update method, not the container's render path, so ~300 Hz is the rate at which `a(float)` is invoked.[^1] Whether the container calls it once per frame or steps it several times per frame to a fixed timestep would take a read of the container loop, and the tick-rate identification above does not depend on which it is.
 
 ## Where the clock is not incremented
 
@@ -78,6 +78,6 @@ Resolved, and not where this page first guessed: the master list is the static `
 [^4]: `wiki/sources/m3-discovery/engine-snapshots.log:531` — `bx = 1918` and `by = 6461` at the `t=10s` snapshot headed at `:400`; the `t=20s` snapshot at `:680` reports `bx = 4911`, `by = 16455` at `:811`–`:812`.
 [^5]: `wiki/sources/m3-discovery/engine-snapshots.log:1091` — `bx = 7909` and `by = 26454` at the `t=30s` snapshot headed at `:960`.
 [^6]: `javap -p -c -cp .game/game-lib.jar` over every class in the jar [synthesis] — a scan for `putfield` of `bx` returns exactly six methods. `game.i.a(float)` is the increment; `gameFramework.ba.h()`, `j.ad.w()` and `j.ad.a(j.au)` each restore a saved pair after `y.a(Lj/k;ZZZ)Z`; `j.ad.aD()` writes `iconst_0` to both; `gameFramework.l.<init>` initialises them. The `.game/` tree is untracked by design, so the command is the reproduction path rather than an archived artifact.
-[^7]: `agent/src/rwbot/agent/EngineHandle.java` — the reflective accessor and the pinned-build failure contract; `javap` of `gameFramework.l.B()` shows a two-instruction body, `getstatic al` then `areturn`.
+[^7]: `agent/src/rwbot/agent/EngineHandle.java:21` — the reflective accessor and the pinned-build failure contract; `javap` of `gameFramework.l.B()` shows a two-instruction body, `getstatic al` then `areturn`.
 [^8]: `wiki/sources/m4-commands/engine-tick-decompiled.txt:6` — the debug line naming `this.bx` as `frame:` and `this.bX.c()` as `network.currentStepRate:`, with `++this.bx;` at `:17` and `this.by = (int)((float)this.by + f2 * 16.666666f);` at `:14`.
 [^9]: `runs/decompiled/com/corrodinggames/rts/gameFramework/f.java:117`–`135` — `public static final strictfp int a(int n2, int n3, int n4)`, reading `l2.bJ` at `:126` and folding `l2.bx` at `:129`–`:130`, with the `notRandInt` range check at `:135`.

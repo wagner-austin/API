@@ -9,6 +9,8 @@ Run artifacts are archived under `runs/` and are the primary sources this wiki c
 [Headless Mode (`-nodisplay`)](../pages/harness-nodisplay.md) -- the full engine boots and simulates with no window; flag inventory, what still needs a GL context, side effects
 [Agent: Render-Callback No-Op](../pages/agent-render-callback-noop.md) -- neutralising the GUI callbacks that dereference a missing display; what unblocked a live headless skirmish
 
+[Determinism policy](../pages/policy-determinism.md) -- what the harness pins per run so a verdict is attributable to the change and not the environment
+[Trace policy](../pages/policy-trace.md) -- the r01..r12 worth traces, peak-vs-final shape, and what a trace is allowed to conclude
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 [Playing Matches in Parallel](../pages/harness-parallel-matches.md) -- what actually had to be separated to run several headless matches at once, and why lockstep is not optional for a batch
 

@@ -72,5 +72,5 @@ Ten times the noise, for the figure that was being compared. Experiments are sco
 Sweeps used to pass `-` for the trace path and keep only the scorecard, on the reasoning that a run not being compared against another has nothing to read a trace for. That was wrong in the way that matters: which run turns out to be worth understanding is not known until after it has been played, and re-running to recover the detail produces a different match. Every sweep match writes one now, named after its job.[^3]
 
 [^1]: `runs/trace-12345.ndjson` against `runs/sweeps/upgrade-fixed/long-s12345.txt`.
-[^2]: `runs/traces/r01..r12-s12345.ndjson`. Peak worth averages 67,650 and arrives 63% of the way through; final worth averages 7,237.
+[^2]: `runs/traces/r01..r12-s12345.ndjson`; `wiki/log.md:661`. Peak worth averages 67,650 and arrives 63% of the way through; final worth averages 7,237.
 [^3]: `src/rw_bot/harness/sweep.py`, `trace_path` and `play_args`.

@@ -80,11 +80,11 @@ The built-in enum arm can never match. Its constants are obfuscated to single le
 
 The agent takes a type name and a position and dispatches. It does not decide what to build, where a structure will fit, or whether the player can afford it — the engine's own validator answers the last of those, and the first two are planner work ([[runtime-split-java-agent-python-brain]]).
 
-[^1]: `.game/assets/translations/Strings.properties` — the `gui.actions.*` key set, 55 keys covering unit abilities with no structure-placement entry among them.
+[^1]: `.game/assets/translations/Strings.properties:375` — the `gui.actions.*` key set, 55 keys covering unit abilities with no structure-placement entry among them.
 [^2]: `wiki/sources/m8-build/placement-setter.txt:3` — `this.a = av.c;` in `au.a(float, float, as, int)`, which also stores the type at `:6` and the selector at `:7`.
 [^3]: `wiki/sources/m8-build/build-action-lookup.txt:11` — `if (as4 != as2 || n2 != -1 && n2 != s3.t()) continue;` inside the builder's build-action lookup.
 [^4]: `wiki/sources/m8-build/build-rejected-selector-zero.txt:6` — `isValidNewWaypoint==false on: builder(pos:4250,2610 id:214 t:0)` after the order at `:3`; the builder never left `(4250.0, 2610.0)`, recorded at `:5`.
 [^5]: `wiki/sources/m8-build/waypoint-validator.txt:8` — the `av.c` branch, with `"Skipping build waypoint with no buildType"` at `:11`, `"can not queue build:"` at `:18`, `"tried to queue a locked building:"` at `:25` and `"tried to queue a unavailable building:"` at `:31`.
 [^6]: `wiki/sources/m8-build/build-succeeded.txt:20` — `[3] com.corrodinggames.rts.game.units.d.m at (4450.0, 2730.0)` first present in the t+5s roster, against the order recorded at `:7`; builder positions at `:15` and in the t+2s roster.
-[^7]: Decompiled `com/corrodinggames/rts/game/units/d/m.java` [synthesis] — its drawable references are `land_factory_back`, `land_factory_front`, `land_factory_front_t` and `land_factory_dead`. The decompiled tree is gitignored; regenerate with `make decompile`.
+[^7]: Decompiled `runs/decompiled/com/corrodinggames/rts/game/units/d/m.java:53` [synthesis] — its drawable references are `land_factory_back`, `land_factory_front`, `land_factory_front_t` and `land_factory_dead`. The decompiled tree is gitignored; regenerate with `make decompile`.
 [^8]: `wiki/sources/m8-build/buildable-type-names.txt` — 90 names, extracted from the `unit:<name>` image references in the `-printunits` catalogue archived at `wiki/sources/m0-probe/printunits.log`.

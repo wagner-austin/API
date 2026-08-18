@@ -96,6 +96,6 @@ rebuild engine the raid was conceived against; extractors are only its
 fuel), and timing.
 
 [^1]: `src/rw_bot/policy/raid.py` — `Raider.strike`, `income_objectives`, `_confirmed_dead`; `tests/test_policy_raid.py` pins each rule.
-[^2]: `runs/sweeps/all-arms-veryhard`, `runs/traces/all-arms-veryhard`; log entry "raid v1 refuted at 0/12", 2026-07-29.
-[^3]: `runs/sweeps/raid2-ab-veryhard`; log entry "raid v2: from 0/12 to cost-neutral", 2026-07-30.
-[^4]: `runs/sweeps/cap-raid5-veryhard`; log entry "cap refuted with its mechanism attached; raid5 says size is not the bite", 2026-07-30.
+[^2]: `runs/sweeps/all-arms-veryhard`, `runs/traces/all-arms-veryhard`; `wiki/log.md:930`, "raid v1 refuted at 0/12", 2026-07-29.
+[^3]: `runs/sweeps/raid2-ab-veryhard`; `wiki/log.md:986`, "raid v2: from 0/12 to cost-neutral", 2026-07-30.
+[^4]: `runs/sweeps/cap-raid5-veryhard`; `wiki/log.md:1020`, "cap refuted with its mechanism attached; raid5 says size is not the bite", 2026-07-30.

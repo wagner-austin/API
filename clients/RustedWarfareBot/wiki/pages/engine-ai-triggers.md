@@ -121,7 +121,7 @@ The capacity ratio is confirmed to be bounded in [0, 1] by the same dump, and th
 The target chooser itself is deliberately out of scope here — this page covers when a force commits, not what it picks.
 
 [^1]: `runs/decompiled/com/corrodinggames/rts/game/n.java:1088` — `public boolean a(double d2) { return this.o >= d2 || d2 == 0.0; }`. `o` is the credit field the agent already reads as `EngineNames.CREDITS`, and the AI class extends the player class, so `this.R.a(1300.0)` is "the AI holds at least 1,300".
-[^2]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java` — `ac()` returns `ag() == 3 || ag() > 300` and `ad()` returns `ag() >= 2`, where `ag()` returns a single stored int.
+[^2]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:129` — `ac()` returns `ag() == 3 || ag() > 300` and `ad()` returns `ag() >= 2`, where `ag()` returns a single stored int.
 [^3]: `runs/decompiled/com/corrodinggames/rts/game/a/i.java:1029`–`1039` — the `e <= 0` branch, its two resets, and the two capacity penalties.
 [^4]: `runs/decompiled/com/corrodinggames/rts/game/a/i.java:1045` — one conjunction of six `(capacity > x || credits >= y)` clauses; `:1048` is the `-120` penalty on a failed attempt.
 [^5]: `runs/decompiled/com/corrodinggames/rts/game/a/i.java:1057`–`1088` — the accumulator, including the unsafe bonus at `:1059`, the sevenfold reduction when the defending-group count reaches 2, and the credit-gated increments.

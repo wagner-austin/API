@@ -266,13 +266,13 @@ dip 2,450). Every arm still loses; what moved and what did not:[^8]
   starved the home fortress, and forward pieces die in contested ground
   — bastion's fire_bridge lesson, confirmed on the new chassis.
 
-[^10]: `runs/sweeps/imp-flame/` — 24 scorecards; `python -m
+[^10]: `runs/sweeps/imp-flame/` per `wiki/log.md:1358` — 24 scorecards; `python -m
     scripts.analyze_sweep imp-flame` for the table, 2026-08-01.
 
-[^9]: `runs/tech-flame{,-s777,-s424242}.out` — verdicts, dips and the
+[^9]: `runs/tech-flame.out` per `wiki/log.md:1347` — verdicts, dips and the
     `convert:c_turret_t2_flame` ledger lines, 2026-08-01.
 
-[^8]: `runs/tech-{fab,scout2,mech,mech2,mech3,mecharty2}.out`,
+[^8]: `runs/tech-fab.out:25` (verdict line; siblings scout2, mech, mech2, mech3, mecharty2 alike),
     `runs/reflex-imp3.out` — full spend ledgers and reach censuses,
     2026-08-01.
 

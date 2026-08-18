@@ -92,7 +92,7 @@ A ceiling was added on the argument that a builder is 500 credits of thing that 
 
 **Availability.** The unit cap and tech gating are the engine's own predicate, asked by the agent rather than modelled here.[^4]
 
-[^1]: See [[ai-opponent-strategy]].
+[^1]: See [[ai-opponent-strategy]] § "Production is a weighted mix, not a build order".
 [^2]: See [[mechanics-unit-value]] and `wiki/sources/m21-losses/where-units-die.txt`.
-[^3]: See [[policy-budget]].
-[^4]: See [[mechanics-build-actions]].
+[^3]: See [[policy-budget]] § "Refusals are the informative half".
+[^4]: See [[mechanics-build-actions]] § "What actually stops a production order".

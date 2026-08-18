@@ -55,7 +55,7 @@ The brain is replaceable. It speaks a documented line protocol to the agent, so 
 
 One future carve-out is named deliberately: if the planner grows a search kernel — rollouts, MCTS, or a custom pathfinder across the four movement layers — that is a compiled hot loop callable from Python, not a reason to rewrite the planner. Revisit on a profile, not on principle ([[harness-nodisplay]]).
 
-[^1]: `.game/fallback64.bat` — `jvm64\bin\java -Xmx1000M … -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main`; `.game/jvm64/bin/java.exe -version` reports "openjdk version 13 2019-09-17".
+[^1]: `.game/fallback64.bat:2` — `jvm64\bin\java -Xmx1000M … -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main`; `.game/jvm64/bin/java.exe -version` reports "openjdk version 13 2019-09-17".
 [^2]: `clients/README.md` in the api monorepo — "Each client is a standalone Poetry package with strict typing, 100% test coverage, and event-driven architecture", listing DiscordBot and TankpitBot; shared libraries `monorepo-guards`, `platform-core`, `platform-discord`, `platform-workers`.
 [^3]: `wiki/sources/m0-probe/nodisplay-boot.log:264` [synthesis] — "Map size: 170, 170" for the menu map, establishing the order of magnitude for grid-shaped planner state; larger skirmish maps exceed it.
 [^4]: `.game/preferences.ini`, `[keys]` section — `attack_move`, `patrol`, `guard_unit`, `stop`, `action_set_rally` are each bound key actions, confirming they are engine-side standing behaviours rather than one-shot commands.

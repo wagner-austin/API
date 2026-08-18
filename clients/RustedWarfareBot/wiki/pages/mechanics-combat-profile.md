@@ -128,7 +128,7 @@ is a reflective call per pair per tick for an answer that does not change.
 [^3]: `com/corrodinggames/rts/game/units/b/c.java:251` implements the airborne
     test as `!this.b()`, and `:74` implements the submerged test as a height
     comparison — both state rather than type.
-[^4]: `wiki/sources/m11-pools/type-flags.ndjson` — one `unitcombat` record per
+[^4]: `wiki/sources/m11-pools/type-flags.ndjson:174` — one `unitcombat` record per
     registered type, 173 of them.
-[^5]: `agent/src/rwbot/agent/TypeFlags.java`, `combatOf` — returns
+[^5]: `agent/src/rwbot/agent/TypeFlags.java:64`, `combatOf` — returns
     `Combat.UNARMED` before reading any layer predicate.

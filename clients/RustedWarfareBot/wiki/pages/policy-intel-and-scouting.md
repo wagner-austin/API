@@ -64,7 +64,7 @@ therefore posed precisely: eyes that cost no production slot — a scout
 drafted only from surplus throughput, or intel taken from combat contact
 alone.
 
-[^4]: `runs/sweeps/all-arms-veryhard`; log entry "the all-arms batch", 2026-07-29.
+[^4]: `runs/sweeps/all-arms-veryhard`; `wiki/log.md:921`, "the all-arms batch", 2026-07-29.
 
 ## Corrections flow back
 
@@ -75,4 +75,4 @@ caller ([[policy-raid]]).
 
 [^1]: `src/rw_bot/policy/intel.py` — `INTEL_WINDOW_FRAMES`, `Sighting` (deliberately a `counter.Threat`), identity-ordered `remembered()`.
 [^2]: `src/rw_bot/policy/scouting.py` — the farthest-first route, the once-per-leg order rule, the circuit reset on replacement.
-[^3]: `runs/sweeps/scout-ab-veryhard`; log entry "scouting v1 refuted", 2026-07-29. The v2 fixes: `campaign._mobile_threats` and `ScoutRunner.need`'s worker floor.
+[^3]: `runs/sweeps/scout-ab-veryhard`; `wiki/log.md:899`, "scouting v1 refuted", 2026-07-29. The v2 fixes: `campaign._mobile_threats` and `ScoutRunner.need`'s worker floor.

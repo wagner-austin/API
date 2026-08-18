@@ -75,5 +75,5 @@ reclaim. `guard_cap 0` stands in the champion.
 
 [^1]: `src/rw_bot/policy/guard.py` — `OUTPOST_RADIUS`, `deepest_intruder` with the engageability and tie-break rules; `dispatch.py` `WaveController._guard`.
 [^2]: `src/rw_bot/policy/dispatch.py` — the `_guard` docstring carries the argument; only `externallyArmed` intrusion paths bypass `muster`.
-[^3]: `runs/sweeps/guard-ab-hard`, `runs/sweeps/guard-ab-veryhard`; log entries of 2026-07-29.
-[^4]: `runs/sweeps/cap-raid5-veryhard`; log entry "cap refuted with its mechanism attached", 2026-07-30.
+[^3]: `runs/sweeps/guard-ab-hard`, `runs/sweeps/guard-ab-veryhard`; `wiki/log.md:842`, 2026-07-29.
+[^4]: `runs/sweeps/cap-raid5-veryhard`; `wiki/log.md:1020`, "cap refuted with its mechanism attached", 2026-07-30.
