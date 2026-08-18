@@ -10,9 +10,13 @@ source_paths:
   - "wiki/log.md"
   - "doctrines/flame-nocover.doctrine"
   - "runs/sweeps/"
+source_git_blobs:
+  "wiki/log.md": "f81d58fbcc4fdb9e68062c7fdaad9889cb8ecccf"
+  "doctrines/flame-nocover.doctrine": "f2fef915923ca031d05cda11f83029d0e89e195e"
 game_version: "1.15 (code 176, build #28)"
 confidence: high
 fact_checked: 2026-08-17
+hubs: [bot-architecture]
 ---
 
 # Campaign Ledger — The Standing Scoreboard

@@ -16,6 +16,7 @@ source_git_blobs:
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high
+hubs: [headless-harness]
 ---
 
 # Run Lifecycle: Why Ad-Hoc Jobs Stopped Being Enough

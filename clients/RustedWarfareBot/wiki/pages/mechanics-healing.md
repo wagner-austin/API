@@ -10,9 +10,12 @@ source_paths:
   - "runs/legion.out"
   - "wiki/sources/m0-probe/printunits.log"
   - "wiki/sources/m17-community/namu-units.txt"
+source_git_blobs:
+  "wiki/sources/m0-probe/printunits.log": "d5ef7237bc6cc175a0e75014b1dafd521806a1e0"
+  "wiki/sources/m17-community/namu-units.txt": "4d5472a2366e2478bc5a56808022fee24ed6d7b7"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
-
+confidence: medium
 hubs: [game-mechanics]
 ---
 

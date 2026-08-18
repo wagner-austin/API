@@ -8,10 +8,10 @@ related:
   - "[[engine-ai-zones]]"
   - "[[mechanics-unit-value]]"
 sources:
-  - "https://steamcommunity.com/sharedfiles/filedetails/?id=1858207046 (Multiplayer Basics)"
-  - "https://steamcommunity.com/sharedfiles/filedetails/?id=1449760671 (RTS Defence)"
-  - "https://www.chaptercheats.com/cheat/pc/388370/rusted-warfare/hint/136775 (Text Walk Through)"
-  - "https://steamcommunity.com/sharedfiles/filedetails/?id=3124371498 (How to win)"
+  - {id: multiplayer-basics, type: webpage, issued: {year: 2019}, title: "Multiplayer Basics", URL: "https://steamcommunity.com/sharedfiles/filedetails/?id=1858207046"}
+  - {id: rts-defence, type: webpage, issued: {year: 2018}, title: "RTS Defence", URL: "https://steamcommunity.com/sharedfiles/filedetails/?id=1449760671"}
+  - {id: text-walk-through, type: webpage, issued: {year: 2020}, title: "Text Walk Through", URL: "https://www.chaptercheats.com/cheat/pc/388370/rusted-warfare/hint/136775"}
+  - {id: how-to-win, type: webpage, issued: {year: 2023}, title: "How to win", URL: "https://steamcommunity.com/sharedfiles/filedetails/?id=3124371498"}
 game_version: "community guides, various patches; claims unverified against 1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: low

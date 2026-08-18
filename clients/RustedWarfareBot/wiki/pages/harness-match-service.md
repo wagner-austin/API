@@ -9,6 +9,10 @@ source_paths:
   - "src/rw_bot/harness/runner.py"
   - "../../libs/platform_workers/src/platform_workers/rq_harness.py"
   - "../../services/covenant-radar-api/docker-compose.yml"
+source_git_blobs:
+  "src/rw_bot/harness/runner.py": "ace02192fa040da0cadc67d3b486300ab03112c5"
+  "../../libs/platform_workers/src/platform_workers/rq_harness.py": "21d8686e6fed6e7a396840a84cf251fe41dc2695"
+  "../../services/covenant-radar-api/docker-compose.yml": "f18715070a89c105837afcff1bcef89b6c315896"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high
