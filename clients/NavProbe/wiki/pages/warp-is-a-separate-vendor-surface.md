@@ -5,9 +5,13 @@ related: ["[[mujoco-untyped-requires-protocol-boundary]]", "[[vmap-requires-ever
 source_paths:
   - "src/navprobe/adapters/mjx_warp_bindings.py"
   - "src/navprobe/adapters/mujoco_bindings.py"
+  - "src/navprobe/adapters/mjx_warp_render.py"
+  - "tests/adapters/test_mjx_warp_bindings.py"
 source_git_blobs:
   "src/navprobe/adapters/mjx_warp_bindings.py": "5b35d7fedcd8f51cf9fcdb0dc88f7f2ae5a471cc"
   "src/navprobe/adapters/mujoco_bindings.py": "4c271831d631dd97a50a9a6129fd7d1abf367aa2"
+  "src/navprobe/adapters/mjx_warp_render.py": "898c44998cd0d22b65901c73453c940b081c50ac"
+  "tests/adapters/test_mjx_warp_bindings.py": "d383a1051a002dfff5c15a463645337255b0b1f7"
 provenance:
   - "mujoco-warp 3.11.0"
 fact_checked: 2026-08-13

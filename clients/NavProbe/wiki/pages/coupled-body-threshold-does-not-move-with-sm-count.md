@@ -2,6 +2,10 @@
 title: The coupled-body determinism threshold does not move with SM count
 tags: [warp, determinism, measurement, finding, gpu, occupancy, negative-result]
 related: ["[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[mjwarp-cannot-compile-under-warp-deterministic-mode]]", "[[the-numbers-are-scene-dependent-the-shapes-replicate]]", "[[measurement-fleet-is-reachable-by-ssh-alias]]"]
+source_paths:
+  - "src/navprobe/sweep.py"
+source_git_blobs:
+  "src/navprobe/sweep.py": "3fbecbbf2caeec07827f618c307ded4699414dfd"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"

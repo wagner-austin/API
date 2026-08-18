@@ -2,6 +2,10 @@
 title: The raycaster inherits non-determinism, it does not create any
 tags: [warp, rendering, determinism, measurement, gpu]
 related: ["[[warp-renderer-depth-is-not-device-portable]]", "[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[warp-rendered-stream-is-reproducible-within-a-device]]"]
+source_paths:
+  - "src/navprobe/adapters/mjx_warp_render.py"
+source_git_blobs:
+  "src/navprobe/adapters/mjx_warp_render.py": "898c44998cd0d22b65901c73453c940b081c50ac"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"

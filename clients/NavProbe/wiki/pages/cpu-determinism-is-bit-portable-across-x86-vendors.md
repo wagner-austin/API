@@ -2,6 +2,10 @@
 title: The CPU control is bit-identical across x86 vendors and vector widths, not merely self-consistent on each
 tags: [cpu, determinism, measurement, finding, control, portability, warp, avx]
 related: ["[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[coupled-body-threshold-does-not-move-with-sm-count]]", "[[cpu-determinism-survives-os-and-version-change]]", "[[measurement-fleet-is-reachable-by-ssh-alias]]", "[[mujoco-requires-avx-so-pre-avx-hosts-are-ineligible]]"]
+source_paths:
+  - "src/navprobe/sweep.py"
+source_git_blobs:
+  "src/navprobe/sweep.py": "3fbecbbf2caeec07827f618c307ded4699414dfd"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"

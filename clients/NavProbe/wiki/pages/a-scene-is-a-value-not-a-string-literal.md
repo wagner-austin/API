@@ -6,10 +6,14 @@ source_paths:
   - "src/navprobe/scenes.py"
   - "src/navprobe/codecs/scene.py"
   - "tests/test_scenes.py"
+  - "src/navprobe/sweep.py"
+  - "tests/codecs/test_scene.py"
 source_git_blobs:
   "src/navprobe/scenes.py": "4a05c692fbd2740bd717f015e7725fa8175fc207"
   "src/navprobe/codecs/scene.py": "504db991c0bc1338aec434e53abe9f029940c0a2"
   "tests/test_scenes.py": "ebeb6878130073a665c2414a61c88d38bcce52eb"
+  "src/navprobe/sweep.py": "3fbecbbf2caeec07827f618c307ded4699414dfd"
+  "tests/codecs/test_scene.py": "a8c0e8b8f974add70c3dea4f35196cd4aee43379"
 fact_checked: 2026-08-14
 confidence: high
 hubs: [instrument-design]

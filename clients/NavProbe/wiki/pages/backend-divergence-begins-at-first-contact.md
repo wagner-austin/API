@@ -2,6 +2,10 @@
 title: Cross-backend divergence begins at the first contact solve, not before
 tags: [mjx, warp, determinism, measurement, finding, contact]
 related: ["[[mjx-determinism-does-not-cross-backends]]", "[[warp-renderer-depth-is-not-device-portable]]"]
+source_paths:
+  - "src/navprobe/crossprocess.py"
+source_git_blobs:
+  "src/navprobe/crossprocess.py": "2d5bfcb44bd8f37f3f2814edccb76f3b444775ee"
 provenance:
   - "mujoco-mjx 3.11.0"
   - "mujoco-warp 3.11.0"

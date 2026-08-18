@@ -4,8 +4,12 @@ tags: [mjx, determinism, measurement, batching]
 related: ["[[jax-cuda-unavailable-on-windows]]", "[[vmap-requires-every-leaf-batched]]"]
 source_paths:
   - "src/navprobe/adapters/mjx.py"
+  - "src/navprobe/sweep.py"
+  - "tests/adapters/test_mjx.py"
 source_git_blobs:
   "src/navprobe/adapters/mjx.py": "539e5fce071b6caf91eba05cf6f6e65bc8e0433d"
+  "src/navprobe/sweep.py": "3fbecbbf2caeec07827f618c307ded4699414dfd"
+  "tests/adapters/test_mjx.py": "1ea2dc9841cc9bbf54c49663d132a965f4650d3f"
 provenance:
   - "mujoco-mjx 3.11.0"
 fact_checked: 2026-08-13

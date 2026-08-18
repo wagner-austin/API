@@ -6,10 +6,12 @@ source_paths:
   - "src/navprobe/adapters/mjx_bindings.py"
   - "src/navprobe/adapters/mujoco_bindings.py"
   - "src/navprobe/adapters/jax_bindings.py"
+  - "tests/adapters/test_mjx_bindings.py"
 source_git_blobs:
   "src/navprobe/adapters/mjx_bindings.py": "7c30f87ec36dafc29bb627b33a91fe62578f853b"
   "src/navprobe/adapters/mujoco_bindings.py": "4c271831d631dd97a50a9a6129fd7d1abf367aa2"
   "src/navprobe/adapters/jax_bindings.py": "0e04487c1a15f649726a2320f5cc1d56c51e7985"
+  "tests/adapters/test_mjx_bindings.py": "1e7d5feafdeac3b87223be01451ada93acd6e731"
 provenance:
   - "mujoco 3.11.0"
   - "jax 0.10.2"

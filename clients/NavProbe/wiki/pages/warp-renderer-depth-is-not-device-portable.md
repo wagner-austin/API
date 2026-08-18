@@ -4,8 +4,10 @@ tags: [warp, rendering, determinism, measurement, finding, depth]
 related: ["[[backend-divergence-begins-at-first-contact]]", "[[mjx-determinism-does-not-cross-backends]]", "[[warp-rendered-stream-is-reproducible-within-a-device]]"]
 source_paths:
   - "src/navprobe/adapters/mjx_warp_render.py"
+  - "src/navprobe/scenes.py"
 source_git_blobs:
   "src/navprobe/adapters/mjx_warp_render.py": "898c44998cd0d22b65901c73453c940b081c50ac"
+  "src/navprobe/scenes.py": "4a05c692fbd2740bd717f015e7725fa8175fc207"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"

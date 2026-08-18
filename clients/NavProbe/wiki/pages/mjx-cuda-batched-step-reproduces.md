@@ -4,8 +4,10 @@ tags: [mjx, determinism, measurement, cuda, batching]
 related: ["[[mjx-batched-step-reproduces-on-cpu]]", "[[mjx-determinism-does-not-cross-backends]]", "[[jax-cuda-unavailable-on-windows]]"]
 source_paths:
   - "src/navprobe/crossprocess.py"
+  - "src/navprobe/sweep.py"
 source_git_blobs:
   "src/navprobe/crossprocess.py": "2d5bfcb44bd8f37f3f2814edccb76f3b444775ee"
+  "src/navprobe/sweep.py": "3fbecbbf2caeec07827f618c307ded4699414dfd"
 provenance:
   - "mujoco-mjx 3.11.0"
   - "jax 0.11.0"

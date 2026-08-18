@@ -2,6 +2,12 @@
 title: GPU non-determinism in MuJoCo-Warp needs mutually-contacting bodies, not many contacts
 tags: [warp, determinism, measurement, finding, contact, gpu]
 related: ["[[backend-divergence-begins-at-first-contact]]", "[[warp-rendered-stream-is-reproducible-within-a-device]]", "[[mjx-cuda-batched-step-reproduces]]"]
+source_paths:
+  - "src/navprobe/scenes.py"
+  - "src/navprobe/sweep.py"
+source_git_blobs:
+  "src/navprobe/scenes.py": "4a05c692fbd2740bd717f015e7725fa8175fc207"
+  "src/navprobe/sweep.py": "3fbecbbf2caeec07827f618c307ded4699414dfd"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"
