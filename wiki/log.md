@@ -151,3 +151,11 @@ Root docs updated: README.md services table
 How the drift stayed invisible: the api copy's only link to corvis was through its *tests*, which walked up to `../MCPs/.env` for `DATABASE_TEST_URL` and wrote into `corvis_test`. Its production code was a snapshot of a schema corvis had moved past three times — `users` replaced by `accounts` + `tenant_memberships`, `content_hash` added NOT NULL, and `documents.category` promoted to a foreign key into the `document_categories` taxonomy (`irvine.council.agenda`-style slugs) while the service still validated against a flat 15-value list matching nothing. Those failures never surfaced because `make check` stops at the guard step, and this project's guards were red, so its tests had not run.
 
 Rule this suggests: a service in this monorepo should not reach into another repo's `.env` for a database. That coupling is what let a dead fork keep "passing" while diverging from the schema it depended on.
+
+## [2026-08-17] add+update | cleargbm boundary page, leaf-wise reference-implementation research folded in
+
+Pages written: cleargbm-python-rust-boundary (new)
+Pages updated: cleargbm-perf-leaf-wise-growth (design-alternative section: LightGBM's flat best_split_per_leaf_ + ArgMax vs this page's BinaryHeap sketch; the Shi-removal vs LightGBM-gain-poisoning fork a leaf-wise arm must decide; pointer to agent-board task 453c9234 which specifies growth_strategy + the paired-quality gate), cleargbm-histogram-split-path (stale _rust.py blob pin 17d203e5 -> 81518f4d; all 10 pins re-verified against the working tree before bumping fact_checked)
+Hubs updated: libs (9 -> 10)
+Index updated: total 11 -> 12
+Notes: The boundary page records the post-ea7835d2 state: f7c61172 (07-21) deleted the compute path, ea7835d2 (08-17) deleted the packaging shim; maturin top-level module; _rust.py Protocol layer as the only Python mirroring Rust signatures. Primary-source backing for the leaf-wise design (captured serial_tree_learner.cpp, Shi 2007 thesis, XGBoost + Friedman papers) landed the same night in the TECH wiki, gradient-boosting-implementation hub; this wiki carries the codebase-side pointers only.
