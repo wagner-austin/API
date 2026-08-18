@@ -25,6 +25,7 @@ from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
     LMModelProto,
+    LoadStateDictResultProto,
     NamedParameter,
     ParameterLike,
 )
@@ -133,6 +134,15 @@ class _FakeLM(LMModelProto):
             for j in range(prompt_len, total_len):
                 result[i, j] = torch.randint(0, 10, (1,)).item()
         return result
+
+    def state_dict(self: _FakeLM) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _FakeLM, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 def _make_prepared() -> PreparedLMModel:

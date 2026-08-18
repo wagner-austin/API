@@ -311,6 +311,7 @@ def _execute_training(
     store: TrainerJobStore,
     ctx: JobContext,
     created_at: datetime,
+    resume: bool,
 ) -> None:
     """Execute training workflow."""
     from model_trainer.core.contracts.progress import TrainingPhase, TrainingProgress
@@ -478,6 +479,7 @@ def _execute_training(
         heartbeat=heartbeat_fn,
         cancelled=cancelled_fn,
         prepared=prepared,
+        resume=resume,
         progress=_progress,
         wandb_publisher=wandb_pub,
     )
@@ -638,6 +640,7 @@ def process_train_job(payload_raw: JSONObject) -> None:
             job_store,
             ctx,
             created_at,
+            payload["resume"],
         )
     except Exception as e:
         _log.exception("Training job failed", extra={"run_id": run_id, "user_id": user_id})

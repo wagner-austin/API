@@ -15,6 +15,7 @@ from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
     LMModelProto,
+    LoadStateDictResultProto,
     NamedParameter,
     ParameterLike,
 )
@@ -133,3 +134,12 @@ class FakeModel(LMModelProto):
             Fake config object.
         """
         return _FakeConfig()
+
+    def state_dict(self: FakeModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: FakeModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self

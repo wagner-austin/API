@@ -143,6 +143,13 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     CLOZE_ITEMS_EMPTY = "CLOZE_ITEMS_EMPTY"
     CLOZE_ITEM_UNSCOREABLE = "CLOZE_ITEM_UNSCOREABLE"
 
+    # Checkpoint / resume errors
+    CHECKPOINT_NOT_FOUND = "CHECKPOINT_NOT_FOUND"
+    CHECKPOINT_CORRUPT = "CHECKPOINT_CORRUPT"
+    CHECKPOINT_CONFIG_MISMATCH = "CHECKPOINT_CONFIG_MISMATCH"
+    CHECKPOINT_SCHEMA_UNSUPPORTED = "CHECKPOINT_SCHEMA_UNSUPPORTED"
+    RUN_NOT_RESUMABLE = "RUN_NOT_RESUMABLE"
+
     # Infrastructure errors
     CUDA_NOT_AVAILABLE = "CUDA_NOT_AVAILABLE"
     CUDA_OOM = "CUDA_OOM"
@@ -537,6 +544,12 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     # Cloze evaluation errors
     ModelTrainerErrorCode.CLOZE_ITEMS_EMPTY: 400,
     ModelTrainerErrorCode.CLOZE_ITEM_UNSCOREABLE: 400,
+    # Checkpoint / resume errors
+    ModelTrainerErrorCode.CHECKPOINT_NOT_FOUND: 404,
+    ModelTrainerErrorCode.CHECKPOINT_CORRUPT: 500,
+    ModelTrainerErrorCode.CHECKPOINT_CONFIG_MISMATCH: 409,
+    ModelTrainerErrorCode.CHECKPOINT_SCHEMA_UNSUPPORTED: 409,
+    ModelTrainerErrorCode.RUN_NOT_RESUMABLE: 409,
     # Infrastructure errors
     ModelTrainerErrorCode.CUDA_NOT_AVAILABLE: 503,
     ModelTrainerErrorCode.CUDA_OOM: 507,

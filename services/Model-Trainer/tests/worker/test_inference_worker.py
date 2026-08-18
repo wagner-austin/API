@@ -42,7 +42,12 @@ from model_trainer.core.encoding import ListEncoded
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.unavailable_backend import UNAVAILABLE_CAPABILITIES
 from model_trainer.core.services.registries import BackendRegistration, ModelRegistry
-from model_trainer.core.types import ForwardOutProto, NamedParameter, ParameterLike
+from model_trainer.core.types import (
+    ForwardOutProto,
+    LoadStateDictResultProto,
+    NamedParameter,
+    ParameterLike,
+)
 from model_trainer.worker import generate_job, score_job
 
 
@@ -185,6 +190,15 @@ class _FakeLMModel:
     def gradient_checkpointing_enable(self) -> None:
         return None
 
+    def state_dict(self: _FakeLMModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _FakeLMModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
+
 
 class _FakeEncoder:
     """Fake encoder that satisfies Encoder protocol."""
@@ -257,6 +271,7 @@ class _FakeBackendWithTopk:
         heartbeat: Callable[[float], None],
         cancelled: Callable[[], bool],
         prepared: PreparedLMModel,
+        resume: bool,
         progress: (
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
@@ -353,6 +368,7 @@ class _FakeBackendNoTopk:
         heartbeat: Callable[[float], None],
         cancelled: Callable[[], bool],
         prepared: PreparedLMModel,
+        resume: bool,
         progress: (
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None

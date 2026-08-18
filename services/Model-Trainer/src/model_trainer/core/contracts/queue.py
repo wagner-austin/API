@@ -58,9 +58,23 @@ class TrainRequestPayload(TypedDict):
 
 
 class TrainJobPayload(TypedDict):
+    """Payload for one execution of a training run.
+
+    Attributes:
+        run_id: Run this execution belongs to. A resume reuses the id of
+            the interrupted run rather than minting a new one.
+        request: The training request; on resume it must match the
+            checkpoint's recorded config field for field.
+        user_id: Submitting user.
+        resume: When True, the worker continues the run from its persisted
+            checkpoint instead of training from scratch, and refuses to
+            start when no valid checkpoint exists.
+    """
+
     run_id: str
     request: TrainRequestPayload
     user_id: int
+    resume: bool
 
 
 class EvalJobPayload(TypedDict):

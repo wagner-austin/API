@@ -120,6 +120,7 @@ def _prepare_trained_model(settings: Settings, tmp_path: Path) -> tuple[Prepared
         run_id="runA",
         heartbeat=_noop,
         cancelled=_never,
+        resume=False,
         prepared=prepared,
         progress=None,
     )

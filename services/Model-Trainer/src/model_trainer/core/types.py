@@ -10,6 +10,17 @@ class ConfigLike(Protocol):
     """Protocol for model configuration objects."""
 
 
+class TorchStateValue(Protocol):
+    """Protocol for one value inside a torch-serialized state payload.
+
+    Deliberately memberless: model, optimizer and RNG state entries are
+    heterogeneous (tensors, numbers, nested containers) and are
+    round-tripped through ``torch.save``/``torch.load`` without being
+    introspected. A consumer that needs a concrete type narrows with
+    ``isinstance``.
+    """
+
+
 class ParameterLike(Protocol):
     """Protocol for model parameters (tensors with gradients)."""
 
@@ -23,11 +34,21 @@ class ParameterLike(Protocol):
         ...
 
 
+class LoadStateDictResultProto(Protocol):
+    """Protocol for the result of a module ``load_state_dict`` call.
+
+    Torch returns a named tuple of missing and unexpected keys; callers
+    here never inspect it, so the protocol carries no members.
+    """
+
+
 class OptimizerProto(Protocol):
     """Protocol for PyTorch optimizer instances."""
 
     def zero_grad(self, *, set_to_none: bool = ...) -> None: ...
     def step(self) -> None: ...
+    def state_dict(self) -> dict[str, TorchStateValue]: ...
+    def load_state_dict(self, state_dict: dict[str, TorchStateValue]) -> None: ...
 
 
 class OptimizerCtorProto(Protocol):
@@ -105,6 +126,16 @@ class LMModelProto(Protocol):
 
     def save_pretrained(self: LMModelProto, out_dir: str) -> None:
         """Save model to directory."""
+        ...
+
+    def state_dict(self: LMModelProto) -> dict[str, torch.Tensor]:
+        """Return the model's parameter and buffer tensors by name."""
+        ...
+
+    def load_state_dict(
+        self: LMModelProto, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        """Load parameter and buffer tensors by name."""
         ...
 
     def gradient_checkpointing_enable(self: LMModelProto) -> None:

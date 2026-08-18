@@ -138,6 +138,7 @@ def test_training_cancellation_with_redis(
     payload = {
         "run_id": run_id,
         "user_id": 1,
+        "resume": False,
         "request": {
             "model_family": "gpt2",
             "model_size": "small",

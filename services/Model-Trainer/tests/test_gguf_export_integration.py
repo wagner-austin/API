@@ -49,6 +49,7 @@ from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
     LMModelProto,
+    LoadStateDictResultProto,
     NamedParameter,
     ParameterLike,
 )
@@ -111,6 +112,15 @@ class _FakeLMModel(LMModelProto):
     @property
     def config(self) -> ConfigLike:
         return self._config
+
+    def state_dict(self: _FakeLMModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _FakeLMModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class _FakeEncoded(Encoded):
@@ -195,6 +205,7 @@ class _HfLmBackend(ModelBackend):
         heartbeat: Callable[[float], None],
         cancelled: Callable[[], bool],
         prepared: PreparedLMModel,
+        resume: bool,
         progress: (
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
@@ -689,6 +700,7 @@ class TestTrainingJobWithGgufExport:
         payload: TrainJobPayload = {
             "run_id": "run-gguf-export-test",
             "user_id": 1,
+            "resume": False,
             "request": {
                 "model_family": "hf_lm",
                 "model_size": "small",

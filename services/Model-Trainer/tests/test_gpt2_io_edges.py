@@ -16,6 +16,7 @@ from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
     LMModelProto,
+    LoadStateDictResultProto,
     NamedParameter,
     ParameterLike,
 )
@@ -72,6 +73,15 @@ class FakeModel(LMModelProto):
     @property
     def config(self: FakeModel) -> ConfigLike:
         return _FakeModelConfig()
+
+    def state_dict(self: FakeModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: FakeModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class Enc:
@@ -187,6 +197,15 @@ class _FakeModel(LMModelProto):
     @property
     def config(self: _FakeModel) -> ConfigLike:
         return self._config
+
+    def state_dict(self: _FakeModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _FakeModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 def test_token_ids_defaults_when_missing() -> None:

@@ -318,6 +318,7 @@ class ModelBackend(Protocol):
         heartbeat: Callable[[float], None],
         cancelled: Callable[[], bool],
         prepared: PreparedLMModel,
+        resume: bool,
         progress: (
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None

@@ -126,6 +126,7 @@ def test_process_train_job_sets_status_message_on_exception(
     payload: TrainJobPayload = {
         "run_id": "run-exc",
         "user_id": 7,
+        "resume": False,
         "request": {
             "model_family": "gpt2",
             "model_size": "small",

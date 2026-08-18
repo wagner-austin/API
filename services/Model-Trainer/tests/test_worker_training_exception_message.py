@@ -42,6 +42,7 @@ def test_training_worker_sets_status_message_on_exception(tmp_path: Path) -> Non
     payload: TrainJobPayload = {
         "run_id": "run-x",
         "user_id": 1,
+        "resume": False,
         "request": {
             "model_family": "gpt2",
             "model_size": "small",

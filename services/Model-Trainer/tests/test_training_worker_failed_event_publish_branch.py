@@ -84,6 +84,7 @@ def test_training_worker_failed_event_publish_branch(
     payload: TrainJobPayload = {
         "run_id": "run-err",
         "user_id": 1,
+        "resume": False,
         "request": {
             "model_family": "gpt2",
             "model_size": "small",

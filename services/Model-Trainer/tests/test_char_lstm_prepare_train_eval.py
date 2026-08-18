@@ -113,6 +113,7 @@ def test_char_lstm_end_to_end_small(settings_with_paths: Settings, tmp_path: Pat
         run_id="runA",
         heartbeat=_noop,
         cancelled=_never,
+        resume=False,
         prepared=prepared,
         progress=track_loss,
     )
@@ -269,6 +270,7 @@ def test_char_lstm_freeze_embed_preserves_embedding_weights(
         run_id="runFreeze",
         heartbeat=_noop,
         cancelled=_never,
+        resume=False,
         prepared=prepared,
         progress=track_loss,
     )
@@ -367,6 +369,7 @@ def test_char_lstm_training_reduces_loss(settings_with_paths: Settings, tmp_path
         run_id="runLossTest",
         heartbeat=_noop,
         cancelled=_never,
+        resume=False,
         prepared=prepared,
         progress=capture_loss,
     )
@@ -451,6 +454,7 @@ def test_char_lstm_save_load_consistency(settings_with_paths: Settings, tmp_path
         run_id="runSaveLoad",
         heartbeat=_noop,
         cancelled=_never,
+        resume=False,
         prepared=prepared,
         progress=track_loss,
     )
@@ -732,6 +736,7 @@ def test_char_lstm_generation_determinism(settings_with_paths: Settings, tmp_pat
         run_id="runDeterminism",
         heartbeat=_noop,
         cancelled=_never,
+        resume=False,
         prepared=prepared,
         progress=track_loss,
     )
@@ -840,6 +845,7 @@ def test_char_lstm_continued_training_reduces_loss(
         run_id="runContinued1",
         heartbeat=_noop,
         cancelled=_never,
+        resume=False,
         prepared=prepared,
         progress=collect_initial,
     )
@@ -903,6 +909,7 @@ def test_char_lstm_continued_training_reduces_loss(
         run_id="runContinued2",
         heartbeat=_noop,
         cancelled=_never,
+        resume=False,
         prepared=prepared,
         progress=collect_continued,
     )

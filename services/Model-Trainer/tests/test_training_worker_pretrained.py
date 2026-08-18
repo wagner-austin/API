@@ -43,6 +43,7 @@ from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
     LMModelProto,
+    LoadStateDictResultProto,
     NamedParameter,
     ParameterLike,
 )
@@ -108,6 +109,15 @@ class _FakeLMModel(LMModelProto):
     @property
     def config(self: _FakeLMModel) -> ConfigLike:
         return self._config
+
+    def state_dict(self: _FakeLMModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _FakeLMModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class _FakeEncoded(Encoded):
@@ -180,6 +190,7 @@ class _BackendWithLoad(ModelBackend):
         self.load_called = False
         self.prepare_called = False
         self.loaded_from: str | None = None
+        self.resume_seen: bool | None = None
         self._train_losses = train_losses
 
     def name(self: _BackendWithLoad) -> str:
@@ -219,12 +230,14 @@ class _BackendWithLoad(ModelBackend):
         heartbeat: Callable[[float], None],
         cancelled: Callable[[], bool],
         prepared: PreparedLMModel,
+        resume: bool,
         progress: (
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
+        self.resume_seen = resume
         # Simulate training progress with decreasing loss
         # Args: step, epoch, loss, train_ppl, grad_norm, samples_per_sec, val_loss, val_ppl
         losses = [2.5, 1.8, 1.2, 0.9, 0.5]
@@ -463,6 +476,7 @@ def test_training_worker_loads_pretrained_model(
     payload: TrainJobPayload = {
         "run_id": "run-finetune",
         "user_id": 1,
+        "resume": False,
         "request": {
             "model_family": "gpt2",
             "model_size": "small",
@@ -501,6 +515,9 @@ def test_training_worker_loads_pretrained_model(
     assert backend_instance is not None and backend_instance.load_called is True
     assert backend_instance.prepare_called is False
     assert backend_instance.loaded_from == str(pretrained_model_dir)
+    # A fresh enqueue trains from scratch: the payload's resume flag reaches
+    # the backend as False.
+    assert backend_instance.resume_seen is False
 
     # Verify loss decreases during training (ml-train-no-loss-check)
     assert len(train_losses) >= 2, "Should have at least 2 loss values"
@@ -567,6 +584,7 @@ class _HfLmBackend(ModelBackend):
         heartbeat: Callable[[float], None],
         cancelled: Callable[[], bool],
         prepared: PreparedLMModel,
+        resume: bool,
         progress: (
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
@@ -671,6 +689,7 @@ def test_training_worker_hf_lm_with_tokenizer_id_none(
     payload: TrainJobPayload = {
         "run_id": "run-hflm-no-tok",
         "user_id": 1,
+        "resume": False,
         "request": {
             "model_family": "hf_lm",
             "model_size": "small",
@@ -871,6 +890,7 @@ def test_continued_training_downloads_artifacts_when_absent_locally(
     payload: TrainJobPayload = {
         "run_id": "run-cooldown",
         "user_id": 1,
+        "resume": False,
         "request": {
             "model_family": "gpt2",
             "model_size": "small",
@@ -920,4 +940,108 @@ def test_continued_training_downloads_artifacts_when_absent_locally(
     assert loss_after < loss_before, f"Loss should decrease: {loss_before} -> {loss_after}"
 
     status = TrainerJobStore(fake).load("run-cooldown")
+    assert status is not None and status["status"] == "completed"
+
+
+# ============================================================================
+# Resume flag pass-through (payload -> backend.train)
+# ============================================================================
+
+
+def test_training_worker_passes_resume_flag_to_backend(
+    tmp_path: Path, settings_factory: _SettingsFactory
+) -> None:
+    """A resume execution hands resume=True to the backend unchanged."""
+    backend_instance_holder: list[_BackendWithLoad | None] = [None]
+    train_losses: list[float] = []
+
+    artifacts = tmp_path / "artifacts"
+    settings = settings_factory(
+        artifacts_root=str(artifacts),
+        runs_root=str(tmp_path / "runs"),
+        logs_root=str(tmp_path / "logs"),
+        data_root=str(tmp_path / "data"),
+        data_bank_api_url="http://data-bank-api.local",
+        data_bank_api_key="secret-key",
+    )
+    _test_hooks.load_settings = lambda: settings
+
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "a.txt").write_text("hello world\nresume data\n", encoding="utf-8")
+
+    tok_id = "tok-resume-test"
+    tok_dir = artifacts / "tokenizers" / tok_id
+    tok_cfg = TokenizerTrainConfig(
+        method="bpe",
+        vocab_size=64,
+        min_frequency=1,
+        corpus_path=str(corpus),
+        holdout_fraction=0.1,
+        seed=42,
+        out_dir=str(tok_dir),
+    )
+    BPEBackend().train(tok_cfg)
+
+    pretrained_run_id = "run-resume-base"
+    pretrained_model_dir = artifacts / "models" / pretrained_run_id
+    pretrained_model_dir.mkdir(parents=True, exist_ok=True)
+    (pretrained_model_dir / "weights.bin").write_bytes(b"\x00pretrained")
+    (pretrained_model_dir / "manifest.json").write_text(
+        '{"model_family": "gpt2", "model_size": "small"}', encoding="utf-8"
+    )
+
+    fake = FakeRedis()
+    _test_hooks.kv_store_factory = lambda url: fake
+    _test_hooks.service_container_from_settings = _create_service_container_factory(
+        fake, backend_instance_holder, train_losses
+    )
+    _test_hooks.corpus_fetcher_factory = _create_corpus_fetcher_factory(corpus)
+    _test_hooks.artifact_store_factory = _create_artifact_store_factory()
+
+    payload: TrainJobPayload = {
+        "run_id": "run-resumed-exec",
+        "user_id": 1,
+        "resume": True,
+        "request": {
+            "model_family": "gpt2",
+            "model_size": "small",
+            "max_seq_len": 16,
+            "num_epochs": 1,
+            "batch_size": 1,
+            "learning_rate": 5e-4,
+            "tokenizer_id": tok_id,
+            "corpus_file_id": "deadbeef",
+            "holdout_fraction": 0.01,
+            "seed": 42,
+            "pretrained_run_id": pretrained_run_id,
+            "freeze_embed": False,
+            "gradient_clipping": 1.0,
+            "optimizer": "adamw",
+            "device": "cpu",
+            "data_num_workers": None,
+            "data_pin_memory": None,
+            "early_stopping_patience": 5,
+            "test_split_ratio": 0.15,
+            "finetune_lr_cap": 5e-5,
+            "loss_mask_prefix_separator": None,
+            "precision": "auto",
+            "hub_model_id": None,
+            "finetuning_strategy": "full",
+            "lora": None,
+            "quantization": None,
+            "gguf_export": None,
+        },
+    }
+
+    train_job.process_train_job(encode_train_job_payload(payload))
+
+    backend_instance = backend_instance_holder[0]
+    assert backend_instance is not None and backend_instance.resume_seen is True
+    # The fake backend emits a decreasing loss series; the guard-mandated
+    # trajectory check keeps this meaningful rather than status-only.
+    loss_before = train_losses[0]
+    loss_after = train_losses[-1]
+    assert loss_after < loss_before
+    status = TrainerJobStore(fake).load("run-resumed-exec")
     assert status is not None and status["status"] == "completed"

@@ -161,6 +161,17 @@ def test_model_trainer_status_for() -> None:
     assert model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND) == 404
     assert model_trainer_status_for(ModelTrainerErrorCode.LOGS_READ_FAILED) == 500
 
+    # Cloze evaluation errors
+    assert model_trainer_status_for(ModelTrainerErrorCode.CLOZE_ITEMS_EMPTY) == 400
+    assert model_trainer_status_for(ModelTrainerErrorCode.CLOZE_ITEM_UNSCOREABLE) == 400
+
+    # Checkpoint / resume errors
+    assert model_trainer_status_for(ModelTrainerErrorCode.CHECKPOINT_NOT_FOUND) == 404
+    assert model_trainer_status_for(ModelTrainerErrorCode.CHECKPOINT_CORRUPT) == 500
+    assert model_trainer_status_for(ModelTrainerErrorCode.CHECKPOINT_CONFIG_MISMATCH) == 409
+    assert model_trainer_status_for(ModelTrainerErrorCode.CHECKPOINT_SCHEMA_UNSUPPORTED) == 409
+    assert model_trainer_status_for(ModelTrainerErrorCode.RUN_NOT_RESUMABLE) == 409
+
     # Infrastructure errors
     assert model_trainer_status_for(ModelTrainerErrorCode.CUDA_NOT_AVAILABLE) == 503
     assert model_trainer_status_for(ModelTrainerErrorCode.CUDA_OOM) == 507
@@ -178,3 +189,8 @@ def test_model_trainer_error_code_enum_values() -> None:
     assert ModelTrainerErrorCode.TOKENIZER_LOAD_FAILED == "TOKENIZER_LOAD_FAILED"
     assert ModelTrainerErrorCode.CORPUS_EMPTY == "CORPUS_EMPTY"
     assert ModelTrainerErrorCode.CUDA_OOM == "CUDA_OOM"
+    assert ModelTrainerErrorCode.CHECKPOINT_NOT_FOUND == "CHECKPOINT_NOT_FOUND"
+    assert ModelTrainerErrorCode.CHECKPOINT_CORRUPT == "CHECKPOINT_CORRUPT"
+    assert ModelTrainerErrorCode.CHECKPOINT_CONFIG_MISMATCH == "CHECKPOINT_CONFIG_MISMATCH"
+    assert ModelTrainerErrorCode.CHECKPOINT_SCHEMA_UNSUPPORTED == "CHECKPOINT_SCHEMA_UNSUPPORTED"
+    assert ModelTrainerErrorCode.RUN_NOT_RESUMABLE == "RUN_NOT_RESUMABLE"

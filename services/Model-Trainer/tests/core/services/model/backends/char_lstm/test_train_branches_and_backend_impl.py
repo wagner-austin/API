@@ -21,9 +21,11 @@ from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
     LMModelProto,
+    LoadStateDictResultProto,
     NamedParameter,
     OptimizerProto,
     ParameterLike,
+    TorchStateValue,
 )
 from model_trainer.infra.persistence.models import TrainingManifestVersions
 
@@ -82,6 +84,13 @@ class _LM(LMModelProto):
     @classmethod
     def from_pretrained(cls: type[_LM], path: str) -> LMModelProto:
         return cls()
+
+    def state_dict(self: _LM) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(self: _LM, state_dict: dict[str, torch.Tensor]) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class _MiniEnc(Encoder):
@@ -175,6 +184,12 @@ def test_trainer_train_one_epoch_cancelled_early_triggers_return() -> None:
         def step(self: _Opt) -> None:
             return None
 
+        def state_dict(self: _Opt) -> dict[str, TorchStateValue]:
+            return {}
+
+        def load_state_dict(self: _Opt, state_dict: dict[str, TorchStateValue]) -> None:
+            _ = state_dict
+
     trainer = bt.BaseTrainer(
         _make_prepared(),
         _make_cfg(),
@@ -182,6 +197,7 @@ def test_trainer_train_one_epoch_cancelled_early_triggers_return() -> None:
         run_id="test-run",
         redis_hb=lambda _: None,
         cancelled=lambda: True,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -221,6 +237,12 @@ def test_trainer_train_one_epoch_progress_and_heartbeat() -> None:
         def step(self: _Opt2) -> None:
             return None
 
+        def state_dict(self: _Opt2) -> dict[str, TorchStateValue]:
+            return {}
+
+        def load_state_dict(self: _Opt2, state_dict: dict[str, TorchStateValue]) -> None:
+            _ = state_dict
+
     def _progress_cb(
         step: int,
         epoch: int,
@@ -240,6 +262,7 @@ def test_trainer_train_one_epoch_progress_and_heartbeat() -> None:
         run_id="test-run",
         redis_hb=lambda t: hb_calls.append(t),
         cancelled=lambda: False,
+        resume=False,
         progress=_progress_cb,
         service_name="char-lstm-train",
     )
@@ -277,7 +300,8 @@ def test_trainer_run_training_loop_breaks_on_cancelled() -> None:
         _make_settings(),
         run_id="test-run",
         redis_hb=lambda _: None,
-        cancelled=lambda: True,  # Always cancelled
+        cancelled=lambda: True,
+        resume=False,  # Always cancelled
         progress=None,
         service_name="char-lstm-train",
     )
@@ -290,6 +314,10 @@ def test_trainer_run_training_loop_breaks_on_cancelled() -> None:
         model=_LM(),
         dataloader=DataLoader(ds, batch_size=1, shuffle=False),
         effective_lr=1e-3,
+        start_epoch=0,
+        start_step=0,
+        initial_last_loss=0.0,
+        restored=None,
     )
     # out is (loss, steps, cancelled, early_stopped)
     assert out[2] is True
@@ -376,6 +404,7 @@ def test_train_prepared_calls_save_when_not_cancelled(
         run_id="rid2",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
     )
     expected_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "models" / "rid2"
@@ -458,7 +487,8 @@ def test_train_prepared_skips_save_when_cancelled(
         settings_with_paths,
         run_id="rid3",
         redis_hb=lambda _: None,
-        cancelled=lambda: True,  # Always cancelled - save should be skipped
+        cancelled=lambda: True,
+        resume=False,  # Always cancelled - save should be skipped
         progress=None,
     )
     # Save should be skipped when cancelled=True
@@ -484,6 +514,7 @@ def test_trainer_run_training_loop_progress_none_branch() -> None:
         run_id="test-run",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -496,6 +527,10 @@ def test_trainer_run_training_loop_progress_none_branch() -> None:
         model=_LM(),
         dataloader=dl,
         effective_lr=1e-3,
+        start_epoch=0,
+        start_step=0,
+        initial_last_loss=0.0,
+        restored=None,
     )
     # Verify the return values: (final_loss, total_steps, was_cancelled, early_stopped)
     assert out[0] >= 0.0, f"Expected non-negative loss, got {out[0]}"
@@ -522,6 +557,12 @@ def test_trainer_train_one_epoch_progress_none_inside_loop() -> None:
         def step(self: _Opt3) -> None:
             return None
 
+        def state_dict(self: _Opt3) -> dict[str, TorchStateValue]:
+            return {}
+
+        def load_state_dict(self: _Opt3, state_dict: dict[str, TorchStateValue]) -> None:
+            _ = state_dict
+
     dl = DataLoader(_DS1(), batch_size=1, shuffle=False)
 
     trainer = bt.BaseTrainer(
@@ -531,6 +572,7 @@ def test_trainer_train_one_epoch_progress_none_inside_loop() -> None:
         run_id="test-run",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -579,6 +621,7 @@ def test_run_training_loop_progress_called_when_no_batches() -> None:
         run_id="test-run",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=_progress_cb,
         service_name="char-lstm-train",
     )
@@ -593,6 +636,10 @@ def test_run_training_loop_progress_called_when_no_batches() -> None:
         model=_LM(),
         dataloader=empty_loader,
         effective_lr=1e-3,
+        start_epoch=0,
+        start_step=0,
+        initial_last_loss=0.0,
+        restored=None,
     )
     # Ensure branch executed: progress called even if no steps advanced
     # out is (loss, steps, cancelled, early_stopped)
@@ -713,6 +760,7 @@ def test_train_with_freeze_embed_enabled(tmp_path: Path) -> None:
         run_id="test-run-freeze",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=track_loss,
         service_name="char-lstm-train",
     )
@@ -818,6 +866,7 @@ def test_setup_device_cuda_not_available() -> None:
         run_id="test-cuda-fail",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -919,6 +968,7 @@ def test_train_one_epoch_fp16_scaler_paths() -> None:
         run_id="test-fp16-run",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -1018,6 +1068,7 @@ def test_setup_device_cuda_available() -> None:
         run_id="test-cuda-ok",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -1043,6 +1094,7 @@ def test_apply_lr_cap_when_finetuning() -> None:
         run_id="test-lr-cap",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -1068,6 +1120,7 @@ def test_apply_lr_cap_no_cap_when_not_finetuning() -> None:
         run_id="test-no-cap",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -1123,6 +1176,7 @@ def test_early_stopping_triggers_after_patience_exceeded() -> None:
         run_id="test-early-stop",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -1139,6 +1193,10 @@ def test_early_stopping_triggers_after_patience_exceeded() -> None:
         model=_ConstantLossLM(),
         dataloader=train_loader,
         effective_lr=1e-3,
+        start_epoch=0,
+        start_step=0,
+        initial_last_loss=0.0,
+        restored=None,
     )
 
     assert early_stopped is True, "Expected early stopping to trigger"
@@ -1177,6 +1235,7 @@ def test_apply_lr_cap_no_log_when_lr_below_cap() -> None:
         run_id="test-no-log-cap",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -1207,6 +1266,7 @@ def test_make_loader_returns_none_for_empty_files(tmp_path: Path) -> None:
         run_id="test-make-loader-none",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -1240,6 +1300,7 @@ def test_build_all_loaders_raises_when_no_train_data(tmp_path: Path) -> None:
         run_id="test-no-train-data",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
     )
@@ -1380,6 +1441,7 @@ def test_log_wandb_config_called_when_publisher_present() -> None:
         run_id="test-wandb-config",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
@@ -1408,6 +1470,7 @@ def test_log_wandb_step_called_when_publisher_present() -> None:
         run_id="test-wandb-step",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
@@ -1443,6 +1506,7 @@ def test_log_wandb_epoch_called_when_publisher_present() -> None:
         run_id="test-wandb-epoch",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
@@ -1481,6 +1545,7 @@ def test_log_wandb_final_called_when_publisher_present() -> None:
         run_id="test-wandb-final",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
@@ -1515,6 +1580,7 @@ def test_log_wandb_final_skips_none_values() -> None:
         run_id="test-wandb-final-none",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
@@ -1543,6 +1609,7 @@ def test_log_wandb_epoch_table_skips_when_no_publisher() -> None:
         run_id="test-no-wandb-table",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=None,
@@ -1567,6 +1634,7 @@ def test_log_wandb_epoch_table_skips_when_no_summaries() -> None:
         run_id="test-wandb-table-empty",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
@@ -1596,6 +1664,7 @@ def test_log_wandb_epoch_table_logs_data_when_summaries_exist() -> None:
         run_id="test-wandb-table-data",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
@@ -1624,6 +1693,7 @@ def test_finish_wandb_skips_when_no_publisher() -> None:
         run_id="test-no-wandb-finish",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=None,
@@ -1648,6 +1718,7 @@ def test_finish_wandb_calls_finish_when_publisher_present() -> None:
         run_id="test-wandb-finish",
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,

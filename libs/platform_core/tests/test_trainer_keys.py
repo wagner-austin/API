@@ -3,6 +3,7 @@ from __future__ import annotations
 from platform_core.trainer_keys import (
     ARTIFACT_FILE_ID_PREFIX,
     CANCEL_KEY_PREFIX,
+    CLOZE_KEY_PREFIX,
     CONVERSATION_KEY_PREFIX,
     CONVERSATION_META_KEY_PREFIX,
     EVAL_KEY_PREFIX,
@@ -14,6 +15,7 @@ from platform_core.trainer_keys import (
     STATUS_KEY_PREFIX,
     artifact_file_id_key,
     cancel_key,
+    cloze_key,
     conversation_key,
     conversation_meta_key,
     eval_key,
@@ -36,6 +38,7 @@ def test_trainer_key_helpers() -> None:
     assert artifact_file_id_key(rid) == f"{ARTIFACT_FILE_ID_PREFIX}{rid}:file_id"
     assert cancel_key(rid) == f"{CANCEL_KEY_PREFIX}{rid}:cancelled"
     assert score_key(rid, req_id) == f"{SCORE_KEY_PREFIX}{rid}:{req_id}"
+    assert cloze_key(rid, req_id) == f"{CLOZE_KEY_PREFIX}{rid}:{req_id}"
     assert generate_key(rid, req_id) == f"{GENERATE_KEY_PREFIX}{rid}:{req_id}"
     session_id = "s1"
     assert conversation_key(rid, session_id) == f"{CONVERSATION_KEY_PREFIX}{rid}:{session_id}"

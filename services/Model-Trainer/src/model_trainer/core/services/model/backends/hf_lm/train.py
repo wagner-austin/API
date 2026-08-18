@@ -25,6 +25,7 @@ def train_prepared_hf_lm(
     run_id: str,
     redis_hb: Callable[[float], None],
     cancelled: Callable[[], bool],
+    resume: bool,
     progress: ProgressCallback | None = None,
     wandb_publisher: WandbPublisher | None = None,
 ) -> TrainOutcome:
@@ -39,6 +40,7 @@ def train_prepared_hf_lm(
         run_id: Unique identifier for this training run.
         redis_hb: Heartbeat callback (called with timestamp every 10 steps).
         cancelled: Callback to check if training was cancelled.
+        resume: When True, continue the run from its persisted checkpoint.
         progress: Optional callback for progress updates
             (step, epoch, loss, grad_norm, samples_per_sec, val_loss, val_ppl).
         wandb_publisher: Optional W&B publisher for metrics.
@@ -54,6 +56,7 @@ def train_prepared_hf_lm(
         run_id=run_id,
         redis_hb=redis_hb,
         cancelled=cancelled,
+        resume=resume,
         progress=progress,
         service_name="hf-lm-train",
         wandb_publisher=wandb_publisher,

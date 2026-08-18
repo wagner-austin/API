@@ -488,8 +488,24 @@ class TestTrainJobPayloadEncoding:
         return {
             "run_id": "run-12345",
             "user_id": 42,
+            "resume": False,
             "request": self._make_minimal_request(),
         }
+
+    def test_resume_true_round_trips(self) -> None:
+        """A resume execution's flag survives encode and decode."""
+        payload = self._make_job_payload()
+        payload["resume"] = True
+        encoded = encode_train_job_payload(payload)
+        assert encoded["resume"] is True
+        assert decode_train_job_payload(encoded)["resume"] is True
+
+    def test_decode_missing_resume_raises(self) -> None:
+        """The resume flag is required; an old-shape payload is refused."""
+        encoded = encode_train_job_payload(self._make_job_payload())
+        del encoded["resume"]
+        with pytest.raises(JSONTypeError, match="resume"):
+            _ = decode_train_job_payload(encoded)
 
     def test_encode_decode_roundtrip(self) -> None:
         """Test that encode and decode are inverse operations."""
@@ -566,6 +582,7 @@ class TestTrainJobPayloadEncoding:
         payload: TrainJobPayload = {
             "run_id": "lora-run",
             "user_id": 99,
+            "resume": False,
             "request": request,
         }
         encoded = encode_train_job_payload(payload)

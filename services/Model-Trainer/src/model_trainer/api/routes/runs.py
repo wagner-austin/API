@@ -315,6 +315,36 @@ class _RunsRoutes:
             self._sse_iter(path, tail, follow), media_type="text/event-stream", headers=headers
         )
 
+    async def resume_training(self: _RunsRoutes, run_id: str, request: Request) -> TrainResponse:
+        """Re-enqueue a failed run to continue from its checkpoint.
+
+        The body is the same TrainRequest the run was originally
+        submitted with; the worker refuses to resume when it differs
+        from the checkpoint's recorded config.
+
+        Args:
+            run_id: The interrupted run to continue.
+            request: HTTP request carrying the TrainRequest body.
+
+        Returns:
+            TrainResponse naming the run and the new queue job.
+        """
+        raw_body = await request.body()
+        from platform_core.json_utils import load_json_str
+
+        body = load_json_str(raw_body.decode("utf-8"))
+        req: TrainRequest = _decode_train_request(body)
+        orchestrator = self.c.training_orchestrator
+        extra: LoggingExtra = {
+            "category": "api",
+            "service": "runs",
+            "run_id": run_id,
+            "event": "runs_resume",
+        }
+        _logger.info("runs resume", extra=extra)
+        out = orchestrator.enqueue_resume(run_id, req)
+        return {"run_id": out["run_id"], "job_id": out["job_id"]}
+
     def cancel_run(self: _RunsRoutes, run_id: str) -> CancelResponse:
         r = self.c.redis
         from platform_core.trainer_keys import cancel_key
@@ -505,6 +535,7 @@ def build_router(container: ServiceContainer) -> APIRouter:
     router.add_api_route("/{run_id}/logs", h.run_logs, methods=["GET"])
     router.add_api_route("/{run_id}/logs/stream", h.run_logs_stream, methods=["GET"])
     router.add_api_route("/{run_id}/cancel", h.cancel_run, methods=["POST"])
+    router.add_api_route("/{run_id}/resume", h.resume_training, methods=["POST"])
     # Inference routes
     router.add_api_route("/{run_id}/cloze", h.enqueue_cloze, methods=["POST"])
     router.add_api_route("/{run_id}/cloze/{request_id}", h.get_cloze, methods=["GET"])

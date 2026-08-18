@@ -22,6 +22,7 @@ from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
     LMModelProto,
+    LoadStateDictResultProto,
     NamedParameter,
     ParameterLike,
 )
@@ -140,6 +141,15 @@ class FakeHFModel(LMModelProto):
             Fake config object.
         """
         return _FakeConfig()
+
+    def state_dict(self: FakeHFModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: FakeHFModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class FakeHFTokenizer:
@@ -450,6 +460,15 @@ class FakeScoreModel(LMModelProto):
         """Return config."""
         return _FakeConfig()
 
+    def state_dict(self: FakeScoreModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: FakeScoreModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
+
 
 class _FakeLogitsOut(ForwardOutProto):
     """Fake forward output with logits."""
@@ -605,6 +624,15 @@ class FakeGenerateModel(LMModelProto):
         new_tokens = torch.tensor(token_rows)
         return torch.cat([input_ids.expand(batch_size, -1), new_tokens], dim=1)
 
+    def state_dict(self: FakeGenerateModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: FakeGenerateModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
+
 
 class FakeEvalModel(LMModelProto):
     """Fake model for evaluation tests."""
@@ -685,6 +713,15 @@ class FakeEvalModel(LMModelProto):
     def config(self) -> ConfigLike:
         """Return config."""
         return _FakeConfig()
+
+    def state_dict(self: FakeEvalModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: FakeEvalModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class _FakeLossOut(ForwardOutProto):
@@ -805,6 +842,15 @@ class FakeSinglePositionScoreModel(LMModelProto):
     def config(self) -> ConfigLike:
         """Return config."""
         return _FakeConfig()
+
+    def state_dict(self: FakeSinglePositionScoreModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: FakeSinglePositionScoreModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class FakeDataset(CausalLMDatasetProto):

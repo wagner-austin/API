@@ -508,6 +508,7 @@ class TestDefaultCreateTrainer:
             run_id="test-run",
             redis_hb=lambda x: None,
             cancelled=lambda: False,
+            resume=False,
             progress=None,
             service_name="test-service",
             wandb_publisher=None,

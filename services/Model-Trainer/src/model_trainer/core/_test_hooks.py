@@ -7,6 +7,7 @@ No conditionals needed - just call the hook directly.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
 from types import TracebackType
@@ -39,7 +40,7 @@ from model_trainer.core.contracts.dataset import DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.services.registries import ModelRegistry
-from model_trainer.core.types import LMModelProto
+from model_trainer.core.types import LMModelProto, TorchStateValue
 
 # ============================================================================
 # Training infrastructure hooks
@@ -1073,6 +1074,84 @@ def _default_get_directory_size_bytes(path: Path) -> int:
     return total
 
 
+class TorchCudaGetRngStateAllProto(Protocol):
+    """Protocol for the ``torch.cuda.get_rng_state_all`` hook."""
+
+    def __call__(self) -> list[torch.Tensor]:
+        """Return every CUDA device's generator state."""
+        ...
+
+
+class TorchCudaSetRngStateAllProto(Protocol):
+    """Protocol for the ``torch.cuda.set_rng_state_all`` hook."""
+
+    def __call__(self, states: list[torch.Tensor]) -> None:
+        """Restore every CUDA device's generator state.
+
+        Args:
+            states: States previously returned by
+                ``torch.cuda.get_rng_state_all``.
+        """
+        ...
+
+
+def _default_torch_cuda_get_rng_state_all() -> list[torch.Tensor]:
+    """Production torch.cuda.get_rng_state_all - used as default hook.
+
+    A thin adapter over torch; the checkpoint capture owns the
+    availability check through the ``cuda_is_available`` hook.
+    """
+    return list(torch.cuda.get_rng_state_all())
+
+
+def _default_torch_cuda_set_rng_state_all(states: list[torch.Tensor]) -> None:
+    """Production torch.cuda.set_rng_state_all - used as default hook.
+
+    Args:
+        states: States previously returned by
+            ``torch.cuda.get_rng_state_all``.
+    """
+    torch.cuda.set_rng_state_all(states)
+
+
+class RandomGetstateProto(Protocol):
+    """Protocol for the ``random.getstate`` hook."""
+
+    def __call__(self) -> tuple[TorchStateValue, ...]:
+        """Return the current python RNG state tuple."""
+        ...
+
+
+class RandomSetstateProto(Protocol):
+    """Protocol for the ``random.setstate`` hook."""
+
+    def __call__(self, state: tuple[TorchStateValue, ...]) -> None:
+        """Restore a python RNG state tuple.
+
+        Args:
+            state: State tuple previously returned by ``random.getstate``.
+        """
+        ...
+
+
+def _default_random_getstate() -> tuple[TorchStateValue, ...]:
+    """Production random.getstate - used as default hook."""
+    random_mod = __import__("random")
+    fn: Callable[[], tuple[TorchStateValue, ...]] = random_mod.getstate
+    return fn()
+
+
+def _default_random_setstate(state: tuple[TorchStateValue, ...]) -> None:
+    """Production random.setstate - used as default hook.
+
+    Args:
+        state: State tuple previously returned by ``random.getstate``.
+    """
+    random_mod = __import__("random")
+    fn: Callable[[tuple[TorchStateValue, ...]], None] = random_mod.setstate
+    fn(state)
+
+
 class TorchDeviceProto(Protocol):
     """Protocol for torch.device creation hook."""
 
@@ -1101,3 +1180,9 @@ gpu_reset_peak_memory_stats: GpuResetPeakMemoryStatsProto = _default_gpu_reset_p
 count_model_parameters: CountModelParametersProto = _default_count_model_parameters
 get_directory_size_bytes: GetDirectorySizeBytesProto = _default_get_directory_size_bytes
 torch_device: TorchDeviceProto = _default_torch_device
+
+# RNG hooks (used by training checkpoint capture/restore)
+random_getstate: RandomGetstateProto = _default_random_getstate
+random_setstate: RandomSetstateProto = _default_random_setstate
+torch_cuda_get_rng_state_all: TorchCudaGetRngStateAllProto = _default_torch_cuda_get_rng_state_all
+torch_cuda_set_rng_state_all: TorchCudaSetRngStateAllProto = _default_torch_cuda_set_rng_state_all

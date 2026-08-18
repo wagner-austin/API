@@ -72,6 +72,7 @@ class TrainFn(Protocol):
         run_id: str,
         redis_hb: Callable[[float], None],
         cancelled: Callable[[], bool],
+        resume: bool,
         progress: (
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
@@ -184,6 +185,7 @@ class _FactoryBackend:
         heartbeat: Callable[[float], None],
         cancelled: Callable[[], bool],
         prepared: PreparedLMModel,
+        resume: bool,
         progress: (
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
@@ -197,6 +199,7 @@ class _FactoryBackend:
             run_id=run_id,
             redis_hb=heartbeat,
             cancelled=cancelled,
+            resume=resume,
             progress=progress,
             wandb_publisher=wandb_publisher,
         )

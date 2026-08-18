@@ -120,6 +120,9 @@ class TrainingManifest(TypedDict):
     test_perplexity: float | None
     best_val_loss: float | None
     early_stopped: bool
+    # None for a run that trained start to finish in one execution; the
+    # epoch index a resumed execution continued from otherwise.
+    resumed_from_epoch: int | None
     # New fields for feature roadmap
     timing: TrainingManifestTiming
     performance: TrainingManifestPerformance
@@ -194,6 +197,9 @@ class TrainingManifestFull(TypedDict):
     test_perplexity: float | None
     best_val_loss: float | None
     early_stopped: bool
+    # None for a run that trained start to finish in one execution; the
+    # epoch index a resumed execution continued from otherwise.
+    resumed_from_epoch: int | None
     # New fields for feature roadmap
     timing: TrainingManifestTiming
     performance: TrainingManifestPerformance

@@ -186,6 +186,7 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
             run_id="run-gpu-test",
             heartbeat=_noop,
             cancelled=_never,
+            resume=False,
             prepared=prepared,
             progress=track_progress,
         )

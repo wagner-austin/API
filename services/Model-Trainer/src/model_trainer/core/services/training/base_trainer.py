@@ -20,12 +20,19 @@ from pathlib import Path
 from typing import Final, Literal, Protocol
 
 import torch
+from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
+from model_trainer.core.contracts.checkpoint import (
+    CHECKPOINT_SCHEMA_VERSION,
+    EpochSummaryRecord,
+    TrainingCheckpointMeta,
+    model_train_config_mismatches,
+)
 from model_trainer.core.contracts.dataset import DatasetConfig
 from model_trainer.core.contracts.model import (
     EarlyStoppingState,
@@ -33,6 +40,14 @@ from model_trainer.core.contracts.model import (
     PreparedLMModel,
     TrainOutcome,
     ValidationMetrics,
+)
+from model_trainer.core.services.training.checkpoint import (
+    TrainingCheckpoint,
+    capture_rng_states,
+    delete_training_checkpoint,
+    load_training_checkpoint,
+    restore_rng_states,
+    save_training_checkpoint,
 )
 from model_trainer.core.services.training.dataloader import DataLoader
 from model_trainer.core.services.training.dataset_builder import CausalLMDataset
@@ -166,6 +181,7 @@ class BaseTrainer:
     )
     _service_name: str
     _wandb: WandbPublisher | None
+    _resume: bool
     # New instance state for enhanced training
     _device: torch.device
     _es_state: EarlyStoppingState
@@ -178,6 +194,11 @@ class BaseTrainer:
     _training_start_iso: str
     _total_samples_processed: int
     _total_tokens_processed: int
+    # Resume state: epoch the current execution continued from (None when
+    # training from scratch) and wall-clock seconds consumed by prior
+    # executions of this run.
+    _resumed_from_epoch: int | None
+    _elapsed_before: float
 
     def __init__(
         self: BaseTrainer,
@@ -188,6 +209,7 @@ class BaseTrainer:
         run_id: str,
         redis_hb: Callable[[float], None],
         cancelled: Callable[[], bool],
+        resume: bool,
         progress: (
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
@@ -204,6 +226,10 @@ class BaseTrainer:
             run_id: Unique identifier for this training run.
             redis_hb: Heartbeat callback (called with timestamp every 10 steps).
             cancelled: Callback to check if training was cancelled.
+            resume: When True, continue the run from its persisted
+                checkpoint; training refuses to start when no valid
+                checkpoint exists or the config differs from the one the
+                checkpoint records.
             progress: Optional callback for progress updates
                 (step, epoch, loss, ppl, grad_norm, samples_per_sec, val_loss, val_ppl).
             service_name: Service name for logging.
@@ -215,6 +241,7 @@ class BaseTrainer:
         self._run_id = run_id
         self._redis_hb = redis_hb
         self._cancelled = cancelled
+        self._resume = resume
         self._progress = progress
         self._service_name = service_name
         self._wandb = wandb_publisher
@@ -224,6 +251,15 @@ class BaseTrainer:
         self._training_start_iso = ""
         self._total_samples_processed = 0
         self._total_tokens_processed = 0
+        self._resumed_from_epoch = None
+        self._elapsed_before = 0.0
+        # Early-stopping state lives here rather than only in train() so the
+        # epoch-boundary checkpoint writer never sees a partial object.
+        self._es_state = EarlyStoppingState(
+            best_val_loss=float("inf"),
+            epochs_no_improve=0,
+        )
+        self._best_checkpoint_path = None
 
     def train(self: BaseTrainer) -> TrainOutcome:
         """Execute the training loop with early stopping and validation.
@@ -271,9 +307,28 @@ class BaseTrainer:
         )
         self._best_checkpoint_path = None
 
+        # 4b. Apply the persisted checkpoint when resuming
+        restored: TrainingCheckpoint | None = None
+        start_epoch = 0
+        start_step = 0
+        initial_last_loss = 0.0
+        if self._resume:
+            restored = load_training_checkpoint(self._settings, self._run_id)
+            self._require_matching_config(restored.meta)
+            self._apply_checkpoint(restored)
+            start_epoch = restored.meta["epochs_completed"]
+            start_step = restored.meta["global_step"]
+            initial_last_loss = restored.meta["last_loss"]
+
         # 5. Run training loop (UPDATED - returns more info)
         last_loss, step, was_cancelled, early_stopped = self._run_training_loop(
-            model, train_loader, effective_lr
+            model,
+            train_loader,
+            effective_lr,
+            start_epoch=start_epoch,
+            start_step=start_step,
+            initial_last_loss=initial_last_loss,
+            restored=restored,
         )
 
         out_dir = str(_test_hooks.model_dir(self._settings, self._run_id))
@@ -314,10 +369,14 @@ class BaseTrainer:
         if self._es_state["best_val_loss"] < float("inf"):
             best_val_loss = self._es_state["best_val_loss"]
 
-        # 8. Compute training metrics for manifest
+        # 8. Compute training metrics for manifest. Duration accumulates
+        # across executions: prior executions' time comes from the
+        # checkpoint, this execution's from the monotonic clock.
         training_end_time = _test_hooks.time_monotonic()
         training_end_iso = _test_hooks.datetime_utcnow_iso()
-        training_duration_sec = training_end_time - self._training_start_time
+        training_duration_sec = (
+            training_end_time - self._training_start_time
+        ) + self._elapsed_before
 
         # Get GPU peak memory (None if CPU training)
         peak_gpu_memory_bytes = _test_hooks.gpu_max_memory_allocated()
@@ -361,6 +420,12 @@ class BaseTrainer:
         )
         self._log_wandb_epoch_table()
         self._finish_wandb()
+
+        # A finished run's final model and manifest supersede its resume
+        # state; a cancelled run keeps the checkpoint so it stays
+        # explicitly resumable.
+        if not was_cancelled:
+            _ = delete_training_checkpoint(self._settings, self._run_id)
 
         ppl = float(math.exp(last_loss)) if last_loss < 20 else float("inf")
         return TrainOutcome(
@@ -611,11 +676,144 @@ class BaseTrainer:
             },
         )
 
+    def _require_matching_config(self: BaseTrainer, meta: TrainingCheckpointMeta) -> None:
+        """Refuse to resume under a config that differs from the checkpoint's.
+
+        Args:
+            meta: Metadata loaded from the run's checkpoint.
+
+        Raises:
+            AppError: With ``CHECKPOINT_CONFIG_MISMATCH`` naming every
+                differing field. A resume must reproduce the interrupted
+                run exactly; a changed config describes a different
+                experiment and needs a fresh run.
+        """
+        mismatches = model_train_config_mismatches(meta["config"], self._cfg)
+        if mismatches:
+            raise AppError(
+                ModelTrainerErrorCode.CHECKPOINT_CONFIG_MISMATCH,
+                (
+                    f"run '{self._run_id}' cannot resume: the submitted config "
+                    f"differs from the checkpoint's on: {', '.join(mismatches)}"
+                ),
+                model_trainer_status_for(ModelTrainerErrorCode.CHECKPOINT_CONFIG_MISMATCH),
+            )
+
+    def _apply_checkpoint(self: BaseTrainer, restored: TrainingCheckpoint) -> None:
+        """Restore trainer state from a loaded checkpoint.
+
+        Loads model weights, early-stopping state, progress counters,
+        epoch summaries, accumulated timing and every RNG state, so the
+        next epoch proceeds exactly as it would have in the interrupted
+        execution. The optimizer state is applied separately inside the
+        training loop, where the optimizer is constructed.
+
+        Args:
+            restored: The validated checkpoint.
+        """
+        meta = restored.meta
+        _ = self._prepared.model.load_state_dict(restored.model_state)
+        best_val_loss = meta["best_val_loss"]
+        self._es_state = EarlyStoppingState(
+            best_val_loss=float("inf") if best_val_loss is None else best_val_loss,
+            epochs_no_improve=meta["epochs_no_improve"],
+        )
+        if meta["best_saved"]:
+            self._best_checkpoint_path = Path(
+                str(_test_hooks.model_dir(self._settings, self._run_id))
+            )
+        self._total_samples_processed = meta["total_samples_processed"]
+        self._total_tokens_processed = meta["total_tokens_processed"]
+        self._epoch_summaries = [
+            (
+                record["epoch"],
+                record["train_loss"],
+                record["train_ppl"],
+                record["val_loss"],
+                record["val_ppl"],
+            )
+            for record in meta["epoch_summaries"]
+        ]
+        self._elapsed_before = meta["elapsed_seconds"]
+        self._training_start_iso = meta["started_at_iso"]
+        self._resumed_from_epoch = meta["epochs_completed"]
+        restore_rng_states(restored.rng)
+        _logger.info(
+            "Resuming run from checkpoint",
+            extra={
+                "category": "training",
+                "event": "training_resumed",
+                "run_id": self._run_id,
+                "resumed_from_epoch": meta["epochs_completed"],
+                "global_step": meta["global_step"],
+            },
+        )
+
+    def _save_epoch_checkpoint(
+        self: BaseTrainer,
+        *,
+        model: LMModelProto,
+        optim: OptimizerProto,
+        epochs_completed: int,
+        global_step: int,
+        last_loss: float,
+    ) -> None:
+        """Persist the rolling checkpoint at an epoch boundary.
+
+        Args:
+            model: The model whose state to persist.
+            optim: The optimizer whose state to persist.
+            epochs_completed: Number of fully completed epochs.
+            global_step: Optimizer steps taken so far.
+            last_loss: Training loss at the boundary.
+        """
+        best = self._es_state["best_val_loss"]
+        now = _test_hooks.time_monotonic()
+        meta: TrainingCheckpointMeta = {
+            "schema_version": CHECKPOINT_SCHEMA_VERSION,
+            "run_id": self._run_id,
+            "epochs_completed": epochs_completed,
+            "global_step": global_step,
+            "last_loss": last_loss,
+            "best_val_loss": None if best == float("inf") else best,
+            "epochs_no_improve": self._es_state["epochs_no_improve"],
+            "best_saved": self._best_checkpoint_path is not None,
+            "total_samples_processed": self._total_samples_processed,
+            "total_tokens_processed": self._total_tokens_processed,
+            "elapsed_seconds": self._elapsed_before + (now - self._training_start_time),
+            "started_at_iso": self._training_start_iso,
+            "epoch_summaries": [
+                EpochSummaryRecord(
+                    epoch=epoch,
+                    train_loss=train_loss,
+                    train_ppl=train_ppl,
+                    val_loss=val_loss,
+                    val_ppl=val_ppl,
+                )
+                for epoch, train_loss, train_ppl, val_loss, val_ppl in self._epoch_summaries
+            ],
+            "config": self._cfg,
+        }
+        _ = save_training_checkpoint(
+            self._settings,
+            TrainingCheckpoint(
+                meta=meta,
+                model_state=model.state_dict(),
+                optimizer_state=optim.state_dict(),
+                rng=capture_rng_states(),
+            ),
+        )
+
     def _run_training_loop(
         self: BaseTrainer,
         model: LMModelProto,
         dataloader: DataLoader,
         effective_lr: float,
+        *,
+        start_epoch: int,
+        start_step: int,
+        initial_last_loss: float,
+        restored: TrainingCheckpoint | None,
     ) -> tuple[float, int, bool, bool]:
         """Run the main training loop with early stopping.
 
@@ -623,14 +821,22 @@ class BaseTrainer:
             model: The language model to train.
             dataloader: Training data loader.
             effective_lr: Learning rate (potentially capped for fine-tuning).
+            start_epoch: Epoch index to start from; non-zero on resume.
+            start_step: Global step count already taken; non-zero on resume.
+            initial_last_loss: Loss carried from the checkpoint, reported
+                unchanged when the loop body never runs.
+            restored: Checkpoint whose optimizer state to apply, or None
+                when training from scratch.
 
         Returns:
             Tuple of (final_loss, total_steps, was_cancelled, early_stopped).
         """
         optimizer_cls = _get_optimizer_for_config(self._cfg["optimizer"])
         optim = optimizer_cls(model.parameters(), lr=effective_lr)
-        step = 0
-        last_loss = 0.0
+        if restored is not None:
+            optim.load_state_dict(restored.optimizer_state)
+        step = start_step
+        last_loss = initial_last_loss
         was_cancelled = False
         early_stopped = False
         device_str = str(self._device)
@@ -638,7 +844,7 @@ class BaseTrainer:
         total_epochs = self._cfg["num_epochs"]
         batches_per_epoch = len(dataloader)
 
-        for epoch in range(total_epochs):
+        for epoch in range(start_epoch, total_epochs):
             epoch_step_start = step
             _logger.info(
                 "Epoch %d/%d started batches=%d",
@@ -745,7 +951,20 @@ class BaseTrainer:
                             "patience": patience,
                         },
                     )
-                    break
+
+            # An early-stopped run completes in this execution and needs
+            # no resume state; every other completed epoch publishes the
+            # rolling checkpoint so an interruption costs at most one
+            # epoch.
+            if early_stopped:
+                break
+            self._save_epoch_checkpoint(
+                model=model,
+                optim=optim,
+                epochs_completed=epoch + 1,
+                global_step=step,
+                last_loss=last_loss,
+            )
 
         return last_loss, step, was_cancelled, early_stopped
 
@@ -976,6 +1195,7 @@ class BaseTrainer:
             "test_perplexity": test_ppl,
             "best_val_loss": best_val_loss,
             "early_stopped": early_stopped,
+            "resumed_from_epoch": self._resumed_from_epoch,
             "timing": timing,
             "performance": performance,
             "model_info": model_info,
@@ -1037,6 +1257,7 @@ class BaseTrainer:
             "test_perplexity": manifest["test_perplexity"],
             "best_val_loss": manifest["best_val_loss"],
             "early_stopped": manifest["early_stopped"],
+            "resumed_from_epoch": manifest["resumed_from_epoch"],
             "timing": manifest["timing"],
             "performance": manifest["performance"],
             "model_info": manifest["model_info"],

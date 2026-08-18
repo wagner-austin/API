@@ -169,6 +169,7 @@ def test_training_and_eval_tiny(
         run_id="run-test",
         redis_hb=_hb,
         cancelled=_cancelled,
+        resume=False,
         progress=track_loss,
     )
     assert res["loss"] >= 0.0
@@ -349,6 +350,7 @@ def test_cancel_during_eval_returns_partial_results(
         run_id="run-cancel-val",
         redis_hb=_hb,
         cancelled=_cancelled,
+        resume=False,
         progress=track_progress,
     )
     # Training should complete or be cancelled - either way loss should be valid

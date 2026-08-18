@@ -11,7 +11,13 @@ import torch.nn.functional as _functional
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 
-from model_trainer.core.types import ForwardOutProto, LMModelProto, NamedParameter, ParameterLike
+from model_trainer.core.types import (
+    ForwardOutProto,
+    LMModelProto,
+    LoadStateDictResultProto,
+    NamedParameter,
+    ParameterLike,
+)
 
 
 class _ForwardOut(ForwardOutProto):
@@ -232,6 +238,35 @@ class CharLSTMModel(LMModelProto):
     def named_parameters(self: CharLSTMModel) -> Sequence[tuple[str, NamedParameter]]:
         # Convert iterator to a concrete sequence for typing contract
         return list(self._m.named_parameters())
+
+    def state_dict(self: CharLSTMModel) -> dict[str, torch.Tensor]:
+        """Return the inner module's parameter and buffer tensors by name."""
+
+        class _HasStateDict(Protocol):
+            def state_dict(self: _HasStateDict) -> dict[str, torch.Tensor]: ...
+
+        inner: _HasStateDict = self._m
+        return inner.state_dict()
+
+    def load_state_dict(
+        self: CharLSTMModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        """Load parameter and buffer tensors by name into the inner module.
+
+        Args:
+            state_dict: Tensors keyed by parameter and buffer names.
+
+        Returns:
+            The torch missing/unexpected-keys result, opaque here.
+        """
+
+        class _HasLoadStateDict(Protocol):
+            def load_state_dict(
+                self: _HasLoadStateDict, state_dict: dict[str, torch.Tensor]
+            ) -> LoadStateDictResultProto: ...
+
+        inner: _HasLoadStateDict = self._m
+        return inner.load_state_dict(state_dict)
 
     def to(self: CharLSTMModel, device: str) -> LMModelProto:
         self._m.to(device)

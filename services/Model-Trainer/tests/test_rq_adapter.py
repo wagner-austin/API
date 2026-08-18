@@ -167,6 +167,7 @@ def _train_payload() -> TrainJobPayload:
             "gguf_export": None,
         },
         "user_id": 1,
+        "resume": False,
     }
 
 
@@ -267,6 +268,7 @@ def test_rq_enqueuer_methods() -> None:
                 "gguf_export": None,
             },
             "user_id": 1,
+            "resume": False,
         }
         jid = enq.enqueue_train(train_payload)
         assert jid.startswith("id:train:run-1")

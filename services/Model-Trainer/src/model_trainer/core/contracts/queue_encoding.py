@@ -608,6 +608,7 @@ def encode_train_job_payload(payload: TrainJobPayload) -> JSONObject:
         "run_id": payload["run_id"],
         "user_id": payload["user_id"],
         "request": encode_train_request_payload(payload["request"]),
+        "resume": payload["resume"],
     }
 
 
@@ -632,11 +633,13 @@ def decode_train_job_payload(obj: JSONObject) -> TrainJobPayload:
     if not isinstance(request_raw, dict):
         raise JSONTypeError(f"Field 'request' must be an object, got {type(request_raw).__name__}")
     request = decode_train_request_payload(request_raw)
+    resume = require_bool(obj, "resume")
 
     return {
         "run_id": run_id,
         "user_id": user_id,
         "request": request,
+        "resume": resume,
     }
 
 

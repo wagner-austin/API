@@ -9,6 +9,7 @@ from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
     LMModelProto,
+    LoadStateDictResultProto,
     NamedParameter,
     ParameterLike,
 )
@@ -52,6 +53,15 @@ class _MockModelWithPositions:
     def gradient_checkpointing_enable(self: _MockModelWithPositions) -> None:
         return None
 
+    def state_dict(self: _MockModelWithPositions) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _MockModelWithPositions, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
+
 
 class _MockModelNoPositions:
     """Mock model without n_positions in config."""
@@ -91,6 +101,15 @@ class _MockModelNoPositions:
     def gradient_checkpointing_enable(self: _MockModelNoPositions) -> None:
         return None
 
+    def state_dict(self: _MockModelNoPositions) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _MockModelNoPositions, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
+
 
 class _MockModelNonIntPositions:
     """Mock model with n_positions as non-int."""
@@ -129,6 +148,15 @@ class _MockModelNonIntPositions:
 
     def gradient_checkpointing_enable(self: _MockModelNonIntPositions) -> None:
         return None
+
+    def state_dict(self: _MockModelNonIntPositions) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _MockModelNonIntPositions, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class _MockModelConfigProperty:
@@ -170,6 +198,15 @@ class _MockModelConfigProperty:
     @property
     def config(self: _MockModelConfigProperty) -> ConfigLike:
         return self._EmptyCfg()
+
+    def state_dict(self: _MockModelConfigProperty) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _MockModelConfigProperty, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 def test_get_model_max_seq_len_branches() -> None:

@@ -189,6 +189,16 @@ def _optional_float(obj: JSONObject, key: str) -> float | None:
     return float(val)
 
 
+def _optional_int(obj: JSONObject, key: str) -> int | None:
+    """Extract optional integer field."""
+    val = obj.get(key)
+    if val is None:
+        return None
+    if isinstance(val, bool) or not isinstance(val, int):
+        raise JSONTypeError(f"Field '{key}' must be an integer or null, got {type(val).__name__}")
+    return val
+
+
 class _ManifestFields:
     """Container for decoded manifest fields to avoid long tuples."""
 
@@ -223,6 +233,9 @@ class _ManifestFields:
     test_perplexity: float | None
     best_val_loss: float | None
     early_stopped: bool
+    # None on runs trained before checkpointing existed, and on every run
+    # that trained start to finish in one execution.
+    resumed_from_epoch: int | None
 
     def __init__(
         self: _ManifestFields,
@@ -255,6 +268,7 @@ class _ManifestFields:
         test_perplexity: float | None,
         best_val_loss: float | None,
         early_stopped: bool,
+        resumed_from_epoch: int | None,
     ) -> None:
         self.run_id = run_id
         self.model_family = model_family
@@ -284,6 +298,7 @@ class _ManifestFields:
         self.test_perplexity = test_perplexity
         self.best_val_loss = best_val_loss
         self.early_stopped = early_stopped
+        self.resumed_from_epoch = resumed_from_epoch
 
 
 def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
@@ -316,6 +331,7 @@ def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
         test_loss=_optional_float(obj, "test_loss"),
         test_perplexity=_optional_float(obj, "test_perplexity"),
         best_val_loss=_optional_float(obj, "best_val_loss"),
+        resumed_from_epoch=_optional_int(obj, "resumed_from_epoch"),
     )
 
 
@@ -398,6 +414,7 @@ def load_manifest_from_text(text: str) -> TrainingManifest:
         "test_perplexity": fields.test_perplexity,
         "best_val_loss": fields.best_val_loss,
         "early_stopped": fields.early_stopped,
+        "resumed_from_epoch": fields.resumed_from_epoch,
         "timing": timing,
         "performance": performance,
         "model_info": model_info,

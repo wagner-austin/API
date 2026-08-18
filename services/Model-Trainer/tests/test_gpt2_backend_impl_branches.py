@@ -11,7 +11,12 @@ from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import ListEncoded
 from model_trainer.core.services.model.backend_factory import create_gpt2_backend
-from model_trainer.core.types import ForwardOutProto, NamedParameter, ParameterLike
+from model_trainer.core.types import (
+    ForwardOutProto,
+    LoadStateDictResultProto,
+    NamedParameter,
+    ParameterLike,
+)
 
 
 class _FakeConfigLike:
@@ -61,6 +66,15 @@ class _FakeLMModel:
 
     def gradient_checkpointing_enable(self) -> None:
         return None
+
+    def state_dict(self: _FakeLMModel) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _FakeLMModel, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class _FakeEncoder:

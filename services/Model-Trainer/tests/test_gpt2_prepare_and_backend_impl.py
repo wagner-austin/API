@@ -181,6 +181,7 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
         run_id="run-backend",
         heartbeat=_hb,
         cancelled=_cancelled,
+        resume=False,
         prepared=prepared,
         progress=track_loss,
     )

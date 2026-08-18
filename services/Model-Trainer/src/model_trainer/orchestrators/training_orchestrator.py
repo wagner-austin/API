@@ -26,6 +26,7 @@ from ..core.contracts.queue import EvalJobPayload, TrainJobPayload, TrainRequest
 from ..core.infra.redis_utils import get_with_retry, set_with_retry
 from ..core.services.queue.rq_adapter import RQEnqueuer
 from ..core.services.registries import ModelRegistry
+from ..core.services.training.checkpoint import checkpoint_exists
 from ..infra.persistence.models import EvalCache
 from ..infra.storage.run_store import RunStore
 from ..worker.trainer_job_store import TrainerJobStore
@@ -54,23 +55,24 @@ class TrainingOrchestrator:
         self._models = model_registry
         self._job_store = TrainerJobStore(redis_client)
 
-    def enqueue_training(self: TrainingOrchestrator, req: TrainRequest) -> TrainResponse:
-        # Early validation via registry if available
-        if self._models is not None:
-            try:
-                _ = self._models.get(req["model_family"])
-            except AppError:
-                _logger.info(
-                    "unsupported model family",
-                    extra={
-                        "category": "orchestrator",
-                        "service": "training",
-                        "event": "model_backend_unavailable",
-                        "model_family": req["model_family"],
-                    },
-                )
-                raise
-        run_id = self._store.create_run(req["model_family"], req["model_size"])
+    def _build_request_payload(
+        self: TrainingOrchestrator, req: TrainRequest
+    ) -> TrainRequestPayload:
+        """Build the queue request payload from an API training request.
+
+        Shared by fresh enqueues and resumes so both executions of a run
+        travel through one encoding.
+
+        Args:
+            req: The decoded API training request.
+
+        Returns:
+            The queue-ready request payload.
+
+        Raises:
+            AppError: With ``CORPUS_NOT_FOUND`` when the corpus file id
+                is blank.
+        """
         # Pass corpus_file_id through to worker; worker resolves locally
         fid = req["corpus_file_id"].strip()
         if fid == "":  # should not occur due to schema min_length
@@ -79,8 +81,7 @@ class TrainingOrchestrator:
                 "corpus_file_id must be non-empty",
                 model_trainer_status_for(ModelTrainerErrorCode.CORPUS_NOT_FOUND),
             )
-
-        request_payload: TrainRequestPayload = {
+        return {
             "model_family": req["model_family"],
             "model_size": req["model_size"],
             "max_seq_len": req["max_seq_len"],
@@ -109,12 +110,26 @@ class TrainingOrchestrator:
             "quantization": req["quantization"],
             "gguf_export": req["gguf_export"],
         }
+
+    def _enqueue_execution(
+        self: TrainingOrchestrator, run_id: str, req: TrainRequest, *, resume: bool
+    ) -> TrainResponse:
+        """Enqueue one execution of a run and record it as queued.
+
+        Args:
+            run_id: The run this execution belongs to.
+            req: The decoded API training request.
+            resume: Whether the worker continues from the run's checkpoint.
+
+        Returns:
+            TrainResponse naming the run and the queue job.
+        """
         payload: TrainJobPayload = {
             "run_id": run_id,
-            "request": request_payload,
+            "request": self._build_request_payload(req),
             "user_id": int(req["user_id"]),
+            "resume": resume,
         }
-
         job_id = self._enq.enqueue_train(payload)
         now = datetime.utcnow()
         self._job_store.save(
@@ -123,7 +138,7 @@ class TrainingOrchestrator:
                 "user_id": int(req["user_id"]),
                 "status": "queued",
                 "progress": 0,
-                "message": "queued",
+                "message": "resume queued" if resume else "queued",
                 "created_at": now,
                 "updated_at": now,
                 "error": None,
@@ -136,10 +151,72 @@ class TrainingOrchestrator:
                 "category": "training",
                 "service": "orchestrator",
                 "run_id": run_id,
-                "event": "enqueued",
+                "event": "resume_enqueued" if resume else "enqueued",
             },
         )
         return TrainResponse(run_id=run_id, job_id=job_id)
+
+    def enqueue_training(self: TrainingOrchestrator, req: TrainRequest) -> TrainResponse:
+        # Early validation via registry if available
+        if self._models is not None:
+            try:
+                _ = self._models.get(req["model_family"])
+            except AppError:
+                _logger.info(
+                    "unsupported model family",
+                    extra={
+                        "category": "orchestrator",
+                        "service": "training",
+                        "event": "model_backend_unavailable",
+                        "model_family": req["model_family"],
+                    },
+                )
+                raise
+        run_id = self._store.create_run(req["model_family"], req["model_size"])
+        return self._enqueue_execution(run_id, req, resume=False)
+
+    def enqueue_resume(self: TrainingOrchestrator, run_id: str, req: TrainRequest) -> TrainResponse:
+        """Re-enqueue a failed run to continue from its checkpoint.
+
+        The run keeps its id: a resume is another execution of the same
+        run, not a new run. The submitted request must carry the original
+        config; the worker refuses a mismatch against the checkpoint's
+        recorded fingerprint before touching the model.
+
+        Args:
+            run_id: The interrupted run to continue.
+            req: The training request, identical to the original.
+
+        Returns:
+            TrainResponse naming the run and the new queue job.
+
+        Raises:
+            AppError: With ``RUN_NOT_FOUND`` when the run is unknown;
+                ``RUN_NOT_RESUMABLE`` when the run is queued, running or
+                already completed; ``CHECKPOINT_NOT_FOUND`` when no
+                checkpoint file exists for the run.
+        """
+        status_obj = self._job_store.load(run_id)
+        if status_obj is None:
+            raise AppError(
+                ModelTrainerErrorCode.RUN_NOT_FOUND,
+                "run not found",
+                model_trainer_status_for(ModelTrainerErrorCode.RUN_NOT_FOUND),
+            )
+        status_v = status_obj["status"]
+        if status_v != "failed":
+            raise AppError(
+                ModelTrainerErrorCode.RUN_NOT_RESUMABLE,
+                f"run '{run_id}' has status '{status_v}'; only a failed run can resume",
+                model_trainer_status_for(ModelTrainerErrorCode.RUN_NOT_RESUMABLE),
+            )
+        if not checkpoint_exists(self._settings, run_id):
+            raise AppError(
+                ModelTrainerErrorCode.CHECKPOINT_NOT_FOUND,
+                f"no checkpoint exists for run '{run_id}'; resubmit it as a fresh run",
+                model_trainer_status_for(ModelTrainerErrorCode.CHECKPOINT_NOT_FOUND),
+            )
+        return self._enqueue_execution(run_id, req, resume=True)
 
     def get_status(self: TrainingOrchestrator, run_id: str) -> RunStatusResponse:
         from typing import Literal

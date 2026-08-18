@@ -143,6 +143,7 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
         run_id=run_id,
         redis_hb=lambda _: None,
         cancelled=lambda: False,
+        resume=False,
     )
 
     run_dir = _model_dir(settings, run_id)

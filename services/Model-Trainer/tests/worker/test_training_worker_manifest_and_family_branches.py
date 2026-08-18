@@ -307,3 +307,27 @@ def test_load_manifest_peak_gpu_memory_mb_valid_number() -> None:
     }
     result = manifest.load_manifest_from_text(dump_json_str(valid_manifest))
     assert result["performance"]["peak_gpu_memory_mb"] == 1024.5
+
+
+def test_load_manifest_decodes_resumed_from_epoch() -> None:
+    """A manifest written by a resumed run round-trips its resume marker."""
+    obj = _base_manifest()
+    obj["resumed_from_epoch"] = 7
+    decoded = manifest.load_manifest_from_text(dump_json_str(obj))
+    assert decoded["resumed_from_epoch"] == 7
+
+
+def test_load_manifest_rejects_non_integer_resumed_from_epoch() -> None:
+    """The resume marker must be an integer or null."""
+    obj = _base_manifest()
+    obj["resumed_from_epoch"] = "seven"
+    with pytest.raises(JSONTypeError, match="resumed_from_epoch"):
+        _ = manifest.load_manifest_from_text(dump_json_str(obj))
+
+
+def test_load_manifest_rejects_boolean_resumed_from_epoch() -> None:
+    """Booleans are not integers for the resume marker."""
+    obj = _base_manifest()
+    obj["resumed_from_epoch"] = True
+    with pytest.raises(JSONTypeError, match="resumed_from_epoch"):
+        _ = manifest.load_manifest_from_text(dump_json_str(obj))

@@ -159,6 +159,7 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
         run_id=run_id,
         redis_hb=_hb,
         cancelled=_cancelled,
+        resume=False,
     )
     loss_final: float = result["loss"]
     assert loss_final <= loss_initial or loss_final >= 0.0

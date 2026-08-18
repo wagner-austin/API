@@ -94,6 +94,7 @@ class _CapturingTrainerFactory:
         run_id: str,
         redis_hb: Callable[[float], None],
         cancelled: Callable[[], bool],
+        resume: bool,
         progress: ProgressCallback | None,
         service_name: str,
         wandb_publisher: WandbPublisher | None,
@@ -179,6 +180,7 @@ class TestTrainPreparedHfLm:
             run_id="run-123",
             redis_hb=heartbeat,
             cancelled=cancelled,
+            resume=False,
         )
 
         trainer = _require_trainer(factory)
@@ -232,6 +234,7 @@ class TestTrainPreparedHfLm:
             run_id="run-456",
             redis_hb=lambda _: None,
             cancelled=lambda: False,
+            resume=False,
             progress=progress,
         )
 
@@ -263,6 +266,7 @@ class TestTrainPreparedHfLm:
             run_id="run-789",
             redis_hb=lambda _: None,
             cancelled=lambda: False,
+            resume=False,
             wandb_publisher=None,
         )
 

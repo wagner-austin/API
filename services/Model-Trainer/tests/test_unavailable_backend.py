@@ -19,6 +19,7 @@ from model_trainer.core.types import (
     ConfigLike,
     ForwardOutProto,
     LMModelProto,
+    LoadStateDictResultProto,
     NamedParameter,
     ParameterLike,
 )
@@ -65,6 +66,15 @@ class _FakeLM(LMModelProto):
             n_positions = 8
 
         return _C()
+
+    def state_dict(self: _FakeLM) -> dict[str, torch.Tensor]:
+        return {}
+
+    def load_state_dict(
+        self: _FakeLM, state_dict: dict[str, torch.Tensor]
+    ) -> LoadStateDictResultProto:
+        _ = state_dict
+        return self
 
 
 class _FakeEnc(Encoder):
@@ -155,6 +165,7 @@ def test_unavailable_backend_all_methods_raise() -> None:
             run_id="r1",
             heartbeat=lambda t: None,
             cancelled=lambda: False,
+            resume=False,
             prepared=dummy,
         )
     with pytest.raises(AppError):

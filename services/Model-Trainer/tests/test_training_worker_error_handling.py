@@ -74,6 +74,7 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
     payload: TrainJobPayload = {
         "run_id": "run-non-redis-err",
         "user_id": 7,
+        "resume": False,
         "request": {
             "model_family": "gpt2",
             "model_size": "small",
@@ -165,6 +166,7 @@ def test_process_train_job_logs_redis_error_on_handle_error(
     payload: TrainJobPayload = {
         "run_id": "run-redis-err",
         "user_id": 8,
+        "resume": False,
         "request": {
             "model_family": "gpt2",
             "model_size": "small",
