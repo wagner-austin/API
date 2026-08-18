@@ -159,3 +159,15 @@ Pages updated: cleargbm-perf-leaf-wise-growth (design-alternative section: Light
 Hubs updated: libs (9 -> 10)
 Index updated: total 11 -> 12
 Notes: The boundary page records the post-ea7835d2 state: f7c61172 (07-21) deleted the compute path, ea7835d2 (08-17) deleted the packaging shim; maturin top-level module; _rust.py Protocol layer as the only Python mirroring Rust signatures. Primary-source backing for the leaf-wise design (captured serial_tree_learner.cpp, Shi 2007 thesis, XGBoost + Friedman papers) landed the same night in the TECH wiki, gradient-boosting-implementation hub; this wiki carries the codebase-side pointers only.
+
+## [2026-08-18] update | NavProbe listed as a client; growth-policy scripts repointed after a package move
+
+Hubs updated: clients (NavProbe added to the client list and to the dedicated-wiki section; the section header no longer says "both game bots", which was wrong twice over)
+Index updated: clients hub description (NavProbe named, and the dedicated-wiki count corrected from two clients to three)
+Pages updated: cleargbm-perf-leaf-wise-growth (footnote 11 repointed at the new script and package locations)
+Root docs updated: README.md Clients table gains NavProbe
+Notes: NavProbe had been on disk since 08-13 with 27 wiki pages of its own and appeared in neither the README nor this wiki, so the monorepo's own surface did not list one of its clients. It is a determinism instrument rather than a user-facing client and the hub says so, because filing it beside three bots without that sentence would misdescribe it.
+
+The growth-policy experiment scripts moved from libs/cleargbm/scripts/ to libs/covenant_ml/scripts/, and the measurement logic they used to inline now lives in the covenant_ml.growth_policy package. The move was not tidying: libs/cleargbm depends only on numpy and cleargbm_rs, so xgboost, lightgbm and scikit-learn are all absent from its environment and the dataset path resolved only from libs/covenant_ml — the scripts could not have run where they were filed. libs/covenant_ml carries all three vendors plus the dataset at the exact relative path they read.
+
+Rule this suggests: a script belongs in the package whose environment can run it, and "which venv has these imports" is worth checking before filing one. Two gates agreed the scripts were misplaced and neither was consulted at the time — libs/cleargbm's make check was red on them for strict-mypy, ruff ANN, the guards' print ban and its 100% coverage gate over scripts/, all at once.
