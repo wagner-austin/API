@@ -21,11 +21,11 @@ source_git_blobs:
   "libs/cleargbm_rs/src/tree/histograms.rs": 681166b919d3f740b0564516ae68cbf8b139b2e5
   "libs/cleargbm_rs/src/losses/derivatives.rs": 398e2a3ad3cd564d76f0361626e105d2ad9c2e6f
   "libs/cleargbm_rs/src/losses/sigmoid_arr.rs": e73feb1e3d0604709332eb3885539d27062e006b
-  "libs/cleargbm/src/cleargbm/_rust.py": 17d203e55d6c4018df0306b8aa6e84c47cd73da8
+  "libs/cleargbm/src/cleargbm/_rust.py": 81518f4dcaaf19ba0cf5489b035007fca0827f31
   "libs/cleargbm/src/cleargbm/ensemble.py": c60640610f62458f20e017392104ba5a219a6b11
   "libs/cleargbm/docs/VALIDATION_REPORT_2026-07-20.md": c601efb92c2f596c97e60fdddade03d9dc1fa379
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md": 3f95cc90aaf624a9f250c4b5f892c570ac27c4df
-fact_checked: "2026-07-21"
+fact_checked: "2026-08-17"
 confidence: high
 hubs: [libs]
 ---

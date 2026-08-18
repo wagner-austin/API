@@ -5,6 +5,7 @@ related:
   - "[[cleargbm-histogram-split-path]]"
   - "[[cleargbm-leaf-normalized-benchmarking]]"
 source_paths:
+  - libs/cleargbm/docs/EXPERIMENT_2026-08-17_growth_policy_xgb_instrument.md
   - libs/cleargbm_rs/src/tree/builder.rs
   - libs/cleargbm_rs/src/tree/mod.rs
   - libs/cleargbm_rs/src/training/config.rs
@@ -12,16 +13,18 @@ source_git_blobs:
   "libs/cleargbm_rs/src/tree/builder.rs": b28c382a41a489df68fa9cd7c2c87bafee26a6a9
   "libs/cleargbm_rs/src/tree/mod.rs": ef4ab30d8be7e5684d8d2c9deeeecefc42a3f1d9
   "libs/cleargbm_rs/src/training/config.rs": b0b59d60edc871f4808c72dc582eaac15087f39b
-fact_checked: "2026-07-31"
+fact_checked: "2026-08-17"
 confidence: medium
 hubs: [libs]
 ---
 
 # ClearGBM perf — leaf-wise tree growth
 
-Replace ClearGBM's depth-first tree growth with LightGBM's leaf-wise (best-first) strategy: at every step, expand the leaf with the highest split gain across the whole tree, not the deepest-yet-unfinished branch. This is a **capacity gain, not a speed gain** — leaf-wise reaches equivalent loss with fewer effective splits, so at matched `n_estimators` the model has more useful capacity per tree. ClearGBM currently builds 1.523× LightGBM's leaves for a quality that is a statistical tie[^8][^1].
+Replace ClearGBM's depth-first tree growth with LightGBM's leaf-wise (best-first) strategy: at every step, expand the leaf with the highest split gain across the whole tree, not the deepest-yet-unfinished branch. An earlier revision framed this as a capacity gain; the 2026-08-17 instrument measurement below reversed that — on this workload extra capacity *hurts*, and the prize is **reaching tied quality with fewer leaves, i.e. less tree-building work**. ClearGBM currently builds 1.523× LightGBM's leaves for a quality that is a statistical tie[^8][^1], and the quality ceiling is reachable at roughly half ClearGBM's leaf spend[^11].
 
 **Confidence: medium.** Impact on this benchmark is ambiguous — quality is already a statistical tie with LightGBM[^1], so the accuracy ceiling is small. The *work* ceiling is not small: ClearGBM builds 1.52× LightGBM's leaves for that tied quality[^8], and leaf-wise is the change that closes it.
+
+**Measured 2026-08-17, before building it:** using XGBoost as the instrument (it implements both growth policies), leaf-wise growth monotonically *hurt* quality on the bankruptcy workload — depthwise at 22.8 mean leaves beat lossguide at 31 and 47 leaves on AUC-ROC, AUC-PR and log-loss — and on two smaller datasets (Taiwan bankruptcy, German credit) all arms were identical because min-leaf regularization stopped growth at ~4.5 leaves before any budget bound. Full protocol, numbers and confounds: `libs/cleargbm/docs/EXPERIMENT_2026-08-17_growth_policy_xgb_instrument.md`[^11]. Consequence for this page: the prize is **work reduction at statistically tied quality** (the ceiling is reachable at ~23 leaves; ClearGBM spends ~47), not a capacity gain, and the variant should be judged on fit-time-at-tied-quality with quality regression as the guarded downside.
 
 The interpretability objection that previously appeared here has been **withdrawn** — it rested on ClearGBM producing balanced trees, which measurement disproves[^7]. See § "Interpretability cost".
 
@@ -54,7 +57,7 @@ Replace the `Vec<PendingNode>` LIFO stack[^2] with a **max-heap ordered by best-
 3. Pop the highest-gain leaf. Expand it. Compute the best split for each of its two children and push them back.
 4. Stop when the heap is empty OR when `n_leaves >= max_leaves` OR when the highest available gain is `≤ min_gain_to_split`.
 
-The `Vec<PendingNode>`[^2] → `BinaryHeap<(NotNan<f64>, PendingNode)>` swap is small in LOC. The real work is:
+The `Vec<PendingNode>`[^2] → `BinaryHeap<(NotNan<f64>, PendingNode)>` swap is small in LOC. **Design alternative, recorded 2026-08-17 from the reference implementation:** LightGBM does not use a heap. `SerialTreeLearner::Train` keeps a flat `best_split_per_leaf_` array sized `num_leaves`, recomputes best splits only for the two leaves the previous split created, and selects with a plain ArgMax over the array; `max_depth` is enforced by writing `kMinScore` into a capped leaf's cached gain so it can never win the ArgMax (gain poisoning), leaving the selection path constraint-free. Shi's thesis, the origin of best-first induction, instead *removes* a constraint-blocked node from the node list. The two differ when a blocked leaf could later become splittable, and a leaf-wise arm must pick one and name it in the config surface. Primary-source pages for both, with line citations into the captured `serial_tree_learner.cpp` and the thesis PDF, are in the tech-wiki (`~/PROJECTS/tech-wiki`): `lightgbm-leaf-wise-growth-argmax-loop` and `shi-2007-best-first-tree-induction`. At `num_leaves` ≈ 31 the flat-array ArgMax is O(leaves) per split with no heap maintenance, and it composes with the sibling-histogram cache concern below because the recompute set is exactly the two new leaves. Whichever structure is chosen, the real work is[^2]:
 
 - **A new stopping criterion.** Depth-first uses `max_depth` (a per-branch limit); leaf-wise needs `max_leaves` (a whole-tree limit) — otherwise leaf-wise can produce arbitrarily deep single-branch trees on adversarial data.
 - **Config plumbing.** `GradientBoostingConfig` today has `max_depth`[^4] but no `max_leaves`. Add `max_leaves: Option<usize>` (`None` = disable the leaf-wise cap; falls back to `max_depth`).
@@ -78,6 +81,8 @@ pub enum GrowthStrategy { DepthFirst, LeafWise }
 ```
 
 Validation: when `growth_strategy == LeafWise`, either `max_leaves` OR `max_depth` must be set (raise `InvalidParameter` on the double-`None` case), mirroring the existing `max_depth < 1` guard[^4]. Both defaults preserve backward compatibility.
+
+This config surface, extending the validated-config shape at[^4], is now specified as a prerequisite on agent-board task `453c9234` ("deterministic variant-trialing state", 2026-08-17), which also requires the benchmark factory to compare `cleargbm` vs `cleargbm@leaf_wise` vs `lightgbm` in one manifest and declares the gate type for this change: algorithmic, judged by paired per-seed quality on identical company-disjoint splits, NOT bit-identity. Implementation should route through that task rather than landing ad hoc.
 
 Serde on `GrowthStrategy` follows the same pattern as `MonotonicConstraint` in `libs/cleargbm_rs/src/split/serde_impl.rs` — a three-variant enum serialized as a string[^9].
 
@@ -115,4 +120,5 @@ Given ClearGBM's positioning as *Gradient Boosting You Can See Through*[^6], the
 [^7]: `libs/cleargbm/src/cleargbm/ensemble.py:195` — `export_model_json(model)`, the API this reading came from. Tree dump of a model trained on the bankruptcy dataset at `max_depth=5`, read 2026-07-24: 13 distinct `feature_index` values among depth-5 internal nodes; root-to-leaf path lengths 4–6. **The dump itself was not committed**, so the counts are reproducible via that function on the same dataset and config but are not re-readable from a stored artifact.
 [^8]: `libs/covenant_ml/docs/BENCHMARK_MANIFEST_2026-07-24.json` § `results[]` — 47.15 vs 30.96 leaves (leaf ratio 1.523×), being the across-seed mean of `results[].mean_leaves` over seeds `[42, 43, 44]`; recomputed from the manifest 2026-08-05, reproduces exactly. The earlier 57.9 vs 31.0 figures at `max_depth=6` are from the pre-rebuild harness and are narrated at [[cleargbm-leaf-normalized-benchmarking]] § "Measured tree-size divergence"; they are not in this manifest.
 [^9]: `libs/cleargbm_rs/src/split/serde_impl.rs:8,11-27` — `use super::{MonotonicConstraint, ...}`, the `// MonotonicConstraint Serialization` banner, `impl Serialize for MonotonicConstraint`, and a string-visitor deserializer. This is the pattern a `GrowthStrategy` enum would copy.
+[^11]: libs/cleargbm/docs/EXPERIMENT_2026-08-17_growth_policy_xgb_instrument.md — protocol, per-arm table, the min_child_weight hessian-vs-count confound, and the small-dataset null. Scripts: libs/cleargbm/scripts/experiment_growth_policy_xgb_instrument.py + experiment_growth_policy_multi_dataset.py, seeds 42/43/44 fixed inline.
 [^10]: Verified 2026-07-31 against `libs/cleargbm/src` and `libs/cleargbm_rs/src` (excluding vendored `.venv`): `export_model_json` at `libs/cleargbm/src/cleargbm/ensemble.py:195`; split-count importance at `libs/cleargbm_rs/src/training/importance.rs:15`, whose module doc at `:4-10` states it counts "the split feature at any internal node across all trees, then normalize so …" and "deliberately does not depend on gain-per-split", noting gain-weighted importance as "a future enhancement"; monotonic constraints at `libs/cleargbm_rs/src/split/mod.rs` + `split/serde_impl.rs`. A case-sensitive grep for `SHAP` and `shap_values` across both source trees returns **no match** — the explain surface is `FeatureContribution` in `libs/cleargbm/src/cleargbm/_types_explain.py:34`.
