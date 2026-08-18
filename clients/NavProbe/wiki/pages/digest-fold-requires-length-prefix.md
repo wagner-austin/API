@@ -52,6 +52,6 @@ In practice every value passed to `digest_run` is a 64-character hex digest, and
 
 [^1]: tests/test_digest.py::TestDigestRun::test_equal_length_runs_with_the_same_concatenation_do_not_collide, enforcing src/navprobe/digest.py:56 — `[observed]` — run in the package venv: `python -c "from navprobe.digest import digest_run; print(digest_run(['aab','b']) == digest_run(['aa','bb']))"` printed `True` before the fix.
 [^2]: `src/navprobe/digest.py` L56-80, `digest_run` — the fold mixes in `encode_row([float(len(step_digests))])` before iterating.
-[^3]: `src/navprobe/canonical.py` L119-140, `encode_text` — "Four bytes of little-endian byte count followed by the UTF-8 payload."
-[^4]: `src/navprobe/canonical.py` L72-92, `_require_encodable_length` — shared by `encode_row` (L113) and `encode_text` (L138).
-[^5]: `tests/test_digest.py` L80 `TestDigestRun::test_equal_length_runs_with_the_same_concatenation_do_not_collide` and L91 `::test_a_boundary_shift_across_three_steps_is_visible` — both fail against the pre-fix fold.
+[^3]: `src/navprobe/canonical.py` L155-185, `encode_text` — "Four bytes of little-endian byte count followed by the UTF-8 payload."
+[^4]: `src/navprobe/canonical.py` L108-130, `_require_encodable_length` — called by `encode_row` at L149 and by `encode_text` at L174.
+[^5]: `tests/test_digest.py` L80 `test_equal_length_runs_with_the_same_concatenation_do_not_collide` and L91 `test_a_boundary_shift_across_three_steps_is_visible`, both in `TestDigestRun` (L53) — both fail against the pre-fix fold.

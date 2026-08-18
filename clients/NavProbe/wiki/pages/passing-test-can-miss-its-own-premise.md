@@ -56,5 +56,5 @@ The test was replaced by two that fail against the pre-fix fold, rather than rep
 
 The finding was reached by running the suspected collision against the installed code, not by reading it.[^2] Reading the fold would have shown a count prefix and a loop, which is exactly what the original author saw.
 
-[^1]: `tests/test_digest.py` L76-95 — `TestDigestRun` now carries `test_step_count_separates_runs_of_different_lengths` (the original assertion, renamed to its real scope), `test_equal_length_runs_with_the_same_concatenation_do_not_collide`, and `test_a_boundary_shift_across_three_steps_is_visible`.
+[^1]: `tests/test_digest.py` L53-103 `TestDigestRun` now carries `test_step_count_separates_runs_of_different_lengths` (L76, the original assertion, renamed to its real scope), `test_equal_length_runs_with_the_same_concatenation_do_not_collide` (L80), and `test_a_boundary_shift_across_three_steps_is_visible` (L91`.
 [^2]: src/navprobe/digest.py:56 `digest_run` — `[observed]` — `python -c "from navprobe.digest import digest_run; print(digest_run(['aab','b']) == digest_run(['aa','bb']))"` printed `True` against the pre-fix code.

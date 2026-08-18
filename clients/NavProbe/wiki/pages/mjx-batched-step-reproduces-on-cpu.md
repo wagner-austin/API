@@ -63,6 +63,6 @@ The reference digest differs at every width, so the sweep is distinguishing its 
 
 Build an `MjxSimulatorFactory` per width, hand it to `ProbeService`, and run a trial at a fixed `TrialSpec`.[^3] The trial protocol — one pinned seed, N freshly built simulators, every repetition compared against the first — is what makes the runs comparable; it is not something the caller assembles.
 
-[^1]: `src/navprobe/adapters/mjx.py` L183-210, `MjxSimulatorFactory.__init__` — compiles MJCF, places the model, and builds `jit(vmap(step, in_axes=(None, 0)))` once; each `__call__` returns a simulator with its own batched state.
+[^1]: `src/navprobe/adapters/mjx.py` L184-210, `__init__` of `MjxSimulatorFactory` (L167) — compiles MJCF, places the model, and builds `jit(vmap(step, in_axes=(None, 0)))` once; each `__call__` returns a simulator with its own batched state.
 [^2]: `tests/adapters/test_mjx.py::TestTrialAgainstMjx::test_batch_width_changes_the_reference_digest` — pins that two widths produce different digests.
 [^3]: src/navprobe/sweep.py:51 `run_scene_sweep` — `[observed]` — sweep over `world_counts` with `TrialSpec(seed=7, step_count=200, repetitions=5)`, `perturbation=0.05`, on `mujoco-mjx 3.11.0` / `jax 0.10.2` CPU; output is the table above.

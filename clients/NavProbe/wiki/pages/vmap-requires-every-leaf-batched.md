@@ -60,5 +60,5 @@ Because the batch axis is leading, `qpos.tolist()` on the batched state returns 
 
 [^1]: `[observed]` — driving `MjxSimulator.advance` against a state built by `base_data.replace(qpos=...)` on `mujoco-mjx` 3.11.0 / `jax` 0.10.2 raised the quoted `ValueError` from `jax/_src/api.py` `_get_axis_size`.
 [^2]: `src/navprobe/adapters/mjx.py` L193-204 — `build_one` and `state_transforms.vmap(build_one)`.
-[^3]: `src/navprobe/adapters/mjx_bindings.py` L35-56 `FlatArrayProtocol` / `BatchedArrayProtocol`, and L223-250 `StateBuilderProtocol` / `BatchedStateBuilderProtocol`.
+[^3]: `src/navprobe/adapters/jax_bindings.py` L30 `FlatArrayProtocol` and L42 `BatchedArrayProtocol` (imported into the MJX bindings at `src/navprobe/adapters/mjx_bindings.py` L30), and `src/navprobe/adapters/mjx_bindings.py` L164 `StateBuilderProtocol` and L179 `BatchedStateBuilderProtocol`.
 [^4]: `tests/adapters/test_mjx.py::TestObservation::test_flattens_every_world_into_one_observation` — asserts the observation length is `world_count * nq`.
