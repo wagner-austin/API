@@ -12,6 +12,11 @@ services:
         TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cu124}
         GIT_COMMIT: ${GIT_COMMIT:-}
     container_name: model-trainer-api
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "4"
     env_file:
       - .env
     environment:
@@ -62,6 +67,15 @@ services:
         TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cu124}
         GIT_COMMIT: ${GIT_COMMIT:-}
     container_name: model-trainer-worker
+    # The worker logs one JSON line per training step (tens of thousands per
+    # run); an uncapped json-file log grows without bound, slows every
+    # `docker logs` query, and feeds VHDX bloat. 200MB rolling window keeps
+    # roughly the last few runs' logs.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "4"
     command: ["modeltrainer-rq-worker"]
     env_file:
       - .env
