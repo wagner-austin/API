@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.job_types import JobStatusLiteral
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str, narrow_json_to_dict
+from platform_core.trainer_keys import cancel_key
 from platform_workers.redis import _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
 
@@ -177,7 +178,25 @@ class TestEnqueueResume:
         status = TrainerJobStore(redis).load(RUN_ID)
         assert status is not None and status["status"] == "queued"
         assert status["message"] == "resume queued"
-        redis.assert_only_called({"hset", "hgetall"})
+        redis.assert_only_called({"hset", "hgetall", "delete"})
+
+    def test_resume_clears_a_stale_cancel_flag(self, tmp_path: Path) -> None:
+        """A cancel flag left by an earlier cancellation must not survive the
+        enqueue of a resume: the flag has no expiry, and a resumed run would
+        otherwise read it at its first cancellation check and stop instantly,
+        making resume-after-cancel impossible."""
+        redis = FakeRedis()
+        fake_queue = FakeQueue(job_id="job-resume-2")
+        _install_fake_rq(fake_queue)
+        orch, settings = _make_orchestrator(tmp_path, redis)
+        _seed_status(redis, RUN_ID, "failed")
+        _touch_checkpoint(settings, RUN_ID)
+        redis.set(cancel_key(RUN_ID), "1")
+
+        out = orch.enqueue_resume(RUN_ID, _make_request())
+        assert out["job_id"] == "job-resume-2"
+        assert redis.get(cancel_key(RUN_ID)) is None and len(fake_queue.jobs) == 1
+        redis.assert_only_called({"set", "get", "hset", "hgetall", "delete"})
 
     def test_fresh_enqueue_carries_resume_false(self, tmp_path: Path) -> None:
         redis = FakeRedis()
@@ -189,7 +208,7 @@ class TestEnqueueResume:
         assert out["job_id"] == "job-fresh-1"
         raw = fake_queue.jobs[0].args[0]
         assert _payload_field(raw, "resume") is False
-        redis.assert_only_called({"hset"})
+        redis.assert_only_called({"hset", "delete"})
 
 
 class TestResumeRoute:
@@ -237,4 +256,4 @@ class TestResumeRoute:
         assert body["run_id"] == RUN_ID
         assert body["job_id"] == "job-route-1"
         assert len(fake_queue.jobs) == 1
-        fake_redis.assert_only_called({"hset", "hgetall"})
+        fake_redis.assert_only_called({"hset", "hgetall", "delete"})

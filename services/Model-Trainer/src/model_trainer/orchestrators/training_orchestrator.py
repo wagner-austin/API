@@ -6,6 +6,7 @@ from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import (
     artifact_file_id_key,
+    cancel_key,
     eval_key,
     heartbeat_key,
 )
@@ -130,6 +131,13 @@ class TrainingOrchestrator:
             "user_id": int(req["user_id"]),
             "resume": resume,
         }
+        # Enqueueing an execution supersedes any earlier cancellation of this
+        # run id: the cancel flag has no expiry, so without this delete a run
+        # cancelled once could never be resumed. The worker would read the
+        # stale flag at its first cancellation check and stop immediately.
+        # Deleting BEFORE enqueue keeps the flag's normal path intact: a
+        # cancel issued after this point targets the new execution.
+        _ = self._redis.delete(cancel_key(run_id))
         job_id = self._enq.enqueue_train(payload)
         now = datetime.utcnow()
         self._job_store.save(

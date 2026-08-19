@@ -95,4 +95,4 @@ def test_runs_train_with_corpus_file_id(tmp_path: Path, settings_factory: _Setti
     # The payload structure is: {"run_id": ..., "user_id": ..., "request": {"corpus_file_id": ...}}
     payload_str = str(enqueued.args[0])
     assert "deadbeef" in payload_str, f"corpus_file_id not found: {payload_str}"
-    fake.assert_only_called({"hset"})
+    fake.assert_only_called({"hset", "delete"})
