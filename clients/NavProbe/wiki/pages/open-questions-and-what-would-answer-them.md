@@ -5,7 +5,7 @@ related: ["[[the-numbers-are-scene-dependent-the-shapes-replicate]]", "[[mjwarp-
 source_paths:
   - "wiki/log.md"
 source_git_blobs:
-  "wiki/log.md": "39302407f39e0dafc6935a927d3a0171efdf51f2"
+  "wiki/log.md": "7aa52bc3a8ecde57c6d7cc34f51247c201dcd5c6"
 fact_checked: 2026-08-18
 confidence: high
 hubs: [instrument-design]
