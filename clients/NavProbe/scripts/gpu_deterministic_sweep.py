@@ -1,8 +1,12 @@
 """GPU determinism sweep for the ten-scene family under a chosen Warp mode.
 
-Usage: python scripts/gpu_deterministic_sweep.py <MODE> <CACHE_DIR>
-  MODE      NOT_GUARANTEED | RUN_TO_RUN | GPU_TO_GPU
-  CACHE_DIR Warp kernel-cache directory for this run
+Usage: python scripts/gpu_deterministic_sweep.py <MODE> <CACHE_DIR> [MAX_RECORDS]
+  MODE        NOT_GUARANTEED | RUN_TO_RUN | GPU_TO_GPU
+  CACHE_DIR   Warp kernel-cache directory for this run
+  MAX_RECORDS optional wp.config.deterministic_max_records override. The
+              default 0 uses Warp's code-generated lower bound, which the
+              solver's data-dependent contact loops exceed at 32 bodies
+              (RuntimeError: deterministic scatter buffer overflow in '_M').
 
 Mirrors the wiki-pinned CPU-control design exactly, on cuda:0: scenes
 separated 2/8/16/32 at spacing 0.070 and touching 2/4/5/6/8/32 at 0.055,
@@ -23,6 +27,9 @@ import warp as wp
 wp.config.kernel_cache_dir = cache_dir
 if mode_name != "NOT_GUARANTEED":
     wp.config.deterministic = getattr(wp.DeterministicMode, mode_name)
+max_records = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+if max_records:
+    wp.config.deterministic_max_records = max_records
 wp.init()
 
 from navprobe.adapters.mjx_warp_state import MjWarpStateSimulatorFactory
@@ -71,6 +78,7 @@ with wp.ScopedDevice("cuda:0"):
 
 report = {
     "mode": mode_name,
+    "max_records": max_records,
     "device": str(wp.get_device("cuda:0")),
     "trial": dict(TRIAL),
     "world_count": WORLD_COUNT,
