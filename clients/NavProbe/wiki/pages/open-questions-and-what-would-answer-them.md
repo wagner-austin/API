@@ -5,7 +5,7 @@ related: ["[[the-numbers-are-scene-dependent-the-shapes-replicate]]", "[[mjwarp-
 source_paths:
   - "wiki/log.md"
 source_git_blobs:
-  "wiki/log.md": "6a3636d6f8d3d1c4b0f4425d8c0a8764cd2953eb"
+  "wiki/log.md": "39302407f39e0dafc6935a927d3a0171efdf51f2"
 fact_checked: 2026-08-18
 confidence: high
 hubs: [instrument-design]
@@ -21,7 +21,7 @@ Ordered by value, not by effort.
 
 Warp's deterministic modes would make most of this wiki's findings a *setting* rather than a property, and MuJoCo-Warp cannot compile under them ([[mjwarp-cannot-compile-under-warp-deterministic-mode]]). Compilation stops at the first rejected function, so a fix there could have revealed the next one.
 
-**It did not.** With the withdrawn upstream PR #1591's three-line alias patch applied, every module in the touching-row pipeline compiles cold and steps under BOTH `RUN_TO_RUN` and `GPU_TO_GPU` ([[tactile-alias-patch-clears-warp-deterministic-compile]]). The solver kernels this wiki attributes the non-determinism to were already deterministic-mode-clean. **And the GPU verdict is in, same day: all ten scenes bit-reproducible under `RUN_TO_RUN` on `cuda:0`, including every coupled-body scene, with `deterministic_max_records` raised to 64 to clear a runtime record-buffer overflow at 32 bodies.** What remains of this question is only the cost: the sweep ran under co-resident training load, so a clean-GPU throughput comparison (deterministic vs default) is the outstanding measurement, along with cross-process digest repetition.
+**It did not.** With the withdrawn upstream PR #1591's three-line alias patch applied, every module in the touching-row pipeline compiles cold and steps under BOTH `RUN_TO_RUN` and `GPU_TO_GPU` ([[tactile-alias-patch-clears-warp-deterministic-compile]]). The solver kernels this wiki attributes the non-determinism to were already deterministic-mode-clean. **And the GPU verdict is in, same day: all ten scenes bit-reproducible under `RUN_TO_RUN` on `cuda:0`, including every coupled-body scene, with `deterministic_max_records` raised to 64 to clear a runtime record-buffer overflow at 32 bodies.** The cost and cross-process checks landed the same night on the freed GPU: warm-run cost 3.3 to 7.1x (overall 5.07x at world_count 2, worst in the most-coupled scenes), and three separate processes under different load produced 10/10 identical digests. This question is closed end to end; what it leaves behind is scale-dependence of the cost (world_count 2 under-occupies the card) and cross-machine digest repetition, both folded into question 2's hardware axis.
 
 **Upstream is answering a stronger version of this question by another route.** As of 2026-08-18 `google-deepmind/mujoco_warp` carries an unmerged three-PR stack (#1422, #1425, #1533, none merged) that builds an opt-in `opt.deterministic` stepping mode at the MJWarp level — sorted contacts, count-based row allocation, serial sensor scans — rather than through Warp's codegen mode. PR #1533's description enumerates every remaining order-sensitive accumulation in the pipeline, which is, in effect, upstream's own list of "the next blockers". An independent third party also filed and withdrew (CLA failure, 16 minutes) an issue + fix pair for exactly the `_sensor_tactile` mix (#1590/#1591) on 2026-08-18. The local-patch experiment is still worth running: it tests Warp's codegen mode, which the upstream stack deliberately bypasses.
 

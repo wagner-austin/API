@@ -69,10 +69,20 @@ Ran the same evening on `cuda:0` (RTX 3090 Ti), same ten-scene family and trial 
 
 The first GPU attempt died at the 32-body separated scene with `RuntimeError: Deterministic scatter buffer overflow in kernel '_M'. Increase 'deterministic_max_records' or reduce the per-thread atomic count.` Warp's deterministic lowering buffers each thread's atomic writes as records before sorting and reducing them; the default capacity (`wp.config.deterministic_max_records = 0`) uses a code-generated static lower bound, which the solver's data-dependent contact loops exceed once enough bodies interact. Setting `deterministic_max_records = 64` before `wp.init()` cleared it at every scene size tested. The failure is loud, not silent — but it means the deterministic path carries a model-dependent capacity knob: a configuration validated on small scenes can still fail at runtime on larger ones. Nobody could have reported this before, because nothing MJWarp-shaped ever compiled far enough to reach it.
 
+## The cost: 3.3x to 7.1x at this instrument's scale, worst where the coupling is worst
+
+Measured on the freed GPU (trainer finished, 0 % baseline utilisation): each mode run twice in sequence with a shared kernel cache, and the warm second runs compared per scene. Default mode: 12.6 to 20.3 s per scene. `RUN_TO_RUN`: 42 to 137 s. Ratios 3.3 to 5.2x on the separated family, 3.5 to 7.1x on the touching family — **the deterministic path is most expensive in exactly the coupled scenes it exists to fix** (6.4 to 7.1x at touching 6/8/32), consistent with record buffering and sorting scaling with contact coupling. Overall warm-total ratio 5.07x.
+
+Two qualifiers keep this from being a universal number. The per-scene wall includes per-scene model construction and cache loads, not pure stepping. And `world_count = 2` barely occupies an RTX 3090 Ti: Warp's own published table shows the sort-and-reduce path *gaining* on atomics as contention rises, so at RL-scale world counts the ratio could move substantially in either direction. This is the instrument's cost, honestly bounded, not MJWarp's cost in general.
+
+## The default mode replicated its own failure in the same session
+
+The warm default-mode run, on the same patched build, same night, same card, reported the touching family irreproducible from 5 bodies upward and the separated family reproducible throughout — the exact boundary [[warp-gpu-determinism-fails-on-coupled-bodies]] published. The patch alters nothing under the default mode; the mode switch carries the entire effect.
+
+## Cross-process, cross-load reproducibility: three processes, one digest set
+
+Three separate `RUN_TO_RUN` processes — the original sweep under heavy co-resident training load, a cold fresh process on the idle GPU, and a warm process on the idle GPU — produced **10/10 identical digests pairwise across all three**. The deterministic path's output is invariant to process boundaries and to GPU load, which upgrades the claim from within-process repetition to the reproducibility users actually need.
+
 ## What this does not establish
 
-**Throughput cost is unmeasured.** The sweep shared the GPU with a co-resident training job for its whole duration, so the per-scene wall times in the archived log measure contention, not the deterministic path. A clean-GPU timing pass is the remaining measurement.
-
-**Reproducibility was established within one process** — twelve rollouts per scene in a single process, the same design under which the default mode fails. Cross-process and cross-boot repetition of the RUN_TO_RUN digests is unmeasured, as is `GPU_TO_GPU` behaviour on a second architecture. The digests in the archived report are RUN_TO_RUN-mode digests and are not comparable to default-mode GPU digests or to the CPU reference — the deterministic lowering fixes a *different* summation order, it does not reproduce either of the old ones.
-
-The scene family declares `nsensor = 0`, so the aliased tactile writes were compiled but never executed with live taxel data; a model that uses tactile sensing should be checked for output equivalence against the unpatched build under the default mode before the patch is trusted beyond compilation. One scene family, one pipeline configuration (sparse solver path, nworld 2), `deterministic_max_records` validated only up to 32 bodies.
+The digests are RUN_TO_RUN-mode digests, comparable neither to default-mode GPU digests nor to the CPU reference — the deterministic lowering fixes a *different* summation order rather than reproducing either of the old ones. Cross-boot and cross-machine repetition of the RUN_TO_RUN digests is unmeasured, as is `GPU_TO_GPU` on a second architecture. The scene family declares `nsensor = 0`, so the aliased tactile writes were compiled but never executed with live taxel data; a model that uses tactile sensing should be checked for output equivalence against the unpatched build before the patch is trusted beyond compilation. One scene family, one pipeline configuration (sparse solver path, nworld 2), `deterministic_max_records` validated only up to 32 bodies.
