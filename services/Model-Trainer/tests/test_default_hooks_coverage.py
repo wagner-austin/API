@@ -20,7 +20,9 @@ from model_trainer.core._test_hooks import (
     ServiceContainerProto,
     _default_artifact_store,
     _default_corpus_fetcher_factory,
+    _default_cuda_device_name,
     _default_cuda_is_available,
+    _default_env_git_commit,
     _default_httpx_client_factory,
     _default_load_settings,
     _default_rq_queue,
@@ -61,6 +63,42 @@ def test_default_cuda_is_available_returns_bool() -> None:
     result: bool = _default_cuda_is_available()
     # Result should be bool (True or False depending on GPU availability)
     assert result is True or result is False
+
+
+def test_default_cuda_device_name_names_the_card() -> None:
+    """The adapter reaches real torch, like the torch.cuda memory adapters do.
+
+    It assumes CUDA is present because its only caller gates on the
+    cuda_is_available hook first; this suite runs on the GPU box.
+    """
+    name: str = _default_cuda_device_name()
+    assert name != ""
+
+
+def test_default_env_git_commit_reads_the_build_stamp() -> None:
+    """A set variable is returned verbatim; unset and empty are both None.
+
+    The default reads through the platform config env hook, so the fake goes
+    there, with a finally restore.
+    """
+    from platform_core.config import config_test_hooks
+
+    original = config_test_hooks.get_env
+    values: dict[str, str | None] = {}
+
+    def _fake_get_env(key: str) -> str | None:
+        return values.get(key)
+
+    config_test_hooks.get_env = _fake_get_env
+    try:
+        values["GIT_COMMIT"] = "abc123def456"
+        assert _default_env_git_commit() == "abc123def456"
+        values["GIT_COMMIT"] = ""
+        assert _default_env_git_commit() is None
+        del values["GIT_COMMIT"]
+        assert _default_env_git_commit() is None
+    finally:
+        config_test_hooks.get_env = original
 
 
 def test_default_httpx_client_factory_returns_client() -> None:

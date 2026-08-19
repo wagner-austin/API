@@ -55,6 +55,22 @@ class CudaIsAvailableProto(Protocol):
         ...
 
 
+class CudaDeviceNameProto(Protocol):
+    """Protocol for cuda_device_name hook."""
+
+    def __call__(self) -> str:
+        """Get the CUDA device 0 model name. Callers gate on cuda_is_available."""
+        ...
+
+
+class EnvGitCommitProto(Protocol):
+    """Protocol for env_git_commit hook."""
+
+    def __call__(self) -> str | None:
+        """Read the build-stamped GIT_COMMIT variable, None when unset or empty."""
+        ...
+
+
 class PkgVersionProto(Protocol):
     """Protocol for pkg_version hook."""
 
@@ -339,6 +355,35 @@ def _default_cuda_is_available() -> bool:
     return torch.cuda.is_available()
 
 
+def _default_cuda_device_name() -> str:
+    """Production cuda_device_name - used as default hook.
+
+    Callers gate on the run's device being "cuda" (which _setup_device has
+    already proven available); repeating the check here would hide a caller
+    that forgot the gate. Calling this initialises a CUDA context in the
+    process, which is exactly why cpu-device runs must not reach it.
+    """
+    import torch
+
+    return torch.cuda.get_device_name(0)
+
+
+def _default_env_git_commit() -> str | None:
+    """Production env_git_commit - used as default hook.
+
+    The deployed image carries no .git directory, so `git rev-parse` inside
+    the container can never answer; the build bakes the commit into the
+    GIT_COMMIT environment variable instead. An empty or unset variable is
+    None: the manifest records that the commit was not stamped rather than
+    an empty string that reads as a value. Reads through the platform config
+    env hook, the one sanctioned environment accessor.
+    """
+    from platform_core.config import config_test_hooks
+
+    value = config_test_hooks.get_env("GIT_COMMIT")
+    return value if value else None
+
+
 _log = get_logger(__name__)
 
 
@@ -430,6 +475,8 @@ httpx_client_factory: HttpxClientFactoryProto = _default_httpx_client_factory
 
 # Training infrastructure hooks
 cuda_is_available: CudaIsAvailableProto = _default_cuda_is_available
+cuda_device_name: CudaDeviceNameProto = _default_cuda_device_name
+env_git_commit: EnvGitCommitProto = _default_env_git_commit
 pkg_version: PkgVersionProto = _default_pkg_version
 model_dir: ModelDirProto = _default_model_dir
 split_corpus_files: SplitCorpusFilesProto = _default_split_corpus_files

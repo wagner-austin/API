@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import torch
+from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
@@ -138,6 +139,8 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
     orig_cuda_is_available = _test_hooks.cuda_is_available
     orig_torch_device = _test_hooks.torch_device
     orig_gpu_reset = _test_hooks.gpu_reset_peak_memory_stats
+    orig_cuda_device_name = _test_hooks.cuda_device_name
+    orig_env_git_commit = _test_hooks.env_git_commit
 
     # Override hooks to simulate CUDA scenario
     def _fake_gpu_memory() -> int:
@@ -154,10 +157,18 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
         # No-op since we're not actually using CUDA
         pass
 
+    def _fake_cuda_device_name() -> str:
+        return "Fake GPU Model 9000"
+
+    def _fake_env_git_commit() -> str:
+        return "stamped0commit0hash"
+
     _test_hooks.gpu_max_memory_allocated = _fake_gpu_memory
     _test_hooks.cuda_is_available = _fake_cuda_available
     _test_hooks.torch_device = _fake_torch_device
     _test_hooks.gpu_reset_peak_memory_stats = _fake_gpu_reset
+    _test_hooks.cuda_device_name = _fake_cuda_device_name
+    _test_hooks.env_git_commit = _fake_env_git_commit
 
     # Temporarily modify cfg to have device='cuda' to trigger the conditional
     # The actual tensor operations happen on CPU, but the string check passes
@@ -199,9 +210,114 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
         assert loss_after < loss_before, (
             f"Training should reduce loss: before={loss_before:.4f}, after={loss_after:.4f}"
         )
+
+        # The manifest pins provenance: the stamped commit wins over rev-parse,
+        # and the GPU model is recorded because cuda_is_available said cuda.
+        manifest_path = artifacts / "models" / "run-gpu-test" / "manifest.json"
+        manifest_obj = narrow_json_to_dict(load_json_str(manifest_path.read_text(encoding="utf-8")))
+        assert manifest_obj["git_commit"] == "stamped0commit0hash"
+        system_obj = narrow_json_to_dict(manifest_obj["system"])
+        assert system_obj["gpu_name"] == "Fake GPU Model 9000"
     finally:
         # Restore hooks
         _test_hooks.gpu_max_memory_allocated = orig_gpu_mem
         _test_hooks.cuda_is_available = orig_cuda_is_available
         _test_hooks.torch_device = orig_torch_device
         _test_hooks.gpu_reset_peak_memory_stats = orig_gpu_reset
+        _test_hooks.cuda_device_name = orig_cuda_device_name
+        _test_hooks.env_git_commit = orig_env_git_commit
+
+
+def test_cpu_manifest_records_no_gpu_name(
+    tmp_path: Path, settings_factory: _SettingsFactory
+) -> None:
+    """A cpu-device run's manifest records gpu_name null even on a CUDA box.
+
+    The field pins what the run used, not what hardware exists — and the cpu
+    branch must not query the device name, because doing so initialises a
+    CUDA context in the writing process (the node-down crash that pairing
+    caused in this suite is why the gate reads the config device).
+    """
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    settings = settings_factory(
+        artifacts_root=str(artifacts),
+        runs_root=str(tmp_path / "runs"),
+        logs_root=str(tmp_path / "logs"),
+        data_root=str(tmp_path / "data"),
+    )
+    corpus_path = _write_tiny_corpus(tmp_path)
+    tok_id = "tok-cpu-test"
+    tok_dir = _train_char_tokenizer(tmp_path, corpus_path, tok_id)
+
+    cfg: ModelTrainConfig = {
+        "model_family": "char_lstm",
+        "model_size": "tiny",
+        "max_seq_len": 16,
+        "num_epochs": 3,
+        "batch_size": 2,
+        "learning_rate": 1e-3,
+        "tokenizer_id": tok_id,
+        "corpus_path": corpus_path,
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "data_num_workers": 0,
+        "data_pin_memory": False,
+        "early_stopping_patience": 0,
+        "test_split_ratio": 0.0,
+        "finetune_lr_cap": 0.0,
+        "loss_mask_prefix_separator": None,
+        "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "gguf_export": None,
+    }
+
+    backend = create_char_lstm_backend(LocalTextDatasetBuilder())
+    handle = CharBackend().load(str(Path(tok_dir) / "tokenizer.json"))
+    prepared = backend.prepare(cfg, settings, tokenizer=handle)
+
+    train_losses: list[float] = []
+
+    def track_progress(
+        step: int,
+        epoch: int,
+        loss: float,
+        train_ppl: float,
+        grad_norm: float,
+        samples_per_sec: float,
+        val_loss: float | None,
+        val_ppl: float | None,
+    ) -> None:
+        train_losses.append(loss)
+
+    # No hook fakes: the gate reads cfg["device"], so a cpu run on a real
+    # CUDA box is exactly the case under test.
+    out = backend.train(
+        cfg,
+        settings,
+        run_id="run-cpu-test",
+        heartbeat=_noop,
+        cancelled=_never,
+        resume=False,
+        prepared=prepared,
+        progress=track_progress,
+    )
+    assert out["steps"] >= 1
+    loss_before = train_losses[0]
+    loss_after = train_losses[-1]
+    assert loss_after < loss_before, (
+        f"Training should reduce loss: before={loss_before:.4f}, after={loss_after:.4f}"
+    )
+
+    manifest_path = artifacts / "models" / "run-cpu-test" / "manifest.json"
+    manifest_obj = narrow_json_to_dict(load_json_str(manifest_path.read_text(encoding="utf-8")))
+    system_obj = narrow_json_to_dict(manifest_obj["system"])
+    assert system_obj["gpu_name"] is None

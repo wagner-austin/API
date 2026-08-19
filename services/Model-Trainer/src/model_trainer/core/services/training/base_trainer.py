@@ -131,6 +131,12 @@ def _gather_lib_versions(service_name: str) -> TrainingManifestVersions:
 def _maybe_git_commit(settings: Settings, service_name: str) -> str | None:
     """Attempt to get git commit hash for reproducibility.
 
+    The build-stamped GIT_COMMIT variable wins: a deployed image carries no
+    .git directory, so the subprocess path below can never answer inside a
+    container, and every manifest the 2026-08-18 provenance audit archived
+    had git_commit null for exactly that reason. The subprocess path remains
+    for development checkouts run outside the image.
+
     Args:
         settings: Application settings containing artifacts_root.
         service_name: Name of the service for logging.
@@ -139,6 +145,10 @@ def _maybe_git_commit(settings: Settings, service_name: str) -> str | None:
         Git commit hash or None if detection fails.
     """
     import subprocess as _sp
+
+    stamped = _test_hooks.env_git_commit()
+    if stamped is not None:
+        return stamped
 
     try:
         repo_root = Path(settings["app"]["artifacts_root"]).parents[1]
@@ -1183,6 +1193,14 @@ class BaseTrainer:
                 "platform": _platform.system(),
                 "platform_release": _platform.release(),
                 "machine": _platform.machine(),
+                # Gated on the run's device, not on hardware presence: a cpu
+                # run records null even on a CUDA box (the field pins what the
+                # run USED), and querying the name would needlessly initialise
+                # a CUDA context in the writing process. _setup_device already
+                # guarantees device "cuda" implies CUDA is available.
+                "gpu_name": (
+                    _test_hooks.cuda_device_name() if self._cfg["device"] == "cuda" else None
+                ),
             },
             "git_commit": _maybe_git_commit(self._settings, self._service_name),
             "device": self._cfg["device"],

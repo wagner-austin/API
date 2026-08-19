@@ -90,6 +90,9 @@ def _decode_manifest_system(obj: JSONObject) -> TrainingManifestSystem:
         "platform": require_str(sys, "platform"),
         "platform_release": require_str(sys, "platform_release"),
         "machine": require_str(sys, "machine"),
+        # Absent in manifests written before the field existed; absence means
+        # the GPU model was not recorded, which None states exactly.
+        "gpu_name": _optional_str(sys, "gpu_name"),
     }
 
 

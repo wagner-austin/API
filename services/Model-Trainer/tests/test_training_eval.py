@@ -49,9 +49,15 @@ def _validate_versions_dict(versions_raw: dict[str, JSONValue]) -> dict[str, str
 
 
 def _validate_system_dict(system_raw: dict[str, JSONValue]) -> dict[str, str | int]:
-    """Validate system dict - values must be non-empty str or int."""
+    """Validate system dict - values must be non-empty str or int.
+
+    ``gpu_name`` is the one nullable member: it pins the GPU the run used,
+    and a cpu-device run records null even on a CUDA box.
+    """
     system_typed: dict[str, str | int] = {}
     for k, v in system_raw.items():
+        if k == "gpu_name" and v is None:
+            continue
         is_str = isinstance(v, str) and len(v) >= 1
         is_int = isinstance(v, int) and not isinstance(v, bool)
         if not (is_str or is_int):

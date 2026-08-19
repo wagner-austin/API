@@ -62,10 +62,16 @@ FROM python:${PYTHON_VERSION} AS runtime-base
 # cu124 default as the global one and as docker-compose.yml.
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cu124
 
+# The service commit, baked at build time so every TrainingManifest can name
+# the code that trained the run; the image carries no .git for rev-parse.
+# Empty when the build did not pass it, which the manifest records as null.
+ARG GIT_COMMIT=
+
 ENV PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    TORCH_INDEX=${TORCH_INDEX}
+    TORCH_INDEX=${TORCH_INDEX} \
+    GIT_COMMIT=${GIT_COMMIT}
 
 RUN addgroup --system app && adduser --system --home /home/app --ingroup app app
 

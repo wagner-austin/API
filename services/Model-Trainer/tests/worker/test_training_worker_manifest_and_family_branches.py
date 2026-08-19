@@ -281,6 +281,39 @@ def test_load_manifest_peak_gpu_memory_mb_bool_error() -> None:
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
 
 
+def test_load_manifest_system_gpu_name_string_accepted() -> None:
+    """A manifest naming the GPU model decodes; the field pins which card trained the run."""
+    ok_manifest: _ManifestDict = {
+        **_base_manifest(),
+        "system": {
+            "cpu_count": 1,
+            "platform": "x",
+            "platform_release": "y",
+            "machine": "z",
+            "gpu_name": "NVIDIA GeForce RTX 3090",
+        },
+    }
+    loaded = manifest.load_manifest_from_text(dump_json_str(ok_manifest))
+    assert loaded["run_id"] == _base_manifest()["run_id"]
+    assert loaded["system"]["gpu_name"] == "NVIDIA GeForce RTX 3090"
+
+
+def test_load_manifest_system_gpu_name_wrong_type_error() -> None:
+    """gpu_name must be a string or absent; a number is a corrupted manifest."""
+    bad_manifest: _ManifestDict = {
+        **_base_manifest(),
+        "system": {
+            "cpu_count": 1,
+            "platform": "x",
+            "platform_release": "y",
+            "machine": "z",
+            "gpu_name": 3090,
+        },
+    }
+    with pytest.raises(JSONTypeError, match="gpu_name"):
+        _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
+
+
 def test_load_manifest_peak_gpu_memory_mb_string_error() -> None:
     """Cover manifest.py _decode_manifest_performance else branch for peak_gpu_memory_mb."""
     bad_manifest: _ManifestDict = {

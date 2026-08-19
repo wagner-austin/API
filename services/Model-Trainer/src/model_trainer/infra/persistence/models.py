@@ -25,6 +25,7 @@ class TrainingManifestSystem(TypedDict):
     platform: str
     platform_release: str
     machine: str
+    gpu_name: str | None
 
 
 class TrainingManifestTiming(TypedDict):
