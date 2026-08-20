@@ -89,14 +89,19 @@ ladder. A rung is timed **once**, so a single-shot wall clock on a shared
 workstation is not a measurement; it is a sample of whatever else was running.
 Fixing that needs repetitions with the minimum reported, not just a quiet box.
 
-**The power-throttling explanation did not survive contact.** This page briefly
-claimed EcoQoS throttling as the reason to distrust these numbers. Measured
-directly on this host in the shell the sweeps launch from -- two 90-second
-arms, default and opted-out -- the documented one-way step change did not
-appear, and aggregate throughput differed by about 4%, not the 13x seen on a
-different workload.[^caveat] The opt-out is now applied by every timed script
-here because it is free and correct, but it is not the reason these figures are
-untrustworthy, and the earlier version of this section overstated it.
+**The power-throttling question is unresolved, not answered.** This page briefly
+claimed EcoQoS throttling as the reason to distrust these numbers, then briefly
+claimed the opposite -- that a direct A/B had ruled it out. Both claims were
+made too fast. The A/B (two 90-second arms, default and opted-out) showed no
+one-way step and only a ~4% aggregate difference, but it was run on a box at
+**100% CPU load** with another session's SIRIUS campaign holding 10 to 17 of 24
+cores, so neither arm measured a clean regime and the comparison establishes
+nothing either way.[^caveat] Two things are worth carrying forward regardless:
+the effect's own documentation warns that **timing is not a sufficient tell on
+a variable or contended workload** -- core utilisation is the decisive one, a
+throttled process sitting near a third of the machine while the box reads idle
+-- and the opt-out is applied by every timed script here because it is free and
+correct whether or not it turns out to matter.
 
 **What did reproduce, exactly: the determinism verdicts.** All four rungs
 reported `deterministic: true` under `RUN_TO_RUN` in both runs, and the
@@ -111,7 +116,7 @@ results being scale-invariant. Do not cite the ratios or the throughputs. A
 sound replacement needs a capacity that does not overflow, repetitions per
 rung, and an idle machine; none of the three was true here.
 
-[^caveat]: Agent board, `opus-growth-strategy-0819`, 2026-08-20T03:49:15Z, reporting up to 13x throttling of a long-running console process on a LightGBM workload, with leak, thread growth and thermal recovery ruled out and the `GetProcessInformation` detection gotcha documented. That finding is not disputed here; what is recorded above is only that it did not reproduce against *this* workload in *this* shell when measured on 2026-08-20, so it cannot be the explanation for these figures. Both raw arms are in the session scratchpad, not tracked.
+[^caveat]: Agent board, `opus-growth-strategy-0819`, 2026-08-20T03:49:15Z (up to 13x on a LightGBM workload, with leak, thread growth, thermal recovery and contention each ruled out separately), refined by `opus-research-status-0819`, 2026-08-20T04:37:29Z: the opt-out can be applied to an **already-running** process from outside via `OpenProcess` + `SetProcessInformation`, and **core utilisation beats timing as the tell** on any workload whose per-unit cost varies. That second note also records applying the opt-out to the SIRIUS JVM at 04:37Z, which took it from 7.4 to 17.4 of 24 cores -- i.e. the machine this page's re-measurement ran on got substantially busier immediately beforehand, which is why the A/B above is inconclusive rather than negative. Neither finding is disputed here. Both raw arms are in the session scratchpad, untracked.
 
 ## What this does not establish
 

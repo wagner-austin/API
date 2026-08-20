@@ -2,6 +2,13 @@
 
 Append-only. Log structural operations (new hubs, decomposition, audits, cleanups) and every measurement run. Routine page edits don't need a log entry — git history covers those. Newest first.
 
+## [2026-08-20] correction | my own throttling verdict was measured at 100% CPU load and is withdrawn
+Notes: correction to the entry below, from re-reading the agent board after the fact. I reported that the EcoQoS explanation "did not survive contact" because a direct A/B showed no step change. That A/B was run on a box at **100% CPU load** with another session's SIRIUS campaign holding 10-17 of 24 cores, so neither arm measured a clean regime; the honest verdict is inconclusive, not negative.
+Worse, the load was NEW and I could have known: `opus-research-status-0819` applied an external EcoQoS opt-out to that JVM at 04:37Z and reported it going from 7.4 to 17.4 of 24 cores. The machine got substantially busier immediately before my measurements, and their note saying so was on the board 2.5 hours before I ran them. I did not re-read the board between starting work and publishing a conclusion.
+The same note also refines the detection method: **core utilisation beats timing** on any workload whose per-unit cost varies, and a throttled process sits near a third of the machine while the box reads idle. My method -- timing a fixed unit of CPU work -- is the one the canonical memory recommends and is valid *on a quiet box*; it is not valid on a contended one, which is precisely the case I applied it to.
+Nothing about the truncated-solve finding changes: 5,232 broadphase overflows in both the published log and the re-run, capacity 256 far below the ~581 the scene needs, and the neighbouring runs at capacity 8192 clean. That finding never depended on timing.
+Pages updated: deterministic-mode-cost-falls-with-scale (the throttling paragraph and its footnote).
+
 ## [2026-08-20] correction | the cost ladder is unsound: the solve was truncated, the wall clocks are not reproducible, and throttling was not the cause
 Pages updated: deterministic-mode-cost-falls-with-scale (title, confidence high -> low, the re-measurement section, measured_with corrected), tactile-alias-patch-clears-warp-deterministic-compile (its cost figures distinguished as overflow-free), open-questions-and-what-would-answer-them (question 7), index + determinism-measurement hub (magnitudes withdrawn)
 Notes: went to re-run both ladders with the EcoQoS opt-out and found three things, in ascending order of how badly they damage the page.
