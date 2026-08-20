@@ -109,5 +109,20 @@ fail_under = 100
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-v -n auto --dist loadscope"
-timeout = 300
+# 900, not 300. Measured 2026-08-19: the slowest test here
+# (test_cancel_during_eval_returns_partial_results, a 3-epoch CPU GPT-2 train)
+# takes 99.18 s ALONE on a fully idle box. Under `-n auto` each of ~31 workers
+# also spins torch's own intra-op thread pool, so the parallel case is several
+# times slower and 300 s left only ~3x headroom -- the bound was firing on
+# slow-but-working tests, not on hangs.
+#
+# That mattered because timeout_method has no benign path on Windows: there is no
+# SIGALRM, so "thread" is the only option, and its expiry calls os._exit(1). The
+# worker dies with no cleanup and no protocol shutdown, the xdist controller is
+# left waiting on a dead channel, and the survivors block forever. See
+# scripts/run-tests.ps1 for the 2026-08-19 incident.
+#
+# This bound is here to catch a genuine hang, not to police a slow test. Revisit
+# with real parallel-run durations rather than by guessing.
+timeout = 900
 timeout_method = "thread"

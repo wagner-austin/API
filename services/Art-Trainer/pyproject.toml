@@ -139,7 +139,16 @@ fail_under = 100
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-v -n auto --dist loadscope"
-timeout = 300
+# 900, not 300. This is a torch project on the same 32-thread box as
+# Model-Trainer, where the slowest test measured 99.18 s ALONE on an idle machine
+# while the bound was 300 s. Under `-n auto` each of ~31 workers also spins
+# torch's own intra-op thread pool, so the parallel case is several times slower.
+#
+# Windows has no SIGALRM, so timeout_method can only be "thread", whose expiry
+# calls os._exit(1): the worker dies with no cleanup and no protocol shutdown,
+# and the xdist controller is left waiting on a dead channel. A timeout here is
+# not a soft failure. See scripts/run-tests.ps1 for the 2026-08-19 incident.
+timeout = 900
 timeout_method = "thread"
 filterwarnings = [
     "ignore::DeprecationWarning:importlib._bootstrap",  # SWIG types from PIL/BLIP
