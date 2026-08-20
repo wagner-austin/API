@@ -271,6 +271,43 @@ def load_prepared_hf_lm_from_handle(
     )
 
 
+def load_prepared_hf_lm_from_hub(hub_model_id: str) -> PreparedLMModel:
+    """Load an untrained model straight from the hub, with no adaptation.
+
+    This is the baseline counterpart of
+    :func:`load_prepared_hf_lm_from_handle`. That one reads an artifact
+    directory and asks a finetuning strategy to reapply whatever was trained;
+    this one deliberately does neither, because a baseline is defined by having
+    nothing applied to it. The two share the tokenizer and token-id handling so
+    a baseline and an arm are scored through identical machinery.
+
+    Args:
+        hub_model_id: HuggingFace model id, for example ``gpt2-medium``.
+
+    Returns:
+        PreparedLMModel holding the untouched pretrained weights.
+    """
+    base_model = HFHooks.load_hf_model(hub_model_id)
+    hf_tokenizer = HFHooks.load_hf_tokenizer(hub_model_id)
+    eos_id, pad_id, _ = _token_ids_from_hf_tokenizer(hf_tokenizer)
+
+    return PreparedLMModel(
+        model=base_model,
+        # A baseline has no trained tokenizer of its own; the hub model's own
+        # tokenizer is the only one that matches these weights.
+        tokenizer_id=None,
+        eos_id=eos_id,
+        pad_id=pad_id,
+        max_seq_len=_get_model_max_seq_len(base_model),
+        tok_for_dataset=HFTokenizerEncoder(hf_tokenizer),
+        # No finetuning strategy was applied, which is the defining property of
+        # a baseline -- recorded as absent rather than as a "none" sentinel.
+        strategy_name=None,
+        hub_model_id=hub_model_id,
+        is_peft=False,
+    )
+
+
 def _get_model_max_seq_len(model: LMModelProto) -> int:
     """Extract max sequence length from model config.
 
@@ -306,5 +343,6 @@ def _get_model_max_seq_len(model: LMModelProto) -> int:
 __all__ = [
     "HFLMMetadata",
     "load_prepared_hf_lm_from_handle",
+    "load_prepared_hf_lm_from_hub",
     "save_prepared_hf_lm",
 ]

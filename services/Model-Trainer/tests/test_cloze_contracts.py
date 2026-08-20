@@ -24,9 +24,11 @@ from model_trainer.core.contracts.cloze import (
     encode_cloze_item_outcome,
     render_candidates,
 )
-from model_trainer.core.contracts.queue import ClozeJobPayload
+from model_trainer.core.contracts.queue import BaselineClozeJobPayload, ClozeJobPayload
 from model_trainer.core.contracts.queue_encoding import (
+    decode_baseline_cloze_job_payload,
     decode_cloze_job_payload,
+    encode_baseline_cloze_job_payload,
     encode_cloze_job_payload,
 )
 
@@ -293,3 +295,41 @@ def test_typed_dicts_construct_directly() -> None:
     assert render_candidates(item) == ["x 1", "x 2"]
     assert result["chance"] == pytest.approx(0.5)
     assert result["outcomes"][0]["item_id"] == "a"
+
+
+def _valid_baseline_payload() -> BaselineClozeJobPayload:
+    return BaselineClozeJobPayload(
+        hub_model_id="gpt2", items_file_id="file-1", max_seq_len=256, device="cpu"
+    )
+
+
+def test_baseline_job_payload_round_trips() -> None:
+    payload = _valid_baseline_payload()
+    encoded = encode_baseline_cloze_job_payload(payload)
+    assert decode_baseline_cloze_job_payload(encoded) == payload
+
+
+def test_baseline_payload_rejects_a_blank_model_id() -> None:
+    """The model id becomes half the key the result is stored under.
+
+    A blank one would produce a record nobody can identify, which is the exact
+    condition this capability exists to end, so it fails at decode.
+    """
+    encoded = encode_baseline_cloze_job_payload(_valid_baseline_payload())
+    encoded["hub_model_id"] = "   "
+    with pytest.raises(JSONTypeError):
+        decode_baseline_cloze_job_payload(encoded)
+
+
+def test_baseline_payload_rejects_a_blank_items_file_id() -> None:
+    encoded = encode_baseline_cloze_job_payload(_valid_baseline_payload())
+    encoded["items_file_id"] = ""
+    with pytest.raises(JSONTypeError):
+        decode_baseline_cloze_job_payload(encoded)
+
+
+def test_baseline_payload_rejects_a_non_positive_max_seq_len() -> None:
+    encoded = encode_baseline_cloze_job_payload(_valid_baseline_payload())
+    encoded["max_seq_len"] = 0
+    with pytest.raises(JSONTypeError):
+        decode_baseline_cloze_job_payload(encoded)

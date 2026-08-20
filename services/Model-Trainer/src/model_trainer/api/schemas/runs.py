@@ -201,6 +201,38 @@ class ClozeResponse(TypedDict, total=True):
     outcomes: list[ClozeItemOutcome] | None
 
 
+class BaselineClozeRequest(TypedDict, total=True):
+    """Request to score an untrained hub model on a cloze item set.
+
+    Names a model rather than a run, because the point is to measure what a
+    model scores having never been trained here.
+    """
+
+    hub_model_id: str
+    items_file_id: str
+    max_seq_len: int
+    device: str
+
+
+class BaselineClozeResponse(TypedDict, total=True):
+    """Response from scoring an untrained model.
+
+    Identified by the model and the item set rather than by a request id.
+    Those two fields fully determine the measurement, so a caller that asks the
+    same question twice gets the same record instead of two that could
+    disagree.
+    """
+
+    hub_model_id: str
+    items_file_id: str
+    status: Literal["queued", "running", "completed", "failed"]
+    total: int | None
+    correct: int | None
+    accuracy: float | None
+    chance: float | None
+    outcomes: list[ClozeItemOutcome] | None
+
+
 class GenerateRequest(TypedDict, total=True):
     """Request to generate text from a trained model."""
 

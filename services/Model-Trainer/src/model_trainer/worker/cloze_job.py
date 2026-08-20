@@ -39,7 +39,7 @@ from model_trainer.worker.job_utils import (
 from model_trainer.worker.manifest import as_device, as_model_family, load_manifest_from_text
 
 
-class _ClozeCacheModel(TypedDict, total=False):
+class ClozeCacheModel(TypedDict, total=False):
     """Redis-cached shape of a cloze job's lifecycle and outcome.
 
     ``outcomes`` carries the per-item records encoded by
@@ -108,7 +108,7 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
     run_id = payload["run_id"]
     request_id = payload["request_id"]
 
-    running: _ClozeCacheModel = {"status": "running"}
+    running: ClozeCacheModel = {"status": "running"}
     r.set(cloze_key(run_id, request_id), dump_json_str(running))
 
     try:
@@ -153,7 +153,7 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
         encoded_outcomes: list[JSONValue] = [
             encode_cloze_item_outcome(outcome) for outcome in result["outcomes"]
         ]
-        out: _ClozeCacheModel = {
+        out: ClozeCacheModel = {
             "status": "completed",
             "total": result["total"],
             "correct": result["correct"],
@@ -162,7 +162,7 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
             "outcomes": encoded_outcomes,
         }
     except Exception as e:
-        out_failed: _ClozeCacheModel = {"status": "failed"}
+        out_failed: ClozeCacheModel = {"status": "failed"}
         log.exception("Cloze failed run_id=%s request_id=%s error=%s", run_id, request_id, e)
         r.set(cloze_key(run_id, request_id), dump_json_str(out_failed))
         raise
@@ -178,6 +178,7 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
 
 
 __all__ = [
+    "ClozeCacheModel",
     "parse_items",
     "process_cloze_job",
 ]

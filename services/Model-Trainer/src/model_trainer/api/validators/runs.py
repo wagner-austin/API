@@ -13,6 +13,7 @@ from platform_core.validators import (
 )
 
 from ..schemas.runs import (
+    BaselineClozeRequest,
     ChatRequest,
     ClozeRequest,
     EvaluateRequest,
@@ -772,6 +773,51 @@ def _decode_cloze_request(obj: JSONValue) -> ClozeRequest:
     return ClozeRequest(items_file_id=items_file_id, max_seq_len=max_seq_len)
 
 
+def _decode_baseline_cloze_request(obj: JSONValue) -> BaselineClozeRequest:
+    """Decode and validate a request to score an untrained model.
+
+    Args:
+        obj: Parsed request body.
+
+    Returns:
+        Validated BaselineClozeRequest.
+
+    Raises:
+        AppError: With ``INVALID_INPUT`` when ``hub_model_id`` or
+            ``items_file_id`` is missing or blank, or ``max_seq_len`` falls
+            outside the supported range. Both ids are rejected blank here
+            because together they form the key the result is stored under, and
+            a blank half would produce a record nobody can identify.
+    """
+    d = load_json_dict(obj)
+
+    hub_model_id = validate_str(d.get("hub_model_id"), "hub_model_id")
+    if hub_model_id.strip() == "":
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="hub_model_id must not be blank",
+            http_status=422,
+        )
+
+    items_file_id = validate_str(d.get("items_file_id"), "items_file_id")
+    if items_file_id.strip() == "":
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="items_file_id must not be blank",
+            http_status=422,
+        )
+
+    max_seq_len = validate_int_range(d.get("max_seq_len"), "max_seq_len", ge=8, default=512)
+    device = validate_str(d.get("device"), "device") if d.get("device") is not None else "cpu"
+
+    return BaselineClozeRequest(
+        hub_model_id=hub_model_id,
+        items_file_id=items_file_id,
+        max_seq_len=max_seq_len,
+        device=device,
+    )
+
+
 def _decode_score_request(obj: JSONValue) -> ScoreRequest:
     """Decode and validate a score request."""
     d = load_json_dict(obj)
@@ -959,6 +1005,7 @@ def _decode_chat_request(obj: JSONValue) -> ChatRequest:
 
 
 __all__ = [
+    "_decode_baseline_cloze_request",
     "_decode_chat_request",
     "_decode_evaluate_request",
     "_decode_generate_request",

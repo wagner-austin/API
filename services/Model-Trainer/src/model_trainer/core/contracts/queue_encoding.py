@@ -26,7 +26,12 @@ from platform_core.json_utils import (
 )
 
 from .model import GgufExportConfig, LoraConfig, QuantizationConfig
-from .queue import ClozeJobPayload, TrainJobPayload, TrainRequestPayload
+from .queue import (
+    BaselineClozeJobPayload,
+    ClozeJobPayload,
+    TrainJobPayload,
+    TrainRequestPayload,
+)
 
 
 def encode_lora_config(config: LoraConfig) -> JSONObject:
@@ -595,6 +600,58 @@ def decode_cloze_job_payload(obj: JSONObject) -> ClozeJobPayload:
     }
 
 
+def encode_baseline_cloze_job_payload(payload: BaselineClozeJobPayload) -> JSONObject:
+    """Encode BaselineClozeJobPayload TypedDict to JSONObject for RQ serialization.
+
+    Args:
+        payload: Baseline cloze job payload to encode.
+
+    Returns:
+        JSON-serializable dictionary suitable for RQ job queue.
+    """
+    return {
+        "hub_model_id": payload["hub_model_id"],
+        "items_file_id": payload["items_file_id"],
+        "max_seq_len": payload["max_seq_len"],
+        "device": payload["device"],
+    }
+
+
+def decode_baseline_cloze_job_payload(obj: JSONObject) -> BaselineClozeJobPayload:
+    """Decode JSONObject to BaselineClozeJobPayload with full validation.
+
+    Args:
+        obj: JSON object to decode.
+
+    Returns:
+        Validated BaselineClozeJobPayload TypedDict.
+
+    Raises:
+        JSONTypeError: If required fields are missing, have wrong types, if
+            ``max_seq_len`` is not positive, or if ``hub_model_id`` is blank.
+            A blank model id is rejected here rather than downstream because it
+            would otherwise become part of a Redis key and produce a record
+            nobody can identify.
+    """
+    hub_model_id = require_str(obj, "hub_model_id")
+    if hub_model_id.strip() == "":
+        raise JSONTypeError("Field 'hub_model_id' must not be blank")
+    items_file_id = require_str(obj, "items_file_id")
+    if items_file_id.strip() == "":
+        raise JSONTypeError("Field 'items_file_id' must not be blank")
+    max_seq_len = require_int(obj, "max_seq_len")
+    if max_seq_len <= 0:
+        raise JSONTypeError(f"Field 'max_seq_len' must be positive, got {max_seq_len}")
+    device = require_str(obj, "device")
+
+    return {
+        "hub_model_id": hub_model_id,
+        "items_file_id": items_file_id,
+        "max_seq_len": max_seq_len,
+        "device": device,
+    }
+
+
 def encode_train_job_payload(payload: TrainJobPayload) -> JSONObject:
     """Encode TrainJobPayload TypedDict to JSONObject for RQ serialization.
 
@@ -644,12 +701,14 @@ def decode_train_job_payload(obj: JSONObject) -> TrainJobPayload:
 
 
 __all__ = [
+    "decode_baseline_cloze_job_payload",
     "decode_cloze_job_payload",
     "decode_gguf_export_config",
     "decode_lora_config",
     "decode_quantization_config",
     "decode_train_job_payload",
     "decode_train_request_payload",
+    "encode_baseline_cloze_job_payload",
     "encode_cloze_job_payload",
     "encode_gguf_export_config",
     "encode_lora_config",

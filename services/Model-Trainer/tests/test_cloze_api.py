@@ -16,13 +16,17 @@ from fastapi.testclient import TestClient
 from platform_core.errors import AppError, ErrorCode, ModelTrainerErrorCode
 from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str, load_json_str
-from platform_core.trainer_keys import cloze_key
+from platform_core.trainer_keys import baseline_cloze_key, cloze_key
 from platform_workers.redis import RedisBytesProto, _RedisBytesClient
 from platform_workers.rq_harness import RQClientQueue, RQRetryLike
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
 
 from model_trainer.api.routes import runs as runs_routes
-from model_trainer.api.validators.runs import _decode_cloze_request
+from model_trainer.api.schemas.runs import BaselineClozeRequest
+from model_trainer.api.validators.runs import (
+    _decode_baseline_cloze_request,
+    _decode_cloze_request,
+)
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import load_settings
 from model_trainer.core.services.container import ServiceContainer
@@ -292,4 +296,219 @@ class TestClozeRoutes:
     def test_get_cloze_missing_returns_404(self) -> None:
         client, _ = self._make_client()
         res = client.get("/runs/run123/cloze/absent", headers={"X-API-Key": "test-key"})
+        assert res.status_code == 404
+
+
+class TestBaselineClozeRequestValidator:
+    def test_defaults_max_seq_len_and_device(self) -> None:
+        """Device defaults to cpu because a baseline is cheap and often local."""
+        req = _decode_baseline_cloze_request({"hub_model_id": "gpt2", "items_file_id": "file-1"})
+        assert req["hub_model_id"] == "gpt2"
+        assert req["max_seq_len"] == 512
+        assert req["device"] == "cpu"
+
+    def test_accepts_explicit_max_seq_len_and_device(self) -> None:
+        req = _decode_baseline_cloze_request(
+            {
+                "hub_model_id": "gpt2-medium",
+                "items_file_id": "file-1",
+                "max_seq_len": 128,
+                "device": "cuda",
+            }
+        )
+        assert req["max_seq_len"] == 128
+        assert req["device"] == "cuda"
+
+    def test_rejects_blank_hub_model_id(self) -> None:
+        """Blank halves of the identity are rejected at the edge.
+
+        The model id becomes part of the key the result is stored under, so a
+        blank one would produce a record nobody can identify.
+        """
+        with pytest.raises(AppError) as excinfo:
+            _decode_baseline_cloze_request({"hub_model_id": "  ", "items_file_id": "file-1"})
+        err: AppError[ErrorCode] = excinfo.value
+        assert err.code == ErrorCode.INVALID_INPUT
+
+    def test_rejects_blank_items_file_id(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            _decode_baseline_cloze_request({"hub_model_id": "gpt2", "items_file_id": " "})
+        err: AppError[ErrorCode] = excinfo.value
+        assert err.code == ErrorCode.INVALID_INPUT
+
+
+class TestBaselineClozeOrchestrator:
+    def _make_orchestrator(self) -> tuple[InferenceOrchestrator, FakeRedis, FakeQueue]:
+        queue = _install_fakes()
+        redis = FakeRedis()
+        enq = RQEnqueuer("redis://ignored", RQSettings(60, 300, 300, 1, [30]))
+        orch = InferenceOrchestrator(settings=load_settings(), redis_client=redis, enqueuer=enq)
+        return orch, redis, queue
+
+    def test_enqueue_records_under_the_baseline_key_not_a_run_key(self) -> None:
+        """The identity is the model and the item set, so there is no request id."""
+        orch, redis, queue = self._make_orchestrator()
+
+        out = orch.enqueue_baseline_cloze(
+            {
+                "hub_model_id": "gpt2",
+                "items_file_id": "file-1",
+                "max_seq_len": 128,
+                "device": "cpu",
+            }
+        )
+
+        assert out["status"] == "queued"
+        assert out["hub_model_id"] == "gpt2"
+        assert out["items_file_id"] == "file-1"
+        assert len(queue.jobs) == 1
+        assert (
+            queue.jobs[0].func
+            == "model_trainer.worker.baseline_cloze_job.process_baseline_cloze_job"
+        )
+        assert queue.jobs[0].description == "baseline-cloze:gpt2:file-1"
+
+        cached = redis.get(baseline_cloze_key("gpt2", "file-1"))
+        if not isinstance(cached, str):
+            raise AssertionError(f"expected cached str, got {type(cached)}")
+        obj = load_json_str(cached)
+        if not isinstance(obj, dict):
+            raise AssertionError(f"expected dict, got {type(obj)}")
+        assert obj["status"] == "queued"
+        redis.assert_only_called({"set", "get"})
+
+    def test_asking_twice_addresses_one_record(self) -> None:
+        """Two requests for the same pair must not produce two measurements.
+
+        Asserted as the second enqueue overwriting the same key, because a
+        scheme keyed by request id would leave two records that could disagree
+        about what the same model scored on the same items.
+        """
+        orch, redis, queue = self._make_orchestrator()
+        req: BaselineClozeRequest = {
+            "hub_model_id": "gpt2",
+            "items_file_id": "file-1",
+            "max_seq_len": 128,
+            "device": "cpu",
+        }
+
+        first = orch.enqueue_baseline_cloze(req)
+        second = orch.enqueue_baseline_cloze(req)
+
+        assert first["hub_model_id"] == second["hub_model_id"]
+        assert first["items_file_id"] == second["items_file_id"]
+        assert len(queue.jobs) == 2
+        # Both writes addressed the same key, so the second measurement
+        # replaces the first rather than sitting beside it.
+        written = {call.args[0] for call in redis.get_calls("set")}
+        assert written == {baseline_cloze_key("gpt2", "file-1")}
+
+    def test_get_returns_completed_counts(self) -> None:
+        orch, redis, _ = self._make_orchestrator()
+        cache: dict[str, JSONValue] = {
+            "status": "completed",
+            "total": 2627,
+            "correct": 1374,
+            "accuracy": 0.523,
+            "chance": 0.25,
+        }
+        redis.set(baseline_cloze_key("gpt2", "file-1"), dump_json_str(cache))
+
+        out = orch.get_baseline_cloze("gpt2", "file-1")
+
+        assert out["status"] == "completed"
+        assert out["total"] == 2627
+        assert out["accuracy"] == pytest.approx(0.523)
+        assert out["hub_model_id"] == "gpt2"
+
+    def test_get_on_an_unmeasured_pair_raises_rather_than_returning_empty(self) -> None:
+        """ "Never measured" must not be readable as "measured zero".
+
+        A caller that treated absence as a result would publish a baseline that
+        does not exist, which is the defect this capability was built to end.
+        """
+        orch, _, _ = self._make_orchestrator()
+
+        with pytest.raises(AppError) as excinfo:
+            orch.get_baseline_cloze("gpt2", "never-scored")
+
+        err: AppError[ModelTrainerErrorCode] = excinfo.value
+        assert err.code == ModelTrainerErrorCode.DATA_NOT_FOUND
+        assert "never-scored" in str(err)
+
+
+class TestBaselineClozeRoutes:
+    def _make_client(self) -> tuple[TestClient, FakeRedis]:
+        _install_fakes()
+        s = load_settings()
+        r = FakeRedis()
+        ds = LocalTextDatasetBuilder()
+        enq = RQEnqueuer("redis://ignored", RQSettings(60, 300, 300, 1, [30]))
+        model_reg = ModelRegistry(registrations={}, dataset_builder=ds)
+        container = ServiceContainer(
+            settings=s,
+            redis=r,
+            rq_enqueuer=enq,
+            training_orchestrator=TrainingOrchestrator(
+                settings=s, redis_client=r, enqueuer=enq, model_registry=model_reg
+            ),
+            inference_orchestrator=InferenceOrchestrator(settings=s, redis_client=r, enqueuer=enq),
+            conversation_orchestrator=ConversationOrchestrator(
+                settings=s, redis_client=r, enqueuer=enq
+            ),
+            tokenizer_orchestrator=TokenizerOrchestrator(settings=s, redis_client=r, enqueuer=enq),
+            model_registry=model_reg,
+            tokenizer_registry=TokenizerRegistry(backends={}),
+            dataset_builder=ds,
+        )
+        app = FastAPI()
+        app.include_router(runs_routes.build_router(container), prefix="/runs")
+        install_exception_handlers_fastapi(app, logger_name="test", request_id_var=None)
+        return TestClient(app), r
+
+    def test_post_baseline_cloze_enqueues(self) -> None:
+        """`baselines` must route to the baseline handler, not be read as a run id.
+
+        The literal segment only wins over the /{run_id}/ parameter because it
+        is registered first, so this also pins that ordering.
+        """
+        client, _ = self._make_client()
+
+        res = client.post(
+            "/runs/baselines/cloze",
+            headers={"X-API-Key": "test-key"},
+            content=dump_json_str({"hub_model_id": "gpt2", "items_file_id": "file-1"}),
+        )
+
+        assert res.status_code == 200
+        parsed = load_json_str(res.text)
+        if not isinstance(parsed, dict):
+            raise AssertionError(f"expected dict body, got {type(parsed)}")
+        assert parsed["hub_model_id"] == "gpt2"
+        assert parsed["status"] == "queued"
+
+    def test_get_baseline_cloze_returns_the_recorded_score(self) -> None:
+        client, redis = self._make_client()
+        cache: dict[str, JSONValue] = {
+            "status": "completed",
+            "total": 2627,
+            "correct": 1374,
+            "accuracy": 0.523,
+            "chance": 0.25,
+            "outcomes": [{"item_id": "page::1", "correct": True, "scores": [1.0, 3.0]}],
+        }
+        redis.set(baseline_cloze_key("gpt2", "file-1"), dump_json_str(cache))
+
+        res = client.get("/runs/baselines/gpt2/cloze/file-1", headers={"X-API-Key": "test-key"})
+
+        assert res.status_code == 200
+        parsed = load_json_str(res.text)
+        if not isinstance(parsed, dict):
+            raise AssertionError(f"expected dict body, got {type(parsed)}")
+        assert parsed["total"] == 2627
+        assert parsed["hub_model_id"] == "gpt2"
+
+    def test_get_baseline_cloze_missing_returns_404(self) -> None:
+        client, _ = self._make_client()
+        res = client.get("/runs/baselines/gpt2/cloze/absent", headers={"X-API-Key": "test-key"})
         assert res.status_code == 404

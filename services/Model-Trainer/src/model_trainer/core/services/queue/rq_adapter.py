@@ -10,6 +10,7 @@ from platform_workers.rq_harness import RQClientQueue, RQJobLike
 from ... import _test_hooks
 from ...contracts.conversation import ChatJobPayload
 from ...contracts.queue import (
+    BaselineClozeJobPayload,
     ClozeJobPayload,
     EvalJobPayload,
     GenerateJobPayload,
@@ -17,7 +18,10 @@ from ...contracts.queue import (
     TokenizerTrainPayload,
     TrainJobPayload,
 )
-from ...contracts.queue_encoding import encode_train_job_payload
+from ...contracts.queue_encoding import (
+    encode_baseline_cloze_job_payload,
+    encode_train_job_payload,
+)
 
 
 class RQSettings:
@@ -178,6 +182,31 @@ class RQEnqueuer:
             failure_ttl=self.settings.failure_ttl_sec,
             retry=retry,
             description=f"cloze:{payload['run_id']}:{payload['request_id']}",
+        )
+        return job.get_id()
+
+    def enqueue_baseline_cloze(self: RQEnqueuer, payload: BaselineClozeJobPayload) -> str:
+        """Enqueue a baseline cloze job for an untrained hub model.
+
+        Args:
+            payload: Job payload naming the model, item set, budget and device.
+
+        Returns:
+            Job ID string for tracking the enqueued job.
+        """
+        conn = self._connection()
+        q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
+        retry = _test_hooks.rq_retry_factory(
+            max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
+        )
+        job: RQJobLike = q.enqueue(
+            "model_trainer.worker.baseline_cloze_job.process_baseline_cloze_job",
+            encode_baseline_cloze_job_payload(payload),
+            job_timeout=self.settings.job_timeout_sec,
+            result_ttl=self.settings.result_ttl_sec,
+            failure_ttl=self.settings.failure_ttl_sec,
+            retry=retry,
+            description=f"baseline-cloze:{payload['hub_model_id']}:{payload['items_file_id']}",
         )
         return job.get_id()
 

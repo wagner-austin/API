@@ -11,10 +11,18 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 from platform_core.logging import get_logger
-from platform_core.trainer_keys import cloze_key, generate_key, score_key
+from platform_core.trainer_keys import (
+    baseline_cloze_key,
+    cloze_key,
+    generate_key,
+    score_key,
+)
 from platform_workers.redis import RedisStrProto
+from typing_extensions import TypedDict
 
 from ..api.schemas.runs import (
+    BaselineClozeRequest,
+    BaselineClozeResponse,
     ClozeRequest,
     ClozeResponse,
     GenerateRequest,
@@ -24,7 +32,12 @@ from ..api.schemas.runs import (
 )
 from ..core.config.settings import Settings
 from ..core.contracts.cloze import ClozeItemOutcome, decode_cloze_item_outcome
-from ..core.contracts.queue import ClozeJobPayload, GenerateJobPayload, ScoreJobPayload
+from ..core.contracts.queue import (
+    BaselineClozeJobPayload,
+    ClozeJobPayload,
+    GenerateJobPayload,
+    ScoreJobPayload,
+)
 from ..core.infra.redis_utils import get_with_retry, set_with_retry
 from ..core.services.queue.rq_adapter import RQEnqueuer
 
@@ -57,6 +70,72 @@ def _narrow_status(status_v: JSONValue) -> Literal["queued", "running", "complet
     if status_v == "completed":
         return "completed"
     return "failed"
+
+
+class _ScoredCloze(TypedDict):
+    """The parts of a cloze cache entry that a run and a baseline share."""
+
+    status: Literal["queued", "running", "completed", "failed"]
+    total: int | None
+    correct: int | None
+    accuracy: float | None
+    chance: float | None
+    outcomes: list[ClozeItemOutcome] | None
+
+
+def _decode_cloze_cache(raw: str) -> _ScoredCloze:
+    """Decode a cloze cache entry, whether it came from a run or a baseline.
+
+    Both write the same shape, so both read it through here rather than each
+    keeping a copy that could drift on what counts as corrupt.
+
+    Args:
+        raw: The cached JSON string.
+
+    Returns:
+        The status and, once the job has finished, the counts and per-item
+        outcomes.
+
+    Raises:
+        AppError: With ``DATA_NOT_FOUND`` when the entry is not a JSON object,
+            or carries an ``outcomes`` field that is not a list.
+    """
+    obj = load_json_str(raw)
+    if not isinstance(obj, dict):
+        raise AppError(
+            ModelTrainerErrorCode.DATA_NOT_FOUND,
+            "cloze cache corrupt",
+            model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
+        )
+
+    total_v = obj.get("total")
+    correct_v = obj.get("correct")
+    accuracy_v = obj.get("accuracy")
+    chance_v = obj.get("chance")
+    outcomes_v = obj.get("outcomes")
+
+    # A cache entry written before the job finished carries no outcomes, so
+    # absence is a normal lifecycle state rather than corruption. Anything
+    # present, however, is decoded strictly: a malformed record must surface
+    # as an error rather than reach a caller as a silently shortened list.
+    outcomes: list[ClozeItemOutcome] | None = None
+    if outcomes_v is not None:
+        if not isinstance(outcomes_v, list):
+            raise AppError(
+                ModelTrainerErrorCode.DATA_NOT_FOUND,
+                "cloze cache outcomes is not a list",
+                model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
+            )
+        outcomes = [decode_cloze_item_outcome(narrow_json_to_dict(entry)) for entry in outcomes_v]
+
+    return {
+        "status": _narrow_status(obj.get("status")),
+        "total": total_v if isinstance(total_v, int) else None,
+        "correct": correct_v if isinstance(correct_v, int) else None,
+        "accuracy": float(accuracy_v) if isinstance(accuracy_v, int | float) else None,
+        "chance": float(chance_v) if isinstance(chance_v, int | float) else None,
+        "outcomes": outcomes,
+    }
 
 
 class InferenceOrchestrator:
@@ -194,44 +273,110 @@ class InferenceOrchestrator:
                 model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
             )
 
-        obj = load_json_str(str(raw))
-        if not isinstance(obj, dict):
+        scored = _decode_cloze_cache(raw)
+        return {
+            "request_id": request_id,
+            "status": scored["status"],
+            "total": scored["total"],
+            "correct": scored["correct"],
+            "accuracy": scored["accuracy"],
+            "chance": scored["chance"],
+            "outcomes": scored["outcomes"],
+        }
+
+    def enqueue_baseline_cloze(
+        self: InferenceOrchestrator, req: BaselineClozeRequest
+    ) -> BaselineClozeResponse:
+        """Enqueue a cloze scoring job for an untrained hub model.
+
+        Args:
+            req: The model, item set, token budget and device.
+
+        Returns:
+            Response echoing the model and item set with a queued status. There
+            is no request id: the pair already identifies the measurement.
+        """
+        payload: BaselineClozeJobPayload = {
+            "hub_model_id": req["hub_model_id"],
+            "items_file_id": req["items_file_id"],
+            "max_seq_len": req["max_seq_len"],
+            "device": req["device"],
+        }
+
+        _ = self._enq.enqueue_baseline_cloze(payload)
+
+        cache: dict[str, JSONValue] = {
+            "status": "queued",
+            "total": None,
+            "correct": None,
+            "accuracy": None,
+            "chance": None,
+        }
+        set_with_retry(
+            self._redis,
+            baseline_cloze_key(req["hub_model_id"], req["items_file_id"]),
+            dump_json_str(cache),
+        )
+
+        _logger.info(
+            "baseline cloze enqueued",
+            extra={
+                "category": "inference",
+                "service": "orchestrator",
+                "hub_model_id": req["hub_model_id"],
+                "items_file_id": req["items_file_id"],
+                "event": "baseline_cloze_enqueued",
+            },
+        )
+
+        return {
+            "hub_model_id": req["hub_model_id"],
+            "items_file_id": req["items_file_id"],
+            "status": "queued",
+            "total": None,
+            "correct": None,
+            "accuracy": None,
+            "chance": None,
+            "outcomes": None,
+        }
+
+    def get_baseline_cloze(
+        self: InferenceOrchestrator, hub_model_id: str, items_file_id: str
+    ) -> BaselineClozeResponse:
+        """Get an untrained model's score on an item set.
+
+        Args:
+            hub_model_id: The model that was scored.
+            items_file_id: The item set it was scored on.
+
+        Returns:
+            Current status and, once completed, the counts and accuracy.
+
+        Raises:
+            AppError: With ``DATA_NOT_FOUND`` when this model has never been
+                scored on this item set. That is an error rather than an empty
+                result, because a caller treating "never measured" as "measured
+                zero" would silently publish a baseline that does not exist.
+        """
+        raw = get_with_retry(self._redis, baseline_cloze_key(hub_model_id, items_file_id))
+        if raw is None:
             raise AppError(
                 ModelTrainerErrorCode.DATA_NOT_FOUND,
-                "cloze cache corrupt",
+                f"no baseline recorded for model '{hub_model_id}' on item set "
+                f"'{items_file_id}'; score it first",
                 model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
             )
 
-        total_v = obj.get("total")
-        correct_v = obj.get("correct")
-        accuracy_v = obj.get("accuracy")
-        chance_v = obj.get("chance")
-        outcomes_v = obj.get("outcomes")
-
-        # A cache entry written before the job finished carries no outcomes, so
-        # absence is a normal lifecycle state rather than corruption. Anything
-        # present, however, is decoded strictly: a malformed record must surface
-        # as an error rather than reach a caller as a silently shortened list.
-        outcomes: list[ClozeItemOutcome] | None = None
-        if outcomes_v is not None:
-            if not isinstance(outcomes_v, list):
-                raise AppError(
-                    ModelTrainerErrorCode.DATA_NOT_FOUND,
-                    "cloze cache outcomes is not a list",
-                    model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
-                )
-            outcomes = [
-                decode_cloze_item_outcome(narrow_json_to_dict(entry)) for entry in outcomes_v
-            ]
-
+        scored = _decode_cloze_cache(raw)
         return {
-            "request_id": request_id,
-            "status": _narrow_status(obj.get("status")),
-            "total": total_v if isinstance(total_v, int) else None,
-            "correct": correct_v if isinstance(correct_v, int) else None,
-            "accuracy": float(accuracy_v) if isinstance(accuracy_v, int | float) else None,
-            "chance": float(chance_v) if isinstance(chance_v, int | float) else None,
-            "outcomes": outcomes,
+            "hub_model_id": hub_model_id,
+            "items_file_id": items_file_id,
+            "status": scored["status"],
+            "total": scored["total"],
+            "correct": scored["correct"],
+            "accuracy": scored["accuracy"],
+            "chance": scored["chance"],
+            "outcomes": scored["outcomes"],
         }
 
     def get_score(self: InferenceOrchestrator, run_id: str, request_id: str) -> ScoreResponse:

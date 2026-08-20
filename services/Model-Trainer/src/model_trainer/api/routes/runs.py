@@ -19,6 +19,8 @@ from ...core.services.container import ServiceContainer
 from ..middleware import api_key_dependency
 from ..schemas.runs import (
     ArtifactPointerResponse,
+    BaselineClozeRequest,
+    BaselineClozeResponse,
     CancelResponse,
     ChatHistoryResponse,
     ChatRequest,
@@ -37,6 +39,7 @@ from ..schemas.runs import (
     TrainResponse,
 )
 from ..validators.runs import (
+    _decode_baseline_cloze_request,
     _decode_chat_request,
     _decode_cloze_request,
     _decode_generate_request,
@@ -390,6 +393,46 @@ class _RunsRoutes:
             "outcomes": out["outcomes"],
         }
 
+    async def enqueue_baseline_cloze(self: _RunsRoutes, request: Request) -> BaselineClozeResponse:
+        """Score an untrained hub model on a cloze item set.
+
+        Takes no run id: the point is to measure a model that was never trained
+        here, which is the floor every trained arm's accuracy is read against.
+
+        Args:
+            request: Request whose body names the model, items, budget, device.
+
+        Returns:
+            BaselineClozeResponse with a queued status.
+        """
+        raw_body = await request.body()
+        from platform_core.json_utils import load_json_str
+
+        body = load_json_str(raw_body.decode("utf-8"))
+        req: BaselineClozeRequest = _decode_baseline_cloze_request(body)
+        extra: LoggingExtra = {
+            "category": "api",
+            "service": "runs",
+            "run_id": req["hub_model_id"],
+            "event": "baselines_enqueue_cloze",
+        }
+        _logger.info("baselines enqueue cloze", extra=extra)
+        return self.c.inference_orchestrator.enqueue_baseline_cloze(req)
+
+    def get_baseline_cloze(
+        self: _RunsRoutes, hub_model_id: str, items_file_id: str
+    ) -> BaselineClozeResponse:
+        """Get an untrained model's recorded score on an item set.
+
+        Args:
+            hub_model_id: The model that was scored.
+            items_file_id: The item set it was scored on.
+
+        Returns:
+            BaselineClozeResponse with the status and, once done, the counts.
+        """
+        return self.c.inference_orchestrator.get_baseline_cloze(hub_model_id, items_file_id)
+
     def get_cloze(self: _RunsRoutes, run_id: str, request_id: str) -> ClozeResponse:
         orchestrator = self.c.inference_orchestrator
         out = orchestrator.get_cloze(run_id, request_id)
@@ -533,6 +576,15 @@ def build_router(container: ServiceContainer) -> APIRouter:
     router = APIRouter(dependencies=[api_dep])
     h = _RunsRoutes(container)
     router.add_api_route("/train", h.start_training, methods=["POST"])
+    # Baseline routes come before every /{run_id}/... pattern: a literal path
+    # segment only wins over a parameter when it is registered first, and
+    # "baselines" would otherwise be accepted as a run id.
+    router.add_api_route("/baselines/cloze", h.enqueue_baseline_cloze, methods=["POST"])
+    router.add_api_route(
+        "/baselines/{hub_model_id}/cloze/{items_file_id}",
+        h.get_baseline_cloze,
+        methods=["GET"],
+    )
     router.add_api_route("/{run_id}", h.run_status, methods=["GET"])
     router.add_api_route("/{run_id}/progress", h.run_progress, methods=["GET"])
     router.add_api_route("/{run_id}/evaluate", h.run_evaluate, methods=["POST"])

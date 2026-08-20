@@ -399,3 +399,33 @@ def test_rq_enqueuer_methods() -> None:
         _test_hooks.rq_queue_factory = orig_queue
         _test_hooks.rq_retry_factory = orig_retry
         _test_hooks.rq_connection_factory = orig_conn
+
+
+def test_a_baseline_cloze_job_is_enqueued_against_the_model_not_a_run(
+    rq_fakes: _Fakes,
+) -> None:
+    """The description must name the model and item set, because there is no run.
+
+    That description is the only human-readable handle on the job in the queue,
+    and a baseline carries no run id to fall back on.
+    """
+    enq = RQEnqueuer(redis_url="redis://localhost/0", settings=_settings())
+
+    enq.enqueue_baseline_cloze(
+        {
+            "hub_model_id": "gpt2",
+            "items_file_id": "file-1",
+            "max_seq_len": 128,
+            "device": "cpu",
+        }
+    )
+
+    last = rq_fakes.queue.last
+    if last is None:
+        raise AssertionError("expected an enqueue call")
+    func_ref, payload, kwargs = last
+    assert func_ref == "model_trainer.worker.baseline_cloze_job.process_baseline_cloze_job"
+    assert kwargs["description"] == "baseline-cloze:gpt2:file-1"
+    if not isinstance(payload, dict):
+        raise AssertionError(f"expected payload dict, got {type(payload)}")
+    assert payload["hub_model_id"] == "gpt2"

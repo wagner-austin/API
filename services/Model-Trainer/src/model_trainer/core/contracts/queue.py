@@ -109,6 +109,27 @@ class ClozeJobPayload(TypedDict):
     max_seq_len: int
 
 
+class BaselineClozeJobPayload(TypedDict):
+    """Payload for scoring an untrained model on a cloze item set.
+
+    Carries no run id and no request id, unlike :class:`ClozeJobPayload`. A
+    baseline is fully identified by which model was scored and which items it
+    was scored on, so those two fields are the identity and asking twice is the
+    same question rather than a second measurement.
+
+    Attributes:
+        hub_model_id: HuggingFace model id scored with no training applied.
+        items_file_id: Data-bank file holding the newline-delimited item set.
+        max_seq_len: Token budget each rendered candidate is truncated to.
+        device: Torch device string the scoring tensors are placed on.
+    """
+
+    hub_model_id: str
+    items_file_id: str
+    max_seq_len: int
+    device: str
+
+
 class ScoreJobPayload(TypedDict):
     """Payload for score inference job."""
 

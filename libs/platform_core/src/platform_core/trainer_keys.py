@@ -9,6 +9,7 @@ MSG_KEY_PREFIX: Final[str] = "runs:message:"
 ARTIFACT_FILE_ID_PREFIX: Final[str] = "runs:artifact:"
 CANCEL_KEY_PREFIX: Final[str] = "runs:"
 JOB_ID_KEY_PREFIX: Final[str] = "runs:job:"
+BASELINE_CLOZE_KEY_PREFIX: Final[str] = "baselines:cloze:"
 SCORE_KEY_PREFIX: Final[str] = "runs:score:"
 CLOZE_KEY_PREFIX: Final[str] = "runs:cloze:"
 GENERATE_KEY_PREFIX: Final[str] = "runs:gen:"
@@ -39,6 +40,26 @@ def artifact_file_id_key(run_id: str) -> str:
 
 def cancel_key(run_id: str) -> str:
     return f"{CANCEL_KEY_PREFIX}{run_id}:cancelled"
+
+
+def baseline_cloze_key(hub_model_id: str, items_file_id: str) -> str:
+    """Key holding an untrained model's cloze score on one item set.
+
+    Keyed by what identifies the measurement rather than by a request id: a
+    baseline is fully determined by which model was scored and which items it
+    was scored on, so asking twice is the same question and must not produce
+    two records that could disagree. This is deliberately a different namespace
+    from ``cloze_key`` -- a baseline is not a run, and must never be readable
+    as one.
+
+    Args:
+        hub_model_id: HuggingFace model id that was scored.
+        items_file_id: Data-bank file id of the item set.
+
+    Returns:
+        The Redis key holding the baseline result.
+    """
+    return f"{BASELINE_CLOZE_KEY_PREFIX}{hub_model_id}:{items_file_id}"
 
 
 def job_id_key(run_id: str) -> str:
@@ -84,6 +105,7 @@ def progress_key(run_id: str) -> str:
 
 __all__ = [
     "ARTIFACT_FILE_ID_PREFIX",
+    "BASELINE_CLOZE_KEY_PREFIX",
     "CANCEL_KEY_PREFIX",
     "CLOZE_KEY_PREFIX",
     "CONVERSATION_KEY_PREFIX",
@@ -97,6 +119,7 @@ __all__ = [
     "SCORE_KEY_PREFIX",
     "STATUS_KEY_PREFIX",
     "artifact_file_id_key",
+    "baseline_cloze_key",
     "cancel_key",
     "cloze_key",
     "conversation_key",

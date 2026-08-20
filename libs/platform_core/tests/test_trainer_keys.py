@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from platform_core.trainer_keys import (
     ARTIFACT_FILE_ID_PREFIX,
+    BASELINE_CLOZE_KEY_PREFIX,
     CANCEL_KEY_PREFIX,
     CLOZE_KEY_PREFIX,
     CONVERSATION_KEY_PREFIX,
@@ -15,6 +16,7 @@ from platform_core.trainer_keys import (
     SCORE_KEY_PREFIX,
     STATUS_KEY_PREFIX,
     artifact_file_id_key,
+    baseline_cloze_key,
     cancel_key,
     cloze_key,
     conversation_key,
@@ -48,6 +50,7 @@ def test_trainer_key_helpers() -> None:
     assert conversation_meta_key(rid, session_id) == expected_conversation_meta_key
     assert progress_key(rid) == f"{PROGRESS_KEY_PREFIX}{rid}"
     assert job_id_key(rid) == f"{JOB_ID_KEY_PREFIX}{rid}"
+    assert baseline_cloze_key("gpt2", "f1") == f"{BASELINE_CLOZE_KEY_PREFIX}gpt2:f1"
 
 
 def test_job_id_key_does_not_collide_with_the_cancel_key() -> None:
@@ -59,3 +62,14 @@ def test_job_id_key_does_not_collide_with_the_cancel_key() -> None:
     rid = "r1"
     assert job_id_key(rid) != cancel_key(rid)
     assert job_id_key(rid) != status_key(rid)
+
+
+def test_baseline_cloze_key_is_not_in_the_run_namespace() -> None:
+    """A baseline is not a run and must never be readable as one.
+
+    Both key families concern the same measurement type, so the separation is
+    asserted rather than assumed: a baseline that collided into `runs:cloze:`
+    would appear in the run ledger as if something had trained.
+    """
+    assert not baseline_cloze_key("gpt2", "f1").startswith("runs:")
+    assert baseline_cloze_key("gpt2", "f1") != cloze_key("gpt2", "f1")
