@@ -30,6 +30,14 @@ from model_trainer.core.contracts.model import (
 )
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 
+# Size tables for the capability declarations below. They live in a neutral
+# module rather than inside the backend packages because those packages'
+# __init__ re-export their whole backend -- importing any submodule of one
+# executes train, which imports base_trainer, which is the cycle
+# tests/test_import_cycles.py guards. That is also why every other backend
+# import in this module is deferred into a function.
+from .model_sizes import CHAR_LSTM_MODEL_SIZES, GPT2_MODEL_SIZES
+
 
 class EvalResultProto(Protocol):
     """Protocol for evaluation result from backend evaluate functions."""
@@ -256,14 +264,23 @@ def create_backend(
     return _FactoryBackend(funcs, dataset_builder, caps)
 
 
-# Capabilities declarations for each backend
+# Capabilities declarations for each backend.
+#
+# `supported_sizes` is DERIVED from each backend's size table, never hand-written.
+# When it was a literal maintained alongside the table, the two drifted in both
+# directions and nothing compared them: GPT-2 advertised a "tiny" its table did
+# not implement (a bare KeyError for anyone who believed the advertisement) and
+# hid an "xl" it did implement, while char_lstm advertised only ("small",) while
+# implementing tiny and medium as well. Deriving makes both failures
+# unrepresentable rather than merely detectable. Enforced by the
+# `capability-sizes-derived` guard rule.
 GPT2_CAPABILITIES: BackendCapabilities = {
     "supports_train": True,
     "supports_evaluate": True,
     "supports_score": True,
     "supports_generate": True,
     "supports_distributed": False,
-    "supported_sizes": ("tiny", "small", "medium", "large"),
+    "supported_sizes": tuple(GPT2_MODEL_SIZES),
 }
 
 CHAR_LSTM_CAPABILITIES: BackendCapabilities = {
@@ -272,7 +289,7 @@ CHAR_LSTM_CAPABILITIES: BackendCapabilities = {
     "supports_score": True,
     "supports_generate": True,
     "supports_distributed": False,
-    "supported_sizes": ("small",),
+    "supported_sizes": tuple(CHAR_LSTM_MODEL_SIZES),
 }
 
 

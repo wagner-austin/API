@@ -7,29 +7,12 @@ return strictly typed values with no Any, cast, or type: ignore.
 
 from __future__ import annotations
 
-from typing import Final, Protocol
+from typing import Protocol
 
-from typing_extensions import TypedDict
+from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 
+from model_trainer.core.services.model.model_sizes import GPT2_MODEL_SIZES as MODEL_SIZES
 from model_trainer.core.types import LMModelProto
-
-
-class GPT2ModelSizeConfig(TypedDict, total=True):
-    """Configuration for GPT-2 model architecture by size."""
-
-    hidden_size: int
-    n_layer: int
-    n_head: int
-
-
-# GPT-2 model size configurations
-# Reference: https://huggingface.co/docs/transformers/model_doc/gpt2
-MODEL_SIZES: Final[dict[str, GPT2ModelSizeConfig]] = {
-    "small": {"hidden_size": 768, "n_layer": 12, "n_head": 12},  # ~124M params
-    "medium": {"hidden_size": 1024, "n_layer": 24, "n_head": 16},  # ~355M params
-    "large": {"hidden_size": 1280, "n_layer": 36, "n_head": 20},  # ~774M params
-    "xl": {"hidden_size": 1600, "n_layer": 48, "n_head": 25},  # ~1.5B params
-}
 
 
 class GPT2ConfigProto(Protocol):
@@ -105,15 +88,25 @@ def create_gpt2_config(
     Args:
         vocab_size: Size of the vocabulary (from tokenizer).
         max_seq_len: Maximum sequence length (n_positions).
-        model_size: One of "small", "medium", "large", "xl".
+        model_size: One of "tiny", "small", "medium", "large", "xl".
 
     Returns:
         A GPT2Config instance with the specified architecture.
 
     Raises:
-        KeyError: If model_size is not a valid size key.
+        AppError: If model_size is not a valid size key.
     """
-    size_config = MODEL_SIZES[model_size]
+    # Was a bare ``MODEL_SIZES[model_size]``. An unknown size therefore escaped as
+    # KeyError -- an untyped 500 for what is a caller mistake -- while char_lstm's
+    # equivalent lookup had always raised AppError(INVALID_MODEL_SIZE). Same error
+    # code here so the two backends reject an unknown size identically.
+    size_config = MODEL_SIZES.get(model_size)
+    if size_config is None:
+        raise AppError(
+            ModelTrainerErrorCode.INVALID_MODEL_SIZE,
+            "invalid model_size for gpt2",
+            model_trainer_status_for(ModelTrainerErrorCode.INVALID_MODEL_SIZE),
+        )
     config_cls = _get_gpt2_config_class()
     return config_cls(
         vocab_size=vocab_size,
@@ -137,13 +130,14 @@ def create_gpt2_model(
     Args:
         vocab_size: Size of the vocabulary (from tokenizer).
         max_seq_len: Maximum sequence length (n_positions).
-        model_size: One of "small", "medium", "large", "xl".
+        model_size: One of "tiny", "small", "medium", "large", "xl".
 
     Returns:
         A newly initialized GPT2LMHeadModel conforming to LMModelProto.
 
     Raises:
-        KeyError: If model_size is not a valid size key.
+        AppError: If model_size is not a valid size key. Propagated from
+            create_gpt2_config, which is where the size is resolved.
     """
     config = create_gpt2_config(
         vocab_size=vocab_size,

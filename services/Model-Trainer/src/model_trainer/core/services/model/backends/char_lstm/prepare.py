@@ -5,6 +5,9 @@ from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_
 from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoder
+from model_trainer.core.services.model.model_sizes import (
+    CHAR_LSTM_MODEL_SIZES as MODEL_SIZES,
+)
 
 from .io import encoder_from_handle, token_ids
 from .model import CharLSTM, CharLSTMModel
@@ -12,17 +15,14 @@ from .model import CharLSTM, CharLSTMModel
 
 def _size_to_dims(size: str) -> tuple[int, int, int, float]:
     # Returns (embed_dim, hidden_dim, num_layers, dropout)
-    if size == "tiny":
-        return 128, 256, 2, 0.10
-    if size == "small":
-        return 256, 512, 2, 0.10
-    if size == "medium":
-        return 384, 768, 3, 0.10
-    raise AppError(
-        ModelTrainerErrorCode.INVALID_MODEL_SIZE,
-        "invalid model_size for char_lstm",
-        model_trainer_status_for(ModelTrainerErrorCode.INVALID_MODEL_SIZE),
-    )
+    cfg = MODEL_SIZES.get(size)
+    if cfg is None:
+        raise AppError(
+            ModelTrainerErrorCode.INVALID_MODEL_SIZE,
+            "invalid model_size for char_lstm",
+            model_trainer_status_for(ModelTrainerErrorCode.INVALID_MODEL_SIZE),
+        )
+    return cfg["embed_dim"], cfg["hidden_dim"], cfg["num_layers"], cfg["dropout"]
 
 
 def _encoder_for_dataset(tok: TokenizerHandle) -> Encoder:

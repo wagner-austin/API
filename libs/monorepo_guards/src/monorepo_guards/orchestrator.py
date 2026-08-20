@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from monorepo_guards import Rule, RuleReport, Violation
+from monorepo_guards.capability_rules import CapabilityDerivationRule
 from monorepo_guards.config import GuardConfig
 from monorepo_guards.config_helpers_rules import ConfigHelpersRule
 from monorepo_guards.config_loader import _decode_monorepo_guard_config
@@ -70,6 +71,7 @@ def _run_with_config(config: GuardConfig) -> int:
         HookDispatchRule(),
         WeakAssertionRule(),
         MLTestQualityRule(),
+        CapabilityDerivationRule(),
         FakeRedisRule(),
         MockBanRule(),
         MonkeyPatchBanRule(),

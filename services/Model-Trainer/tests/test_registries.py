@@ -9,8 +9,15 @@ from model_trainer.core.services.dataset.local_text_builder import LocalTextData
 from model_trainer.core.services.model.backend_factory import (
     CHAR_LSTM_CAPABILITIES,
     GPT2_CAPABILITIES,
+    HF_LM_CAPABILITIES,
     create_char_lstm_backend,
     create_gpt2_backend,
+)
+from model_trainer.core.services.model.backends.char_lstm.prepare import _size_to_dims
+from model_trainer.core.services.model.backends.gpt2.hf_gpt2 import create_gpt2_config
+from model_trainer.core.services.model.model_sizes import (
+    CHAR_LSTM_MODEL_SIZES,
+    GPT2_MODEL_SIZES,
 )
 from model_trainer.core.services.model.unavailable_backend import (
     UNAVAILABLE_CAPABILITIES,
@@ -137,7 +144,11 @@ def test_backend_capabilities_values() -> None:
     assert GPT2_CAPABILITIES["supports_score"] is True
     assert GPT2_CAPABILITIES["supports_generate"] is True
     assert GPT2_CAPABILITIES["supports_distributed"] is False
-    assert GPT2_CAPABILITIES["supported_sizes"] == ("tiny", "small", "medium", "large")
+    # Asserted as a RELATION against the implementation, not as a copy of the
+    # literal. The previous form (== a hand-typed tuple) proved only that the
+    # constant was what someone typed, and passed happily while the registry
+    # advertised a "tiny" the table did not implement and hid an "xl" it did.
+    assert GPT2_CAPABILITIES["supported_sizes"] == tuple(GPT2_MODEL_SIZES)
 
     # CharLSTM capabilities
     assert CHAR_LSTM_CAPABILITIES["supports_train"] is True
@@ -145,7 +156,7 @@ def test_backend_capabilities_values() -> None:
     assert CHAR_LSTM_CAPABILITIES["supports_score"] is True
     assert CHAR_LSTM_CAPABILITIES["supports_generate"] is True
     assert CHAR_LSTM_CAPABILITIES["supports_distributed"] is False
-    assert CHAR_LSTM_CAPABILITIES["supported_sizes"] == ("small",)
+    assert CHAR_LSTM_CAPABILITIES["supported_sizes"] == tuple(CHAR_LSTM_MODEL_SIZES)
 
     # Unavailable capabilities
     assert UNAVAILABLE_CAPABILITIES["supports_train"] is False
@@ -178,10 +189,62 @@ def test_factory_backend_capabilities() -> None:
     assert caps["supports_score"] is True
     assert caps["supports_generate"] is True
     assert caps["supports_distributed"] is False
-    assert caps["supported_sizes"] == ("tiny", "small", "medium", "large")
+    assert caps["supported_sizes"] == tuple(GPT2_MODEL_SIZES)
 
 
 def test_tokenizer_registry_missing() -> None:
     reg = TokenizerRegistry(backends={})
     with pytest.raises(AppError):
         _ = reg.get("nope")
+
+
+# --- Capability declarations must be true, not merely well-formed -------------
+#
+# The tests above assert each capability against the implementation it describes.
+# These assert the advertisement END TO END: every size a backend advertises must
+# actually resolve. That is the check the original defect needed -- the registry
+# advertised a GPT-2 "tiny" that was absent from the size table, so the only way
+# to find out was to ask for it and take a bare KeyError.
+
+
+def test_every_advertised_gpt2_size_resolves() -> None:
+    """Each advertised GPT-2 size builds a config with the table's architecture."""
+    advertised = GPT2_CAPABILITIES["supported_sizes"]
+    assert advertised, "GPT-2 must advertise at least one size"
+    for size in advertised:
+        cfg = create_gpt2_config(vocab_size=128, max_seq_len=16, model_size=size)
+        expected = GPT2_MODEL_SIZES[size]
+        assert cfg.n_embd == expected["hidden_size"]
+        assert cfg.n_layer == expected["n_layer"]
+        assert cfg.n_head == expected["n_head"]
+
+
+def test_unknown_gpt2_size_raises_apperror() -> None:
+    """An unadvertised size is a typed rejection, not a bare KeyError."""
+    with pytest.raises(AppError):
+        _ = create_gpt2_config(vocab_size=128, max_seq_len=16, model_size="gargantuan")
+
+
+def test_every_advertised_char_lstm_size_resolves() -> None:
+    """Each advertised char-LSTM size resolves to the table's dimensions."""
+    advertised = CHAR_LSTM_CAPABILITIES["supported_sizes"]
+    assert advertised, "char_lstm must advertise at least one size"
+    for size in advertised:
+        expected = CHAR_LSTM_MODEL_SIZES[size]
+        assert _size_to_dims(size) == (
+            expected["embed_dim"],
+            expected["hidden_dim"],
+            expected["num_layers"],
+            expected["dropout"],
+        )
+
+
+def test_unknown_char_lstm_size_raises_apperror() -> None:
+    with pytest.raises(AppError):
+        _ = _size_to_dims("gargantuan")
+
+
+def test_sizeless_backends_advertise_no_sizes() -> None:
+    """hf_lm takes its size from hub_model_id, so an empty tuple is the honest claim."""
+    assert HF_LM_CAPABILITIES["supported_sizes"] == ()
+    assert UNAVAILABLE_CAPABILITIES["supported_sizes"] == ()

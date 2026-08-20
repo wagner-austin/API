@@ -23,7 +23,8 @@ def prepare_gpt2_with_handle(
 
     Raises:
         ValueError: If tokenizer is None or tokenizer_id is None.
-        KeyError: If model_size in cfg is not valid.
+        AppError: If model_size in cfg is not valid. Propagated from
+            create_gpt2_config, which resolves the size.
     """
     if tokenizer is None:
         raise ValueError("tokenizer is required for gpt2 backend")
