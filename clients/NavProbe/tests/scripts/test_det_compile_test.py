@@ -54,6 +54,11 @@ class TestCompileGate:
         """A mode that compiles and steps is the record this gate writes."""
         assert main(["RUN_TO_RUN", "cache"]) == 0
 
+    def test_opts_out_of_power_throttling(self, harness: Harness) -> None:
+        """The gate records a cold-codegen wall time, so it is a measurement."""
+        main(["RUN_TO_RUN", "cache"])
+        assert harness.opt_out.calls == 1
+
     def test_passes_the_mode_and_a_zero_record_bound(self, harness: Harness) -> None:
         """The gate tests compilation, so it leaves the bound at Warp's own."""
         main(["GPU_TO_GPU", "fresh"])

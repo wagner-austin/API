@@ -196,6 +196,22 @@ class RecordingWriter:
         raise AssertionError(f"no document with banner {banner!r} in {self.chunks!r}")
 
 
+class RecordingOptOut:
+    """Records that the power-throttling opt-out was requested.
+
+    A fake rather than the real call because the real one alters the *test
+    worker's* power state, which would leak into every later test in that
+    worker and quietly change what the suite is measured under.
+    """
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self) -> None:
+        """Record one request."""
+        self.calls += 1
+
+
 class SteppingClock:
     """A monotonic clock that advances a fixed amount per reading.
 

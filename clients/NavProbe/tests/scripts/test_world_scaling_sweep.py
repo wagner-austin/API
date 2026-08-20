@@ -95,6 +95,15 @@ class TestScalingRun:
         """A completed ladder exits clean."""
         assert main(["RUN_TO_RUN", "cache", "64", "256", "2", "64"]) == 0
 
+    def test_opts_out_of_power_throttling_before_timing_anything(self, harness: Harness) -> None:
+        """This ladder IS a wall-clock measurement; the opt-out is the point.
+
+        Without it the throughput figures mix two power regimes, which is
+        exactly why the published curve had to be marked provisional.
+        """
+        main(["RUN_TO_RUN", "cache", "64", "256", "2"])
+        assert harness.opt_out.calls == 1
+
     def test_runs_every_rung_in_order(self, harness: Harness) -> None:
         """The ladder's order is the curve's x-axis."""
         main(["RUN_TO_RUN", "cache", "64", "256", "2", "64", "512"])

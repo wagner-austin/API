@@ -18,6 +18,7 @@ from tests.scripts.vendor import (
     FakeInitWarp,
     FakeWarpRuntime,
     RecordingFactoryConstructor,
+    RecordingOptOut,
     RecordingWriter,
     SteppingClock,
 )
@@ -42,6 +43,7 @@ class Harness:
         init_warp: The initialiser, recording the configuration asked for.
         construct: The factory constructor, recording its arguments.
         writer: Everything the script wrote.
+        opt_out: Records that power throttling was opted out of.
     """
 
     def __init__(
@@ -50,11 +52,13 @@ class Harness:
         init_warp: FakeInitWarp,
         construct: RecordingFactoryConstructor,
         writer: RecordingWriter,
+        opt_out: RecordingOptOut,
     ) -> None:
         self.runtime = runtime
         self.init_warp = init_warp
         self.construct = construct
         self.writer = writer
+        self.opt_out = opt_out
 
 
 def install(deterministic: bool) -> Harness:
@@ -70,11 +74,13 @@ def install(deterministic: bool) -> Harness:
     init_warp = FakeInitWarp(runtime)
     construct = RecordingFactoryConstructor(runtime, deterministic)
     writer = RecordingWriter()
+    opt_out = RecordingOptOut()
+    _test_hooks.opt_out_of_power_throttling = opt_out
     _test_hooks.init_warp = init_warp
     _test_hooks.load_state_factory = lambda: construct
     _test_hooks.write_out = writer
     _test_hooks.monotonic = SteppingClock(CLOCK_STEP)
-    return Harness(runtime, init_warp, construct, writer)
+    return Harness(runtime, init_warp, construct, writer, opt_out)
 
 
 @pytest.fixture()
@@ -89,6 +95,7 @@ def harness() -> Generator[Harness, None, None]:
         _test_hooks.load_state_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
+        _test_hooks.opt_out_of_power_throttling,
     )
     yield install(deterministic=True)
     (
@@ -96,6 +103,7 @@ def harness() -> Generator[Harness, None, None]:
         _test_hooks.load_state_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
+        _test_hooks.opt_out_of_power_throttling,
     ) = saved
 
 
@@ -114,6 +122,7 @@ def drifting_harness() -> Generator[Harness, None, None]:
         _test_hooks.load_state_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
+        _test_hooks.opt_out_of_power_throttling,
     )
     yield install(deterministic=False)
     (
@@ -121,4 +130,5 @@ def drifting_harness() -> Generator[Harness, None, None]:
         _test_hooks.load_state_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
+        _test_hooks.opt_out_of_power_throttling,
     ) = saved

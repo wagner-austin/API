@@ -17,8 +17,10 @@ below.** A three-line alias patch clears the block, and under `RUN_TO_RUN` all t
 by default — reproduce bit for bit ([[tactile-alias-patch-clears-warp-deterministic-compile]]).
 So the failures below are real, reachable by anyone running the shipped package, and
 **fixable**: they describe the default, not a limit of the hardware or the solver. What
-that costs is [[deterministic-mode-cost-falls-with-scale]] — 5x at small parallelism,
-falling to 3x at 4096 worlds and still falling.
+that costs is [[deterministic-mode-cost-falls-with-scale]]: a few-fold slowdown that
+*falls* as parallelism rises. Read the direction, not the numbers — that ladder's
+figures were measured on a solve the contact buffer had silently truncated, and its
+wall clocks move by up to 4x with host load.
 
 **The headline results so far**, all in the default mode. Three separate reproducibility failures, none of which a simple benchmark would surface. Read the figures as instances rather than constants — every precise number below moved when re-measured on a different scene, while every shape held ([[the-numbers-are-scene-dependent-the-shapes-replicate]]):
 

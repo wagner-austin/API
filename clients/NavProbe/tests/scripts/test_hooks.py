@@ -16,6 +16,7 @@ and a Protocol that had drifted from Warp would fail only at measurement time.
 
 from __future__ import annotations
 
+import ctypes
 from pathlib import Path
 
 import pytest
@@ -34,8 +35,20 @@ class TestHookSurface:
         Asserting the whole sorted set rather than membership means a new hook
         cannot be introduced without a decision recorded here.
         """
-        exported = sorted(name for name in _test_hooks.__all__ if not name.endswith("Protocol"))
-        assert exported == ["init_warp", "load_state_factory", "monotonic", "write_out"]
+        exported = sorted(
+            name
+            for name in _test_hooks.__all__
+            if not name.endswith(("Protocol", "Error", "State")) and name.islower()
+        )
+        assert exported == [
+            "disable_power_throttling",
+            "init_warp",
+            "load_state_factory",
+            "monotonic",
+            "opt_out_of_power_throttling",
+            "win32_process_information_setter",
+            "write_out",
+        ]
 
     def test_binds_every_hook_at_import(self) -> None:
         """Production wires nothing; the bindings are live on import.
@@ -49,6 +62,94 @@ class TestHookSurface:
             callable(_test_hooks.write_out),
             callable(_test_hooks.monotonic),
         ] == [True, True, True, True]
+
+
+class TestPowerThrottlingOptOut:
+    """The Win32 opt-out that decides what every wall clock here reads."""
+
+    def test_requests_never_throttle_rather_than_always(self) -> None:
+        """The encoding is one bit away from requesting the opposite.
+
+        ``ControlMask = EXECUTION_SPEED`` with ``StateMask = 0`` means "never
+        throttle"; setting ``StateMask`` to ``EXECUTION_SPEED`` instead means
+        "always throttle". Asserted rather than left to review, because both
+        spellings are accepted by Windows and only one of them is a
+        measurement.
+        """
+        seen: list[tuple[int, int, int]] = []
+
+        def setter(version: int, control_mask: int, state_mask: int) -> int:
+            seen.append((version, control_mask, state_mask))
+            return 0
+
+        _test_hooks.disable_power_throttling(setter)
+        assert seen == [(_test_hooks.STATE_VERSION, _test_hooks.EXECUTION_SPEED, 0)]
+
+    def test_raises_when_the_platform_refuses(self) -> None:
+        """There is no fallback: an un-opted-out run times two power regimes."""
+
+        def refusing(version: int, control_mask: int, state_mask: int) -> int:
+            return 87
+
+        with pytest.raises(_test_hooks.PowerThrottlingError) as caught:
+            _test_hooks.disable_power_throttling(refusing)
+        assert caught.value.code == "NP-POWER-001"
+
+    def test_carries_the_win32_code_in_the_message(self) -> None:
+        """A refusal is only actionable if it says what Windows returned."""
+
+        def refusing(version: int, control_mask: int, state_mask: int) -> int:
+            return 87
+
+        with pytest.raises(_test_hooks.PowerThrottlingError) as caught:
+            _test_hooks.disable_power_throttling(refusing)
+        assert "win32 87" in caught.value.message
+
+    def test_the_state_structure_matches_the_win32_layout(self) -> None:
+        """Three ULONGs, twelve bytes.
+
+        A wrong size is the failure mode that bit this monorepo already: a
+        hardcoded struct length made SetInformationJobObject return
+        ERROR_BAD_LENGTH while the surrounding call still succeeded, so the
+        protection looked applied and was not.
+        """
+        state = _test_hooks.PowerThrottlingState(Version=1, ControlMask=1, StateMask=0)
+        assert ctypes.sizeof(state) == 12
+
+    def test_the_real_boundary_reports_success_as_zero(self) -> None:
+        """A valid request is accepted, and accepted is spelled ``0``."""
+        code = _test_hooks.win32_process_information_setter(
+            _test_hooks.STATE_VERSION, _test_hooks.EXECUTION_SPEED, 0
+        )
+        assert code == 0
+
+    def test_the_real_boundary_reports_a_refusal_as_a_win32_code(self) -> None:
+        """The refusal path, exercised against Windows rather than a fake.
+
+        An unsupported struct version is rejected with
+        ``ERROR_INVALID_PARAMETER`` (87) and changes nothing about the
+        process, which makes it the one way to reach this branch honestly. The
+        branch matters because it is what turns a silent no-op into
+        ``NP-POWER-001``: Windows signals refusal by return value, and a
+        setter that dropped it would leave every sweep timing a throttled
+        process while reporting success.
+        """
+        code = _test_hooks.win32_process_information_setter(
+            _test_hooks.STATE_VERSION + 998, _test_hooks.EXECUTION_SPEED, 0
+        )
+        assert code == 87
+
+    def test_the_real_win32_call_is_accepted_by_this_host(self) -> None:
+        """The production path works on the machine the sweeps run on.
+
+        This calls the real API and opts this worker out for the rest of its
+        life, which is harmless -- the effect is what a measurement wants
+        anyway. It is the only way to know the boundary works, since the state
+        cannot be read back: a throttled process and an opted-out one report
+        identical state, so the sweeps apply this blind and a silent refusal
+        would put us back where the cost curve started.
+        """
+        _test_hooks.opt_out_of_power_throttling()
 
 
 class TestWriteOut:

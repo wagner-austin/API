@@ -155,6 +155,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ValueError: When Warp does not recognise the requested device.
     """
     invocation = parse_invocation(list(sys.argv[1:]) if argv is None else argv)
+    _test_hooks.opt_out_of_power_throttling()
     warp = _test_hooks.init_warp(invocation.mode_name, invocation.cache_dir, invocation.max_records)
     device_label = str(warp.get_device(invocation.device))
     construct = _test_hooks.load_state_factory()

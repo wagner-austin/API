@@ -7,7 +7,7 @@ source_paths:
   - "scripts/det_compile_test.py"
 source_git_blobs:
   "scripts/apply_tactile_alias_patch.py": "a5c27614e81318fe95f5160e5049651dc313ebde"
-  "scripts/det_compile_test.py": "2703c59d1f88cd393a0f0a386761679c53b13b87"
+  "scripts/det_compile_test.py": "17aa86fa60ab29175b7921ec5721ae7a7b42d95d"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"
@@ -80,6 +80,15 @@ The first GPU attempt died at the 32-body separated scene with `RuntimeError: De
 ## The cost: 3.3x to 7.1x at this instrument's scale, worst where the coupling is worst
 
 Measured on the freed GPU (trainer finished, 0 % baseline utilisation): each mode run twice in sequence with a shared kernel cache, and the warm second runs compared per scene. Default mode: 12.6 to 20.3 s per scene. `RUN_TO_RUN`: 42 to 137 s. Ratios 3.3 to 5.2x on the separated family, 3.5 to 7.1x on the touching family — **the deterministic path is most expensive in exactly the coupled scenes it exists to fix** (6.4 to 7.1x at touching 6/8/32), consistent with record buffering and sorting scaling with contact coupling. Overall warm-total ratio 5.07x.
+
+These figures ran at `constraint_capacity = 8192` and the archived logs carry **zero**
+contact-buffer overflows, so unlike the world-count ladder
+([[deterministic-mode-cost-falls-with-scale]]) they measure the full solve. What they
+share with it is the weaker caveat: they are single-shot wall clocks taken on a shared
+workstation whose idleness was verified at the GPU but not at the host CPU, and a
+2026-08-20 re-measurement showed host load alone moving comparable timings by up to 4x.
+The ratio is better protected than an absolute time would be, since both arms ran in one
+session minutes apart, but it has not been repeated.
 
 Two qualifiers keep this from being a universal number. The per-scene wall includes per-scene model construction and cache loads, not pure stepping. And `world_count = 2` barely occupies an RTX 3090 Ti: Warp's own published table shows the sort-and-reduce path *gaining* on atomics as contention rises, so at RL-scale world counts the ratio could move substantially in either direction. This is the instrument's cost, honestly bounded, not MJWarp's cost in general.
 

@@ -5,7 +5,7 @@ related: ["[[the-numbers-are-scene-dependent-the-shapes-replicate]]", "[[mjwarp-
 source_paths:
   - "wiki/log.md"
 source_git_blobs:
-  "wiki/log.md": "eb66a54b50f0447fbecf791c2b4510fd0aa1c1b8"
+  "wiki/log.md": "20eba9cae9593fd848609201e15f9c2d2bba09a8"
 fact_checked: 2026-08-19
 confidence: high
 hubs: [instrument-design]
@@ -75,6 +75,40 @@ The coupled-body boundary sits at five or six bodies depending on the harness. N
 The raycaster adds no run-to-run variance of its own ([[the-raycaster-inherits-nondeterminism-it-does-not-create-it]]), measured by freezing a state and re-rendering it. It has not been measured while the *physics* is irreproducible — which is the case any real manipulation scene would be in.
 
 **What would answer it:** a rendered trial on a coupled-body scene above the threshold, comparing whether the rendered divergence tracks the state divergence exactly or exceeds it.
+
+## 7. What does deterministic mode actually cost? (the published answer is unsound)
+
+Listed last because it is a methodology gap rather than a physics unknown, but it
+invalidates a published page, so it is not low priority.
+
+[[deterministic-mode-cost-falls-with-scale]] reports a cost curve measured over
+world counts. An attempted re-measurement on 2026-08-20 found three problems with
+it, two of which are fatal to the numbers:
+
+- **The solve was truncated.** Every rung ran at `constraint_capacity = 256`, and
+  the archived log carries 5,232 `broadphase overflow` warnings asking for roughly
+  581. MuJoCo-Warp reports the overflow as a warning, so the ladder completed and
+  reported throughput for less work than the scene specifies. The capacity had been
+  chosen so 4096 worlds would *fit*, not so the scene would *solve*.
+- **The wall clocks are not reproducible.** The same ladder re-run came back 1.2x to
+  4.0x slower per rung, with a non-monotonic curve (64 worlds slower than 512),
+  because a SIRIUS job was holding 68% CPU throughout. Each rung is timed **once**.
+- **Power throttling was not the cause**, despite this wiki briefly saying so. It did
+  not reproduce when measured directly here.
+
+The cost figures on [[tactile-alias-patch-clears-warp-deterministic-compile]] are in
+better shape: they ran at capacity 8192 with **zero** overflows, so they measure the
+full solve, and both arms ran minutes apart in one session, which protects a ratio
+better than an absolute. They are still single-shot.
+
+**What would answer it:** re-run the ladder with (a) a capacity that does not overflow
+— roughly 1024, verified by grepping the run's own log for `broadphase overflow` rather
+than by trusting the setting, (b) repetitions per rung with the **minimum** reported,
+since the minimum is the sample least contaminated by whatever else the machine was
+doing, and (c) an idle host, verified by total CPU load and not merely by GPU
+utilisation, which is the check that missed SIRIUS. If (a) forces a lower ceiling than
+4096 worlds on 24 GiB, report the lower ceiling: a ladder that stops at 512 with a
+complete solve says more than one that reaches 4096 with a truncated one.
 
 ## What is *not* open
 

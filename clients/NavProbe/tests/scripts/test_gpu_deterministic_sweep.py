@@ -91,6 +91,15 @@ class TestSweepRun:
         """A completed sweep exits clean."""
         assert main(["RUN_TO_RUN", "cache"]) == 0
 
+    def test_opts_out_of_power_throttling_before_timing_anything(self, harness: Harness) -> None:
+        """Otherwise the wall clocks mix two power regimes.
+
+        This is the defect that made the published cost curve provisional, so
+        the wiring is asserted rather than assumed present.
+        """
+        main(["RUN_TO_RUN", "cache"])
+        assert harness.opt_out.calls == 1
+
     def test_passes_the_configuration_to_warp(self, harness: Harness) -> None:
         """The mode, cache directory and record bound reach the initialiser."""
         main(["RUN_TO_RUN", "cache-dir", "64"])
