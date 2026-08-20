@@ -12,6 +12,7 @@ rules of undocumented systems and prove the inferred model matches reality.
 | [DiscordBot](./DiscordBot) | Discord bot with slash commands for QR codes, transcripts, digit recognition, and model training | qr-api, transcript-api, handwriting-ai, model-trainer |
 | [TankpitBot](./TankpitBot) | System identification against an undocumented network protocol — CDP capture, XOR codec, live probes, provenance-carrying beliefs, archive-priced validators, server twin | (standalone) |
 | [RustedWarfareBot](./RustedWarfareBot) | System identification against an obfuscated binary — JVM bytecode injection, build-pinned engine claims, doctrine-controlled experiments, seeded reproducible matches | (standalone) |
+| [NavProbe](./NavProbe) | Reproducibility instrument for simulated navigation — seeded rollouts, canonical digests, determinism verdicts across MJX and MuJoCo-Warp | (standalone) |
 
 ### The instruments
 

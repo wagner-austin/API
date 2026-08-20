@@ -2,15 +2,15 @@
 
 Typed Python monorepo for ML training, NLP, media services, and quant-ML risk modeling. Strict mypy (no `Any`, no `cast`, no `type: ignore`), 100% statement + branch test coverage, FastAPI + RQ + Redis + Kafka architecture.
 
-## For recruiters — start here
+## Start here
 
-If evaluating this repo, read these three (15 min total):
+The three parts of this repo worth reading first:
 
-1. **[`libs/cleargbm/`](libs/cleargbm)** + **[`libs/cleargbm_rs/`](libs/cleargbm_rs)** — From-scratch interpretable gradient boosting: numpy Python orchestration with a Rust core (histogram building, tree construction, prediction pipeline) exposed via PyO3 bindings. Rare skill demo.
-2. **[`services/covenant-radar-api/`](services/covenant-radar-api)** + **[`libs/covenant_ml/`](libs/covenant_ml)** + **[`libs/covenant_nn/`](libs/covenant_nn)** — Multi-model risk prediction: pluggable ML backends (XGBoost, LightGBM, ClearGBM, LogReg, RF) and PyTorch NN backends (MLP, LSTM), Optuna optimization, Kafka streaming. Quant-ML shop quality.
-3. **[`libs/monorepo_guards/`](libs/monorepo_guards)** — Custom static-analysis framework: 31 architecture-enforcement rules (Python + Rust) that lint invariants CI-time. Enforcement-as-code pattern.
+1. **[`libs/cleargbm/`](libs/cleargbm)** + **[`libs/cleargbm_rs/`](libs/cleargbm_rs)** — From-scratch interpretable gradient boosting: numpy Python orchestration with a Rust core (histogram building, tree construction, prediction pipeline) exposed via PyO3 bindings.
+2. **[`services/covenant-radar-api/`](services/covenant-radar-api)** + **[`libs/covenant_ml/`](libs/covenant_ml)** + **[`libs/covenant_nn/`](libs/covenant_nn)** — Multi-model risk prediction: pluggable ML backends (XGBoost, LightGBM, ClearGBM, LogReg, RF) and PyTorch NN backends (MLP, LSTM), Optuna optimization, Kafka streaming.
+3. **[`libs/monorepo_guards/`](libs/monorepo_guards)** — Custom static-analysis framework: architecture-enforcement rules (Python + Rust) that lint invariants CI-time.
 
-Skip: hobby services (`grandma-api`, `github-stats-api`, `procart-api`) unless curious.
+The smaller services (`grandma-api`, `github-stats-api`, `procart-api`) are side projects.
 
 ## Services
 
@@ -57,7 +57,7 @@ Skip: hobby services (`grandma-api`, `github-stats-api`, `procart-api`) unless c
 | [platform_langid](libs/platform_langid) | Spoken language identification from audio using Meta MMS-LID |
 | [platform_translate](libs/platform_translate) | Text translation with pluggable backends (Anthropic, OpenAI) |
 | [instrument_io](libs/instrument_io) | Scientific instrument data format readers and writers (mass spec, mzML, Excel, PDF) |
-| [monorepo_guards](libs/monorepo_guards) | Code quality rules (31 static analysis checks, Python + Rust) |
+| [monorepo_guards](libs/monorepo_guards) | Code quality rules (34 static analysis checks, Python + Rust) |
 | [covenant_domain](libs/covenant_domain) | Loan covenant domain models and rule engine |
 | [covenant_ml](libs/covenant_ml) | Classification and regression backends (XGBoost, LightGBM, ClearGBM, LogReg, RF) with Optuna, temporal/NetCDF features |
 | [covenant_nn](libs/covenant_nn) | PyTorch neural network backends (MLP, LSTM) for classification and regression |
