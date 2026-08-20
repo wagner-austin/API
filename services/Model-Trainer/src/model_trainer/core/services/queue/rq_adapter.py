@@ -95,6 +95,21 @@ class RQEnqueuer:
         )
         return job.get_id()
 
+    def remove_queued_job(self: RQEnqueuer, job_id: str) -> bool:
+        """Remove a still-pending job from the queue.
+
+        Args:
+            job_id: The queue job id to remove.
+
+        Returns:
+            True when the job was pending and is now gone; False when it was
+            not in the queue, which means a worker had already taken it and
+            the job must be stopped by the cancellation flag instead.
+        """
+        conn = self._connection()
+        q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
+        return q.remove(job_id) > 0
+
     def enqueue_eval(self: RQEnqueuer, payload: EvalJobPayload) -> str:
         conn = self._connection()
         q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)

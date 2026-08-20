@@ -385,7 +385,32 @@ class TestFakeQueue:
             result_ttl=3600,
             failure_ttl=86400,
             description="test job",
+            job_id="test-job-id",
         )
+
+    def test_remove_drops_a_pending_job_and_reports_one(self) -> None:
+        queue = FakeQueue("job-a")
+        _ = queue.enqueue("my.func")
+
+        assert queue.remove("job-a") == 1
+        assert queue.jobs == []
+
+    def test_remove_reports_zero_when_no_pending_job_matches(self) -> None:
+        """The count is how a caller tells "dequeued it" from "too late"."""
+        queue = FakeQueue("job-a")
+        _ = queue.enqueue("my.func")
+
+        assert queue.remove("job-b") == 0
+        assert len(queue.jobs) == 1
+
+    def test_remove_drops_exactly_one_entry_when_ids_repeat(self) -> None:
+        """RQ issues LREM with a count of 1, so the fake must not clear all."""
+        queue = FakeQueue("job-a")
+        _ = queue.enqueue("first")
+        _ = queue.enqueue("second")
+
+        assert queue.remove("job-a") == 1
+        assert [job.func for job in queue.jobs] == ["second"]
 
     def test_enqueue_with_custom_job_id(self) -> None:
         queue = FakeQueue("custom-job")
@@ -548,7 +573,8 @@ class TestNamedTuples:
         assert m2.args == ("key",)
 
     def test_enqueued_job_fields(self) -> None:
-        e = EnqueuedJob("func", ("a",), 60, 3600, 86400, "desc")
+        e = EnqueuedJob("func", ("a",), 60, 3600, 86400, "desc", "job-1")
+        assert e.job_id == "job-1"
         assert e.func == "func"
         assert e.args == ("a",)
         assert e.job_timeout == 60

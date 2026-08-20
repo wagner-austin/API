@@ -347,10 +347,15 @@ class _RunsRoutes:
         return {"run_id": out["run_id"], "job_id": out["job_id"]}
 
     def cancel_run(self: _RunsRoutes, run_id: str) -> CancelResponse:
-        r = self.c.redis
-        from platform_core.trainer_keys import cancel_key
+        """Cancel a run, dequeueing its job when it has not started yet.
 
-        r.set(cancel_key(run_id), "1")
+        Args:
+            run_id: Training run identifier.
+
+        Returns:
+            CancelResponse saying whether the job was removed from the queue
+            or a running worker was asked to stop.
+        """
         extra5: LoggingExtra = {
             "category": "api",
             "service": "runs",
@@ -358,7 +363,7 @@ class _RunsRoutes:
             "event": "runs_cancel",
         }
         _logger.info("runs cancel", extra=extra5)
-        return CancelResponse(status="cancellation-requested")
+        return self.c.training_orchestrator.cancel(run_id)
 
     async def enqueue_cloze(self: _RunsRoutes, run_id: str, request: Request) -> ClozeResponse:
         raw_body = await request.body()

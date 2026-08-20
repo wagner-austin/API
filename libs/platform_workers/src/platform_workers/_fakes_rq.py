@@ -77,6 +77,7 @@ class EnqueuedJob(NamedTuple):
     result_ttl: int | None
     failure_ttl: int | None
     description: str | None
+    job_id: str
 
 
 class FakeQueue:
@@ -105,9 +106,30 @@ class FakeQueue:
                 result_ttl=result_ttl,
                 failure_ttl=failure_ttl,
                 description=description,
+                job_id=self._job_id,
             )
         )
         return FakeJob(self._job_id)
+
+    def remove(self, job_or_id: str) -> int:
+        """Drop one pending job with the given id, as RQ's LREM does.
+
+        Exactly one entry is removed even when several share an id, because
+        the real queue is a Redis list and ``remove`` issues ``LREM key 1 id``.
+        A fake that cleared every match would let a test pass against
+        behaviour the queue does not have.
+
+        Args:
+            job_or_id: The job id to remove.
+
+        Returns:
+            1 when a pending job was removed, 0 when none matched.
+        """
+        for index, job in enumerate(self.jobs):
+            if job.job_id == job_or_id:
+                del self.jobs[index]
+                return 1
+        return 0
 
 
 # =============================================================================

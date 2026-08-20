@@ -92,4 +92,5 @@ def test_orchestrator_threads_user_id() -> None:
     user_id = _get_payload_user_id(job.args[0])
     assert user_id == 42
 
-    r.assert_only_called({"hset", "delete"})
+    # The `set` records the run's queue job id, so a later cancel can dequeue it.
+    r.assert_only_called({"hset", "delete", "set"})

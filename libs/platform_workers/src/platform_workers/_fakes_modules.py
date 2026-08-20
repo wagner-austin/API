@@ -138,6 +138,7 @@ class _FakeRQQueueInternal:
         self.name = name
         self.connection = connection
         self._job_id = "fake-job-id"
+        self._pending: list[str] = []
 
     def enqueue(
         self,
@@ -149,7 +150,23 @@ class _FakeRQQueueInternal:
         retry: RQRetryLike | None = None,
         description: str | None = None,
     ) -> _RQJobInternal:
-        return _FakeRQJob(f"job-{func_ref}")
+        job_id = f"job-{func_ref}"
+        self._pending.append(job_id)
+        return _FakeRQJob(job_id)
+
+    def remove(self, job_or_id: str) -> int:
+        """Drop one pending job id, as RQ's LREM-backed remove does.
+
+        Args:
+            job_or_id: The job id to remove.
+
+        Returns:
+            1 when a pending job was removed, 0 when none matched.
+        """
+        if job_or_id not in self._pending:
+            return 0
+        self._pending.remove(job_or_id)
+        return 1
 
 
 class _FakeRQWorkerInternal:

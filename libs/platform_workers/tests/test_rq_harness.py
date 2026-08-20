@@ -107,6 +107,34 @@ def test_rq_worker_work_wrapper() -> None:
     assert did_work is True
 
 
+def test_rq_queue_remove_forwards_to_the_underlying_queue() -> None:
+    """The adapter must pass the id through and return RQ's own count.
+
+    That count is the only thing distinguishing "removed it before a worker
+    took it" from "too late, it is already running", so an adapter that
+    swallowed it would make the cancel path unable to tell the caller which
+    happened.
+    """
+    from platform_workers import rq_harness as rh
+
+    rq_hook, _rq_module = make_fake_load_rq_module()
+    hooks.load_rq_module = rq_hook
+
+    conn = FakeRedisBytesClient()
+    queue = rh.rq_queue("test", conn)
+    job = queue.enqueue("my.func")
+
+    assert queue.remove(job.get_id()) == 1
+    assert queue.remove(job.get_id()) == 0
+
+
+def test_internal_fake_queue_remove_reports_zero_for_an_unknown_id() -> None:
+    conn = FakeRedisBytesClient()
+    inner = _FakeRQQueueInternal("test", connection=conn)
+
+    assert inner.remove("never-enqueued") == 0
+
+
 def test_get_current_job_returns_none_outside_worker() -> None:
     """Test get_current_job returns None when not in worker context."""
     rq_hook, _rq_module = make_fake_load_rq_module(current_job=None)

@@ -126,6 +126,18 @@ class _FakeQueueWithRecording:
         job: RQJobLike = _FakeJob(self._job_id)
         return job
 
+    def remove(self, job_or_id: str) -> int:
+        """Report that nothing was pending; this fake records enqueues only.
+
+        Args:
+            job_or_id: The job id a caller would remove.
+
+        Returns:
+            0, since this double keeps no pending list to remove from.
+        """
+        _ = job_or_id
+        return 0
+
 
 class RecordingHooksState:
     """State holder for recording hooks during test."""

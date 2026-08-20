@@ -181,6 +181,18 @@ def test_get_queue_returns_queue_adapter() -> None:
             enqueued.append({"func": func, "args": list(args)})
             return _FakeRQJob()
 
+        def remove(self, job_or_id: str) -> int:
+            """Report that nothing was pending; this fake records enqueues only.
+
+            Args:
+                job_or_id: The job id a caller would remove.
+
+            Returns:
+                0, since this double keeps no pending list to remove from.
+            """
+            _ = job_or_id
+            return 0
+
     def _fake_rq_conn(url: str) -> FakeRedisBytesClient:
         return FakeRedisBytesClient()
 
@@ -570,6 +582,18 @@ class _FakeRQClientQueueForTest:
     ) -> _FakeRQJobForTrainingTest:
         self._tracker["count"] += 1
         return _FakeRQJobForTrainingTest()
+
+    def remove(self, job_or_id: str) -> int:
+        """Report that nothing was pending; this fake tracks enqueues only.
+
+        Args:
+            job_or_id: The job id a caller would remove.
+
+        Returns:
+            0, since this double keeps no pending list to remove from.
+        """
+        _ = job_or_id
+        return 0
 
 
 def test_create_training_job_via_testclient(tmp_path: Path) -> None:

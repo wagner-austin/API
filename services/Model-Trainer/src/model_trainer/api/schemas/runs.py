@@ -140,7 +140,10 @@ class EvaluateResponse(TypedDict, total=True):
 
 
 class CancelResponse(TypedDict, total=True):
-    status: Literal["cancellation-requested"]
+    # `dequeued` means the job was still pending and was removed, so the run
+    # is already terminal. `cancellation-requested` means a worker holds it
+    # and will stop at its next cancellation check.
+    status: Literal["cancellation-requested", "dequeued"]
 
 
 class ArtifactPointerResponse(TypedDict, total=True):

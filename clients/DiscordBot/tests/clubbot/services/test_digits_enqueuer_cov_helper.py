@@ -50,6 +50,18 @@ def test_digits_enqueuer_queue_and_retry_helpers_cov() -> None:
             _ = (func_ref, args, job_timeout, result_ttl, failure_ttl, retry, description)
             return _DummyJob()
 
+        def remove(self, job_or_id: str) -> int:
+            """Report that nothing was pending; this enqueuer never removes.
+
+            Args:
+                job_or_id: The job id a caller would remove.
+
+            Returns:
+                0, since this double holds no queue to remove from.
+            """
+            _ = job_or_id
+            return 0
+
     class _DummyRetry:
         def __init__(self) -> None:
             self.max = 1

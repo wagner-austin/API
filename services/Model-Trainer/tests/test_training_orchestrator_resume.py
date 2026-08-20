@@ -180,7 +180,7 @@ class TestEnqueueResume:
         status = TrainerJobStore(redis).load(RUN_ID)
         assert status is not None and status["status"] == "queued"
         assert status["message"] == "resume queued"
-        redis.assert_only_called({"hset", "hgetall", "delete"})
+        redis.assert_only_called({"hset", "hgetall", "delete", "set"})
 
     def test_resume_clears_a_stale_cancel_flag(self, tmp_path: Path) -> None:
         """A cancel flag left by an earlier cancellation must not survive the
@@ -210,7 +210,7 @@ class TestEnqueueResume:
         assert out["job_id"] == "job-fresh-1"
         raw = fake_queue.jobs[0].args[0]
         assert _payload_field(raw, "resume") is False
-        redis.assert_only_called({"hset", "delete"})
+        redis.assert_only_called({"hset", "delete", "set"})
 
 
 class TestResumeRoute:
@@ -258,4 +258,4 @@ class TestResumeRoute:
         assert body["run_id"] == RUN_ID
         assert body["job_id"] == "job-route-1"
         assert len(fake_queue.jobs) == 1
-        fake_redis.assert_only_called({"hset", "hgetall", "delete"})
+        fake_redis.assert_only_called({"hset", "hgetall", "delete", "set"})

@@ -35,6 +35,8 @@ class _TrackingQueue(RQClientQueue):
     def __init__(self) -> None:
         self.last: tuple[str, _JsonValue, _KwargsDict] | None = None
         self.last_retry: RQRetryLike | None = None
+        self.removed: list[str] = []
+        self.remove_result = 1
 
     def enqueue(
         self,
@@ -58,6 +60,19 @@ class _TrackingQueue(RQClientQueue):
         self.last_retry = retry
         desc_str = description if description is not None else "job"
         return FakeJob(f"id:{desc_str}")
+
+    def remove(self, job_or_id: str) -> int:
+        """Record a removal and report the configured outcome.
+
+        Args:
+            job_or_id: The job id the adapter asked to remove.
+
+        Returns:
+            ``remove_result``, so a test can present both the job-was-pending
+            and the job-already-taken cases.
+        """
+        self.removed.append(job_or_id)
+        return self.remove_result
 
 
 class _Fakes:
@@ -183,6 +198,28 @@ def test_a_train_job_is_enqueued_with_no_retry_policy(rq_fakes: _Fakes) -> None:
 
     assert rq_fakes.queue.last_retry is None
     assert rq_fakes.retries == []
+
+
+def test_removing_a_pending_job_reports_it_was_removed(rq_fakes: _Fakes) -> None:
+    """The adapter must pass the id through and read RQ's own count.
+
+    The count is what separates "cancelled it before a worker took it" from
+    "too late", which is the entire decision the cancel path makes.
+    """
+    enq = RQEnqueuer(redis_url="redis://localhost/0", settings=_settings())
+    rq_fakes.queue.remove_result = 1
+
+    assert enq.remove_queued_job("job-7") is True
+    assert rq_fakes.queue.removed == ["job-7"]
+
+
+def test_removing_a_job_a_worker_already_took_reports_false(rq_fakes: _Fakes) -> None:
+    """RQ removes nothing once a worker has popped the job off the list."""
+    enq = RQEnqueuer(redis_url="redis://localhost/0", settings=_settings())
+    rq_fakes.queue.remove_result = 0
+
+    assert enq.remove_queued_job("job-7") is False
+    assert rq_fakes.queue.removed == ["job-7"]
 
 
 def test_an_inference_job_keeps_the_retry_policy(rq_fakes: _Fakes) -> None:

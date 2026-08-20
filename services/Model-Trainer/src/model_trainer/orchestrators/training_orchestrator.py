@@ -9,12 +9,14 @@ from platform_core.trainer_keys import (
     cancel_key,
     eval_key,
     heartbeat_key,
+    job_id_key,
 )
 from platform_workers.redis import RedisStrProto
 from typing_extensions import TypedDict
 
 from ..api.schemas.pointers import ArtifactPointer
 from ..api.schemas.runs import (
+    CancelResponse,
     EvaluateRequest,
     EvaluateResponse,
     ProgressResponse,
@@ -146,6 +148,10 @@ class TrainingOrchestrator:
         # cancel issued after this point targets the new execution.
         _ = self._redis.delete(cancel_key(run_id))
         job_id = self._enq.enqueue_train(payload)
+        # The queue knows jobs, not runs, and a run can be enqueued more than
+        # once through resume. Cancelling a run that has not started yet has
+        # to remove its job, so the mapping has to outlive this call.
+        set_with_retry(self._redis, job_id_key(run_id), job_id)
         now = datetime.utcnow()
         self._job_store.save(
             {
@@ -249,6 +255,62 @@ class TrainingOrchestrator:
                 model_trainer_status_for(ModelTrainerErrorCode.CHECKPOINT_NOT_FOUND),
             )
         return self._enqueue_execution(run_id, req, resume=True)
+
+    def cancel(self: TrainingOrchestrator, run_id: str) -> CancelResponse:
+        """Cancel a run, removing its job from the queue if it has not started.
+
+        The cancellation flag alone is not enough for queued work. A worker
+        that dequeues a flagged job still loads the model before reaching its
+        first cancellation check, so cancelling a queued run used to cost a
+        full model load and left the run advertising `queued` while a job for
+        it was still pending. Removing the job is what makes the cancellation
+        immediate.
+
+        The flag is set regardless, because the job may be taken between the
+        status read and the removal attempt; the flag is what stops it then.
+
+        Args:
+            run_id: The run to cancel.
+
+        Returns:
+            CancelResponse reporting `dequeued` when the job was pending and
+            was removed, or `cancellation-requested` when a worker already
+            holds it and must stop itself.
+        """
+        set_with_retry(self._redis, cancel_key(run_id), "1")
+
+        job_id = get_with_retry(self._redis, job_id_key(run_id))
+        if job_id is None or not self._enq.remove_queued_job(job_id):
+            return CancelResponse(status="cancellation-requested")
+
+        # Nothing will ever run this job now, so this call owns the run's
+        # terminal state. Leaving it `queued` would strand it exactly the way
+        # a dead worker strands a `processing` run.
+        now = datetime.utcnow()
+        status_obj = self._job_store.load(run_id)
+        self._job_store.save(
+            {
+                "job_id": run_id,
+                "user_id": status_obj["user_id"] if status_obj is not None else 0,
+                "status": "failed",
+                "progress": 0,
+                "message": "cancelled before training started",
+                "created_at": status_obj["created_at"] if status_obj is not None else now,
+                "updated_at": now,
+                "error": ModelTrainerErrorCode.TRAINING_CANCELLED.value,
+                "artifact_file_id": None,
+            },
+        )
+        _logger.info(
+            "queued run cancelled",
+            extra={
+                "category": "training",
+                "service": "orchestrator",
+                "run_id": run_id,
+                "event": "cancel_dequeued",
+            },
+        )
+        return CancelResponse(status="dequeued")
 
     def get_status(self: TrainingOrchestrator, run_id: str) -> RunStatusResponse:
         from typing import Literal

@@ -68,6 +68,10 @@ class _RQQueueInternal(Protocol):
         description: str | None = ...,
     ) -> _RQJobInternal: ...
 
+    # Named `job_or_id` because that is RQ's own parameter name; the real
+    # method accepts a Job or an id string and we only ever pass the id.
+    def remove(self, job_or_id: str) -> int: ...
+
 
 class _RQWorkerInternal(Protocol):
     """Protocol for internal RQ SimpleWorker."""
@@ -127,6 +131,8 @@ class RQClientQueue(Protocol):
         description: str | None = ...,
     ) -> RQJobLike: ...
 
+    def remove(self, job_or_id: str) -> int: ...
+
 
 class RQJobLike(Protocol):
     """Public protocol for RQ Job."""
@@ -184,6 +190,20 @@ class _RQQueueAdapter(_RQQueueLike, RQClientQueue):
                 return str(self._inner.id)
 
         return _Job(job)
+
+    def remove(self, job_or_id: str) -> int:
+        """Remove a job id from this queue's pending list.
+
+        Args:
+            job_or_id: The RQ job id to remove.
+
+        Returns:
+            How many entries were removed: 1 when the job was still pending,
+            0 when it had already been picked up or never queued. The count is
+            the caller's only way to tell those apart, so it is returned rather
+            than discarded.
+        """
+        return self._inner.remove(job_or_id)
 
 
 def _rq_queue_raw(name: str, connection: _RedisBytesClient) -> _RQQueueInternal:
