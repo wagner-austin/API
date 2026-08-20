@@ -146,7 +146,9 @@ class TestEnqueueResume:
         exc: AppError[ModelTrainerErrorCode] = excinfo.value
         assert exc.code == ModelTrainerErrorCode.RUN_NOT_RESUMABLE
         assert status in str(exc)
-        redis.assert_only_called({"hset", "hgetall"})
+        # The `get` is the heartbeat read: a non-failed run is only refused
+        # once its worker has been confirmed alive.
+        redis.assert_only_called({"hset", "hgetall", "get"})
 
     def test_failed_run_without_checkpoint_is_refused(self, tmp_path: Path) -> None:
         redis = FakeRedis()

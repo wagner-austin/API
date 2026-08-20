@@ -22,12 +22,19 @@ from ..api.schemas.runs import (
     TrainRequest,
     TrainResponse,
 )
+from ..core import _test_hooks
 from ..core.config.settings import Settings
 from ..core.contracts.queue import EvalJobPayload, TrainJobPayload, TrainRequestPayload
 from ..core.infra.redis_utils import get_with_retry, set_with_retry
 from ..core.services.queue.rq_adapter import RQEnqueuer
 from ..core.services.registries import ModelRegistry
 from ..core.services.training.checkpoint import checkpoint_exists
+from ..core.services.training.liveness import (
+    WORKER_HEARTBEAT_TIMEOUT_SECONDS,
+    seconds_since_last_sign_of_life,
+    worker_death_message,
+    worker_has_died,
+)
 from ..infra.persistence.models import EvalCache
 from ..infra.storage.run_store import RunStore
 from ..worker.trainer_job_store import TrainerJobStore
@@ -200,9 +207,12 @@ class TrainingOrchestrator:
 
         Raises:
             AppError: With ``RUN_NOT_FOUND`` when the run is unknown;
-                ``RUN_NOT_RESUMABLE`` when the run is queued, running or
-                already completed; ``CHECKPOINT_NOT_FOUND`` when no
-                checkpoint file exists for the run.
+                ``RUN_NOT_RESUMABLE`` when the run is queued, genuinely still
+                running, or already completed; ``CHECKPOINT_NOT_FOUND`` when no
+                checkpoint file exists for the run. A run still reading
+                ``processing`` whose worker has gone silent past the heartbeat
+                timeout is resumable, because that status reflects a killed
+                worker rather than work in progress.
         """
         status_obj = self._job_store.load(run_id)
         if status_obj is None:
@@ -213,11 +223,25 @@ class TrainingOrchestrator:
             )
         status_v = status_obj["status"]
         if status_v != "failed":
-            raise AppError(
-                ModelTrainerErrorCode.RUN_NOT_RESUMABLE,
-                f"run '{run_id}' has status '{status_v}'; only a failed run can resume",
-                model_trainer_status_for(ModelTrainerErrorCode.RUN_NOT_RESUMABLE),
-            )
+            # A run whose worker was killed still reads `processing`, because
+            # nothing ran to record otherwise. Those are precisely the runs
+            # worth resuming -- interrupted rather than broken, and usually
+            # holding a checkpoint -- so the same predicate the status endpoint
+            # uses admits them here instead of making an operator edit Redis.
+            hb_raw = get_with_retry(self._redis, heartbeat_key(run_id))
+            if not worker_has_died(
+                status=status_v,
+                last_heartbeat_ts=float(hb_raw) if hb_raw is not None else None,
+                status_updated_at=status_obj["updated_at"],
+                now_ts=_test_hooks.time_wall_clock(),
+                timeout_seconds=WORKER_HEARTBEAT_TIMEOUT_SECONDS,
+            ):
+                raise AppError(
+                    ModelTrainerErrorCode.RUN_NOT_RESUMABLE,
+                    f"run '{run_id}' has status '{status_v}'; only a failed run, or one "
+                    f"whose worker died, can resume",
+                    model_trainer_status_for(ModelTrainerErrorCode.RUN_NOT_RESUMABLE),
+                )
         if not checkpoint_exists(self._settings, run_id):
             raise AppError(
                 ModelTrainerErrorCode.CHECKPOINT_NOT_FOUND,
@@ -246,6 +270,34 @@ class TrainingOrchestrator:
                 model_trainer_status_for(ModelTrainerErrorCode.RUN_NOT_FOUND),
             )
         status_v = status_obj["status"]
+        hb_raw = get_with_retry(self._redis, heartbeat_key(run_id))
+        hb = float(hb_raw) if hb_raw is not None else None
+
+        # A killed container writes nothing on its way out, so `processing` on
+        # its own is not evidence the run is alive. The heartbeat is, and it is
+        # read here rather than by a reaper so that a caller polling for a
+        # terminal state gets the truth on the very next poll.
+        now_ts = _test_hooks.time_wall_clock()
+        if worker_has_died(
+            status=status_v,
+            last_heartbeat_ts=hb,
+            status_updated_at=status_obj["updated_at"],
+            now_ts=now_ts,
+            timeout_seconds=WORKER_HEARTBEAT_TIMEOUT_SECONDS,
+        ):
+            silence = seconds_since_last_sign_of_life(
+                last_heartbeat_ts=hb,
+                status_updated_at=status_obj["updated_at"],
+                now_ts=now_ts,
+            )
+            return RunStatusResponse(
+                run_id=run_id,
+                status="failed",
+                last_heartbeat_ts=hb,
+                message=worker_death_message(run_id=run_id, silent_for_seconds=silence),
+                error=ModelTrainerErrorCode.RUN_WORKER_DIED.value,
+            )
+
         status_literal: Literal["queued", "running", "completed", "failed"]
         if status_v == "queued":
             status_literal = "queued"
@@ -256,13 +308,12 @@ class TrainingOrchestrator:
         else:
             # status_v == "failed" is the only remaining case per JobStatusLiteral
             status_literal = "failed"
-        hb_raw = get_with_retry(self._redis, heartbeat_key(run_id))
-        hb = float(hb_raw) if hb_raw is not None else None
         return RunStatusResponse(
             run_id=run_id,
             status=status_literal,
             last_heartbeat_ts=hb,
             message=status_obj["message"],
+            error=status_obj["error"],
         )
 
     def enqueue_evaluation(

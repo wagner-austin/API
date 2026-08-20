@@ -967,6 +967,23 @@ class TimeMonotonicProto(Protocol):
         ...
 
 
+class TimeWallClockProto(Protocol):
+    """Protocol for the time.time hook.
+
+    Distinct from :class:`TimeMonotonicProto` because heartbeats are stamped
+    with wall-clock time and compared across processes: the worker writes the
+    stamp and the API reads it, and two processes share no monotonic epoch.
+    """
+
+    def __call__(self) -> float:
+        """Return seconds since the Unix epoch.
+
+        Returns:
+            Current wall-clock value.
+        """
+        ...
+
+
 class DatetimeUtcnowIsoProto(Protocol):
     """Protocol for getting current UTC time as ISO 8601 string."""
 
@@ -1087,6 +1104,17 @@ def _default_time_monotonic() -> float:
     import time
 
     return time.monotonic()
+
+
+def _default_time_wall_clock() -> float:
+    """Production time.time - used as default hook.
+
+    Returns:
+        Seconds since the Unix epoch.
+    """
+    import time
+
+    return time.time()
 
 
 def _default_datetime_utcnow_iso() -> str:
@@ -1226,6 +1254,7 @@ def _default_torch_device(device_str: str) -> torch.device:
 
 # Training metrics hooks
 time_monotonic: TimeMonotonicProto = _default_time_monotonic
+time_wall_clock: TimeWallClockProto = _default_time_wall_clock
 datetime_utcnow_iso: DatetimeUtcnowIsoProto = _default_datetime_utcnow_iso
 gpu_max_memory_allocated: GpuMaxMemoryAllocatedProto = _default_gpu_max_memory_allocated
 gpu_reset_peak_memory_stats: GpuResetPeakMemoryStatsProto = _default_gpu_reset_peak_memory_stats

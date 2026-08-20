@@ -119,6 +119,10 @@ class RunStatusResponse(TypedDict, total=True):
     status: Literal["queued", "running", "completed", "failed"]
     last_heartbeat_ts: float | None
     message: str | None
+    # Traceable code for why a run is not healthy, so a caller can tell a
+    # training failure from the machine disappearing underneath one. None on a
+    # run that has nothing wrong with it.
+    error: str | None
 
 
 class EvaluateRequest(TypedDict, total=True):

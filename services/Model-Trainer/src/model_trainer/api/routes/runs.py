@@ -148,6 +148,7 @@ class _RunsRoutes:
             "status": res["status"],
             "last_heartbeat_ts": res["last_heartbeat_ts"],
             "message": res["message"],
+            "error": res["error"],
         }
 
     def run_progress(self: _RunsRoutes, run_id: str) -> ProgressResponse:

@@ -150,6 +150,7 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     CHECKPOINT_CONFIG_MISMATCH = "CHECKPOINT_CONFIG_MISMATCH"
     CHECKPOINT_SCHEMA_UNSUPPORTED = "CHECKPOINT_SCHEMA_UNSUPPORTED"
     RUN_NOT_RESUMABLE = "RUN_NOT_RESUMABLE"
+    RUN_WORKER_DIED = "RUN_WORKER_DIED"
 
     # Infrastructure errors
     CUDA_NOT_AVAILABLE = "CUDA_NOT_AVAILABLE"
@@ -552,6 +553,7 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     ModelTrainerErrorCode.CHECKPOINT_CONFIG_MISMATCH: 409,
     ModelTrainerErrorCode.CHECKPOINT_SCHEMA_UNSUPPORTED: 409,
     ModelTrainerErrorCode.RUN_NOT_RESUMABLE: 409,
+    ModelTrainerErrorCode.RUN_WORKER_DIED: 500,
     # Infrastructure errors
     ModelTrainerErrorCode.CUDA_NOT_AVAILABLE: 503,
     ModelTrainerErrorCode.CUDA_OOM: 507,
