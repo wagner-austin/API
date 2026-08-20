@@ -26,8 +26,20 @@ Default path is this repo's venv:
 ``.venv/Lib/site-packages/mujoco_warp/_src/sensor.py``.
 """
 
+from __future__ import annotations
+
 import pathlib
 import sys
+from collections.abc import Sequence
+
+from navprobe import NavProbeError
+from scripts import _test_hooks
+from scripts.arguments import ScriptArgumentError
+
+#: The two things this script can do to the installed vendor file.
+ACTIONS = ("apply", "revert")
+
+USAGE = "usage: apply_tactile_alias_patch (apply|revert) [path-to-sensor.py]"
 
 _SIG_OLD = """  # Data out:
   sensordata_out: wp.array2d[float],
@@ -48,8 +60,16 @@ _SIG_NEW = """  # Data out:
 
   sensor_id = taxel_sensorid[taxelid]"""
 
-_MAX_OLD = "    wp.atomic_max(sensordata_out, worldid, sensor_adr[sensor_id] + 0 * dim + vertid, forceT[0])"
-_MAX_NEW = "    wp.atomic_max(sensordata_max_out, worldid, sensor_adr[sensor_id] + 0 * dim + vertid, forceT[0])"
+# Split across source lines by implicit concatenation only. The values must
+# match the vendor file byte for byte, so the strings themselves are unwrapped.
+_MAX_OLD = (
+    "    wp.atomic_max(sensordata_out, worldid, "
+    "sensor_adr[sensor_id] + 0 * dim + vertid, forceT[0])"
+)
+_MAX_NEW = (
+    "    wp.atomic_max(sensordata_max_out, worldid, "
+    "sensor_adr[sensor_id] + 0 * dim + vertid, forceT[0])"
+)
 
 _LAUNCH_OLD = """      weld_geom_count,
       weld_geom_list,
@@ -75,19 +95,66 @@ _LAUNCH_NEW = """      weld_geom_count,
 _DEFAULT = ".venv/Lib/site-packages/mujoco_warp/_src/sensor.py"
 
 
+class PatchSiteError(NavProbeError):
+    """A patch site did not appear exactly once in the target file.
+
+    Anything other than one occurrence means the installed vendor file is not
+    the revision this patch was written against, and swapping anyway would
+    either miss the site or corrupt a second one.
+
+    Args:
+        code: Stable identifier in the ``NP-PATCH-<NNN>`` range.
+        message: Which site failed, and how many times it was found.
+    """
+
+
 def _swap(text: str, pairs: list[tuple[str, str]]) -> str:
+    """Apply each replacement exactly once.
+
+    Args:
+        text: The file's contents, newline-normalised.
+        pairs: ``(old, new)`` site replacements, applied in order.
+
+    Returns:
+        The rewritten contents.
+
+    Raises:
+        PatchSiteError: When a site is absent or appears more than once.
+    """
     for old, new in pairs:
-        if text.count(old) != 1:
-            raise SystemExit(f"expected exactly one occurrence, found {text.count(old)}: {old[:80]!r}")
+        found = text.count(old)
+        if found != 1:
+            raise PatchSiteError(
+                "NP-PATCH-001",
+                f"expected exactly one occurrence, found {found}: {old[:80]!r}",
+            )
         text = text.replace(old, new)
     return text
 
 
-def main() -> None:
-    if len(sys.argv) < 2 or sys.argv[1] not in ("apply", "revert"):
-        raise SystemExit(__doc__)
-    action = sys.argv[1]
-    path = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else _DEFAULT)
+def main(argv: Sequence[str] | None = None) -> int:
+    """Apply or revert the alias patch.
+
+    Args:
+        argv: Arguments excluding the program name. ``None`` reads the process
+            arguments.
+
+    Returns:
+        ``0`` on success.
+
+    Raises:
+        ScriptArgumentError: When no action is given, or it is neither
+            ``apply`` nor ``revert``.
+        PatchSiteError: When the target file is not the revision this patch was
+            written against.
+    """
+    args = list(sys.argv[1:]) if argv is None else list(argv)
+    if not args or args[0] not in ACTIONS:
+        raise ScriptArgumentError(
+            "NP-ARGS-007", f"{USAGE} -- expected one of {ACTIONS}, got {args[:1]}"
+        )
+    action = args[0]
+    path = pathlib.Path(args[1] if len(args) > 1 else _DEFAULT)
     raw = path.read_bytes()
     # Preserve the file's own line-ending convention: normalize to LF for the
     # swap, then restore CRLF iff the file used it. A silent EOL rewrite would
@@ -100,8 +167,9 @@ def main() -> None:
     if had_crlf:
         out = out.replace(b"\n", b"\r\n")
     path.write_bytes(out)
-    print(f"{action}: OK ({path})")
+    _test_hooks.write_out(f"{action}: OK ({path})\n")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main(None))

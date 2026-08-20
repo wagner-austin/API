@@ -13,14 +13,14 @@ positive.
 
 from __future__ import annotations
 
-from navprobe.codecs.scene import encode_float_field
 from navprobe.records import DispersionRecord
 from navprobe.wireformat import (
-    WireFormatError,
+    encode_float_field,
     header_line,
     join_document,
     require_no_body,
     require_non_negative_field,
+    require_non_negative_float_field,
     require_positive_field,
     split_document,
     split_header_line,
@@ -31,32 +31,6 @@ DISPERSION_BANNER = "navprobe-dispersion/1"
 
 #: Header lines an encoded dispersion record occupies.
 DISPERSION_HEADER_FIELD_COUNT = 4
-
-
-def require_non_negative_float_field(raw: str, field: str) -> float:
-    """Convert a hexadecimal token to a float of zero or greater.
-
-    Args:
-        raw: The token to convert.
-        field: Field name, used in the error message.
-
-    Returns:
-        The token as a float.
-
-    Raises:
-        WireFormatError: When the token is not a hexadecimal float, or is
-            negative. A spread is a range and cannot be below zero.
-    """
-    if not raw.startswith(("0x", "-0x", "inf", "-inf", "nan")):
-        raise WireFormatError(
-            "NP-WIRE-014", f"field {field!r} must be a hexadecimal float, got {raw!r}"
-        )
-    value = float.fromhex(raw)
-    if value < 0.0:
-        raise WireFormatError(
-            "NP-WIRE-016", f"field {field!r} must be zero or greater, got {value}"
-        )
-    return value
 
 
 def encode_dispersion_record(record: DispersionRecord) -> str:
@@ -116,5 +90,4 @@ __all__ = [
     "DISPERSION_HEADER_FIELD_COUNT",
     "decode_dispersion_record",
     "encode_dispersion_record",
-    "require_non_negative_float_field",
 ]

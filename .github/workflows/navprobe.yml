@@ -1,0 +1,86 @@
+name: navprobe
+
+# The measurement scripts under `clients/NavProbe/scripts/` produced this
+# project's published GPU determinism results, and were committed having never
+# passed `make check`: 16 guard violations and 0% coverage, on 2026-08-18 and
+# 2026-08-19. Nothing caught it, because nothing ran the gate -- there are no
+# git hooks, and the only suite workflow in this repository is path-filtered to
+# one service. That is the same failure this repository already recorded once,
+# in the header of `turkic-api.yml`: a guard that "sat red and unrun because
+# nothing executed this service's suite". The lesson had been encoded for one
+# service rather than as a habit, so the next project without a workflow
+# repeated it.
+#
+# NavProbe's suite runs on a CPU-only runner. Its tests take Warp's default
+# device rather than naming `cuda:0`, and the determinism assertions are
+# stated to hold on the CPU device, so no GPU is required here -- what a GPU
+# adds is the measurements, which are taken by hand and recorded in the wiki,
+# not by CI.
+
+on:
+  push:
+    paths:
+      - "clients/NavProbe/**"
+      - "libs/monorepo_guards/**"
+      - "monorepo-guards.toml"
+      - ".github/workflows/navprobe.yml"
+  pull_request:
+    paths:
+      - "clients/NavProbe/**"
+      - "libs/monorepo_guards/**"
+      - "monorepo-guards.toml"
+      - ".github/workflows/navprobe.yml"
+
+concurrency:
+  group: navprobe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/NavProbe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.3.4
+
+      - name: Cache the virtualenv
+        uses: actions/cache@v4
+        with:
+          path: clients/NavProbe/.venv
+          key: navprobe-venv-${{ hashFiles('clients/NavProbe/poetry.lock') }}
+
+      # `sync` rather than `install`: install leaves behind anything the lock
+      # file no longer mentions, which is how a removed dependency kept
+      # resolving out of a stale environment.
+      - name: Install dependencies
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry sync --with dev
+
+      - name: Guards
+        run: poetry run python -m scripts.guard
+
+      - name: Lint
+        run: |
+          poetry run ruff check .
+          poetry run ruff format --check .
+
+      - name: Types
+        run: poetry run mypy src tests scripts
+
+      # Coverage covers `scripts` as well as `src`. That is the half that was
+      # missing: the four scripts were tracked, inside the coverage target, and
+      # at 0%, and no run ever said so.
+      - name: Tests
+        run: >
+          poetry run pytest -n auto
+          --cov-branch --cov=src --cov=scripts --cov-report=term-missing

@@ -238,14 +238,127 @@ class SweepEntry(TypedDict):
     trial: TrialRecord
 
 
+class DeviceRunConditions(TypedDict):
+    """The conditions any device-scoped measurement run was taken under.
+
+    Declared once and inherited, because a determinism figure is meaningless
+    without these four: the same scene family reproduces or does not depending
+    on the Warp mode, on the record bound, and on the card. Separating the
+    resolved device from the requested one is deliberate — a report that stored
+    only ``cuda:1`` could not distinguish the card that ran from the name that
+    was typed.
+
+    Attributes:
+        mode: The Warp determinism mode, one of ``NOT_GUARANTEED``,
+            ``RUN_TO_RUN`` or ``GPU_TO_GPU``.
+        device: The resolved device's label, as Warp reports it.
+        device_request: The device identifier asked for on the command line.
+        max_records: ``wp.config.deterministic_max_records`` in force. Zero
+            means Warp's own code-generated lower bound.
+    """
+
+    mode: str
+    device: str
+    device_request: str
+    max_records: int
+
+
+class SweepRunRecord(DeviceRunConditions):
+    """A scene-family sweep together with the conditions it ran under.
+
+    The record a cross-device comparison is made from: two of these, decoded
+    and compared entry by entry, answer whether a determinism boundary moved.
+
+    Attributes:
+        world_count: Parallel worlds each simulator carried.
+        perturbation: Half-width of the seed-driven initial offset range.
+        constraint_capacity: Upper bound on constraints, contacts and Jacobian
+            non-zeros the allocation reserved.
+        entries: One entry per scene, in sweep order.
+    """
+
+    world_count: int
+    perturbation: float
+    constraint_capacity: int
+    entries: tuple[SweepEntry, ...]
+
+
+class ScalingRungRecord(TypedDict):
+    """One world count's verdict and throughput within a scaling ladder.
+
+    Digests are *not* comparable across rungs — each world is seed-perturbed,
+    so changing the world count changes the state being digested. The digest is
+    carried so a rung can be compared against a repeat of itself, and never
+    against its neighbours.
+
+    Attributes:
+        world_count: Parallel worlds this rung ran.
+        reference_digest: The rung's reference digest.
+        deterministic: Whether every repetition agreed.
+        first_divergent_step: First step at which two repetitions parted, or
+            ``None`` when they never did.
+        wall_seconds: Seconds the rung took, including any compilation.
+        world_steps_per_second: Throughput derived from ``wall_seconds``.
+    """
+
+    world_count: int
+    reference_digest: str
+    deterministic: bool
+    first_divergent_step: int | None
+    wall_seconds: float
+    world_steps_per_second: float
+
+
+class ScalingRunRecord(DeviceRunConditions):
+    """A world-count ladder together with the conditions it ran under.
+
+    Attributes:
+        capacity: Per-world constraint capacity the ladder allocated.
+        scene: The one scene laddered over.
+        spec: The trial design, held fixed so world count is the only variable.
+        perturbation: Half-width of the seed-driven initial offset range.
+        rungs: One rung per world count, in ladder order.
+    """
+
+    capacity: int
+    scene: SceneSpec
+    spec: TrialSpec
+    perturbation: float
+    rungs: tuple[ScalingRungRecord, ...]
+
+
+class CompileGateRecord(DeviceRunConditions):
+    """Evidence that one determinism mode compiled and stepped.
+
+    Records a pass only. A mode Warp rejects raises out of the gate carrying
+    the vendor's own error, which is a better record of the rejection than any
+    summary this package could store — and letting it propagate is what keeps
+    the gate from reporting a genuine bug as a determinism-mode rejection.
+
+    Attributes:
+        wall_seconds: Seconds the gate took, including cold codegen.
+        world_count: Parallel worlds the gate allocated.
+        scene: The scene the gate compiled.
+    """
+
+    wall_seconds: float
+    world_count: int
+    scene: SceneSpec
+
+
 __all__ = [
     "ComparisonRecord",
+    "CompileGateRecord",
+    "DeviceRunConditions",
     "DispersionRecord",
     "RunRecord",
     "RunSpec",
+    "ScalingRunRecord",
+    "ScalingRungRecord",
     "SceneSpec",
     "StepRecord",
     "SweepEntry",
+    "SweepRunRecord",
     "TrialRecord",
     "TrialSpec",
 ]

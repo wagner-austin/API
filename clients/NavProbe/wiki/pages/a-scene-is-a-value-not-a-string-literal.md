@@ -5,15 +5,17 @@ related: ["[[warp-gpu-determinism-fails-on-coupled-bodies]]", "[[bit-equality-is
 source_paths:
   - "src/navprobe/scenes.py"
   - "src/navprobe/codecs/scene.py"
+  - "src/navprobe/wireformat.py"
   - "tests/test_scenes.py"
   - "src/navprobe/sweep.py"
   - "tests/codecs/test_scene.py"
 source_git_blobs:
   "src/navprobe/scenes.py": "4a05c692fbd2740bd717f015e7725fa8175fc207"
-  "src/navprobe/codecs/scene.py": "504db991c0bc1338aec434e53abe9f029940c0a2"
+  "src/navprobe/codecs/scene.py": "f0ea50af3585bab267f52832eb73b75bb3f7514b"
+  "src/navprobe/wireformat.py": "3937d4a49ee9e32db7e614afbb89b97d1861a7c8"
   "tests/test_scenes.py": "ebeb6878130073a665c2414a61c88d38bcce52eb"
   "src/navprobe/sweep.py": "3fbecbbf2caeec07827f618c307ded4699414dfd"
-  "tests/codecs/test_scene.py": "a8c0e8b8f974add70c3dea4f35196cd4aee43379"
+  "tests/codecs/test_scene.py": "cdbd6f14f617e5904d203f79b447a1b78b8828de"
 fact_checked: 2026-08-14
 confidence: high
 hubs: [instrument-design]
@@ -58,5 +60,5 @@ Without it, an invalid spec fails somewhere inside MuJoCo's compiler with a mess
 
 [^1]: `src/navprobe/scenes.py` — `SceneSpec` is declared in `navprobe.records`; `build_scene`, `bodies_touch`, `layer_count` and `row_scene` live here.
 [^2]: src/navprobe/sweep.py:51 `run_scene_sweep` — `[observed]` — the same row family measured by a standalone script (identical worlds) reproduced at 5 bodies and failed at 6; measured by `navprobe.sweep.run_scene_sweep` through `navprobe.adapters.mjx_warp_state` with `perturbation=0.01`, it reproduced at 4 and failed from 5.
-[^3]: `src/navprobe/codecs/scene.py` — `encode_float_field` / `require_positive_float_field`; `tests/codecs/test_scene.py::TestFloatFields::test_round_trips_a_value_with_no_exact_decimal_form`.
+[^3]: `src/navprobe/wireformat.py` — `encode_float_field` / `require_positive_float_field`, and the shared `require_hexadecimal_float` beneath them; `tests/test_wireformat.py::TestEncodeFloatField::test_round_trips_a_value_with_no_exact_decimal_form` covers the encoding, and `tests/codecs/test_scene.py::TestSceneFloatFields::test_round_trips_a_spec_whose_floats_have_no_exact_decimal_form` covers a *scene* reaching it. Both helpers lived in `src/navprobe/codecs/scene.py` until 2026-08-19; they were lifted into `wireformat` when a third copy of the same hexadecimal check turned up in `codecs/observation.py` and a fourth in `codecs/dispersion.py`, all four sharing error code `NP-WIRE-014` for different checks.
 [^4]: `src/navprobe/scenes.py` — `build_scene` calls `require_scene` before emitting anything; `tests/test_scenes.py::TestBuildScene::test_validates_before_building`.

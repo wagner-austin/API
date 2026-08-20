@@ -8,15 +8,16 @@ from navprobe.codecs.run import encode_run_record
 from navprobe.codecs.scene import (
     SCENE_BANNER,
     SCENE_FIELD_COUNT,
+    SCENE_FIELD_NAMES,
     decode_scene_fields,
+    decode_scene_headers,
     decode_scene_spec,
-    encode_float_field,
+    encode_scene_headers,
     encode_scene_spec,
-    require_positive_float_field,
     scene_fields,
 )
 from navprobe.records import RunRecord, RunSpec, SceneSpec
-from navprobe.wireformat import SEPARATOR, WireFormatError
+from navprobe.wireformat import SEPARATOR, WireFormatError, encode_float_field
 
 
 def _spec() -> SceneSpec:
@@ -38,43 +39,63 @@ def _lines() -> list[str]:
     return encode_scene_spec(_spec()).strip("\n").split("\n")
 
 
-class TestFloatFields:
-    """Tests for the exact float encoding."""
+class TestSceneHeaders:
+    """Tests for the header form a fixed-scene record embeds."""
 
-    def test_round_trips_a_value_with_no_exact_decimal_form(self) -> None:
-        """The hexadecimal form recovers the original bits.
+    def test_emits_one_line_per_field(self) -> None:
+        """The count is what lets an enclosing record slice its header."""
+        assert len(encode_scene_headers(_spec())) == SCENE_FIELD_COUNT
 
-        0.055 is not exactly representable in binary, so this fails for any
-        codec that goes through a rounded decimal string.
+    def test_names_every_field(self) -> None:
+        """A header line without its key cannot be order-checked on decode."""
+        assert [line.split(SEPARATOR)[0] for line in encode_scene_headers(_spec())] == list(
+            SCENE_FIELD_NAMES
+        )
+
+    def test_round_trips(self) -> None:
+        """A scene survives its header form exactly."""
+        assert decode_scene_headers(encode_scene_headers(_spec())) == _spec()
+
+    def test_agrees_with_the_row_form(self) -> None:
+        """Both forms carry the same values in the same order.
+
+        Two encodings of one layout are free to drift; this pins them together.
         """
-        assert require_positive_float_field(encode_float_field(0.055), "f") == 0.055
+        assert [line.split(SEPARATOR)[1] for line in encode_scene_headers(_spec())] == list(
+            scene_fields(_spec())
+        )
 
-    def test_round_trips_a_very_small_value(self) -> None:
-        """Subnormal-adjacent values survive, which decimal formatting need not."""
-        assert require_positive_float_field(encode_float_field(1e-300), "f") == 1e-300
-
-    def test_rejects_a_decimal_token(self) -> None:
-        """A decimal string is refused rather than silently parsed."""
+    def test_rejects_headers_in_the_wrong_order(self) -> None:
+        """Order is pinned by key rather than assumed."""
+        lines = list(encode_scene_headers(_spec()))
+        lines[0], lines[1] = lines[1], lines[0]
         with pytest.raises(WireFormatError) as caught:
-            require_positive_float_field("0.055", "f")
-        assert caught.value.code == "NP-WIRE-014"
+            decode_scene_headers(tuple(lines))
+        assert caught.value.code == "NP-WIRE-006"
 
-    def test_rejects_a_zero_value(self) -> None:
+
+class TestSceneFloatFields:
+    """Tests that a scene's floats reach the exact encoding.
+
+    The encoding itself is tested once in ``tests/test_wireformat.py``. What is
+    asserted here is that a *scene* uses it, which is the property that decides
+    whether a published measurement names the scene it was taken on.
+    """
+
+    def test_round_trips_a_spec_whose_floats_have_no_exact_decimal_form(self) -> None:
+        """0.055 and 0.03 are not exactly representable in binary.
+
+        A codec that went through a rounded decimal string would fail this,
+        and the scene it named would not be the scene that ran.
+        """
+        assert decode_scene_spec(encode_scene_spec(_spec())) == _spec()
+
+    def test_rejects_a_zero_length(self) -> None:
         """A length or duration of zero describes no scene."""
+        lines = encode_scene_spec(_spec()).strip("\n").split("\n")
+        lines[3] = f"spacing{SEPARATOR}{encode_float_field(0.0)}"
         with pytest.raises(WireFormatError) as caught:
-            require_positive_float_field(encode_float_field(0.0), "f")
-        assert caught.value.code == "NP-WIRE-015"
-
-    def test_rejects_a_negative_value(self) -> None:
-        """Negative lengths are refused by the same check."""
-        with pytest.raises(WireFormatError) as caught:
-            require_positive_float_field(encode_float_field(-0.5), "f")
-        assert caught.value.code == "NP-WIRE-015"
-
-    def test_rejects_not_a_number(self) -> None:
-        """NaN passes the prefix check and must be caught by the range check."""
-        with pytest.raises(WireFormatError) as caught:
-            require_positive_float_field("nan", "f")
+            decode_scene_spec("\n".join(lines) + "\n")
         assert caught.value.code == "NP-WIRE-015"
 
 

@@ -41,6 +41,37 @@ TRIAL_FIELD_COUNT = 7
 ENTRY_TOKEN_COUNT = 1 + SCENE_FIELD_COUNT + TRIAL_FIELD_COUNT
 
 
+def encode_sweep_entry(entry: SweepEntry) -> str:
+    """Encode one sweep entry to its row form.
+
+    Split out from :func:`encode_sweep` so a record that *embeds* a sweep --
+    one carrying the conditions the sweep ran under -- reuses this row rather
+    than restating the field order. Two declarations of a row layout are free
+    to drift, and a drifted row would decode into the wrong fields silently.
+
+    Args:
+        entry: The entry to encode.
+
+    Returns:
+        One tab-separated row, without a trailing newline.
+    """
+    trial = entry["trial"]
+    spec = trial["spec"]
+    return SEPARATOR.join(
+        (
+            ENTRY_TAG,
+            *scene_fields(entry["scene"]),
+            str(spec["seed"]),
+            str(spec["step_count"]),
+            str(spec["repetitions"]),
+            str(trial["world_count"]),
+            trial["reference_digest"],
+            encode_bool(trial["deterministic"]),
+            encode_optional_int(trial["first_divergent_step"]),
+        )
+    )
+
+
 def encode_sweep(entries: tuple[SweepEntry, ...]) -> str:
     """Encode a sweep to its text form.
 
@@ -50,26 +81,7 @@ def encode_sweep(entries: tuple[SweepEntry, ...]) -> str:
     Returns:
         The encoded text, newline-terminated.
     """
-    rows = []
-    for entry in entries:
-        trial = entry["trial"]
-        spec = trial["spec"]
-        rows.append(
-            SEPARATOR.join(
-                (
-                    ENTRY_TAG,
-                    *scene_fields(entry["scene"]),
-                    str(spec["seed"]),
-                    str(spec["step_count"]),
-                    str(spec["repetitions"]),
-                    str(trial["world_count"]),
-                    trial["reference_digest"],
-                    encode_bool(trial["deterministic"]),
-                    encode_optional_int(trial["first_divergent_step"]),
-                )
-            )
-        )
-    return join_document([SWEEP_BANNER, *rows])
+    return join_document([SWEEP_BANNER, *(encode_sweep_entry(entry) for entry in entries)])
 
 
 def decode_sweep_entry(line: str, position: int) -> SweepEntry:
@@ -138,4 +150,5 @@ __all__ = [
     "decode_sweep",
     "decode_sweep_entry",
     "encode_sweep",
+    "encode_sweep_entry",
 ]

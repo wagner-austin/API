@@ -13,14 +13,14 @@ codec's check rather than restating it.
 
 from __future__ import annotations
 
-from navprobe.codecs.dispersion import require_non_negative_float_field
-from navprobe.codecs.scene import encode_float_field
 from navprobe.records import DivergenceRecord
 from navprobe.wireformat import (
+    encode_float_field,
     header_line,
     join_document,
     require_no_body,
     require_non_negative_field,
+    require_non_negative_float_field,
     require_positive_field,
     split_document,
     split_header_line,

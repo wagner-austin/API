@@ -10,9 +10,8 @@ from navprobe.codecs.divergence import (
     decode_divergence_record,
     encode_divergence_record,
 )
-from navprobe.codecs.scene import encode_float_field
 from navprobe.records import DispersionRecord, DivergenceRecord
-from navprobe.wireformat import SEPARATOR, WireFormatError
+from navprobe.wireformat import SEPARATOR, WireFormatError, encode_float_field
 
 
 def _record() -> DivergenceRecord:

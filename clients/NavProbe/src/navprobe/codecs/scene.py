@@ -15,11 +15,12 @@ from __future__ import annotations
 
 from navprobe.records import SceneSpec
 from navprobe.wireformat import (
-    WireFormatError,
+    encode_float_field,
     header_line,
     join_document,
     require_no_body,
     require_positive_field,
+    require_positive_float_field,
     split_document,
     split_header_line,
 )
@@ -29,46 +30,6 @@ SCENE_BANNER = "navprobe-scene/1"
 
 #: Header lines an encoded scene specification occupies.
 SCENE_HEADER_FIELD_COUNT = 5
-
-
-def encode_float_field(value: float) -> str:
-    """Encode a float exactly.
-
-    Args:
-        value: The value to encode.
-
-    Returns:
-        The value's hexadecimal form, which round-trips without loss.
-    """
-    return value.hex()
-
-
-def require_positive_float_field(raw: str, field: str) -> float:
-    """Convert a hexadecimal token to a float greater than zero.
-
-    Args:
-        raw: The token to convert.
-        field: Field name, used in the error message.
-
-    Returns:
-        The token as a float.
-
-    Raises:
-        WireFormatError: When the token is not a hexadecimal float, or is not
-            positive. Every float in a scene is a length or a duration, and
-            neither is meaningful at zero or below.
-    """
-    if not raw.startswith(("0x", "-0x", "inf", "-inf", "nan")):
-        raise WireFormatError(
-            "NP-WIRE-014",
-            f"field {field!r} must be a hexadecimal float, got {raw!r}",
-        )
-    value = float.fromhex(raw)
-    if not value > 0.0:
-        raise WireFormatError(
-            "NP-WIRE-015", f"field {field!r} must be greater than zero, got {value}"
-        )
-    return value
 
 
 def encode_scene_spec(spec: SceneSpec) -> str:
@@ -166,15 +127,62 @@ def decode_scene_fields(fields: tuple[str, ...], position: int) -> SceneSpec:
 #: Fields a scene occupies when embedded in another record's row.
 SCENE_FIELD_COUNT = 5
 
+#: Names a scene's fields carry when embedded as another record's header lines,
+#: in the same fixed order :func:`scene_fields` emits them.
+SCENE_FIELD_NAMES = ("body_count", "lattice_width", "spacing", "radius", "timestep")
+
+
+def encode_scene_headers(spec: SceneSpec) -> tuple[str, ...]:
+    """Encode a scene as header lines of an enclosing record.
+
+    The variant a record needs when it holds the scene *fixed* for its whole
+    body -- a ladder over world counts, or a compile gate -- where repeating
+    the scene on every row would imply it could vary.
+
+    Args:
+        spec: The specification to encode.
+
+    Returns:
+        Exactly :data:`SCENE_FIELD_COUNT` header lines.
+    """
+    return tuple(
+        header_line(name, value)
+        for name, value in zip(SCENE_FIELD_NAMES, scene_fields(spec), strict=True)
+    )
+
+
+def decode_scene_headers(lines: tuple[str, ...]) -> SceneSpec:
+    """Decode a scene from an enclosing record's header lines.
+
+    Args:
+        lines: Exactly :data:`SCENE_FIELD_COUNT` header lines, in the order
+            :func:`encode_scene_headers` emits them.
+
+    Returns:
+        The decoded specification.
+
+    Raises:
+        WireFormatError: When a line is malformed, carries the wrong key, or
+            holds a value outside its field's range.
+    """
+    return decode_scene_fields(
+        tuple(
+            split_header_line(line, name)
+            for line, name in zip(lines, SCENE_FIELD_NAMES, strict=True)
+        ),
+        0,
+    )
+
 
 __all__ = [
     "SCENE_BANNER",
     "SCENE_FIELD_COUNT",
+    "SCENE_FIELD_NAMES",
     "SCENE_HEADER_FIELD_COUNT",
     "decode_scene_fields",
+    "decode_scene_headers",
     "decode_scene_spec",
-    "encode_float_field",
+    "encode_scene_headers",
     "encode_scene_spec",
-    "require_positive_float_field",
     "scene_fields",
 ]

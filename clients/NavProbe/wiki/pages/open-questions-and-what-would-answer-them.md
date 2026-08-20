@@ -5,8 +5,8 @@ related: ["[[the-numbers-are-scene-dependent-the-shapes-replicate]]", "[[mjwarp-
 source_paths:
   - "wiki/log.md"
 source_git_blobs:
-  "wiki/log.md": "7aa52bc3a8ecde57c6d7cc34f51247c201dcd5c6"
-fact_checked: 2026-08-18
+  "wiki/log.md": "eb66a54b50f0447fbecf791c2b4510fd0aa1c1b8"
+fact_checked: 2026-08-19
 confidence: high
 hubs: [instrument-design]
 ---
@@ -31,9 +31,26 @@ Warp's deterministic modes would make most of this wiki's findings a *setting* r
 
 Everything GPU-side was measured on two Ampere sm_86 devices: the RTX 3090 Ti (84 SMs) and, since 2026-08-16, sedona's RTX 3070 Ti Laptop (46 SMs), where the coupled-body threshold did not move ([[coupled-body-threshold-does-not-move-with-sm-count]]). That falsifies the occupancy explanation *within* an architecture but says nothing about cross-architecture codegen: both devices compile to the same sm_86 target. A threshold that is a codegen or warp-scheduling artefact could still move on a different architecture; one that is algorithmic should not.
 
-**What would answer it:** run the same sweep on a non-Ampere card (the pending sm_75 GTX 1630 purchase, or any Ada/Hopper device). The instrument needs no change — it already ran unmodified across Windows and WSL2 — and the machines do not need to share a process or even a filesystem: each records an observation or a trial, and a third process compares the files ([[the-numbers-are-scene-dependent-the-shapes-replicate]] explains why the figures rather than the shapes are what to watch).
+**What would answer it:** run the same sweep on a non-Ampere card — the sm_75 GTX 1630, in the post as of 2026-08-19. The instrument needs no change of *design*; the sweep scripts gained a `--device` flag the same day so a host holding two cards can address each one, and the resolved device is recorded in every report ([[measurement-fleet-is-reachable-by-ssh-alias]] lists what each machine can host).
+
+**The card goes in `austinpc`, beside the 3090 Ti — not in a second machine.** That is a measurement decision, not a convenience one. Question 2 asks to isolate *architecture*; putting the 1630 in the one box that already holds an Ampere card holds the OS, the driver, the CPU and the RAM fixed, leaving the architecture as the only variable. Housing it in `lavender` — the only other machine with a free slot — would introduce a second driver branch on top, which is exactly the confound [[coupled-body-threshold-does-not-move-with-sm-count]] already had to caveat when `sedona` ran driver 551.23 against this host's 13.1. The board is a full-ATX MSI PRO Z790-P WIFI with a second x16-length slot, and the card is 75 W slot-powered, so no PSU work is needed; the two things to check physically are whether the 3090 Ti's cooler blocks that slot and whether the PSU has headroom.
+
+**The recipe**, once the card is in — one run per device, then compare the decoded records rather than the terminal output:
+
+```
+python -m scripts.gpu_deterministic_sweep RUN_TO_RUN <fresh-cache-0> 64 --device cuda:0
+python -m scripts.gpu_deterministic_sweep RUN_TO_RUN <fresh-cache-1> 64 --device cuda:1
+```
+
+Each writes a `navprobe-sweep-run/1` document; `navprobe.codecs.sweep_run.decode_sweep_run` reads both, and the comparison is scene-by-scene on the verdicts. A fresh cache directory per device is not optional — a shared one would let the second run load the first's compiled kernels, which is the one thing a codegen question must not allow.
+
+**It also makes `GPU_TO_GPU` testable for the first time.** That mode compiles under the alias patch ([[tactile-alias-patch-clears-warp-deterministic-compile]]) but has never been swept, because a mode whose entire claim is *the same digest on different devices* cannot be tested with one architecture. Two architectures in one box turns it into a real experiment, and it absorbs the cross-machine digest repetition left over from question 1. If the digests match across sm_75 and sm_86 under `GPU_TO_GPU`, coupled-body reproducibility is portable rather than merely per-device — a stronger result than anything on this wiki so far.
+
+**One constraint to plan around:** 4 GiB of VRAM. The scale ladder needed `constraint_capacity` right-sized to 256 to fit 4096 worlds on a 24 GiB card ([[deterministic-mode-cost-falls-with-scale]]), so the top rungs will cap lower here. Irrelevant to the threshold sweep, which runs at `world_count = 2`.
 
 **Cheaper partial answer available first:** MJWarp exposes `Model.block_dim`. Varying it on *this* hardware tests the scheduling hypothesis without another card, and has not been done.
+
+**What is no longer needed for this question:** `emerald`. Its one job was the AVX-without-AVX2 rung, and that axis is closed by construction — MuJoCo's shipped binary will not import below AVX ([[mujoco-requires-avx-so-pre-avx-hosts-are-ineligible]]), so no processor exists that could extend it. It has no discrete GPU and no unmeasured CPU property, so it answers nothing here. Its pending Ubuntu reimage was a Windows-10-end-of-life plan, not a measurement need.
 
 ## 3. Does the coupled-body threshold survive other geometry?
 

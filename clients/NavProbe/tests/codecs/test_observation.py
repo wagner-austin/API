@@ -10,11 +10,10 @@ from navprobe.codecs.observation import (
     decode_observation_record,
     decode_value_row,
     encode_observation_record,
-    require_float_field,
 )
-from navprobe.codecs.scene import encode_float_field, encode_scene_spec
+from navprobe.codecs.scene import encode_scene_spec
 from navprobe.records import ObservationRecord, SceneSpec
-from navprobe.wireformat import SEPARATOR, WireFormatError
+from navprobe.wireformat import SEPARATOR, WireFormatError, encode_float_field
 
 
 def _record() -> ObservationRecord:
@@ -39,28 +38,6 @@ def _lines() -> list[str]:
         The encoded lines with the trailing blank removed.
     """
     return encode_observation_record(_record()).strip("\n").split("\n")
-
-
-class TestRequireFloatField:
-    """Tests for :func:`require_float_field`."""
-
-    def test_accepts_a_negative_value(self) -> None:
-        """An observed value has no range; a position may be negative."""
-        assert require_float_field(encode_float_field(-1.5), "f") == -1.5
-
-    def test_accepts_zero(self) -> None:
-        """Zero depth is a real reading, not a missing one."""
-        assert require_float_field(encode_float_field(0.0), "f") == 0.0
-
-    def test_round_trips_a_value_with_no_exact_decimal_form(self) -> None:
-        """A magnitude computed from rounded values would be of the rounding."""
-        assert require_float_field(encode_float_field(0.055), "f") == 0.055
-
-    def test_rejects_a_decimal_token(self) -> None:
-        """Decimal text is refused rather than silently parsed."""
-        with pytest.raises(WireFormatError) as caught:
-            require_float_field("0.055", "f")
-        assert caught.value.code == "NP-WIRE-014"
 
 
 class TestEncodeObservationRecord:

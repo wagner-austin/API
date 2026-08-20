@@ -200,6 +200,108 @@ def encode_bool(value: bool) -> str:
     return FALSE_TOKEN
 
 
+def encode_float_field(value: float) -> str:
+    """Encode a float exactly.
+
+    Args:
+        value: The value to encode.
+
+    Returns:
+        The value's hexadecimal form, which round-trips without loss.
+    """
+    return value.hex()
+
+
+def require_hexadecimal_float(raw: str, field: str) -> float:
+    """Convert a hexadecimal token to a float.
+
+    Args:
+        raw: The token to convert.
+        field: Field name, used in the error message.
+
+    Returns:
+        The token as a float.
+
+    Raises:
+        WireFormatError: When the token is not a hexadecimal float.
+    """
+    if not raw.startswith(("0x", "-0x", "inf", "-inf", "nan")):
+        raise WireFormatError(
+            "NP-WIRE-014",
+            f"field {field!r} must be a hexadecimal float, got {raw!r}",
+        )
+    return float.fromhex(raw)
+
+
+def require_positive_float_field(raw: str, field: str) -> float:
+    """Convert a hexadecimal token to a float greater than zero.
+
+    Args:
+        raw: The token to convert.
+        field: Field name, used in the error message.
+
+    Returns:
+        The token as a float.
+
+    Raises:
+        WireFormatError: When the token is not a hexadecimal float, or is not
+            positive. Every float in a scene is a length or a duration, and
+            neither is meaningful at zero or below.
+    """
+    value = require_hexadecimal_float(raw, field)
+    if not value > 0.0:
+        raise WireFormatError(
+            "NP-WIRE-015", f"field {field!r} must be greater than zero, got {value}"
+        )
+    return value
+
+
+def require_float_field(raw: str, field: str) -> float:
+    """Convert a hexadecimal token to a float of any sign.
+
+    The unconstrained variant. An observed value has no range at all: a
+    position may be negative, a depth may be zero, and neither is a
+    construction error. The only thing refused is a token that is not a float.
+
+    Args:
+        raw: The token to convert.
+        field: Field name, used in the error message.
+
+    Returns:
+        The token as a float.
+
+    Raises:
+        WireFormatError: When the token is not a hexadecimal float.
+    """
+    return require_hexadecimal_float(raw, field)
+
+
+def require_non_negative_float_field(raw: str, field: str) -> float:
+    """Convert a hexadecimal token to a float of zero or greater.
+
+    The variant a *measurement* needs rather than a scene parameter. A spread
+    is a range and cannot be below zero; an elapsed time may legitimately be
+    zero where a spacing or a radius may not.
+
+    Args:
+        raw: The token to convert.
+        field: Field name, used in the error message.
+
+    Returns:
+        The token as a float.
+
+    Raises:
+        WireFormatError: When the token is not a hexadecimal float, or is
+            negative.
+    """
+    value = require_hexadecimal_float(raw, field)
+    if value < 0.0:
+        raise WireFormatError(
+            "NP-WIRE-016", f"field {field!r} must be zero or greater, got {value}"
+        )
+    return value
+
+
 def header_line(key: str, value: str) -> str:
     """Build one ``key<TAB>value`` header line.
 
@@ -314,15 +416,20 @@ __all__ = [
     "TRUE_TOKEN",
     "WireFormatError",
     "encode_bool",
+    "encode_float_field",
     "encode_optional_int",
     "header_line",
     "join_document",
     "require_bool_field",
+    "require_float_field",
+    "require_hexadecimal_float",
     "require_int_field",
     "require_no_body",
     "require_non_negative_field",
+    "require_non_negative_float_field",
     "require_optional_non_negative_field",
     "require_positive_field",
+    "require_positive_float_field",
     "require_text_field",
     "split_document",
     "split_header_line",

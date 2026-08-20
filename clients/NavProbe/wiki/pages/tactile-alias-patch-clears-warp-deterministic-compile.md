@@ -6,8 +6,8 @@ source_paths:
   - "scripts/apply_tactile_alias_patch.py"
   - "scripts/det_compile_test.py"
 source_git_blobs:
-  "scripts/apply_tactile_alias_patch.py": "b244ed872f85a1e71b69c2e686e33f81810915f7"
-  "scripts/det_compile_test.py": "36ab97032303159839966c2c7afb356e78845488"
+  "scripts/apply_tactile_alias_patch.py": "a5c27614e81318fe95f5160e5049651dc313ebde"
+  "scripts/det_compile_test.py": "2703c59d1f88cd393a0f0a386761679c53b13b87"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"
@@ -23,6 +23,14 @@ measured_with:
   model: navprobe.scenes.row_scene(6, 0.055, 0.03, 0.005), nworld 2, nsensor = 0
   kernel_cache: fresh directory per run via wp.config.kernel_cache_dir (cold codegen, every module logged compiled)
   patch: scripts/apply_tactile_alias_patch.py (the PR #1591 alias-binding shape, applied to site-packages)
+  script_revision: >-
+    both cited scripts were reworked 2026-08-19 to satisfy this repo's guard rules (structured
+    output through navprobe.codecs, no bare prints, no blind excepts), and the compile gate now
+    drives the scene through navprobe.adapters.mjx_warp_state rather than hand-written
+    put_model/put_data calls. The patch's three swap sites are byte-identical to the revision
+    that ran, and its apply/revert round trip was re-verified against the installed sensor.py at
+    the rework. The gate no longer catches a rejection -- a mode Warp refuses now raises the
+    vendor's own error instead of being summarised into a FAIL document.
   gpu_sweep: cuda:0 RTX 3090 Ti, ten-scene family, TrialSpec(seed 7, 150 steps, 12 reps), deterministic_max_records 64, co-resident training load (timings not interpretable)
 hubs: [determinism-measurement]
 ---

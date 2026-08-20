@@ -8,11 +8,10 @@ from navprobe.codecs.dispersion import (
     DISPERSION_BANNER,
     decode_dispersion_record,
     encode_dispersion_record,
-    require_non_negative_float_field,
 )
-from navprobe.codecs.scene import encode_float_field, encode_scene_spec
+from navprobe.codecs.scene import encode_scene_spec
 from navprobe.records import DispersionRecord, SceneSpec
-from navprobe.wireformat import SEPARATOR, WireFormatError
+from navprobe.wireformat import SEPARATOR, WireFormatError, encode_float_field
 
 
 def _record() -> DispersionRecord:
@@ -36,34 +35,6 @@ def _lines() -> list[str]:
         The encoded lines with the trailing blank removed.
     """
     return encode_dispersion_record(_record()).strip("\n").split("\n")
-
-
-class TestNonNegativeFloatField:
-    """Tests for :func:`require_non_negative_float_field`."""
-
-    def test_accepts_zero(self) -> None:
-        """A deterministic configuration has a spread of exactly zero.
-
-        This is the most important value the record carries, so it must decode
-        rather than being rejected as out of range.
-        """
-        assert require_non_negative_float_field(encode_float_field(0.0), "f") == 0.0
-
-    def test_round_trips_a_tiny_spread(self) -> None:
-        """A last-bit spread survives, which is the value that matters."""
-        assert require_non_negative_float_field(encode_float_field(4.47e-08), "f") == 4.47e-08
-
-    def test_rejects_a_negative_spread(self) -> None:
-        """A range cannot be below zero."""
-        with pytest.raises(WireFormatError) as caught:
-            require_non_negative_float_field(encode_float_field(-1.0), "f")
-        assert caught.value.code == "NP-WIRE-016"
-
-    def test_rejects_a_decimal_token(self) -> None:
-        """Decimal text is refused rather than silently parsed."""
-        with pytest.raises(WireFormatError) as caught:
-            require_non_negative_float_field("0.5", "f")
-        assert caught.value.code == "NP-WIRE-014"
 
 
 class TestDispersionRecordCodec:

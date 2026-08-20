@@ -17,15 +17,20 @@ from navprobe.wireformat import (
     TRUE_TOKEN,
     WireFormatError,
     encode_bool,
+    encode_float_field,
     encode_optional_int,
     header_line,
     join_document,
     require_bool_field,
+    require_float_field,
+    require_hexadecimal_float,
     require_int_field,
     require_no_body,
     require_non_negative_field,
+    require_non_negative_float_field,
     require_optional_non_negative_field,
     require_positive_field,
+    require_positive_float_field,
     require_text_field,
     split_document,
     split_header_line,
@@ -33,6 +38,131 @@ from navprobe.wireformat import (
 
 #: A banner used only to exercise the shared document splitter.
 _BANNER = "navprobe-test/1"
+
+
+class TestEncodeFloatField:
+    """Tests for :func:`encode_float_field`."""
+
+    def test_round_trips_a_value_with_no_exact_decimal_form(self) -> None:
+        """The hexadecimal form recovers the original bits.
+
+        0.055 is not exactly representable in binary, so this fails for any
+        codec that goes through a rounded decimal string.
+        """
+        assert require_float_field(encode_float_field(0.055), "f") == 0.055
+
+    def test_round_trips_a_very_small_value(self) -> None:
+        """Subnormal-adjacent values survive, which decimal formatting need not."""
+        assert require_float_field(encode_float_field(1e-300), "f") == 1e-300
+
+    def test_round_trips_a_negative_value(self) -> None:
+        """Sign survives the hexadecimal form."""
+        assert require_float_field(encode_float_field(-1.5), "f") == -1.5
+
+
+class TestRequireHexadecimalFloat:
+    """Tests for :func:`require_hexadecimal_float`, the shared prefix check."""
+
+    def test_accepts_zero(self) -> None:
+        """Zero is a real reading, not a missing one."""
+        assert require_hexadecimal_float(encode_float_field(0.0), "f") == 0.0
+
+    def test_rejects_a_decimal_token(self) -> None:
+        """Decimal text is refused rather than silently parsed.
+
+        ``float()`` would accept it, which is exactly why the token is matched
+        rather than converted: the format accepts less than the parser does.
+        """
+        with pytest.raises(WireFormatError) as caught:
+            require_hexadecimal_float("0.055", "f")
+        assert caught.value.code == "NP-WIRE-014"
+
+    def test_accepts_not_a_number(self) -> None:
+        """NaN passes the prefix check, so range checks must catch it.
+
+        Pinned because the positive and non-negative variants rely on it: if
+        this rejected NaN, their range checks would be unreachable.
+        """
+        parsed = require_hexadecimal_float("nan", "f")
+        assert parsed != parsed
+
+
+class TestRequireFloatField:
+    """Tests for :func:`require_float_field`, the unconstrained variant."""
+
+    def test_accepts_a_negative_value(self) -> None:
+        """An observed value has no range; a position may be negative."""
+        assert require_float_field(encode_float_field(-1.5), "f") == -1.5
+
+    def test_accepts_zero(self) -> None:
+        """Zero depth is a real reading, not a missing one."""
+        assert require_float_field(encode_float_field(0.0), "f") == 0.0
+
+    def test_rejects_a_decimal_token(self) -> None:
+        """Decimal text is refused rather than silently parsed."""
+        with pytest.raises(WireFormatError) as caught:
+            require_float_field("0.055", "f")
+        assert caught.value.code == "NP-WIRE-014"
+
+
+class TestRequirePositiveFloatField:
+    """Tests for :func:`require_positive_float_field`."""
+
+    def test_accepts_a_positive_value(self) -> None:
+        """A length round-trips through the exact encoding."""
+        assert require_positive_float_field(encode_float_field(0.055), "f") == 0.055
+
+    def test_rejects_a_zero_value(self) -> None:
+        """A length or duration of zero describes no scene."""
+        with pytest.raises(WireFormatError) as caught:
+            require_positive_float_field(encode_float_field(0.0), "f")
+        assert caught.value.code == "NP-WIRE-015"
+
+    def test_rejects_a_negative_value(self) -> None:
+        """Negative lengths are refused by the same check."""
+        with pytest.raises(WireFormatError) as caught:
+            require_positive_float_field(encode_float_field(-0.5), "f")
+        assert caught.value.code == "NP-WIRE-015"
+
+    def test_rejects_not_a_number(self) -> None:
+        """NaN passes the prefix check and must be caught by the range check."""
+        with pytest.raises(WireFormatError) as caught:
+            require_positive_float_field("nan", "f")
+        assert caught.value.code == "NP-WIRE-015"
+
+    def test_rejects_a_decimal_token(self) -> None:
+        """The prefix check fires before the range check."""
+        with pytest.raises(WireFormatError) as caught:
+            require_positive_float_field("0.055", "f")
+        assert caught.value.code == "NP-WIRE-014"
+
+
+class TestRequireNonNegativeFloatField:
+    """Tests for :func:`require_non_negative_float_field`."""
+
+    def test_accepts_zero(self) -> None:
+        """A deterministic configuration has a spread of exactly zero.
+
+        This is the most important value such a record carries, so it must
+        decode rather than being rejected as out of range.
+        """
+        assert require_non_negative_float_field(encode_float_field(0.0), "f") == 0.0
+
+    def test_round_trips_a_tiny_spread(self) -> None:
+        """A last-bit spread survives, which is the value that matters."""
+        assert require_non_negative_float_field(encode_float_field(4.47e-08), "f") == 4.47e-08
+
+    def test_rejects_a_negative_spread(self) -> None:
+        """A range cannot be below zero."""
+        with pytest.raises(WireFormatError) as caught:
+            require_non_negative_float_field(encode_float_field(-1.0), "f")
+        assert caught.value.code == "NP-WIRE-016"
+
+    def test_rejects_a_decimal_token(self) -> None:
+        """Decimal text is refused rather than silently parsed."""
+        with pytest.raises(WireFormatError) as caught:
+            require_non_negative_float_field("0.5", "f")
+        assert caught.value.code == "NP-WIRE-014"
 
 
 class TestRequireIntField:
