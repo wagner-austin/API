@@ -36,7 +36,7 @@ from model_trainer.api.schemas.tokenizers import (
     TokenizerTrainResponse,
 )
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.dataset import DatasetConfig
+from model_trainer.core.contracts.dataset import CorpusSplit, DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.services.registries import ModelRegistry
@@ -87,11 +87,11 @@ class ModelDirProto(Protocol):
         ...
 
 
-class SplitCorpusFilesProto(Protocol):
-    """Protocol for split_corpus_files hook."""
+class SplitCorpusProto(Protocol):
+    """Protocol for the split_corpus hook."""
 
-    def __call__(self, cfg: DatasetConfig) -> tuple[list[str], list[str], list[str]]:
-        """Split corpus files into train/val/test sets."""
+    def __call__(self, cfg: DatasetConfig) -> CorpusSplit:
+        """Partition a corpus into disjoint train/validation/test lines."""
         ...
 
 
@@ -406,12 +406,17 @@ def _default_model_dir(settings: Settings, run_id: str) -> Path:
     return _model_dir(settings, run_id)
 
 
-def _default_split_corpus_files(
-    cfg: DatasetConfig,
-) -> tuple[list[str], list[str], list[str]]:
-    """Production split_corpus_files - used as default hook."""
+def _default_split_corpus(cfg: DatasetConfig) -> CorpusSplit:
+    """Production split_corpus - used as default hook.
+
+    Args:
+        cfg: Dataset configuration with corpus path and split ratios.
+
+    Returns:
+        The three disjoint partitions, as corpus lines.
+    """
     from model_trainer.core.services.training.dataset_builder import (
-        split_corpus_files as _split,
+        split_corpus as _split,
     )
 
     return _split(cfg)
@@ -479,7 +484,7 @@ cuda_device_name: CudaDeviceNameProto = _default_cuda_device_name
 env_git_commit: EnvGitCommitProto = _default_env_git_commit
 pkg_version: PkgVersionProto = _default_pkg_version
 model_dir: ModelDirProto = _default_model_dir
-split_corpus_files: SplitCorpusFilesProto = _default_split_corpus_files
+split_corpus: SplitCorpusProto = _default_split_corpus
 freeze_embeddings: FreezeEmbeddingsProto = _default_freeze_embeddings
 shutil_which: ShutilWhichProto = _default_shutil_which
 

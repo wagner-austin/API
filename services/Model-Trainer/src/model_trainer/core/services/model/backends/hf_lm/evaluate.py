@@ -127,9 +127,9 @@ def evaluate_hf_lm(
         holdout_fraction=cfg["holdout_fraction"],
         test_split_ratio=cfg["test_split_ratio"],
     )
-    _, val_files, _ = dataset_builder.split(ds_cfg)
+    split = dataset_builder.split(ds_cfg)
     dataset: CausalLMDatasetProto = create_dataset(
-        files=val_files,
+        lines=split["validation"],
         tokenizer=prepared.tok_for_dataset,
         max_len=cfg["max_seq_len"],
         eos_id=eos_id,

@@ -82,9 +82,9 @@ def evaluate_gpt2(
         holdout_fraction=cfg["holdout_fraction"],
         test_split_ratio=cfg["test_split_ratio"],
     )
-    _, val_files, _ = dataset_builder.split(ds_cfg)
+    split = dataset_builder.split(ds_cfg)
     dataset = CausalLMDataset(
-        files=val_files,
+        lines=split["validation"],
         tokenizer=tokenizer,
         max_len=cfg["max_seq_len"],
         eos_id=eos_id,

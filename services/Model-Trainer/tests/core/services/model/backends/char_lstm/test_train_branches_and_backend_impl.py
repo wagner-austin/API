@@ -163,6 +163,78 @@ def test_gather_versions_handles_missing() -> None:
     assert all(v == "unknown" for v in vers.values())
 
 
+class _EvalDS:
+    """Dataset of a fixed number of identical two-token rows."""
+
+    def __init__(self: _EvalDS, rows: int) -> None:
+        self._rows = rows
+
+    def __len__(self: _EvalDS) -> int:
+        return self._rows
+
+    def __getitem__(self: _EvalDS, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        vals: list[int] = [1, 1]
+        ids = torch.tensor(vals, dtype=torch.long)
+        return (ids, ids)
+
+
+def _eval_trainer(*, cancelled: bool) -> bt.BaseTrainer:
+    """Build a trainer whose evaluation runs on CPU with a fixed cancel answer.
+
+    Args:
+        cancelled: What the cancellation callback reports on every call.
+
+    Returns:
+        A trainer ready for ``_run_evaluation``.
+    """
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-eval",
+        redis_hb=lambda _: None,
+        cancelled=lambda: cancelled,
+        resume=False,
+        progress=None,
+        service_name="char-lstm-train",
+    )
+    trainer._device = torch.device("cpu")
+    return trainer
+
+
+def test_run_evaluation_returns_partial_metrics_when_cancelled() -> None:
+    """Cancelling mid-evaluation returns what was measured, not a whole pass.
+
+    This path used to be reached only because a single-file corpus was split
+    into itself three times, which handed every such run a validation loader.
+    Now that the split is disjoint, the path is exercised directly.
+
+    Cancellation is checked before the first batch is scored, so no batch
+    contributes and the reported loss is the zero-batch average rather than the
+    model's 0.1 per-batch loss.
+    """
+    loader = DataLoader(_EvalDS(4), batch_size=1, shuffle=False)
+
+    metrics = _eval_trainer(cancelled=True)._run_evaluation(loader, eval_type="validation")
+
+    assert metrics["val_loss"] == 0.0
+    assert metrics["val_ppl"] == 1.0
+
+
+def test_run_evaluation_logs_progress_on_an_interval_not_every_batch() -> None:
+    """Twenty batches give ``log_interval = 2``, so half the batches skip logging.
+
+    That exercises the progress check in both directions; with fewer than ten
+    batches the interval collapses to 1 and the skip branch never runs.
+    """
+    loader = DataLoader(_EvalDS(20), batch_size=1, shuffle=False)
+
+    metrics = _eval_trainer(cancelled=False)._run_evaluation(loader, eval_type="test")
+
+    # _LM returns a constant 0.1 loss per batch, so the average is that loss.
+    assert abs(metrics["val_loss"] - 0.1) < 1e-6
+
+
 def test_trainer_train_one_epoch_cancelled_early_triggers_return() -> None:
     """Test that _train_one_epoch returns immediately when cancelled."""
 
@@ -334,7 +406,9 @@ def test_train_prepared_calls_save_when_not_cancelled(
     tmp_path: Path, settings_with_paths: Settings
 ) -> None:
     from model_trainer.core import _test_hooks
+    from model_trainer.core.contracts.dataset import CorpusSplit
     from model_trainer.core.contracts.dataset import DatasetConfig as DS_Cfg
+    from model_trainer.core.services.training.dataset_builder import read_corpus_lines
 
     # Create corpus file
     corpus_dir = tmp_path / "corpus"
@@ -342,11 +416,11 @@ def test_train_prepared_calls_save_when_not_cancelled(
     corpus_file = corpus_dir / "train.txt"
     corpus_file.write_text("hello world test data\n" * 10, encoding="utf-8")
 
-    # Hook split_corpus_files to return our test file
-    def _test_split(cfg: DS_Cfg) -> tuple[list[str], list[str], list[str]]:
-        return [str(corpus_file)], [], []
+    # Hook split_corpus to train on our test corpus with no holdout
+    def _test_split(cfg: DS_Cfg) -> CorpusSplit:
+        return CorpusSplit(train=read_corpus_lines([str(corpus_file)]), validation=(), test=())
 
-    _test_hooks.split_corpus_files = _test_split
+    _test_hooks.split_corpus = _test_split
 
     class _RecorderLM(_LM):
         def __init__(self: _RecorderLM) -> None:
@@ -418,7 +492,9 @@ def test_train_prepared_skips_save_when_cancelled(
     tmp_path: Path, settings_with_paths: Settings
 ) -> None:
     from model_trainer.core import _test_hooks
+    from model_trainer.core.contracts.dataset import CorpusSplit
     from model_trainer.core.contracts.dataset import DatasetConfig as DS_Cfg
+    from model_trainer.core.services.training.dataset_builder import read_corpus_lines
 
     # Create corpus file
     corpus_dir = tmp_path / "corpus"
@@ -426,11 +502,11 @@ def test_train_prepared_skips_save_when_cancelled(
     corpus_file = corpus_dir / "train.txt"
     corpus_file.write_text("hello world test data\n" * 10, encoding="utf-8")
 
-    # Hook split_corpus_files to return our test file
-    def _test_split(cfg: DS_Cfg) -> tuple[list[str], list[str], list[str]]:
-        return [str(corpus_file)], [], []
+    # Hook split_corpus to train on our test corpus with no holdout
+    def _test_split(cfg: DS_Cfg) -> CorpusSplit:
+        return CorpusSplit(train=read_corpus_lines([str(corpus_file)]), validation=(), test=())
 
-    _test_hooks.split_corpus_files = _test_split
+    _test_hooks.split_corpus = _test_split
 
     class _RecorderLM(_LM):
         def __init__(self: _RecorderLM) -> None:
@@ -703,7 +779,9 @@ def test_freeze_embeddings_when_enabled() -> None:
 def test_train_with_freeze_embed_enabled(tmp_path: Path) -> None:
     """Test that training with freeze_embed=True calls _freeze_embeddings hook."""
     from model_trainer.core import _test_hooks
+    from model_trainer.core.contracts.dataset import CorpusSplit
     from model_trainer.core.contracts.dataset import DatasetConfig as DS_Cfg
+    from model_trainer.core.services.training.dataset_builder import read_corpus_lines
 
     freeze_called = {"count": 0}
 
@@ -720,11 +798,11 @@ def test_train_with_freeze_embed_enabled(tmp_path: Path) -> None:
     corpus_file = corpus_dir / "train.txt"
     corpus_file.write_text("hello world test data\n" * 10, encoding="utf-8")
 
-    # Hook split_corpus_files to return our test file
-    def _test_split(cfg: DS_Cfg) -> tuple[list[str], list[str], list[str]]:
-        return [str(corpus_file)], [], []
+    # Hook split_corpus to train on our test corpus with no holdout
+    def _test_split(cfg: DS_Cfg) -> CorpusSplit:
+        return CorpusSplit(train=read_corpus_lines([str(corpus_file)]), validation=(), test=())
 
-    _test_hooks.split_corpus_files = _test_split
+    _test_hooks.split_corpus = _test_split
 
     # Hook model_dir to use tmp_path
     def _test_model_dir(settings: Settings, run_id: str) -> Path:
@@ -1281,12 +1359,13 @@ def test_make_loader_returns_none_for_empty_files(tmp_path: Path) -> None:
 def test_build_all_loaders_raises_when_no_train_data(tmp_path: Path) -> None:
     """Test _build_all_loaders raises RuntimeError when no training data (line 379)."""
     from model_trainer.core import _test_hooks
+    from model_trainer.core.contracts.dataset import CorpusSplit
     from model_trainer.core.contracts.dataset import DatasetConfig as DS_Cfg
 
-    def _fake_split(cfg: DS_Cfg) -> tuple[list[str], list[str], list[str]]:
-        return [], [], []
+    def _fake_split(cfg: DS_Cfg) -> CorpusSplit:
+        return CorpusSplit(train=(), validation=(), test=())
 
-    _test_hooks.split_corpus_files = _fake_split
+    _test_hooks.split_corpus = _fake_split
 
     cfg: ModelTrainConfig = {
         **_make_cfg(),

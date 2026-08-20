@@ -89,7 +89,11 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
     artifacts = Path(settings["app"]["artifacts_root"])
     corpus = tmp_path / "corpus"
     corpus.mkdir()
-    (corpus / "a.txt").write_text("this is one here\nthis is two here\n", encoding="utf-8")
+    # Twenty lines, not two: the split is over corpus lines, so the training
+    # run behind this cloze job needs enough of them to hold a partition out.
+    (corpus / "a.txt").write_text(
+        "".join(f"this is line {i} here\n" for i in range(20)), encoding="utf-8"
+    )
 
     tok_id = "tok-cloze"
     tok_dir = artifacts / "tokenizers" / tok_id

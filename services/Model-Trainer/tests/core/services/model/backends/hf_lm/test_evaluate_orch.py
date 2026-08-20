@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Protocol
 
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.dataset import DatasetConfig
+from model_trainer.core.contracts.dataset import CorpusSplit, DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoder
@@ -46,24 +46,24 @@ class _SettingsFactory(Protocol):
 class _FakeDatasetBuilder:
     """Fake dataset builder for testing."""
 
-    def __init__(self, val_files: list[str]) -> None:
+    def __init__(self, val_lines: tuple[str, ...]) -> None:
         """Initialize.
 
         Args:
-            val_files: Validation file paths.
+            val_lines: Corpus lines the validation partition should hold.
         """
-        self._val_files = val_files
+        self._val_lines = val_lines
 
-    def split(self, cfg: DatasetConfig) -> tuple[list[str], list[str], list[str]]:
-        """Split corpus.
+    def split(self, cfg: DatasetConfig) -> CorpusSplit:
+        """Partition a corpus.
 
         Args:
             cfg: Dataset config.
 
         Returns:
-            Train, val, test file lists.
+            The three partitions, with only validation populated.
         """
-        return [], self._val_files, []
+        return CorpusSplit(train=(), validation=self._val_lines, test=())
 
 
 class TestGetAutocastContext:
@@ -156,7 +156,7 @@ class TestEvaluateHfLm:
 
         def fake_create_dataset(
             *,
-            files: Sequence[str],
+            lines: Sequence[str],
             tokenizer: Encoder,
             max_len: int,
             eos_id: int,
@@ -186,7 +186,7 @@ class TestEvaluateHfLm:
             artifacts_root=str(tmp_path),
             data_root=str(tmp_path),
         )
-        dataset_builder = _FakeDatasetBuilder(["val_file.txt"])
+        dataset_builder = _FakeDatasetBuilder(("val line one", "val line two"))
 
         result = evaluate_hf_lm(
             run_id="test-run",
@@ -209,7 +209,7 @@ class TestEvaluateHfLm:
 
         def fake_create_dataset(
             *,
-            files: Sequence[str],
+            lines: Sequence[str],
             tokenizer: Encoder,
             max_len: int,
             eos_id: int,
@@ -246,7 +246,7 @@ class TestEvaluateHfLm:
             artifacts_root=str(tmp_path),
             data_root=str(tmp_path),
         )
-        dataset_builder = _FakeDatasetBuilder([])
+        dataset_builder = _FakeDatasetBuilder(())
 
         result = evaluate_hf_lm(
             run_id="test-run",
@@ -283,7 +283,7 @@ class TestEvaluateHfLm:
 
         def fake_create_dataset(
             *,
-            files: Sequence[str],
+            lines: Sequence[str],
             tokenizer: Encoder,
             max_len: int,
             eos_id: int,
@@ -321,7 +321,7 @@ class TestEvaluateHfLm:
             artifacts_root=str(tmp_path),
             data_root=str(tmp_path),
         )
-        dataset_builder = _FakeDatasetBuilder(["val_file.txt"])
+        dataset_builder = _FakeDatasetBuilder(("val line one", "val line two"))
 
         result = evaluate_hf_lm(
             run_id="test-run",

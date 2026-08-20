@@ -1,32 +1,74 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Final
 
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.logging import get_logger
 
-from ...contracts.dataset import DatasetConfig
+from ...contracts.dataset import CorpusSplit, DatasetConfig
 from ...encoding import Encoded, Encoder
 from ..data.corpus import list_text_files
 
 _logger: Final = get_logger(__name__)
 
 
-def split_corpus_files(cfg: DatasetConfig) -> tuple[list[str], list[str], list[str]]:
-    """Split corpus files into train/val/test sets.
+def read_corpus_lines(files: Sequence[str]) -> tuple[str, ...]:
+    """Read every content-bearing line of the given files, in file order.
 
-    Files are split in order: train | val | test.
-    The split ratios are controlled by holdout_fraction (val) and test_split_ratio (test).
+    Blank lines are dropped here rather than during tokenization so that the
+    split fractions are taken over lines that actually carry corpus content.
 
     Args:
-        cfg: Dataset configuration with corpus_path, holdout_fraction, test_split_ratio.
+        files: Paths to read, in the order their contents are concatenated.
 
     Returns:
-        Tuple of (train_files, val_files, test_files).
+        The stripped, non-empty lines of every file, concatenated in order.
+    """
+    lines: list[str] = []
+    for path in files:
+        with open(path, encoding="utf-8", errors="ignore") as handle:
+            for raw in handle:
+                stripped = raw.strip()
+                if stripped:
+                    lines.append(stripped)
+    return tuple(lines)
+
+
+def _partition_size(total: int, ratio: float) -> int:
+    """Line count a requested ratio claims, never rounding a wanted split to nothing.
+
+    Args:
+        total: Content lines available in the whole corpus.
+        ratio: Requested fraction; zero or less requests no partition at all.
+
+    Returns:
+        The partition's line count, or zero when no partition was requested.
+    """
+    if ratio <= 0:
+        return 0
+    return max(1, int(total * ratio))
+
+
+def split_corpus(cfg: DatasetConfig) -> CorpusSplit:
+    """Partition a corpus into disjoint train, validation and test lines.
+
+    Lines are assigned in corpus order -- train, then validation, then test --
+    so a given corpus and set of ratios always produce the same partition.
+
+    Args:
+        cfg: Dataset configuration carrying corpus_path, holdout_fraction and
+            test_split_ratio.
+
+    Returns:
+        The three disjoint partitions. Validation and test are empty when their
+        ratio is zero, which is how a caller asks to train without a holdout.
 
     Raises:
-        AppError: If no text files found under corpus_path (CORPUS_EMPTY).
+        AppError: ``CORPUS_EMPTY`` when corpus_path holds no text files, or
+            holds only blank ones. ``CORPUS_HOLDOUT_UNSATISFIABLE`` when the
+            requested fractions would leave no line to train on.
     """
     files = list_text_files(cfg.corpus_path)
     if not files:
@@ -36,28 +78,37 @@ def split_corpus_files(cfg: DatasetConfig) -> tuple[list[str], list[str], list[s
             model_trainer_status_for(ModelTrainerErrorCode.CORPUS_EMPTY),
         )
 
-    n = len(files)
+    lines = read_corpus_lines(files)
+    total = len(lines)
+    if total == 0:
+        raise AppError(
+            ModelTrainerErrorCode.CORPUS_EMPTY,
+            f"The {len(files)} text file(s) under {cfg.corpus_path} hold no non-blank lines",
+            model_trainer_status_for(ModelTrainerErrorCode.CORPUS_EMPTY),
+        )
 
-    # Calculate split counts (ensure at least 1 file per non-zero split)
-    test_n = max(1, int(n * cfg.test_split_ratio)) if cfg.test_split_ratio > 0 else 0
-    val_n = max(1, int(n * cfg.holdout_fraction)) if cfg.holdout_fraction > 0 else 0
+    test_n = _partition_size(total, cfg.test_split_ratio)
+    val_n = _partition_size(total, cfg.holdout_fraction)
+    if test_n + val_n >= total:
+        raise AppError(
+            ModelTrainerErrorCode.CORPUS_HOLDOUT_UNSATISFIABLE,
+            (
+                f"A corpus of {total} line(s) cannot yield {val_n} validation and "
+                f"{test_n} test line(s) disjoint from its training lines. Lower "
+                f"holdout_fraction (={cfg.holdout_fraction}) or test_split_ratio "
+                f"(={cfg.test_split_ratio}), enlarge the corpus, or pass 0 for both "
+                f"to train without a holdout."
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CORPUS_HOLDOUT_UNSATISFIABLE),
+        )
 
-    # Handle edge case: not enough files for all splits
-    if test_n + val_n >= n:
-        # If only 1 file, use it for all splits
-        if n == 1:
-            return files, files, files
-        # Otherwise, give priority to train, then val, then test
-        test_n = min(test_n, max(0, n - 2))
-        val_n = min(val_n, max(0, n - test_n - 1))
-
-    # Split: train | val | test (from end of list)
-    test_files = files[-test_n:] if test_n > 0 else []
-    remaining = files[:-test_n] if test_n > 0 else files
-    val_files = remaining[-val_n:] if val_n > 0 else []
-    train_files = remaining[:-val_n] if val_n > 0 and len(remaining) > val_n else remaining
-
-    return train_files, val_files, test_files
+    train_end = total - val_n - test_n
+    val_end = train_end + val_n
+    return CorpusSplit(
+        train=lines[:train_end],
+        validation=lines[train_end:val_end],
+        test=lines[val_end:],
+    )
 
 
 IGNORE_INDEX = -100
@@ -115,72 +166,58 @@ class CausalLMDataset:
     def __init__(
         self: CausalLMDataset,
         *,
-        files: list[str],
+        lines: Sequence[str],
         tokenizer: Encoder,
         max_len: int,
         eos_id: int,
         pad_id: int,
         loss_mask_prefix_separator: str | None = None,
     ) -> None:
-        total_files = len(files)
+        total_lines = len(lines)
         _logger.info(
-            "Tokenization started files=%d",
-            total_files,
+            "Tokenization started lines=%d",
+            total_lines,
             extra={
                 "category": "dataset",
                 "event": "tokenization_started",
-                "total_files": total_files,
+                "total_lines": total_lines,
             },
         )
 
         self._ids: list[int] = []
         self._labels: list[int] = []
-        total_lines = 0
-        files_processed = 0
         masked_tokens = 0
 
-        # Log progress every 10% of files or at least every 10 files
-        log_interval = max(1, min(10, total_files // 10))
+        # Log progress every 10% of lines, and never more than ten times.
+        log_interval = max(1, total_lines // 10)
 
-        for fp in files:
-            file_lines = 0
-            with open(fp, encoding="utf-8", errors="ignore") as f:
-                for line in f:
-                    s = line.strip()
-                    if not s:
-                        continue
-                    prefix_ids, body_ids = _split_line(s, tokenizer, loss_mask_prefix_separator)
-                    self._ids.extend([*prefix_ids, *body_ids, eos_id])
-                    self._labels.extend(
-                        [
-                            *([IGNORE_INDEX] * len(prefix_ids)),
-                            *body_ids,
-                            eos_id,
-                        ]
-                    )
-                    masked_tokens += len(prefix_ids)
-                    file_lines += 1
-            total_lines += file_lines
-            files_processed += 1
+        for index, line in enumerate(lines, start=1):
+            prefix_ids, body_ids = _split_line(line, tokenizer, loss_mask_prefix_separator)
+            self._ids.extend([*prefix_ids, *body_ids, eos_id])
+            self._labels.extend(
+                [
+                    *([IGNORE_INDEX] * len(prefix_ids)),
+                    *body_ids,
+                    eos_id,
+                ]
+            )
+            masked_tokens += len(prefix_ids)
 
-            # Log progress periodically
-            if files_processed % log_interval == 0:
-                progress_pct = int((files_processed * 100) / total_files)
+            if index % log_interval == 0:
+                progress_pct = int((index * 100) / total_lines)
                 _logger.info(
-                    "Tokenization progress files=%d/%d (%.0f%%) tokens=%d lines=%d",
-                    files_processed,
-                    total_files,
+                    "Tokenization progress lines=%d/%d (%d%%) tokens=%d",
+                    index,
+                    total_lines,
                     progress_pct,
                     len(self._ids),
-                    total_lines,
                     extra={
                         "category": "dataset",
                         "event": "tokenization_progress",
-                        "files_processed": files_processed,
-                        "total_files": total_files,
+                        "lines_processed": index,
+                        "total_lines": total_lines,
                         "progress_pct": progress_pct,
                         "tokens": len(self._ids),
-                        "lines": total_lines,
                     },
                 )
 
@@ -197,8 +234,7 @@ class CausalLMDataset:
         # means the separator is not discriminating.
         masked_pct = (100.0 * masked_tokens / len(self._ids)) if self._ids else 0.0
         _logger.info(
-            "Tokenization completed files=%d lines=%d tokens=%d chunks=%d masked=%d (%.2f%%)",
-            total_files,
+            "Tokenization completed lines=%d tokens=%d chunks=%d masked=%d (%.2f%%)",
             total_lines,
             len(self._ids),
             num_chunks,
@@ -207,7 +243,6 @@ class CausalLMDataset:
             extra={
                 "category": "dataset",
                 "event": "tokenization_completed",
-                "files": total_files,
                 "lines": total_lines,
                 "tokens": len(self._ids),
                 "chunks": num_chunks,

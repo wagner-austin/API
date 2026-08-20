@@ -82,10 +82,10 @@ def evaluate_char_lstm(
         holdout_fraction=cfg["holdout_fraction"],
         test_split_ratio=cfg["test_split_ratio"],
     )
-    _, val_files, _ = dataset_builder.split(ds_cfg)
+    split = dataset_builder.split(ds_cfg)
     prepared_for_tok = _load_prepared_from_handle(str(_model_dir(settings, run_id)), handle)
     dataset = CausalLMDataset(
-        files=val_files,
+        lines=split["validation"],
         tokenizer=prepared_for_tok.tok_for_dataset,
         max_len=cfg["max_seq_len"],
         eos_id=eos_id,

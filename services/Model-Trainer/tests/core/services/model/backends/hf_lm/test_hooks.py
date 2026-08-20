@@ -215,19 +215,13 @@ class TestDefaultReadTextFile:
 class TestDefaultCreateCausalDataset:
     """Tests for _default_create_causal_dataset function."""
 
-    def test_creates_dataset_from_files(self, tmp_path: Path) -> None:
+    def test_creates_dataset_from_lines(self) -> None:
         """Test that _default_create_causal_dataset creates a dataset."""
         import torch
 
-        # Create test files
-        file1 = tmp_path / "train1.txt"
-        file1.write_text("hello world\n", encoding="utf-8")
-        file2 = tmp_path / "train2.txt"
-        file2.write_text("goodbye world\n", encoding="utf-8")
-
         encoder = FakeEncoder()
         dataset = _default_create_causal_dataset(
-            files=[str(file1), str(file2)],
+            lines=("hello world", "goodbye world"),
             tokenizer=encoder,
             max_len=64,
             eos_id=0,
@@ -249,16 +243,11 @@ class TestDefaultCreateCausalDataset:
 class TestDefaultCreateDataloader:
     """Tests for _default_create_dataloader function."""
 
-    def test_creates_dataloader_from_dataset(self, tmp_path: Path) -> None:
+    def test_creates_dataloader_from_dataset(self) -> None:
         """Test that _default_create_dataloader creates a DataLoader."""
-
-        # Create a test file for the dataset
-        file1 = tmp_path / "train.txt"
-        file1.write_text("hello world\n", encoding="utf-8")
-
         encoder = FakeEncoder()
         dataset = _default_create_causal_dataset(
-            files=[str(file1)],
+            lines=("hello world",),
             tokenizer=encoder,
             max_len=64,
             eos_id=0,

@@ -506,13 +506,13 @@ class BaseTrainer:
             holdout_fraction=self._cfg["holdout_fraction"],
             test_split_ratio=self._cfg["test_split_ratio"],
         )
-        train_files, val_files, test_files = _test_hooks.split_corpus_files(ds_cfg)
+        split = _test_hooks.split_corpus(ds_cfg)
 
-        def make_loader(files: list[str], shuffle: bool) -> DataLoader | None:
-            if not files:
+        def make_loader(lines: tuple[str, ...], shuffle: bool) -> DataLoader | None:
+            if not lines:
                 return None
             dataset = CausalLMDataset(
-                files=files,
+                lines=lines,
                 tokenizer=self._prepared.tok_for_dataset,
                 max_len=self._prepared.max_seq_len,
                 eos_id=self._prepared.eos_id,
@@ -527,9 +527,9 @@ class BaseTrainer:
                 pin_memory=self._cfg["data_pin_memory"],
             )
 
-        train_loader = make_loader(train_files, shuffle=True)
-        val_loader = make_loader(val_files, shuffle=False)
-        test_loader = make_loader(test_files, shuffle=False)
+        train_loader = make_loader(split["train"], shuffle=True)
+        val_loader = make_loader(split["validation"], shuffle=False)
+        test_loader = make_loader(split["test"], shuffle=False)
 
         if train_loader is None:
             raise RuntimeError("No training data available")
@@ -545,9 +545,9 @@ class BaseTrainer:
             extra={
                 "category": "training",
                 "event": "loaders_built",
-                "train_files": len(train_files),
-                "val_files": len(val_files),
-                "test_files": len(test_files),
+                "train_lines": len(split["train"]),
+                "val_lines": len(split["validation"]),
+                "test_lines": len(split["test"]),
                 "train_batches": train_batches,
                 "val_batches": val_batches,
                 "test_batches": test_batches,

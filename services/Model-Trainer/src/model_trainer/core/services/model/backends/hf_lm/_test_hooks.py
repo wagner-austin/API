@@ -232,7 +232,7 @@ class CreateCausalDatasetFn(Protocol):
     def __call__(
         self,
         *,
-        files: Sequence[str],
+        lines: Sequence[str],
         tokenizer: Encoder,
         max_len: int,
         eos_id: int,
@@ -241,7 +241,7 @@ class CreateCausalDatasetFn(Protocol):
         """Create a causal LM dataset.
 
         Args:
-            files: List of file paths containing training data.
+            lines: Corpus lines to tokenize, already partitioned.
             tokenizer: Encoder for tokenization.
             max_len: Maximum sequence length.
             eos_id: End of sequence token ID.
@@ -471,7 +471,7 @@ def _default_load_prepared_model(
 
 def _default_create_causal_dataset(
     *,
-    files: Sequence[str],
+    lines: Sequence[str],
     tokenizer: Encoder,
     max_len: int,
     eos_id: int,
@@ -480,7 +480,7 @@ def _default_create_causal_dataset(
     """Production implementation for creating CausalLMDataset.
 
     Args:
-        files: List of file paths containing training data.
+        lines: Corpus lines to tokenize, already partitioned.
         tokenizer: Encoder for tokenization.
         max_len: Maximum sequence length.
         eos_id: End of sequence token ID.
@@ -492,7 +492,7 @@ def _default_create_causal_dataset(
     from model_trainer.core.services.training.dataset_builder import CausalLMDataset
 
     dataset: CausalLMDatasetProto = CausalLMDataset(
-        files=list(files),
+        lines=lines,
         tokenizer=tokenizer,
         max_len=max_len,
         eos_id=eos_id,

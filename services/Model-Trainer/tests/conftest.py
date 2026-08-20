@@ -71,7 +71,7 @@ def _reset_test_hooks_impl(
     orig_cuda_is_available = _test_hooks.cuda_is_available
     orig_pkg_version = _test_hooks.pkg_version
     orig_model_dir = _test_hooks.model_dir
-    orig_split_corpus_files = _test_hooks.split_corpus_files
+    orig_split_corpus = _test_hooks.split_corpus
     orig_freeze_embeddings = _test_hooks.freeze_embeddings
     orig_shutil_which = _test_hooks.shutil_which
     # SentencePiece backend hooks
@@ -144,7 +144,7 @@ def _reset_test_hooks_impl(
     _test_hooks.cuda_is_available = orig_cuda_is_available
     _test_hooks.pkg_version = orig_pkg_version
     _test_hooks.model_dir = orig_model_dir
-    _test_hooks.split_corpus_files = orig_split_corpus_files
+    _test_hooks.split_corpus = orig_split_corpus
     _test_hooks.freeze_embeddings = orig_freeze_embeddings
     _test_hooks.shutil_which = orig_shutil_which
     # SentencePiece backend hooks

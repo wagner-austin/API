@@ -95,7 +95,12 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
 
     corpus = tmp_path / "corpus"
     corpus.mkdir()
-    (corpus / "a.txt").write_text("hello world\nthis is tiny\n", encoding="utf-8")
+    # Twenty lines, not two: the split is over corpus lines, so a corpus this
+    # job evaluates against must be large enough to yield a validation
+    # partition disjoint from what the model trained on.
+    (corpus / "a.txt").write_text(
+        "".join(f"hello world this is tiny line {i}\n" for i in range(20)), encoding="utf-8"
+    )
 
     tok_id = "tok-eval"
     tok_dir = artifacts / "tokenizers" / tok_id
