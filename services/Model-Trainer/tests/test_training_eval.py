@@ -117,7 +117,7 @@ def test_training_and_eval_tiny(
     # Prepare model with adequate batch size for stable training
     cfg: ModelTrainConfig = {
         "model_family": "gpt2",
-        "model_size": "small",
+        "model_size": "tiny",
         "max_seq_len": 16,
         "num_epochs": 3,  # Multiple epochs for loss reduction test
         "batch_size": 4,
@@ -290,7 +290,7 @@ def test_cancel_during_eval_returns_partial_results(
 
     cfg: ModelTrainConfig = {
         "model_family": "gpt2",
-        "model_size": "small",
+        "model_size": "tiny",
         "max_seq_len": 16,
         "num_epochs": 3,  # Multiple epochs for stable loss decrease
         "batch_size": 4,  # Larger batch for stability

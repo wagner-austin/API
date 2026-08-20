@@ -376,7 +376,7 @@ def test_default_load_gpt2_model(tmp_path: Path, settings_factory: _SettingsFact
     model = create_gpt2_model(
         vocab_size=tokenizer.get_vocab_size(),
         max_seq_len=64,
-        model_size="small",
+        model_size="tiny",
     )
     model.save_pretrained(str(model_dir))
 
@@ -490,7 +490,7 @@ def test_default_load_prepared_gpt2_from_handle(
     model = create_gpt2_model(
         vocab_size=tokenizer.get_vocab_size(),
         max_seq_len=64,
-        model_size="small",
+        model_size="tiny",
     )
     model.save_pretrained(str(model_dir))
 
@@ -666,7 +666,7 @@ def test_default_count_model_parameters_returns_int(
     model = create_gpt2_model(
         vocab_size=tokenizer.get_vocab_size(),
         max_seq_len=64,
-        model_size="small",
+        model_size="tiny",
     )
 
     param_count: int = _default_count_model_parameters(model)
@@ -820,7 +820,7 @@ def test_default_create_peft_model(tmp_path: Path, settings_factory: _SettingsFa
     model = create_gpt2_model(
         vocab_size=tokenizer.get_vocab_size(),
         max_seq_len=64,
-        model_size="small",
+        model_size="tiny",
     )
 
     # Create PEFT model using the production hook
@@ -888,7 +888,7 @@ def test_default_load_full_model(tmp_path: Path, settings_factory: _SettingsFact
     model = create_gpt2_model(
         vocab_size=tokenizer.get_vocab_size(),
         max_seq_len=64,
-        model_size="small",
+        model_size="tiny",
     )
 
     # Save model
@@ -955,7 +955,7 @@ def test_default_load_peft_model(tmp_path: Path, settings_factory: _SettingsFact
     base_model = create_gpt2_model(
         vocab_size=tokenizer.get_vocab_size(),
         max_seq_len=64,
-        model_size="small",
+        model_size="tiny",
     )
 
     # Save and reload base model so config._name_or_path is set to a real

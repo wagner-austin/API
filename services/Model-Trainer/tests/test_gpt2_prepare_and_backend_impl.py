@@ -63,7 +63,7 @@ def test_gpt2_prepare_from_artifact(tmp_path: Path, settings_factory: _SettingsF
 
     cfg: ModelTrainConfig = {
         "model_family": "gpt2",
-        "model_size": "small",
+        "model_size": "tiny",
         "max_seq_len": 16,
         "num_epochs": 1,
         "batch_size": 1,
@@ -122,7 +122,7 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
 
     cfg: ModelTrainConfig = {
         "model_family": "gpt2",
-        "model_size": "small",
+        "model_size": "tiny",
         "max_seq_len": 16,
         "num_epochs": 3,
         "batch_size": 4,
@@ -220,7 +220,7 @@ def test_gpt2_prepare_raises_when_tokenizer_none() -> None:
     """Cover gpt2/prepare.py tokenizer None error branch."""
     cfg: ModelTrainConfig = {
         "model_family": "gpt2",
-        "model_size": "small",
+        "model_size": "tiny",
         "max_seq_len": 16,
         "num_epochs": 1,
         "batch_size": 1,
@@ -255,7 +255,7 @@ def test_gpt2_prepare_raises_when_tokenizer_id_none() -> None:
     """Cover gpt2/prepare.py tokenizer_id None error branch."""
     cfg: ModelTrainConfig = {
         "model_family": "gpt2",
-        "model_size": "small",
+        "model_size": "tiny",
         "max_seq_len": 16,
         "num_epochs": 1,
         "batch_size": 1,
@@ -298,7 +298,7 @@ def test_gpt2_evaluate_raises_when_tokenizer_id_none(
 
     cfg: ModelTrainConfig = {
         "model_family": "gpt2",
-        "model_size": "small",
+        "model_size": "tiny",
         "max_seq_len": 16,
         "num_epochs": 1,
         "batch_size": 1,

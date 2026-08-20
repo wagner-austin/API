@@ -114,7 +114,7 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
     run_id = "run-eval"
     cfg: ModelTrainConfig = {
         "model_family": "gpt2",
-        "model_size": "small",
+        "model_size": "tiny",
         "max_seq_len": 16,
         "num_epochs": 1,
         "batch_size": 1,

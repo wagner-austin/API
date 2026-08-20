@@ -107,7 +107,7 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
 
     cfg: ModelTrainConfig = {
         "model_family": "gpt2",
-        "model_size": "small",
+        "model_size": "tiny",
         "max_seq_len": 16,
         "num_epochs": 1,
         "batch_size": 1,
