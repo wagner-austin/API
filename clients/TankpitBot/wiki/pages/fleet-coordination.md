@@ -6,16 +6,24 @@ related:
   - "[[bot-service-architecture]]"
   - "[[tank-freshness-model]]"
 source_paths:
-  - "src/tankpit_bot/fleetshare"
+  - "src/tankpit_bot/fleetshare/__init__.py"
+  - "src/tankpit_bot/fleetshare/codecs.py"
+  - "src/tankpit_bot/fleetshare/merge.py"
+  - "src/tankpit_bot/fleetshare/report.py"
+  - "src/tankpit_bot/fleetshare/role.py"
+  - "src/tankpit_bot/fleetshare/types.py"
   - "src/tankpit_bot/bot/tick_body.py"
   - "src/tankpit_bot/bot/ai/threat_primitives.py"
 source_git_blobs:
-  # `src/tankpit_bot/fleetshare` is deliberately absent: the module is
-  # still untracked in HEAD, so there is no blob to pin. git-blob-hash-pin
-  # exempts untracked paths by design. Pin it in the commit that lands it.
-  "src/tankpit_bot/bot/tick_body.py": ac244e843d87921e805d77bfe6cffefcd7bbe9fa
-  "src/tankpit_bot/bot/ai/threat_primitives.py": c77f4825643181c2a3059e157a030a414b898ea6
-fact_checked: "2026-08-14"
+  "src/tankpit_bot/fleetshare/__init__.py": e17b3322fd0ab35074c56cfff000a9328d245ae8
+  "src/tankpit_bot/fleetshare/codecs.py": cfcd7ceac84cfdf2246fb215a9925b8e686620e1
+  "src/tankpit_bot/fleetshare/merge.py": 3f0738090b0d27be86af0199f2a1a394adc55bc8
+  "src/tankpit_bot/fleetshare/report.py": 02962fcb3cb27dc041e484ea404d53350ac20923
+  "src/tankpit_bot/fleetshare/role.py": a82ac236569bc9444ea5bbb180a163dd443ccf5c
+  "src/tankpit_bot/fleetshare/types.py": 368d8f5ced92ebe03bc183cc5e5d1f479aaeaec2
+  "src/tankpit_bot/bot/tick_body.py": ccf7e6085214f06b2856774aa08db55b7f550910
+  "src/tankpit_bot/bot/ai/threat_primitives.py": 01a0bb653c8186a41a3dc9aa7f9b122feb9e182b
+fact_checked: "2026-08-19"
 confidence: high
 hubs: [architecture]
 ---
@@ -159,6 +167,40 @@ room-enter request's troop byte picks which one to play (the server
 enforces the 5-minute recolor cooldown). Unset: the account default,
 or blue on a first-time entry. The fleet plays blue
 (`.env TANKPIT_TROOP=2`).
+
+## Watch items (2026-08-19 skeptical review)
+
+A full read of the module (all six files, at the pinned blobs) found no
+defect — the gate was green (6,176 tests, 100% statement+branch
+coverage) and the merge laws held up. Four documented hazards, none
+actionable today, recorded so the next lift weighs them:
+
+1. **A malformed FRESH sibling report crashes every teammate's tick,
+   every tick** — deliberate (a live mixed-schema fleet is a genuine
+   bug, and the no-fallbacks rule forbids swallowing it). Note the
+   freshness gate reads `written_ms` BEFORE schema validation
+   (`merge.read_team_reports`), so a future report schema that renames
+   that one field turns a still-running old-build sibling into a
+   fleet-wide crash source. The mitigation is operational: fleets run
+   one build.
+2. **Freshness-domain asymmetry in `_merge_enemy_sightings`:** the
+   pre-gate compares local `timestamp_ms` (advanced by ANY
+   observation, including damage-only syncs) against the remote's
+   `observed_ms` (position freshness). A tank the local wire keeps
+   damage-refreshing but hasn't positioned in a minute rejects a
+   teammate's seconds-old position fix. Conservative direction — it
+   only ever discards remote knowledge, and own wire is the higher
+   trust tier by law — but the comparison crosses freshness domains.
+3. **`ws.container_disproofs` never prunes.** The report builder
+   filters by the share horizon but iterates the whole dict each
+   tick; entries live for the session. Bounded by tiles disproved, so
+   harmless at current session lengths — do not copy the pattern for
+   anything larger.
+4. **The exchange is O(fleet² × rows) per tick:** every bot parses
+   every sibling's full report each ~2 s tick, and the scanned-tile
+   ledger already ran 900–1,300 rows per exchange in a two-bot run.
+   A non-issue at 2–3 bots; revisit the encoding (or share cadence)
+   before running a large fleet.
 
 ## Deliberately deferred
 
