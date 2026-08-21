@@ -6,7 +6,7 @@ from platform_core.json_utils import JSONValue
 from platform_workers.testing import FakeRedis
 
 from music_wrapped_api import _test_hooks
-from music_wrapped_api.api.routes.wrapped import _build_payload_for_service
+from music_wrapped_api.api.routes._payloads import build_payload_for_service
 
 
 def test_build_payload_spotify_token_and_full() -> None:
@@ -23,7 +23,7 @@ def test_build_payload_spotify_token_and_full() -> None:
         "service": "spotify",
         "credentials": {"token_id": "tk"},
     }
-    out_tok = _build_payload_for_service(doc_tok, redis_url="redis://ignored")
+    out_tok = build_payload_for_service(doc_tok, redis_url="redis://ignored")
     assert out_tok["service"] == "spotify" and out_tok["credentials"] is not None
 
     # Full path
@@ -32,7 +32,7 @@ def test_build_payload_spotify_token_and_full() -> None:
         "service": "spotify",
         "credentials": {"access_token": "at2", "refresh_token": "rt2", "expires_in": 3600},
     }
-    out_full = _build_payload_for_service(doc_full, redis_url="redis://ignored")
+    out_full = build_payload_for_service(doc_full, redis_url="redis://ignored")
     assert out_full["service"] == "spotify"
     fr.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -48,7 +48,7 @@ def test_build_payload_apple_token_and_full() -> None:
         "service": "apple_music",
         "credentials": {"token_id": "atk"},
     }
-    out_tok = _build_payload_for_service(doc_tok, redis_url="redis://ignored")
+    out_tok = build_payload_for_service(doc_tok, redis_url="redis://ignored")
     assert out_tok["service"] == "apple_music"
 
     # Full path
@@ -57,7 +57,7 @@ def test_build_payload_apple_token_and_full() -> None:
         "service": "apple_music",
         "credentials": {"developer_token": "d2", "music_user_token": "u2"},
     }
-    out_full = _build_payload_for_service(doc_full, redis_url="redis://ignored")
+    out_full = build_payload_for_service(doc_full, redis_url="redis://ignored")
     assert out_full["service"] == "apple_music"
     fr.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -73,7 +73,7 @@ def test_build_payload_youtube_token_and_full() -> None:
         "service": "youtube_music",
         "credentials": {"token_id": "ytk"},
     }
-    out_tok = _build_payload_for_service(doc_tok, redis_url="redis://ignored")
+    out_tok = build_payload_for_service(doc_tok, redis_url="redis://ignored")
     assert out_tok["service"] == "youtube_music"
 
     # Full path
@@ -82,16 +82,16 @@ def test_build_payload_youtube_token_and_full() -> None:
         "service": "youtube_music",
         "credentials": {"sapisid": "sid2", "cookies": "c=d"},
     }
-    out_full = _build_payload_for_service(doc_full, redis_url="redis://ignored")
+    out_full = build_payload_for_service(doc_full, redis_url="redis://ignored")
     assert out_full["service"] == "youtube_music"
     fr.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_build_payload_unsupported_and_year_invalid() -> None:
     with pytest.raises(AppError):
-        _build_payload_for_service({"service": "soundcloud", "year": 2024}, redis_url="r")
+        build_payload_for_service({"service": "soundcloud", "year": 2024}, redis_url="r")
     with pytest.raises(AppError):
-        _build_payload_for_service(
+        build_payload_for_service(
             {"service": "spotify", "year": "x", "credentials": {"token_id": "z"}}, redis_url="r"
         )
 
@@ -168,28 +168,28 @@ def test_build_payload_token_not_found_and_invalid_full() -> None:
 
     # Spotify token not found
     with pytest.raises(AppError):
-        _build_payload_for_service(
+        build_payload_for_service(
             {"year": 2024, "service": "spotify", "credentials": {"token_id": "missing"}},
             redis_url="redis://ignored",
         )
 
     # Apple token not found
     with pytest.raises(AppError):
-        _build_payload_for_service(
+        build_payload_for_service(
             {"year": 2024, "service": "apple_music", "credentials": {"token_id": "atk"}},
             redis_url="redis://ignored",
         )
 
     # YouTube token not found
     with pytest.raises(AppError):
-        _build_payload_for_service(
+        build_payload_for_service(
             {"year": 2024, "service": "youtube_music", "credentials": {"token_id": "ytk"}},
             redis_url="redis://ignored",
         )
 
     # Apple invalid full types
     with pytest.raises(AppError):
-        _build_payload_for_service(
+        build_payload_for_service(
             {
                 "year": 2024,
                 "service": "apple_music",
@@ -200,14 +200,14 @@ def test_build_payload_token_not_found_and_invalid_full() -> None:
 
     # Apple invalid payload type
     with pytest.raises(AppError):
-        _build_payload_for_service(
+        build_payload_for_service(
             {"year": 2024, "service": "apple_music", "credentials": 1},
             redis_url="redis://ignored",
         )
 
     # YouTube invalid full types
     with pytest.raises(AppError):
-        _build_payload_for_service(
+        build_payload_for_service(
             {
                 "year": 2024,
                 "service": "youtube_music",
@@ -218,14 +218,14 @@ def test_build_payload_token_not_found_and_invalid_full() -> None:
 
     # YouTube invalid payload type
     with pytest.raises(AppError):
-        _build_payload_for_service(
+        build_payload_for_service(
             {"year": 2024, "service": "youtube_music", "credentials": 1},
             redis_url="redis://ignored",
         )
 
     # Spotify invalid payload type
     with pytest.raises(AppError):
-        _build_payload_for_service(
+        build_payload_for_service(
             {"year": 2024, "service": "spotify", "credentials": 1},
             redis_url="redis://ignored",
         )
