@@ -314,3 +314,48 @@ def test_displaced_harvest_landing_unsuppresses_the_radar() -> None:
     assert updated["resource_target_kind"] == "fuel"
     assert updated["resource_target_x"] == 95
     assert updated["resource_target_y"] == 105
+
+
+def test_displaced_landing_with_fresh_evidence_scans_despite_live_coverage() -> None:
+    """Displacement evidence overrides the coverage-based radar skip.
+
+    The s9-2 economics premise ("the mines the un-suppression exists
+    to reveal are known") was false physics — mines are dynamic, and
+    coverage freshness proves container knowledge only. In 7 of the 11
+    archived displacement-orbit runs the skip sat inside the orbit
+    window, suppressing exactly the scan that would have repaired the
+    mine beliefs ([[radar-mechanics]] correction, 2026-08-21). A fresh
+    bounce now forces the repair scan even in live coverage.
+    """
+    state = AIStateDict(
+        **{
+            **make_scanned_ai_state(landing_scan_viewport="0,0"),
+            "mode": "COLLECT",
+            "mode_state": "APPROACH",
+            "mode_started_ms": 90000,
+            "suppress_landing_scan": True,
+            "resource_target_kind": "fuel",
+            "resource_target_x": 95,
+            "resource_target_y": 105,
+        }
+    )
+    containers = {
+        "95,105": make_container_state(
+            x=95, y=105, is_fuel=True, volume=600, timestamp_ms=100000, failed_pickups=0
+        ),
+    }
+    ctx = _collect_ctx(
+        fuel=700,
+        scanned=True,
+        containers=containers,
+        inventory=make_inventory(),
+        ai_state=state,
+    )
+    ctx.ws.mark_landing_refused(95, 105, 7, ctx.timestamp_ms - 1000)
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected collect decision")
+    assert decision["behavior"]["reason_kind"] == "scan_on_landing"
+    assert decision["command"]["cmd_type"] == "radar"

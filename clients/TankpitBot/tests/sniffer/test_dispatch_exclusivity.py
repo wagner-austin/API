@@ -218,7 +218,7 @@ _CHAINS: tuple[tuple[str, Path, tuple[str, ...], str], ...] = (
     ),
     (
         "scorecard diagnostic routing",
-        _ROOT / "diagnostics" / "session_scorecard_accumulator.py",
+        _ROOT / "diagnostics" / "session_scorecard_routes.py",
         ("_route_combat_diagnostic", "_route_fuel_diagnostic"),
         "kind",
     ),
@@ -283,7 +283,7 @@ _CASCADES: tuple[tuple[str, Path, str, str], ...] = (
     ),
     (
         "scorecard metrics kinds",
-        _ROOT / "diagnostics" / "session_scorecard_accumulator.py",
+        _ROOT / "diagnostics" / "session_scorecard_routes.py",
         "_route_metrics_diagnostic",
         "kind",
     ),

@@ -15,6 +15,7 @@ from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.browser.accounts import _ACCOUNTS_PATH, load_accounts
+from tankpit_bot.fleetshare.types import FLEET_ROLES, FleetRole
 from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.fleet_telemetry import FleetTelemetry
@@ -49,6 +50,8 @@ class FleetBotDict(TypedDict):
         instance: Validated instance name (artifact namespace).
         account: ``TANKPIT_ACCOUNT`` the child was spawned with
             (empty means the accounts.json default).
+        role: Resolved :data:`~tankpit_bot.fleetshare.types.FleetRole`
+            the child was spawned with ([[fleet-coordination]]).
         pid: Child process id.
         alive: Whether the process is still running at report time.
         returncode: Exit code once dead; ``None`` while alive.
@@ -59,6 +62,7 @@ class FleetBotDict(TypedDict):
 
     instance: str
     account: str
+    role: FleetRole
     pid: int
     alive: bool
     returncode: int | None
@@ -75,6 +79,7 @@ class _ManagedBot:
         *,
         instance: str,
         account: str,
+        role: FleetRole,
         kills: int,
         seconds: int,
         started_ms: int,
@@ -85,6 +90,7 @@ class _ManagedBot:
         Args:
             instance: Validated instance name.
             account: Account selector the child received.
+            role: Resolved fleet role the child received.
             kills: Kill bound the child received.
             seconds: Seconds bound the child received.
             started_ms: Wall-clock spawn time.
@@ -92,6 +98,7 @@ class _ManagedBot:
         """
         self.instance = instance
         self.account = account
+        self.role = role
         self.kills = kills
         self.seconds = seconds
         self.started_ms = started_ms
@@ -107,6 +114,7 @@ class _ManagedBot:
         return FleetBotDict(
             instance=self.instance,
             account=self.account,
+            role=self.role,
             pid=self.process.pid,
             alive=returncode is None,
             returncode=returncode,
@@ -118,6 +126,28 @@ class _ManagedBot:
 
 class FleetError(RuntimeError):
     """A fleet operation the HTTP layer maps to a 4xx response."""
+
+
+def _resolve_role(role: str) -> FleetRole:
+    """Resolve a spawn request's role selector to a fleet role.
+
+    Args:
+        role: Role selector; empty means fighter — the full doctrine
+            is the primary configuration, a gatherer is an explicit
+            operator choice ([[fleet-coordination]]).
+
+    Returns:
+        The resolved role.
+
+    Raises:
+        FleetError: If the selector is not a fleet role.
+    """
+    candidate = role or "fighter"
+    for known in FLEET_ROLES:
+        if candidate == known:
+            return known
+    known_roles = ", ".join(FLEET_ROLES)
+    raise FleetError(f"role {role!r} is not a fleet role (one of: {known_roles})")
 
 
 class FleetManager:
@@ -169,7 +199,15 @@ class FleetManager:
             cleaned = f"b{cleaned}"[:32]
         return cleaned
 
-    def spawn(self, *, instance: str, account: str, kills: int, seconds: int) -> FleetBotDict:
+    def spawn(
+        self,
+        *,
+        instance: str,
+        account: str,
+        kills: int,
+        seconds: int,
+        role: str = "",
+    ) -> FleetBotDict:
         """Spawn one bot child process under an instance namespace.
 
         Args:
@@ -180,13 +218,17 @@ class FleetManager:
                 accounts.json default.
             kills: Kill bound (0 unbounded).
             seconds: Seconds bound (0 unbounded).
+            role: Fleet role selector; empty means fighter — the full
+                doctrine is the primary configuration, a gatherer is
+                an explicit operator choice ([[fleet-coordination]]).
 
         Returns:
             The spawned instance's report row.
 
         Raises:
             FleetError: If the name is invalid, already registered and
-                alive, or the bounds are negative.
+                alive, the bounds are negative, or the role is not a
+                fleet role.
         """
         if not instance:
             instance = self.derive_instance(account)
@@ -197,6 +239,7 @@ class FleetManager:
             )
         if kills < 0 or seconds < 0:
             raise FleetError("bounds must be non-negative")
+        resolved_role = _resolve_role(role)
         if account:
             configured = self.accounts()
             if account not in configured:
@@ -228,6 +271,10 @@ class FleetManager:
             "TANKPIT_BOT_INSTANCE": instance,
             "TANKPIT_BOT_SESSION_KILLS": str(kills),
             "TANKPIT_BOT_SESSION_SECONDS": str(seconds),
+            # Always explicit: the child inherits the manager's whole
+            # environment, and a TANKPIT_ROLE lingering there must
+            # never silently re-role the entire fleet.
+            "TANKPIT_ROLE": resolved_role,
         }
         if account:
             env["TANKPIT_ACCOUNT"] = account
@@ -235,6 +282,7 @@ class FleetManager:
         bot = _ManagedBot(
             instance=instance,
             account=account,
+            role=resolved_role,
             kills=kills,
             seconds=seconds,
             started_ms=top_hooks.get_current_time_ms(),
@@ -242,9 +290,10 @@ class FleetManager:
         )
         self._bots[instance] = bot
         log.info(
-            "Fleet: spawned instance %r pid %d (kills=%d seconds=%d)",
+            "Fleet: spawned instance %r pid %d (role=%s kills=%d seconds=%d)",
             instance,
             process.pid,
+            resolved_role,
             kills,
             seconds,
         )
@@ -307,6 +356,7 @@ class FleetManager:
             account=bot.account,
             kills=bot.kills,
             seconds=bot.seconds,
+            role=bot.role,
         )
 
     def stats_gate(self, instance: str) -> None:

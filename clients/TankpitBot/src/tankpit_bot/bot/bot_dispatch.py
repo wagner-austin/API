@@ -262,14 +262,18 @@ class DispatchMixin(CompletionsMixin):
         return True
 
     def scope_shift(self, direction: int) -> bool:
-        """Send the scope-extend command: shift the stored viewport window.
+        """Send the scope-extend command and record the in-flight pan.
 
-        Free on every axis (no fuel, no queue slot) — the server
-        answers with a fresh 0x5A whose origin follows the anchor law
-        (the tank pins to the trailing window edge,
-        [[viewport-shift-protocol]]). Fire-and-forget like chat: the
-        sniffer's 0x5A ingestion updates the world's viewport origin
-        when the confirmation lands, so no HFSM transition is taken.
+        Fuel-free, but NOT instantaneous: the server answers with a
+        fresh 0x5A one server tick later (median exactly 2.0 s across
+        759 archived pans) whose origin follows the anchor law, and it
+        silently DROPS viewport-coupled commands dispatched before
+        that confirm lands ([[viewport-shift-protocol]] scope-pending
+        radar drop — half of all scan stalls ever recorded). Promoted
+        from fire-and-forget 2026-08-20: the pan is a tracked
+        ``scope`` action, resolved by the 0x5A (any stale
+        viewport-update mark is cleared at dispatch so the flag means
+        "a 0x5A arrived since THIS pan").
 
         Args:
             direction: Compass byte, clockwise from north (0=N..7=NW).
@@ -279,11 +283,19 @@ class DispatchMixin(CompletionsMixin):
         """
         from tankpit_bot.protocol.commands import build_scope_command
 
+        self.world.check_and_clear_viewport_update_processed()
         if not self._send_bytes(build_scope_command(direction), f"scope({direction})"):
             return False
         emit_diagnostic(
             diagnostic_kind="scope_shift_sent",
             direction=direction,
+        )
+        now = get_current_time_ms()
+        action = make_in_flight_action("scope", 0, 0, now)
+        self._state_data = transition_to(
+            self._state_data,
+            self._state_data["state"],
+            in_flight_action=action,
         )
         return True
 

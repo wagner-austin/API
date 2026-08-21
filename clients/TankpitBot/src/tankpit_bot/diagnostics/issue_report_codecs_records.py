@@ -20,9 +20,11 @@ from platform_core.json_utils import (
 
 from tankpit_bot.diagnostics.issue_report_types import (
     ActionOutcomeRowDict,
+    DisplacedTeleportRecordDict,
     FuelTargetSelectionRecordDict,
     MapOpenSkippedRecordDict,
     SessionRoomRecordDict,
+    SuppressedDispatchRecordDict,
     TeleportAttemptRecordDict,
 )
 
@@ -271,6 +273,76 @@ def decode_action_outcome_row(data: JSONObject) -> ActionOutcomeRowDict:
     )
 
 
+def encode_suppressed_dispatch_record(record: SuppressedDispatchRecordDict) -> JSONObject:
+    """Encode a suppressed-dispatch tally row to JSON.
+
+    Args:
+        record: Record to encode.
+
+    Returns:
+        JSON-compatible representation.
+    """
+    return {
+        "command_name": record["command_name"],
+        "target_x": record["target_x"],
+        "target_y": record["target_y"],
+        "predicted_error_code": record["predicted_error_code"],
+        "count": record["count"],
+    }
+
+
+def decode_suppressed_dispatch_record(data: JSONObject) -> SuppressedDispatchRecordDict:
+    """Decode a suppressed-dispatch tally row from JSON.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated record.
+    """
+    return SuppressedDispatchRecordDict(
+        command_name=require_str(data, "command_name"),
+        target_x=require_int(data, "target_x"),
+        target_y=require_int(data, "target_y"),
+        predicted_error_code=require_int(data, "predicted_error_code"),
+        count=require_int(data, "count"),
+    )
+
+
+def encode_displaced_teleport_record(record: DisplacedTeleportRecordDict) -> JSONObject:
+    """Encode a displaced-teleport tally row to JSON.
+
+    Args:
+        record: Record to encode.
+
+    Returns:
+        JSON-compatible representation.
+    """
+    return {
+        "requested_x": record["requested_x"],
+        "requested_y": record["requested_y"],
+        "count": record["count"],
+        "max_displacement": record["max_displacement"],
+    }
+
+
+def decode_displaced_teleport_record(data: JSONObject) -> DisplacedTeleportRecordDict:
+    """Decode a displaced-teleport tally row from JSON.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated record.
+    """
+    return DisplacedTeleportRecordDict(
+        requested_x=require_int(data, "requested_x"),
+        requested_y=require_int(data, "requested_y"),
+        count=require_int(data, "count"),
+        max_displacement=require_int(data, "max_displacement"),
+    )
+
+
 def encode_session_room_record(record: SessionRoomRecordDict) -> JSONObject:
     """Encode a session room record to JSON.
 
@@ -305,13 +377,17 @@ def decode_session_room_record(data: JSONObject) -> SessionRoomRecordDict:
 
 __all__ = [
     "decode_action_outcome_row",
+    "decode_displaced_teleport_record",
     "decode_fuel_target_selection_record",
     "decode_map_open_skipped_record",
     "decode_session_room_record",
+    "decode_suppressed_dispatch_record",
     "decode_teleport_attempt_record",
     "encode_action_outcome_row",
+    "encode_displaced_teleport_record",
     "encode_fuel_target_selection_record",
     "encode_map_open_skipped_record",
     "encode_session_room_record",
+    "encode_suppressed_dispatch_record",
     "encode_teleport_attempt_record",
 ]

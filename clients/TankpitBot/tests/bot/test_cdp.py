@@ -368,3 +368,34 @@ class TestBotMessageDecoding:
             ws_url="wss://test.tankpit.com/ws",
         )
         bot._on_message_captured(msg)
+
+
+class TestScopeShiftDispatch:
+    """The promoted pan dispatch: in-flight recording + stale-mark clear."""
+
+    def test_scope_shift_records_in_flight_and_clears_stale_mark(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """Dispatching a pan records the ``scope`` action and resets the flag.
+
+        A teleport's 0x5A may have set ``viewport_update_processed``
+        earlier; the dispatch clears it so the flag means "a 0x5A
+        arrived since THIS pan" — without the clear, a stale mark
+        would complete the pan instantly and reopen the race window.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tests.fakes import FakeCDPSession
+
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        fake_cdp: FakeCDPSession = FakeCDPSession()
+        bot._cdp = fake_cdp
+        ws.mark_viewport_update_processed()
+
+        result = bot.scope_shift(3)
+
+        assert result is True
+        assert bot._state_data["in_flight_action"]["kind"] == "scope"
+        assert ws.check_and_clear_viewport_update_processed() is False

@@ -102,6 +102,7 @@ class TestFindPath:
             riding=False,
             hostile_mine_keys=frozenset({"12,10"}),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         path = find_path(terrain, 10, 10, 14, 10)
         assert len(path) > 5
@@ -220,6 +221,7 @@ class TestDirectPathHelpers:
             riding=False,
             hostile_mine_keys=frozenset({"12,10"}),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         assert is_direct_path_clear(terrain, 10, 10, 15, 10) is False
 
@@ -243,6 +245,7 @@ class TestDirectPathHelpers:
             riding=False,
             hostile_mine_keys=frozenset({"13,11"}),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         assert find_path_segment_target(terrain, 10, 10, 14, 10) == (13, 9)
 

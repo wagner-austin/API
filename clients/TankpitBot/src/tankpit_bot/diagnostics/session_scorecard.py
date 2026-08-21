@@ -19,7 +19,7 @@ from tankpit_bot.diagnostics.issue_report_types import (
     TeleportSpendRecordDict,
     make_unsampled_inventory_counts,
 )
-from tankpit_bot.diagnostics.session_scorecard_accumulator import (
+from tankpit_bot.diagnostics.session_scorecard_types import (
     FuelSampleRecordDict,
     ScorecardAccumulatorDict,
 )

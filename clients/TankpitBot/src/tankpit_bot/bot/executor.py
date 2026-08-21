@@ -60,6 +60,7 @@ _LEDGER_KIND_BY_CMD_TYPE: dict[str, LedgerActionKind] = {
     "radar": "scan",
     "map_open": "map_open",
     "shoot": "shoot",
+    "scope_shift": "scope",
 }
 _EQUIPMENT_LABELS: dict[int, str] = {
     1: "armor",
@@ -239,10 +240,13 @@ def dispatch_command(
         # ([[chat-messages]]) — so nothing downstream should wait on it.
         return bot.send_chat(command["message_id"], command["target_x"], command["target_y"])
     if command["cmd_type"] == "scope_shift":
-        # Free viewport pan (no fuel, no queue slot). Like chat there
-        # is no ledger entry: the outcome is the 0x5A confirmation the
-        # sniffer ingests as the new viewport origin, and nothing
-        # downstream correlates an attempt against it.
+        # A tracked action since 2026-08-20: the pan takes one server
+        # tick and the server silently DROPS viewport-coupled commands
+        # dispatched before its 0x5A confirm lands (the scope-pending
+        # radar drop, [[viewport-shift-protocol]] — half of all scan
+        # stalls ever recorded). The dispatch records an in-flight
+        # ``scope`` action, so the tick loop holds the next decision
+        # until the confirm, exactly as every other async action.
         return bot.scope_shift(command["direction"])
     if (
         command["cmd_type"] == "move"

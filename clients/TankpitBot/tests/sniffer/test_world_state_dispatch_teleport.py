@@ -206,3 +206,31 @@ class TestFerryBeliefDisproof:
         dispatch_world_state_update(ws, landed)
 
         assert "111,104" in ws.world_state["terrain"]
+
+
+class TestDisplacementEvidence:
+    """The bounce receipt writes belief, not just a diagnostic."""
+
+    def test_displaced_landing_writes_landing_hostility_evidence(self) -> None:
+        """A meaningful bounce records the requested zone as hostile.
+
+        For four months the receipt fed nothing, so the identical hop
+        could re-certify against mine-blind beliefs forever (the
+        08-05 534-bounce session; the 2026-08-21 marooning). The
+        evidence radius is the chebyshev the server proved it
+        controls: (235,5) landed (230,10) is chebyshev 5.
+        """
+        ws = WorldService()
+        record_teleport_dispatch(
+            ws.ledger,
+            target_x=235,
+            target_y=5,
+            message_index=0,
+            sent_window="(none)",
+        )
+        _seed_self_at(ws, 230, 10)
+
+        _dispatch_landed_and_capture(ws)
+
+        assert "235,5" in ws.landing_refusals
+        assert ws.landing_refusals["235,5"] > 0

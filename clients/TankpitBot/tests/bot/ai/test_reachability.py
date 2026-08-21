@@ -34,6 +34,7 @@ def _mined_terrain(base: InMemoryTerrainMap, keys: frozenset[str]) -> FerryAware
         riding=False,
         hostile_mine_keys=keys,
         occupied_tank_keys=frozenset(),
+        refused_landing_keys=frozenset(),
     )
 
 
@@ -53,6 +54,7 @@ def _occupied_terrain(base: InMemoryTerrainMap, keys: frozenset[str]) -> FerryAw
         riding=False,
         hostile_mine_keys=frozenset(),
         occupied_tank_keys=keys,
+        refused_landing_keys=frozenset(),
     )
 
 

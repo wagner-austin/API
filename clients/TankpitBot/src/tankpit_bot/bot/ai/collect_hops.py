@@ -27,8 +27,10 @@ from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_teleport_command
+from tankpit_bot.inventory import inventory_counts
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
+from tankpit_bot.physics.supervisor import equipment_pickup_refusal
 from tankpit_bot.runtime_logging import (
     emit_ai,
     emit_diagnostic,
@@ -81,8 +83,10 @@ def _equipment_hop_landing(
 def _equipment_hop_barred(ctx: DecideCtx, base_state: AIStateDict) -> bool:
     """Return True when no equipment hop may be scheduled this tick.
 
-    Two bars: inventory already combat-ready (the hunt-entry bar for
-    LOCKLESS collection), and the held-lock bar -- F21
+    Three bars: every slot at rank cap (the physics bar -- the shared
+    ``equipment_pickup_refusal`` law; added 2026-08-20 after the
+    gatherer livelock), inventory already combat-ready (the hunt-entry
+    bar for LOCKLESS collection), and the held-lock bar -- F21
     ([[flag-triage-20260729]], fixed 2026-07-31): during a HELD combat
     lock the entry bar must not schedule travel. With Yuppler locked
     and duals at 22/25 it pulled an 85-tile round trip to top three
@@ -97,6 +101,20 @@ def _equipment_hop_barred(ctx: DecideCtx, base_state: AIStateDict) -> bool:
     Returns:
         True when the hop step must decline.
     """
+    refusal = equipment_pickup_refusal(inventory_counts(ctx.inventory), ctx.self_state["rank"])
+    if refusal is not None:
+        # The physics bar, in addition to the doctrinal one below: a
+        # tank with every slot at rank cap gains nothing from any
+        # equipment container, so a hop can only burn fuel on a
+        # guaranteed code-7 refusal. For a FIGHTER the hunt-entry bar
+        # below always fires first (full stock permits hunting), which
+        # is why this bar was invisibly absent until the gatherer role
+        # made ``hunt_entry_permitted`` unconditionally False and a
+        # full recruit hopped at equipment it could not hold
+        # (bot-20260820-005115, the full-inventory livelock's entry
+        # teleport).
+        emit_hop_declined("equipment", at_capacity=1)
+        return True
     if hunt_entry_permitted(ctx):
         return True
     if base_state["combat_target_id"] != -1 and not weapon_reserves_below_break(ctx):

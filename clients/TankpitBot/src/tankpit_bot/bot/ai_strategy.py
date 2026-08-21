@@ -86,7 +86,9 @@ def decide(
         normalized_state,
         inventory,
         timestamp_ms,
-        compose_decision_terrain(world, terrain, timestamp_ms),
+        compose_decision_terrain(
+            world, terrain, timestamp_ms, ws.hostile_landing_keys(timestamp_ms)
+        ),
         combat_feedback,
         map_fuel_dots,
         ws=ws,

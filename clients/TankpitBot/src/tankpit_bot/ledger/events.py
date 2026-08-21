@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-ActionKind = Literal["scan", "move", "teleport", "collect", "map_open", "shoot"]
-"""The six bot action kinds the ledger records.
+ActionKind = Literal["scan", "move", "teleport", "collect", "map_open", "shoot", "scope"]
+"""The seven bot action kinds the ledger records.
 
 Deliberately narrower than :data:`tankpit_bot.bot.states.ActionKind`,
 which adds the ``"none"`` in-flight sentinel. The ledger records what
@@ -26,6 +26,7 @@ ACTION_KINDS: tuple[ActionKind, ...] = (
     "collect",
     "map_open",
     "shoot",
+    "scope",
 )
 """All action kinds, for iteration and validation messages."""
 

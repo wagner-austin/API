@@ -259,6 +259,20 @@ def _emit_teleport_displacement(ws: WorldService) -> None:
         landed_y=self_state["y"],
         displacement=abs(self_state["x"] - requested_x) + abs(self_state["y"] - requested_y),
     )
+    # The receipt is EVIDENCE, not just observability (2026-08-21 —
+    # for four months it fed nothing, so the same hop could re-certify
+    # against mine-blind beliefs forever: the 08-05 534-refusal
+    # session and the marooning escape/harvest loops). A chebyshev
+    # >= 2 "displacement" is the REFUSAL signature — the tank landed
+    # back at its origin (137/137 archived receipts) — and the
+    # landing selector consumes the ring-blocked verdict through the
+    # composed decision terrain.
+    ws.mark_landing_refused(
+        requested_x,
+        requested_y,
+        max(abs(self_state["x"] - requested_x), abs(self_state["y"] - requested_y)),
+        browser.get_current_time_ms(),
+    )
     _expire_disproven_ferry_belief(ws, requested_x, requested_y)
 
 

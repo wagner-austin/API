@@ -142,6 +142,7 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         self.teleport_landed: bool = False
         self.radar_scan_complete: bool = False
         self.map_data_processed: bool = False
+        self.viewport_update_processed: bool = False
         # Stamped on every dispatched binary world message -- the only
         # truthful liveness signal for the GAME session. Session 3 of
         # run 20260730: the game socket died at 11:58:32, the page
@@ -155,6 +156,7 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         self.pending_radar_empty_delta_ms: int = 0
         self.pending_radar_uses_extra: bool = True
         self.failed_move_targets: dict[str, int] = {}
+        self.landing_refusals: dict[str, int] = {}
         self.movement_rejections: list[int] = []
         # The canonical account-identity model ([[tank-registry]] rank
         # number; state/types/self_account.py) — session-stable "who

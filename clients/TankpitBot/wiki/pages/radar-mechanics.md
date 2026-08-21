@@ -125,6 +125,22 @@ by the `physics_claims` guard stage on every `make check`.
 }
 ```
 
+## The s9-2 correction: coverage is not mine knowledge (2026-08-21)
+
+The radar-spend economics (flags s9-2/4/5) skip the landing radar when
+the viewport sits in live scan coverage — correct for CONTAINER
+knowledge, and stated too broadly for mines ("the mines the
+un-suppression exists to reveal are known"). Mines are dynamic
+(practice bots ring themselves continuously) and reveals are a
+separate, decaying knowledge layer; fleet-shared coverage
+([[fleet-coordination]]) marks ground live without the local reveals
+ever having been ingested. In 7 of the 11 archived displacement-orbit
+runs the skip sat inside the orbit window, suppressing exactly the
+scan that would have repaired the mine beliefs. The law now: a fresh
+displacement ([[teleport-mechanics]] § displacement evidence) forces
+the landing repair radar regardless of coverage; only a
+displacement-free landing in live coverage skips the spend.
+
 [^1]: Originally a user (Austin) statement of 2026-06-12, corroborated at the time by the client's own tip text; the conversation itself has no transcript in the repo. The claim is now carried by the code and stated in its docstring: `src/tankpit_bot/physics/capacity.py:97-98` — "Only the extra radar sweeps the full viewport regardless of rank." That symbol is bound as claim `free-radar-radius` in this page's `json claims` block (`:112`), so `physics_claims` verifies its behaviour on every `make check`.
 [^2]: ~120 built-in scans across the 2026-06-12 captures (`runs/bot/bot-20260612-*.capture_session.json`, 9 sessions) — zero reveals beyond chebyshev 2, hits at radius 1 and 2 only, replacing an unmeasured 7x7 assumption carried from April. Consistent with the shipped law rather than merely asserted alongside it: `free_radar_radius(rank) = 2 + rank // 3` (`src/tankpit_bot/physics/capacity.py:86-100`) returns 2 for ranks 0-2, and those sessions were flown at Private (rank 1) — so radius 2 is exactly what the formula predicts for that corpus, and the sweep cannot speak to the higher-rank steps. Those are pinned instead by the four axial measurements in [^14] and by the probe grid on claim `free-radar-radius`.
 [^3]: run 20260611-062453 — extra count series 10→9→...→3, one consumed per scan

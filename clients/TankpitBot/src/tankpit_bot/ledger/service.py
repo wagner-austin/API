@@ -35,6 +35,10 @@ class LedgerService:
         pending_decisions: Unresolved decision event id per action kind.
         resolved_decision_ids: Decision ids an outcome has consumed.
         pending_teleport: Dispatch context of the in-flight teleport.
+        zero_dispatch_streaks: Consecutive zero-duration ``superseded``
+            closes per kind — the live livelock detector's counter
+            (see ``LIVENESS_STALL_STREAK``). Reset by any non-superseded
+            outcome of the kind.
     """
 
     def __init__(self) -> None:
@@ -49,6 +53,7 @@ class LedgerService:
         self.pending_decisions: dict[ActionKind, int] = {}
         self.resolved_decision_ids: set[int] = set()
         self.pending_teleport: PendingTeleportDispatchDict | None = None
+        self.zero_dispatch_streaks: dict[ActionKind, int] = dict.fromkeys(ACTION_KINDS, 0)
 
     def next_event_id(self) -> int:
         """Return the next session-wide monotonic event id.

@@ -14,10 +14,10 @@ from tankpit_bot.diagnostics.issue_report_types import (
     make_zero_inventory_counts,
 )
 from tankpit_bot.diagnostics.session_scorecard import build_session_scorecard
-from tankpit_bot.diagnostics.session_scorecard_accumulator import (
+from tankpit_bot.diagnostics.session_scorecard_accumulator import route_scorecard_record
+from tankpit_bot.diagnostics.session_scorecard_types import (
     ScorecardAccumulatorDict,
     new_scorecard_accumulator,
-    route_scorecard_record,
 )
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 

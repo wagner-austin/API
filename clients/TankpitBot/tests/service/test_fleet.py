@@ -46,7 +46,7 @@ def _without_accounts() -> PathExistsProtocol:
 
 
 def test_spawn_builds_the_instance_environment(spawner: _FakeSpawner) -> None:
-    """The child receives instance, bounds, and account via env."""
+    """The child receives instance, bounds, account, and role via env."""
     originals = _with_configured_accounts()
     try:
         manager = FleetManager()
@@ -59,12 +59,43 @@ def test_spawn_builds_the_instance_environment(spawner: _FakeSpawner) -> None:
             "TANKPIT_BOT_INSTANCE": "alpha",
             "TANKPIT_BOT_SESSION_KILLS": "30",
             "TANKPIT_BOT_SESSION_SECONDS": "2700",
+            "TANKPIT_ROLE": "fighter",
             "TANKPIT_ACCOUNT": "second",
         }
     ]
     assert row["instance"] == "alpha"
+    assert row["role"] == "fighter"
     assert row["alive"] is True
     assert row["pid"] == 1001
+
+
+def test_spawn_role_is_explicit_validated_and_carried_by_restart(
+    spawner: _FakeSpawner,
+) -> None:
+    """A gatherer spawn sets TANKPIT_ROLE explicitly and restart keeps it.
+
+    The env var is ALWAYS set (never inherited): a TANKPIT_ROLE
+    lingering in the manager's own environment must not silently
+    re-role the fleet. An unknown role is refused before any process
+    exists.
+    """
+    original = _without_accounts()
+    try:
+        manager = FleetManager()
+        row = manager.spawn(instance="alpha", account="", kills=0, seconds=0, role="gatherer")
+
+        with pytest.raises(FleetError, match="not a fleet role"):
+            manager.spawn(instance="bravo", account="", kills=0, seconds=0, role="scout")
+
+        spawner.processes[0].returncode = 0
+        restarted = manager.restart("alpha")
+    finally:
+        top_hooks.path_exists = original
+
+    assert row["role"] == "gatherer"
+    assert spawner.envs[0]["TANKPIT_ROLE"] == "gatherer"
+    assert restarted["role"] == "gatherer"
+    assert spawner.envs == [spawner.envs[0], spawner.envs[0]]
 
 
 def test_accounts_lists_configured_usernames_only(spawner: _FakeSpawner) -> None:
@@ -401,14 +432,18 @@ async def test_http_spawn_list_stop_remove_cycle(
     original_write = top_hooks.write_text
     top_hooks.write_text = fake_write
     try:
-        payload: dict[str, str | int] = {"instance": "alpha", "kills": 30}
+        payload: dict[str, str | int] = {"instance": "alpha", "kills": 30, "role": "gatherer"}
         created = await fleet_client.post("/bots", json=payload)
         assert created.status == 201
+        created_row = narrow_json_to_dict(load_json_str(await created.text()))
+        assert created_row["role"] == "gatherer"
 
         listed = await fleet_client.get("/bots")
         body = narrow_json_to_dict(load_json_str(await listed.text()))
         bots = body["bots"]
         assert isinstance(bots, list) and len(bots) == 1
+        first = narrow_json_to_dict(bots[0])
+        assert first["role"] == "gatherer"
 
         stopped = await fleet_client.post("/bots/alpha/stop")
         assert stopped.status == 200
@@ -435,6 +470,9 @@ async def test_http_page_stats_and_restart(
     assert (page.headers["Content-Type"]).startswith("text/html")
     body = await page.text()
     assert "Tankpit Fleet" in body and "/bots" in body and "/accounts" in body
+    # The spawn form offers every fleet role — a gatherer is a spawn
+    # choice, not an env var the operator has to remember.
+    assert 'id="role"' in body and "gatherer" in body
 
     originals = _with_configured_accounts()
     try:
@@ -489,6 +527,11 @@ async def test_http_rejections_are_typed_statuses(
     """400 for malformed spawns, 409 for duplicates, 404 for ghosts."""
     bad: dict[str, str | int] = {"instance": "../escape"}
     assert (await fleet_client.post("/bots", json=bad)).status == 409
+
+    bad_role: dict[str, str | int] = {"instance": "bravo", "role": "scout"}
+    refused_role = await fleet_client.post("/bots", json=bad_role)
+    assert refused_role.status == 409
+    assert "not a fleet role" in await refused_role.text()
 
     malformed: dict[str, str] = {"kills": "many"}
     assert (await fleet_client.post("/bots", json=malformed)).status == 400

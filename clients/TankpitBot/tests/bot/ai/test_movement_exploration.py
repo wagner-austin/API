@@ -68,7 +68,7 @@ class TestPickupSurfaceRouting:
         )
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = compose_decision_terrain(world, static, _NOW_MS)
+        terrain = compose_decision_terrain(world, static, _NOW_MS, frozenset())
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
@@ -104,7 +104,7 @@ class TestPickupSurfaceRouting:
         )
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = compose_decision_terrain(world, static, _NOW_MS)
+        terrain = compose_decision_terrain(world, static, _NOW_MS, frozenset())
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
@@ -139,7 +139,7 @@ class TestPickupSurfaceRouting:
         )
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = compose_decision_terrain(world, static, _NOW_MS)
+        terrain = compose_decision_terrain(world, static, _NOW_MS, frozenset())
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
@@ -173,7 +173,7 @@ class TestPickupSurfaceRouting:
         )
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = compose_decision_terrain(world, static, _NOW_MS)
+        terrain = compose_decision_terrain(world, static, _NOW_MS, frozenset())
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)

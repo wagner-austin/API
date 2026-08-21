@@ -94,6 +94,18 @@ ShootOutcome = Literal[
 and the executor's target-not-tracked discard (the Phase 0 residue:
 the race guard against the tank vanishing between plan and dispatch)."""
 
+ScopeOutcome = Literal[
+    "confirmed",
+    "superseded",
+    "stall_timeout",
+]
+"""Scope-pan resolutions ([[viewport-shift-protocol]]): the answering
+0x5A confirmed the shifted window (median exactly one server tick,
+p95 two, across 759 archived pans), or the pan stalled out. Promoted
+from fire-and-forget 2026-08-20: an untracked pan let the next tick's
+radar or map_open dispatch into the scope-pending window the server
+silently drops commands in — half of all scan stalls ever recorded."""
+
 ActionOutcome = Literal[
     # scan
     "radar_complete",
@@ -113,19 +125,37 @@ ActionOutcome = Literal[
     # shoot
     "hit",
     "miss",
+    # scope
+    "confirmed",
     # shared
     "command_rejected",
     "stall_timeout",
     "superseded",
 ]
-"""Union of all six per-kind outcome vocabularies."""
+"""Union of all seven per-kind outcome vocabularies."""
+
+LIVENESS_STALL_STREAK = 12
+"""Consecutive zero-dispatch replans of one kind that mean a livelock.
+
+A zero-duration ``superseded`` is a decision the planner replaced
+before anything was dispatched — one replan is normal, a streak means
+the planner keeps deriving an identical plan some downstream veto
+keeps refusing without feedback (the planner/veto gap class,
+[[fleet-coordination]] gatherer livelock). Empirical basis, 459-run
+archive sweep 2026-08-20: the healthy ceiling is 7 (combat re-aiming
+while a shot resolves); the one livelock in the archive ran 93. Set
+above the healthy ceiling with margin, far below the pathology.
+Consumed live (``liveness_stall`` diagnostic at the crossing) and
+post-run (the issue report's streak scan)."""
 
 __all__ = [
+    "LIVENESS_STALL_STREAK",
     "ActionOutcome",
     "CollectOutcome",
     "MapOpenOutcome",
     "MoveOutcome",
     "ScanOutcome",
+    "ScopeOutcome",
     "ShootOutcome",
     "TeleportOutcome",
 ]

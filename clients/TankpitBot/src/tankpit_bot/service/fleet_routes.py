@@ -44,6 +44,7 @@ def encode_fleet_bot(bot: FleetBotDict) -> JSONObject:
     return {
         "instance": bot["instance"],
         "account": bot["account"],
+        "role": bot["role"],
         "pid": bot["pid"],
         "alive": bot["alive"],
         "returncode": bot["returncode"],
@@ -53,14 +54,14 @@ def encode_fleet_bot(bot: FleetBotDict) -> JSONObject:
     }
 
 
-def parse_spawn_request(body: bytes) -> tuple[str, str, int, int]:
+def parse_spawn_request(body: bytes) -> tuple[str, str, int, int, str]:
     """Parse the ``POST /bots`` body.
 
     Args:
         body: Raw request body.
 
     Returns:
-        ``(instance, account, kills, seconds)``.
+        ``(instance, account, kills, seconds, role)``.
 
     Raises:
         JSONTypeError: Malformed JSON or wrong field types.
@@ -70,7 +71,8 @@ def parse_spawn_request(body: bytes) -> tuple[str, str, int, int]:
     account = narrow_json_to_str(data.get("account", ""))
     kills = narrow_json_to_int(data.get("kills", 0))
     seconds = narrow_json_to_int(data.get("seconds", 0))
-    return instance, account, kills, seconds
+    role = narrow_json_to_str(data.get("role", ""))
+    return instance, account, kills, seconds, role
 
 
 def _json_response(payload: JSONObject, status: int = 200) -> web.Response:
@@ -194,8 +196,14 @@ def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:
     async def spawn_bot(request: web.Request) -> web.Response:
         """``POST /bots`` — spawn one instance."""
         try:
-            instance, account, kills, seconds = parse_spawn_request(await request.read())
-            row = manager.spawn(instance=instance, account=account, kills=kills, seconds=seconds)
+            instance, account, kills, seconds, role = parse_spawn_request(await request.read())
+            row = manager.spawn(
+                instance=instance,
+                account=account,
+                kills=kills,
+                seconds=seconds,
+                role=role,
+            )
         except (JSONTypeError, ValueError) as error:
             log.warning("Fleet: rejected spawn request (400): %s", error)
             return web.Response(status=400, text=f"bad spawn request: {error}")

@@ -18,6 +18,7 @@ from tankpit_bot.diagnostics.session_scorecard_render import (
     render_state_budget_lines,
     render_teleport_spend_lines,
 )
+from tankpit_bot.ledger.outcomes import LIVENESS_STALL_STREAK
 
 log = get_logger(__name__)
 
@@ -127,6 +128,25 @@ def _render_action_outcome_section(report: IssueReportDict) -> list[str]:
     return lines
 
 
+def _render_suppressed_section(report: IssueReportDict) -> list[str]:
+    """Return the SUPPRESSED DISPATCHES section lines (empty when none).
+
+    Every row is a target the executor's belief-veto refused at least
+    once without sending anything; the tally is how many times the
+    planner re-selected it anyway.
+    """
+    if not report["suppressed_dispatches"]:
+        return []
+    lines = ["=== SUPPRESSED DISPATCHES (belief-refuted, nothing sent) ==="]
+    for row in report["suppressed_dispatches"]:
+        lines.append(
+            f"  {row['command_name']} to ({row['target_x']},{row['target_y']}) "
+            f"x{row['count']} (predicted 0x52 code {row['predicted_error_code']})"
+        )
+    lines.append("")
+    return lines
+
+
 def _render_scorecard_section(report: IssueReportDict) -> list[str]:
     """Return the session scorecard section lines."""
     scorecard = report["scorecard"]
@@ -159,6 +179,57 @@ def _render_scorecard_section(report: IssueReportDict) -> list[str]:
     return lines
 
 
+# One suppression is the executor's refusal prediction working (a
+# spared server call); two can be one belief refreshing mid-window.
+# THREE same-target suppressions mean the planner was told "this cannot
+# transfer" twice and selected the identical action anyway -- the
+# planner/veto feedback gap that produced the 2026-08-20 gatherer
+# livelock (93 consecutive suppressions on one tile while this report
+# read "no top-level issues detected").
+_SUPPRESSED_STREAK_ISSUE_THRESHOLD = 3
+
+
+def _zero_dispatch_streaks(report: IssueReportDict) -> dict[str, int]:
+    """Return the longest zero-dispatch replan streak per action kind.
+
+    The generalized liveness scan (the suppressed-dispatch rule's
+    veto-agnostic sibling): a zero-duration ``superseded`` outcome is a
+    decision replaced before anything dispatched, and a long
+    same-kind run of them is a planner producing plans that never
+    reach the wire — whatever the veto. Mirrors the ledger's live
+    counter so post-run analysis catches the class even on artifacts
+    from builds without the ``liveness_stall`` diagnostic.
+
+    Args:
+        report: Report whose ``action_outcomes`` rows are scanned in
+            stream order.
+
+    Returns:
+        Per-kind maximum consecutive zero-duration superseded count.
+    """
+    best: dict[str, int] = {}
+    current_kind = ""
+    current = 0
+    for row in report["action_outcomes"]:
+        if row["outcome"] == "superseded" and row["duration_ms"] == 0:
+            current = current + 1 if row["action_kind"] == current_kind else 1
+            current_kind = row["action_kind"]
+            if current > best.get(current_kind, 0):
+                best[current_kind] = current
+        else:
+            current_kind = ""
+            current = 0
+    return best
+
+
+# A displaced teleport is a SUCCESS to the ledger (landed_inexact), so
+# destination repetition hides from every failure counter — the third
+# liveness flavor. Empirical (459-run archive sweep 2026-08-21): the 11
+# pathological runs all repeat a destination >= 3 times (worst: 534 at
+# one tile, the 08-05 ancestor); healthy runs repeat at most twice
+# (combat re-aims at a stationary enemy).
+_DISPLACEMENT_ORBIT_THRESHOLD = 3
+
 # Sessions that shoot this much without a single observed deactivation
 # are chasing unkillable or repairing targets.
 _COMBAT_FUTILITY_SHOT_THRESHOLD = 20
@@ -179,6 +250,24 @@ def _collect_scorecard_issues(scorecard: SessionScorecardDict) -> list[str]:
         Human-readable issue lines (possibly empty).
     """
     issues: list[str] = []
+    stalls = {
+        key.removesuffix(":stall_timeout"): count
+        for key, count in scorecard["action_outcome_counts"].items()
+        if key.endswith(":stall_timeout") and count > 0
+    }
+    if stalls:
+        # Recovered anomalies must be VISIBLE (2026-08-20 lesson: the
+        # scope-pending radar drop hid in stall counts for 19 days
+        # because every stall self-healed — the report surfaces what
+        # breaks, so it must also surface what limps). Post-July the
+        # archive baseline is under one stall per run; any stall is
+        # worth a line.
+        breakdown = " ".join(f"{kind}={count}" for kind, count in sorted(stalls.items()))
+        issues.append(
+            f"{sum(stalls.values())} action(s) stalled to timeout and replanned "
+            f"({breakdown}) -- self-healed, but each stall is ~10 s of session "
+            "time with a cause worth naming"
+        )
     if 0 <= scorecard["fuel_min"] < _FUEL_FLOOR_THRESHOLD:
         issues.append(
             f"fuel floor critical: belief fuel dipped to {scorecard['fuel_min']} "
@@ -227,7 +316,49 @@ def _collect_top_level_issues(report: IssueReportDict) -> list[str]:
         )
     if report["session_room"] is None:
         issues.append("session room unknown -- analysis terrain is unverifiable")
+    issues.extend(_collect_repetition_issues(report))
     issues.extend(_collect_scorecard_issues(report["scorecard"]))
+    return issues
+
+
+def _collect_repetition_issues(report: IssueReportDict) -> list[str]:
+    """Return the liveness-flavor issue lines, one rule per flavor.
+
+    Each flavor is a way a run can burn time without any failure
+    counter noticing: vetoed re-selection (suppressed dispatches),
+    zero-dispatch replans (liveness stalls), and
+    successful-but-bounced landings (displacement orbits).
+
+    Args:
+        report: Report whose tallies are inspected.
+
+    Returns:
+        Human-readable issue lines (possibly empty).
+    """
+    issues: list[str] = []
+    for suppressed in report["suppressed_dispatches"]:
+        if suppressed["count"] >= _SUPPRESSED_STREAK_ISSUE_THRESHOLD:
+            issues.append(
+                f"planner re-selected a belief-refuted {suppressed['command_name']} to "
+                f"({suppressed['target_x']},{suppressed['target_y']}) {suppressed['count']}x "
+                f"(predicted 0x52 code {suppressed['predicted_error_code']}) -- "
+                "the executor's veto is not feeding back into selection"
+            )
+    for displaced in report["displaced_teleports"]:
+        if displaced["count"] >= _DISPLACEMENT_ORBIT_THRESHOLD:
+            issues.append(
+                f"displacement orbit: {displaced['count']} teleports at "
+                f"({displaced['requested_x']},{displaced['requested_y']}) all refused "
+                f"(max displacement {displaced['max_displacement']}) -- landings that "
+                "resolve as successes while the tank never left its origin"
+            )
+    for kind, streak in sorted(_zero_dispatch_streaks(report).items()):
+        if streak >= LIVENESS_STALL_STREAK:
+            issues.append(
+                f"liveness stall: {streak} consecutive {kind} decisions replaced with "
+                f"zero dispatches (healthy archive ceiling is 7) -- the planner is "
+                "spinning without reaching the wire"
+            )
     return issues
 
 
@@ -258,6 +389,7 @@ def render_issue_report(report: IssueReportDict) -> str:
         + _render_teleport_section(report)
         + _render_map_open_section(report)
         + _render_fuel_section(report)
+        + _render_suppressed_section(report)
         + _render_action_outcome_section(report)
         + _render_summary_section(report)
     )

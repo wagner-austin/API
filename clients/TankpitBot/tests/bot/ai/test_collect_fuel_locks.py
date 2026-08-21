@@ -308,6 +308,7 @@ def test_mine_denied_locked_fuel_releases_when_no_shot_exists() -> None:
         riding=False,
         hostile_mine_keys=frozenset({"131,100"}),
         occupied_tank_keys=frozenset(),
+        refused_landing_keys=frozenset(),
     )
     world, self_state = make_world(
         self_x=100,
@@ -368,6 +369,7 @@ def test_mine_denied_locked_fuel_holds_while_the_clearance_shot_exists() -> None
         riding=False,
         hostile_mine_keys=frozenset({"105,100"}),
         occupied_tank_keys=frozenset(),
+        refused_landing_keys=frozenset(),
     )
     world, self_state = make_world(
         self_x=100,

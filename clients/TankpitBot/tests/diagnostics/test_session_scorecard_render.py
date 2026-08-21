@@ -11,11 +11,6 @@ from tankpit_bot.diagnostics.issue_report_types import (
     SessionScorecardDict,
     StateBudgetRecordDict,
 )
-from tankpit_bot.diagnostics.session_scorecard_accumulator import (
-    ScorecardAccumulatorDict,
-    new_scorecard_accumulator,
-    route_scorecard_record,
-)
 from tankpit_bot.diagnostics.session_scorecard_render import (
     collect_scorecard_issues,
     render_fuel_low_water_lines,
@@ -23,81 +18,6 @@ from tankpit_bot.diagnostics.session_scorecard_render import (
     render_shot_billing_lines,
     render_teleport_spend_lines,
 )
-from tankpit_bot.runtime_records import RuntimeEventRecordDict
-
-
-def _record(
-    *,
-    channel: str,
-    message: str = "",
-    timestamp: str = "2026-06-12T06:25:00",
-    fields: dict[str, str | int | float | bool] | None = None,
-) -> RuntimeEventRecordDict:
-    """Build a runtime event record for routing tests.
-
-    Args:
-        channel: Event channel name.
-        message: Event message text.
-        timestamp: ISO timestamp.
-        fields: Structured payload fields.
-
-    Returns:
-        Runtime event record.
-    """
-    return RuntimeEventRecordDict(
-        timestamp=timestamp,
-        level="INFO",
-        logger="tankpit_bot.runtime.events",
-        mode="bot",
-        channel=channel,
-        message=message,
-        fields=fields if fields is not None else {},
-    )
-
-
-def _routed(records: list[RuntimeEventRecordDict]) -> ScorecardAccumulatorDict:
-    """Route every record into a fresh accumulator.
-
-    Args:
-        records: Records in stream order.
-
-    Returns:
-        Routed accumulator.
-    """
-    accumulator = new_scorecard_accumulator()
-    for record in records:
-        route_scorecard_record(record, accumulator)
-    return accumulator
-
-
-def _fuel_sample_record(
-    *,
-    fuel: int,
-    timestamp: str,
-    bot_state: str = "HUNT/ENGAGE",
-    in_flight: str = "shoot",
-) -> RuntimeEventRecordDict:
-    """Build a context-stamped ``self_alignment_sample`` record.
-
-    Args:
-        fuel: ``belief_fuel`` value.
-        timestamp: ISO timestamp.
-        bot_state: Ambient bot-state context.
-        in_flight: Ambient in-flight action kind.
-
-    Returns:
-        Runtime event record.
-    """
-    return _record(
-        channel="DIAGNOSTIC",
-        timestamp=timestamp,
-        fields={
-            "diagnostic_kind": "self_alignment_sample",
-            "belief_fuel": fuel,
-            "bot_state": bot_state,
-            "in_flight_action_kind": in_flight,
-        },
-    )
 
 
 class TestRenderAndIssues:

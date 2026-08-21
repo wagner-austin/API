@@ -118,18 +118,24 @@ __CARD_CSS__
 <div class="panel">
 <table>
   <thead><tr>
-    <th>name</th><th>account</th><th>status</th><th>limits</th>
+    <th>name</th><th>account</th><th>role</th><th>status</th><th>limits</th>
     <th>kills</th><th>deaths</th><th>hit/miss</th><th>dmg +/-</th>
     <th>tp</th><th>0-radar</th><th>inv start&rarr;now</th>
     <th>rank</th><th>time</th><th>actions</th>
   </tr></thead>
-  <tbody id="rows"><tr><td colspan="14" class="empty">loading…</td></tr></tbody>
+  <tbody id="rows"><tr><td colspan="15" class="empty">loading…</td></tr></tbody>
 </table>
 </div>
 <form id="spawn">
   <div class="field wide"><label for="account">Account</label>
     <select id="account"><option value="">default</option></select>
     <div class="hint">from accounts.json</div></div>
+  <div class="field"><label for="role">Role</label>
+    <select id="role">
+      <option value="fighter">fighter</option>
+      <option value="gatherer">gatherer</option>
+    </select>
+    <div class="hint">gatherer never hunts</div></div>
   <div class="field num"><label for="kills">Stop after kills</label>
     <input id="kills" type="number" min="0" value="20">
     <div class="hint">0 = play until stopped</div></div>
@@ -230,6 +236,7 @@ function row(bot) {
                        : (s.available ? s.duration_s : -1);
   tr.innerHTML =
     "<td>" + bot.instance + "</td><td>" + (bot.account || "default") + "</td>" +
+    "<td>" + bot.role + "</td>" +
     "<td>" + status + "</td><td>" + limits + "</td>" +
     "<td>" + (s.available ? s.kills : "") + "</td>" +
     "<td>" + (s.available ? s.deaths : "") + "</td>" +
@@ -286,7 +293,7 @@ async function poll() {
   tbody.replaceChildren();
   if (!names.length) {
     tbody.innerHTML =
-      '<tr><td colspan="14" class="empty">no bots yet — launch one below</td></tr>';
+      '<tr><td colspan="15" class="empty">no bots yet — launch one below</td></tr>';
   }
   for (const name of names) tbody.appendChild(row(registry[name]));
   const running = names.filter((n) => registry[n].alive).length;
@@ -318,6 +325,7 @@ document.getElementById("spawn").addEventListener("submit", async (event) => {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
       account: document.getElementById("account").value,
+      role: document.getElementById("role").value,
       kills: Number(document.getElementById("kills").value) || 0,
       seconds: Number(document.getElementById("seconds").value) || 0,
     }),

@@ -67,6 +67,7 @@ def _composed(base: InMemoryTerrainMap, hostile_keys: frozenset[str]) -> FerryAw
         riding=False,
         hostile_mine_keys=hostile_keys,
         occupied_tank_keys=frozenset(),
+        refused_landing_keys=frozenset(),
     )
 
 

@@ -31,7 +31,9 @@ from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
+from tankpit_bot.inventory import inventory_counts
 from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.physics.supervisor import equipment_pickup_refusal
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.types import ContainerStateDict
 
@@ -108,6 +110,22 @@ def _continue_or_release_equipment_lock(
     base_state: AIStateDict,
     locked_target: ContainerStateDict,
 ) -> tuple[TickDecisionDict | None, AIStateDict]:
+    refusal = equipment_pickup_refusal(inventory_counts(ctx.inventory), ctx.self_state["rank"])
+    if refusal is not None:
+        # The twin of the fuel lock's 2026-07-06 capacity gate, missed
+        # until the first live gatherer run (bot-20260820-005115): a
+        # full-inventory lock kept planning a pickup the executor's
+        # refusal prediction vetoed every tick — suppression dispatches
+        # nothing, so no failure mark ever arrives and the lock never
+        # dies. The physics law is the shared server rule
+        # (``equipment_pickup_refusal``); releasing here lets the
+        # cascade fall through to scan/sweep/frontier coverage.
+        emit_ai(
+            "releasing equipment lock at (%d,%d): every slot at rank cap",
+            locked_target["x"],
+            locked_target["y"],
+        )
+        return None, release_collect_plan(base_state, reason="tank_at_capacity")
     if _superior_equipment_candidate(ctx, locked_target) is not None:
         emit_ai(
             "releasing equipment lock at (%d,%d): markedly closer equipment is visible",

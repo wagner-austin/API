@@ -82,10 +82,12 @@ def visible_fuel_requires_reposition(
     if self_state is None:
         raise FuelTargetingError("self state is unavailable")
     world = probe.get_world_state()
+    now_ms = action_hooks.get_current_time_ms()
     terrain = compose_decision_terrain(
         world,
         probe.world.get_terrain_map(),
-        action_hooks.get_current_time_ms(),
+        now_ms,
+        probe.world.hostile_landing_keys(now_ms),
     )
     if terrain is None:
         raise FuelTargetingError("terrain map is unavailable")

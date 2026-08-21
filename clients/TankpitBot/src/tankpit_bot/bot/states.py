@@ -90,6 +90,7 @@ ActionKind = Literal[
     "scan",
     "shoot",
     "map_open",
+    "scope",
 ]
 
 ACTION_KINDS: tuple[ActionKind, ...] = (
@@ -100,6 +101,7 @@ ACTION_KINDS: tuple[ActionKind, ...] = (
     "scan",
     "shoot",
     "map_open",
+    "scope",
 )
 
 ActionOutcome = Literal[

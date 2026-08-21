@@ -34,6 +34,10 @@ from tankpit_bot.ledger.outcome.move import (
 from tankpit_bot.ledger.outcome.scan import (
     emit_scan_stall_timeout,
 )
+from tankpit_bot.ledger.outcome.scope import (
+    emit_scope_confirmed,
+    emit_scope_stall_timeout,
+)
 from tankpit_bot.ledger.outcome.teleport import (
     emit_teleport_stall_timeout,
 )
@@ -65,6 +69,9 @@ def has_in_flight_action(bot: Bot) -> bool:
 
     if kind == "map_open":
         return _wait_for_map_open_action(bot, action)
+
+    if kind == "scope":
+        return _wait_for_scope_action(bot, action)
 
     return False
 
@@ -125,6 +132,52 @@ def _wait_for_map_open_action(bot: Bot, action: InFlightActionDict) -> bool:
     if _clear_completed_map_open(bot, action):
         return False
     emit_sync("waiting for map open sync")
+    return True
+
+
+def _wait_for_scope_action(bot: Bot, action: InFlightActionDict) -> bool:
+    """Return True while a viewport pan awaits its 0x5A confirmation.
+
+    Scope dispatch (``Rb``) is not server-side rejectable — the server
+    either answers with the shifted 0x5A (median one server tick, 759
+    archived pans) or silently drops the pan; the stall timeout is the
+    only exit for a drop. Holding here is what makes the scope-pending
+    radar drop unrepresentable ([[viewport-shift-protocol]]): no radar
+    or map_open can dispatch until the window has settled. The same
+    orphan-0x52 drain rule as :func:`_wait_for_scan_action` applies.
+    """
+    _drain_orphan_command_error(bot.world, action)
+    if _clear_stalled_action(bot, action):
+        return False
+    if _clear_confirmed_scope(bot, action):
+        return False
+    emit_sync("waiting for scope confirmation")
+    return True
+
+
+def _clear_confirmed_scope(
+    bot: Bot,
+    action: InFlightActionDict,
+) -> bool:
+    """Clear a pending pan once its answering 0x5A was ingested.
+
+    Args:
+        bot: Bot instance.
+        action: The pending scope action record.
+
+    Returns:
+        True if the 0x5A arrived and the action was cleared.
+    """
+    if not bot.world.check_and_clear_viewport_update_processed():
+        return False
+    started_ms = action["started_ms"]
+    duration_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
+    emit_scope_confirmed(bot.world.ledger, duration_ms=duration_ms)
+    bot._state_data = transition_to(
+        bot._state_data,
+        bot.get_state(),
+        in_flight_action=make_no_action(),
+    )
     return True
 
 
@@ -261,6 +314,8 @@ def _emit_stall_outcome(
         )
     elif kind == "map_open":
         emit_map_open_stall_timeout(bot.world.ledger, duration_ms=elapsed_ms, timeout_ms=timeout_ms)
+    elif kind == "scope":
+        emit_scope_stall_timeout(bot.world.ledger, duration_ms=elapsed_ms, timeout_ms=timeout_ms)
 
 
 def _mark_current_viewport_scan_failed(bot: Bot, timestamp_ms: int) -> None:
@@ -320,10 +375,12 @@ def _clear_blocked_walk(
     """
     world = bot.get_world_state()
     self_state = world["self_state"]
+    now_ms = get_current_time_ms()
     terrain = compose_decision_terrain(
         world,
         bot.world.get_terrain_map(),
-        get_current_time_ms(),
+        now_ms,
+        bot.world.hostile_landing_keys(now_ms),
     )
     if self_state is None or terrain is None:
         return False
@@ -357,10 +414,12 @@ def _clear_blocked_collection(
     """
     world = bot.get_world_state()
     self_state = world["self_state"]
+    now_ms = get_current_time_ms()
     terrain = compose_decision_terrain(
         world,
         bot.world.get_terrain_map(),
-        get_current_time_ms(),
+        now_ms,
+        bot.world.hostile_landing_keys(now_ms),
     )
     if self_state is None or terrain is None:
         return False

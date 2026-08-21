@@ -474,3 +474,79 @@ class TestBotInFlightGuards:
 
         assert fake_cdp._sent_methods == []
         assert bot.get_state() == "SCANNING"
+
+
+class TestScopeInFlight:
+    """The tracked pan: hold until 0x5A, stall as the drop's only exit.
+
+    Regression pins for the scope-pending radar drop
+    ([[viewport-shift-protocol]], 2026-08-20): while a pan is in
+    flight the tick loop must not plan — the hold is what makes
+    dispatching radar or map_open into the unsettled window
+    unrepresentable.
+    """
+
+    def test_has_in_flight_action_holds_scope_until_viewport_update(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A pending pan holds the tick loop until its 0x5A is ingested.
+
+        Incidental world syncs must NOT clear it — only
+        ``mark_viewport_update_processed`` (the dispatcher's 0x5A
+        ingestion) is the completion signal, mirroring map_open's
+        MAP_DATA contract.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
+        from tankpit_bot.state.types import WorldStateDict
+
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 800)
+
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        started_ms = get_current_time_ms()
+        bot._state_data = _sba(bot._state_data, "IDLE", "scope", 0, 0, started_ms=started_ms)
+        ws.world_state = WorldStateDict(**{**ws.world_state, "timestamp_ms": started_ms + 1})
+
+        assert has_in_flight_action(bot) is True
+        kind_before_signal = bot._state_data["in_flight_action"]["kind"]
+        assert kind_before_signal == "scope"
+
+        ws.mark_viewport_update_processed()
+
+        assert has_in_flight_action(bot) is False
+        kind_after_signal = bot._state_data["in_flight_action"]["kind"]
+        assert kind_after_signal == "none"
+        outcomes = [record["outcome"] for record in ws.ledger.rings["scope"]]
+        assert outcomes == ["confirmed"]
+
+    def test_stalled_scope_clears_via_timeout(self, fake_env: FakeEnv) -> None:
+        """A dropped pan's only exit is the stall timeout, typed as scope.
+
+        The server silently drops pans in rare windows (no charge, no
+        0x5A — archive max healthy confirm is 8 s, timeout is 10 s);
+        the stall clears the hold so the bot replans, and the ledger
+        books a ``scope:stall_timeout``.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
+
+        ws = WorldService()
+        ws.update_world_state_from_position(50, 50)
+        _update_fuel_total(ws, 800)
+
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        bot._magic = "test_magic"
+        bot._update_state_from_world()
+        bot._update_state_from_world()
+        bot._state_data = _sba(bot._state_data, "IDLE", "scope", 0, 0)
+        bot._state_data["in_flight_action"]["started_ms"] = 1
+
+        waiting = has_in_flight_action(bot)
+
+        assert waiting is False
+        assert bot._state_data["in_flight_action"]["kind"] == "none"
+        outcomes = [record["outcome"] for record in ws.ledger.rings["scope"]]
+        assert outcomes == ["stall_timeout"]

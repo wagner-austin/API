@@ -177,15 +177,32 @@ def emit_teleport(
         True when the hop landed (the tank counts as a mover).
     """
     outcome = process_teleport(world, terrain, tank_id, command["x"], command["y"])
-    if outcome["kind"] != "landed":
-        code = (
-            SUPERVISOR_ERROR_INSUFFICIENT_FUEL
-            if outcome["kind"] == "insufficient_fuel"
-            else SUPERVISOR_ERROR_CANT_GO
-        )
+    if outcome["kind"] == "insufficient_fuel":
         if tank_id == client_id:
             messages.append(
-                SupervisorDict(msg_type=0x52, reset_action=1, close_map=1, error_code=code)
+                SupervisorDict(
+                    msg_type=0x52,
+                    reset_action=1,
+                    close_map=1,
+                    error_code=SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
+                )
+            )
+        return False
+    if outcome["kind"] == "blocked":
+        # The refusal law, mined 2026-08-21 (137/137 archived
+        # receipts, 8,718 landed vs 4 rejected teleports overall): a
+        # fully ring-blocked hop is NOT answered with 0x52 CANT_GO —
+        # the real server confirms the position AT THE ORIGIN,
+        # uncharged, and the client perceives "landed where I stood".
+        # The pre-correction sim sent CANT_GO here, a wire shape the
+        # live server never produces for teleports, which would have
+        # steered the bot down the rejection path instead of the
+        # landing-refusal evidence path ([[teleport-mechanics]] § the
+        # refusal law).
+        if tank_id == client_id:
+            messages.append(position_statement(world, tank_id))
+            messages.append(
+                TeleportLandedDict(msg_type="teleport_landed", subtype=_TELEPORT_LANDED_SUBTYPE)
             )
         return False
     # Wire order law: the SelfMovement position update PRECEDES the

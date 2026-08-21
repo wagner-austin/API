@@ -27,6 +27,38 @@ Teleport is the primary mobility model for search and hunting. Never propose rep
 - If **ENEMY mines** occupy the tile, displaced to nearest open tile — own-color mines never displace (archive 2026-08-06: 1,227 enemy vs 2 friendly displacements, 20 clean exact landings on friendly mines; [[mine-mechanics]] § team scope)
 - If **terrain** (rocks or water) at the target, displaced to nearest open tile
 
+**The refusal law, mined 2026-08-21 (CORRECTING the ejection model
+this paragraph briefly carried):** beyond ring-1, NO ejection exists.
+All **137** archived chebyshev->=2 "displacements" landed the tank
+**exactly at its own origin** (137/137), uncharged (no 6x-distance
+debit follows; the -10s in the receipts are the repair radars) — and
+the archive holds 8,718 landed vs 4 rejected teleports, so the server
+answers a fully ring-blocked hop with a silent **confirm-at-origin**,
+never a 0x52. What the bot logged as ``TELEPORT_DISPLACED`` at
+distance >= 2 was always a REFUSAL: requested tile + whole ring-1
+blocked, tank never moved. For four months that receipt fed nothing,
+which let the identical hop re-certify against mine-blind beliefs
+forever (the 08-05 session in the attainability docstring ran **534
+refusals at one tile in 43 minutes**; the 2026-08-21 marooning ran
+the same loop in escape and harvest form). Now a chebyshev->=2
+refusal (ring-1 one-tile displacement stays routine and unrecorded)
+writes ``ws.landing_refusals`` — requested tile + timestamp — and the
+composed decision terrain refuses LANDINGS in the requested tile's
+ring-1 (exactly the zone one refusal proves; walking unaffected) for
+a 30 s TTL, so the existing unservable/clearance laws finally receive
+the input they were starved of. A fresh refusal also forces the
+landing repair radar regardless of coverage ([[radar-mechanics]] §
+the s9-2 correction), and the analyzer flags any destination refused
+>= 3 times as a **displacement orbit** (the third liveness flavor:
+successful-looking actions, no progress — a refusal resolves
+``landed_inexact``, so repetition hides from every failure counter).
+The sim's physics always matched this law ("beyond-ring-1
+displacement does not exist"); its WIRE SHAPE did not — it answered
+sealed hops with 0x52 CANT_GO, corrected 2026-08-21 to the measured
+confirm-at-origin and pinned by the ring-refusal seam scenario
+(``tests/sim/test_landing_refusal_seam.py``: one hop on the wire,
+refusal ingested, zero repeats).
+
 **Do NOT compute adjacent tiles client-side.** The server is authoritative for placement. Teleporting to an enemy's exact coordinates is correct — the server places you adjacent. This is how human players play.[^8]
 
 ## Fuel cost

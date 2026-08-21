@@ -20,7 +20,12 @@ class TestSurfaceTransitionClamp:
         base = InMemoryTerrainMap({(103, 100): "W", (104, 100): "W"})
         wire = _ferry_tile(102, 100)
         terrain = FerryAwareTerrain(
-            base, wire, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+            base,
+            wire,
+            riding=False,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         clamped = clamp_move_target_at_surface_transition(
@@ -46,6 +51,7 @@ class TestSurfaceTransitionClamp:
             riding=True,
             hostile_mine_keys=frozenset(),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         clamped = clamp_move_target_at_surface_transition(
@@ -68,6 +74,7 @@ class TestSurfaceTransitionClamp:
             riding=False,
             hostile_mine_keys=frozenset(),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         clamped = clamp_move_target_at_surface_transition(
@@ -91,6 +98,7 @@ class TestSurfaceTransitionClamp:
             riding=True,
             hostile_mine_keys=frozenset(),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         clamped = clamp_move_target_at_surface_transition(
@@ -125,6 +133,7 @@ class TestSurfaceRouteTerrain:
             riding=True,
             hostile_mine_keys=frozenset(),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         ground_surface = SurfaceRouteTerrain(ferry_view, water=False)
 
@@ -153,6 +162,7 @@ class TestSurfaceRouteTerrain:
             riding=True,
             hostile_mine_keys=frozenset(),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         water_surface = SurfaceRouteTerrain(ferry_view, water=True)
 
@@ -176,6 +186,7 @@ class TestSurfaceRouteTerrain:
             riding=True,
             hostile_mine_keys=frozenset({"100,100", "101,100"}),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         assert SurfaceRouteTerrain(view, water=False).is_passable(100, 100) is False
@@ -198,6 +209,7 @@ class TestSurfaceRouteTerrain:
             riding=False,
             hostile_mine_keys=frozenset({"100,100"}),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         ground_surface = SurfaceRouteTerrain(view, water=False)
 
@@ -217,6 +229,7 @@ class TestSurfaceRouteTerrain:
             riding=False,
             hostile_mine_keys=frozenset(),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         assert SurfaceRouteTerrain(view, water=False).render_viewport(
             100, 100, 1, 1
@@ -237,6 +250,7 @@ class TestSurfaceAttainability:
             riding=False,
             hostile_mine_keys=frozenset({"101,100"}),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         surface = SurfaceRouteTerrain(ferry_view, water=False)
 
@@ -254,6 +268,7 @@ class TestSurfaceAttainability:
             riding=True,
             hostile_mine_keys=frozenset(),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         ground_surface = SurfaceRouteTerrain(ferry_view, water=False)
 

@@ -6,128 +6,26 @@ the physics-divergence path, and teleport-spend routing.
 
 from __future__ import annotations
 
+from tests.diagnostics._scorecard_fixtures import (
+    _record,
+    _routed,
+)
+
 from tankpit_bot.diagnostics.issue_report_types import (
     InventoryCountsDict,
     TargetedTeleportRecordDict,
 )
 from tankpit_bot.diagnostics.session_scorecard import build_session_scorecard
-from tankpit_bot.diagnostics.session_scorecard_accumulator import (
-    FuelSampleRecordDict,
-    ScorecardAccumulatorDict,
-    new_scorecard_accumulator,
-    route_scorecard_record,
-)
+from tankpit_bot.diagnostics.session_scorecard_accumulator import route_scorecard_record
 from tankpit_bot.diagnostics.session_scorecard_render import (
     collect_scorecard_issues,
     render_scorecard_section,
 )
+from tankpit_bot.diagnostics.session_scorecard_types import (
+    FuelSampleRecordDict,
+    new_scorecard_accumulator,
+)
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
-
-
-def _record(
-    *,
-    channel: str,
-    message: str = "",
-    timestamp: str = "2026-06-12T06:25:00",
-    fields: dict[str, str | int | float | bool] | None = None,
-) -> RuntimeEventRecordDict:
-    """Build a runtime event record for routing tests.
-
-    Args:
-        channel: Event channel name.
-        message: Event message text.
-        timestamp: ISO timestamp.
-        fields: Structured payload fields.
-
-    Returns:
-        Runtime event record.
-    """
-    return RuntimeEventRecordDict(
-        timestamp=timestamp,
-        level="INFO",
-        logger="tankpit_bot.runtime.events",
-        mode="bot",
-        channel=channel,
-        message=message,
-        fields=fields if fields is not None else {},
-    )
-
-
-def _routed(records: list[RuntimeEventRecordDict]) -> ScorecardAccumulatorDict:
-    """Route every record into a fresh accumulator.
-
-    Args:
-        records: Records in stream order.
-
-    Returns:
-        Routed accumulator.
-    """
-    accumulator = new_scorecard_accumulator()
-    for record in records:
-        route_scorecard_record(record, accumulator)
-    return accumulator
-
-
-def test_a_kill_diagnostic_on_another_channel_is_not_counted() -> None:
-    """A record's CHANNEL decides its router, not the fields it carries.
-
-    The channel cascade ends with an explicit ``!= "DIAGNOSTIC"`` arm,
-    and it is the only thing enforcing that. Without it every record
-    that is not STATE, WORLD, or a WIRE shot is handed to the diagnostic
-    router -- 925,744 AI, SYNC, WIRE and WIRE_COMPLETE records across the
-    427 archived runs -- and stays harmless only because all ~20 routing
-    branches happen to be gated on a ``diagnostic_kind`` literal that
-    those records do not carry.
-
-    Routing all 1,403,706 archived records with the arm removed produces
-    a byte-identical accumulator, so no current emitter puts a
-    ``diagnostic_kind`` on another channel and the record below is
-    constructed rather than observed. The arm is what keeps that true:
-    one ``emit_ai(diagnostic_kind=...)`` would otherwise inflate the kill
-    count of every scorecard, silently and in the bot's favour.
-    """
-    accumulator = _routed([_record(channel="AI", fields={"diagnostic_kind": "tank_deactivated"})])
-
-    assert accumulator["kills"] == 0
-
-
-def test_control_the_same_kill_diagnostic_on_its_own_channel_counts() -> None:
-    """Control: on the DIAGNOSTIC channel that exact record IS a kill."""
-    accumulator = _routed(
-        [_record(channel="DIAGNOSTIC", fields={"diagnostic_kind": "tank_deactivated"})]
-    )
-
-    assert accumulator["kills"] == 1
-
-
-def _fuel_sample_record(
-    *,
-    fuel: int,
-    timestamp: str,
-    bot_state: str = "HUNT/ENGAGE",
-    in_flight: str = "shoot",
-) -> RuntimeEventRecordDict:
-    """Build a context-stamped ``self_alignment_sample`` record.
-
-    Args:
-        fuel: ``belief_fuel`` value.
-        timestamp: ISO timestamp.
-        bot_state: Ambient bot-state context.
-        in_flight: Ambient in-flight action kind.
-
-    Returns:
-        Runtime event record.
-    """
-    return _record(
-        channel="DIAGNOSTIC",
-        timestamp=timestamp,
-        fields={
-            "diagnostic_kind": "self_alignment_sample",
-            "belief_fuel": fuel,
-            "bot_state": bot_state,
-            "in_flight_action_kind": in_flight,
-        },
-    )
 
 
 class TestRouting:
@@ -141,7 +39,15 @@ class TestRouting:
                 _record(channel="WIRE", message="shoot(136,149,id=529)"),
                 _record(
                     channel="DIAGNOSTIC",
-                    fields={"diagnostic_kind": "tank_deactivated", "victim_id": 529},
+                    fields={"diagnostic_kind": "tank_identity", "tank_id": 7},
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "tank_deactivated",
+                        "victim_id": 529,
+                        "killer_id": 7,
+                    },
                 ),
                 _record(
                     channel="DIAGNOSTIC",

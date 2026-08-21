@@ -69,6 +69,7 @@ class TestMakeResourceSearchHop:
             riding=False,
             hostile_mine_keys=frozenset({"130,100"}),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         decision = make_resource_search_hop(
             _ctx(terrain=terrain, map_fuel_dots=((130, 100), (160, 100))),

@@ -425,11 +425,17 @@ def _scan_on_landing_decision(
                     "suppress_landing_scan": False,
                 }
             )
-        if not radar_spend_worthwhile(ctx):
-            # Radar-spend economics (flag s9-2): the displaced landing
-            # sits in ground live coverage already explains -- the
-            # mines the un-suppression exists to reveal are known, so
-            # the scan buys nothing. Latch and proceed.
+        if not radar_spend_worthwhile(ctx) and not ctx.ws.has_fresh_landing_refusal(
+            ctx.timestamp_ms
+        ):
+            # Radar-spend economics (flag s9-2), CORRECTED 2026-08-21:
+            # coverage freshness proves the ground was scanned for
+            # containers -- it never proved the MINES were known
+            # (mines are dynamic, and fleet-shared coverage carries no
+            # local reveals). A fresh displacement is the server
+            # proving the mine beliefs wrong, so it forces the repair
+            # scan below regardless of coverage; only a displacement-
+            # free landing in live coverage skips the spend.
             emit_ai(
                 "harvest landing displaced but viewport coverage is live - "
                 "no radar spend, proceeding",

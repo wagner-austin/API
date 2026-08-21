@@ -69,6 +69,7 @@ class FerryAwareTerrain:
         riding: bool,
         hostile_mine_keys: frozenset[str],
         occupied_tank_keys: frozenset[str],
+        refused_landing_keys: frozenset[str],
     ) -> None:
         """Initialize the composed terrain view.
 
@@ -88,12 +89,23 @@ class FerryAwareTerrain:
                 occupied_tank_keys`). A body stops a walk at the tile
                 before it, so it is impassable here for the same
                 reason a mine is.
+            refused_landing_keys: "x,y" keys of freshly refused
+                landing rings (``WorldService.hostile_landing_keys``):
+                the server refused a hop there — requested tile plus
+                ring-1 proven blocked, tank stayed at origin,
+                uncharged (137/137 archived receipts) — and the local
+                mine beliefs have not yet caught up, so LANDINGS are
+                refused while the evidence is fresh. Walking is
+                unaffected — the refusal proves the landing ring, not
+                that the ground is impassable ([[teleport-mechanics]]
+                § the refusal law, 2026-08-21).
         """
         self._base = base
         self._wire_terrain = wire_terrain
         self._riding = riding
         self._hostile_mine_keys = hostile_mine_keys
         self._occupied_tank_keys = occupied_tank_keys
+        self._refused_landing_keys = refused_landing_keys
 
     def get_terrain(self, x: int, y: int) -> str:
         """Get terrain type at game coordinates.
@@ -206,7 +218,15 @@ class FerryAwareTerrain:
         """
         if not self.is_landing_legal(x, y):
             return False
-        return f"{x},{y}" not in self._hostile_mine_keys
+        key = f"{x},{y}"
+        if key in self._refused_landing_keys:
+            # Freshly refused landing ring: the server proved it will
+            # not land the tank here, whatever the mine beliefs say
+            # ([[teleport-mechanics]] § the refusal law — the
+            # mine-blind loop this closes re-certified the identical
+            # hop 534 times in the 08-05 ancestor).
+            return False
+        return key not in self._hostile_mine_keys
 
     def render_viewport(
         self,
@@ -397,13 +417,16 @@ def compose_decision_terrain(
     world: WorldStateDict,
     terrain: TerrainMapProtocol | None,
     now_ms: int,
+    refused_landing_keys: frozenset[str],
 ) -> TerrainMapProtocol | None:
     """Compose the decision terrain view for one tick.
 
-    Assembles all four blocker classes the server routes around into a
-    single passability answer: static minimap terrain, movable blocks
-    and ferries from the wire terrain overlay, hostile mines from the
-    mine registry, and other tanks' bodies from the tank registry.
+    Assembles all five blocker classes the server routes around into a
+    single answer: static minimap terrain, movable blocks and ferries
+    from the wire terrain overlay, hostile mines from the mine
+    registry, other tanks' bodies from the tank registry, and fresh
+    displacement-evidence zones (landings only) from the session's
+    bounce receipts.
 
     Args:
         world: Current world state with wire terrain, mines, tanks and
@@ -414,6 +437,10 @@ def compose_decision_terrain(
             the tick timestamp they already hold, or read the canonical
             clock (``_test_hooks.get_current_time_ms``) -- never a
             second clock source.
+        refused_landing_keys: The session's fresh displacement
+            evidence, expanded to tile keys
+            (``WorldService.hostile_landing_keys(now_ms)``) — callers
+            pass it from the same ``ws`` they already hold.
 
     Returns:
         Composed terrain view, or None when no static map exists.
@@ -426,6 +453,7 @@ def compose_decision_terrain(
         riding=is_riding_ferry(world),
         hostile_mine_keys=frozenset(hostile_mines(world)),
         occupied_tank_keys=occupied_tank_keys(world, now_ms),
+        refused_landing_keys=refused_landing_keys,
     )
 
 

@@ -19,12 +19,16 @@ one outcome -- the still-pending set at session end is exposed via
 
 from __future__ import annotations
 
+from platform_core.logging import get_logger
+
 from tankpit_bot.ledger.events import ActionKind
-from tankpit_bot.ledger.outcomes import ActionOutcome
+from tankpit_bot.ledger.outcomes import LIVENESS_STALL_STREAK, ActionOutcome
 from tankpit_bot.ledger.records import ActionOutcomeRecordDict
 from tankpit_bot.ledger.ring import append_outcome_record
 from tankpit_bot.ledger.service import LedgerService
 from tankpit_bot.runtime_logging import emit_diagnostic
+
+log = get_logger(__name__)
 
 
 def register_pending_decision(
@@ -52,6 +56,25 @@ def register_pending_decision(
             duration_ms=0,
             superseded_by=event_id,
         )
+        # The live livelock detector: a zero-duration superseded is a
+        # decision replaced before ANYTHING dispatched, and a streak of
+        # them is the planner/veto feedback gap ([[fleet-coordination]]
+        # gatherer livelock — 93 in a row while the session looked
+        # busy). Fires once at the crossing; a genuine resolution of
+        # the kind re-arms it below.
+        ledger.zero_dispatch_streaks[action_kind] += 1
+        streak = ledger.zero_dispatch_streaks[action_kind]
+        if streak == LIVENESS_STALL_STREAK:
+            log.warning(
+                "LIVENESS STALL: %s replanned %d consecutive times with zero dispatches",
+                action_kind,
+                streak,
+            )
+            emit_diagnostic(
+                diagnostic_kind="liveness_stall",
+                action_kind=action_kind,
+                streak=streak,
+            )
     ledger.pending_decisions[action_kind] = event_id
 
 
@@ -140,6 +163,11 @@ def emit_action_outcome(
     caused_by = ledger.pending_decisions.pop(action_kind, 0)
     if caused_by != 0:
         ledger.resolved_decision_ids.add(caused_by)
+    if outcome != "superseded":
+        # Any genuine resolution of the kind proves the planner's
+        # output is reaching the wire again — the stall counter and
+        # its one-shot diagnostic both re-arm.
+        ledger.zero_dispatch_streaks[action_kind] = 0
     record = ActionOutcomeRecordDict(
         event_id=ledger.next_event_id(),
         attempt_id=ledger.next_attempt_id(action_kind),
@@ -165,6 +193,7 @@ def emit_action_outcome(
 
 __all__ = [
     "emit_action_outcome",
+    "log",
     "pending_decision_ids",
     "register_pending_decision",
     "resolved_decision_ids",

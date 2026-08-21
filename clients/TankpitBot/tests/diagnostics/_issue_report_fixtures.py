@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from platform_core.json_utils import (
+    JSONObject,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+)
+
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
 )
@@ -61,3 +68,8 @@ def _emit_fuel_target_selection(
         terrain_available=True,
         self_state_available=True,
     )
+
+
+def _round_trip(encoded: JSONObject) -> JSONObject:
+    """Round-trip a dict through ``dump_json_str`` / ``load_json_str``."""
+    return narrow_json_to_dict(load_json_str(dump_json_str(encoded)))

@@ -28,6 +28,7 @@ class WorldServiceRadarMixin:
     world_state: WorldStateDict
     radar_scan_complete: bool
     map_data_processed: bool
+    viewport_update_processed: bool
     pending_radar_uses_extra: bool
     pending_radar_empty_delta_ms: int
     container_desync_ms: int
@@ -63,6 +64,28 @@ class WorldServiceRadarMixin:
     def mark_map_data_processed(self) -> None:
         """Record that a MAP_DATA world-state blob was parsed into positions."""
         self.map_data_processed = True
+
+    def mark_viewport_update_processed(self) -> None:
+        """Record that a 0x5A ViewportUpdate was ingested.
+
+        The scope action's completion signal ([[viewport-shift-protocol]]):
+        every viewport-origin change arrives as a 0x5A, so the in-flight
+        scope's wait gate reads this exactly as map_open reads
+        ``map_data_processed``. Teleport landings also produce 0x5A —
+        the scope dispatch clears any stale mark first, so the flag
+        means "a 0x5A arrived since THIS pan was sent".
+        """
+        self.viewport_update_processed = True
+
+    def check_and_clear_viewport_update_processed(self) -> bool:
+        """Check if a 0x5A ViewportUpdate arrived since last check, then clear.
+
+        Returns:
+            True if a viewport update was ingested since the last call.
+        """
+        result = self.viewport_update_processed
+        self.viewport_update_processed = False
+        return result
 
     def check_and_clear_map_data_processed(self) -> bool:
         """Check if a MAP_DATA world-state blob was parsed since last check.

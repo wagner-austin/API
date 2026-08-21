@@ -5,7 +5,6 @@ pickup, and the statistics key.
 from __future__ import annotations
 
 from tankpit_bot.protocol.constants import (
-    SUPERVISOR_ERROR_CANT_GO,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
 )
 from tankpit_bot.sim.commands import (
@@ -78,15 +77,51 @@ def test_teleport_rejections_emit_supervisor_with_map_close() -> None:
     ]
 
 
-def test_teleport_onto_sealed_tile_is_cant_go() -> None:
-    """A fully sealed ring rejects the hop with cant_go."""
+def test_teleport_onto_sealed_tile_confirms_at_origin() -> None:
+    """A fully sealed ring refuses the hop with a confirm-at-origin.
+
+    The mined refusal law ([[teleport-mechanics]], 2026-08-21: 137/137
+    archived receipts landed the tank exactly at its origin, and the
+    whole archive holds 8,718 landed vs 4 rejected teleports): the
+    real server never answers a ring-blocked hop with 0x52 CANT_GO —
+    it confirms the position AT THE ORIGIN, uncharged. The
+    pre-correction sim sent CANT_GO here, a wire shape live teleports
+    never produce, which would have steered the bot down the
+    rejection path instead of the landing-refusal evidence path.
+    """
     world: SimWorldDict = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     walls = {(30, 30): "#", (31, 30): "#", (30, 29): "#", (29, 30): "#", (30, 31): "#"}
     server = SimServer(world, InMemoryTerrainMap(terrain_data=walls), client_id=9)
     server.queue_command(9, _command(("teleport", 116), 30, 30))
-    rejected = _supervisors(server.advance_tick())
-    assert [r["error_code"] for r in rejected] == [SUPERVISOR_ERROR_CANT_GO]
+    messages = server.advance_tick()
+    assert _supervisors(messages) == []
+    kinds = _kinds(messages)
+    assert 0x3D in kinds
+    assert "teleport_landed" in kinds
+    tank = server.world["tanks"][9]
+    assert (tank["x"], tank["y"]) == (10, 10)
+    assert tank["fuel"] == 1000
+
+
+def test_enemy_refused_teleport_emits_nothing_to_the_client() -> None:
+    """Another tank's ring-refused hop is silent on the client's wire.
+
+    The confirm-at-origin is the REQUESTER's receipt; a bystander sees
+    neither a supervisor nor a landed confirm — the refused tank simply
+    never moves (its cadence syncs keep reporting the origin).
+    """
+    world: SimWorldDict = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
+    world["tanks"][11] = make_sim_tank(11, 1, 8, 15, 10, 1800)
+    walls = {(30, 30): "#", (31, 30): "#", (30, 29): "#", (29, 30): "#", (30, 31): "#"}
+    server = SimServer(world, InMemoryTerrainMap(terrain_data=walls), client_id=9)
+    server.queue_command(11, _command(("teleport", 116), 30, 30))
+    messages = server.advance_tick()
+    assert _supervisors(messages) == []
+    assert "teleport_landed" not in _kinds(messages)
+    enemy = server.world["tanks"][11]
+    assert (enemy["x"], enemy["y"]) == (15, 10)
 
 
 def test_teleport_to_empty_ground_has_no_pickup_message() -> None:

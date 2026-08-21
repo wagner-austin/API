@@ -146,7 +146,7 @@ Codecs: `fleetshare.codecs` — full `require_*` validation on decode.
   first *inside* a priority tier, so fighters converge on one enemy
   without outranking the human-priority doctrine.
 
-## Roles (`FleetRole`, `TANKPIT_ROLE`)
+## Roles (`FleetRole`, `TANKPIT_ROLE`, fleet spawn `role`)
 
 - **fighter** (default): the full HUNT/COLLECT doctrine.
 - **gatherer**: never hunts — the router's `_select_owner_mode`
@@ -158,6 +158,36 @@ Codecs: `fleetshare.codecs` — full `require_*` validation on decode.
   "marooned". The gatherer lives in the collect cascade (scan, sweep,
   search hop, map-for-dots), roaming the map and publishing what it
   finds for the fighters of its color.
+
+  First live gatherer run (bot-20260820-005115 pair): the contract
+  held on the wire — zero shots, zero HUNT-owned ticks across 4m21s —
+  but the run surfaced the **full-inventory equipment livelock**
+  (FIXED same day): a gatherer at rank cap (recruit 20/20/20/20/20)
+  kept the collect cascade's `equipment_locked` target while the
+  dispatch was predictively suppressed every tick ("belief predicts
+  0x52 code 7", 93 consecutive ticks on (133,129)); suppression never
+  bumps `failed_pickups`, so the belief kept winning and the cascade
+  never reached scan/sweep/frontier-walk (1 pickup in 4m21s; 512
+  scanned tiles offered vs 2,734 received — the gatherer fed
+  BACKWARD). Root cause was a role-shaped mask: the equipment HOP was
+  barred only via `hunt_entry_permitted` (a full FIGHTER goes
+  hunting), and the gatherer's unconditional False removed that bar;
+  the LOCK continuation never had the capacity gate the fuel lock
+  gained 2026-07-06. Both now apply the shared
+  `equipment_pickup_refusal` law directly: the hop declines
+  (`at_capacity` tally) and the lock releases `tank_at_capacity`, so
+  a full gatherer falls through to coverage and roams. Belief
+  deletion was rejected as a fix — the teammate's atlas re-feeds the
+  tile within the share TTL. Pinned by
+  `test_locked_equipment_released_when_every_slot_at_rank_cap` and
+  `test_hop_toward_equipment_declines_when_every_slot_at_rank_cap`.
+
+The fleet manager's spawn API carries the role per bot (2026-08-20:
+`POST /bots` gained `"role"`, validated against `FLEET_ROLES`, empty
+means fighter): the manager sets the child's `TANKPIT_ROLE`
+explicitly on every spawn — never inherited, so a stray value in the
+manager's own environment cannot silently re-role the fleet — and
+restart carries the stored role ([[bot-service-architecture]]).
 
 ## Color assignment
 

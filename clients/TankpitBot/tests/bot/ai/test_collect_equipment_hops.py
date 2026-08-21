@@ -69,6 +69,46 @@ def test_hop_toward_equipment_picks_nearest_of_multiple_external_candidates() ->
     assert decision["behavior"]["reason_kind"] == "equipment_hop"
 
 
+def test_hop_toward_equipment_declines_when_every_slot_at_rank_cap() -> None:
+    """The physics bar: a tank that can hold nothing never hops at equipment.
+
+    Regression guard for the gatherer livelock's entry teleport
+    (bot-20260820-005115): for a FIGHTER the hunt-entry bar masks this
+    case (full stock permits hunting, so the hop was barred as a side
+    effect), but a gatherer's ``hunt_entry_permitted`` is
+    unconditionally False, and a full recruit hopped at equipment it
+    could not hold. The shared ``equipment_pickup_refusal`` law now
+    bars the hop directly, whatever the role.
+    """
+    ws = WorldService()
+    containers = {
+        "130,100": make_container_state(
+            x=130,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
+    # The fixture world's corporal (rank 2) caps at 30 per slot; every
+    # slot at 30 is the same all-slots-at-cap shape the live recruit
+    # wedged on at 20s.
+    inventory = make_inventory(default_count=30)
+    terrain = InMemoryTerrainMap()
+    base_ai_state = make_scanned_ai_state()
+    ai_state = AIStateDict(
+        **{
+            **base_ai_state,
+            "config": {**base_ai_state["config"], "role": "gatherer"},
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "", ws=ws)
+
+    assert hop_toward_equipment(ctx, ctx.base) is None
+
+
 def test_hop_toward_equipment_declines_during_a_held_lock_above_break() -> None:
     """F21 fix (2026-07-31): no mid-fight hop while reserves clear the break bar.
 
@@ -450,6 +490,7 @@ def test_hop_skips_a_mine_denied_nearest_and_takes_the_next_candidate() -> None:
         riding=False,
         hostile_mine_keys=frozenset({"131,100"}),
         occupied_tank_keys=frozenset(),
+        refused_landing_keys=frozenset(),
     )
     inventory = make_inventory(default_count=15)
     ctx = DecideCtx(

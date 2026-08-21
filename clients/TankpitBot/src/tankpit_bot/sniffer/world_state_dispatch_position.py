@@ -139,6 +139,7 @@ def _dispatch_tile_patch_update(ws: WorldService, decoded: protocol.BinaryMessag
             "entities": list(entities),
         }:
             update_viewport_entities(ws, viewport_left, viewport_top, entities)
+            ws.mark_viewport_update_processed()
             return True
     return False
 

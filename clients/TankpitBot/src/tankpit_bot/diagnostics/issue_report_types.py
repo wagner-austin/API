@@ -101,6 +101,56 @@ class ActionOutcomeRowDict(TypedDict):
     timestamp: str
 
 
+class SuppressedDispatchRecordDict(TypedDict):
+    """Per-target tally of ``dispatch_suppressed`` DIAGNOSTIC events.
+
+    A suppression is the executor's refusal prediction sparing one
+    wasted server call -- designed behavior, once. A TALLY is the
+    planner failing to consume that veto: nothing was dispatched, so
+    no failure mark exists, and the same belief keeps winning the next
+    plan (the 2026-08-20 gatherer livelock re-planned one suppressed
+    pickup 93 consecutive ticks while the report read healthy).
+
+    Attributes:
+        command_name: Suppressed command kind (``pickup_equipment``,
+            ``pickup_fuel``, ``teleport``).
+        target_x: Target tile X.
+        target_y: Target tile Y.
+        predicted_error_code: The 0x52 code the belief predicted (the
+            last one seen for this target).
+        count: How many times this exact target was suppressed.
+    """
+
+    command_name: str
+    target_x: int
+    target_y: int
+    predicted_error_code: int
+    count: int
+
+
+class DisplacedTeleportRecordDict(TypedDict):
+    """Per-destination tally of ``teleport_displacement`` events.
+
+    A displaced teleport resolves as a SUCCESS (``landed_inexact``),
+    so repetition at one destination accumulates in no failure
+    machinery — the third liveness flavor (successful actions, no
+    progress): the 08-05 ancestor ran 534 bounces at one tile over 43
+    minutes, the 2026-08-21 marooning ran 4-in-10-s escape and
+    harvest loops, and none of it surfaced anywhere.
+
+    Attributes:
+        requested_x: The repeatedly requested landing X.
+        requested_y: The repeatedly requested landing Y.
+        count: How many teleports at this destination displaced.
+        max_displacement: Largest Manhattan bounce observed.
+    """
+
+    requested_x: int
+    requested_y: int
+    count: int
+    max_displacement: int
+
+
 class SessionRoomRecordDict(TypedDict):
     """The single ``session_room_joined`` event for the run.
 
@@ -427,6 +477,13 @@ class IssueReportDict(TypedDict):
         map_open_completions: Count of ``action_outcome`` events with
             ``action_kind == "map_open"`` and
             ``outcome == "map_data_processed"``.
+        suppressed_dispatches: Per-target ``dispatch_suppressed``
+            tallies, highest count first -- the executor's belief-veto
+            refusals the planner failed to consume.
+        displaced_teleports: Per-destination ``teleport_displacement``
+            tallies, highest count first -- bounced landings that
+            resolve as successes and therefore hide from every
+            failure counter.
         scorecard: Per-run outcome scorecard (time budget, combat,
             fuel trajectory, equipment-approach ledger).
     """
@@ -445,11 +502,14 @@ class IssueReportDict(TypedDict):
     fuel_rejected_count: int
     map_open_dispatches: int
     map_open_completions: int
+    suppressed_dispatches: list[SuppressedDispatchRecordDict]
+    displaced_teleports: list[DisplacedTeleportRecordDict]
     scorecard: SessionScorecardDict
 
 
 __all__ = [
     "ActionOutcomeRowDict",
+    "DisplacedTeleportRecordDict",
     "FuelLowWaterEpisodeDict",
     "FuelTargetSelectionRecordDict",
     "InventoryCountsDict",
@@ -458,6 +518,7 @@ __all__ = [
     "SessionRoomRecordDict",
     "SessionScorecardDict",
     "StateBudgetRecordDict",
+    "SuppressedDispatchRecordDict",
     "TargetedTeleportRecordDict",
     "TeleportAttemptRecordDict",
     "TeleportSpendRecordDict",

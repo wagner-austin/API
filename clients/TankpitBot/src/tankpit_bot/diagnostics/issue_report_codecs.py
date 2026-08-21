@@ -21,14 +21,18 @@ from tankpit_bot.diagnostics.issue_report_codecs_records import (
     _require_object_list,
     _require_object_or_none,
     decode_action_outcome_row,
+    decode_displaced_teleport_record,
     decode_fuel_target_selection_record,
     decode_map_open_skipped_record,
     decode_session_room_record,
+    decode_suppressed_dispatch_record,
     decode_teleport_attempt_record,
     encode_action_outcome_row,
+    encode_displaced_teleport_record,
     encode_fuel_target_selection_record,
     encode_map_open_skipped_record,
     encode_session_room_record,
+    encode_suppressed_dispatch_record,
     encode_teleport_attempt_record,
 )
 from tankpit_bot.diagnostics.issue_report_codecs_scorecard import (
@@ -73,6 +77,12 @@ def encode_issue_report(report: IssueReportDict) -> JSONObject:
         "fuel_rejected_count": report["fuel_rejected_count"],
         "map_open_dispatches": report["map_open_dispatches"],
         "map_open_completions": report["map_open_completions"],
+        "suppressed_dispatches": [
+            encode_suppressed_dispatch_record(r) for r in report["suppressed_dispatches"]
+        ],
+        "displaced_teleports": [
+            encode_displaced_teleport_record(r) for r in report["displaced_teleports"]
+        ],
         "scorecard": encode_session_scorecard(report["scorecard"]),
     }
 
@@ -115,6 +125,14 @@ def decode_issue_report(data: JSONObject) -> IssueReportDict:
         fuel_rejected_count=require_int(data, "fuel_rejected_count"),
         map_open_dispatches=require_int(data, "map_open_dispatches"),
         map_open_completions=require_int(data, "map_open_completions"),
+        suppressed_dispatches=[
+            decode_suppressed_dispatch_record(item)
+            for item in _require_object_list(data, "suppressed_dispatches")
+        ],
+        displaced_teleports=[
+            decode_displaced_teleport_record(item)
+            for item in _require_object_list(data, "displaced_teleports")
+        ],
         scorecard=decode_session_scorecard(_require_object(data, "scorecard")),
     )
 

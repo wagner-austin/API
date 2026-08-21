@@ -5,6 +5,8 @@ Equipment and fuel locks, including the critical-equipment override.
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.collect_locks import continue_or_release_lock
+from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
 )
@@ -49,6 +51,44 @@ class TestLockedEquipmentTarget:
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason_kind"] == "equipment_locked"
+
+    def test_locked_equipment_released_when_every_slot_at_rank_cap(self) -> None:
+        """A held equipment lock dies at full inventory instead of livelocking.
+
+        Regression guard for the 2026-08-20 gatherer livelock
+        (bot-20260820-005115): a recruit at 20/20/20/20/20 held an
+        equipment lock for 93 consecutive ticks while the executor's
+        refusal prediction suppressed every dispatch — suppression
+        sends nothing, so no failure mark ever arrived and the lock
+        never died. The twin of the fuel lock's 2026-07-06 capacity
+        gate: the continuation applies the shared
+        ``equipment_pickup_refusal`` law and releases the plan, so
+        the cascade falls through to coverage.
+        """
+        ws = self.ws
+        containers = {"105,105": _c(105, 105, 0, False)}
+        world, self_state = _make_world(containers=containers)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "COLLECT",
+                "mode_state": "APPROACH",
+                "mode_started_ms": 90000,
+                "resource_target_kind": "equipment",
+                "resource_target_x": 105,
+                "resource_target_y": 105,
+            },
+        )
+        # Recruit (rank 0) cap is 20: the live arterial inventory.
+        inventory = _make_inventory(dual_count=20, default_count=20, radar_count=20)
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+
+        decision, updated_state = continue_or_release_lock(ctx, ctx.base)
+
+        assert decision is None
+        assert updated_state["resource_target_kind"] == ""
+        assert updated_state["resource_target_x"] == 0
+        assert updated_state["resource_target_y"] == 0
 
     def test_locked_equipment_target_on_water_holds_plan(self) -> None:
         """A water-locked equipment target holds through the tick.

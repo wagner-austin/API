@@ -146,24 +146,30 @@ def test_require_object_list_rejects_non_object_element() -> None:
 
 
 def test_scorecard_counts_tank_deactivated_kills(fake_fs: FakeFileSystem) -> None:
-    """Every ``tank_deactivated`` event counts as one kill.
+    """A ``tank_deactivated`` counts iff its killer is our own tank.
 
     Since the DOM game-log kill channel was retired (2026-07-19), the
-    wire ``0x41 Deactivation`` is the single emitter -- exactly one
-    event per kill. A repeated ``victim_id`` is a respawned tank
-    killed again and must count again (June capture
-    bot-20260610-011333: victim 507 legitimately killed five times in
-    one 45-minute session).
+    wire ``0x41 Deactivation`` is the single emitter -- but the stream
+    carries EVERY deactivation in view, so the raw count stopped being
+    the kill count the day two bots shared a room (2026-08-20 gatherer
+    run: arterial's report read kills=2 with shots=0, both 0x41s
+    naming its sibling). A repeated ``victim_id`` with our killer id
+    is a respawned tank killed again and must count again (June
+    capture bot-20260610-011333: victim 507 legitimately killed five
+    times in one 45-minute session); a sibling's kill never counts.
     """
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
     _emit_session_room("1", "field01.gif")
-    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=42)
-    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=42)  # respawn re-kill
-    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=99)
+    emit_diagnostic(diagnostic_kind="tank_identity", tank_id=601)
+    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=42, killer_id=601)
+    # Respawn re-kill of the same victim by us: counts again.
+    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=42, killer_id=601)
+    # A fleet sibling's kill in the same room: never ours.
+    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=99, killer_id=1301)
 
     report = build_issue_report(Path(artifacts["latest_events_path"]))
 
-    assert report["scorecard"]["kills"] == 3
+    assert report["scorecard"]["kills"] == 2
 
 
 def test_scorecard_counts_combat_gate_diagnostics(fake_fs: FakeFileSystem) -> None:
@@ -338,3 +344,198 @@ def test_scorecard_issue_combat_futility(fake_fs: FakeFileSystem) -> None:
     assert report["scorecard"]["kills"] == 0
     assert "combat futility" in rendered
     assert "20 shots produced 0 observed kills" in rendered
+
+
+def test_suppressed_dispatch_streak_is_a_top_level_issue(fake_fs: FakeFileSystem) -> None:
+    """Re-selecting a belief-refuted action surfaces as a top-level issue.
+
+    Regression guard for the 2026-08-20 gatherer livelock's
+    invisibility: arterial's report showed 93 suppressed pickups as 116
+    zero-duration ``superseded`` collects and closed with "(no
+    top-level issues detected)". Three same-target suppressions mean
+    the planner was told "this cannot transfer" twice and selected the
+    identical action anyway; a single suppression is the refusal
+    prediction working and must NOT flag.
+    """
+    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
+    _emit_session_room("1", "field01.gif")
+    for _ in range(3):
+        emit_diagnostic(
+            diagnostic_kind="dispatch_suppressed",
+            origin="executor.dispatch_command.refusal_prediction",
+            command_name="pickup_equipment",
+            target_x=133,
+            target_y=129,
+            predicted_error_code=7,
+        )
+    emit_diagnostic(
+        diagnostic_kind="dispatch_suppressed",
+        origin="executor.dispatch_command.refusal_prediction",
+        command_name="pickup_fuel",
+        target_x=90,
+        target_y=91,
+        predicted_error_code=5,
+    )
+
+    report = build_issue_report(Path(artifacts["latest_events_path"]))
+    rendered = render_issue_report(report)
+
+    assert report["suppressed_dispatches"][0]["count"] == 3
+    assert report["suppressed_dispatches"][0]["command_name"] == "pickup_equipment"
+    assert report["suppressed_dispatches"][1]["count"] == 1
+    assert "SUPPRESSED DISPATCHES" in rendered
+    assert "pickup_equipment to (133,129) x3 (predicted 0x52 code 7)" in rendered
+    assert "planner re-selected a belief-refuted pickup_equipment to (133,129) 3x" in rendered
+    # The single fuel suppression renders in the section but is not an issue.
+    assert "pickup_fuel to (90,91) x1" in rendered
+    assert "belief-refuted pickup_fuel" not in rendered
+
+
+def test_zero_dispatch_streak_is_a_liveness_stall_issue(fake_fs: FakeFileSystem) -> None:
+    """A long same-kind zero-dispatch replan streak flags, healthy churn doesn't.
+
+    The veto-agnostic sibling of the suppressed-dispatch rule: catches
+    the planner/veto gap class from the ``action_outcome`` stream
+    alone, so artifacts from builds without the ``liveness_stall``
+    diagnostic still surface it. Thresholds are empirical (459-run
+    archive sweep 2026-08-20): healthy ceiling 7 (combat re-aiming),
+    the one recorded livelock ran 93.
+    """
+    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
+    _emit_session_room("1", "field01.gif")
+    for index in range(12):
+        emit_diagnostic(
+            diagnostic_kind="action_outcome",
+            action_kind="collect",
+            outcome="superseded",
+            event_id=index + 1,
+            attempt_id=index + 1,
+            duration_ms=0,
+        )
+    # A healthy-ceiling shoot streak must NOT flag.
+    for index in range(7):
+        emit_diagnostic(
+            diagnostic_kind="action_outcome",
+            action_kind="shoot",
+            outcome="superseded",
+            event_id=100 + index,
+            attempt_id=index + 1,
+            duration_ms=0,
+        )
+
+    rendered = render_issue_report(build_issue_report(Path(artifacts["latest_events_path"])))
+
+    assert "liveness stall: 12 consecutive collect decisions" in rendered
+    assert "consecutive shoot decisions" not in rendered
+
+
+def test_zero_dispatch_streak_broken_by_a_real_outcome_does_not_flag(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """A genuine resolution mid-run splits the streak below the bar."""
+    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
+    _emit_session_room("1", "field01.gif")
+    for index in range(11):
+        emit_diagnostic(
+            diagnostic_kind="action_outcome",
+            action_kind="collect",
+            outcome="superseded",
+            event_id=index + 1,
+            attempt_id=index + 1,
+            duration_ms=0,
+        )
+    emit_diagnostic(
+        diagnostic_kind="action_outcome",
+        action_kind="collect",
+        outcome="container_consumed",
+        event_id=50,
+        attempt_id=12,
+        duration_ms=1500,
+    )
+    for index in range(11):
+        emit_diagnostic(
+            diagnostic_kind="action_outcome",
+            action_kind="collect",
+            outcome="superseded",
+            event_id=60 + index,
+            attempt_id=13 + index,
+            duration_ms=0,
+        )
+
+    rendered = render_issue_report(build_issue_report(Path(artifacts["latest_events_path"])))
+
+    assert "liveness stall" not in rendered
+
+
+def test_stall_timeouts_surface_as_a_top_level_issue(fake_fs: FakeFileSystem) -> None:
+    """Self-healed stalls are visible, not buried in outcome counts.
+
+    The 2026-08-20 lesson: the scope-pending radar drop hid in
+    ``stall_timeout`` counts for 19 days because every stall
+    recovered. Any stall now gets a top-level line with the per-kind
+    breakdown — the report must surface what limps, not only what
+    breaks.
+    """
+    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
+    _emit_session_room("1", "field01.gif")
+    emit_diagnostic(
+        diagnostic_kind="action_outcome",
+        action_kind="scan",
+        outcome="stall_timeout",
+        event_id=1,
+        attempt_id=1,
+        duration_ms=12052,
+    )
+    emit_diagnostic(
+        diagnostic_kind="action_outcome",
+        action_kind="scope",
+        outcome="stall_timeout",
+        event_id=2,
+        attempt_id=1,
+        duration_ms=10322,
+    )
+
+    rendered = render_issue_report(build_issue_report(Path(artifacts["latest_events_path"])))
+
+    assert "2 action(s) stalled to timeout and replanned" in rendered
+    assert "scan=1 scope=1" in rendered
+
+
+def test_displacement_orbit_is_a_top_level_issue(fake_fs: FakeFileSystem) -> None:
+    """Three bounces at one destination flag; two do not.
+
+    The third liveness flavor: a displaced teleport resolves as a
+    SUCCESS, so destination repetition hides from every failure
+    counter (the 08-05 ancestor ran 534 bounces at one tile with a
+    clean report). Thresholds are empirical: the 11 pathological
+    archive runs all repeat >= 3; healthy combat re-aims repeat at
+    most twice.
+    """
+    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
+    _emit_session_room("1", "field01.gif")
+    for _ in range(3):
+        emit_diagnostic(
+            diagnostic_kind="teleport_displacement",
+            requested_x=128,
+            requested_y=238,
+            landed_x=121,
+            landed_y=230,
+            displacement=15,
+        )
+    for _ in range(2):
+        emit_diagnostic(
+            diagnostic_kind="teleport_displacement",
+            requested_x=82,
+            requested_y=192,
+            landed_x=78,
+            landed_y=188,
+            displacement=8,
+        )
+
+    report = build_issue_report(Path(artifacts["latest_events_path"]))
+    rendered = render_issue_report(report)
+
+    assert report["displaced_teleports"][0]["count"] == 3
+    assert report["displaced_teleports"][0]["max_displacement"] == 15
+    assert "displacement orbit: 3 teleports at (128,238) all refused" in rendered
+    assert "(82,192)" not in rendered.split("TOP-LEVEL")[1]

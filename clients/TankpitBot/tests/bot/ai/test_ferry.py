@@ -37,7 +37,12 @@ class TestFerryAwareTerrain:
         base = InMemoryTerrainMap({(100, 100): "W"})
         wire = _ferry_tile(100, 100)
         terrain = FerryAwareTerrain(
-            base, wire, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+            base,
+            wire,
+            riding=False,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         assert terrain.get_terrain(100, 100) == "~"
@@ -48,10 +53,20 @@ class TestFerryAwareTerrain:
         base = InMemoryTerrainMap({(101, 100): "W"})
 
         riding = FerryAwareTerrain(
-            base, {}, riding=True, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+            base,
+            {},
+            riding=True,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         parked = FerryAwareTerrain(
-            base, {}, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+            base,
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
         assert riding.is_passable(101, 100) is True
         assert parked.is_passable(101, 100) is False
@@ -67,6 +82,7 @@ class TestFerryAwareTerrain:
                 riding=riding,
                 hostile_mine_keys=frozenset(),
                 occupied_tank_keys=frozenset(),
+                refused_landing_keys=frozenset(),
             )
             assert terrain.is_passable(100, 100) is True
             assert terrain.is_passable(102, 100) is False
@@ -80,6 +96,7 @@ class TestFerryAwareTerrain:
             riding=True,
             hostile_mine_keys=frozenset(),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         grid = terrain.render_viewport(100, 100, width=3, height=3)
@@ -111,7 +128,12 @@ class TestFerryAwareTerrain:
             "103,100": make_terrain_tile(x=103, y=100, terrain_type=TERRAIN_BLOCK_STACKED),
         }
         terrain = FerryAwareTerrain(
-            base, wire, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+            base,
+            wire,
+            riding=False,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         assert terrain.get_terrain(101, 100) == "."  # bridge = ground class
@@ -136,7 +158,12 @@ class TestFerryAwareTerrain:
         base = InMemoryTerrainMap({(101, 100): "W"})
         wire = {"101,100": make_terrain_tile(x=101, y=100, terrain_type=TERRAIN_BLOCK_BRIDGE)}
         view = FerryAwareTerrain(
-            base, wire, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+            base,
+            wire,
+            riding=False,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         assert SurfaceRouteTerrain(view, water=False).is_passable(101, 100) is True
@@ -153,7 +180,12 @@ class TestFerryAwareTerrain:
         mines = frozenset({"100,100", "101,100", "102,100"})
         wire = _ferry_tile(102, 100)
         terrain = FerryAwareTerrain(
-            base, wire, riding=True, hostile_mine_keys=mines, occupied_tank_keys=frozenset()
+            base,
+            wire,
+            riding=True,
+            hostile_mine_keys=mines,
+            occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         assert terrain.is_passable(100, 100) is False  # mined ground
@@ -196,7 +228,7 @@ class TestRidingAndComposition:
         """Without a static map there is nothing to compose."""
         world, _self_state = make_world()
 
-        assert compose_decision_terrain(world, None, _NOW_MS) is None
+        assert compose_decision_terrain(world, None, _NOW_MS, frozenset()) is None
 
     def test_compose_builds_riding_view(self) -> None:
         """Composition carries the riding flag into water passability."""
@@ -204,7 +236,7 @@ class TestRidingAndComposition:
         world["terrain"].update(_ferry_tile(100, 100))
         base = InMemoryTerrainMap({(101, 100): "W"})
 
-        composed = compose_decision_terrain(world, base, _NOW_MS)
+        composed = compose_decision_terrain(world, base, _NOW_MS, frozenset())
         if composed is None:
             pytest.fail("expected composed terrain from ferry + base map")
 
@@ -222,7 +254,7 @@ class TestRidingAndComposition:
         world["mines"]["103,100"] = make_mine_state(103, 100, 0, -1, 3, source="radar")
         world["mines"]["104,100"] = make_mine_state(104, 100, 0, -1, 1, source="radar")
 
-        composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS)
+        composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS, frozenset())
         if composed is None:
             pytest.fail("expected composed terrain from mines + base map")
 
@@ -264,7 +296,7 @@ class TestRidingAndComposition:
         )
         world, _self_state = make_world(self_x=100, self_y=100, tanks={"2": ally, "3": enemy})
 
-        composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS)
+        composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS, frozenset())
         if composed is None:
             pytest.fail("expected composed terrain from tanks + base map")
 
@@ -287,6 +319,7 @@ class TestRidingAndComposition:
             riding=False,
             hostile_mine_keys=frozenset({"100,100"}),
             occupied_tank_keys=frozenset({"101,100"}),
+            refused_landing_keys=frozenset(),
         )
 
         assert terrain.is_passable(100, 100) is False
@@ -303,6 +336,7 @@ class TestRidingAndComposition:
             riding=False,
             hostile_mine_keys=frozenset(),
             occupied_tank_keys=frozenset(),
+            refused_landing_keys=frozenset(),
         )
 
         assert terrain.is_landing_legal(102, 100) is False
@@ -329,7 +363,7 @@ class TestRidingAndComposition:
         )
         world, _self_state = make_world(self_x=100, self_y=100, tanks={"4": stale})
 
-        composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS)
+        composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS, frozenset())
         if composed is None:
             pytest.fail("expected composed terrain from tanks + base map")
 

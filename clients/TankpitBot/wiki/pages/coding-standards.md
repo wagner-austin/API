@@ -45,6 +45,47 @@ hubs: [architecture]
 - TypedDict with encode/decode and `require_*` validation[^1]
 - **File size 400-600 lines max, src AND tests** (user ruling 2026-07-31, as recorded: "we need modular, clear separation of concerns, no monolithic files. 400 - 600 lines, including test files too" — supersedes the earlier "under 400 where possible"). Split any over-bar file you touch into cohesive modules; never grow a file already past 600. No re-export shims when splitting (the wrapper ban above applies) — move call-site imports properly. Backlog at ruling time: **40** files over 600, enumerated in the log entry; measured again 2026-08-06 it was **77**, and all 40 originals had GROWN (+6,272 lines, zero splits). The rule is now machine-checked -- `scripts/file_size_rules.py`, wired into `scripts.guard` -- with no allowlist and no baseline, so the backlog is 0 and a file crossing the line fails the gate on the commit that crosses it.[^4]
 
+## Verification discipline (2026-08-20, after the gatherer livelock)
+
+Born from the planner/veto feedback-gap class ([[fleet-coordination]]):
+two behavior holes and two analyzer holes, every one an instance of an
+assumption that had already been falsified somewhere else in the tree.
+
+- **Falsification sweep:** when a live run falsifies an assumption,
+  grep the whole repo for every other site encoding it — the SAME
+  session, before the fix commits. Precedent for the cost of not
+  doing it: the kill-attribution split landed in the live registry
+  2026-08-14 and the analyzer's copy of the same assumption survived
+  six more days, until `test_analyzer_consistency.py` existed to
+  compare them. Its twin: the fuel lock's capacity gate (2026-07-06)
+  whose equipment sibling, 60 lines up in the same file, stayed
+  ungated for six weeks.
+- **Scenario matrix before live:** a new capability's sim soak runs
+  its new cells (role × inventory seed × fuel seed), not just the
+  default scenario, BEFORE the first live run. The gatherer livelock
+  was reachable only in the gatherer × full-stock cell — a cell no
+  soak had ever exercised, so the first live run was the first
+  execution of the code path.
+- **Liveness is an instrumented dimension:** the ledger's
+  `zero_dispatch_streaks` counter emits a `liveness_stall` diagnostic
+  at `LIVENESS_STALL_STREAK` consecutive zero-dispatch replans of one
+  kind, and the issue report scans the same signal post-hoc.
+  Thresholds are empirical (459-run archive sweep: healthy ceiling 7,
+  the one recorded livelock 93) — re-measure before changing them.
+- **Contracts state invariants, not caller snapshots** (2026-08-20,
+  the scope-pending radar drop): "nothing downstream correlates an
+  attempt against it" was true of scope's callers on 08-01 and
+  written as a property of the command; eleven days later a new
+  consumer (the harvest frame shift) inherited it as a guarantee and
+  bought half of all scan stalls ever recorded. Phrase a module's
+  assumptions as invariants of the command/world; when you add a NEW
+  CONSUMER to a module, its stated assumptions are claims to
+  re-verify, not guarantees to trust. Corollary: fire-and-forget
+  dispatch is reserved for commands with NO dependent server state —
+  after the scope promotion, chat is its only member, by contract
+  (the flood mute forbids waiting on chat, and nothing reads its
+  outcome).
+
 ## Git discipline
 
 - NEVER run `git checkout`/`clean`/`restore` without explicit user confirmation[^3]

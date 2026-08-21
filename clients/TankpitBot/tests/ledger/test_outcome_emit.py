@@ -29,6 +29,7 @@ from tankpit_bot.ledger.outcome.teleport import (
 from tankpit_bot.ledger.records import RING_CAPACITY
 from tankpit_bot.ledger.ring import outcome_counts, recent_outcomes
 from tankpit_bot.ledger.service import LedgerService
+from tests.conftest import FakeFileSystem
 
 
 @pytest.fixture()
@@ -204,6 +205,85 @@ def test_teleport_dispatch_context_flows_into_the_outcome(ledger: LedgerService)
     assert follow_up["detail"]["sent_window"] == "(none)"
 
 
-def test_action_kinds_cover_the_six_ledgered_actions(ledger: LedgerService) -> None:
-    """The ledger records exactly the six real action kinds."""
-    assert ACTION_KINDS == ("scan", "move", "teleport", "collect", "map_open", "shoot")
+def test_action_kinds_cover_the_seven_ledgered_actions(ledger: LedgerService) -> None:
+    """The ledger records exactly the seven real action kinds.
+
+    ``scope`` joined 2026-08-20 when the viewport pan was promoted
+    from fire-and-forget ([[viewport-shift-protocol]] scope-pending
+    radar drop) — a new kind here is a deliberate act, never drift.
+    """
+    assert ACTION_KINDS == ("scan", "move", "teleport", "collect", "map_open", "shoot", "scope")
+
+
+def test_zero_dispatch_streak_counts_supersedes_and_rearms(ledger: LedgerService) -> None:
+    """The livelock counter tracks zero-dispatch replans per kind.
+
+    Each ``register_pending_decision`` that closes a prior decision as
+    zero-duration ``superseded`` advances the kind's streak; any
+    genuine (non-superseded) resolution of the kind resets it. The
+    counter is the live half of the liveness instrument
+    ([[fleet-coordination]] gatherer livelock, 2026-08-20).
+    """
+    from tankpit_bot.ledger.outcome._emit import register_pending_decision
+
+    register_pending_decision(ledger, "collect", ledger.next_event_id())
+    assert ledger.zero_dispatch_streaks["collect"] == 0
+
+    register_pending_decision(ledger, "collect", ledger.next_event_id())
+    register_pending_decision(ledger, "collect", ledger.next_event_id())
+    assert ledger.zero_dispatch_streaks["collect"] == 2
+    # Another kind's streak is independent.
+    assert ledger.zero_dispatch_streaks["scan"] == 0
+
+    # A genuine resolution of the kind re-arms the counter.
+    emit_move_position_reached(
+        ledger, duration_ms=10, target_x=1, target_y=2, landed_x=1, landed_y=2
+    )
+    assert ledger.zero_dispatch_streaks["collect"] == 2
+    register_pending_decision(ledger, "move", ledger.next_event_id())
+    emit_move_position_reached(
+        ledger, duration_ms=10, target_x=1, target_y=2, landed_x=1, landed_y=2
+    )
+    assert ledger.zero_dispatch_streaks["move"] == 0
+
+
+def test_liveness_stall_diagnostic_fires_once_at_the_crossing(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """Crossing ``LIVENESS_STALL_STREAK`` emits exactly one diagnostic.
+
+    Once at the crossing, silent while the streak continues, re-armed
+    by a genuine resolution — so a wedged session announces itself in
+    the live log without spamming every subsequent tick.
+    """
+    from pathlib import Path
+
+    from platform_core.json_utils import load_json_str, narrow_json_to_dict
+
+    from tankpit_bot.ledger.outcome._emit import register_pending_decision
+    from tankpit_bot.ledger.outcomes import LIVENESS_STALL_STREAK
+    from tankpit_bot.runtime_logging import configure_probe_runtime_logging
+
+    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
+    ledger = LedgerService()
+
+    def stall_events() -> int:
+        raw = fake_fs.read_text(Path(artifacts["latest_events_path"]))
+        return sum(
+            1
+            for line in raw.splitlines()
+            if line
+            and narrow_json_to_dict(load_json_str(line)).get("diagnostic_kind") == "liveness_stall"
+        )
+
+    for _ in range(LIVENESS_STALL_STREAK + 3):
+        register_pending_decision(ledger, "collect", ledger.next_event_id())
+    assert ledger.zero_dispatch_streaks["collect"] == LIVENESS_STALL_STREAK + 2
+    assert stall_events() == 1
+
+    # Genuine resolution re-arms; a second wedge announces again.
+    emit_scan_radar_complete(ledger, duration_ms=10, target_x=1, target_y=2)
+    register_pending_decision(ledger, "scan", ledger.next_event_id())
+    for _ in range(LIVENESS_STALL_STREAK):
+        register_pending_decision(ledger, "scan", ledger.next_event_id())
+    assert stall_events() == 2

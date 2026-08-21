@@ -113,7 +113,46 @@ Every "Extend view" game-log line is followed by a `0x5A` 0–2 s later — prov
 
 ## Bot's current state (updated 2026-08-01)
 
-**The bot now sends `Rb`** — the scope-shift capability landed end to end: `make_scope_shift_command` → executor → `bot_dispatch.scope_shift` (`build_scope_command`, fire-and-forget like chat; the sniffer's 0x5A ingestion updates the origin when the confirm lands). First doctrine consumer is the **ferry scope scout** (`bot/ai/scope_scout.py`): when the larder declines a water-locked container `no_landing` and no fresh ferry belief exists, one FREE pan at the goal's water runs before any discovery teleport — a revealed ferry arrives as a 0x5A terrain-5 patch and the next larder tick hops `ferry_served` ([[ferry-mechanics]]). One pan per 30 s cooldown (`SCOPE_SCOUT_COOLDOWN_MS` — a no-ferry pan leaves no negative belief, so the latch is what stops a re-fire loop); never during a held combat lock. `Ia` is sent only by the session-start OFF dance; `Sb` remains unsent. The sim enforces the anchor law (`sim/viewport_window.py::apply_scope_shift`, all 8 measured rows pinned in `tests/sim/test_scope.py`) and answers every client `Rb` with the shifted 0x5A.[^7]
+**The bot now sends `Rb`** — the scope-shift capability landed end to end: `make_scope_shift_command` → executor → `bot_dispatch.scope_shift` (`build_scope_command`, fire-and-forget like chat; the sniffer's 0x5A ingestion updates the origin when the confirm lands). First doctrine consumer is the **ferry scope scout** (`bot/ai/scope_scout.py`): when the larder declines a water-locked container `no_landing` and no fresh ferry belief exists, one FREE pan at the goal's water runs before any discovery teleport — a revealed ferry arrives as a 0x5A terrain-5 patch and the next larder tick hops `ferry_served` ([[ferry-mechanics]]). One pan per 30 s cooldown (`SCOPE_SCOUT_COOLDOWN_MS` — a no-ferry pan leaves no negative belief, so the latch is what stops a re-fire loop); never during a held combat lock. `Ia` is sent only by the session-start OFF dance; `Sb` remains unsent. The sim enforces the anchor law (`sim/viewport_window.py::apply_scope_shift`, all 8 measured rows pinned in `tests/sim/test_scope.py`)  and answers every client `Rb` with the shifted 0x5A.[^7]
+
+**The scope-pending radar drop (2026-08-20, FIXED same day):** a `radar`
+dispatched while an `Rb` awaits its 0x5A is **silently dropped by the
+server — no charge, no response** (the fuel receipt around the drop
+reads `+0`; the client's own State 13 "Scope change pending" flag
+`a.Ja` marks exactly this window, and the bot ignores it). Two clean
+receipts in run pair bot-20260820-142810: artax 14:29:13 `scope(1)` →
+14:29:15 `radar` → no charge → 10.3 s stall; arterial 14:31:22
+`scope(3)` (ferry scout) → 14:31:24 `radar` → no charge → 12.1 s
+stall — different scope sources, identical signature, both recovered
+by the stall timeout's replan (retry completes ~1.3 s, normal −10
+charge). Archive prevalence: 23 of the 43 scan `stall_timeout`s ever
+recorded have a `scope()` within 4 s of the radar dispatch — half of
+all scan stalls are this one race. **The window has a second victim:**
+~12 archived `map_open` stalls (2026-08-02 onward, ferry-scout era)
+sit inside the same scope-pending window, so the drop is not
+radar-specific — the server appears to discard any viewport-coupled
+command while the pan settles. (The June/July `map_open` stall
+epidemic — 630 across those months, down to 46 in August after the
+July map surgery — is a separate, mostly-retired story; only the
+scope-correlated residue belongs to this race.) **FIXED 2026-08-20, same day,
+LIVE-VERIFIED the same evening** (pair bot-20260820: 23 pans, 22
+`scope:confirmed` at median ~2.0 s — the 23rd was in flight at
+teardown — and ZERO scope-correlated stalls by the same 4 s
+dispatch-window sweep that found the race; the run's residual stalls
+all lack a nearby pan): the pan was PROMOTED from
+fire-and-forget to a first-class tracked action — ledger kind
+`scope` (outcomes `confirmed` / `stall_timeout`), in-flight recording
+at dispatch, completion on the 0x5A ingestion (`mark_viewport_update_
+processed`, with any stale mark cleared at dispatch so the flag means
+"a 0x5A arrived since THIS pan"), the standard 10 s stall backstop
+(archive max healthy confirm: 8 s). The tick loop now HOLDS during a
+pan exactly as it holds for a radar or map open, so dispatching into
+the scope-pending window is unrepresentable — no defer list, no
+side-channel flag, and the misclassification's two workarounds (the
+executor's fire-and-forget branch, the analyzer's blindness to
+recovered stalls) are gone with it. Cost of the honest model: one
+held tick per pan, the tick the pan was always really spending
+(median confirm = exactly one server tick, 759 archived pans).
 
 ### Autoscroll doctrine addendum (user rulings 2026-08-01, NOT yet implemented)
 

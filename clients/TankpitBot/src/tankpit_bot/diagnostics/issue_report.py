@@ -40,17 +40,19 @@ from typing_extensions import TypedDict
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.diagnostics.issue_report_types import (
     ActionOutcomeRowDict,
+    DisplacedTeleportRecordDict,
     FuelTargetSelectionRecordDict,
     IssueReportDict,
     MapOpenSkippedRecordDict,
     SessionRoomRecordDict,
+    SuppressedDispatchRecordDict,
     TeleportAttemptRecordDict,
 )
 from tankpit_bot.diagnostics.session_scorecard import build_session_scorecard
-from tankpit_bot.diagnostics.session_scorecard_accumulator import (
+from tankpit_bot.diagnostics.session_scorecard_accumulator import route_scorecard_record
+from tankpit_bot.diagnostics.session_scorecard_types import (
     ScorecardAccumulatorDict,
     new_scorecard_accumulator,
-    route_scorecard_record,
 )
 from tankpit_bot.runtime_records import (
     RuntimeEventRecordDict,
@@ -216,6 +218,12 @@ class _ReportAccumulatorDict(TypedDict):
         mode: Latest non-empty mode string observed.
         map_open_dispatches: Count of ``WIRE`` events whose message
             starts with ``map_open``.
+        suppressed_tallies: Per ``(command, x, y)`` counts of
+            ``dispatch_suppressed`` events, with the last predicted
+            0x52 code seen for the key.
+        displacement_tallies: Per ``(x, y)`` requested-destination
+            counts of ``teleport_displacement`` events, with the
+            largest Manhattan bounce seen for the key.
         scorecard: Nested scorecard accumulator. Populated by
             :func:`route_scorecard_record` for every event.
     """
@@ -227,6 +235,8 @@ class _ReportAccumulatorDict(TypedDict):
     session_room: SessionRoomRecordDict | None
     mode: str
     map_open_dispatches: int
+    suppressed_tallies: dict[tuple[str, int, int], tuple[int, int]]
+    displacement_tallies: dict[tuple[int, int], tuple[int, int]]
     scorecard: ScorecardAccumulatorDict
 
 
@@ -240,6 +250,8 @@ def _new_accumulator() -> _ReportAccumulatorDict:
         session_room=None,
         mode="unconfigured",
         map_open_dispatches=0,
+        suppressed_tallies={},
+        displacement_tallies={},
         scorecard=new_scorecard_accumulator(),
     )
 
@@ -269,6 +281,29 @@ def _classify_diagnostic_record(
         accumulator["fuel_target_selections"].append(_classify_fuel_target_selection(record))
     elif kind == "session_room_joined":
         accumulator["session_room"] = _classify_session_room(record)
+    elif kind == "dispatch_suppressed":
+        fields = record["fields"]
+        key = (
+            require_str_field(fields, "command_name"),
+            require_int_field(fields, "target_x"),
+            require_int_field(fields, "target_y"),
+        )
+        count, _ = accumulator["suppressed_tallies"].get(key, (0, 0))
+        accumulator["suppressed_tallies"][key] = (
+            count + 1,
+            require_int_field(fields, "predicted_error_code"),
+        )
+    elif kind == "teleport_displacement":
+        fields = record["fields"]
+        tile = (
+            require_int_field(fields, "requested_x"),
+            require_int_field(fields, "requested_y"),
+        )
+        count, worst = accumulator["displacement_tallies"].get(tile, (0, 0))
+        accumulator["displacement_tallies"][tile] = (
+            count + 1,
+            max(worst, require_int_field(fields, "displacement")),
+        )
 
 
 def _route_record(
@@ -303,6 +338,30 @@ def _route_record(
 # single source of truth for the SessionScorecardDict shape and every
 # field on it -- the report and the in-bot scorecard agree by
 # construction.
+
+
+def _displacement_count_descending(row: DisplacedTeleportRecordDict) -> int:
+    """Sort key: highest displacement tally first.
+
+    Args:
+        row: One displaced-teleport tally row.
+
+    Returns:
+        The negated count.
+    """
+    return -row["count"]
+
+
+def _suppression_count_descending(row: SuppressedDispatchRecordDict) -> int:
+    """Sort key: highest suppression tally first.
+
+    Args:
+        row: One suppressed-dispatch tally row.
+
+    Returns:
+        The negated count.
+    """
+    return -row["count"]
 
 
 def build_issue_report(source_path: Path) -> IssueReportDict:
@@ -343,6 +402,38 @@ def build_issue_report(source_path: Path) -> IssueReportDict:
         for o in action_outcomes
         if o["action_kind"] == "map_open" and o["outcome"] == "map_data_processed"
     )
+    suppressed_dispatches = sorted(
+        (
+            SuppressedDispatchRecordDict(
+                command_name=command_name,
+                target_x=target_x,
+                target_y=target_y,
+                predicted_error_code=code,
+                count=count,
+            )
+            for (command_name, target_x, target_y), (
+                count,
+                code,
+            ) in accumulator["suppressed_tallies"].items()
+        ),
+        key=_suppression_count_descending,
+    )
+
+    displaced_teleports = sorted(
+        (
+            DisplacedTeleportRecordDict(
+                requested_x=requested_x,
+                requested_y=requested_y,
+                count=count,
+                max_displacement=worst,
+            )
+            for (requested_x, requested_y), (
+                count,
+                worst,
+            ) in accumulator["displacement_tallies"].items()
+        ),
+        key=_displacement_count_descending,
+    )
 
     return IssueReportDict(
         source_path=str(source_path),
@@ -359,6 +450,8 @@ def build_issue_report(source_path: Path) -> IssueReportDict:
         fuel_rejected_count=len(fuel_target_selections) - fuel_selected,
         map_open_dispatches=accumulator["map_open_dispatches"],
         map_open_completions=map_open_completions,
+        suppressed_dispatches=suppressed_dispatches,
+        displaced_teleports=displaced_teleports,
         scorecard=build_session_scorecard(accumulator["scorecard"]),
     )
 

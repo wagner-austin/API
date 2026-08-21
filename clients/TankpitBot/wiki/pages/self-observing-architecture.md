@@ -510,9 +510,10 @@ so the shapes had to live somewhere neither imports.[^guard]
         "teleport",
         "collect",
         "map_open",
-        "shoot"
+        "shoot",
+        "scope"
       ],
-      "means": "every dispatchable action kind the ledger books outcomes for"
+      "means": "every dispatchable action kind the ledger books outcomes for - scope joined 2026-08-20 when the pan was promoted from fire-and-forget"
     },
     {
       "id": "events-actionkind",
@@ -655,6 +656,27 @@ so the shapes had to live somewhere neither imports.[^guard]
       "id": "outcomes-teleportoutcome",
       "code": "tankpit_bot.ledger.outcomes:TeleportOutcome",
       "law": "TeleportOutcome."
+    },
+    {
+      "id": "outcomes-scopeoutcome",
+      "code": "tankpit_bot.ledger.outcomes:ScopeOutcome",
+      "law": "Scope-pan resolutions: 0x5A confirmed, superseded, or stalled - the pan is a tracked action since 2026-08-20 (the scope-pending radar drop)."
+    },
+    {
+      "id": "outcome-scope-emit-confirmed",
+      "code": "tankpit_bot.ledger.outcome.scope:emit_scope_confirmed",
+      "law": "Record a pan whose answering 0x5A landed (median one server tick, 759 archived pans)."
+    },
+    {
+      "id": "outcome-scope-emit-stall",
+      "code": "tankpit_bot.ledger.outcome.scope:emit_scope_stall_timeout",
+      "law": "Record a pan the server silently dropped - the stall timeout is a drop's only exit."
+    },
+    {
+      "id": "outcomes-liveness-stall-streak",
+      "code": "tankpit_bot.ledger.outcomes:LIVENESS_STALL_STREAK",
+      "value": 12,
+      "means": "consecutive zero-dispatch replans of one kind that mean a livelock - empirical: 459-run archive sweep 2026-08-20 measured a healthy ceiling of 7 (combat re-aiming) and one livelock at 93 (the gatherer full-inventory wedge)"
     },
     {
       "id": "records-actionoutcomerecorddict",
