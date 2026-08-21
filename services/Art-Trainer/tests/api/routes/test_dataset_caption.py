@@ -1,4 +1,4 @@
-"""Tests for dataset routes."""
+"""Dataset route tests: captioning. Upload/get tests: test_dataset_upload.py."""
 
 from __future__ import annotations
 
@@ -66,65 +66,47 @@ def _make_test_settings(tmp_path: Path) -> Settings:
     }
 
 
-def test_dataset_upload_requires_api_key(tmp_path: Path) -> None:
-    """Test POST /datasets/upload requires API key."""
-    settings = _make_test_settings(tmp_path)
+class FakeCaptionBackend:
+    """Fake caption backend for testing."""
 
-    def load_settings() -> Settings:
-        return settings
+    calls: list[tuple[Path, str]]
+    _caption: str
+    _backend_type: CaptionBackendType
 
-    _test_hooks.load_settings = load_settings
+    def __init__(
+        self, caption: str = "test caption", backend_type: CaptionBackendType = "gemini"
+    ) -> None:
+        """Initialize fake caption backend.
 
-    app = create_app(settings)
-    client = TestClient(app)
+        Args:
+            caption: Caption to return.
+            backend_type: Backend type identifier.
+        """
+        self.calls = []
+        self._caption = caption
+        self._backend_type = backend_type
 
-    response = client.post(
-        "/datasets/upload",
-        data={
-            "trigger_word": "sks person",
-            "training_type": "character",
-            "auto_caption": "false",
-        },
-        files=[("files", ("test.jpg", io.BytesIO(b"fake image"), "image/jpeg"))],
-    )
+    def caption(self, image_path: Path, trigger_word: str) -> str:
+        """Generate a fake caption.
 
-    assert response.status_code == 401
+        Args:
+            image_path: Path to image file.
+            trigger_word: Trigger word.
 
+        Returns:
+            Fake caption string.
+        """
+        self.calls.append((image_path, trigger_word))
+        return f"{trigger_word}, {self._caption}"
 
-def test_dataset_upload_success(tmp_path: Path) -> None:
-    """Test POST /datasets/upload succeeds with API key."""
-    settings = _make_test_settings(tmp_path)
+    @property
+    def backend_type(self) -> CaptionBackendType:
+        """Get the backend type identifier.
 
-    def load_settings() -> Settings:
-        return settings
-
-    _test_hooks.load_settings = load_settings
-
-    app = create_app(settings)
-    client = TestClient(app)
-
-    response = client.post(
-        "/datasets/upload",
-        data={
-            "trigger_word": "sks person",
-            "training_type": "character",
-            "auto_caption": "false",
-        },
-        files=[("files", ("test.jpg", io.BytesIO(b"fake image"), "image/jpeg"))],
-        headers={"X-API-Key": "test-api-key"},
-    )
-
-    assert response.status_code == 200
-    data = load_json_str(response.text)
-    if not isinstance(data, dict):
-        raise AssertionError("Response body must be a JSON object")
-    dataset_id = require_str(data, "dataset_id")
-    image_count = require_int(data, "image_count")
-    caption_count = require_int(data, "caption_count")
-
-    assert dataset_id.count("-") == 4  # UUID format
-    assert image_count == 1
-    assert caption_count == 0  # auto_caption is false
+        Returns:
+            Backend type string.
+        """
+        return self._backend_type
 
 
 def test_dataset_upload_with_auto_caption(tmp_path: Path) -> None:
@@ -182,188 +164,6 @@ def test_dataset_upload_with_auto_caption(tmp_path: Path) -> None:
     # find_images finds .jpg and .JPG separately, so caption_count may differ
     assert caption_count >= 2
     assert len(fake_backend.calls) >= 2
-
-
-def test_dataset_upload_skips_non_image_files(tmp_path: Path) -> None:
-    """Test POST /datasets/upload skips non-image files."""
-    settings = _make_test_settings(tmp_path)
-
-    def load_settings() -> Settings:
-        return settings
-
-    _test_hooks.load_settings = load_settings
-
-    app = create_app(settings)
-    client = TestClient(app)
-
-    response = client.post(
-        "/datasets/upload",
-        data={
-            "trigger_word": "sks person",
-            "training_type": "style",
-            "auto_caption": "false",
-        },
-        files=[
-            ("files", ("photo.jpg", io.BytesIO(b"fake image"), "image/jpeg")),
-            ("files", ("document.txt", io.BytesIO(b"text content"), "text/plain")),
-        ],
-        headers={"X-API-Key": "test-api-key"},
-    )
-
-    assert response.status_code == 200
-    data = load_json_str(response.text)
-    if not isinstance(data, dict):
-        raise AssertionError("Response body must be a JSON object")
-    image_count = require_int(data, "image_count")
-
-    assert image_count == 1  # Only the .jpg file
-
-
-def test_dataset_get_not_found(tmp_path: Path) -> None:
-    """Test GET /datasets/{dataset_id} returns 404 for unknown dataset."""
-    settings = _make_test_settings(tmp_path)
-
-    def load_settings() -> Settings:
-        return settings
-
-    _test_hooks.load_settings = load_settings
-
-    app = create_app(settings)
-    client = TestClient(app)
-
-    response = client.get(
-        "/datasets/nonexistent-id",
-        headers={"X-API-Key": "test-api-key"},
-    )
-
-    assert response.status_code == 404
-    data = load_json_str(response.text)
-    if not isinstance(data, dict):
-        raise AssertionError("Response body must be a JSON object")
-    detail = require_str(data, "detail")
-    assert "not found" in detail
-
-
-def test_dataset_get_success(tmp_path: Path) -> None:
-    """Test GET /datasets/{dataset_id} returns dataset info."""
-    settings = _make_test_settings(tmp_path)
-
-    def load_settings() -> Settings:
-        return settings
-
-    _test_hooks.load_settings = load_settings
-
-    app = create_app(settings)
-    client = TestClient(app)
-
-    # First upload a dataset
-    upload_response = client.post(
-        "/datasets/upload",
-        data={
-            "trigger_word": "sks person",
-            "training_type": "character",
-            "auto_caption": "false",
-        },
-        files=[("files", ("test.jpg", io.BytesIO(b"fake image"), "image/jpeg"))],
-        headers={"X-API-Key": "test-api-key"},
-    )
-    upload_data = load_json_str(upload_response.text)
-    if not isinstance(upload_data, dict):
-        raise AssertionError("Response body must be a JSON object")
-    dataset_id = require_str(upload_data, "dataset_id")
-
-    # Then get the dataset info
-    get_response = client.get(
-        f"/datasets/{dataset_id}",
-        headers={"X-API-Key": "test-api-key"},
-    )
-
-    assert get_response.status_code == 200
-    data = load_json_str(get_response.text)
-    if not isinstance(data, dict):
-        raise AssertionError("Response body must be a JSON object")
-    response_id = require_str(data, "dataset_id")
-    image_count = require_int(data, "image_count")
-
-    assert response_id == dataset_id
-    # find_images finds .jpg and .JPG separately, so image_count may be doubled
-    assert image_count >= 1
-
-
-def test_dataset_upload_empty_filename_skipped(tmp_path: Path) -> None:
-    """Test POST /datasets/upload skips files with no filename."""
-    settings = _make_test_settings(tmp_path)
-
-    def load_settings() -> Settings:
-        return settings
-
-    _test_hooks.load_settings = load_settings
-
-    app = create_app(settings)
-    client = TestClient(app)
-
-    response = client.post(
-        "/datasets/upload",
-        data={
-            "trigger_word": "sks person",
-            "training_type": "style",
-            "auto_caption": "false",
-        },
-        files=[
-            ("files", ("photo.jpg", io.BytesIO(b"fake image"), "image/jpeg")),
-        ],
-        headers={"X-API-Key": "test-api-key"},
-    )
-
-    assert response.status_code == 200
-    data = load_json_str(response.text)
-    if not isinstance(data, dict):
-        raise AssertionError("Response body must be a JSON object")
-    image_count = require_int(data, "image_count")
-    assert image_count == 1
-
-
-class FakeCaptionBackend:
-    """Fake caption backend for testing."""
-
-    calls: list[tuple[Path, str]]
-    _caption: str
-    _backend_type: CaptionBackendType
-
-    def __init__(
-        self, caption: str = "test caption", backend_type: CaptionBackendType = "gemini"
-    ) -> None:
-        """Initialize fake caption backend.
-
-        Args:
-            caption: Caption to return.
-            backend_type: Backend type identifier.
-        """
-        self.calls = []
-        self._caption = caption
-        self._backend_type = backend_type
-
-    def caption(self, image_path: Path, trigger_word: str) -> str:
-        """Generate a fake caption.
-
-        Args:
-            image_path: Path to image file.
-            trigger_word: Trigger word.
-
-        Returns:
-            Fake caption string.
-        """
-        self.calls.append((image_path, trigger_word))
-        return f"{trigger_word}, {self._caption}"
-
-    @property
-    def backend_type(self) -> CaptionBackendType:
-        """Get the backend type identifier.
-
-        Returns:
-            Backend type string.
-        """
-        return self._backend_type
 
 
 def test_dataset_caption_not_found(tmp_path: Path) -> None:
