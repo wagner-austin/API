@@ -46,7 +46,7 @@ from covenant_ml.types import (
 )
 from numpy.typing import NDArray
 from platform_core.json_utils import dump_json_str
-from platform_core.logging import setup_rich_logging
+from platform_core.rich_logging import setup_rich_logging
 from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize.cli import DatasetName
 from scripts.optimize.model_saver import (

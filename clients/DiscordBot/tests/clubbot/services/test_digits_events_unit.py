@@ -3,12 +3,14 @@ from __future__ import annotations
 import logging
 
 import pytest
-from platform_core.digits_metrics_events import (
+from platform_core.digits_metrics_decode import (
     DEFAULT_DIGITS_EVENTS_CHANNEL,
+    decode_digits_event,
+)
+from platform_core.digits_metrics_events import (
     DigitsCompletedMetricsV1,
     DigitsConfigV1,
     DigitsEpochMetricsV1,
-    decode_digits_event,
     encode_digits_metrics_event,
 )
 from platform_core.job_events import JobFailedV1

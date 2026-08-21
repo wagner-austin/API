@@ -7,7 +7,7 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from types import FrameType
 
-from platform_core.logging import create_rich_panel, get_rich_console
+from platform_core.rich_logging import create_rich_panel, get_rich_console
 
 
 class OptimizationState:

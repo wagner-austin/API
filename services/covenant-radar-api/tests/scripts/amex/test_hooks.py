@@ -280,7 +280,7 @@ class TestRealImplementations:
 
         This exercises the real Rich console output path (lines 55-59).
         """
-        from platform_core.logging import setup_rich_logging
+        from platform_core.rich_logging import setup_rich_logging
 
         # Setup rich logging before calling write (required by platform_core)
         setup_rich_logging()

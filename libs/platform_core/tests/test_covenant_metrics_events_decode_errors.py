@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from platform_core.covenant_metrics_events import (
+from platform_core.covenant_metrics_decode import (
     decode_covenant_metrics_event,
 )
 

@@ -12,11 +12,7 @@ import time
 from pathlib import Path
 
 from covenant_ml.types import BackendName
-from platform_core.logging import (
-    RichProgressProtocol,
-    create_rich_progress,
-    get_rich_console,
-)
+from platform_core.rich_logging import RichProgressProtocol, create_rich_progress, get_rich_console
 
 from scripts._test_hooks import (
     LoadingProgressInfo,

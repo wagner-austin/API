@@ -7,7 +7,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from platform_core.logging import (
+from platform_core.rich_logging import (
     RichConsoleProtocol,
     RichRenderableProtocol,
     setup_rich_logging,

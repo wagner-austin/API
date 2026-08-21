@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Literal, TypedDict
 
 from covenant_ml.types import BackendName
-from platform_core.logging import setup_rich_logging
+from platform_core.rich_logging import setup_rich_logging
 
 from scripts.submit._hooks import get_console, get_project_root
 from scripts.submit.pipeline import SubmitConfig, run_pipeline

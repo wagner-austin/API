@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, TypedDict
 
-from platform_core.logging import setup_rich_logging
+from platform_core.rich_logging import setup_rich_logging
 
 from scripts.discover_datasets import _test_hooks
 from scripts.discover_datasets.scanner import scan_external_dir

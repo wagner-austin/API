@@ -17,16 +17,8 @@ Events handled:
 
 from __future__ import annotations
 
-from platform_core.digits_metrics_events import (
-    DigitsArtifactV1,
-    DigitsBatchMetricsV1,
-    DigitsBestMetricsV1,
-    DigitsCompletedMetricsV1,
-    DigitsConfigV1,
-    DigitsEpochMetricsV1,
+from platform_core.digits_metrics_decode import (
     DigitsEventV1,
-    DigitsPruneV1,
-    DigitsUploadV1,
     JobFailedV1,
     decode_digits_event,
     is_digits_artifact,
@@ -38,6 +30,16 @@ from platform_core.digits_metrics_events import (
     is_digits_job_failed,
     is_digits_prune,
     is_digits_upload,
+)
+from platform_core.digits_metrics_events import (
+    DigitsArtifactV1,
+    DigitsBatchMetricsV1,
+    DigitsBestMetricsV1,
+    DigitsCompletedMetricsV1,
+    DigitsConfigV1,
+    DigitsEpochMetricsV1,
+    DigitsPruneV1,
+    DigitsUploadV1,
 )
 from platform_core.json_utils import InvalidJsonError, JSONTypeError
 from platform_core.logging import get_logger

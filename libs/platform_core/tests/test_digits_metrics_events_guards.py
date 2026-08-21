@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from platform_core.digits_metrics_events import (
-    DigitsBatchMetricsV1,
-    DigitsConfigV1,
-    DigitsEpochMetricsV1,
-    DigitsMetricsEventV1,
+from platform_core.digits_metrics_decode import (
     decode_digits_metrics_event,
     is_artifact,
     is_batch,
@@ -16,6 +12,12 @@ from platform_core.digits_metrics_events import (
     is_epoch,
     is_prune,
     is_upload,
+)
+from platform_core.digits_metrics_events import (
+    DigitsBatchMetricsV1,
+    DigitsConfigV1,
+    DigitsEpochMetricsV1,
+    DigitsMetricsEventV1,
     make_artifact_event,
     make_batch_metrics_event,
     make_best_metrics_event,

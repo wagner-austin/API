@@ -17,7 +17,7 @@ from covenant_ml.explainers.registry import ExplainerRegistration, ExplainerRegi
 from covenant_ml.explainers.types import ExplainResult, SupportedExplainer
 from covenant_ml.types import BackendName
 from numpy.typing import NDArray
-from platform_core.logging import setup_rich_logging
+from platform_core.rich_logging import setup_rich_logging
 from platform_ml.explainers.protocol import FeatureExplainer, PredictorProtocol
 from platform_ml.explainers.types import (
     ComputationalCost,

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Literal, TypedDict
 
 from covenant_ml.types import BackendName
-from platform_core.logging import setup_rich_logging
+from platform_core.rich_logging import setup_rich_logging
 
 from scripts.amex._hooks import get_console, get_project_root
 from scripts.amex.pipeline import run_pipeline

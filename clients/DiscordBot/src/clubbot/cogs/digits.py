@@ -4,7 +4,9 @@ from typing import Final, Protocol
 
 import discord
 from discord import Member, User, app_commands
-from platform_core.digits_metrics_events import DEFAULT_DIGITS_EVENTS_CHANNEL
+from platform_core.digits_metrics_decode import (
+    DEFAULT_DIGITS_EVENTS_CHANNEL,
+)
 from platform_core.errors import AppError, ErrorCode
 from platform_core.logging import get_logger
 from platform_discord.embed_helpers import add_field, create_embed, set_footer

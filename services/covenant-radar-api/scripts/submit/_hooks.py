@@ -39,7 +39,7 @@ class _RichConsoleAdapter:
         Args:
             message: Message to write.
         """
-        from platform_core.logging import get_rich_console
+        from platform_core.rich_logging import get_rich_console
 
         console = get_rich_console()
         console_print = console.print

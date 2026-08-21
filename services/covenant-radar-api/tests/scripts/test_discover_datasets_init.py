@@ -7,7 +7,7 @@ import tempfile
 from collections.abc import Generator
 
 import pytest
-from platform_core.logging import RichConsoleProtocol, RichRenderableProtocol
+from platform_core.rich_logging import RichConsoleProtocol, RichRenderableProtocol
 
 from scripts import discover_datasets
 from scripts.discover_datasets import _test_hooks

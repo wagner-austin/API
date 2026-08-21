@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from typing import Literal
 
 from covenant_ml.types import BackendName
-from platform_core.logging import get_rich_console
+from platform_core.rich_logging import get_rich_console
 
 # Type aliases for standard datasets
 FeaturePreset = Literal["none", "log_only", "ratios_only", "full"]

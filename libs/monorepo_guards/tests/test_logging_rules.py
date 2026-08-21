@@ -33,6 +33,17 @@ def test_logging_rule_skips_platform_core_logging_module(tmp_path: Path) -> None
     assert len(violations) == 0
 
 
+def test_logging_rule_skips_platform_core_rich_logging_module(tmp_path: Path) -> None:
+    """platform_core/rich_logging.py implements the logging layer and is skipped."""
+    code = "import logging\nlogger = logging.getLogger(__name__)\n"
+    path = tmp_path / "platform_core" / "src" / "platform_core" / "rich_logging.py"
+    _write(path, code)
+
+    rule = LoggingRule()
+    violations = rule.run([path])
+    assert len(violations) == 0
+
+
 def test_logging_rule_skips_test_logging_files(tmp_path: Path) -> None:
     """Test that test_logging.py files are skipped from checks."""
     code = "import logging\nlogger = logging.getLogger(__name__)\n"

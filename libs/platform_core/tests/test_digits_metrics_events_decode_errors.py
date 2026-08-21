@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from platform_core.digits_metrics_events import (
+from platform_core.digits_metrics_decode import (
     decode_digits_metrics_event,
 )
 

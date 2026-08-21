@@ -35,7 +35,7 @@ from covenant_ml.types import (
     TrainOutcome,
 )
 from numpy.typing import NDArray
-from platform_core.logging import setup_rich_logging
+from platform_core.rich_logging import setup_rich_logging
 
 from covenant_radar_api.worker.optimize_types import UnifiedOptimizationResult
 

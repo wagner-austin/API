@@ -44,7 +44,7 @@ class TestRichConsoleAdapter:
 
     def test_rich_console_adapter_write(self) -> None:
         """Test RichConsoleAdapter write method."""
-        from platform_core.logging import setup_rich_logging
+        from platform_core.rich_logging import setup_rich_logging
 
         # Set up rich logging before using the adapter
         setup_rich_logging()
@@ -60,7 +60,7 @@ class TestDefaultConsoleFactory:
 
     def test_default_console_factory_returns_writable_console(self) -> None:
         """Test that factory returns a console that can write."""
-        from platform_core.logging import setup_rich_logging
+        from platform_core.rich_logging import setup_rich_logging
 
         # Set up rich logging before using the console factory
         setup_rich_logging()

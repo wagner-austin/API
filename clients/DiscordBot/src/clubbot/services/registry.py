@@ -3,18 +3,20 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypedDict
 
-from platform_core.digits_metrics_events import (
+from platform_core.digits_metrics_decode import (
     DEFAULT_DIGITS_EVENTS_CHANNEL,
+    DigitsEventV1,
+    decode_digits_event,
+)
+from platform_core.digits_metrics_events import (
     DigitsArtifactV1,
     DigitsBatchMetricsV1,
     DigitsBestMetricsV1,
     DigitsCompletedMetricsV1,
     DigitsConfigV1,
     DigitsEpochMetricsV1,
-    DigitsEventV1,
     DigitsPruneV1,
     DigitsUploadV1,
-    decode_digits_event,
 )
 from platform_core.job_events import (
     JobEventV1,

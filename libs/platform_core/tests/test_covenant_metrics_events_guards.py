@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from platform_core.covenant_metrics_events import (
-    AlertTriggeredV1,
-    CovenantMetricsEventV1,
-    PredictionCompletedV1,
-    RetrainTriggeredV1,
+from platform_core.covenant_metrics_decode import (
     decode_covenant_metrics_event,
     is_alert_triggered,
     is_evaluation_completed,
@@ -14,6 +10,12 @@ from platform_core.covenant_metrics_events import (
     is_prediction_completed,
     is_retrain_triggered,
     is_stream_lag,
+)
+from platform_core.covenant_metrics_events import (
+    AlertTriggeredV1,
+    CovenantMetricsEventV1,
+    PredictionCompletedV1,
+    RetrainTriggeredV1,
     make_alert_triggered_event,
     make_evaluation_completed_event,
     make_measurement_received_event,

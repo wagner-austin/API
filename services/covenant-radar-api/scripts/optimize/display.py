@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from covenant_ml.types import BackendName
 from platform_core.json_utils import require_float, require_int, require_str
-from platform_core.logging import (
+from platform_core.rich_logging import (
     RichTableProtocol,
     create_rich_panel,
     create_rich_table,

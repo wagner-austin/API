@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from platform_core.logging import RichConsoleProtocol, get_rich_console
+from platform_core.rich_logging import RichConsoleProtocol, get_rich_console
 
 
 class ConsoleFactory(Protocol):

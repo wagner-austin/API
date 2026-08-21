@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from platform_core.covenant_metrics_events import (
+from platform_core.covenant_metrics_decode import (
     CovenantEventV1,
     decode_covenant_event,
-    encode_covenant_metrics_event,
     is_covenant_alert_triggered,
     is_covenant_evaluation_completed,
     is_covenant_job_completed,
@@ -17,6 +16,9 @@ from platform_core.covenant_metrics_events import (
     is_covenant_prediction_completed,
     is_covenant_retrain_triggered,
     is_covenant_stream_lag,
+)
+from platform_core.covenant_metrics_events import (
+    encode_covenant_metrics_event,
     make_alert_triggered_event,
     make_evaluation_completed_event,
     make_measurement_received_event,
@@ -197,7 +199,9 @@ class TestDecodeCovenantEvent:
 
 class TestCombinedTypeGuards:
     def test_is_covenant_job_started(self) -> None:
-        from platform_core.covenant_metrics_events import JobStartedV1
+        from platform_core.covenant_metrics_decode import (
+            JobStartedV1,
+        )
 
         started: JobStartedV1 = {
             "type": "covenant.job.started.v1",
@@ -210,7 +214,9 @@ class TestCombinedTypeGuards:
         assert is_covenant_job_started(ev)
 
     def test_is_covenant_job_completed(self) -> None:
-        from platform_core.covenant_metrics_events import JobCompletedV1
+        from platform_core.covenant_metrics_decode import (
+            JobCompletedV1,
+        )
 
         completed: JobCompletedV1 = {
             "type": "covenant.job.completed.v1",
@@ -224,7 +230,9 @@ class TestCombinedTypeGuards:
         assert is_covenant_job_completed(ev)
 
     def test_is_covenant_job_failed(self) -> None:
-        from platform_core.covenant_metrics_events import JobFailedV1
+        from platform_core.covenant_metrics_decode import (
+            JobFailedV1,
+        )
 
         failed: JobFailedV1 = {
             "type": "covenant.job.failed.v1",
@@ -334,6 +342,8 @@ class TestCombinedTypeGuards:
 
 class TestDefaultChannel:
     def test_default_channel_value(self) -> None:
-        from platform_core.covenant_metrics_events import DEFAULT_COVENANT_EVENTS_CHANNEL
+        from platform_core.covenant_metrics_decode import (
+            DEFAULT_COVENANT_EVENTS_CHANNEL,
+        )
 
         assert DEFAULT_COVENANT_EVENTS_CHANNEL == "covenant:events"

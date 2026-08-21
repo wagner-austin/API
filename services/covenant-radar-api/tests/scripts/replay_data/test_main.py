@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from platform_core.logging import setup_rich_logging
+from platform_core.rich_logging import setup_rich_logging
 from scripts.replay_data.__main__ import (
     _parse_args,
     _parse_speed,

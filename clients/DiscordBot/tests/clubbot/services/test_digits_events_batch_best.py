@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 import pytest
-from platform_core.digits_metrics_events import (
+from platform_core.digits_metrics_decode import (
     decode_digits_event,
     is_digits_batch,
     is_digits_best,

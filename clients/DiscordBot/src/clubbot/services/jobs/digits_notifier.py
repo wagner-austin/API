@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Final, Protocol
 
-from platform_core.digits_metrics_events import DEFAULT_DIGITS_EVENTS_CHANNEL
+from platform_core.digits_metrics_decode import (
+    DEFAULT_DIGITS_EVENTS_CHANNEL,
+)
 from platform_discord.bot_subscriber import BotEventSubscriber
 from platform_discord.handwriting import (
     DigitsEventV1,

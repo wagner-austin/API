@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
-from platform_core.logging import setup_rich_logging
+from platform_core.rich_logging import setup_rich_logging
 from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize._formatters import format_loading_progress
 from scripts.optimize.cli import DatasetName, FeaturePreset

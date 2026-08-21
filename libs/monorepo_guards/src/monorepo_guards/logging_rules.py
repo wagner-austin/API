@@ -22,8 +22,14 @@ class LoggingRule:
     _ALLOWED_PATHS: ClassVar[frozenset[str]] = frozenset()
 
     def _should_skip_file(self, path: Path) -> bool:
-        """Check if file should be skipped from logging checks."""
-        if "platform_core" in path.parts and path.name == "logging.py":
+        """Check if file should be skipped from logging checks.
+
+        The two platform_core modules that IMPLEMENT the logging layer
+        (core ``logging.py`` and the rich console half split out of it,
+        ``rich_logging.py``) are the boundary everything else is pushed
+        behind — they alone touch stdlib logging directly.
+        """
+        if "platform_core" in path.parts and path.name in ("logging.py", "rich_logging.py"):
             return True
         if "tests" in path.parts:
             return True

@@ -3,7 +3,9 @@ from __future__ import annotations
 import logging
 
 import pytest
-from platform_core.digits_metrics_events import decode_digits_event
+from platform_core.digits_metrics_decode import (
+    decode_digits_event,
+)
 from platform_core.json_utils import JSONTypeError
 
 logger = logging.getLogger(__name__)

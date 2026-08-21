@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from covenant_ml.types import BackendName
-from platform_core.logging import (
+from platform_core.rich_logging import (
     create_rich_panel,
     create_rich_progress,
     create_rich_table,

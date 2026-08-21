@@ -13,7 +13,7 @@ from typing import Literal
 
 from covenant_ml.explainers.types import SupportedExplainer
 from covenant_ml.types import BackendName
-from platform_core.logging import get_rich_console
+from platform_core.rich_logging import get_rich_console
 
 # Type aliases
 DatasetName = Literal["taiwan", "us", "polish"]

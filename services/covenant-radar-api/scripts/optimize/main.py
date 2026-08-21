@@ -11,7 +11,8 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 
-from platform_core.logging import get_logger, setup_rich_logging
+from platform_core.logging import get_logger
+from platform_core.rich_logging import setup_rich_logging
 
 from scripts.optimize.cli import parse_args
 from scripts.optimize.display import print_config, print_result

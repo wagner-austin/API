@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import TypedDict
 
-from platform_core.logging import get_rich_console
+from platform_core.rich_logging import get_rich_console
 
 from covenant_radar_api.streaming.config import load_streaming_config
 from covenant_radar_api.streaming.producer import (

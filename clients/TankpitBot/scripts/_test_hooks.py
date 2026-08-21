@@ -141,7 +141,7 @@ def _real_setup_rich_logging(level: LogLevel) -> None:
     Args:
         level: Log level string.
     """
-    from platform_core.logging import setup_rich_logging as real_setup
+    from platform_core.rich_logging import setup_rich_logging as real_setup
 
     real_setup(level=level)
 

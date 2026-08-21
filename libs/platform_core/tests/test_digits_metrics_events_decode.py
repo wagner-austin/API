@@ -19,31 +19,28 @@ from platform_core.digits_metrics_events import (
 
 class TestDecodeDigitsEvent:
     def test_raises_for_non_dict(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         with pytest.raises(JSONTypeError, match="Expected JSON object"):
             decode_digits_event("[]")
 
     def test_raises_for_non_string_type(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         with pytest.raises(JSONTypeError, match="Field 'type' must be a string"):
             decode_digits_event('{"type": 123}')
 
     def test_raises_for_unknown_type(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         with pytest.raises(JSONTypeError, match="Unknown digits event type"):
             decode_digits_event('{"type": "unknown.event.v1", "job_id": "j", "user_id": 1}')
 
     def test_decodes_job_started_event(self) -> None:
-        from platform_core.digits_metrics_events import (
-            decode_digits_event,
-            is_digits_job_started,
-        )
+        from platform_core.digits_metrics_decode import decode_digits_event, is_digits_job_started
 
         payload = """{
             "type": "digits.job.started.v1",
@@ -57,7 +54,7 @@ class TestDecodeDigitsEvent:
         assert ev["type"] == "digits.job.started.v1"
 
     def test_decodes_job_completed_event(self) -> None:
-        from platform_core.digits_metrics_events import (
+        from platform_core.digits_metrics_decode import (
             decode_digits_event,
             is_digits_job_completed,
         )
@@ -75,10 +72,7 @@ class TestDecodeDigitsEvent:
         assert ev["type"] == "digits.job.completed.v1"
 
     def test_decodes_job_failed_event_user(self) -> None:
-        from platform_core.digits_metrics_events import (
-            decode_digits_event,
-            is_digits_job_failed,
-        )
+        from platform_core.digits_metrics_decode import decode_digits_event, is_digits_job_failed
 
         payload = """{
             "type": "digits.job.failed.v1",
@@ -93,10 +87,7 @@ class TestDecodeDigitsEvent:
         assert ev["type"] == "digits.job.failed.v1"
 
     def test_decodes_job_failed_event_system(self) -> None:
-        from platform_core.digits_metrics_events import (
-            decode_digits_event,
-            is_digits_job_failed,
-        )
+        from platform_core.digits_metrics_decode import decode_digits_event, is_digits_job_failed
 
         payload = """{
             "type": "digits.job.failed.v1",
@@ -111,10 +102,7 @@ class TestDecodeDigitsEvent:
         assert ev["type"] == "digits.job.failed.v1"
 
     def test_decodes_metrics_event(self) -> None:
-        from platform_core.digits_metrics_events import (
-            decode_digits_event,
-            is_digits_config,
-        )
+        from platform_core.digits_metrics_decode import decode_digits_event, is_digits_config
 
         ev = make_config_event(job_id="j1", user_id=1, model_id="m", total_epochs=1, queue="q")
         payload = encode_digits_metrics_event(ev)
@@ -123,7 +111,7 @@ class TestDecodeDigitsEvent:
         assert decoded["type"] == "digits.metrics.config.v1"
 
     def test_raises_for_wrong_domain(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         payload = """{
@@ -137,7 +125,7 @@ class TestDecodeDigitsEvent:
             decode_digits_event(payload)
 
     def test_raises_for_missing_queue_in_started(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         payload = """{
@@ -150,7 +138,7 @@ class TestDecodeDigitsEvent:
             decode_digits_event(payload)
 
     def test_raises_for_missing_fields_in_completed(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         payload = """{
@@ -163,7 +151,7 @@ class TestDecodeDigitsEvent:
             decode_digits_event(payload)
 
     def test_raises_for_missing_message_in_failed(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         payload = """{
@@ -177,7 +165,7 @@ class TestDecodeDigitsEvent:
             decode_digits_event(payload)
 
     def test_raises_for_invalid_error_kind(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         payload = """{
@@ -192,7 +180,7 @@ class TestDecodeDigitsEvent:
             decode_digits_event(payload)
 
     def test_raises_for_unknown_job_event_suffix(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         payload = """{
@@ -205,7 +193,7 @@ class TestDecodeDigitsEvent:
             decode_digits_event(payload)
 
     def test_raises_for_missing_job_id(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         payload = '{"type": "digits.metrics.config.v1", "user_id": 1}'
@@ -213,7 +201,7 @@ class TestDecodeDigitsEvent:
             decode_digits_event(payload)
 
     def test_raises_for_unknown_metrics_type(self) -> None:
-        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.digits_metrics_decode import decode_digits_event
         from platform_core.json_utils import JSONTypeError
 
         payload = '{"type": "digits.metrics.unknown.v1", "job_id": "j1", "user_id": 1}'
@@ -223,7 +211,7 @@ class TestDecodeDigitsEvent:
 
 class TestCombinedTypeGuards:
     def test_is_digits_job_started(self) -> None:
-        from platform_core.digits_metrics_events import (
+        from platform_core.digits_metrics_decode import (
             DigitsEventV1,
             JobStartedV1,
             is_digits_job_started,
@@ -240,7 +228,7 @@ class TestCombinedTypeGuards:
         assert is_digits_job_started(ev)
 
     def test_is_digits_job_completed(self) -> None:
-        from platform_core.digits_metrics_events import (
+        from platform_core.digits_metrics_decode import (
             DigitsEventV1,
             JobCompletedV1,
             is_digits_job_completed,
@@ -258,7 +246,7 @@ class TestCombinedTypeGuards:
         assert is_digits_job_completed(ev)
 
     def test_is_digits_job_failed(self) -> None:
-        from platform_core.digits_metrics_events import (
+        from platform_core.digits_metrics_decode import (
             DigitsEventV1,
             JobFailedV1,
             is_digits_job_failed,
@@ -276,7 +264,7 @@ class TestCombinedTypeGuards:
         assert is_digits_job_failed(ev)
 
     def test_is_digits_config(self) -> None:
-        from platform_core.digits_metrics_events import DigitsEventV1, is_digits_config
+        from platform_core.digits_metrics_decode import DigitsEventV1, is_digits_config
 
         ev: DigitsEventV1 = make_config_event(
             job_id="j", user_id=1, model_id="m", total_epochs=1, queue="q"
@@ -284,7 +272,7 @@ class TestCombinedTypeGuards:
         assert is_digits_config(ev)
 
     def test_is_digits_batch(self) -> None:
-        from platform_core.digits_metrics_events import DigitsEventV1, is_digits_batch
+        from platform_core.digits_metrics_decode import DigitsEventV1, is_digits_batch
 
         ev: DigitsEventV1 = make_batch_metrics_event(
             job_id="j",
@@ -310,7 +298,7 @@ class TestCombinedTypeGuards:
         assert is_digits_batch(ev)
 
     def test_is_digits_epoch(self) -> None:
-        from platform_core.digits_metrics_events import DigitsEventV1, is_digits_epoch
+        from platform_core.digits_metrics_decode import DigitsEventV1, is_digits_epoch
 
         ev: DigitsEventV1 = make_epoch_metrics_event(
             job_id="j",
@@ -325,7 +313,7 @@ class TestCombinedTypeGuards:
         assert is_digits_epoch(ev)
 
     def test_is_digits_best(self) -> None:
-        from platform_core.digits_metrics_events import DigitsEventV1, is_digits_best
+        from platform_core.digits_metrics_decode import DigitsEventV1, is_digits_best
 
         ev: DigitsEventV1 = make_best_metrics_event(
             job_id="j", user_id=1, model_id="m", epoch=1, val_acc=0.9
@@ -333,13 +321,13 @@ class TestCombinedTypeGuards:
         assert is_digits_best(ev)
 
     def test_is_digits_artifact(self) -> None:
-        from platform_core.digits_metrics_events import DigitsEventV1, is_digits_artifact
+        from platform_core.digits_metrics_decode import DigitsEventV1, is_digits_artifact
 
         ev: DigitsEventV1 = make_artifact_event(job_id="j", user_id=1, model_id="m", path="/p")
         assert is_digits_artifact(ev)
 
     def test_is_digits_upload(self) -> None:
-        from platform_core.digits_metrics_events import DigitsEventV1, is_digits_upload
+        from platform_core.digits_metrics_decode import DigitsEventV1, is_digits_upload
 
         ev: DigitsEventV1 = make_upload_event(
             job_id="j",
@@ -354,16 +342,13 @@ class TestCombinedTypeGuards:
         assert is_digits_upload(ev)
 
     def test_is_digits_prune(self) -> None:
-        from platform_core.digits_metrics_events import DigitsEventV1, is_digits_prune
+        from platform_core.digits_metrics_decode import DigitsEventV1, is_digits_prune
 
         ev: DigitsEventV1 = make_prune_event(job_id="j", user_id=1, model_id="m", deleted_count=1)
         assert is_digits_prune(ev)
 
     def test_is_digits_completed_metrics(self) -> None:
-        from platform_core.digits_metrics_events import (
-            DigitsEventV1,
-            is_digits_completed_metrics,
-        )
+        from platform_core.digits_metrics_decode import DigitsEventV1, is_digits_completed_metrics
 
         ev: DigitsEventV1 = make_completed_metrics_event(
             job_id="j", user_id=1, model_id="m", val_acc=0.9
@@ -371,7 +356,7 @@ class TestCombinedTypeGuards:
         assert is_digits_completed_metrics(ev)
 
     def test_type_guards_return_false_for_non_matching(self) -> None:
-        from platform_core.digits_metrics_events import (
+        from platform_core.digits_metrics_decode import (
             DigitsEventV1,
             is_digits_artifact,
             is_digits_batch,
@@ -404,6 +389,6 @@ class TestCombinedTypeGuards:
 
 class TestDefaultChannel:
     def test_default_channel_value(self) -> None:
-        from platform_core.digits_metrics_events import DEFAULT_DIGITS_EVENTS_CHANNEL
+        from platform_core.digits_metrics_decode import DEFAULT_DIGITS_EVENTS_CHANNEL
 
         assert DEFAULT_DIGITS_EVENTS_CHANNEL == "digits:events"

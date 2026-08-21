@@ -11,7 +11,7 @@ from platform_core.logging import (
 
 def test_setup_rich_logging_returns_logger() -> None:
     """Test setup_rich_logging returns configured root logger."""
-    from platform_core.logging import setup_rich_logging
+    from platform_core.rich_logging import setup_rich_logging
 
     logger = setup_rich_logging(level="INFO")
 
@@ -21,7 +21,7 @@ def test_setup_rich_logging_returns_logger() -> None:
 
 def test_setup_rich_logging_with_options() -> None:
     """Test setup_rich_logging accepts all options."""
-    from platform_core.logging import setup_rich_logging
+    from platform_core.rich_logging import setup_rich_logging
 
     logger = setup_rich_logging(
         level="DEBUG",
@@ -34,7 +34,7 @@ def test_setup_rich_logging_with_options() -> None:
 
 def test_setup_rich_logging_silences_third_party() -> None:
     """Test setup_rich_logging sets WARNING level for noisy loggers."""
-    from platform_core.logging import setup_rich_logging
+    from platform_core.rich_logging import setup_rich_logging
 
     setup_rich_logging(level="DEBUG")
 
@@ -46,7 +46,7 @@ def test_setup_rich_logging_silences_third_party() -> None:
 
 def test_get_rich_console_after_setup() -> None:
     """Test get_rich_console returns console after setup."""
-    from platform_core.logging import (
+    from platform_core.rich_logging import (
         RichConsoleProtocol,
         get_rich_console,
         setup_rich_logging,
@@ -62,24 +62,24 @@ def test_get_rich_console_after_setup() -> None:
 
 def test_get_rich_console_before_setup_raises() -> None:
     """Test get_rich_console raises RuntimeError before setup."""
-    import platform_core.logging as log_mod
-    from platform_core.logging import get_rich_console
+    import platform_core.rich_logging as rich_mod
+    from platform_core.rich_logging import get_rich_console
 
     # Reset module state to simulate no setup
-    original = log_mod._rich_console
-    log_mod._rich_console = None
+    original = rich_mod._rich_console
+    rich_mod._rich_console = None
 
     try:
         with pytest.raises(RuntimeError) as raised:
             get_rich_console()
         assert "setup_rich_logging()" in str(raised.value)
     finally:
-        log_mod._rich_console = original
+        rich_mod._rich_console = original
 
 
 def test_create_rich_table_basic() -> None:
     """Test create_rich_table creates a table with columns and rows."""
-    from platform_core.logging import (
+    from platform_core.rich_logging import (
         RichTableProtocol,
         create_rich_table,
         get_rich_console,
@@ -102,11 +102,7 @@ def test_create_rich_table_basic() -> None:
 
 def test_create_rich_table_no_header() -> None:
     """Test create_rich_table with show_header=False."""
-    from platform_core.logging import (
-        create_rich_table,
-        get_rich_console,
-        setup_rich_logging,
-    )
+    from platform_core.rich_logging import create_rich_table, get_rich_console, setup_rich_logging
 
     setup_rich_logging()
     console = get_rich_console()
@@ -121,11 +117,7 @@ def test_create_rich_table_no_header() -> None:
 
 def test_create_rich_panel_basic() -> None:
     """Test create_rich_panel creates a panel."""
-    from platform_core.logging import (
-        create_rich_panel,
-        get_rich_console,
-        setup_rich_logging,
-    )
+    from platform_core.rich_logging import create_rich_panel, get_rich_console, setup_rich_logging
 
     setup_rich_logging()
     console = get_rich_console()
@@ -137,11 +129,7 @@ def test_create_rich_panel_basic() -> None:
 
 def test_create_rich_panel_no_title() -> None:
     """Test create_rich_panel without title."""
-    from platform_core.logging import (
-        create_rich_panel,
-        get_rich_console,
-        setup_rich_logging,
-    )
+    from platform_core.rich_logging import create_rich_panel, get_rich_console, setup_rich_logging
 
     setup_rich_logging()
     console = get_rich_console()
@@ -153,7 +141,7 @@ def test_create_rich_panel_no_title() -> None:
 
 def test_create_rich_progress_context_manager() -> None:
     """Test create_rich_progress as context manager."""
-    from platform_core.logging import (
+    from platform_core.rich_logging import (
         RichProgressProtocol,
         create_rich_progress,
         get_rich_console,
@@ -180,7 +168,7 @@ def test_create_rich_progress_context_manager() -> None:
 
 def test_create_rich_spinner_progress_context_manager() -> None:
     """Test create_rich_spinner_progress as context manager."""
-    from platform_core.logging import (
+    from platform_core.rich_logging import (
         RichProgressProtocol,
         create_rich_spinner_progress,
         get_rich_console,
@@ -206,11 +194,7 @@ def test_create_rich_spinner_progress_context_manager() -> None:
 
 def test_rich_console_print_table() -> None:
     """Test rich console can print a table."""
-    from platform_core.logging import (
-        create_rich_table,
-        get_rich_console,
-        setup_rich_logging,
-    )
+    from platform_core.rich_logging import create_rich_table, get_rich_console, setup_rich_logging
 
     setup_rich_logging()
     console = get_rich_console()
@@ -224,11 +208,7 @@ def test_rich_console_print_table() -> None:
 
 def test_rich_console_print_panel() -> None:
     """Test rich console can print a panel."""
-    from platform_core.logging import (
-        create_rich_panel,
-        get_rich_console,
-        setup_rich_logging,
-    )
+    from platform_core.rich_logging import create_rich_panel, get_rich_console, setup_rich_logging
 
     setup_rich_logging()
     console = get_rich_console()

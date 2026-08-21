@@ -41,7 +41,8 @@ from platform_core.json_utils import (
     load_json_str,
     require_float,
 )
-from platform_core.logging import get_logger, get_rich_console
+from platform_core.logging import get_logger
+from platform_core.rich_logging import get_rich_console
 
 import scripts._test_hooks as _hooks
 from scripts._test_hooks import UnifiedOptimizationResult
