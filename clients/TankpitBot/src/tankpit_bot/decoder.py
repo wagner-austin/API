@@ -366,7 +366,7 @@ def load_and_decode_session(
 def main() -> None:
     """Entry point for tankpit-decode command."""
     from dotenv import load_dotenv
-    from platform_core.logging import setup_rich_logging
+    from platform_core.rich_logging import setup_rich_logging
 
     load_dotenv()
     setup_rich_logging(level="INFO")

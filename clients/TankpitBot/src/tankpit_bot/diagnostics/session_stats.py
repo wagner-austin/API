@@ -14,7 +14,8 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from platform_core.logging import get_logger, setup_rich_logging
+from platform_core.logging import get_logger
+from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.diagnostics.event_stream import load_event_records

@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import TypeVar
 
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
-from platform_core.logging import setup_rich_logging, stdlib_logging
+from platform_core.logging import stdlib_logging
+from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.runtime_records import (

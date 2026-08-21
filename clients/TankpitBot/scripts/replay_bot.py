@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
-from platform_core.logging import get_logger, setup_rich_logging
+from platform_core.logging import get_logger
+from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.replay.engine import replay_session

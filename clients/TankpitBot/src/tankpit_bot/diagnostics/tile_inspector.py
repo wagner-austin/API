@@ -24,7 +24,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from platform_core.logging import get_logger, setup_rich_logging
+from platform_core.logging import get_logger
+from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.ai.equipment_search import find_teleport_landing_tile, is_reachable

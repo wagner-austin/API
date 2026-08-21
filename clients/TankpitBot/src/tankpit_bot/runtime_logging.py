@@ -21,7 +21,8 @@ from __future__ import annotations
 from contextvars import ContextVar
 from pathlib import Path
 
-from platform_core.logging import get_logger, setup_rich_logging, stdlib_logging
+from platform_core.logging import get_logger, stdlib_logging
+from platform_core.rich_logging import setup_rich_logging
 
 from tankpit_bot.runtime_artifacts import (
     BotRunArtifactsDict,
