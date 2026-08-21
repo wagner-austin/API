@@ -49,33 +49,60 @@ def register_pending_decision(
     """
     prior = ledger.pending_decisions.get(action_kind)
     if prior is not None:
+        dispatched = prior in ledger.dispatched_decision_ids
         emit_action_outcome(
             ledger,
             action_kind=action_kind,
             outcome="superseded",
             duration_ms=0,
             superseded_by=event_id,
+            dispatched=dispatched,
         )
-        # The live livelock detector: a zero-duration superseded is a
-        # decision replaced before ANYTHING dispatched, and a streak of
-        # them is the planner/veto feedback gap ([[fleet-coordination]]
-        # gatherer livelock — 93 in a row while the session looked
-        # busy). Fires once at the crossing; a genuine resolution of
-        # the kind re-arms it below.
-        ledger.zero_dispatch_streaks[action_kind] += 1
-        streak = ledger.zero_dispatch_streaks[action_kind]
-        if streak == LIVENESS_STALL_STREAK:
-            log.warning(
-                "LIVENESS STALL: %s replanned %d consecutive times with zero dispatches",
-                action_kind,
-                streak,
-            )
-            emit_diagnostic(
-                diagnostic_kind="liveness_stall",
-                action_kind=action_kind,
-                streak=streak,
-            )
+        # The live livelock detector counts only UNDISPATCHED
+        # supersedes: a decision replaced before anything reached the
+        # wire, whose streak is the planner/veto feedback gap
+        # ([[fleet-coordination]] gatherer livelock — 93 in a row
+        # while the session looked busy). A superseded close of a
+        # DISPATCHED decision instead resets the streak — the planner
+        # is reaching the wire, its outcome just went unclassified
+        # (the 2026-08-21 false positive: 12 dispatched-and-echoed
+        # clearance shots read as a livelock). Fires once at the
+        # crossing; any genuine resolution also re-arms it below.
+        if dispatched:
+            ledger.zero_dispatch_streaks[action_kind] = 0
+        else:
+            ledger.zero_dispatch_streaks[action_kind] += 1
+            streak = ledger.zero_dispatch_streaks[action_kind]
+            if streak == LIVENESS_STALL_STREAK:
+                log.warning(
+                    "LIVENESS STALL: %s replanned %d consecutive times with zero dispatches",
+                    action_kind,
+                    streak,
+                )
+                emit_diagnostic(
+                    diagnostic_kind="liveness_stall",
+                    action_kind=action_kind,
+                    streak=streak,
+                )
     ledger.pending_decisions[action_kind] = event_id
+
+
+def mark_decision_dispatched(ledger: LedgerService, event_id: int) -> None:
+    """Record that a decision's command actually reached the wire.
+
+    Called by the executor after a successful dispatch. A decision so
+    marked can close ``superseded`` without feeding the zero-dispatch
+    streak — the planner's output demonstrably left the process, so a
+    replan on top of it is re-aiming, not a livelock. Marking by event
+    id (not kind) keeps the mark valid across
+    :func:`transfer_pending_decision` (a deferred teleport's map_open
+    dispatch marks the ORIGINAL teleport decision).
+
+    Args:
+        ledger: Session ledger holding the pairing state.
+        event_id: The dispatched decision's event id.
+    """
+    ledger.dispatched_decision_ids.add(event_id)
 
 
 def transfer_pending_decision(
@@ -163,6 +190,7 @@ def emit_action_outcome(
     caused_by = ledger.pending_decisions.pop(action_kind, 0)
     if caused_by != 0:
         ledger.resolved_decision_ids.add(caused_by)
+        ledger.dispatched_decision_ids.discard(caused_by)
     if outcome != "superseded":
         # Any genuine resolution of the kind proves the planner's
         # output is reaching the wire again — the stall counter and
@@ -194,6 +222,7 @@ def emit_action_outcome(
 __all__ = [
     "emit_action_outcome",
     "log",
+    "mark_decision_dispatched",
     "pending_decision_ids",
     "register_pending_decision",
     "resolved_decision_ids",

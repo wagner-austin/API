@@ -12,6 +12,7 @@ from __future__ import annotations
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
+    require_bool,
     require_dict,
     require_int,
     require_list,
@@ -250,6 +251,7 @@ def encode_action_outcome_row(record: ActionOutcomeRowDict) -> JSONObject:
         "event_id": record["event_id"],
         "attempt_id": record["attempt_id"],
         "duration_ms": record["duration_ms"],
+        "dispatched": record["dispatched"],
         "timestamp": record["timestamp"],
     }
 
@@ -269,6 +271,7 @@ def decode_action_outcome_row(data: JSONObject) -> ActionOutcomeRowDict:
         event_id=require_int(data, "event_id"),
         attempt_id=require_int(data, "attempt_id"),
         duration_ms=require_int(data, "duration_ms"),
+        dispatched=require_bool(data, "dispatched"),
         timestamp=require_str(data, "timestamp"),
     )
 

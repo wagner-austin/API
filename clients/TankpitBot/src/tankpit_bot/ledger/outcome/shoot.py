@@ -89,6 +89,37 @@ def emit_shoot_miss(
     )
 
 
+def emit_shoot_fired(
+    ledger: LedgerService, *, duration_ms: int, aim_x: int, aim_y: int
+) -> ActionOutcomeRecordDict:
+    """Record a ground-aimed shot whose own 0x53 echo arrived.
+
+    The echo is the server's receipt that the shot was accepted,
+    billed, and fired — it carries the weapon byte, never hit/miss
+    ([[decode-coverage]] 0x53). A clearance shot targets a tile, not
+    a tank, so hit/miss semantics do not apply and this is its final
+    resolution. Unlike the id-keyed combat payloads, the aim tile IS
+    the commanded fact here, so it rides along.
+
+    Args:
+        ledger: Session ledger receiving the outcome.
+        duration_ms: Dispatch-to-echo wall-clock ms.
+        aim_x: Commanded aim tile X.
+        aim_y: Commanded aim tile Y.
+
+    Returns:
+        The recorded outcome.
+    """
+    return emit_action_outcome(
+        ledger,
+        action_kind="shoot",
+        outcome="fired",
+        duration_ms=duration_ms,
+        aim_x=aim_x,
+        aim_y=aim_y,
+    )
+
+
 def emit_shoot_command_rejected(
     ledger: LedgerService, *, duration_ms: int, target_id: int, target_name: str, error_code: int
 ) -> ActionOutcomeRecordDict:
@@ -118,6 +149,7 @@ def emit_shoot_command_rejected(
 __all__ = [
     "HitSignal",
     "emit_shoot_command_rejected",
+    "emit_shoot_fired",
     "emit_shoot_hit",
     "emit_shoot_miss",
 ]

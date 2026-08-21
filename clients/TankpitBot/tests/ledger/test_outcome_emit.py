@@ -247,6 +247,85 @@ def test_zero_dispatch_streak_counts_supersedes_and_rearms(ledger: LedgerService
     assert ledger.zero_dispatch_streaks["move"] == 0
 
 
+def test_dispatched_supersede_resets_the_streak_and_records_the_mark(
+    ledger: LedgerService,
+) -> None:
+    """A superseded close of a DISPATCHED decision is a re-aim, not a stall.
+
+    The 2026-08-21 false positive: 12 clearance shots each reached the
+    wire and echoed, yet every decision closed ``superseded`` and the
+    counter read them as zero dispatches. With the executor's dispatch
+    mark, the supersede resets the streak, carries ``dispatched=True``
+    in its record, and consumes the mark.
+    """
+    from tankpit_bot.ledger.outcome._emit import (
+        mark_decision_dispatched,
+        register_pending_decision,
+    )
+
+    first = ledger.next_event_id()
+    register_pending_decision(ledger, "shoot", first)
+    mark_decision_dispatched(ledger, first)
+    # Build a streak first so the reset is observable.
+    ledger.zero_dispatch_streaks["shoot"] = 5
+
+    register_pending_decision(ledger, "shoot", ledger.next_event_id())
+
+    assert ledger.zero_dispatch_streaks["shoot"] == 0
+    superseded = recent_outcomes(ledger, "shoot", 1)[0]
+    assert superseded["outcome"] == "superseded"
+    assert superseded["detail"]["dispatched"] is True
+    assert first not in ledger.dispatched_decision_ids
+
+    # An UNDISPATCHED supersede still counts, from the reset baseline.
+    register_pending_decision(ledger, "shoot", ledger.next_event_id())
+    assert ledger.zero_dispatch_streaks["shoot"] == 1
+    undispatched = recent_outcomes(ledger, "shoot", 1)[0]
+    assert undispatched["detail"]["dispatched"] is False
+
+
+def test_dispatch_mark_survives_the_pending_transfer(ledger: LedgerService) -> None:
+    """A deferred teleport's map_open dispatch credits the ORIGINAL decision.
+
+    The mark is keyed by event id, so moving the pending decision from
+    ``teleport`` to ``map_open`` (the executor's map-open deferral)
+    keeps the dispatched fact attached to it.
+    """
+    from tankpit_bot.ledger.outcome._emit import (
+        mark_decision_dispatched,
+        register_pending_decision,
+        transfer_pending_decision,
+    )
+
+    decision_id = ledger.next_event_id()
+    register_pending_decision(ledger, "teleport", decision_id)
+    transfer_pending_decision(ledger, "teleport", "map_open")
+    mark_decision_dispatched(ledger, decision_id)
+
+    register_pending_decision(ledger, "map_open", ledger.next_event_id())
+
+    superseded = recent_outcomes(ledger, "map_open", 1)[0]
+    assert superseded["detail"]["dispatched"] is True
+    assert ledger.zero_dispatch_streaks["map_open"] == 0
+
+
+def test_genuine_resolution_discards_the_dispatch_mark(ledger: LedgerService) -> None:
+    """Resolving a marked decision consumes its mark — the set stays bounded."""
+    from tankpit_bot.ledger.outcome._emit import (
+        mark_decision_dispatched,
+        register_pending_decision,
+    )
+
+    decision_id = ledger.next_event_id()
+    register_pending_decision(ledger, "scan", decision_id)
+    mark_decision_dispatched(ledger, decision_id)
+
+    emit_scan_radar_complete(ledger, duration_ms=10, target_x=1, target_y=2)
+
+    assert ledger.dispatched_decision_ids == set()
+    assert ledger.zero_dispatch_streaks["scan"] == 0
+
+
 def test_liveness_stall_diagnostic_fires_once_at_the_crossing(
     fake_fs: FakeFileSystem,
 ) -> None:

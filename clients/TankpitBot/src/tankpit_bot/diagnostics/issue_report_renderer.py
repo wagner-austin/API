@@ -113,16 +113,33 @@ def _render_fuel_section(report: IssueReportDict) -> list[str]:
 
 
 def _render_action_outcome_section(report: IssueReportDict) -> list[str]:
-    """Return the ACTION OUTCOMES section lines."""
+    """Return the ACTION OUTCOMES section lines.
+
+    Opens with the wire-vs-ledger tally per kind so a reader can see at
+    a glance whether the outcome rows below can be trusted: a kind
+    whose dispatch count dwarfs its completion count has a broken or
+    missing completion path, and its rows tell you nothing. Superseded
+    rows carry their dispatch mark for the same reason — ``dispatched=
+    False`` is a vetoed plan, ``dispatched=True`` a re-aim over a live
+    command.
+    """
     lines = ["=== ACTION OUTCOMES ==="]
+    completions = _completions_by_kind(report)
+    if report["wire_dispatches_by_kind"]:
+        tally = " ".join(
+            f"{kind}={dispatched}/{completions.get(kind, 0)}"
+            for kind, dispatched in sorted(report["wire_dispatches_by_kind"].items())
+        )
+        lines.append(f"  wire dispatches/ledger completions: {tally}")
     if not report["action_outcomes"]:
         lines.append("  (none)")
     else:
         for row in report["action_outcomes"]:
+            suffix = f" dispatched={row['dispatched']}" if row["outcome"] == "superseded" else ""
             lines.append(
                 f"  {row['action_kind']}#{row['attempt_id']} "
                 f"outcome={row['outcome']} "
-                f"duration_ms={row['duration_ms']}"
+                f"duration_ms={row['duration_ms']}{suffix}"
             )
     lines.append("")
     return lines
@@ -193,25 +210,30 @@ def _zero_dispatch_streaks(report: IssueReportDict) -> dict[str, int]:
     """Return the longest zero-dispatch replan streak per action kind.
 
     The generalized liveness scan (the suppressed-dispatch rule's
-    veto-agnostic sibling): a zero-duration ``superseded`` outcome is a
-    decision replaced before anything dispatched, and a long
+    veto-agnostic sibling): an UNDISPATCHED ``superseded`` outcome is
+    a decision replaced before anything reached the wire, and a long
     same-kind run of them is a planner producing plans that never
-    reach the wire — whatever the veto. Mirrors the ledger's live
-    counter so post-run analysis catches the class even on artifacts
-    from builds without the ``liveness_stall`` diagnostic.
+    dispatch — whatever the veto. A superseded row whose decision DID
+    dispatch breaks the streak, exactly as the ledger's live counter
+    does (2026-08-21 correction: 12 dispatched-and-echoed clearance
+    shots read as a livelock before the dispatch mark existed). On
+    artifacts predating the mark, dispatched supersedes are
+    indistinguishable from vetoed ones and still count — pair any
+    streak line from an old artifact with the completion-audit rule,
+    which names the kinds whose outcome labels cannot be trusted.
 
     Args:
         report: Report whose ``action_outcomes`` rows are scanned in
             stream order.
 
     Returns:
-        Per-kind maximum consecutive zero-duration superseded count.
+        Per-kind maximum consecutive undispatched superseded count.
     """
     best: dict[str, int] = {}
     current_kind = ""
     current = 0
     for row in report["action_outcomes"]:
-        if row["outcome"] == "superseded" and row["duration_ms"] == 0:
+        if row["outcome"] == "superseded" and row["duration_ms"] == 0 and not row["dispatched"]:
             current = current + 1 if row["action_kind"] == current_kind else 1
             current_kind = row["action_kind"]
             if current > best.get(current_kind, 0):
@@ -222,6 +244,70 @@ def _zero_dispatch_streaks(report: IssueReportDict) -> dict[str, int]:
     return best
 
 
+# The completion audit's dispatch floor: below this many wire sends, a
+# kind with zero completions is more likely teardown truncation (the
+# last in-flight action legitimately never resolves — e.g. the 30-min
+# soak's 178th pan) than a modeling gap. The one known gap ran 13
+# dispatches; a real one recurs every session, so 5 catches it while
+# sparing the truncation tail.
+_COMPLETION_AUDIT_DISPATCH_THRESHOLD = 5
+
+# Outcomes that close a decision without proving the ledger can SEE the
+# kind's completion: a supersede is bookkeeping, a stall timeout is the
+# absence of an answer. Everything else is a wire-confirmed resolution.
+_NON_COMPLETION_OUTCOMES = frozenset({"superseded", "stall_timeout"})
+
+
+def _completions_by_kind(report: IssueReportDict) -> dict[str, int]:
+    """Return per-kind counts of wire-confirmed resolutions.
+
+    Args:
+        report: Report whose ``action_outcomes`` rows are tallied.
+
+    Returns:
+        Kind-to-count mapping over outcomes that prove the ledger can
+        see the kind complete (everything but supersedes and stalls).
+    """
+    completions: dict[str, int] = {}
+    for row in report["action_outcomes"]:
+        if row["outcome"] not in _NON_COMPLETION_OUTCOMES:
+            completions[row["action_kind"]] = completions.get(row["action_kind"], 0) + 1
+    return completions
+
+
+def _completion_audit_issues(report: IssueReportDict) -> list[str]:
+    """Return one issue line per kind that dispatches but never completes.
+
+    The wire-vs-ledger consistency rule: the WIRE channel counts what
+    actually left the process per kind; the outcome rows count what the
+    ledger resolved. A kind with real dispatch traffic and ZERO
+    wire-confirmed completions has no working completion path — a
+    ledger modeling gap. Every outcome-derived rule (streaks, stall
+    lines, per-kind counts) silently lies about such a kind, so the
+    gap itself must be a top-level line (2026-08-21: shoot ran 13
+    dispatches / 0 completions for a whole session class and the
+    silence was misread as a livelock).
+
+    Args:
+        report: Report whose wire tallies and outcome rows are compared.
+
+    Returns:
+        Human-readable issue lines (possibly empty).
+    """
+    completions = _completions_by_kind(report)
+    issues: list[str] = []
+    for kind, dispatched in sorted(report["wire_dispatches_by_kind"].items()):
+        if dispatched >= _COMPLETION_AUDIT_DISPATCH_THRESHOLD and completions.get(kind, 0) == 0:
+            issues.append(
+                f"ledger modeling gap: {dispatched} {kind} commands reached the wire "
+                "but the ledger recorded ZERO completions for the kind -- every "
+                f"outcome-based rule is blind to {kind}; distrust its outcome labels "
+                "in this report (including any liveness-stall line) until the kind "
+                "gets a completion path"
+            )
+    return issues
+
+
 # A displaced teleport is a SUCCESS to the ledger (landed_inexact), so
 # destination repetition hides from every failure counter — the third
 # liveness flavor. Empirical (459-run archive sweep 2026-08-21): the 11
@@ -230,8 +316,12 @@ def _zero_dispatch_streaks(report: IssueReportDict) -> dict[str, int]:
 # (combat re-aims at a stationary enemy).
 _DISPLACEMENT_ORBIT_THRESHOLD = 3
 
-# Sessions that shoot this much without a single observed deactivation
-# are chasing unkillable or repairing targets.
+# Sessions that shoot this much AT TANKS without a single observed
+# deactivation are chasing unkillable or repairing targets. Ground-aimed
+# clearance shots (``shoot:fired``) are collect doctrine, not combat —
+# the first live run after the echo receipt landed (2026-08-21, 53
+# clearance shots, 0 kills, a gatherer doing its job) tripped the
+# unsplit rule, so the tally now subtracts them.
 _COMBAT_FUTILITY_SHOT_THRESHOLD = 20
 
 # The fuel-critical band: combat needs ~10 fuel per shot and teleports
@@ -273,8 +363,14 @@ def _collect_scorecard_issues(scorecard: SessionScorecardDict) -> list[str]:
             f"fuel floor critical: belief fuel dipped to {scorecard['fuel_min']} "
             f"(below {_FUEL_FLOOR_THRESHOLD})"
         )
-    if scorecard["shots"] >= _COMBAT_FUTILITY_SHOT_THRESHOLD and scorecard["kills"] == 0:
-        issues.append(f"combat futility: {scorecard['shots']} shots produced 0 observed kills")
+    clearance_shots = scorecard["action_outcome_counts"].get("shoot:fired", 0)
+    tank_targeted = max(0, scorecard["shots"] - clearance_shots)
+    if tank_targeted >= _COMBAT_FUTILITY_SHOT_THRESHOLD and scorecard["kills"] == 0:
+        suffix = f" ({clearance_shots} clearance shots excluded)" if clearance_shots else ""
+        issues.append(
+            f"combat futility: {tank_targeted} tank-targeted shots produced "
+            f"0 observed kills{suffix}"
+        )
     return issues
 
 
@@ -316,6 +412,7 @@ def _collect_top_level_issues(report: IssueReportDict) -> list[str]:
         )
     if report["session_room"] is None:
         issues.append("session room unknown -- analysis terrain is unverifiable")
+    issues.extend(_completion_audit_issues(report))
     issues.extend(_collect_repetition_issues(report))
     issues.extend(_collect_scorecard_issues(report["scorecard"]))
     return issues
@@ -355,9 +452,9 @@ def _collect_repetition_issues(report: IssueReportDict) -> list[str]:
     for kind, streak in sorted(_zero_dispatch_streaks(report).items()):
         if streak >= LIVENESS_STALL_STREAK:
             issues.append(
-                f"liveness stall: {streak} consecutive {kind} decisions replaced with "
-                f"zero dispatches (healthy archive ceiling is 7) -- the planner is "
-                "spinning without reaching the wire"
+                f"liveness stall: {streak} consecutive {kind} decisions replaced "
+                "before anything reached the wire -- the planner keeps deriving a "
+                "plan some veto keeps refusing without feedback"
             )
     return issues
 

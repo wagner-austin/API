@@ -50,6 +50,43 @@ def mark_combat_hit(ws: WorldService, weapon_byte: int, victim_id: int) -> None:
         _decrement_ammo_for_weapon(ws, weapon_byte)
 
 
+def mark_pending_ground_shot(ws: WorldService, aim_x: int, aim_y: int, dispatch_ms: int) -> None:
+    """Record a dispatched ground-aimed shot awaiting its 0x53 receipt.
+
+    Called by the executor when a shoot command with ``target_id == 0``
+    (clearance fire at a tile) goes to the wire. The tick loop's
+    ground-shot resolver consumes the mark when the echo arrives and
+    emits the shot's ``fired`` resolution. At most one shot is in
+    flight per tick, so overwriting a stale mark is the correct
+    supersede semantics — the replaced shot's decision already closed
+    through the ledger's dispatched-supersede path.
+
+    Args:
+        ws: World service instance.
+        aim_x: Commanded aim tile X.
+        aim_y: Commanded aim tile Y.
+        dispatch_ms: Wall-clock dispatch timestamp.
+    """
+    ws.pending_ground_shot_aim_x = aim_x
+    ws.pending_ground_shot_aim_y = aim_y
+    ws.pending_ground_shot_dispatch_ms = dispatch_ms
+
+
+def clear_pending_ground_shot(ws: WorldService) -> None:
+    """Drop any pending ground-shot mark.
+
+    Called when a tank-targeted shot dispatches (the combat feedback
+    classifier owns the next echo) and by the resolver once the mark
+    is consumed.
+
+    Args:
+        ws: World service instance.
+    """
+    ws.pending_ground_shot_aim_x = 0
+    ws.pending_ground_shot_aim_y = 0
+    ws.pending_ground_shot_dispatch_ms = 0
+
+
 def check_and_clear_combat_hit(ws: WorldService) -> bool:
     """Check if our most recent shot consumed ammo (= hit), then clear.
 
@@ -275,8 +312,10 @@ __all__ = [
     "check_and_clear_last_shot_victim_id",
     "check_and_clear_our_shot_response",
     "check_and_clear_teleport_landed",
+    "clear_pending_ground_shot",
     "drain_killed_tank_ids",
     "mark_combat_hit",
+    "mark_pending_ground_shot",
     "mark_tank_killed",
     "mark_teleport_landed",
     "peek_combat_hit",

@@ -135,6 +135,7 @@ def test_action_outcome_row_round_trip() -> None:
         event_id=7,
         attempt_id=3,
         duration_ms=850,
+        dispatched=True,
         timestamp="2026-06-07T22:12:33",
     )
 

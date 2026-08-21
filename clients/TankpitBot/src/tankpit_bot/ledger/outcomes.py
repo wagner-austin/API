@@ -87,12 +87,23 @@ ShootOutcome = Literal[
     "hit",
     "superseded",
     "miss",
+    "fired",
     "command_rejected",
 ]
 """Shoot resolutions from the per-shot ammo-consumption ledger
 (consumption = hit, user contract 2026-07-02) plus the 0x52 rejection
 and the executor's target-not-tracked discard (the Phase 0 residue:
-the race guard against the tank vanishing between plan and dispatch)."""
+the race guard against the tank vanishing between plan and dispatch).
+
+``fired`` (2026-08-21) is the ground-aimed shot's resolution: a
+clearance shot targets a tile, not a tank, so hit/miss semantics never
+apply — its own 0x53 echo is the server's receipt that the shot was
+accepted, billed, and fired. Before this label existed, shoot was the
+ONLY action kind with no completion path for a whole class of its
+dispatches: every clearance shot's decision died ``superseded``
+(soak bot-20260821-013519: 13 wire dispatches, 12/12 superseded,
+0 completions), which the liveness counter misread as a livelock —
+the detector's first live catch was a catch of itself."""
 
 ScopeOutcome = Literal[
     "confirmed",
@@ -125,6 +136,7 @@ ActionOutcome = Literal[
     # shoot
     "hit",
     "miss",
+    "fired",
     # scope
     "confirmed",
     # shared
@@ -137,16 +149,24 @@ ActionOutcome = Literal[
 LIVENESS_STALL_STREAK = 12
 """Consecutive zero-dispatch replans of one kind that mean a livelock.
 
-A zero-duration ``superseded`` is a decision the planner replaced
-before anything was dispatched — one replan is normal, a streak means
-the planner keeps deriving an identical plan some downstream veto
-keeps refusing without feedback (the planner/veto gap class,
-[[fleet-coordination]] gatherer livelock). Empirical basis, 459-run
-archive sweep 2026-08-20: the healthy ceiling is 7 (combat re-aiming
-while a shot resolves); the one livelock in the archive ran 93. Set
-above the healthy ceiling with margin, far below the pathology.
-Consumed live (``liveness_stall`` diagnostic at the crossing) and
-post-run (the issue report's streak scan)."""
+A superseded close counts toward the streak ONLY when the closed
+decision's command never reached the wire (the executor marks every
+real dispatch via ``mark_decision_dispatched``) — one undispatched
+replan is normal, a streak means the planner keeps deriving an
+identical plan some downstream veto keeps refusing without feedback
+(the planner/veto gap class, [[fleet-coordination]] gatherer
+livelock). A superseded close of a DISPATCHED decision resets the
+streak instead: the planner's output demonstrably reached the wire,
+so no livelock is in progress (2026-08-21 correction — before the
+dispatch gate, combat re-aims and outcome-less clearance shots
+counted as "zero dispatches" and the counter's first live catch was
+a false positive on 12 dispatched-and-echoed shots). Empirical
+basis, 459-run archive sweep 2026-08-20: the pre-gate healthy
+ceiling was 7 (dispatched combat re-aims, which no longer count);
+the one livelock in the archive ran 93 genuinely undispatched
+replans. Set above the old ceiling with margin, far below the
+pathology. Consumed live (``liveness_stall`` diagnostic at the
+crossing) and post-run (the issue report's streak scan)."""
 
 __all__ = [
     "LIVENESS_STALL_STREAK",

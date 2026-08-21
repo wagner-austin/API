@@ -91,7 +91,7 @@ def test_superseding_decision_closes_the_prior_one(ledger: LedgerService) -> Non
     assert len(records) == 1
     assert records[0]["outcome"] == "superseded"
     assert records[0]["caused_by"] == first_id
-    assert records[0]["detail"] == {"superseded_by": second_id}
+    assert records[0]["detail"] == {"superseded_by": second_id, "dispatched": False}
     assert pending_decision_ids(ledger) == {"move": second_id}
 
 

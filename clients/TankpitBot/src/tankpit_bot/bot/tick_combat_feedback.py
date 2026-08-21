@@ -24,6 +24,7 @@ from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.ledger.damage_book import resolve_dealt
 from tankpit_bot.ledger.outcome.shoot import (
     emit_shoot_command_rejected,
+    emit_shoot_fired,
     emit_shoot_hit,
     emit_shoot_miss,
 )
@@ -44,6 +45,7 @@ from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_command_error,
     check_and_clear_last_shot_victim_id,
     check_and_clear_our_shot_response,
+    clear_pending_ground_shot,
     drain_killed_tank_ids,
     peek_combat_hit,
     peek_command_error,
@@ -119,6 +121,56 @@ def _merge_protocol_kills(ws: WorldService, ai_state: AIStateDict) -> AIStateDic
             "combat_target_y": 0 if target_was_killed else ai_state["combat_target_y"],
         }
     )
+
+
+def _resolve_pending_ground_shot(bot: Bot) -> None:
+    """Resolve a ground-aimed shot's ledger outcome from its receipts.
+
+    A clearance shot targets a tile, not a tank, so the id-keyed combat
+    classifier never sees it — before this resolver every one of its
+    decisions rotted into ``superseded`` (the 2026-08-21 false
+    liveness alarm: 13 wire dispatches, 12/12 superseded). Two
+    receipts can arrive:
+
+    * the own 0x53 echo — the server accepted, billed, and fired the
+      shot: resolve ``fired`` and consume the per-shot flags the echo
+      set, so they cannot leak into the NEXT tank-targeted shot's
+      classification as a stale instant response;
+    * a shot-rejecting 0x52 — no echo will ever come ([[shot-range]]:
+      five code-0 rejections, zero echoes): resolve
+      ``command_rejected``.
+
+    Neither receipt yet: keep waiting; a superseding shot closes the
+    decision through the ledger's dispatched-supersede path, alarm-free.
+
+    Args:
+        bot: Bot instance.
+    """
+    ws = bot.world
+    dispatch_ms = ws.pending_ground_shot_dispatch_ms
+    if dispatch_ms == 0:
+        return
+    aim_x = ws.pending_ground_shot_aim_x
+    aim_y = ws.pending_ground_shot_aim_y
+    duration_ms = get_current_time_ms() - dispatch_ms
+    if peek_command_error(ws) in _SHOT_REJECTING_COMMAND_ERRORS:
+        error_code = check_and_clear_command_error(ws)
+        emit_shoot_command_rejected(
+            ws.ledger,
+            duration_ms=duration_ms,
+            target_id=0,
+            target_name="",
+            error_code=error_code,
+        )
+        clear_pending_ground_shot(ws)
+        return
+    if not check_and_clear_our_shot_response(ws):
+        return
+    check_and_clear_combat_hit(ws)
+    check_and_clear_last_shot_victim_id(ws)
+    ws.pending_shot_inventory_snapshot = None
+    emit_shoot_fired(ws.ledger, duration_ms=duration_ms, aim_x=aim_x, aim_y=aim_y)
+    clear_pending_ground_shot(ws)
 
 
 def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:

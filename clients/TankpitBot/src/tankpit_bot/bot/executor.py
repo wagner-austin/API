@@ -13,15 +13,20 @@ from tankpit_bot.bot.types import (
     BotCommand,
     PickupEquipmentCommandDict,
     PickupFuelCommandDict,
+    ShootCommandDict,
     TeleportCommandDict,
 )
+from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.browser.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.inventory import inventory_counts
 from tankpit_bot.ledger.ammo_book import record_ammo_scan
 from tankpit_bot.ledger.decision import record_decision
 from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
 from tankpit_bot.ledger.fuel_book import record_fuel_entry
-from tankpit_bot.ledger.outcome._emit import transfer_pending_decision
+from tankpit_bot.ledger.outcome._emit import (
+    mark_decision_dispatched,
+    transfer_pending_decision,
+)
 from tankpit_bot.ledger.outcome.teleport import (
     record_teleport_dispatch,
 )
@@ -37,6 +42,10 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
 )
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.sniffer.world_state_combat import (
+    clear_pending_ground_shot,
+    mark_pending_ground_shot,
+)
 from tankpit_bot.state.types.coord import coord_key
 
 # Combat equipment slots that get toggled based on behavior mode.
@@ -208,6 +217,42 @@ def _dispatch_tracked_target_command(bot: BotProtocol, command: BotCommand) -> b
     raise ValueError(f"Not a tracked-target command: {command['cmd_type']}")
 
 
+def _dispatch_shoot_command(bot: BotProtocol, command: ShootCommandDict) -> bool:
+    """Send a shoot command and stage its resolution bookkeeping.
+
+    Records the combat target so the 0x53 dispatcher can attribute the
+    seeker's resolved tile to the right tank when refreshing
+    off-viewport positions from homing/missile tracking, and snapshots
+    the inventory so combat_feedback can confirm hits via ammo delta
+    when the wire's ``victim_id`` lookup misses (off-viewport target).
+
+    A GROUND-AIMED shot (``target_id == 0``, clearance fire at a tile)
+    additionally marks the pending ground shot: it has no tank target
+    for the combat classifier to resolve, so its own 0x53 echo is its
+    receipt, consumed by the tick loop's ground-shot resolver into
+    ``shoot:fired``. A tank-targeted shot instead clears any stale
+    ground mark — it owns the next echo.
+
+    Args:
+        bot: Bot instance for sending commands.
+        command: The shoot command.
+
+    Returns:
+        True if the command was dispatched.
+    """
+    ws = bot.world
+    ws.last_shot_combat_target_id = command["target_id"]
+    ws.pending_shot_inventory_snapshot = ws.inventory_state
+    dispatched_shot = bot.shoot_at(command["target_x"], command["target_y"], command["target_id"])
+    if dispatched_shot and command["target_id"] == 0:
+        mark_pending_ground_shot(
+            ws, command["target_x"], command["target_y"], get_current_time_ms()
+        )
+    elif dispatched_shot:
+        clear_pending_ground_shot(ws)
+    return dispatched_shot
+
+
 def dispatch_command(
     bot: BotProtocol,
     command: BotCommand,
@@ -255,16 +300,7 @@ def dispatch_command(
     ):
         return _dispatch_tracked_target_command(bot, command)
     if command["cmd_type"] == "shoot":
-        # Record the combat target so the 0x53 dispatcher can attribute
-        # the seeker's resolved tile to the right tank when refreshing
-        # off-viewport positions from homing/missile tracking. Snapshot
-        # the inventory so combat_feedback can confirm hits via ammo
-        # delta when the wire's victim_id lookup misses (off-viewport
-        # target).
-        ws = bot.world
-        ws.last_shot_combat_target_id = command["target_id"]
-        ws.pending_shot_inventory_snapshot = ws.inventory_state
-        return bot.shoot_at(command["target_x"], command["target_y"], command["target_id"])
+        return _dispatch_shoot_command(bot, command)
     if command["cmd_type"] == "radar":
         dispatched_radar = bot.use_radar()
         if dispatched_radar:
@@ -435,8 +471,9 @@ def execute(
     )
 
     ledger_kind = _LEDGER_KIND_BY_CMD_TYPE.get(command["cmd_type"])
+    decision_event_id = 0
     if ledger_kind is not None:
-        record_decision(
+        decision_event_id = record_decision(
             bot.world.ledger,
             action_kind=ledger_kind,
             cmd_type=command["cmd_type"],
@@ -449,6 +486,15 @@ def execute(
             target_id=behavior["target_id"],
         )
     primary_sent = dispatch_command(bot, command, snapshot)
+    if primary_sent and decision_event_id != 0:
+        # The zero-dispatch streak counter's ground truth: a decision
+        # so marked reached the wire, so a later superseded close of
+        # it is a re-aim, never a livelock symptom. Marked by event id
+        # so a deferred teleport's map_open dispatch credits the
+        # ORIGINAL teleport decision across the pending transfer.
+        # Suppressed dispatches return False and stay unmarked — they
+        # are exactly what the streak exists to count.
+        mark_decision_dispatched(bot.world.ledger, decision_event_id)
     if primary_sent and decision["secondary_command"] is not None:
         secondary = decision["secondary_command"]
         emit_ai("secondary cmd=%s", secondary["cmd_type"])

@@ -109,6 +109,7 @@ def boot_seam(
     enemy_counts: tuple[int, int, int, int, int] = (0, 0, 0, 0, 0),
     ferries: tuple[tuple[int, int], ...] = (),
     blocks: tuple[tuple[int, int], ...] = (),
+    enemy_alive: bool = True,
 ) -> tuple[Bot, SimServer, SimCDPSession, bytes]:
     """Build a real Bot wired to a fresh sim world over the seam.
 
@@ -125,6 +126,10 @@ def boot_seam(
             soaks driven by ``sim.opponent``).
         ferries: Ferry seeding as (x, y) pairs (water tiles).
         blocks: Resting movable-block seeding as (x, y) pairs.
+        enemy_alive: False boots an enemy-free room (the handshake
+            announces only living tanks) — for collect-only scenarios
+            where any combat lane would hijack the behavior under
+            test.
 
     Returns:
         The bot, the sim server, the sim CDP link, and the XOR table,
@@ -140,6 +145,7 @@ def boot_seam(
     world["tanks"][SEAM_CLIENT_ID]["counts"] = list(counts)
     world["tanks"][SEAM_ENEMY_ID] = make_sim_tank(SEAM_ENEMY_ID, 1, 8, 110, 100, enemy_fuel)
     world["tanks"][SEAM_ENEMY_ID]["counts"] = list(enemy_counts)
+    world["tanks"][SEAM_ENEMY_ID]["alive"] = enemy_alive
     for x, y, volume in containers:
         world["containers"].append(SimContainerDict(x=x, y=y, volume=volume, dotted=True))
     for x, y in equipment:

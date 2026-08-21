@@ -90,6 +90,12 @@ class ActionOutcomeRowDict(TypedDict):
         duration_ms: Wall-clock milliseconds between dispatch and the
             resolution (0 for pre-dispatch executor discards, -1 when
             the gate fired with no recorded dispatch time).
+        dispatched: Whether the decision's command reached the wire.
+            True by definition for every genuine resolution (the wire
+            answered, so something was sent); for ``superseded`` rows
+            it is the executor's dispatch mark — False on artifacts
+            predating the mark (2026-08-21), where a dispatched
+            supersede is indistinguishable from a vetoed one.
         timestamp: ISO timestamp from the event record.
     """
 
@@ -98,6 +104,7 @@ class ActionOutcomeRowDict(TypedDict):
     event_id: int
     attempt_id: int
     duration_ms: int
+    dispatched: bool
     timestamp: str
 
 
@@ -484,6 +491,14 @@ class IssueReportDict(TypedDict):
             tallies, highest count first -- bounced landings that
             resolve as successes and therefore hide from every
             failure counter.
+        wire_dispatches_by_kind: Count of ``WIRE`` command sends per
+            LEDGER action kind (the wire event's ``action_kind`` field
+            mapped through the command-to-kind table). The completion
+            audit compares this against recorded completions: a kind
+            that dispatches but never completes is a ledger modeling
+            gap, and every outcome-derived rule is blind to it
+            (2026-08-21: shoot ran 13 dispatches / 0 completions and
+            the liveness scan read the silence as a livelock).
         scorecard: Per-run outcome scorecard (time budget, combat,
             fuel trajectory, equipment-approach ledger).
     """
@@ -504,6 +519,7 @@ class IssueReportDict(TypedDict):
     map_open_completions: int
     suppressed_dispatches: list[SuppressedDispatchRecordDict]
     displaced_teleports: list[DisplacedTeleportRecordDict]
+    wire_dispatches_by_kind: dict[str, int]
     scorecard: SessionScorecardDict
 
 

@@ -343,7 +343,7 @@ def test_scorecard_issue_combat_futility(fake_fs: FakeFileSystem) -> None:
     assert report["scorecard"]["shots"] == 20
     assert report["scorecard"]["kills"] == 0
     assert "combat futility" in rendered
-    assert "20 shots produced 0 observed kills" in rendered
+    assert "20 tank-targeted shots produced 0 observed kills" in rendered
 
 
 def test_suppressed_dispatch_streak_is_a_top_level_issue(fake_fs: FakeFileSystem) -> None:

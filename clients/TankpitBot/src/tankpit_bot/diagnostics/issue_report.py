@@ -65,6 +65,23 @@ log = get_logger(__name__)
 
 _LANDED_STATUSES: frozenset[str] = frozenset({"landed_exact", "landed_inexact"})
 
+# WIRE command names (the prefix ``command_sender`` stamps as the wire
+# event's ``action_kind``) -> the ledger kind that must eventually record
+# the completion. Mirrors the executor's ``_LEDGER_KIND_BY_CMD_TYPE``
+# with the wire-side spellings (``scope`` for ``scope_shift``). Names
+# absent here (``chat``, ``enter_game``, ``equipment``, ...) are
+# fire-and-forget or non-decision sends with no ledger contract.
+_WIRE_NAME_TO_LEDGER_KIND: dict[str, str] = {
+    "move": "move",
+    "pickup_fuel": "collect",
+    "pickup_equipment": "collect",
+    "teleport": "teleport",
+    "shoot": "shoot",
+    "radar": "scan",
+    "scope": "scope",
+    "map_open": "map_open",
+}
+
 
 def _require_bool_field(
     fields: dict[str, str | int | float | bool],
@@ -184,12 +201,19 @@ def _classify_action_outcome(record: RuntimeEventRecordDict) -> ActionOutcomeRow
         Strict-typed action outcome row.
     """
     fields = record["fields"]
+    outcome = require_str_field(fields, "outcome")
+    # Every genuine resolution proves a dispatch (the wire answered);
+    # only ``superseded`` rows need the executor's explicit mark, and
+    # artifacts predating the mark (2026-08-21) read False there --
+    # the honest value: whether those closes dispatched is unknowable.
+    dispatched = outcome != "superseded" or fields.get("dispatched") is True
     return ActionOutcomeRowDict(
         action_kind=require_str_field(fields, "action_kind"),
-        outcome=require_str_field(fields, "outcome"),
+        outcome=outcome,
         event_id=require_int_field(fields, "event_id"),
         attempt_id=require_int_field(fields, "attempt_id"),
         duration_ms=require_int_field(fields, "duration_ms"),
+        dispatched=dispatched,
         timestamp=record["timestamp"],
     )
 
@@ -224,6 +248,10 @@ class _ReportAccumulatorDict(TypedDict):
         displacement_tallies: Per ``(x, y)`` requested-destination
             counts of ``teleport_displacement`` events, with the
             largest Manhattan bounce seen for the key.
+        wire_dispatch_tallies: Per-LEDGER-KIND counts of ``WIRE``
+            command sends (wire ``action_kind`` mapped through
+            ``_WIRE_NAME_TO_LEDGER_KIND``) — the completion audit's
+            dispatch side.
         scorecard: Nested scorecard accumulator. Populated by
             :func:`route_scorecard_record` for every event.
     """
@@ -237,6 +265,7 @@ class _ReportAccumulatorDict(TypedDict):
     map_open_dispatches: int
     suppressed_tallies: dict[tuple[str, int, int], tuple[int, int]]
     displacement_tallies: dict[tuple[int, int], tuple[int, int]]
+    wire_dispatch_tallies: dict[str, int]
     scorecard: ScorecardAccumulatorDict
 
 
@@ -252,6 +281,7 @@ def _new_accumulator() -> _ReportAccumulatorDict:
         map_open_dispatches=0,
         suppressed_tallies={},
         displacement_tallies={},
+        wire_dispatch_tallies={},
         scorecard=new_scorecard_accumulator(),
     )
 
@@ -324,6 +354,12 @@ def _route_record(
     if channel == "WIRE":
         if record["message"].startswith("map_open"):
             accumulator["map_open_dispatches"] += 1
+        wire_name = record["fields"].get("action_kind")
+        if isinstance(wire_name, str):
+            ledger_kind = _WIRE_NAME_TO_LEDGER_KIND.get(wire_name)
+            if ledger_kind is not None:
+                tallies = accumulator["wire_dispatch_tallies"]
+                tallies[ledger_kind] = tallies.get(ledger_kind, 0) + 1
     elif channel == "DIAGNOSTIC":
         _classify_diagnostic_record(record, accumulator)
     route_scorecard_record(record, accumulator["scorecard"])
@@ -452,6 +488,7 @@ def build_issue_report(source_path: Path) -> IssueReportDict:
         map_open_completions=map_open_completions,
         suppressed_dispatches=suppressed_dispatches,
         displaced_teleports=displaced_teleports,
+        wire_dispatches_by_kind=dict(accumulator["wire_dispatch_tallies"]),
         scorecard=build_session_scorecard(accumulator["scorecard"]),
     )
 

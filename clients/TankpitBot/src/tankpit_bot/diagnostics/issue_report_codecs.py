@@ -83,6 +83,7 @@ def encode_issue_report(report: IssueReportDict) -> JSONObject:
         "displaced_teleports": [
             encode_displaced_teleport_record(r) for r in report["displaced_teleports"]
         ],
+        "wire_dispatches_by_kind": dict(report["wire_dispatches_by_kind"]),
         "scorecard": encode_session_scorecard(report["scorecard"]),
     }
 
@@ -133,8 +134,23 @@ def decode_issue_report(data: JSONObject) -> IssueReportDict:
             decode_displaced_teleport_record(item)
             for item in _require_object_list(data, "displaced_teleports")
         ],
+        wire_dispatches_by_kind=_decode_wire_dispatches(
+            _require_object(data, "wire_dispatches_by_kind")
+        ),
         scorecard=decode_session_scorecard(_require_object(data, "scorecard")),
     )
+
+
+def _decode_wire_dispatches(data: JSONObject) -> dict[str, int]:
+    """Decode the per-kind wire dispatch tally map.
+
+    Args:
+        data: JSON object mapping ledger kind to dispatch count.
+
+    Returns:
+        Validated kind-to-count mapping.
+    """
+    return {kind: require_int(data, kind) for kind in data}
 
 
 __all__ = [

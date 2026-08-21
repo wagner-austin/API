@@ -676,7 +676,12 @@ so the shapes had to live somewhere neither imports.[^guard]
       "id": "outcomes-liveness-stall-streak",
       "code": "tankpit_bot.ledger.outcomes:LIVENESS_STALL_STREAK",
       "value": 12,
-      "means": "consecutive zero-dispatch replans of one kind that mean a livelock - empirical: 459-run archive sweep 2026-08-20 measured a healthy ceiling of 7 (combat re-aiming) and one livelock at 93 (the gatherer full-inventory wedge)"
+      "means": "consecutive UNDISPATCHED replans of one kind that mean a livelock - since 2026-08-21 the counter is dispatch-gated (a superseded close of a decision whose command reached the wire RESETS the streak; the ungated counter's first live catch was a false positive on 12 dispatched-and-echoed clearance shots). Empirical: 459-run archive sweep 2026-08-20 measured a pre-gate healthy ceiling of 7 (dispatched combat re-aims, which no longer count) and one livelock at 93 genuinely undispatched replans (the gatherer full-inventory wedge)"
+    },
+    {
+      "id": "outcome-shoot-emit-fired",
+      "code": "tankpit_bot.ledger.outcome.shoot:emit_shoot_fired",
+      "law": "Record a ground-aimed shot whose own 0x53 echo arrived - the echo is the server's receipt (accepted, billed, fired; weapon byte, never hit/miss), and it is a tile-aimed clearance shot's final resolution. Before it existed, shoot was the only action kind with no completion path for ground aims: 13 wire dispatches / 12 superseded / 0 completions in soak bot-20260821-013519."
     },
     {
       "id": "records-actionoutcomerecorddict",

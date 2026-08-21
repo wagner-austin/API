@@ -132,6 +132,19 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # not see purple-9 off-viewport). ``None`` when no shoot is
         # pending or the delta has already been consumed.
         self.pending_shot_inventory_snapshot: InventoryState | None = None
+        # The in-flight GROUND-AIMED shot (clearance fire at a tile,
+        # ``target_id == 0``), or dispatch_ms == 0 when none. Ground
+        # shots have no tank target, so the combat feedback classifier
+        # never resolves them — their own 0x53 echo is their receipt
+        # (accepted, billed, fired) and their final ledger resolution
+        # (``shoot:fired``). Before this existed, shoot was the one
+        # action kind whose clearance dispatches ALL closed
+        # ``superseded`` (2026-08-21 false liveness alarm). Written at
+        # the executor's shoot dispatch, consumed by the tick loop's
+        # ground-shot resolver.
+        self.pending_ground_shot_aim_x: int = 0
+        self.pending_ground_shot_aim_y: int = 0
+        self.pending_ground_shot_dispatch_ms: int = 0
         # Undrained 0x41 deactivations, victim -> killer. The killer id
         # travels with the victim because the two consumers diverge:
         # the dead-tank registry takes every victim, but the session

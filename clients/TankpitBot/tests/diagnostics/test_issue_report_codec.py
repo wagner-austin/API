@@ -80,6 +80,7 @@ def test_issue_report_round_trip_with_session_room_present() -> None:
                 event_id=7,
                 attempt_id=3,
                 duration_ms=850,
+                dispatched=True,
                 timestamp="2026-06-07T22:12:33",
             )
         ],
@@ -106,6 +107,7 @@ def test_issue_report_round_trip_with_session_room_present() -> None:
                 max_displacement=15,
             )
         ],
+        wire_dispatches_by_kind={"map_open": 1, "teleport": 1},
         scorecard=SessionScorecardDict(
             duration_seconds=0,
             state_budget=[],
@@ -178,6 +180,7 @@ def test_issue_report_round_trip_with_no_session_room() -> None:
         map_open_completions=0,
         suppressed_dispatches=[],
         displaced_teleports=[],
+        wire_dispatches_by_kind={},
         scorecard=SessionScorecardDict(
             duration_seconds=0,
             state_budget=[],
@@ -273,6 +276,7 @@ def test_decode_issue_report_treats_absent_session_room_as_none() -> None:
         "map_open_completions": 0,
         "suppressed_dispatches": [],
         "displaced_teleports": [],
+        "wire_dispatches_by_kind": {},
         "scorecard": encode_session_scorecard(
             SessionScorecardDict(
                 duration_seconds=0,

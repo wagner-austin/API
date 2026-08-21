@@ -24,6 +24,7 @@ from tankpit_bot.bot.tick_combat_feedback import (
     _get_combat_feedback,
     _has_pending_shot_feedback,
     _merge_protocol_kills,
+    _resolve_pending_ground_shot,
 )
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import _test_hooks as browser_hooks
@@ -143,7 +144,11 @@ def _tick_once(bot: Bot) -> None:
 
     world = bot.get_world_state()
 
-    # 5. Combat feedback (counters incremented inside _get_combat_feedback)
+    # 5. Combat feedback (counters incremented inside _get_combat_feedback).
+    # Ground-aimed shots resolve first: their echo receipt is not
+    # combat feedback and must not linger as stale flags for the
+    # id-keyed classifier below.
+    _resolve_pending_ground_shot(bot)
     combat_feedback = _get_combat_feedback(bot)
 
     # 6. DECIDE
