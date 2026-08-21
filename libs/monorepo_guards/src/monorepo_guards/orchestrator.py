@@ -20,6 +20,7 @@ from monorepo_guards.httpx_rules import HttpxRule
 from monorepo_guards.imports_rules import ImportsRule
 from monorepo_guards.json_rules import JsonRule
 from monorepo_guards.logging_rules import LoggingRule
+from monorepo_guards.ml_test_quality_rules import MLTestQualityRule
 from monorepo_guards.mock_rules import MockBanRule
 from monorepo_guards.monkey_patch_rules import MonkeyPatchBanRule
 from monorepo_guards.pattern_rules import PatternRule
@@ -36,7 +37,7 @@ from monorepo_guards.rust_rules import (
 from monorepo_guards.security_rules import SecurityRule
 from monorepo_guards.standardization_rules import StandardizationRule
 from monorepo_guards.suppress_rules import SuppressRule
-from monorepo_guards.test_quality_rules import MLTestQualityRule, WeakAssertionRule
+from monorepo_guards.test_quality_rules import WeakAssertionRule
 from monorepo_guards.tests_rules import PolicyTestsRule
 from monorepo_guards.typing_rules import TypingRule
 from monorepo_guards.util import iter_py_files
