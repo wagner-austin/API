@@ -12,7 +12,7 @@ from torch.optim.optimizer import Optimizer as TorchOptimizer
 from torch.utils.data import DataLoader, Dataset
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import BatchLoaderProtocol
+from handwriting_ai._hook_protocols_training import BatchLoaderProtocol
 from handwriting_ai.training import mnist_train as mt
 from handwriting_ai.training.dataset import PreprocessDataset
 from handwriting_ai.training.mnist_train import (

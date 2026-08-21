@@ -6,7 +6,8 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.testing import make_fake_env
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import MemoryGuardConfigDict, ResourceLimitsDict
+from handwriting_ai._hook_protocols_ml import ResourceLimitsDict
+from handwriting_ai._hook_protocols_training import MemoryGuardConfigDict
 from handwriting_ai.jobs import digits
 
 
@@ -47,7 +48,8 @@ def test_decode_payload_rejects_invalid_types() -> None:
 
 
 def test_build_config_event_includes_limits() -> None:
-    from platform_core.digits_metrics_events import DigitsConfigV1, is_config
+    from platform_core.digits_metrics_decode import is_config
+    from platform_core.digits_metrics_events import DigitsConfigV1
 
     def _fake_limits() -> ResourceLimitsDict:
         return {

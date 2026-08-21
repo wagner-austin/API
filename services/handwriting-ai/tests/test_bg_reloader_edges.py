@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import ThreadProtocol
+from handwriting_ai._hook_protocols_system import ThreadProtocol
 from handwriting_ai.api.main import (
     _debug_invoke_reloader_start,
     _debug_invoke_reloader_stop,

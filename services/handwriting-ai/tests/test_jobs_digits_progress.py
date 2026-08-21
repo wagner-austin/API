@@ -12,7 +12,7 @@ from platform_workers.testing import FakeRedis, FakeRedisPublishError
 import handwriting_ai.jobs.digits as dj
 import handwriting_ai.training.mnist_train as mt
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import ResourceLimitsDict
+from handwriting_ai._hook_protocols_ml import ResourceLimitsDict
 from handwriting_ai.training.train_config import (
     TrainConfig,
     TrainingResult,

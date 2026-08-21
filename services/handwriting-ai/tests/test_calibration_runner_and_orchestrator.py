@@ -9,7 +9,8 @@ from pathlib import Path
 from PIL import Image
 from platform_core.logging import get_logger
 
-from handwriting_ai._test_hooks import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_training import CalibrationRunnerResultDict
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
@@ -268,9 +269,6 @@ def test_child_entry_flush_handles_handlers_without_flush(tmp_path: Path) -> Non
     from multiprocessing import Queue
 
     from handwriting_ai import _test_hooks
-    from handwriting_ai._test_hooks import (
-        CalibrationRunnerResultDict,
-    )
     from handwriting_ai.training.calibration.candidates import Candidate
     from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
     from handwriting_ai.training.calibration.runner import _child_entry

@@ -11,6 +11,8 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_training import BatchIterableProtocol, DataLoaderConfigProtocol
 from handwriting_ai.monitoring import is_cgroup_available
 from handwriting_ai.training.calibration._types import CalibrationResultDict
 from handwriting_ai.training.calibration.candidates import Candidate
@@ -197,7 +199,7 @@ def _expand_upper_bound_if_headroom(
 
 def _search_best_batch_size(
     *,
-    ds: _test_hooks.PreprocessDatasetProtocol,
+    ds: PreprocessDatasetProtocol,
     cand: Candidate,
     samples: int,
     device: torch.device,
@@ -216,7 +218,7 @@ def _search_best_batch_size(
 
     while bs_lo <= bs_hi:
         mid = (bs_lo + bs_hi) // 2
-        loader: _test_hooks.BatchIterableProtocol | None = None
+        loader: BatchIterableProtocol | None = None
         try:
             mid = min(mid, int(ds_len))
             cfg_try = DataLoaderConfig(
@@ -365,8 +367,8 @@ def _resolve_worker_context(
 
 
 def _safe_loader(
-    ds: _test_hooks.PreprocessDatasetProtocol,
-    cfg: _test_hooks.DataLoaderConfigProtocol,
+    ds: PreprocessDatasetProtocol,
+    cfg: DataLoaderConfigProtocol,
 ) -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
     ctx_method = _resolve_worker_context(int(cfg["num_workers"]))
     # Import PreprocessDataset here to check type at runtime
@@ -386,7 +388,7 @@ def _safe_loader(
     )
 
 
-def _shutdown_loader(loader: _test_hooks.BatchIterableProtocol) -> None:
+def _shutdown_loader(loader: BatchIterableProtocol) -> None:
     """Forcefully shut down DataLoader workers to prevent lingering processes.
 
     This function handles both real DataLoader objects (which have _iterator)
@@ -528,7 +530,7 @@ def _measure_candidate(
 
 
 def _measure_candidate_internal(
-    ds: _test_hooks.PreprocessDatasetProtocol,
+    ds: PreprocessDatasetProtocol,
     cand: Candidate,
     samples: int,
     on_improvement: Callable[[CalibrationResult], None] | None,

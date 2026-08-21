@@ -6,11 +6,8 @@ from torch.nn import Module as TorchModule
 from torch.optim.optimizer import Optimizer as TorchOptimizer
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import (
-    BatchIterableProtocol,
-    DataLoaderConfigProtocol,
-    PreprocessDatasetProtocol,
-)
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_training import BatchIterableProtocol, DataLoaderConfigProtocol
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.measure import _measure_candidate
 from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset

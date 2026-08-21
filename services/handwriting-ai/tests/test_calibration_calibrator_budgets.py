@@ -5,11 +5,11 @@ from pathlib import Path
 from PIL import Image
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import (
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_training import (
     CandidateRunnerProtocol,
     MemorySnapshotDict,
     OrchestratorProtocol,
-    PreprocessDatasetProtocol,
 )
 from handwriting_ai.training.calibration._types import (
     CalibrationResultDict,

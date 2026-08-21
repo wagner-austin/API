@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import handwriting_ai.training.safety as safety
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import (
+from handwriting_ai._hook_protocols_training import (
     CgroupMemoryBreakdownDict,
     CgroupMemoryUsageDict,
     MemorySnapshotDict,

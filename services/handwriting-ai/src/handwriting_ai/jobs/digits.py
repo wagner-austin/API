@@ -25,6 +25,7 @@ from platform_workers.redis import RedisStrProto
 from platform_workers.rq_harness import get_current_job
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols_training import TrainingProgressModuleProtocol
 from handwriting_ai.config import Settings
 from handwriting_ai.training.dataset import load_mnist_dataset
 from handwriting_ai.training.metrics import BatchMetrics
@@ -278,7 +279,7 @@ def _decode_and_process_train_job(payload: dict[str, JSONValue]) -> None:
     redis_client: RedisStrProto = _test_hooks.redis_factory(redis_url)
 
     job_ctx: JobContext | None = None
-    training_progress_module: _test_hooks.TrainingProgressModuleProtocol | None = None
+    training_progress_module: TrainingProgressModuleProtocol | None = None
     try:
         job_ctx = _test_hooks.make_job_context(
             redis=redis_client,

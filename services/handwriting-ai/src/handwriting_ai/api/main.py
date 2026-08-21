@@ -10,6 +10,8 @@ from platform_core.logging import get_logger, setup_logging
 from platform_core.request_context import install_request_id_middleware
 from platform_core.security import ApiKeyCheckFn, create_api_key_dependency
 
+from handwriting_ai._hook_protocols_system import EventProtocol, ThreadProtocol
+
 from .. import _test_hooks
 from ..config import Limits, Settings, ensure_settings, limits_from_settings, load_settings
 from ..inference.engine import InferenceEngine
@@ -30,8 +32,8 @@ def _setup_optional_reloader(
     if reload_interval_seconds is None or float(reload_interval_seconds) <= 0.0:
         return
 
-    stop_evt: _test_hooks.EventProtocol | None = None
-    thread: _test_hooks.ThreadProtocol | None = None
+    stop_evt: EventProtocol | None = None
+    thread: ThreadProtocol | None = None
 
     def _start_bg_reloader() -> None:
         nonlocal stop_evt, thread

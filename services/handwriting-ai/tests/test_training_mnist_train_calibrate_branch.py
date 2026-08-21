@@ -11,11 +11,8 @@ from torch.optim.optimizer import Optimizer as TorchOptimizer
 from torch.utils.data import Dataset
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import (
-    BatchLoaderProtocol,
-    EffectiveConfigDict,
-    ResourceLimitsDict,
-)
+from handwriting_ai._hook_protocols_ml import ResourceLimitsDict
+from handwriting_ai._hook_protocols_training import BatchLoaderProtocol, EffectiveConfigDict
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
 from handwriting_ai.training.dataset import DataLoaderConfig
 from handwriting_ai.training.mnist_train import train_with_config

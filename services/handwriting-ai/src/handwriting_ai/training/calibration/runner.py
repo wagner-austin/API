@@ -19,6 +19,8 @@ from platform_core.logging import (
 from torch.utils.data import Dataset as _TorchDataset
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_training import MultiprocessingProcessProtocol
 from handwriting_ai.training.calibration._types import (
     BudgetConfigDict,
     CandidateErrorDict,
@@ -54,7 +56,7 @@ BudgetConfig = BudgetConfigDict
 class CandidateRunner(Protocol):
     def run(
         self,
-        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
         cand: Candidate,
         samples: int,
         budget: BudgetConfig,
@@ -202,7 +204,7 @@ class SubprocessRunner:
 
     def run(
         self,
-        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
         cand: Candidate,
         samples: int,
         budget: BudgetConfig,
@@ -256,7 +258,7 @@ class SubprocessRunner:
 
     def _wait_for_outcome(
         self,
-        proc: _test_hooks.MultiprocessingProcessProtocol,
+        proc: MultiprocessingProcessProtocol,
         out_path: str,
         start: float,
         timeout_s: float,
@@ -464,7 +466,7 @@ def _rebuild_mnist_raw_dataset(root: Path, train: bool) -> _MNISTRawDataset:
     return _MNISTRawDataset(imgs, labels, root=root, train=train)
 
 
-def _to_spec(ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec) -> PreprocessSpec:
+def _to_spec(ds: PreprocessDatasetProtocol | PreprocessSpec) -> PreprocessSpec:
     if isinstance(ds, dict):
         return ds
     k = ds.knobs

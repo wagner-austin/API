@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from platform_core.logging import get_logger
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai.training.calibration._types import OrchestratorConfigDict
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.checkpoint import (
@@ -75,7 +76,7 @@ class Orchestrator:
     def _run_stage(
         self,
         stage: CalibrationStage,
-        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
         items: Sequence[Candidate],
         samples: int,
         budget: BudgetConfig,
@@ -185,7 +186,7 @@ class Orchestrator:
 
     def run_stage_a(
         self,
-        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
         cands: list[Candidate],
         samples: int,
     ) -> list[CalibrationResult]:
@@ -208,7 +209,7 @@ class Orchestrator:
 
     def run_stage_b(
         self,
-        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
         shortlist: list[CalibrationResult],
         samples: int,
     ) -> list[CalibrationResult]:

@@ -14,25 +14,33 @@ import torch
 from platform_workers.rq_harness import WorkerConfig
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_defaults import _default_artifact_store_factory, _default_run_worker
+from handwriting_ai._hook_defaults_ml import _default_principal_angle
+from handwriting_ai._hook_defaults_system import _default_event_factory, _default_thread_factory
+from handwriting_ai._hook_defaults_training import (
+    _default_mp_get_all_start_methods,
+    _default_mp_get_context,
+)
+from handwriting_ai._hook_protocols_ml import InferenceTorchModelProtocol, LoadStateResultProtocol
 
 
 def test_default_mp_get_all_start_methods_returns_spawn() -> None:
     """Test _default_mp_get_all_start_methods returns a list containing 'spawn'."""
-    methods = _test_hooks._default_mp_get_all_start_methods()
+    methods = _default_mp_get_all_start_methods()
     # 'spawn' is available on all platforms (Windows, macOS, Linux)
     assert "spawn" in methods
 
 
 def test_default_mp_get_context_returns_context_with_method() -> None:
     """Test _default_mp_get_context returns a context with spawn method."""
-    ctx = _test_hooks._default_mp_get_context("spawn")
+    ctx = _default_mp_get_context("spawn")
     # The wrapper should have method = spawn (or the requested method)
     assert ctx.method == "spawn"
 
 
 def test_default_mp_get_context_with_none_method() -> None:
     """Test _default_mp_get_context with None method returns default context."""
-    ctx = _test_hooks._default_mp_get_context(None)
+    ctx = _default_mp_get_context(None)
     # Method should be None for default context
     assert ctx.method is None or ctx.method == "spawn" or ctx.method == "fork"
 
@@ -44,7 +52,7 @@ def test_default_thread_factory_creates_working_thread() -> None:
     def target() -> None:
         executed["flag"] = True
 
-    thread = _test_hooks._default_thread_factory(target=target, daemon=True, name="test-thread")
+    thread = _default_thread_factory(target=target, daemon=True, name="test-thread")
     thread.start()
     thread.join(timeout=1.0)
     # Verify the thread actually ran its target function
@@ -53,7 +61,7 @@ def test_default_thread_factory_creates_working_thread() -> None:
 
 def test_default_event_factory_creates_working_event() -> None:
     """Test _default_event_factory creates an event with set/wait behavior."""
-    event = _test_hooks._default_event_factory()
+    event = _default_event_factory()
     # Event should start unset
     assert event.is_set() is False
     event.set()
@@ -75,7 +83,7 @@ def test_default_principal_angle_with_diagonal_returns_float() -> None:
     for i in range(10):
         pix[i, i] = 0
 
-    result = _test_hooks._default_principal_angle(img, 10, 10)
+    result = _default_principal_angle(img, 10, 10)
     # For a diagonal line, result should be a float around 45 degrees (or ~0.78 radians)
     # We verify it's a specific value rather than just existence
     assert result is None or (-90.0 <= result <= 90.0)
@@ -103,7 +111,7 @@ def test_default_run_worker_calls_runner() -> None:
 
     logger = FakeLogger()
 
-    _test_hooks._default_run_worker(config, logger, fake_runner)
+    _default_run_worker(config, logger, fake_runner)
     # Verify runner was called exactly once with the correct config
     assert len(calls) == 1
     assert calls[0]["redis_url"] == config["redis_url"]
@@ -182,7 +190,7 @@ class _FakeModelNonStringKey:
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
-    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> _test_hooks.LoadStateResultProtocol:
+    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> LoadStateResultProtocol:
         _ = sd
 
         class _Res:
@@ -213,7 +221,7 @@ class _FakeModelNonTensorValue:
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
-    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> _test_hooks.LoadStateResultProtocol:
+    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> LoadStateResultProtocol:
         _ = sd
 
         class _Res:
@@ -241,7 +249,7 @@ def test_engine_state_dict_non_string_key_raises() -> None:
 
     original_build = _test_hooks.build_model
 
-    def _fake_build(arch: str, n_classes: int) -> _test_hooks.InferenceTorchModelProtocol:
+    def _fake_build(arch: str, n_classes: int) -> InferenceTorchModelProtocol:
         _ = (arch, n_classes)
         return _FakeModelNonStringKey()
 
@@ -259,7 +267,7 @@ def test_engine_state_dict_non_tensor_value_raises() -> None:
 
     original_build = _test_hooks.build_model
 
-    def _fake_build(arch: str, n_classes: int) -> _test_hooks.InferenceTorchModelProtocol:
+    def _fake_build(arch: str, n_classes: int) -> InferenceTorchModelProtocol:
         _ = (arch, n_classes)
         return _FakeModelNonTensorValue()
 
@@ -283,7 +291,7 @@ class _StateDictInterceptorBadKey:
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
-    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> _test_hooks.LoadStateResultProtocol:
+    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> LoadStateResultProtocol:
         _ = sd
 
         class _Res:
@@ -313,7 +321,7 @@ class _StateDictInterceptorBadValue:
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
-    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> _test_hooks.LoadStateResultProtocol:
+    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> LoadStateResultProtocol:
         _ = sd
 
         class _Res:
@@ -410,7 +418,7 @@ def test_default_artifact_store_factory_creates_store() -> None:
     """Test _default_artifact_store_factory creates a valid ArtifactStore."""
     # Call the factory with dummy credentials - it just constructs objects
     # without making network calls until methods are actually invoked
-    store = _test_hooks._default_artifact_store_factory(
+    store = _default_artifact_store_factory(
         api_url="http://localhost:8000",
         api_key="test-api-key",
     )

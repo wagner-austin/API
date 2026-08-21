@@ -10,11 +10,8 @@ from platform_core.json_utils import JSONTypeError
 
 import handwriting_ai.training.calibrate as cal
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import (
-    BatchIterableProtocol,
-    DataLoaderConfigProtocol,
-    PreprocessDatasetProtocol,
-)
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_training import BatchIterableProtocol, DataLoaderConfigProtocol
 from handwriting_ai.training.dataset import (
     AugmentConfig,
     MNISTLike,

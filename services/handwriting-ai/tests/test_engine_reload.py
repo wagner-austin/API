@@ -9,7 +9,7 @@ import torch
 from platform_core.json_utils import dump_json_str
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import StatResultProtocol
+from handwriting_ai._hook_protocols import StatResultProtocol
 from handwriting_ai.config import (
     AppConfig,
     DigitsConfig,

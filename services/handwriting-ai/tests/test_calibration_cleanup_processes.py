@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import MultiprocessingChildProtocol
+from handwriting_ai._hook_protocols_training import MultiprocessingChildProtocol
 from handwriting_ai.training.calibration import measure as m
 
 

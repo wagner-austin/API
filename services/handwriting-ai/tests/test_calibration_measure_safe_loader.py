@@ -6,7 +6,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 import handwriting_ai.training.calibrate as cal
-from handwriting_ai._test_hooks import AugmentKnobsDict
+from handwriting_ai._hook_protocols_ml import AugmentKnobsDict, PreprocessDatasetProtocol
 from handwriting_ai.training.dataset import AugmentConfig, DataLoaderConfig, PreprocessDataset
 
 
@@ -75,7 +75,6 @@ class _NotPreprocessDataset:
 
 def test_safe_loader_rejects_non_preprocess_dataset() -> None:
     """Test that _safe_loader raises TypeError for non-PreprocessDataset inputs."""
-    from handwriting_ai._test_hooks import PreprocessDatasetProtocol
 
     cfg_loader = DataLoaderConfig(
         batch_size=1,

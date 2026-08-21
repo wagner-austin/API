@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 
 import handwriting_ai.training.mnist_train as mt
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import BatchLoaderProtocol
+from handwriting_ai._hook_protocols_training import BatchLoaderProtocol
 from handwriting_ai.training.metrics import BatchMetrics
 from handwriting_ai.training.mnist_train import set_progress_emitter
 from handwriting_ai.training.progress import (

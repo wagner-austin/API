@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import EventProtocol, ThreadProtocol
+from handwriting_ai._hook_protocols_system import EventProtocol, ThreadProtocol
 from handwriting_ai.api.main import (
     _debug_invoke_reloader_start,
     _debug_invoke_reloader_stop,

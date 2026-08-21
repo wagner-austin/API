@@ -9,10 +9,8 @@ import pytest
 from PIL import Image
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import (
-    CalibrationRunnerResultDict,
-    PreprocessDatasetProtocol,
-)
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_training import CalibrationRunnerResultDict
 from handwriting_ai.training.calibration._types import CandidateDict
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec

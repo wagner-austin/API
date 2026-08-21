@@ -6,9 +6,7 @@ import pytest
 import torch
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import (
-    LoggerInstanceProtocol,
-)
+from handwriting_ai._hook_protocols import LoggerInstanceProtocol
 from handwriting_ai.training import loops
 
 

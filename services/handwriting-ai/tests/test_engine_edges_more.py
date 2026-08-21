@@ -10,6 +10,7 @@ from platform_core.json_utils import JSONTypeError
 from torch import Tensor
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols_ml import InferenceTorchModelProtocol, LoadStateResultProtocol
 from handwriting_ai.config import (
     AppConfig,
     DigitsConfig,
@@ -78,7 +79,7 @@ class _FakeModelNonDict:
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
-    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> _test_hooks.LoadStateResultProtocol:
+    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> LoadStateResultProtocol:
         _ = sd
 
         class _Res:
@@ -110,7 +111,7 @@ class _FakeModelInvalidEntries:
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
-    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> _test_hooks.LoadStateResultProtocol:
+    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> LoadStateResultProtocol:
         _ = sd
 
         class _Res:
@@ -134,7 +135,7 @@ class _FakeModelInvalidEntries:
 
 
 def test_build_fresh_state_dict_non_dict_from_model_raises() -> None:
-    def _bm(arch: str, n_classes: int) -> _test_hooks.InferenceTorchModelProtocol:
+    def _bm(arch: str, n_classes: int) -> InferenceTorchModelProtocol:
         _ = (arch, n_classes)
         return _FakeModelNonDict()
 
@@ -144,7 +145,7 @@ def test_build_fresh_state_dict_non_dict_from_model_raises() -> None:
 
 
 def test_build_fresh_state_dict_invalid_entries_raise() -> None:
-    def _bm(arch: str, n_classes: int) -> _test_hooks.InferenceTorchModelProtocol:
+    def _bm(arch: str, n_classes: int) -> InferenceTorchModelProtocol:
         _ = (arch, n_classes)
         return _FakeModelInvalidEntries()
 

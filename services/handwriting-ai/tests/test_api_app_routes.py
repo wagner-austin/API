@@ -12,6 +12,7 @@ from platform_core.json_utils import JSONValue
 from platform_core.logging import JsonFormatter, get_logger
 from torch import Tensor
 
+from handwriting_ai._hook_protocols_system import ThreadProtocol, ThreadTargetProtocol
 from handwriting_ai.api.main import create_app
 from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import InferenceEngine
@@ -113,7 +114,6 @@ def test_structured_logs_include_request_and_latency(tmp_path: Path) -> None:
 
 def test_optional_reloader_not_started_when_disabled(tmp_path: Path) -> None:
     from handwriting_ai import _test_hooks
-    from handwriting_ai._test_hooks import ThreadProtocol, ThreadTargetProtocol
 
     s = _mk_settings(tmp_path)
     started = {"count": 0}

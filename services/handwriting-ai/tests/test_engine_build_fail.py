@@ -11,7 +11,7 @@ from platform_core.json_utils import dump_json_str
 from platform_core.logging import JsonFormatter, get_logger
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import InferenceTorchModelProtocol
+from handwriting_ai._hook_protocols_ml import InferenceTorchModelProtocol
 from handwriting_ai.config import (
     AppConfig,
     DigitsConfig,

@@ -9,6 +9,7 @@ from platform_core.json_utils import JSONTypeError
 from torch import Tensor
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols import StatResultProtocol
 from handwriting_ai.config import AppConfig, DigitsConfig, SecurityConfig
 from handwriting_ai.inference.engine import (
     InferenceEngine,
@@ -65,7 +66,7 @@ def test_reload_if_changed_rejects_zero_and_flapping_sizes(tmp_path: Path) -> No
     orig_path_stat = _test_hooks.path_stat
 
     # Case 1: size1 <= 0 returns False
-    def _stat_zero(path: Path, *, follow_symlinks: bool = True) -> _test_hooks.StatResultProtocol:
+    def _stat_zero(path: Path, *, follow_symlinks: bool = True) -> StatResultProtocol:
         if path.as_posix().endswith("manifest.json"):
             return _FakeStat(st_mtime=999999.0, st_size=0)
         if path.as_posix().endswith("model.pt"):
@@ -78,7 +79,7 @@ def test_reload_if_changed_rejects_zero_and_flapping_sizes(tmp_path: Path) -> No
     # Case 2: second size read differs -> returns False
     calls = {"n": 0}
 
-    def _stat_flap(path: Path, *, follow_symlinks: bool = True) -> _test_hooks.StatResultProtocol:
+    def _stat_flap(path: Path, *, follow_symlinks: bool = True) -> StatResultProtocol:
         if path.as_posix().endswith("manifest.json"):
             # Many stat() calls happen inside _collect_artifact_mtimes();
             # trigger flapping exactly for the two size reads that follow that loop.

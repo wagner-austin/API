@@ -7,7 +7,8 @@ import pytest
 import scripts.guard as guard
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import GuardRunForProjectProtocol
+from handwriting_ai._hook_defaults import _default_guard_find_monorepo_root
+from handwriting_ai._hook_protocols import GuardRunForProjectProtocol
 
 
 class _RunCall(TypedDict):
@@ -23,7 +24,7 @@ def test_default_find_monorepo_root_locates_libs(tmp_path: Path) -> None:
     start = libs / "some" / "deep"
     start.mkdir(parents=True, exist_ok=True)
 
-    found = _test_hooks._default_guard_find_monorepo_root(start)
+    found = _default_guard_find_monorepo_root(start)
     assert found == root
 
 
@@ -32,7 +33,7 @@ def test_default_find_monorepo_root_raises_when_missing(tmp_path: Path) -> None:
     start = tmp_path / "no_libs"
     start.mkdir(parents=True, exist_ok=True)
     with pytest.raises(RuntimeError):
-        _ = _test_hooks._default_guard_find_monorepo_root(start)
+        _ = _default_guard_find_monorepo_root(start)
 
 
 def test_main_invokes_run_and_supports_flags(tmp_path: Path) -> None:

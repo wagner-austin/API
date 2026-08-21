@@ -6,11 +6,8 @@ import pytest
 from PIL import Image
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import (
-    CandidateRunnerProtocol,
-    OrchestratorProtocol,
-    PreprocessDatasetProtocol,
-)
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_training import CandidateRunnerProtocol, OrchestratorProtocol
 from handwriting_ai.training.calibration._types import (
     CalibrationResultDict,
     CandidateDict,

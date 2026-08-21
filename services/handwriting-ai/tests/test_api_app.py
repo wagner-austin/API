@@ -18,6 +18,7 @@ from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 from torch import Tensor
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols_ml import InferencePoolProtocol, PredictImplProtocol
 from handwriting_ai.api.main import (
     _debug_invoke_reloader_start,
     _debug_invoke_reloader_stop,
@@ -61,9 +62,7 @@ class _FakePool:
     def __init__(self) -> None:
         self.submit_fn: Callable[[Tensor], Future[PredictOutput]] = _no_future_prepared
 
-    def submit(
-        self, fn: _test_hooks.PredictImplProtocol, preprocessed: Tensor
-    ) -> Future[PredictOutput]:
+    def submit(self, fn: PredictImplProtocol, preprocessed: Tensor) -> Future[PredictOutput]:
         """Return the prepared future instead of running fn.
 
         Args:
@@ -85,9 +84,9 @@ def _bind_fake_pool() -> _FakePool:
     """
     pool = _FakePool()
 
-    def _make(settings: Settings) -> _test_hooks.InferencePoolProtocol:
+    def _make(settings: Settings) -> InferencePoolProtocol:
         _ = settings
-        made: _test_hooks.InferencePoolProtocol = pool
+        made: InferencePoolProtocol = pool
         return made
 
     _test_hooks.make_inference_pool = _make

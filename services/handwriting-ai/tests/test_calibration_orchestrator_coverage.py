@@ -5,7 +5,8 @@ from pathlib import Path
 from PIL import Image
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import MemorySnapshotDict, PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
+from handwriting_ai._hook_protocols_training import MemorySnapshotDict
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
 from handwriting_ai.training.calibration.measure import CalibrationResult

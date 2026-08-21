@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols import LoggerInstanceProtocol
+from handwriting_ai._hook_protocols_training import EffectiveConfigDict
 from handwriting_ai.training.dataset import AugmentConfig, DataLoaderConfig
 from handwriting_ai.training.resources import ResourceLimits
 
@@ -14,7 +16,7 @@ from .runner import BudgetConfig, SubprocessRunner
 from .signature import make_signature as _make_signature
 
 
-def _get_logger() -> _test_hooks.LoggerInstanceProtocol:
+def _get_logger() -> LoggerInstanceProtocol:
     return _test_hooks.get_logger("handwriting_ai.calibration")
 
 
@@ -24,7 +26,7 @@ class CalibrationError(RuntimeError):
     pass
 
 
-def _result_to_effective(res: CalibrationResult) -> _test_hooks.EffectiveConfigDict:
+def _result_to_effective(res: CalibrationResult) -> EffectiveConfigDict:
     loader_cfg = DataLoaderConfig(
         batch_size=res["batch_size"],
         num_workers=res["num_workers"],
@@ -49,7 +51,7 @@ def calibrate_input_pipeline(
     cache_path: Path,
     ttl_seconds: int,
     force: bool,
-) -> _test_hooks.EffectiveConfigDict:
+) -> EffectiveConfigDict:
     log = _get_logger()
     sig = _make_signature(limits)
     if not force:

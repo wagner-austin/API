@@ -7,7 +7,7 @@ from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.json_utils import JSONTypeError
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import ArtifactStoreProtocol
+from handwriting_ai._hook_protocols import ArtifactStoreProtocol
 from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import InferenceEngine, download_remote_artifact
 

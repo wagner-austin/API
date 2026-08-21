@@ -10,7 +10,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import ResourceLimitsDict
+from handwriting_ai._hook_protocols_ml import ResourceLimitsDict
 from handwriting_ai.training import safety as _safety
 from handwriting_ai.training.train_config import TrainConfig, default_train_config
 

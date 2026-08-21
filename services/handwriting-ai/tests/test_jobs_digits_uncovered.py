@@ -9,7 +9,7 @@ from platform_core.json_utils import JSONValue
 from platform_workers.redis import RedisStrProto
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import JobContextProtocol
+from handwriting_ai._hook_protocols import JobContextProtocol
 from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import build_fresh_state_dict
 from handwriting_ai.jobs import digits as dj

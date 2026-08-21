@@ -13,6 +13,7 @@ from platform_core.errors import ErrorCode, HandwritingErrorCode
 from platform_core.json_utils import JSONValue
 from torch import Tensor
 
+from handwriting_ai._hook_protocols_ml import PreprocessOptionsDict, PreprocessOutputDict
 from handwriting_ai.api.main import create_app
 from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import (
@@ -146,7 +147,6 @@ def test_read_raises_on_timeout_and_cancels_future(tmp_path: Path) -> None:
     from PIL.Image import Image as PILImage
 
     from handwriting_ai import _test_hooks
-    from handwriting_ai._test_hooks import PreprocessOptionsDict, PreprocessOutputDict
 
     settings = _settings(tmp_path)
 

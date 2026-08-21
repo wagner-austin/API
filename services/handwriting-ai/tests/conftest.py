@@ -15,7 +15,7 @@ from platform_workers.rq_harness import _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import ArtifactStoreFactoryProtocol, ArtifactStoreProtocol
+from handwriting_ai._hook_protocols import ArtifactStoreFactoryProtocol, ArtifactStoreProtocol
 from handwriting_ai.inference.types import PredictOutput
 
 # =============================================================================

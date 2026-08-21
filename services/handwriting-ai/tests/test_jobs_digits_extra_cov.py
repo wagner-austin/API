@@ -9,7 +9,7 @@ from platform_workers.redis import RedisStrProto
 
 import handwriting_ai.jobs.digits as dj
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import JobContextProtocol
+from handwriting_ai._hook_protocols import JobContextProtocol
 
 
 class _StubJobCtx:

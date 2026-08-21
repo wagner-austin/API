@@ -9,7 +9,7 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import BatchMetricsDict
+from handwriting_ai._hook_protocols_training import BatchMetricsDict
 from handwriting_ai.training import loops
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None

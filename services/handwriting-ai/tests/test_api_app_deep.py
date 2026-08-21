@@ -15,7 +15,7 @@ from platform_core.json_utils import JSONValue
 from torch import Tensor, nn
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._test_hooks import PreprocessOptionsDict, PreprocessOutputDict
+from handwriting_ai._hook_protocols_ml import PreprocessOptionsDict, PreprocessOutputDict
 from handwriting_ai.api import main as app_mod
 from handwriting_ai.api.main import create_app
 from handwriting_ai.config import Settings

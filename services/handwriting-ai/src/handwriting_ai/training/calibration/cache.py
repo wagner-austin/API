@@ -11,11 +11,12 @@ from platform_core.json_utils import (
 )
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols import LoggerInstanceProtocol
 from handwriting_ai.training.calibration.measure import CalibrationResult
 from handwriting_ai.training.calibration.signature import CalibrationSignature
 
 
-def _get_logger() -> _test_hooks.LoggerInstanceProtocol:
+def _get_logger() -> LoggerInstanceProtocol:
     return _test_hooks.get_logger("handwriting_ai.calibration")
 
 
