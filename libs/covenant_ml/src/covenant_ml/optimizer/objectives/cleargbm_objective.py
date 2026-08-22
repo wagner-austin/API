@@ -21,6 +21,7 @@ from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
+from covenant_ml.backends.cleargbm.config_resolution import _compute_class_weight
 from covenant_ml.features import (
     FeaturePreset,
     engineer_features,
@@ -55,6 +56,53 @@ def _extract_positive_class_proba(
     for pair in proba:
         positive_probs.append(pair[1])
     return np.array(positive_probs, dtype=np.float64)
+
+
+def _build_trial_config(
+    *,
+    int_params: SampledIntParams,
+    float_params: SampledFloatParams,
+    y_train: NDArray[np.int64],
+    random_state: int,
+    early_stopping_rounds: int,
+) -> GradientBoostingConfig:
+    """Build the training config one optimization trial runs under.
+
+    Every trial trains under the same auto-computed class weight the
+    backend applies to the final model. Trials trained unweighted until
+    2026-08-22, so the sweep tuned an objective the production model never
+    trained — the exact mismatch that made the pre-fix "optimal" configs
+    stale the moment weighting became real.
+
+    Args:
+        int_params: Integer hyperparameters from the sampler.
+        float_params: Float hyperparameters from the sampler.
+        y_train: Training labels the class weight derives from.
+        random_state: Random seed for the trial's training.
+        early_stopping_rounds: Early stopping patience.
+
+    Returns:
+        The trial's training configuration.
+    """
+    return GradientBoostingConfig(
+        n_estimators=int_params["n_estimators"],
+        max_depth=int_params["max_depth"],
+        learning_rate=float_params["learning_rate"],
+        min_samples_split=int_params.get("min_samples_split", 10),
+        min_samples_leaf=int_params.get("min_samples_leaf", 5),
+        max_features=None,
+        max_bins=int_params.get("max_bins", 64),
+        subsample=float_params.get("subsample", 1.0),
+        random_state=random_state,
+        monotonic_constraints=None,
+        reg_alpha=0.0,
+        reg_lambda=0.0,
+        n_jobs=1,  # Sequential for stability
+        early_stopping_rounds=early_stopping_rounds,
+        growth_strategy="depth_wise",
+        num_leaves=None,
+        scale_pos_weight=_compute_class_weight(y_train),
+    )
 
 
 class ClearGBMObjective:
@@ -168,34 +216,12 @@ class ClearGBMObjective:
         _ = train_ratio, val_ratio, test_ratio
         _ = string_params  # ClearGBM has no string params
 
-        # Extract hyperparameters from typed dicts
-        n_estimators = int_params["n_estimators"]
-        max_depth = int_params["max_depth"]
-        min_samples_split = int_params.get("min_samples_split", 10)
-        min_samples_leaf = int_params.get("min_samples_leaf", 5)
-        max_bins = int_params.get("max_bins", 64)
-        learning_rate = float_params["learning_rate"]
-        subsample = float_params.get("subsample", 1.0)
-
-        # Build ClearGBM config
-        config: GradientBoostingConfig = GradientBoostingConfig(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            learning_rate=learning_rate,
-            min_samples_split=min_samples_split,
-            min_samples_leaf=min_samples_leaf,
-            max_features=None,
-            max_bins=max_bins,
-            subsample=subsample,
+        config = _build_trial_config(
+            int_params=int_params,
+            float_params=float_params,
+            y_train=self._y_train,
             random_state=random_state,
-            monotonic_constraints=None,
-            reg_alpha=0.0,
-            reg_lambda=0.0,
-            n_jobs=1,  # Sequential for stability
             early_stopping_rounds=self._early_stopping_rounds,
-            growth_strategy="depth_wise",
-            num_leaves=None,
-            scale_pos_weight=1.0,
         )
 
         model = train_gradient_boosting(

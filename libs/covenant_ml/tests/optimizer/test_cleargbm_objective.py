@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 
 from covenant_ml.optimizer.objectives.cleargbm_objective import (
     ClearGBMObjective,
+    _build_trial_config,
     _extract_positive_class_proba,
     create_cleargbm_objective,
 )
@@ -441,3 +442,28 @@ class TestNFeaturesProperty:
         objective = ClearGBMObjective(x_positive, y, names, feature_preset="log_only")
         # log_only typically doubles features (original + log)
         assert objective.n_features > 4
+
+
+class TestBuildTrialConfig:
+    """The trial config must train the objective the final model trains."""
+
+    def test_trial_weight_matches_backend_formula(self) -> None:
+        """A trial's scale_pos_weight is neg/pos of its training labels.
+
+        Trials trained unweighted until 2026-08-22 while the backend
+        weighted the final model — the sweep tuned an objective production
+        never ran.
+        """
+        y = np.zeros(100, dtype=np.int64)
+        y[:25] = 1  # 25 positive, 75 negative -> weight 3.0
+        config = _build_trial_config(
+            int_params=SampledIntParams(n_estimators=10, max_depth=3),
+            float_params=SampledFloatParams(learning_rate=0.1),
+            y_train=y,
+            random_state=42,
+            early_stopping_rounds=5,
+        )
+        assert config["scale_pos_weight"] == 3.0
+        assert config["growth_strategy"] == "depth_wise"
+        assert config["num_leaves"] is None
+        assert config["max_features"] is None
