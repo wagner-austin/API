@@ -311,7 +311,9 @@ def test_create_wandb_publisher_enabled_returns_publisher() -> None:
     """Cover train_job.py lines 58-62 (wandb enabled branch)."""
     from platform_ml.testing import hooks as wandb_hooks
 
-    from model_trainer.worker.train_job import _create_wandb_publisher
+    from model_trainer.worker.train_job_lifecycle import (
+        _create_wandb_publisher,
+    )
 
     settings = load_settings()
     # Enable wandb in settings
@@ -346,7 +348,9 @@ def test_create_wandb_publisher_unavailable_returns_none() -> None:
     from platform_ml.testing import hooks as wandb_hooks
     from platform_ml.wandb_publisher import WandbUnavailableError
 
-    from model_trainer.worker.train_job import _create_wandb_publisher
+    from model_trainer.worker.train_job_lifecycle import (
+        _create_wandb_publisher,
+    )
 
     settings = load_settings()
     # Enable wandb in settings

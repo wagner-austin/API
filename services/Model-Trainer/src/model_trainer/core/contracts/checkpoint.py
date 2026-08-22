@@ -36,17 +36,20 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from .model import ModelTrainConfig
-from .queue_encoding import (
+from model_trainer.core.contracts.queue_encoding_configs import (
     _decode_optional_gguf_export,
     _decode_optional_lora,
     _decode_optional_quantization,
-    _narrow_finetuning_strategy,
-    _narrow_model_family,
-    _narrow_optimizer,
     encode_gguf_export_config,
     encode_lora_config,
     encode_quantization_config,
+)
+
+from .model import ModelTrainConfig
+from .queue_encoding import (
+    _narrow_finetuning_strategy,
+    _narrow_model_family,
+    _narrow_optimizer,
 )
 
 #: Version stamp written into every checkpoint. A decoder that meets a

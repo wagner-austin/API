@@ -1,4 +1,4 @@
-"""Tests for pretrained model loading in train_job.py (lines 223-230)."""
+"""Pretrained training worker: execution and outcomes."""
 
 from __future__ import annotations
 
@@ -14,7 +14,13 @@ from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import ArtifactStoreProto, ServiceContainerProto
+from model_trainer.core._hook_protocols import (
+    ArtifactStoreFactoryProto,
+    ArtifactStoreProto,
+    ServiceContainerFactoryProto,
+    ServiceContainerProto,
+)
+from model_trainer.core._hook_protocols_ml import CorpusFetcherFactoryProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import DatasetBuilder
 from model_trainer.core.contracts.model import (
@@ -61,12 +67,69 @@ class _FakeConfig(ConfigLike):
     n_positions: int = 64
 
 
+class _FakeEncoded(Encoded):
+    """Fake encoded result implementing Encoded protocol."""
+
+    def __init__(self: _FakeEncoded, id_list: list[int]) -> None:
+        self._ids = id_list
+
+    @property
+    def ids(self: _FakeEncoded) -> list[int]:
+        return self._ids
+
+
 class _FakeFwd(ForwardOutProto):
     """Fake forward output."""
 
     @property
     def loss(self: _FakeFwd) -> torch.Tensor:
         return torch.tensor(0.1)
+
+
+class _BackendRegistry:
+    """Simple registry wrapper for backend instance tracking."""
+
+    def __init__(
+        self, backend_instance_holder: list[_BackendWithLoad | None], train_losses: list[float]
+    ) -> None:
+        self._holder = backend_instance_holder
+        self._train_losses = train_losses
+
+    def get(self, name: str) -> _BackendWithLoad:
+        if self._holder[0] is None:
+            self._holder[0] = _BackendWithLoad(self._train_losses)
+        backend = self._holder[0]
+        if backend is None:
+            raise AssertionError("backend should not be None after assignment")
+        return backend
+
+
+class _FakeCorpusFetcher:
+    """Fake CorpusFetcher for tests."""
+
+    def __init__(self: _FakeCorpusFetcher, corpus_path: Path) -> None:
+        self._corpus_path = corpus_path
+
+    def fetch(self: _FakeCorpusFetcher, fid: str) -> Path:
+        return self._corpus_path
+
+
+class _FakeEncoder:
+    """Fake encoder for PreparedLMModel.tok_for_dataset."""
+
+    def encode(self: _FakeEncoder, text: str) -> Encoded:
+        return _FakeEncoded([ord(c) for c in text])
+
+    def decode(self: _FakeEncoder, ids: list[int]) -> str:
+        return "".join(chr(i) for i in ids if i < 128)
+
+    def token_to_id(self: _FakeEncoder, token: str) -> int | None:
+        if len(token) == 1:
+            return ord(token)
+        return None
+
+    def get_vocab_size(self: _FakeEncoder) -> int:
+        return 256
 
 
 class _FakeLMModel(LMModelProto):
@@ -120,67 +183,36 @@ class _FakeLMModel(LMModelProto):
         return self
 
 
-class _FakeEncoded(Encoded):
-    """Fake encoded result implementing Encoded protocol."""
+class _FakeStore:
+    def __init__(
+        self: _FakeStore, base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> None:
+        pass
 
-    def __init__(self: _FakeEncoded, id_list: list[int]) -> None:
-        self._ids = id_list
-
-    @property
-    def ids(self: _FakeEncoded) -> list[int]:
-        return self._ids
-
-
-class _FakeEncoder:
-    """Fake encoder for PreparedLMModel.tok_for_dataset."""
-
-    def encode(self: _FakeEncoder, text: str) -> Encoded:
-        return _FakeEncoded([ord(c) for c in text])
-
-    def decode(self: _FakeEncoder, ids: list[int]) -> str:
-        return "".join(chr(i) for i in ids if i < 128)
-
-    def token_to_id(self: _FakeEncoder, token: str) -> int | None:
-        if len(token) == 1:
-            return ord(token)
-        return None
-
-    def get_vocab_size(self: _FakeEncoder) -> int:
-        return 256
-
-
-def _make_fake_prepared(tokenizer_id: str | None) -> PreparedLMModel:
-    """Create a fake PreparedLMModel for testing."""
-    return PreparedLMModel(
-        model=_FakeLMModel(),
-        tokenizer_id=tokenizer_id,
-        eos_id=0,
-        pad_id=1,
-        max_seq_len=64,
-        tok_for_dataset=_FakeEncoder(),
-    )
-
-
-# ============================================================================
-# Test helpers and settings protocol
-# ============================================================================
-
-
-class _SettingsFactory(Protocol):
-    def __call__(
-        self,
+    def upload_artifact(
+        self: _FakeStore,
+        dir_path: Path,
         *,
-        artifacts_root: str | None = ...,
-        runs_root: str | None = ...,
-        logs_root: str | None = ...,
-        data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
-        threads: int | None = ...,
-        redis_url: str | None = ...,
-        app_env: Literal["dev", "prod"] | None = ...,
-        security_api_key: str | None = ...,
-    ) -> Settings: ...
+        artifact_name: str,
+        request_id: str,
+    ) -> FileUploadResponse:
+        return FileUploadResponse(
+            file_id="finetuned-file-id",
+            size=1,
+            sha256="x",
+            content_type="application/gzip",
+            created_at=None,
+        )
+
+    def download_artifact(
+        self: _FakeStore,
+        file_id: str,
+        *,
+        dest_dir: Path,
+        request_id: str,
+        expected_root: str,
+    ) -> Path:
+        return dest_dir / expected_root
 
 
 class _BackendWithLoad(ModelBackend):
@@ -282,66 +314,6 @@ class _BackendWithLoad(ModelBackend):
         raise NotImplementedError
 
 
-class _FakeCorpusFetcher:
-    """Fake CorpusFetcher for tests."""
-
-    def __init__(self: _FakeCorpusFetcher, corpus_path: Path) -> None:
-        self._corpus_path = corpus_path
-
-    def fetch(self: _FakeCorpusFetcher, fid: str) -> Path:
-        return self._corpus_path
-
-
-class _FakeStore:
-    def __init__(
-        self: _FakeStore, base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> None:
-        pass
-
-    def upload_artifact(
-        self: _FakeStore,
-        dir_path: Path,
-        *,
-        artifact_name: str,
-        request_id: str,
-    ) -> FileUploadResponse:
-        return FileUploadResponse(
-            file_id="finetuned-file-id",
-            size=1,
-            sha256="x",
-            content_type="application/gzip",
-            created_at=None,
-        )
-
-    def download_artifact(
-        self: _FakeStore,
-        file_id: str,
-        *,
-        dest_dir: Path,
-        request_id: str,
-        expected_root: str,
-    ) -> Path:
-        return dest_dir / expected_root
-
-
-class _BackendRegistry:
-    """Simple registry wrapper for backend instance tracking."""
-
-    def __init__(
-        self, backend_instance_holder: list[_BackendWithLoad | None], train_losses: list[float]
-    ) -> None:
-        self._holder = backend_instance_holder
-        self._train_losses = train_losses
-
-    def get(self, name: str) -> _BackendWithLoad:
-        if self._holder[0] is None:
-            self._holder[0] = _BackendWithLoad(self._train_losses)
-        backend = self._holder[0]
-        if backend is None:
-            raise AssertionError("backend should not be None after assignment")
-        return backend
-
-
 class _FakeServiceContainer:
     """Fake ServiceContainer for pretrained model tests."""
 
@@ -363,11 +335,50 @@ class _FakeServiceContainer:
         return self._model_registry
 
 
+class _SettingsFactory(Protocol):
+    def __call__(
+        self,
+        *,
+        artifacts_root: str | None = ...,
+        runs_root: str | None = ...,
+        logs_root: str | None = ...,
+        data_root: str | None = ...,
+        data_bank_api_url: str | None = ...,
+        data_bank_api_key: str | None = ...,
+        threads: int | None = ...,
+        redis_url: str | None = ...,
+        app_env: Literal["dev", "prod"] | None = ...,
+        security_api_key: str | None = ...,
+    ) -> Settings: ...
+
+
+def _create_artifact_store_factory() -> ArtifactStoreFactoryProto:
+    """Create an artifact store factory for testing."""
+
+    def _factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+
+    return _factory
+
+
+def _create_corpus_fetcher_factory(
+    corpus_path: Path,
+) -> CorpusFetcherFactoryProto:
+    """Create a corpus fetcher factory for testing."""
+
+    def _factory(api_url: str, api_key: str, cache_dir: Path) -> _FakeCorpusFetcher:
+        return _FakeCorpusFetcher(corpus_path)
+
+    return _factory
+
+
 def _create_service_container_factory(
     fake_redis: FakeRedis,
     backend_instance_holder: list[_BackendWithLoad | None],
     train_losses: list[float],
-) -> _test_hooks.ServiceContainerFactoryProto:
+) -> ServiceContainerFactoryProto:
     """Create a service container factory for testing."""
 
     def _from_settings(settings: Settings) -> ServiceContainerProto:
@@ -389,150 +400,20 @@ def _create_service_container_factory(
     return _from_settings
 
 
-def _create_corpus_fetcher_factory(
-    corpus_path: Path,
-) -> _test_hooks.CorpusFetcherFactoryProto:
-    """Create a corpus fetcher factory for testing."""
-
-    def _factory(api_url: str, api_key: str, cache_dir: Path) -> _FakeCorpusFetcher:
-        return _FakeCorpusFetcher(corpus_path)
-
-    return _factory
-
-
-def _create_artifact_store_factory() -> _test_hooks.ArtifactStoreFactoryProto:
-    """Create an artifact store factory for testing."""
-
-    def _factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
-
-    return _factory
-
-
-def test_training_worker_loads_pretrained_model(
-    tmp_path: Path, settings_factory: _SettingsFactory
-) -> None:
-    """Cover train_job.py lines 223-230 - pretrained model loading branch."""
-    # Track backend instance and losses for assertions
-    backend_instance_holder: list[_BackendWithLoad | None] = [None]
-    train_losses: list[float] = []
-
-    # Environment roots
-    artifacts = tmp_path / "artifacts"
-    settings = settings_factory(
-        artifacts_root=str(artifacts),
-        runs_root=str(tmp_path / "runs"),
-        logs_root=str(tmp_path / "logs"),
-        data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
+def _make_fake_prepared(tokenizer_id: str | None) -> PreparedLMModel:
+    """Create a fake PreparedLMModel for testing."""
+    return PreparedLMModel(
+        model=_FakeLMModel(),
+        tokenizer_id=tokenizer_id,
+        eos_id=0,
+        pad_id=1,
+        max_seq_len=64,
+        tok_for_dataset=_FakeEncoder(),
     )
-
-    # Settings via hook
-    _test_hooks.load_settings = lambda: settings
-
-    # Minimal corpus for tokenizer training
-    corpus = tmp_path / "corpus"
-    corpus.mkdir()
-    (corpus / "a.txt").write_text("hello world\nfinetuning data\n", encoding="utf-8")
-
-    # Train a real tokenizer using BPEBackend
-    tok_id = "tok-pretrained-test"
-    tok_dir = artifacts / "tokenizers" / tok_id
-    tok_cfg = TokenizerTrainConfig(
-        method="bpe",
-        vocab_size=64,
-        min_frequency=1,
-        corpus_path=str(corpus),
-        holdout_fraction=0.1,
-        seed=42,
-        out_dir=str(tok_dir),
-    )
-    BPEBackend().train(tok_cfg)
-
-    # Create a pretrained model directory (simulating a previous training run)
-    pretrained_run_id = "run-pretrained-base"
-    pretrained_model_dir = artifacts / "models" / pretrained_run_id
-    pretrained_model_dir.mkdir(parents=True, exist_ok=True)
-    (pretrained_model_dir / "weights.bin").write_bytes(b"\x00pretrained")
-    (pretrained_model_dir / "manifest.json").write_text(
-        '{"model_family": "gpt2", "model_size": "small"}', encoding="utf-8"
-    )
-
-    # Fake redis via hook
-    fake = FakeRedis()
-    _test_hooks.kv_store_factory = lambda url: fake
-
-    # Set up hooks using extracted factory functions
-    _test_hooks.service_container_from_settings = _create_service_container_factory(
-        fake, backend_instance_holder, train_losses
-    )
-    _test_hooks.corpus_fetcher_factory = _create_corpus_fetcher_factory(corpus)
-    _test_hooks.artifact_store_factory = _create_artifact_store_factory()
-
-    # Build payload with pretrained_run_id set
-    payload: TrainJobPayload = {
-        "run_id": "run-finetune",
-        "user_id": 1,
-        "resume": False,
-        "request": {
-            "model_family": "gpt2",
-            "model_size": "small",
-            "max_seq_len": 16,
-            "num_epochs": 1,
-            "batch_size": 1,
-            "learning_rate": 5e-4,
-            "tokenizer_id": tok_id,
-            "corpus_file_id": "deadbeef",
-            "holdout_fraction": 0.01,
-            "seed": 42,
-            "pretrained_run_id": pretrained_run_id,
-            "freeze_embed": False,
-            "gradient_clipping": 1.0,
-            "optimizer": "adamw",
-            "device": "cpu",
-            "data_num_workers": None,
-            "data_pin_memory": None,
-            "early_stopping_patience": 5,
-            "test_split_ratio": 0.15,
-            "finetune_lr_cap": 5e-5,
-            "loss_mask_prefix_separator": None,
-            "precision": "auto",
-            "hub_model_id": None,
-            "finetuning_strategy": "full",
-            "lora": None,
-            "quantization": None,
-            "gguf_export": None,
-        },
-    }
-
-    train_job.process_train_job(encode_train_job_payload(payload))
-
-    # Verify backend.load() was called instead of backend.prepare()
-    backend_instance = backend_instance_holder[0]
-    assert backend_instance is not None and backend_instance.load_called is True
-    assert backend_instance.prepare_called is False
-    assert backend_instance.loaded_from == str(pretrained_model_dir)
-    # A fresh enqueue trains from scratch: the payload's resume flag reaches
-    # the backend as False.
-    assert backend_instance.resume_seen is False
-
-    # Verify loss decreases during training (ml-train-no-loss-check)
-    assert len(train_losses) >= 2, "Should have at least 2 loss values"
-    loss_before = train_losses[0]
-    loss_after = train_losses[-1]
-    assert loss_after < loss_before, f"Loss should decrease: {loss_before} -> {loss_after}"
-
-    # Verify status is completed
-    status = TrainerJobStore(fake).load("run-finetune")
-    assert status is not None and status["status"] == "completed"
-    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish", "expire"})
 
 
 # ============================================================================
-# Test for hf_lm with tokenizer_id=None (covers train_job.py:293)
+# Test helpers and settings protocol
 # ============================================================================
 
 
@@ -632,7 +513,7 @@ def _create_hf_lm_service_container_factory(
     fake_redis: FakeRedis,
     backend_instance_holder: list[_HfLmBackend | None],
     train_losses: list[float],
-) -> _test_hooks.ServiceContainerFactoryProto:
+) -> ServiceContainerFactoryProto:
     """Create a service container factory for hf_lm testing."""
 
     def _from_settings(settings: Settings) -> ServiceContainerProto:
@@ -745,6 +626,7 @@ def test_training_worker_hf_lm_with_tokenizer_id_none(
     # Verify status is completed
     status = TrainerJobStore(fake).load("run-hflm-no-tok")
     assert status is not None and status["status"] == "completed"
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish", "expire"})
 
 
 # ============================================================================
@@ -941,6 +823,7 @@ def test_continued_training_downloads_artifacts_when_absent_locally(
 
     status = TrainerJobStore(fake).load("run-cooldown")
     assert status is not None and status["status"] == "completed"
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish", "expire"})
 
 
 # ============================================================================
@@ -1045,3 +928,4 @@ def test_training_worker_passes_resume_flag_to_backend(
     assert loss_after < loss_before
     status = TrainerJobStore(fake).load("run-resumed-exec")
     assert status is not None and status["status"] == "completed"
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish", "expire"})

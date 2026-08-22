@@ -11,11 +11,7 @@ from platform_core.queues import TRAINER_QUEUE
 from platform_workers.rq_harness import WorkerConfig
 
 from model_trainer import _test_hooks
-from model_trainer.worker_entry import (
-    _build_config,
-    _run_worker,
-    main,
-)
+from model_trainer.worker_entry import _build_config, _run_worker, main
 
 
 def _make_env_getter(env_vars: dict[str, str]) -> Callable[[str], str | None]:

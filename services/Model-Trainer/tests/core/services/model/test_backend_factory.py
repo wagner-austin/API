@@ -77,13 +77,14 @@ class TestCreateHfLmBackend:
 
     def test_creates_model_backend_with_capabilities(self) -> None:
         """Test that create_hf_lm_backend returns a ModelBackend with capabilities."""
-        from model_trainer.core.contracts.dataset import DatasetConfig
+        from model_trainer.core.contracts.dataset import CorpusSplit, DatasetConfig
 
         class _FakeDatasetBuilder:
             """Fake dataset builder for testing."""
 
-            def split(self, cfg: DatasetConfig) -> tuple[list[str], list[str], list[str]]:
-                return [], [], []
+            def split(self, cfg: DatasetConfig) -> CorpusSplit:
+                del cfg
+                return {"train": (), "validation": (), "test": ()}
 
         backend = create_hf_lm_backend(_FakeDatasetBuilder())
         caps = backend.capabilities()

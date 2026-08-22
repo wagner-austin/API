@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 from model_trainer.api.routes import runs as runs_routes
-from model_trainer.api.routes.runs import _BinaryFileProto
+from model_trainer.api.routes.runs_files import _BinaryFileProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.services.container import ServiceContainer
 

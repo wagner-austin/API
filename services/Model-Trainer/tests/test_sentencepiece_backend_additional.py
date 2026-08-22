@@ -8,9 +8,7 @@ from platform_core.json_utils import dump_json_str
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
-from model_trainer.core.services.tokenizer.spm_backend import (
-    SentencePieceBackend,
-)
+from model_trainer.core.services.tokenizer.spm_backend import SentencePieceBackend
 
 
 def test_spm_encode_ids_blank_output_returns_empty(tmp_path: Path) -> None:

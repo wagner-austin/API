@@ -6,7 +6,7 @@ import torch
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import load_settings
-from model_trainer.core.contracts.dataset import DatasetBuilder, DatasetConfig
+from model_trainer.core.contracts.dataset import CorpusSplit, DatasetBuilder, DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import ListEncoded
@@ -132,9 +132,9 @@ def test_gpt2_backend_load_calls_helper() -> None:
             return 1
 
     class _DS(DatasetBuilder):
-        def split(self: _DS, cfg: DatasetConfig) -> tuple[list[str], list[str], list[str]]:
+        def split(self: _DS, cfg: DatasetConfig) -> CorpusSplit:
             _ = cfg
-            return ([], [], [])
+            return {"train": (), "validation": (), "test": ()}
 
     dataset: DatasetBuilder = _DS()
     backend = create_gpt2_backend(dataset)

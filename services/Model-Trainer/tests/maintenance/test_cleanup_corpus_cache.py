@@ -3,11 +3,9 @@ from __future__ import annotations
 import pytest
 
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import CorpusCacheCleanupResultProto
+from model_trainer.core._hook_protocols_ml import CorpusCacheCleanupResultProto
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.services.data.corpus_cache_cleanup import (
-    CorpusCacheCleanupError,
-)
+from model_trainer.core.services.data.corpus_cache_cleanup import CorpusCacheCleanupError
 from model_trainer.maintenance.cleanup import run_corpus_cleanup
 
 

@@ -10,14 +10,8 @@ from platform_core.errors import AppError
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import PreparedLMModel
-from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
-    Hooks,
-    reset_hooks,
-)
-from model_trainer.core.services.model.backends.hf_lm.generate import (
-    _read_prompt,
-    generate_hf_lm,
-)
+from model_trainer.core.services.model.backends.hf_lm._test_hooks import Hooks, reset_hooks
+from model_trainer.core.services.model.backends.hf_lm.generate import _read_prompt, generate_hf_lm
 
 from .testing import FakeEncoder, FakeGenerateModel, make_generate_config
 

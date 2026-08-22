@@ -9,11 +9,7 @@ from typing import Protocol
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.model import (
-    ModelTrainConfig,
-    PreparedLMModel,
-    TrainOutcome,
-)
+from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel, TrainOutcome
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
     Hooks,
     ProgressCallback,

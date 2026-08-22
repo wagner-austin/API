@@ -10,9 +10,7 @@ from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.backend_factory import create_gpt2_backend
-from model_trainer.core.services.model.backends.gpt2 import (
-    prepare_gpt2_with_handle,
-)
+from model_trainer.core.services.model.backends.gpt2 import prepare_gpt2_with_handle
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 
 

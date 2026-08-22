@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-import io
 import os
-import types
 from collections import deque
 from collections.abc import Callable, Generator
-from typing import Protocol
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.params import Depends as DependsParamType
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.logging import get_logger
+
+from model_trainer.api.routes.runs_files import (
+    _BinaryFileProto,
+    _BinaryFileWrapper,
+)
 
 from ...core.infra.paths import model_logs_path
 from ...core.logging.types import LoggingExtra
@@ -48,60 +50,6 @@ from ..validators.runs import (
 )
 
 _logger = get_logger(__name__)
-
-
-class _BinaryFileProto(Protocol):
-    """Protocol for file-like objects needed by SSE streaming."""
-
-    def seek(self, offset: int, whence: int = 0) -> int: ...
-    def readline(self) -> bytes: ...
-    def __enter__(self) -> _BinaryFileProto: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> bool | None: ...
-    def __iter__(self) -> _BinaryFileProto: ...
-    def __next__(self) -> bytes: ...
-
-
-class _BinaryFileWrapper:
-    """Wrapper around BufferedReader that properly implements _BinaryFileProto."""
-
-    _f: io.BufferedReader
-
-    def __init__(self, path: str, mode: str) -> None:
-        raw = io.FileIO(path, mode)
-        self._f = io.BufferedReader(raw)
-
-    def seek(self, offset: int, whence: int = 0) -> int:
-        return self._f.seek(offset, whence)
-
-    def readline(self) -> bytes:
-        return self._f.readline()
-
-    def __enter__(self) -> _BinaryFileWrapper:
-        self._f.__enter__()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> bool | None:
-        self._f.__exit__(exc_type, exc_val, exc_tb)
-        return None
-
-    def __iter__(self) -> _BinaryFileWrapper:
-        return self
-
-    def __next__(self) -> bytes:
-        line = self._f.readline()
-        if not line:
-            raise StopIteration
-        return line
 
 
 class _RunsRoutes:

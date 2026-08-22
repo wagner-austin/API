@@ -195,7 +195,9 @@ def test_cleanup_raises_on_non_directory_cache(tmp_path: Path) -> None:
 
 def test_scan_cache_dir_raises_on_oserror(tmp_path: Path) -> None:
     from model_trainer.core import _test_hooks
-    from model_trainer.core._test_hooks import ScandirIterator
+    from model_trainer.core._hook_protocols import (
+        ScandirIterator,
+    )
 
     cache_dir = tmp_path / "corpus_cache"
     cache_dir.mkdir()
@@ -219,7 +221,9 @@ def test_scan_cache_dir_raises_on_oserror(tmp_path: Path) -> None:
 
 def test_disk_usage_error_raises(tmp_path: Path) -> None:
     from model_trainer.core import _test_hooks
-    from model_trainer.core._test_hooks import DiskUsageProto
+    from model_trainer.core._hook_protocols import (
+        DiskUsageProto,
+    )
 
     cfg: CorpusCacheCleanupConfig = {
         "enabled": True,

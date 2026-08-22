@@ -234,7 +234,9 @@ def test_tokenizer_cleanup_oserror_on_iterdir_raises(
     tmp_path: Path,
 ) -> None:
     from model_trainer.core import _test_hooks
-    from model_trainer.core._test_hooks import PathIterator
+    from model_trainer.core._hook_protocols import (
+        PathIterator,
+    )
 
     artifacts = tmp_path
     tokenizers_root = artifacts / "tokenizers"

@@ -6,12 +6,7 @@ from typing import Literal, Protocol
 from fastapi.testclient import TestClient
 from platform_workers.redis import _RedisBytesClient
 from platform_workers.rq_harness import RQClientQueue, RQRetryLike
-from platform_workers.testing import (
-    FakeQueue,
-    FakeRedis,
-    FakeRedisBytesClient,
-    FakeRetry,
-)
+from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
 
 from model_trainer.api.main import create_app
 from model_trainer.core import _test_hooks

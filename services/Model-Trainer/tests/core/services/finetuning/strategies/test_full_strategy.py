@@ -9,10 +9,7 @@ from pathlib import Path
 import pytest
 
 from model_trainer.core.contracts.model import ModelTrainConfig
-from model_trainer.core.services.finetuning.strategies._test_hooks import (
-    Hooks,
-    reset_hooks,
-)
+from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks, reset_hooks
 from model_trainer.core.services.finetuning.strategies.full import (
     FullFineTuneStrategy,
     create_full_strategy,

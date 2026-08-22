@@ -32,7 +32,8 @@ from model_trainer.core.infra.paths import model_dir
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.backend_factory import create_char_lstm_backend
 from model_trainer.core.services.tokenizer.char_backend import CharBackend
-from model_trainer.core.services.training.base_trainer import AdamW, BaseTrainer
+from model_trainer.core.services.training.base_trainer import BaseTrainer
+from model_trainer.core.services.training.base_trainer_core import AdamW
 from model_trainer.core.services.training.checkpoint import (
     TrainingCheckpoint,
     capture_rng_states,

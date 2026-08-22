@@ -13,7 +13,7 @@ from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import ArtifactStoreProto, ServiceContainerProto
+from model_trainer.core._hook_protocols import ArtifactStoreProto, ServiceContainerProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import DatasetBuilder
 from model_trainer.core.contracts.model import (

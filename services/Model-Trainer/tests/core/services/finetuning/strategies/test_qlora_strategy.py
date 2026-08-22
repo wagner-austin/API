@@ -8,15 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from model_trainer.core.contracts.model import (
-    LoraConfig,
-    ModelTrainConfig,
-    QuantizationConfig,
-)
-from model_trainer.core.services.finetuning.strategies._test_hooks import (
-    Hooks,
-    reset_hooks,
-)
+from model_trainer.core.contracts.model import LoraConfig, ModelTrainConfig, QuantizationConfig
+from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks, reset_hooks
 from model_trainer.core.services.finetuning.strategies.qlora import (
     QLoRAStrategy,
     _require_lora_config,

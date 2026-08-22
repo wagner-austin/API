@@ -23,10 +23,7 @@ from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient,
 
 from model_trainer.api.routes import runs as runs_routes
 from model_trainer.api.schemas.runs import BaselineClozeRequest
-from model_trainer.api.validators.runs import (
-    _decode_baseline_cloze_request,
-    _decode_cloze_request,
-)
+from model_trainer.api.validators.runs import _decode_baseline_cloze_request, _decode_cloze_request
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import load_settings
 from model_trainer.core.services.container import ServiceContainer

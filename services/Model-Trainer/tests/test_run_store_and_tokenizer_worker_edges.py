@@ -7,7 +7,7 @@ from platform_core.json_utils import _JSONInputValue as JSONInputValue
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import CorpusFetcherProto
+from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
 from model_trainer.core.contracts.queue import TokenizerTrainPayload
 from model_trainer.infra.storage.run_store import RunStore
 from model_trainer.worker import tokenizer_worker as tkw

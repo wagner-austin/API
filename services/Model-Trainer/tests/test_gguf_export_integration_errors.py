@@ -1,4 +1,4 @@
-"""Integration tests for GGUF export functionality."""
+"""GGUF export integration: failure paths."""
 
 from __future__ import annotations
 
@@ -12,14 +12,13 @@ from platform_core.data_bank_protocol import FileUploadResponse
 from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.redis import RedisStrProto
 
-from model_trainer.core._test_hooks import (
+from model_trainer.core._hook_protocols import (
     ArtifactStoreFactoryProto,
     ArtifactStoreProto,
-    CorpusFetcherFactoryProto,
-    CorpusFetcherProto,
     ServiceContainerFactoryProto,
     ServiceContainerProto,
 )
+from model_trainer.core._hook_protocols_ml import CorpusFetcherFactoryProto, CorpusFetcherProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
     BackendCapabilities,
@@ -53,7 +52,7 @@ from model_trainer.core.types import (
     NamedParameter,
     ParameterLike,
 )
-from model_trainer.worker.train_job import _maybe_export_to_gguf
+from model_trainer.worker.train_job_lifecycle import _maybe_export_to_gguf
 
 # ============================================================================
 # Fake model components for training job tests
@@ -66,12 +65,41 @@ class _FakeConfig(ConfigLike):
     n_positions: int = 64
 
 
+class _FakeEncoded(Encoded):
+    """Fake encoded result implementing Encoded protocol."""
+
+    def __init__(self, id_list: list[int]) -> None:
+        self._ids = id_list
+
+    @property
+    def ids(self) -> list[int]:
+        return self._ids
+
+
 class _FakeFwd(ForwardOutProto):
     """Fake forward output."""
 
     @property
     def loss(self) -> torch.Tensor:
         return torch.tensor(0.1)
+
+
+class _FakeEncoder:
+    """Fake encoder for PreparedLMModel.tok_for_dataset."""
+
+    def encode(self, text: str) -> Encoded:
+        return _FakeEncoded([ord(c) for c in text])
+
+    def decode(self, ids: list[int]) -> str:
+        return "".join(chr(i) for i in ids if i < 128)
+
+    def token_to_id(self, token: str) -> int | None:
+        if len(token) == 1:
+            return ord(token)
+        return None
+
+    def get_vocab_size(self) -> int:
+        return 256
 
 
 class _FakeLMModel(LMModelProto):
@@ -123,33 +151,67 @@ class _FakeLMModel(LMModelProto):
         return self
 
 
-class _FakeEncoded(Encoded):
-    """Fake encoded result implementing Encoded protocol."""
+class _FakeArtifactStore:
+    """Fake artifact store for testing."""
 
-    def __init__(self, id_list: list[int]) -> None:
-        self._ids = id_list
+    def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
+        pass
+
+    def upload_artifact(
+        self,
+        dir_path: Path,
+        *,
+        artifact_name: str,
+        request_id: str,
+    ) -> FileUploadResponse:
+        return FileUploadResponse(
+            file_id="uploaded-file-id",
+            size=1,
+            sha256="x",
+            content_type="application/gzip",
+            created_at=None,
+        )
+
+    def download_artifact(
+        self,
+        file_id: str,
+        *,
+        dest_dir: Path,
+        request_id: str,
+        expected_root: str,
+    ) -> Path:
+        return dest_dir / expected_root
+
+
+class _FakeCorpusFetcher:
+    """Fake corpus fetcher for testing."""
+
+    def __init__(self, corpus_path: Path) -> None:
+        self._corpus_path = corpus_path
+
+    def fetch(self, fid: str) -> Path:
+        return self._corpus_path
+
+
+class _FakeServiceContainer:
+    """Fake service container for testing."""
+
+    def __init__(self, s: Settings, r: RedisStrProto, reg: ModelRegistry) -> None:
+        self._settings = s
+        self._redis = r
+        self._model_registry = reg
 
     @property
-    def ids(self) -> list[int]:
-        return self._ids
+    def settings(self) -> Settings:
+        return self._settings
 
+    @property
+    def redis(self) -> RedisStrProto:
+        return self._redis
 
-class _FakeEncoder:
-    """Fake encoder for PreparedLMModel.tok_for_dataset."""
-
-    def encode(self, text: str) -> Encoded:
-        return _FakeEncoded([ord(c) for c in text])
-
-    def decode(self, ids: list[int]) -> str:
-        return "".join(chr(i) for i in ids if i < 128)
-
-    def token_to_id(self, token: str) -> int | None:
-        if len(token) == 1:
-            return ord(token)
-        return None
-
-    def get_vocab_size(self) -> int:
-        return 256
+    @property
+    def model_registry(self) -> ModelRegistry:
+        return self._model_registry
 
 
 def _make_fake_prepared(tokenizer_id: str | None) -> PreparedLMModel:
@@ -245,67 +307,26 @@ class _HfLmBackend(ModelBackend):
         raise NotImplementedError
 
 
-class _FakeArtifactStore:
-    """Fake artifact store for testing."""
+def _create_artifact_store_factory() -> ArtifactStoreFactoryProto:
+    """Create an artifact store factory for testing."""
 
-    def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-        pass
+    def _factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _FakeArtifactStore(base_url, api_key, timeout_seconds=timeout_seconds)
 
-    def upload_artifact(
-        self,
-        dir_path: Path,
-        *,
-        artifact_name: str,
-        request_id: str,
-    ) -> FileUploadResponse:
-        return FileUploadResponse(
-            file_id="uploaded-file-id",
-            size=1,
-            sha256="x",
-            content_type="application/gzip",
-            created_at=None,
-        )
-
-    def download_artifact(
-        self,
-        file_id: str,
-        *,
-        dest_dir: Path,
-        request_id: str,
-        expected_root: str,
-    ) -> Path:
-        return dest_dir / expected_root
+    return _factory
 
 
-class _FakeCorpusFetcher:
-    """Fake corpus fetcher for testing."""
+def _create_corpus_fetcher_factory(
+    corpus_path: Path,
+) -> CorpusFetcherFactoryProto:
+    """Create a corpus fetcher factory for testing."""
 
-    def __init__(self, corpus_path: Path) -> None:
-        self._corpus_path = corpus_path
+    def _factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
+        return _FakeCorpusFetcher(corpus_path)
 
-    def fetch(self, fid: str) -> Path:
-        return self._corpus_path
-
-
-class _FakeServiceContainer:
-    """Fake service container for testing."""
-
-    def __init__(self, s: Settings, r: RedisStrProto, reg: ModelRegistry) -> None:
-        self._settings = s
-        self._redis = r
-        self._model_registry = reg
-
-    @property
-    def settings(self) -> Settings:
-        return self._settings
-
-    @property
-    def redis(self) -> RedisStrProto:
-        return self._redis
-
-    @property
-    def model_registry(self) -> ModelRegistry:
-        return self._model_registry
+    return _factory
 
 
 def _create_service_container_factory(
@@ -328,28 +349,6 @@ def _create_service_container_factory(
         return _FakeServiceContainer(settings, fake_redis, model_registry)
 
     return _from_settings
-
-
-def _create_corpus_fetcher_factory(
-    corpus_path: Path,
-) -> CorpusFetcherFactoryProto:
-    """Create a corpus fetcher factory for testing."""
-
-    def _factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
-        return _FakeCorpusFetcher(corpus_path)
-
-    return _factory
-
-
-def _create_artifact_store_factory() -> ArtifactStoreFactoryProto:
-    """Create an artifact store factory for testing."""
-
-    def _factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeArtifactStore(base_url, api_key, timeout_seconds=timeout_seconds)
-
-    return _factory
 
 
 class TestQueueEncodingRoundTrip:
@@ -649,7 +648,9 @@ class TestTrainingJobWithGgufExport:
         from model_trainer.core.config.settings import load_settings
         from model_trainer.core.contracts.model import LoraConfig
         from model_trainer.core.contracts.queue import TrainJobPayload
-        from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
+        from model_trainer.core.contracts.queue_encoding import (
+            encode_train_job_payload,
+        )
         from model_trainer.worker import train_job
         from model_trainer.worker.trainer_job_store import TrainerJobStore
 

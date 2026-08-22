@@ -6,7 +6,7 @@ from platform_workers.testing import FakeRedis
 from model_trainer.api.main import create_app
 from model_trainer.api.schemas.tokenizers import TokenizerTrainRequest, TokenizerTrainResponse
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import TokenizerOrchestratorProto
+from model_trainer.core._hook_protocols_ml import TokenizerOrchestratorProto
 from model_trainer.core.config.settings import load_settings
 
 

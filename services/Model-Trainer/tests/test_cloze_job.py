@@ -22,7 +22,8 @@ from platform_core.trainer_keys import artifact_file_id_key, cloze_key
 from platform_workers.testing import FakeRedis as _FakeRedis
 
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import ArtifactStoreProto, CorpusFetcherProto
+from model_trainer.core._hook_protocols import ArtifactStoreProto
+from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.cloze import BLANK_MARKER, ClozeItem, encode_cloze_item
 from model_trainer.core.contracts.model import ModelTrainConfig

@@ -4,13 +4,8 @@ from pathlib import Path
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
-from model_trainer.core.services.model.backends.char_lstm.io import (
-    get_model_max_seq_len,
-)
-from model_trainer.core.services.model.backends.char_lstm.model import (
-    CharLSTM,
-    CharLSTMModel,
-)
+from model_trainer.core.services.model.backends.char_lstm.io import get_model_max_seq_len
+from model_trainer.core.services.model.backends.char_lstm.model import CharLSTM, CharLSTMModel
 from model_trainer.core.services.model.backends.char_lstm.prepare import (
     prepare_char_lstm_with_handle,
 )

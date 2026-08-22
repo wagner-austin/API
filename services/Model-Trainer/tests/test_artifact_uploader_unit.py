@@ -12,9 +12,9 @@ from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import ArtifactStoreProto
+from model_trainer.core._hook_protocols import ArtifactStoreProto
 from model_trainer.core.config.settings import Settings
-from model_trainer.worker import train_job
+from model_trainer.worker import train_job_lifecycle
 
 
 class _SettingsFactory(Protocol):
@@ -44,7 +44,7 @@ def test_upload_and_persist_pointer_config_missing(
         data_bank_api_key="",
     )
     with pytest.raises(AppError, match="data-bank-api configuration missing"):
-        train_job._upload_and_persist_pointer(
+        train_job_lifecycle._upload_and_persist_pointer(
             settings,
             r,
             run_id="rid",
@@ -103,7 +103,7 @@ def test_upload_and_persist_pointer_missing_dir(
         data_bank_api_url="http://x",
         data_bank_api_key="k",
     )
-    train_job._upload_and_persist_pointer(
+    train_job_lifecycle._upload_and_persist_pointer(
         settings,
         r,
         run_id="run-missing",
@@ -164,7 +164,7 @@ def test_upload_and_persist_pointer_success(
         data_bank_api_url="http://db.local",
         data_bank_api_key="secret",
     )
-    train_job._upload_and_persist_pointer(
+    train_job_lifecycle._upload_and_persist_pointer(
         settings,
         r,
         run_id="run1",
@@ -220,7 +220,7 @@ def test_upload_and_persist_pointer_store_error(
         data_bank_api_key="secret",
     )
     with pytest.raises(ArtifactStoreError):
-        train_job._upload_and_persist_pointer(
+        train_job_lifecycle._upload_and_persist_pointer(
             settings,
             r,
             run_id="run2",

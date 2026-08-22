@@ -8,7 +8,7 @@ from platform_core.job_types import job_key
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import CorpusFetcherProto
+from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
 from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
 from model_trainer.worker import train_job

@@ -23,7 +23,7 @@ from platform_core.trainer_keys import baseline_cloze_key, cloze_key
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import CorpusFetcherProto
+from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.cloze import BLANK_MARKER, ClozeItem, encode_cloze_item
 from model_trainer.core.contracts.queue import BaselineClozeJobPayload

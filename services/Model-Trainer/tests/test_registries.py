@@ -15,10 +15,7 @@ from model_trainer.core.services.model.backend_factory import (
 )
 from model_trainer.core.services.model.backends.char_lstm.prepare import _size_to_dims
 from model_trainer.core.services.model.backends.gpt2.hf_gpt2 import create_gpt2_config
-from model_trainer.core.services.model.model_sizes import (
-    CHAR_LSTM_MODEL_SIZES,
-    GPT2_MODEL_SIZES,
-)
+from model_trainer.core.services.model.model_sizes import CHAR_LSTM_MODEL_SIZES, GPT2_MODEL_SIZES
 from model_trainer.core.services.model.unavailable_backend import (
     UNAVAILABLE_CAPABILITIES,
     UnavailableBackend,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from model_trainer.core import _test_hooks
-from model_trainer.core._test_hooks import TokenizerCleanupResultProto
+from model_trainer.core._hook_protocols_ml import TokenizerCleanupResultProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.services.tokenizer.tokenizer_cleanup import TokenizerCleanupError
 from model_trainer.maintenance.cleanup import run_tokenizer_cleanup
