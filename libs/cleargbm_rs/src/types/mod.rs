@@ -183,17 +183,43 @@ impl TreeNode {
 /// Equivalent to Python `HistogramBuffer` but with explicit sizing.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HistogramBuffer {
-    /// Sum of gradients per bin.
-    pub(crate) gradient_sums: Vec<f64>,
-
-    /// Sum of hessians per bin.
-    pub(crate) hessian_sums: Vec<f64>,
-
-    /// Count of samples per bin.
-    pub(crate) counts: Vec<usize>,
+    /// Per-bin accumulators, stored interleaved so one sample's update
+    /// touches one contiguous 24-byte record instead of three parallel
+    /// arrays. See [`BinAccumulator`] for why.
+    pub(crate) bins: Vec<BinAccumulator>,
 
     /// Number of bins (fixed at construction).
     pub(crate) n_bins: usize,
+}
+
+/// One bin's accumulators, interleaved.
+///
+/// The histogram hot loop performs a read-modify-write on all three values
+/// for one bin per sample. With three parallel arrays that update touches
+/// three cache lines and pays three bounds checks; interleaved it touches one
+/// 24-byte record (one line, occasionally two when the record straddles a
+/// boundary) and pays a single bounds check. This is LightGBM's `hist_t`
+/// grad/hess interleaving, extended to carry the sample count this codebase
+/// also accumulates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct BinAccumulator {
+    /// Sum of gradients in this bin.
+    pub(crate) gradient_sum: f64,
+
+    /// Sum of hessians in this bin.
+    pub(crate) hessian_sum: f64,
+
+    /// Count of samples in this bin.
+    pub(crate) count: usize,
+}
+
+impl BinAccumulator {
+    /// The all-zero accumulator a fresh histogram starts from.
+    pub(crate) const ZERO: Self = Self {
+        gradient_sum: 0.0_f64,
+        hessian_sum: 0.0_f64,
+        count: 0_usize,
+    };
 }
 
 impl HistogramBuffer {
@@ -209,9 +235,7 @@ impl HistogramBuffer {
     #[must_use]
     pub fn new(n_bins: usize) -> Self {
         Self {
-            gradient_sums: vec![0.0_f64; n_bins],
-            hessian_sums: vec![0.0_f64; n_bins],
-            counts: vec![0_usize; n_bins],
+            bins: vec![BinAccumulator::ZERO; n_bins],
             n_bins,
         }
     }
@@ -239,15 +263,13 @@ impl HistogramBuffer {
         gradient: f64,
         hessian: f64,
     ) -> Result<(), ClearGbmError> {
-        if bin >= self.n_bins {
-            return Err(ClearGbmError::BinIndexOutOfBounds {
-                bin,
-                n_bins: self.n_bins,
-            });
-        }
-        self.gradient_sums[bin] += gradient;
-        self.hessian_sums[bin] += hessian;
-        self.counts[bin] += 1;
+        let n_bins = self.n_bins;
+        let Some(acc) = self.bins.get_mut(bin) else {
+            return Err(ClearGbmError::BinIndexOutOfBounds { bin, n_bins });
+        };
+        acc.gradient_sum += gradient;
+        acc.hessian_sum += hessian;
+        acc.count += 1;
         Ok(())
     }
 
@@ -261,9 +283,9 @@ impl HistogramBuffer {
     ///
     /// Returns `ClearGbmError::BinIndexOutOfBounds` if `bin` >= `n_bins`.
     pub fn gradient_sum(&self, bin: usize) -> Result<f64, ClearGbmError> {
-        self.gradient_sums
+        self.bins
             .get(bin)
-            .copied()
+            .map(|acc| acc.gradient_sum)
             .ok_or(ClearGbmError::BinIndexOutOfBounds {
                 bin,
                 n_bins: self.n_bins,
@@ -280,9 +302,9 @@ impl HistogramBuffer {
     ///
     /// Returns `ClearGbmError::BinIndexOutOfBounds` if `bin` >= `n_bins`.
     pub fn hessian_sum(&self, bin: usize) -> Result<f64, ClearGbmError> {
-        self.hessian_sums
+        self.bins
             .get(bin)
-            .copied()
+            .map(|acc| acc.hessian_sum)
             .ok_or(ClearGbmError::BinIndexOutOfBounds {
                 bin,
                 n_bins: self.n_bins,
@@ -299,38 +321,45 @@ impl HistogramBuffer {
     ///
     /// Returns `ClearGbmError::BinIndexOutOfBounds` if `bin` >= `n_bins`.
     pub fn count(&self, bin: usize) -> Result<usize, ClearGbmError> {
-        self.counts
+        self.bins
             .get(bin)
-            .copied()
+            .map(|acc| acc.count)
             .ok_or(ClearGbmError::BinIndexOutOfBounds {
                 bin,
                 n_bins: self.n_bins,
             })
     }
 
-    /// Returns a slice of all gradient sums.
+    /// Returns all gradient sums, materialized in bin order.
+    ///
+    /// Materializes from the interleaved storage; intended for
+    /// serialization and inspection, not for hot-path use.
     #[must_use]
-    pub fn gradient_sums(&self) -> &[f64] {
-        &self.gradient_sums
+    pub fn gradient_sums(&self) -> Vec<f64> {
+        self.bins.iter().map(|acc| acc.gradient_sum).collect()
     }
 
-    /// Returns a slice of all hessian sums.
+    /// Returns all hessian sums, materialized in bin order.
+    ///
+    /// Materializes from the interleaved storage; intended for
+    /// serialization and inspection, not for hot-path use.
     #[must_use]
-    pub fn hessian_sums(&self) -> &[f64] {
-        &self.hessian_sums
+    pub fn hessian_sums(&self) -> Vec<f64> {
+        self.bins.iter().map(|acc| acc.hessian_sum).collect()
     }
 
-    /// Returns a slice of all counts.
+    /// Returns all counts, materialized in bin order.
+    ///
+    /// Materializes from the interleaved storage; intended for
+    /// serialization and inspection, not for hot-path use.
     #[must_use]
-    pub fn counts(&self) -> &[usize] {
-        &self.counts
+    pub fn counts(&self) -> Vec<usize> {
+        self.bins.iter().map(|acc| acc.count).collect()
     }
 
     /// Resets all bins to zero (for reuse).
     pub fn reset(&mut self) {
-        self.gradient_sums.fill(0.0_f64);
-        self.hessian_sums.fill(0.0_f64);
-        self.counts.fill(0_usize);
+        self.bins.fill(BinAccumulator::ZERO);
     }
 
     /// Computes sibling histogram by subtraction: self = parent - child.
@@ -358,9 +387,11 @@ impl HistogramBuffer {
         }
 
         for i in 0_usize..self.n_bins {
-            self.gradient_sums[i] = parent.gradient_sums[i] - child.gradient_sums[i];
-            self.hessian_sums[i] = parent.hessian_sums[i] - child.hessian_sums[i];
-            self.counts[i] = parent.counts[i].saturating_sub(child.counts[i]);
+            self.bins[i] = BinAccumulator {
+                gradient_sum: parent.bins[i].gradient_sum - child.bins[i].gradient_sum,
+                hessian_sum: parent.bins[i].hessian_sum - child.bins[i].hessian_sum,
+                count: parent.bins[i].count.saturating_sub(child.bins[i].count),
+            };
         }
 
         Ok(())
@@ -383,9 +414,7 @@ impl HistogramBuffer {
             });
         }
 
-        self.gradient_sums.copy_from_slice(&other.gradient_sums);
-        self.hessian_sums.copy_from_slice(&other.hessian_sums);
-        self.counts.copy_from_slice(&other.counts);
+        self.bins.copy_from_slice(&other.bins);
 
         Ok(())
     }

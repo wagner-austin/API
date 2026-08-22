@@ -268,119 +268,58 @@ fn test_coverage_explicit_match_propagation() -> Result<(), ClearGbmError> {
 }
 
 #[test]
-fn test_corrupted_histogram_error_propagation() -> Result<(), ClearGbmError> {
-    // Create corrupted HistogramBuffers via serde to trigger various error paths.
-    // Different array lengths trigger different error branches.
+fn test_mismatched_histogram_arrays_rejected_at_deserialization() -> Result<(), ClearGbmError> {
+    // Before the bin accumulators were interleaved, the three histogram
+    // arrays could disagree in length and the split scan needed a per-field
+    // error arm for every access. Interleaving makes that state impossible
+    // to construct, and the deserializer is the boundary that keeps it so:
+    // any per-field length disagreement is rejected before a
+    // `HistogramBuffer` exists.
 
-    fn test_corrupted(json: &str, n_regular_bins: usize) -> Result<(), ClearGbmError> {
-        let histogram: HistogramBuffer = match serde_json::from_str(json) {
-            Ok(h) => h,
-            Err(e) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "deserialize".to_string(),
-                    reason: format!("{}", e),
-                })
-            }
-        };
-
-        let config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
-            Ok(c) => c,
-            Err(e) => return Err(e),
-        };
-
-        let result = find_best_split_from_histogram(
-            &histogram,
-            0_usize,
-            &config,
-            n_regular_bins,
-            MonotonicConstraint::None,
-        );
-
+    fn assert_rejected(json: &str) {
+        let result: Result<HistogramBuffer, serde_json::Error> = serde_json::from_str(json);
         assert!(result.is_err());
-        assert!(matches!(
-            result,
-            Err(ClearGbmError::BinIndexOutOfBounds { .. })
-        ));
-        Ok(())
     }
 
-    // ========== Tests with NaN bin (n_regular_bins < n_bins) ==========
-    // These hit the NaN bin access error branches (lines 452, 456, 460)
-
-    // Test NaN bin: gradient_sums too short at nan_bin_idx
-    let json_nan1 = r#"{
+    // gradient_sums shorter than n_bins
+    assert_rejected(
+        r#"{
         "n_bins": 10,
         "gradient_sums": [1.0, 2.0, 3.0],
         "hessian_sums": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         "counts": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
-    }"#;
-    match test_corrupted(json_nan1, 9_usize) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
+    }"#,
+    );
 
-    // Test NaN bin: hessian_sums too short at nan_bin_idx
-    let json_nan2 = r#"{
+    // hessian_sums shorter than n_bins
+    assert_rejected(
+        r#"{
         "n_bins": 10,
         "gradient_sums": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         "hessian_sums": [1.0, 2.0, 3.0],
         "counts": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
-    }"#;
-    match test_corrupted(json_nan2, 9_usize) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
+    }"#,
+    );
 
-    // Test NaN bin: counts too short at nan_bin_idx
-    let json_nan3 = r#"{
+    // counts shorter than n_bins
+    assert_rejected(
+        r#"{
         "n_bins": 10,
         "gradient_sums": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         "hessian_sums": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         "counts": [5, 5, 5]
-    }"#;
-    match test_corrupted(json_nan3, 9_usize) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
+    }"#,
+    );
 
-    // ========== Tests without NaN bin (n_regular_bins = n_bins) ==========
-    // These hit the loop error branches (lines 475, 479, 483, 517, 521, 525)
-
-    // Test loop: gradient_sums too short
-    let json_loop1 = r#"{
-        "n_bins": 10,
-        "gradient_sums": [1.0, 2.0, 3.0],
-        "hessian_sums": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-        "counts": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
-    }"#;
-    match test_corrupted(json_loop1, 10_usize) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
-
-    // Test loop: hessian_sums too short
-    let json_loop2 = r#"{
-        "n_bins": 10,
-        "gradient_sums": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-        "hessian_sums": [1.0, 2.0, 3.0],
-        "counts": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
-    }"#;
-    match test_corrupted(json_loop2, 10_usize) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
-
-    // Test loop: counts too short
-    let json_loop3 = r#"{
-        "n_bins": 10,
-        "gradient_sums": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-        "hessian_sums": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    // arrays longer than n_bins are equally a disagreement
+    assert_rejected(
+        r#"{
+        "n_bins": 2,
+        "gradient_sums": [1.0, 1.0, 1.0],
+        "hessian_sums": [1.0, 1.0, 1.0],
         "counts": [5, 5, 5]
-    }"#;
-    match test_corrupted(json_loop3, 10_usize) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
+    }"#,
+    );
 
     Ok(())
 }

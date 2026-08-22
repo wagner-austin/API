@@ -89,9 +89,7 @@ pub(crate) fn build_histogram_ordered_trusted(request: HistogramRequest<'_>) -> 
         n_bins,
     } = request;
     let mut histogram = HistogramBuffer::new(n_bins);
-    let gradient_sums = &mut histogram.gradient_sums;
-    let hessian_sums = &mut histogram.hessian_sums;
-    let counts = &mut histogram.counts;
+    let acc_bins = &mut histogram.bins;
 
     // ------------------------------------------------------------
     // Vectorized main loop: unrolled 8-wide, sequential reads on the
@@ -154,37 +152,45 @@ pub(crate) fn build_histogram_ordered_trusted(request: HistogramRequest<'_>) -> 
         let h6 = ordered_hessians[pos + 6_usize];
         let h7 = ordered_hessians[pos + 7_usize];
 
-        gradient_sums[b0] += g0;
-        hessian_sums[b0] += h0;
-        counts[b0] += 1_usize;
+        let acc0 = &mut acc_bins[b0];
+        acc0.gradient_sum += g0;
+        acc0.hessian_sum += h0;
+        acc0.count += 1_usize;
 
-        gradient_sums[b1] += g1;
-        hessian_sums[b1] += h1;
-        counts[b1] += 1_usize;
+        let acc1 = &mut acc_bins[b1];
+        acc1.gradient_sum += g1;
+        acc1.hessian_sum += h1;
+        acc1.count += 1_usize;
 
-        gradient_sums[b2] += g2;
-        hessian_sums[b2] += h2;
-        counts[b2] += 1_usize;
+        let acc2 = &mut acc_bins[b2];
+        acc2.gradient_sum += g2;
+        acc2.hessian_sum += h2;
+        acc2.count += 1_usize;
 
-        gradient_sums[b3] += g3;
-        hessian_sums[b3] += h3;
-        counts[b3] += 1_usize;
+        let acc3 = &mut acc_bins[b3];
+        acc3.gradient_sum += g3;
+        acc3.hessian_sum += h3;
+        acc3.count += 1_usize;
 
-        gradient_sums[b4] += g4;
-        hessian_sums[b4] += h4;
-        counts[b4] += 1_usize;
+        let acc4 = &mut acc_bins[b4];
+        acc4.gradient_sum += g4;
+        acc4.hessian_sum += h4;
+        acc4.count += 1_usize;
 
-        gradient_sums[b5] += g5;
-        hessian_sums[b5] += h5;
-        counts[b5] += 1_usize;
+        let acc5 = &mut acc_bins[b5];
+        acc5.gradient_sum += g5;
+        acc5.hessian_sum += h5;
+        acc5.count += 1_usize;
 
-        gradient_sums[b6] += g6;
-        hessian_sums[b6] += h6;
-        counts[b6] += 1_usize;
+        let acc6 = &mut acc_bins[b6];
+        acc6.gradient_sum += g6;
+        acc6.hessian_sum += h6;
+        acc6.count += 1_usize;
 
-        gradient_sums[b7] += g7;
-        hessian_sums[b7] += h7;
-        counts[b7] += 1_usize;
+        let acc7 = &mut acc_bins[b7];
+        acc7.gradient_sum += g7;
+        acc7.hessian_sum += h7;
+        acc7.count += 1_usize;
 
         pos += 8_usize;
     }
@@ -192,9 +198,10 @@ pub(crate) fn build_histogram_ordered_trusted(request: HistogramRequest<'_>) -> 
     for &idx in remainder {
         let idx_usize = crate::narrow::index_widen(idx);
         let bin = usize::from(bins[idx_usize]);
-        gradient_sums[bin] += ordered_gradients[pos];
-        hessian_sums[bin] += ordered_hessians[pos];
-        counts[bin] += 1_usize;
+        let acc = &mut acc_bins[bin];
+        acc.gradient_sum += ordered_gradients[pos];
+        acc.hessian_sum += ordered_hessians[pos];
+        acc.count += 1_usize;
         pos += 1_usize;
     }
 
@@ -231,6 +238,13 @@ pub(crate) fn reorder_grad_hess_into(
 ) {
     assert!(ordered_gradients.len() == sample_indices.len());
     assert!(ordered_hessians.len() == sample_indices.len());
+    // No software prefetch here, and that is a measured decision: a
+    // black-box forced-read 16 iterations ahead (the safe spelling of
+    // `_mm_prefetch` under this crate's `unsafe_code = "forbid"`) was
+    // measured 2026-08-21 at +2.5% fit time against this plain loop. The
+    // sample indices are sorted ascending, so the hardware prefetcher
+    // already covers the walk and the warming loads are pure overhead. See
+    // `libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-21_interleave.md`.
     for (i, &idx) in sample_indices.iter().enumerate() {
         let idx_usize = crate::narrow::index_widen(idx);
         ordered_gradients[i] = gradients[idx_usize];

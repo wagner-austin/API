@@ -463,21 +463,18 @@ pub fn find_best_split_from_histogram(
     let has_nan_bin = n_bins > n_regular_bins;
     let nan_bin_idx = n_regular_bins;
 
-    // Extract NaN bin statistics
+    // Extract NaN bin statistics.
+    //
+    // Direct indexing, not the fallible accessors: `bins.len() == n_bins` is
+    // a `HistogramBuffer` construction invariant (`new`, serde, subtraction
+    // and copy all enforce it), and `nan_bin_idx < n_bins` follows from the
+    // `n_regular_bins > n_bins` guard above. Before the accumulators were
+    // interleaved the three arrays could disagree in length and each access
+    // needed its own error arm; a per-field length disagreement can no
+    // longer be constructed, so those arms would be dead code.
     let (g_nan, h_nan, n_nan) = if has_nan_bin {
-        let g = match histogram.gradient_sum(nan_bin_idx) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
-        let h = match histogram.hessian_sum(nan_bin_idx) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
-        let n = match histogram.count(nan_bin_idx) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
-        (g, h, n)
+        let acc = histogram.bins[nan_bin_idx];
+        (acc.gradient_sum, acc.hessian_sum, acc.count)
     } else {
         (0.0_f64, 0.0_f64, 0_usize)
     };
@@ -490,23 +487,11 @@ pub fn find_best_split_from_histogram(
     // Cache bin data to avoid redundant histogram access in the split search loop
     let mut bin_data: Vec<(f64, f64, usize)> = Vec::with_capacity(n_regular_bins);
 
-    for i in 0_usize..n_regular_bins {
-        let g = match histogram.gradient_sum(i) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
-        let h = match histogram.hessian_sum(i) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
-        let n = match histogram.count(i) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
-        g_regular += g;
-        h_regular += h;
-        n_regular += n;
-        bin_data.push((g, h, n));
+    for acc in histogram.bins.iter().take(n_regular_bins) {
+        g_regular += acc.gradient_sum;
+        h_regular += acc.hessian_sum;
+        n_regular += acc.count;
+        bin_data.push((acc.gradient_sum, acc.hessian_sum, acc.count));
     }
 
     // Total including NaN

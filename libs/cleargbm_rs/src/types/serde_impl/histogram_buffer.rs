@@ -3,7 +3,7 @@
 use serde::de::{self, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::types::HistogramBuffer;
+use crate::types::{BinAccumulator, HistogramBuffer};
 
 impl Serialize for HistogramBuffer {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -19,15 +19,15 @@ impl Serialize for HistogramBuffer {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
-        match state.serialize_field("gradient_sums", self.gradient_sums()) {
+        match state.serialize_field("gradient_sums", &self.gradient_sums()) {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
-        match state.serialize_field("hessian_sums", self.hessian_sums()) {
+        match state.serialize_field("hessian_sums", &self.hessian_sums()) {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
-        match state.serialize_field("counts", self.counts()) {
+        match state.serialize_field("counts", &self.counts()) {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
@@ -161,29 +161,48 @@ impl<'de> Visitor<'de> for HistogramBufferVisitor {
             }
         }
 
-        let n_bins = match n_bins {
+        let n_bins: usize = match n_bins {
             Some(v) => v,
             None => return Err(de::Error::missing_field("n_bins")),
         };
-        let gradient_sums = match gradient_sums {
+        let gradient_sums: Vec<f64> = match gradient_sums {
             Some(v) => v,
             None => return Err(de::Error::missing_field("gradient_sums")),
         };
-        let hessian_sums = match hessian_sums {
+        let hessian_sums: Vec<f64> = match hessian_sums {
             Some(v) => v,
             None => return Err(de::Error::missing_field("hessian_sums")),
         };
-        let counts = match counts {
+        let counts: Vec<usize> = match counts {
             Some(v) => v,
             None => return Err(de::Error::missing_field("counts")),
         };
 
-        Ok(HistogramBuffer {
-            n_bins,
-            gradient_sums,
-            hessian_sums,
-            counts,
-        })
+        // The wire format is three parallel arrays; the in-memory layout is
+        // interleaved. A length disagreement between the arrays (or with
+        // n_bins) would silently truncate under zip, so it is rejected here.
+        if gradient_sums.len() != n_bins || hessian_sums.len() != n_bins || counts.len() != n_bins {
+            return Err(de::Error::invalid_length(
+                gradient_sums
+                    .len()
+                    .min(hessian_sums.len())
+                    .min(counts.len()),
+                &"gradient_sums, hessian_sums and counts must all have n_bins entries",
+            ));
+        }
+
+        let bins: Vec<BinAccumulator> = gradient_sums
+            .into_iter()
+            .zip(hessian_sums)
+            .zip(counts)
+            .map(|((gradient_sum, hessian_sum), count)| BinAccumulator {
+                gradient_sum,
+                hessian_sum,
+                count,
+            })
+            .collect();
+
+        Ok(HistogramBuffer { bins, n_bins })
     }
 }
 
