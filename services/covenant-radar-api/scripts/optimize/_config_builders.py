@@ -167,7 +167,6 @@ def _build_cleargbm_config(
         max_bins=int_params["max_bins"],
         subsample=float_params["subsample"],
         random_state=42,
-        track_contributions=False,
         monotonic_constraints=None,
         reg_alpha=float_params["reg_alpha"],
         reg_lambda=float_params["reg_lambda"],

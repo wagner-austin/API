@@ -218,9 +218,6 @@ def _parse_cleargbm_config(
     Raises:
         JSONTypeError: If required fields are missing or have wrong types.
     """
-    track_val = raw.get("track_contributions")
-    if not isinstance(track_val, bool):
-        raise JSONTypeError("track_contributions must be a boolean")
     growth_strategy = _parse_cleargbm_growth_strategy(raw)
     num_leaves = _parse_cleargbm_num_leaves(raw)
     if growth_strategy == "leaf_wise" and num_leaves is None:
@@ -237,7 +234,6 @@ def _parse_cleargbm_config(
         "max_bins": _optional_int(raw, "max_bins", 64),
         "subsample": require_float(raw, "subsample"),
         "random_state": require_int(raw, "random_state"),
-        "track_contributions": track_val,
         "monotonic_constraints": _parse_monotonic_constraints(raw),
         "reg_alpha": _optional_float(raw, "reg_alpha", 0.0),
         "reg_lambda": _optional_float(raw, "reg_lambda", 1.0),

@@ -282,7 +282,6 @@ class TestClearGBMTraining:
                 "max_features": None,
                 "subsample": 1.0,
                 "random_state": 42,
-                "track_contributions": False,
                 "train_ratio": 0.6,
                 "val_ratio": 0.2,
                 "test_ratio": 0.2,

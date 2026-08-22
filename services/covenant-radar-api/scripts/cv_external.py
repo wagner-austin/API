@@ -82,7 +82,6 @@ def _cleargbm_config(seed: int, growth_strategy: ClearGBMGrowthStrategy) -> Clea
         max_bins=64,
         subsample=0.8,
         random_state=seed,
-        track_contributions=False,
         monotonic_constraints=None,
         reg_alpha=0.0,
         reg_lambda=1.0,

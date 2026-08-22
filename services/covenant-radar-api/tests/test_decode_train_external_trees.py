@@ -85,8 +85,7 @@ class TestParseExternalTrainRequestTreeBackends:
             "min_samples_leaf": 5,
             "max_features": 0.8,
             "subsample": 0.8,
-            "random_state": 42,
-            "track_contributions": true
+            "random_state": 42
         }"""
         result = parse_external_train_request(body)
 
@@ -101,7 +100,6 @@ class TestParseExternalTrainRequestTreeBackends:
         assert result["config"]["min_samples_leaf"] == 5
         assert result["config"]["max_features"] == 0.8
         assert result["config"]["subsample"] == 0.8
-        assert result["config"]["track_contributions"] is True
         assert result["config"]["max_bins"] == 64
         assert result["config"]["reg_alpha"] == 0.0
         assert result["config"]["reg_lambda"] == 1.0
@@ -122,7 +120,6 @@ class TestParseExternalTrainRequestTreeBackends:
             "max_features": null,
             "subsample": 0.9,
             "random_state": 7,
-            "track_contributions": false,
             "monotonic_constraints": {"feature_a": 1, "feature_b": -1}
         }"""
         result = parse_external_train_request(body)
@@ -134,7 +131,6 @@ class TestParseExternalTrainRequestTreeBackends:
             "feature_a": 1,
             "feature_b": -1,
         }
-        assert result["config"]["track_contributions"] is False
 
     def test_valid_logreg_request(self) -> None:
         """Test parsing valid LogReg request."""

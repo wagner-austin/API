@@ -395,7 +395,6 @@ class TestBuildClearGBMConfig:
         assert config["min_samples_split"] == 10
         assert config["min_samples_leaf"] == 5
         assert config["max_bins"] == 64
-        assert config["track_contributions"] is False
         assert config["monotonic_constraints"] is None
         assert config["n_jobs"] == -1
         assert config["growth_strategy"] == "depth_wise"

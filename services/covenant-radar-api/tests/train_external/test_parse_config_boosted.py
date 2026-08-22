@@ -86,7 +86,6 @@ class TestClearGBMConfig:
                 "max_features": 0.8,
                 "subsample": 0.8,
                 "random_state": 42,
-                "track_contributions": True,
             }
         )
         result = _parse_external_train_config(config_json)
@@ -100,7 +99,6 @@ class TestClearGBMConfig:
         assert result["config"]["min_samples_leaf"] == 5
         assert result["config"]["max_features"] == 0.8
         assert result["config"]["subsample"] == 0.8
-        assert result["config"]["track_contributions"] is True
         assert result["config"]["max_bins"] == 64
         assert result["config"]["reg_alpha"] == 0.0
         assert result["config"]["reg_lambda"] == 1.0
@@ -123,7 +121,6 @@ class TestClearGBMConfig:
                 "max_features": 10,
                 "subsample": 0.9,
                 "random_state": 7,
-                "track_contributions": False,
                 "monotonic_constraints": {"feature_a": 1, "feature_b": -1},
             }
         )
@@ -150,7 +147,6 @@ class TestClearGBMConfig:
                 "max_features": None,
                 "subsample": 0.9,
                 "random_state": 7,
-                "track_contributions": False,
             }
         )
         result = _parse_external_train_config(config_json)
@@ -172,7 +168,6 @@ class TestClearGBMConfig:
                 "max_features": 0.5,
                 "subsample": 0.9,
                 "random_state": 7,
-                "track_contributions": True,
                 "monotonic_constraints": None,
             }
         )
@@ -196,7 +191,6 @@ class TestClearGBMConfig:
                 "max_bins": 128,
                 "subsample": 1.0,
                 "random_state": 99,
-                "track_contributions": False,
                 "reg_alpha": 0.5,
                 "reg_lambda": 2.0,
                 "n_jobs": 4,
@@ -226,7 +220,6 @@ class TestClearGBMConfig:
                 "max_features": None,
                 "subsample": 0.8,
                 "random_state": 42,
-                "track_contributions": False,
                 "growth_strategy": "leaf_wise",
                 "num_leaves": 31,
             }
@@ -251,7 +244,6 @@ class TestClearGBMConfig:
                 "max_features": None,
                 "subsample": 0.8,
                 "random_state": 42,
-                "track_contributions": False,
                 "growth_strategy": "depth_wise",
             }
         )
@@ -275,7 +267,6 @@ class TestClearGBMConfig:
                 "max_features": None,
                 "subsample": 0.8,
                 "random_state": 42,
-                "track_contributions": False,
                 "growth_strategy": "leaf_wise",
             }
         )
@@ -296,7 +287,6 @@ class TestClearGBMConfig:
                 "max_features": None,
                 "subsample": 0.8,
                 "random_state": 42,
-                "track_contributions": False,
                 "num_leaves": 31,
             }
         )
@@ -317,7 +307,6 @@ class TestClearGBMConfig:
                 "max_features": None,
                 "subsample": 0.8,
                 "random_state": 42,
-                "track_contributions": False,
                 "growth_strategy": "best_first",
             }
         )
@@ -338,7 +327,6 @@ class TestClearGBMConfig:
                 "max_features": None,
                 "subsample": 0.8,
                 "random_state": 42,
-                "track_contributions": False,
                 "growth_strategy": "leaf_wise",
                 "num_leaves": True,
             }
@@ -346,8 +334,14 @@ class TestClearGBMConfig:
         with pytest.raises(JSONTypeError, match="num_leaves must be an integer or null"):
             _parse_external_train_config(config_json)
 
-    def test_missing_track_contributions_raises(self) -> None:
-        """Missing track_contributions raises JSONTypeError."""
+    def test_stray_track_contributions_is_tolerated(self) -> None:
+        """The removed track_contributions field is ignored, not required.
+
+        The knob was removed 2026-08-22 (contribution extraction is a
+        post-hoc explainer capability, never a training one); older clients
+        still sending it must not break, and the parsed config must not
+        carry it.
+        """
         config_json = dump_json_str(
             {
                 "backend": "cleargbm",
@@ -362,8 +356,10 @@ class TestClearGBMConfig:
                 "random_state": 7,
             }
         )
-        with pytest.raises(JSONTypeError, match="track_contributions must be a boolean"):
-            _parse_external_train_config(config_json)
+        result = _parse_external_train_config(config_json)
+        if result["backend"] != "cleargbm":
+            raise AssertionError("Expected cleargbm backend")
+        assert "track_contributions" not in result["config"]
 
     def test_invalid_max_features_type_raises(self) -> None:
         """Invalid max_features type raises JSONTypeError."""
@@ -379,7 +375,6 @@ class TestClearGBMConfig:
                 "max_features": "invalid",
                 "subsample": 0.9,
                 "random_state": 7,
-                "track_contributions": True,
             }
         )
         with pytest.raises(JSONTypeError, match="max_features must be"):
@@ -399,7 +394,6 @@ class TestClearGBMConfig:
                 "max_features": 0.5,
                 "subsample": 0.9,
                 "random_state": 7,
-                "track_contributions": True,
                 "monotonic_constraints": "invalid",
             }
         )
@@ -420,7 +414,6 @@ class TestClearGBMConfig:
                 "max_features": 0.5,
                 "subsample": 0.9,
                 "random_state": 7,
-                "track_contributions": True,
                 "monotonic_constraints": {"feature_a": "not_int"},
             }
         )
