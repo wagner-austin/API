@@ -75,9 +75,12 @@ def _config_to_rust_dict(
     (``"depth_wise"`` / ``"leaf_wise"``) rather than being re-encoded, so the
     policy has exactly one spelling everywhere it appears.
 
-    The two remaining Python-only fields (``max_features``,
-    ``track_contributions``) are dropped because the Rust core does not
-    implement them.
+    Every config field crosses to Rust; nothing is dropped. ``max_features``
+    became a real per-split feature budget on 2026-08-22, and
+    ``track_contributions`` was removed from the config outright the same
+    day — contribution extraction is a post-hoc explainer capability over
+    the saved model, not a training knob, and a config field the trainer
+    ignores is the defect class this codebase spent the day eradicating.
 
     ``monotonic_constraints`` is stored as a tuple of ints on the Python side
     and as a list of enum-variant strings on the Rust side; this function
@@ -108,6 +111,7 @@ def _config_to_rust_dict(
         "growth_strategy": config["growth_strategy"],
         "num_leaves": config["num_leaves"],
         "scale_pos_weight": config["scale_pos_weight"],
+        "max_features": config["max_features"],
     }
 
 

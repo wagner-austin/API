@@ -52,7 +52,6 @@ def make_config(
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,
-        track_contributions=True,
         monotonic_constraints=None,
         reg_alpha=reg_alpha,
         reg_lambda=reg_lambda,

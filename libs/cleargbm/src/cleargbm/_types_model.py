@@ -16,7 +16,6 @@ from cleargbm._types_json import (
     _as_json_dict,
     _get_optional_float,
     _get_optional_int,
-    _require_bool,
     _require_float,
     _require_int,
     _require_str,
@@ -64,11 +63,12 @@ class GradientBoostingConfig(TypedDict):
         learning_rate: Shrinkage factor for updates.
         min_samples_split: Minimum samples to split a node.
         min_samples_leaf: Minimum samples in a leaf.
-        max_features: Max features per split (None = all).
+        max_features: Features each split may consider (None = all). A real
+            per-split budget as of 2026-08-22; earlier configs carried the
+            field but the trainer ignored it.
         max_bins: Number of histogram bins for split finding (64-256 typical).
         subsample: Row subsampling ratio.
         random_state: Random seed.
-        track_contributions: Track feature contributions.
         monotonic_constraints: Per-feature constraints (-1, 0, +1).
         reg_alpha: L1 regularization term on leaf weights (default: 0.0).
         reg_lambda: L2 regularization term on leaf weights (default: 1.0).
@@ -108,7 +108,6 @@ class GradientBoostingConfig(TypedDict):
     max_bins: int
     subsample: float
     random_state: int
-    track_contributions: bool
     monotonic_constraints: tuple[int, ...] | None
     reg_alpha: float
     reg_lambda: float
@@ -179,7 +178,6 @@ def encode_gradient_boosting_config(
         "max_bins": config["max_bins"],
         "subsample": config["subsample"],
         "random_state": config["random_state"],
-        "track_contributions": config["track_contributions"],
         "monotonic_constraints": (
             list(config["monotonic_constraints"])
             if config["monotonic_constraints"] is not None
@@ -226,7 +224,6 @@ def decode_gradient_boosting_config(
     max_bins = require_positive_int(_require_int(raw, "max_bins"), "max_bins")
     subsample = require_unit_float(_require_float(raw, "subsample"), "subsample")
     random_state = _require_int(raw, "random_state")
-    track_contributions = _require_bool(raw, "track_contributions")
 
     monotonic_constraints: tuple[int, ...] | None = None
     if "monotonic_constraints" in raw and raw["monotonic_constraints"] is not None:
@@ -277,7 +274,6 @@ def decode_gradient_boosting_config(
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,
-        track_contributions=track_contributions,
         monotonic_constraints=monotonic_constraints,
         reg_alpha=reg_alpha,
         reg_lambda=reg_lambda,

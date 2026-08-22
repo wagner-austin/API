@@ -177,7 +177,6 @@ class TestHelperErrorPaths:
                         "max_bins": 64,
                         "subsample": 1.0,
                         "random_state": 0,
-                        "track_contributions": False,
                         "monotonic_constraints": None,
                     },
                 }
@@ -203,7 +202,6 @@ class TestHelperErrorPaths:
                         "max_bins": 64,
                         "subsample": 1.0,
                         "random_state": 0,
-                        "track_contributions": False,
                         "monotonic_constraints": None,
                     },
                 }
@@ -229,7 +227,6 @@ class TestHelperErrorPaths:
                         "max_bins": 64,
                         "subsample": 1.0,
                         "random_state": 0,
-                        "track_contributions": False,
                         "monotonic_constraints": None,
                     },
                 }

@@ -40,7 +40,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 0.8,
             "random_state": 42,
-            "track_contributions": True,
             "monotonic_constraints": (1, -1, 0),
             "reg_alpha": 0.1,
             "reg_lambda": 1.0,
@@ -62,7 +61,6 @@ class TestGradientBoostingConfig:
         assert decoded["max_bins"] == 64
         assert decoded["subsample"] == 0.8
         assert decoded["random_state"] == 42
-        assert decoded["track_contributions"] is True
         assert decoded["monotonic_constraints"] == (1, -1, 0)
         assert decoded["reg_alpha"] == 0.1
         assert decoded["reg_lambda"] == 1.0
@@ -83,7 +81,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": None,
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -115,7 +112,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": [2],  # invalid value
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -140,7 +136,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": "not a list",
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -165,7 +160,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": ["not an int"],
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -190,7 +184,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": [True],  # bool, not int
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -215,7 +208,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": None,
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -242,7 +234,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": None,
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -291,7 +282,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": None,
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -316,7 +306,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": None,
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -346,7 +335,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": None,
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -372,7 +360,6 @@ class TestGradientBoostingConfig:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": None,
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
@@ -423,7 +410,6 @@ class TestGradientBoostingModel:
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
-            "track_contributions": False,
             "monotonic_constraints": None,
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,

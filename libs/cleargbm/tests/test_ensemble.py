@@ -43,7 +43,6 @@ def _make_config(
         max_bins=8,
         subsample=1.0,
         random_state=42,
-        track_contributions=False,
         monotonic_constraints=monotonic_constraints,
         reg_alpha=0.0,
         reg_lambda=reg_lambda,
@@ -105,10 +104,10 @@ class TestValidateTrainingInputs:
 
 
 class TestConfigToRustDict:
-    """Config translation: Python-only fields are dropped, monotonic list is passed through."""
+    """Config translation: every field crosses; monotonic list is passed through."""
 
-    def test_carries_the_fifteen_hyperparameters_plus_n_jobs(self) -> None:
-        """The Rust-side dict has exactly the 16 keys the Rust trainer reads."""
+    def test_carries_the_sixteen_hyperparameters_plus_n_jobs(self) -> None:
+        """The Rust-side dict has exactly the 17 keys the Rust trainer reads."""
         result = _config_to_rust_dict(_make_config())
         expected = {
             "n_estimators",
@@ -127,6 +126,7 @@ class TestConfigToRustDict:
             "growth_strategy",
             "num_leaves",
             "scale_pos_weight",
+            "max_features",
         }
         assert set(result.keys()) == expected
 
@@ -150,11 +150,15 @@ class TestConfigToRustDict:
         result = _config_to_rust_dict(_make_config(n_jobs=3))
         assert result["n_jobs"] == 3
 
-    def test_drops_python_only_fields(self) -> None:
-        """max_features and track_contributions have no Rust implementation."""
+    def test_forwards_max_features_to_the_rust_core(self) -> None:
+        """max_features must reach Rust, where it budgets each split search.
+
+        Regression guard: this field was dropped here for as long as the
+        core lacked the capability, leaving a config knob the trainer
+        silently ignored.
+        """
         result = _config_to_rust_dict(_make_config())
-        assert "max_features" not in result
-        assert "track_contributions" not in result
+        assert result["max_features"] is None
 
     def test_monotonic_constraints_none_stays_none(self) -> None:
         """None constraint stays None in the dict."""
