@@ -15,7 +15,7 @@ from numpy.typing import NDArray
 from covenant_ml.backends.cleargbm import (
     create_cleargbm_backend,
 )
-from covenant_ml.backends.cleargbm.backend import (
+from covenant_ml.backends.cleargbm.config_resolution import (
     _is_cleargbm_config,
 )
 from covenant_ml.backends.protocol import PreparedClassifier

@@ -11,7 +11,7 @@ from __future__ import annotations
 import types
 import uuid
 from pathlib import Path
-from typing import Protocol, TypeGuard
+from typing import Protocol
 
 import numpy as np
 from cleargbm.ensemble import (
@@ -31,12 +31,17 @@ from ...trainer import stratified_split
 from ...types import (
     BackendName,
     ClassifierTrainConfig,
-    ClearGBMConfig,
     EvalMetrics,
     FeatureImportance,
     TrainOutcome,
 )
 from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
+from .config_resolution import (
+    _compute_class_weight,
+    _is_cleargbm_config,
+    _resolve_max_features,
+    _resolve_monotonic_constraints,
+)
 
 _log = get_logger(__name__)
 
@@ -130,49 +135,6 @@ _py_gbm_model_n_trees: _NTreesProto = _native_mod.py_gbm_model_n_trees_rs
 # cleargbm auto-imports the Rust extension at its own module load, so simply
 # importing ``cleargbm.ensemble`` above already guarantees the native path is
 # live. No hook-activation call is required.
-
-
-def _is_cleargbm_config(cfg: ClassifierTrainConfig) -> TypeGuard[ClearGBMConfig]:
-    """Check if config is ClearGBMConfig by looking for ClearGBM-specific keys.
-
-    Args:
-        cfg: Configuration to check.
-
-    Returns:
-        True if config is ClearGBMConfig.
-    """
-    return (
-        isinstance(cfg, dict)
-        and "min_samples_split" in cfg
-        and "min_samples_leaf" in cfg  # LightGBM has min_child_samples instead
-    )
-
-
-def _compute_class_weight(y_train: NDArray[np.int64]) -> float:
-    """Compute scale_pos_weight from training labels.
-
-    Args:
-        y_train: Training labels.
-
-    Returns:
-        Weight for positive class.
-    """
-    pos_mask: NDArray[np.bool_] = y_train == 1
-    neg_mask: NDArray[np.bool_] = y_train == 0
-    n_positive = int(np.count_nonzero(pos_mask))
-    n_negative = int(np.count_nonzero(neg_mask))
-    if n_positive == 0:
-        raise ValueError("Training set has no positive samples")
-    computed = float(n_negative) / float(n_positive)
-    _log.info(
-        "Auto-calculated scale_pos_weight for ClearGBM",
-        extra={
-            "n_positive": n_positive,
-            "n_negative": n_negative,
-            "scale_pos_weight": computed,
-        },
-    )
-    return computed
 
 
 CLEARGBM_CAPABILITIES: BackendCapabilities = {
@@ -333,22 +295,27 @@ class ClearGBMBackend(ClassifierBackend):
         else:
             resolved_names = tuple(feature_names)
 
-        # Build ClearGBM config
+        # Build ClearGBM config. Every field comes from cfg — this method
+        # hardcoded max_features/track_contributions/monotonic_constraints/
+        # reg_alpha/reg_lambda/n_jobs until 2026-08-22, silently training
+        # with different regularization than the caller stated.
         gbm_config: GradientBoostingConfig = GradientBoostingConfig(
             n_estimators=cfg["n_estimators"],
             max_depth=cfg["max_depth"],
             learning_rate=cfg["learning_rate"],
             min_samples_split=cfg["min_samples_split"],
             min_samples_leaf=cfg["min_samples_leaf"],
-            max_features=None,
+            max_features=_resolve_max_features(cfg["max_features"], n_feats),
             max_bins=cfg["max_bins"],
             subsample=cfg["subsample"],
             random_state=cfg["random_state"],
-            track_contributions=True,
-            monotonic_constraints=None,
-            reg_alpha=0.0,
-            reg_lambda=0.0,
-            n_jobs=1,
+            track_contributions=cfg["track_contributions"],
+            monotonic_constraints=_resolve_monotonic_constraints(
+                cfg["monotonic_constraints"], resolved_names
+            ),
+            reg_alpha=cfg["reg_alpha"],
+            reg_lambda=cfg["reg_lambda"],
+            n_jobs=cfg["n_jobs"],
             early_stopping_rounds=cfg["early_stopping_rounds"],
             growth_strategy=cfg["growth_strategy"],
             num_leaves=cfg["num_leaves"],

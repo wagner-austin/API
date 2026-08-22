@@ -16,7 +16,7 @@ from covenant_ml.backends.cleargbm import (
     CLEARGBM_CAPABILITIES,
     create_cleargbm_backend,
 )
-from covenant_ml.backends.cleargbm.backend import (
+from covenant_ml.backends.cleargbm.config_resolution import (
     _compute_class_weight,
     _is_cleargbm_config,
 )

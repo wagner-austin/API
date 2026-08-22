@@ -14,6 +14,10 @@ import pytest
 from covenant_ml.backends.cleargbm import (
     create_cleargbm_backend,
 )
+from covenant_ml.backends.cleargbm.config_resolution import (
+    _resolve_max_features,
+    _resolve_monotonic_constraints,
+)
 from covenant_ml.types import (
     MLPConfig,
     TrainConfig,
@@ -212,6 +216,56 @@ def test_cleargbm_backend_train_with_subsampling(tmp_path: Path) -> None:
 
     # Should complete successfully
     assert outcome["samples_total"] == 100
+
+
+def test_cleargbm_backend_honors_reg_lambda(tmp_path: Path) -> None:
+    """reg_lambda from the config reaches the trainer and changes the model.
+
+    The backend hardcoded reg_lambda=0.0 until 2026-08-22, so cv_external's
+    stated reg_lambda=1.0 trained unregularized. Heavy L2 must shrink leaf
+    values, so predictions from the two settings cannot be identical.
+    """
+    backend = create_cleargbm_backend()
+    x, y, names = _make_synthetic_dataset()
+
+    outputs: dict[float, str] = {}
+    for reg_lambda in (0.0, 100.0):
+        config = _make_cleargbm_config(n_estimators=5)
+        config["reg_lambda"] = reg_lambda
+        outcome = _invoke_cleargbm_train(
+            backend, x, y, names, config, tmp_path / f"reg_{reg_lambda}"
+        )
+        outputs[reg_lambda] = Path(outcome["model_path"]).read_text(encoding="utf-8")
+
+    assert outputs[0.0] != outputs[100.0]
+
+
+def test_cleargbm_backend_rejects_unknown_constraint_feature(tmp_path: Path) -> None:
+    """A monotonic constraint naming a nonexistent feature is an error,
+    not a silently dropped constraint."""
+    backend = create_cleargbm_backend()
+    x, y, names = _make_synthetic_dataset()
+
+    config = _make_cleargbm_config(n_estimators=3)
+    config["monotonic_constraints"] = {"no_such_feature": 1}
+
+    with pytest.raises(ValueError, match="monotonic_constraints name unknown features"):
+        _invoke_cleargbm_train(backend, x, y, names, config, tmp_path)
+
+
+def test_resolve_monotonic_constraints_maps_names_to_columns() -> None:
+    """Named constraints land on their columns; unnamed columns get 0."""
+    resolved = _resolve_monotonic_constraints({"b": -1, "c": 1}, ("a", "b", "c"))
+    assert resolved == (0, -1, 1)
+    assert _resolve_monotonic_constraints(None, ("a", "b")) is None
+
+
+def test_resolve_max_features_translates_each_form() -> None:
+    """None passes through; ints pass through; fractions become counts."""
+    assert _resolve_max_features(None, 10) is None
+    assert _resolve_max_features(4, 10) == 4
+    assert _resolve_max_features(0.5, 10) == 5
+    assert _resolve_max_features(0.01, 10) == 1
 
 
 def test_cleargbm_backend_train_leaf_wise(tmp_path: Path) -> None:
