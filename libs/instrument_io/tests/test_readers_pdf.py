@@ -7,8 +7,9 @@ from pathlib import Path
 import pytest
 
 from instrument_io._exceptions import PDFReadError
+from instrument_io.fakes import FakePDF, FakePDFPage
 from instrument_io.readers.pdf import PDFReader, _is_pdf_file
-from instrument_io.testing import FakePDF, FakePDFPage, hooks
+from instrument_io.testing import hooks
 
 
 def test_is_pdf_file_valid(tmp_path: Path) -> None:

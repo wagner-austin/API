@@ -103,6 +103,11 @@ from instrument_io._protocols.reportlab import (
     TableStyleCommand4,
     TableStyleCommand5,
     TableStyleProtocol,
+)
+from instrument_io._protocols.reportlab import (
+    StyleProtocol as ReportlabStyleProtocol,
+)
+from instrument_io._protocols.reportlab_factories import (
     _command4_to_tuple,
     _command5_to_tuple,
     _create_image,
@@ -117,10 +122,7 @@ from instrument_io._protocols.reportlab import (
     _create_table_style_mixed,
     _get_sample_stylesheet,
 )
-from instrument_io._protocols.reportlab import (
-    StyleProtocol as ReportlabStyleProtocol,
-)
-from instrument_io._protocols.reportlab import (
+from instrument_io._protocols.reportlab_factories import (
     _create_table as _create_reportlab_table,
 )
 

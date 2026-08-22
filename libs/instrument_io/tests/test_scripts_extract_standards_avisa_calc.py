@@ -7,6 +7,9 @@ from pathlib import Path
 from scripts.extract_standards import (
     StandardsExtractor,
 )
+from scripts.extract_standards_sources import (
+    process_avisa_calc,
+)
 
 from instrument_io._protocols.openpyxl import _create_workbook
 
@@ -28,7 +31,7 @@ class TestProcessAvisaCalc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_avisa_calc(file_path)
+        process_avisa_calc(extractor, file_path)
 
         assert "Avisa Calc" in extractor.file_stats
         assert extractor.file_stats["Avisa Calc"]["sheets"] == 1
@@ -47,7 +50,7 @@ class TestProcessAvisaCalc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_avisa_calc(file_path)
+        process_avisa_calc(extractor, file_path)
 
         assert "Avisa Calc" in extractor.file_stats
 
@@ -69,7 +72,7 @@ class TestProcessAvisaCalc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_avisa_calc(file_path)
+        process_avisa_calc(extractor, file_path)
 
         assert "Avisa Calc" in extractor.file_stats
 
@@ -86,7 +89,7 @@ class TestProcessAvisaCalc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_avisa_calc(file_path)
+        process_avisa_calc(extractor, file_path)
 
         assert "Avisa Calc" in extractor.file_stats
 
@@ -107,7 +110,7 @@ class TestProcessAvisaCalc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_avisa_calc(file_path)
+        process_avisa_calc(extractor, file_path)
 
         assert "Avisa Calc" in extractor.file_stats
 
@@ -126,7 +129,7 @@ class TestProcessAvisaCalc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_avisa_calc(file_path)
+        process_avisa_calc(extractor, file_path)
 
         assert "Avisa Calc" in extractor.file_stats
 
@@ -143,7 +146,7 @@ class TestProcessAvisaCalc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_avisa_calc(file_path)
+        process_avisa_calc(extractor, file_path)
 
         assert "Avisa Calc" in extractor.file_stats
 
@@ -172,7 +175,7 @@ class TestProcessAvisaCalc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_avisa_calc(file_path)
+        process_avisa_calc(extractor, file_path)
 
         assert "Avisa Calc" in extractor.file_stats
         # Only the valid Limonene should be extracted

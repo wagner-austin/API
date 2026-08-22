@@ -8,10 +8,11 @@ import pytest
 
 from instrument_io._exceptions import WatersReadError
 from instrument_io._protocols.rainbow import DataDirectoryProtocol
+from instrument_io.fakes import FakeDataDirectory, FakeDataFile, FakeDataFile3D
 from instrument_io.readers.waters import (
     WatersReader,
 )
-from instrument_io.testing import FakeDataDirectory, FakeDataFile, FakeDataFile3D, hooks
+from instrument_io.testing import hooks
 
 
 class TestWatersReaderWithFakes:

@@ -8,6 +8,7 @@ import pytest
 
 from instrument_io._exceptions import ImzMLReadError
 from instrument_io._protocols.imzml import ImzMLParserProtocol
+from instrument_io.fakes import FakeImzMLParser
 from instrument_io.readers.imzml import (
     ImzMLReader,
     _compute_image_dimensions,
@@ -15,7 +16,7 @@ from instrument_io.readers.imzml import (
     _is_imzml_file,
     _spectrum_to_imaging_spectrum,
 )
-from instrument_io.testing import FakeImzMLParser, hooks
+from instrument_io.testing import hooks
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

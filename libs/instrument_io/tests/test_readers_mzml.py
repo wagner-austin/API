@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from instrument_io.readers.mzml import (
-    MzMLReader,
+from instrument_io.readers.mzml import MzMLReader
+from instrument_io.readers.mzml_spectrum import (
     _compute_chromatogram_stats,
     _is_mzml_file,
     _is_mzxml_file,

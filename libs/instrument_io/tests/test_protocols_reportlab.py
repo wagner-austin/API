@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from instrument_io._protocols.reportlab import (
-    TableStyleCommand4,
-    TableStyleCommand5,
+from instrument_io._protocols.reportlab import TableStyleCommand4, TableStyleCommand5
+from instrument_io._protocols.reportlab_factories import (
     _create_image,
     _create_list_flowable,
     _create_list_item,

@@ -7,6 +7,15 @@ from pathlib import Path
 from scripts.extract_standards import (
     StandardsExtractor,
 )
+from scripts.extract_standards_sources import (
+    process_chiral_standards,
+    process_claire_std,
+    process_jasmine_2024,
+    process_old_compiled,
+    process_response_factors,
+    process_standards_and_cals,
+    process_universal_list,
+)
 
 from instrument_io._protocols.openpyxl import _create_workbook
 
@@ -30,7 +39,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_response_factors(file_path)
+        process_response_factors(extractor, file_path)
 
         assert "Response Factors" in extractor.file_stats
         assert extractor.file_stats["Response Factors"]["sheets"] == 1
@@ -50,7 +59,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_response_factors(file_path)
+        process_response_factors(extractor, file_path)
 
         assert "Response Factors" in extractor.file_stats
         assert extractor.file_stats["Response Factors"]["extracted"] >= 1
@@ -70,7 +79,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_response_factors(file_path)
+        process_response_factors(extractor, file_path)
 
         assert "Response Factors" in extractor.file_stats
         assert extractor.file_stats["Response Factors"]["extracted"] >= 1
@@ -90,7 +99,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_response_factors(file_path)
+        process_response_factors(extractor, file_path)
 
         assert "Response Factors" in extractor.file_stats
         assert extractor.file_stats["Response Factors"]["extracted"] == 0
@@ -117,7 +126,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_response_factors(file_path)
+        process_response_factors(extractor, file_path)
 
         assert "Response Factors" in extractor.file_stats
         # Only the valid Limonene should be extracted
@@ -137,7 +146,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_chiral_standards(file_path)
+        process_chiral_standards(extractor, file_path)
 
         assert "ChiralStandards" in extractor.file_stats
 
@@ -154,7 +163,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_chiral_standards(file_path)
+        process_chiral_standards(extractor, file_path)
 
         assert "ChiralStandards" in extractor.file_stats
         assert extractor.file_stats["ChiralStandards"]["extracted"] == 0
@@ -181,7 +190,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_chiral_standards(file_path)
+        process_chiral_standards(extractor, file_path)
 
         assert "ChiralStandards" in extractor.file_stats
         # Only the valid (R)-Limonene should be extracted
@@ -200,7 +209,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_standards_and_cals(file_path)
+        process_standards_and_cals(extractor, file_path)
 
         assert "StandardsAndCals" in extractor.file_stats
 
@@ -219,7 +228,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_standards_and_cals(file_path)
+        process_standards_and_cals(extractor, file_path)
 
         assert "StandardsAndCals" in extractor.file_stats
         assert extractor.file_stats["StandardsAndCals"]["extracted"] == 0
@@ -246,7 +255,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_standards_and_cals(file_path)
+        process_standards_and_cals(extractor, file_path)
 
         assert "StandardsAndCals" in extractor.file_stats
         # Only the valid mixture should result in extractions
@@ -265,7 +274,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_jasmine_2024(file_path)
+        process_jasmine_2024(extractor, file_path)
 
         assert "Jasmine2024" in extractor.file_stats
 
@@ -282,7 +291,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_jasmine_2024(file_path)
+        process_jasmine_2024(extractor, file_path)
 
         assert "Jasmine2024" in extractor.file_stats
         assert extractor.file_stats["Jasmine2024"]["extracted"] == 0
@@ -300,7 +309,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_claire_std(file_path)
+        process_claire_std(extractor, file_path)
 
         assert "ClaireStd" in extractor.file_stats
 
@@ -317,7 +326,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_claire_std(file_path)
+        process_claire_std(extractor, file_path)
 
         assert "ClaireStd" in extractor.file_stats
         assert extractor.file_stats["ClaireStd"]["extracted"] == 0
@@ -335,7 +344,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_old_compiled(file_path)
+        process_old_compiled(extractor, file_path)
 
         assert "OldCompiled" in extractor.file_stats
 
@@ -352,7 +361,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_old_compiled(file_path)
+        process_old_compiled(extractor, file_path)
 
         assert "OldCompiled" in extractor.file_stats
         assert extractor.file_stats["OldCompiled"]["extracted"] == 0
@@ -380,7 +389,7 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_universal_list(file_path)
+        process_universal_list(extractor, file_path)
 
         assert "UniversalList" in extractor.file_stats
 
@@ -404,6 +413,6 @@ class TestStandardsExtractorProcessMethods:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_universal_list(file_path)
+        process_universal_list(extractor, file_path)
 
         assert "UniversalList" in extractor.file_stats

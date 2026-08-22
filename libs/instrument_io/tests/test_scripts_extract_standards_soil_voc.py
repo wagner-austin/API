@@ -7,6 +7,9 @@ from pathlib import Path
 from scripts.extract_standards import (
     StandardsExtractor,
 )
+from scripts.extract_standards_sources import (
+    process_soil_voc,
+)
 
 from instrument_io._protocols.openpyxl import _create_workbook
 
@@ -31,7 +34,7 @@ class TestProcessSoilVoc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_soil_voc(file_path)
+        process_soil_voc(extractor, file_path)
 
         assert "Soil VOC" in extractor.file_stats
         assert extractor.file_stats["Soil VOC"]["sheets"] == 1
@@ -54,7 +57,7 @@ class TestProcessSoilVoc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_soil_voc(file_path)
+        process_soil_voc(extractor, file_path)
 
         assert "Soil VOC" in extractor.file_stats
 
@@ -72,7 +75,7 @@ class TestProcessSoilVoc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_soil_voc(file_path)
+        process_soil_voc(extractor, file_path)
 
         assert "Soil VOC" in extractor.file_stats
 
@@ -95,7 +98,7 @@ class TestProcessSoilVoc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_soil_voc(file_path)
+        process_soil_voc(extractor, file_path)
 
         assert "Soil VOC" in extractor.file_stats
 
@@ -117,6 +120,6 @@ class TestProcessSoilVoc:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_soil_voc(file_path)
+        process_soil_voc(extractor, file_path)
 
         assert "Soil VOC" in extractor.file_stats

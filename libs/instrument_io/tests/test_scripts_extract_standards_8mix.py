@@ -7,6 +7,9 @@ from pathlib import Path
 from scripts.extract_standards import (
     StandardsExtractor,
 )
+from scripts.extract_standards_sources import (
+    process_8mix,
+)
 
 from instrument_io._protocols.openpyxl import _create_workbook
 
@@ -35,7 +38,7 @@ class TestProcess8mix:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_8mix(file_path)
+        process_8mix(extractor, file_path)
 
         assert "8mix" in extractor.file_stats
         assert extractor.file_stats["8mix"]["sheets"] == 1
@@ -58,7 +61,7 @@ class TestProcess8mix:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_8mix(file_path)
+        process_8mix(extractor, file_path)
 
         assert "8mix" in extractor.file_stats
         assert extractor.file_stats["8mix"]["extracted"] == 0
@@ -80,7 +83,7 @@ class TestProcess8mix:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_8mix(file_path)
+        process_8mix(extractor, file_path)
 
         assert "8mix" in extractor.file_stats
 
@@ -102,7 +105,7 @@ class TestProcess8mix:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_8mix(file_path)
+        process_8mix(extractor, file_path)
 
         assert "8mix" in extractor.file_stats
 
@@ -120,7 +123,7 @@ class TestProcess8mix:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_8mix(file_path)
+        process_8mix(extractor, file_path)
 
         assert "8mix" in extractor.file_stats
 
@@ -143,6 +146,6 @@ class TestProcess8mix:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_8mix(file_path)
+        process_8mix(extractor, file_path)
 
         assert "8mix" in extractor.file_stats

@@ -7,12 +7,13 @@ from pathlib import Path
 import pytest
 
 from instrument_io._exceptions import ThermoReadError
+from instrument_io.fakes import FakeMzMLReader
 from instrument_io.readers.thermo import (
     ThermoReader,
     _compute_chromatogram_stats,
     _is_raw_file,
 )
-from instrument_io.testing import FakeMzMLReader, hooks
+from instrument_io.testing import hooks
 from instrument_io.types.spectrum import MSSpectrum
 
 

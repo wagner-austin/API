@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from instrument_io._exceptions import SMPSReadError, TXTReadError
-from instrument_io.testing import (
+from instrument_io.fakes import (
     FakeDataDirectory,
     FakeDataFile,
     FakeDataFile3D,
@@ -22,6 +22,8 @@ from instrument_io.testing import (
     _FakeNdArray1D,
     _FakeNdArray2D,
     _FakeNdArray3D,
+)
+from instrument_io.testing import (
     _prod_shutil_which,
     _prod_smps_read_lines,
     _prod_txt_detect_encoding,

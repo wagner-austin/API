@@ -11,7 +11,7 @@ class TestSpectrumToMSSpectrumAlternativePaths:
 
     def test_retention_time_from_direct_retentiontime(self) -> None:
         """Test RT extraction from direct 'retentionTime' key (mzXML style)."""
-        from instrument_io.readers.mzml import _spectrum_to_msspectrum
+        from instrument_io.readers.mzml_spectrum import _spectrum_to_msspectrum
 
         # Create minimal spectrum with retentionTime instead of scanList
         spectrum = SpectrumDict(
@@ -29,7 +29,7 @@ class TestSpectrumToMSSpectrumAlternativePaths:
 
     def test_ms_level_from_mslevel_camelcase(self) -> None:
         """Test MS level extraction from 'msLevel' key (mzXML style)."""
-        from instrument_io.readers.mzml import _spectrum_to_msspectrum
+        from instrument_io.readers.mzml_spectrum import _spectrum_to_msspectrum
 
         # Create spectrum with msLevel instead of 'ms level'
         spectrum = SpectrumDict(
@@ -46,7 +46,7 @@ class TestSpectrumToMSSpectrumAlternativePaths:
 
     def test_retention_time_from_scanlist_dict(self) -> None:
         """Test RT extraction from scanList dict structure."""
-        from instrument_io.readers.mzml import _spectrum_to_msspectrum
+        from instrument_io.readers.mzml_spectrum import _spectrum_to_msspectrum
 
         # Create spectrum with scanList structure
         scan_entry: dict[str, SpectrumValue] = {"scan start time": 2.5}
@@ -70,7 +70,7 @@ class TestSpectrumToMSSpectrumAlternativePaths:
         When scanList is a dict with 'scan' key but the list is empty,
         the RT extraction falls through to retentionTime or defaults to 0.0.
         """
-        from instrument_io.readers.mzml import _spectrum_to_msspectrum
+        from instrument_io.readers.mzml_spectrum import _spectrum_to_msspectrum
 
         scanlist: dict[str, SpectrumValue] = {"scan": []}
         spectrum = SpectrumDict(
@@ -92,7 +92,7 @@ class TestSpectrumToMSSpectrumAlternativePaths:
 
         When scanList['scan'][0] is not a dict, RT extraction falls through.
         """
-        from instrument_io.readers.mzml import _spectrum_to_msspectrum
+        from instrument_io.readers.mzml_spectrum import _spectrum_to_msspectrum
 
         scanlist: dict[str, SpectrumValue] = {"scan": ["not a dict"]}
         spectrum = SpectrumDict(
@@ -114,7 +114,7 @@ class TestSpectrumToMSSpectrumAlternativePaths:
 
         When neither 'ms level' nor 'msLevel' is an int, ms_level defaults to 1.
         """
-        from instrument_io.readers.mzml import _spectrum_to_msspectrum
+        from instrument_io.readers.mzml_spectrum import _spectrum_to_msspectrum
 
         spectrum = SpectrumDict(
             {
@@ -131,7 +131,7 @@ class TestSpectrumToMSSpectrumAlternativePaths:
 
     def test_both_ms_level_keys_missing(self) -> None:
         """Test when neither 'ms level' nor 'msLevel' is present."""
-        from instrument_io.readers.mzml import _spectrum_to_msspectrum
+        from instrument_io.readers.mzml_spectrum import _spectrum_to_msspectrum
 
         spectrum = SpectrumDict(
             {
@@ -147,7 +147,7 @@ class TestSpectrumToMSSpectrumAlternativePaths:
 
     def test_mslevel_float_not_used(self) -> None:
         """Test that msLevel as float doesn't get used (branch 307->309)."""
-        from instrument_io.readers.mzml import _spectrum_to_msspectrum
+        from instrument_io.readers.mzml_spectrum import _spectrum_to_msspectrum
 
         spectrum = SpectrumDict(
             {

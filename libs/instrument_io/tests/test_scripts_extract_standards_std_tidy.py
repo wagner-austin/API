@@ -7,6 +7,9 @@ from pathlib import Path
 from scripts.extract_standards import (
     StandardsExtractor,
 )
+from scripts.extract_standards_sources import (
+    process_std_tidy,
+)
 
 from instrument_io._protocols.openpyxl import _create_workbook
 
@@ -31,7 +34,7 @@ class TestProcessStdTidy:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_std_tidy(file_path)
+        process_std_tidy(extractor, file_path)
 
         assert "Std Tidy" in extractor.file_stats
         assert extractor.file_stats["Std Tidy"]["sheets"] == 1
@@ -54,7 +57,7 @@ class TestProcessStdTidy:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_std_tidy(file_path)
+        process_std_tidy(extractor, file_path)
 
         assert "Std Tidy" in extractor.file_stats
 
@@ -76,7 +79,7 @@ class TestProcessStdTidy:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_std_tidy(file_path)
+        process_std_tidy(extractor, file_path)
 
         assert "Std Tidy" in extractor.file_stats
 
@@ -96,7 +99,7 @@ class TestProcessStdTidy:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_std_tidy(file_path)
+        process_std_tidy(extractor, file_path)
 
         assert "Std Tidy" in extractor.file_stats
         assert extractor.file_stats["Std Tidy"]["extracted"] == 0
@@ -121,7 +124,7 @@ class TestProcessStdTidy:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_std_tidy(file_path)
+        process_std_tidy(extractor, file_path)
 
         assert "Std Tidy" in extractor.file_stats
 
@@ -140,7 +143,7 @@ class TestProcessStdTidy:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_std_tidy(file_path)
+        process_std_tidy(extractor, file_path)
 
         assert "Std Tidy" in extractor.file_stats
 
@@ -157,6 +160,6 @@ class TestProcessStdTidy:
         wb.close()
 
         extractor = StandardsExtractor()
-        extractor._process_std_tidy(file_path)
+        process_std_tidy(extractor, file_path)
 
         assert "Std Tidy" in extractor.file_stats

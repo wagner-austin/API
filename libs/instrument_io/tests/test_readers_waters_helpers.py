@@ -8,6 +8,7 @@ import pytest
 
 from instrument_io._exceptions import WatersReadError
 from instrument_io._protocols.rainbow import DataDirectoryProtocol
+from instrument_io.fakes import FakeDataDirectory, FakeDataFile
 from instrument_io.readers.waters import (
     WatersReader,
     _build_chromatogram_meta,
@@ -18,7 +19,6 @@ from instrument_io.readers.waters import (
     _find_uv_file,
     _is_waters_raw_directory,
 )
-from instrument_io.testing import FakeDataDirectory, FakeDataFile
 
 
 class TestIsWatersRawDirectory:
