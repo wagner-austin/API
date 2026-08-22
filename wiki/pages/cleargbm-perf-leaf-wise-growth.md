@@ -6,15 +6,20 @@ related:
   - "[[cleargbm-leaf-normalized-benchmarking]]"
 source_paths:
   - libs/cleargbm/docs/EXPERIMENT_2026-08-17_growth_policy_xgb_instrument.md
+  - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-19_growth_variants.md
+  - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-21_four_arm.md
   - libs/cleargbm_rs/src/tree/builder.rs
+  - libs/cleargbm_rs/src/tree/leafwise.rs
   - libs/cleargbm_rs/src/tree/mod.rs
   - libs/cleargbm_rs/src/training/config.rs
 source_git_blobs:
-  "libs/cleargbm_rs/src/tree/builder.rs": b28c382a41a489df68fa9cd7c2c87bafee26a6a9
-  "libs/cleargbm_rs/src/tree/mod.rs": ef4ab30d8be7e5684d8d2c9deeeecefc42a3f1d9
-  "libs/cleargbm_rs/src/training/config.rs": b0b59d60edc871f4808c72dc582eaac15087f39b
-fact_checked: "2026-08-17"
-confidence: medium
+  "libs/cleargbm/docs/EXPERIMENT_2026-08-17_growth_policy_xgb_instrument.md": 570404c5fe5b67cd737dd3cddc41a29a614544e2
+  "libs/cleargbm_rs/src/tree/builder.rs": 8f518f965e4615c42267996ec73c087b838be84c
+  "libs/cleargbm_rs/src/tree/leafwise.rs": 0e540b746f0db6468f0cb6522ce43781b9a8c244
+  "libs/cleargbm_rs/src/tree/mod.rs": f2c7332be3dae4cc20b758b4c11a561626ec4401
+  "libs/cleargbm_rs/src/training/config.rs": 85fb08e891055d724122b6ff42e8d0af346e4639
+fact_checked: "2026-08-21"
+confidence: high
 hubs: [libs]
 ---
 
@@ -27,6 +32,15 @@ Replace ClearGBM's depth-first tree growth with LightGBM's leaf-wise (best-first
 **Measured 2026-08-17, before building it:** using XGBoost as the instrument (it implements both growth policies), leaf-wise growth monotonically *hurt* quality on the bankruptcy workload — depthwise at 22.8 mean leaves beat lossguide at 31 and 47 leaves on AUC-ROC, AUC-PR and log-loss — and on two smaller datasets (Taiwan bankruptcy, German credit) all arms were identical because min-leaf regularization stopped growth at ~4.5 leaves before any budget bound. Full protocol, numbers and confounds: `libs/cleargbm/docs/EXPERIMENT_2026-08-17_growth_policy_xgb_instrument.md`[^11]. Consequence for this page: the prize is **work reduction at statistically tied quality** (the ceiling is reachable at ~23 leaves; ClearGBM spends ~47), not a capacity gain, and the variant should be judged on fit-time-at-tied-quality with quality regression as the guarded downside.
 
 The interpretability objection that previously appeared here has been **withdrawn** — it rested on ClearGBM producing balanced trees, which measurement disproves[^7]. See § "Interpretability cost".
+
+## IMPLEMENTED and measured (2026-08-20 / 2026-08-21)
+
+Everything below the fold was written while this was a proposal; it is kept as the design record. What actually landed (commits `2a55899c` cleargbm_rs, `1a04bb1e` cleargbm, `bd55e8d6` covenant_ml, closing agent-board task `453c9234`):
+
+- **The axis is `growth_strategy: depth_wise | leaf_wise` paired with `num_leaves: int | None`** — not the `max_leaves: Option<usize>` sketch below. The pairing is validated: `leaf_wise` without a budget is an error, a budget under `depth_wise` is an error, `num_leaves < 2` is an error. Depth-wise behaviour is byte-unchanged, so every pre-existing manifest stays comparable.
+- **The builder is `libs/cleargbm_rs/src/tree/leafwise.rs`** — a flat frontier with ArgMax over gain (the LightGBM structure the design alternative below recorded), not the `BinaryHeap` sketch. Only the two children of a split are re-evaluated; sibling subtraction is retained. Blocked leaves are **removed** from candidacy (Shi 2007) rather than gain-poisoned; the module header proves the two are equivalent here (depth never decreases, a node's samples and histograms never change once built, so a blocked leaf can never become splittable).
+- **The load-bearing test**: with an unreachable budget, leaf-wise and depth-wise must produce bit-identical predictions — growth order changes which node splits *first*, never which nodes are splittable. It does.
+- **Measured twice, deterministically**: `BENCHMARK_RESULTS_2026-08-19_growth_variants.md` (three arms) and `BENCHMARK_RESULTS_2026-08-21_four_arm.md` (adds the `xgboost` arm). Leaf-wise reaches statistically tied quality at a third fewer leaves (~31 vs ~47) and is ~6% faster wall-clock; per leaf it is the *more* expensive builder (~1.4x), so the speed-up is entirely from building fewer leaves. Quality metrics reproduce bit-for-bit across the two dated runs — the deterministic-trialing property the board task demanded. The 2026-08-19 run also caught and fixed a measurement defect: Windows EcoQoS throttling stepped fit times 13x mid-run; `covenant_ml.benchmarking.power` now opts the process out and refuses to run throttled.
 
 ## What today's code does (depth-first)
 
@@ -48,7 +62,7 @@ while let Some(pending) = stack.pop() {
 
 Because Rust's `Vec::pop` is LIFO and the left child is pushed second, the left child is processed first — full depth-first traversal of the left subtree before touching the right. Every leaf gets one split before any other leaf gets two[^3].
 
-## What leaf-wise would change
+## What leaf-wise would change (design record — superseded by the implementation above)
 
 Replace the `Vec<PendingNode>` LIFO stack[^2] with a **max-heap ordered by best-available split gain**. At every step:
 
@@ -63,7 +77,7 @@ The `Vec<PendingNode>`[^2] → `BinaryHeap<(NotNan<f64>, PendingNode)>` swap is 
 - **Config plumbing.** `GradientBoostingConfig` today has `max_depth`[^4] but no `max_leaves`. Add `max_leaves: Option<usize>` (`None` = disable the leaf-wise cap; falls back to `max_depth`).
 - **Sibling-histogram cache invariant.** Today the depth-first code takes advantage of the fact that the sibling of a just-processed node is next on the stack; it caches the parent's histogram for the sibling-subtraction trick[^5]. Leaf-wise breaks the sibling-adjacency invariant — the sibling might not be the next leaf popped. The cache eviction policy has to change: hold the parent histogram as long as EITHER child is still an open leaf.
 
-## Config surface
+## Config surface (design record — the landed surface is `growth_strategy` + `num_leaves`, see above)
 
 New field on `libs/cleargbm_rs/src/training/config.rs::GradientBoostingConfig`[^4]:
 
