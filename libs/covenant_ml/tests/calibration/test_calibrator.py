@@ -15,7 +15,7 @@ from covenant_ml.calibration import (
     create_isotonic_calibrator,
     create_platt_calibrator,
 )
-from covenant_ml.calibration.calibrator import (
+from covenant_ml.calibration._calibrator_math import (
     _apply_sigmoid,
     _clip_probabilities,
     _compute_brier_score,

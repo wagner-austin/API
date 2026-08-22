@@ -7,12 +7,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 from covenant_ml.backends.regressor_protocol import RegressorBackend
-from covenant_ml.types import (
-    LSTMConfig,
+from covenant_ml.types import LSTMConfig, TrainConfig
+from covenant_ml.types_regression import (
     RegressionTrainOutcome,
     RegressionTrainProgress,
     RegressorTrainConfig,
-    TrainConfig,
 )
 from numpy.typing import NDArray
 

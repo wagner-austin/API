@@ -21,14 +21,13 @@ from covenant_ml.optimizer.types import (
     SampledStringParams,
     TrialResult,
 )
-
-from .conftest import (
-    FakeObjective,
+from tests.optimizer._fake_optuna import (
     FakeTrial,
     get_fake_optuna_factories,
     make_optuna_config,
     make_optuna_test_data,
 )
+from tests.optimizer._objective_fixtures import FakeObjective
 
 # =============================================================================
 # Helpers

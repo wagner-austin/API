@@ -13,20 +13,23 @@ from typing import TypeGuard
 import numpy as np
 from numpy.typing import NDArray
 
-from ...metrics import compute_all_regression_metrics
-from ...optimizer.search_spaces import make_xgboost_default_space, make_xgboost_focused_space
-from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
-from ...trainer import train_regression_model_with_validation
-from ...types import (
+from covenant_ml.metrics_regression import compute_all_regression_metrics
+from covenant_ml.trainer_regression_fit import train_regression_model_with_validation
+from covenant_ml.types import (
     FeatureImportance,
+    TrainConfig,
+)
+from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
     RegressorBackendName,
     RegressorTrainConfig,
-    TrainConfig,
     XGBRegressorFactory,
     XGBRegressorModelProtocol,
 )
+
+from ...optimizer.search_spaces import make_xgboost_default_space, make_xgboost_focused_space
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from ..protocol import BackendCapabilities
 from ..regressor_protocol import (
     PreparedRegressor,

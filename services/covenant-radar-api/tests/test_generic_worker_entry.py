@@ -18,7 +18,10 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from covenant_ml.datasets.types import TemporalFeatureState, encode_temporal_feature_state
+from covenant_ml.datasets.types_temporal import (
+    TemporalFeatureState,
+    encode_temporal_feature_state,
+)
 from covenant_ml.types import PredictorProtocol
 from numpy.typing import NDArray
 from platform_core.json_utils import dump_json_str

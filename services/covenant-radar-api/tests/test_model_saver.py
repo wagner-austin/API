@@ -22,10 +22,7 @@ from covenant_ml.backends.registry import (
     ClassifierRegistry,
 )
 from covenant_ml.datasets import DatasetConfig, DatasetRegistry, LoadedDataset
-from covenant_ml.types import (
-    BackendName,
-    TrainOutcome,
-)
+from covenant_ml.types import BackendName, TrainOutcome
 from platform_core.json_utils import dump_json_str
 from platform_core.rich_logging import setup_rich_logging
 from scripts.optimize.cli import DatasetName

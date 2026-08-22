@@ -11,7 +11,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,

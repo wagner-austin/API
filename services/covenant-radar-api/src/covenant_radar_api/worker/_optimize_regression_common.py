@@ -12,7 +12,7 @@ from pathlib import Path
 
 from covenant_ml.datasets import RegressionLoadedDataset
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 

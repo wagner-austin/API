@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.datasets.loaders._parquet_cache_io import _CacheLock
 from covenant_ml.datasets.loaders._parsing import encode_label, find_column_index
 from covenant_ml.datasets.loaders._polars_aggregation import (
     aggregate_timeseries,
@@ -40,7 +41,6 @@ from covenant_ml.datasets.loaders._polars_window import (
     compute_multi_window_features,
 )
 from covenant_ml.datasets.loaders.parquet_cache import (
-    _CacheLock,
     _compute_config_hash,
     check_cache,
     get_cache_dir,

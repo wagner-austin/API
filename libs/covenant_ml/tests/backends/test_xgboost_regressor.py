@@ -21,7 +21,7 @@ from covenant_ml.backends.xgboost.regressor import (
     create_xgboost_regressor_backend,
 )
 from covenant_ml.testing import make_train_config
-from covenant_ml.types import RegressionTrainProgress
+from covenant_ml.types_regression import RegressionTrainProgress
 
 
 def _make_regression_data(

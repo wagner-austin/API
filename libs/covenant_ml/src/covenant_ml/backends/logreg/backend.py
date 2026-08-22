@@ -18,20 +18,21 @@ from numpy.typing import NDArray
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 
-from ...metrics import compute_all_metrics
-from ...optimizer.search_spaces import make_logreg_default_space, make_logreg_focused_space
-from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
-from ...trainer import stratified_split
-from ...types import (
+from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
     EvalMetrics,
     FeatureImportance,
     LogRegConfig,
-    LogRegModelMeta,
     TrainOutcome,
     TrainProgress,
 )
+from covenant_ml.types_model_meta import LogRegModelMeta
+
+from ...metrics import compute_all_metrics
+from ...optimizer.search_spaces import make_logreg_default_space, make_logreg_focused_space
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
+from ...trainer import stratified_split
 from ..protocol import (
     BackendCapabilities,
     ClassifierBackend,

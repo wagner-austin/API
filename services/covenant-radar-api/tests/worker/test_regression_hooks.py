@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker._regression_hooks import (

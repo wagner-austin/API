@@ -9,6 +9,8 @@ import pytest
 from covenant_ml.types import (
     MLPConfig,
     MLPOptimizer,
+)
+from covenant_ml.types_regression import (
     RegressionTrainOutcome,
     RegressionTrainProgress,
     RegressorTrainConfig,

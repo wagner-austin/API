@@ -18,8 +18,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-
-from .conftest import (
+from tests.optimizer._fake_optuna import (
     make_optuna_config,
     make_optuna_test_data,
 )

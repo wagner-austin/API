@@ -16,7 +16,7 @@ Strict typing: no Any, no casts, no type: ignore.
 from __future__ import annotations
 
 import numpy as np
-from covenant_ml.datasets.types import TemporalFeatureState
+from covenant_ml.datasets.types_temporal import TemporalFeatureState
 from numpy.typing import NDArray
 
 from ..base_schemas import (

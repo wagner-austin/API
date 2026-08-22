@@ -12,10 +12,7 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-from covenant_ml.types import (
-    LightGBMConfig,
-    TrainConfig,
-)
+from covenant_ml.types import LightGBMConfig, TrainConfig
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,

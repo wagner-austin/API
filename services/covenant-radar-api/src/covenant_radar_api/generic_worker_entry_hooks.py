@@ -16,7 +16,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from covenant_ml.datasets.types import TemporalFeatureState, require_temporal_feature_state
+from covenant_ml.datasets.types_temporal import (
+    TemporalFeatureState,
+    require_temporal_feature_state,
+)
 from covenant_ml.types import PredictorProtocol
 from platform_core.json_utils import (
     JSONTypeError,

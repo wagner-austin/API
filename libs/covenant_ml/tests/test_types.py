@@ -10,10 +10,6 @@ from covenant_ml.types import (
     DMatrixProtocol,
     EvalMetrics,
     FeatureImportance,
-    RegressionMetrics,
-    RegressionTrainOutcome,
-    RegressionTrainProgress,
-    RegressorBackendName,
     TrainOutcome,
     TrainProgress,
     XGBBoosterProtocol,
@@ -21,6 +17,12 @@ from covenant_ml.types import (
     XGBClassifierLoader,
     XGBModelProtocol,
     XGBParams,
+)
+from covenant_ml.types_regression import (
+    RegressionMetrics,
+    RegressionTrainOutcome,
+    RegressionTrainProgress,
+    RegressorBackendName,
 )
 
 

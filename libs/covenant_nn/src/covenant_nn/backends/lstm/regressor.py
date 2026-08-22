@@ -21,7 +21,7 @@ from covenant_ml.backends.regressor_protocol import (
     PreparedRegressor,
     RegressorProgressCallback,
 )
-from covenant_ml.metrics import compute_all_regression_metrics
+from covenant_ml.metrics_regression import compute_all_regression_metrics
 from covenant_ml.optimizer.search_spaces import (
     make_lstm_default_space,
     make_lstm_focused_space,
@@ -32,9 +32,8 @@ from covenant_ml.optimizer.types import (
     SearchSpace,
 )
 from covenant_ml.trainer import regression_split
-from covenant_ml.types import (
-    FeatureImportance,
-    LSTMConfig,
+from covenant_ml.types import FeatureImportance, LSTMConfig
+from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
     RegressorBackendName,

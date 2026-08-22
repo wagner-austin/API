@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from . import _hooks
-from ._hooks import CudaRuntimeAvailableProtocol
-from .types import (
+from covenant_ml.types import (
     LightGBMConfig,
     LogRegConfig,
     LSTMConfig,
@@ -18,6 +16,9 @@ from .types import (
     RequestedDevice,
     TrainConfig,
 )
+
+from . import _hooks
+from ._hooks import CudaRuntimeAvailableProtocol
 
 
 def set_cuda_hook(hook: CudaRuntimeAvailableProtocol) -> None:

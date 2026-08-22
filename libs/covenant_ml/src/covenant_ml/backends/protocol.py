@@ -12,18 +12,19 @@ from typing import Protocol, TypedDict
 import numpy as np
 from numpy.typing import NDArray
 
-from ..optimizer.types import (
-    SampledFloatParams,
-    SampledIntParams,
-    SearchSpace,
-)
-from ..types import (
+from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
     EvalMetrics,
     FeatureImportance,
     TrainOutcome,
     TrainProgress,
+)
+
+from ..optimizer.types import (
+    SampledFloatParams,
+    SampledIntParams,
+    SearchSpace,
 )
 
 

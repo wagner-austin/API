@@ -12,7 +12,11 @@ from numpy.typing import NDArray
 
 from covenant_ml.backends.registry import default_registry
 from covenant_ml.base_trainer import BaseTabularTrainer
-from covenant_ml.types import TrainConfig, TrainOutcome, TrainProgress
+from covenant_ml.types import (
+    TrainConfig,
+    TrainOutcome,
+    TrainProgress,
+)
 
 
 def _make_binary_dataset(

@@ -11,13 +11,12 @@ from covenant_ml.optimizer.optuna_backend import (
 )
 from covenant_ml.optimizer.search_spaces import make_random_forest_default_space
 from covenant_ml.optimizer.types import TrialResult
-
-from .conftest import (
-    FakeObjective,
+from tests.optimizer._fake_optuna import (
     get_fake_optuna_factories,
     make_optuna_config,
     make_optuna_test_data,
 )
+from tests.optimizer._objective_fixtures import FakeObjective
 
 # =============================================================================
 # Tests: Random Forest Optimizer

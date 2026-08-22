@@ -7,7 +7,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 from covenant_ml.testing import make_train_config
-from covenant_ml.trainer import save_model, train_model
+from covenant_ml.trainer_fit import (
+    save_model,
+    train_model,
+)
 from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 from numpy.typing import NDArray
 from platform_workers.testing import FakeRedis, FakeRedisBytesClient

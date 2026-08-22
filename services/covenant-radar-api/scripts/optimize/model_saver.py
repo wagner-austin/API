@@ -20,11 +20,7 @@ from covenant_ml.features import (
     engineer_features,
     get_feature_config_for_preset,
 )
-from covenant_ml.types import (
-    BackendName,
-    ClassifierTrainConfig,
-    TrainOutcome,
-)
+from covenant_ml.types import BackendName, ClassifierTrainConfig, TrainOutcome
 from numpy.typing import NDArray
 from platform_core.json_utils import (
     dump_json_str,

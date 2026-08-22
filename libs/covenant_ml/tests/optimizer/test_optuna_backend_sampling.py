@@ -17,8 +17,7 @@ from covenant_ml.optimizer.types import (
     FloatRangeSpec,
     IntRangeSpec,
 )
-
-from .conftest import FakeTrial
+from tests.optimizer._fake_optuna import FakeTrial
 
 # =============================================================================
 # Tests: Integer Parameter Sampling

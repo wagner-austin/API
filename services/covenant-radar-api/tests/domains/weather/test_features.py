@@ -6,7 +6,7 @@ import math
 
 import numpy as np
 import pytest
-from covenant_ml.datasets.types import (
+from covenant_ml.datasets.types_temporal import (
     SeasonalCycleCoefficients,
     TailThresholds,
     TemporalFeatureConfig,

@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from ..types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
+
 from .protocol import BackendCapabilities
 from .regressor_protocol import RegressorBackend
 

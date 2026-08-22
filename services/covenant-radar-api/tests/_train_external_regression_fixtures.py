@@ -27,8 +27,8 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SearchSpace,
 )
-from covenant_ml.types import (
-    FeatureImportance,
+from covenant_ml.types import FeatureImportance
+from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
     RegressorBackendName,

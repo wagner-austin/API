@@ -17,7 +17,7 @@ from typing import Literal, Protocol, TypedDict
 import numpy as np
 from covenant_ml.explainers.regression_registry import RegressionExplainerRegistry
 from covenant_ml.explainers.types import RegressionExplainResult, SupportedExplainer
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 from numpy.typing import NDArray
 from platform_core.json_utils import (
     JSONObject,

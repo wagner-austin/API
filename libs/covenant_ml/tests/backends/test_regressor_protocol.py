@@ -24,12 +24,14 @@ from covenant_ml.optimizer.search_spaces import (
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from covenant_ml.types import (
     FeatureImportance,
+    TrainConfig,
+)
+from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
     RegressionTrainProgress,
     RegressorBackendName,
     RegressorTrainConfig,
-    TrainConfig,
 )
 
 

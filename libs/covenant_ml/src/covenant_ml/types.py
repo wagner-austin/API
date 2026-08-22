@@ -81,274 +81,23 @@ class AMEXMetricResult(TypedDict, total=True):
     default_rate_at_4_percent: float  # Recall at top 4% weighted predictions
 
 
-class TrainOutcome(TypedDict, total=True):
-    """Complete training outcome with metrics from all splits."""
-
-    model_path: str
-    model_id: str
-    samples_total: int
-    samples_train: int
-    samples_val: int
-    samples_test: int
-    train_metrics: EvalMetrics
-    val_metrics: EvalMetrics
-    test_metrics: EvalMetrics
-    best_val_auc: float
-    best_round: int
-    total_rounds: int
-    early_stopped: bool
-    # Union inlined to avoid forward ref
-    config: (
-        TrainConfig
-        | MLPConfig
-        | LSTMConfig
-        | LightGBMConfig
-        | ClearGBMConfig
-        | LogRegConfig
-        | RandomForestConfig
-    )
-    feature_importances: list[FeatureImportance]  # Sorted by importance (descending)
-    # Class weight used for training (auto-calculated if not provided in config)
-    scale_pos_weight_computed: float
-
-
 # MLP backend configuration (tabular classifier)
 # Precision/device types use platform_ml conventions (no runtime import here).
-MLPPrecision = Literal["fp32", "fp16", "bf16", "auto"]
-MLPOptimizer = Literal["adamw", "adam", "sgd"]
-
-
-class MLPConfig(TypedDict, total=True):
-    """Strict configuration for MLP backend training.
-
-    Includes explicit train/val/test splits, deterministic seed, and early stopping.
-    Optimizer is pluggable and narrowed to a small, supported set.
-    """
-
-    device: RequestedDevice
-    precision: MLPPrecision
-    optimizer: MLPOptimizer
-    hidden_sizes: tuple[int, ...]
-    learning_rate: float
-    batch_size: int
-    n_epochs: int
-    dropout: float
-    train_ratio: float
-    val_ratio: float
-    test_ratio: float
-    random_state: int
-    early_stopping_patience: int
 
 
 # LSTM backend configuration (temporal sequence classifier)
-LSTMPrecision = Literal["fp32", "fp16", "bf16", "auto"]
-
-
-class LSTMConfig(TypedDict, total=True):
-    """Strict configuration for LSTM backend training.
-
-    LSTM processes temporal sequences of financial data for bankruptcy prediction.
-    Each sequence contains multiple years of data for a single company.
-
-    The backend accepts either:
-    - Pre-sequenced data: (n_sequences, seq_len, n_features) with sequence_length set
-    - Flat data: (n_samples, n_features) reshaped to pseudo-sequences internally
-
-    For proper temporal modeling, use SequenceBuilder to prepare data with
-    entity_ids and years before training.
-    """
-
-    device: RequestedDevice
-    precision: LSTMPrecision
-    hidden_size: int  # LSTM hidden state dimension
-    num_layers: int  # Number of stacked LSTM layers
-    dropout: float  # Dropout between LSTM layers (only if num_layers > 1)
-    bidirectional: bool  # Process sequences in both directions
-    sequence_length: int  # Number of time periods in each sequence
-    learning_rate: float
-    batch_size: int
-    n_epochs: int
-    train_ratio: float
-    val_ratio: float
-    test_ratio: float
-    random_state: int
-    early_stopping_patience: int
 
 
 # LightGBM backend configuration
-class LightGBMConfig(TypedDict, total=True):
-    """Strict configuration for LightGBM backend training.
-
-    LightGBM is a gradient boosting framework that uses tree-based learning.
-    It's faster than XGBoost and handles large datasets efficiently.
-
-    Key differences from XGBoost:
-    - num_leaves: Controls tree complexity (instead of just max_depth)
-    - min_child_samples: Minimum data in a leaf
-    - Uses leaf-wise tree growth (vs level-wise in XGBoost)
-    """
-
-    device: RequestedDevice
-    learning_rate: float
-    max_depth: int
-    n_estimators: int
-    num_leaves: int  # LightGBM-specific: controls complexity
-    min_child_samples: int  # LightGBM-specific: minimum data in leaf
-    subsample: float
-    colsample_bytree: float
-    reg_alpha: float  # L1 regularization
-    reg_lambda: float  # L2 regularization
-    train_ratio: float
-    val_ratio: float
-    test_ratio: float
-    random_state: int
-    early_stopping_rounds: int
-
-
-class ClearGBMConfig(TypedDict, total=True):
-    """Configuration for ClearGBM backend training.
-
-    ClearGBM is a numpy-based gradient boosting implementation with
-    built-in interpretability features (rule extraction, feature contributions).
-    No external C++ dependencies required.
-
-    Args:
-        n_estimators: Number of boosting rounds.
-        max_depth: Maximum tree depth.
-        learning_rate: Shrinkage factor for updates.
-        min_samples_split: Minimum samples required to split a node.
-        min_samples_leaf: Minimum samples required in a leaf.
-        max_features: Max features per split (None = all, int = count, float = fraction).
-        max_bins: Histogram bins for O(K) split finding (default: 64).
-        subsample: Row subsampling ratio (1.0 = no subsampling).
-        random_state: Random seed for reproducibility.
-        track_contributions: Enable per-prediction feature contribution tracking.
-        monotonic_constraints: Dict mapping feature names to +1 (increasing) or -1 (decreasing).
-        reg_alpha: L1 regularization term on leaf weights.
-        reg_lambda: L2 regularization term on leaf weights.
-        n_jobs: Number of parallel workers (-1 = all cores, 1 = sequential).
-        train_ratio: Fraction of data for training.
-        val_ratio: Fraction of data for validation.
-        test_ratio: Fraction of data for testing.
-        early_stopping_rounds: Rounds without improvement to stop.
-    """
-
-    n_estimators: int
-    max_depth: int
-    learning_rate: float
-    min_samples_split: int
-    min_samples_leaf: int
-    max_features: int | float | None
-    max_bins: int
-    subsample: float
-    random_state: int
-    track_contributions: bool
-    monotonic_constraints: dict[str, int] | None
-    reg_alpha: float
-    reg_lambda: float
-    n_jobs: int
-    train_ratio: float
-    val_ratio: float
-    test_ratio: float
-    early_stopping_rounds: int
 
 
 # Logistic Regression backend configuration
-LogRegSolver = Literal["lbfgs", "liblinear", "newton-cg", "newton-cholesky", "sag", "saga"]
-LogRegPenalty = Literal["l1", "l2", "elasticnet", "none"]
-
-
-class LogRegConfig(TypedDict, total=True):
-    """Configuration for Logistic Regression backend training.
-
-    Logistic regression provides a simple, interpretable linear classifier
-    with probabilistic outputs. It serves as a strong baseline and is useful
-    for calibration benchmarking since its outputs are naturally calibrated.
-
-    Args:
-        solver: Optimization algorithm. "lbfgs" is default for small datasets.
-            "saga" supports all penalty types including elasticnet.
-        penalty: Regularization type. "l2" (ridge) is default.
-            "l1" (lasso) for sparsity, "elasticnet" requires saga solver.
-        C: Inverse regularization strength. Smaller values = stronger reg.
-        max_iter: Maximum iterations for solver convergence.
-        tol: Tolerance for stopping criteria.
-        class_weight_balanced: If True, weights inversely proportional to
-            class frequencies. Equivalent to class_weight="balanced".
-        train_ratio: Fraction of data for training.
-        val_ratio: Fraction of data for validation.
-        test_ratio: Fraction of data for testing.
-        random_state: Random seed for reproducibility.
-        l1_ratio: ElasticNet mixing parameter (0=L2, 1=L1). Only used with
-            penalty="elasticnet" and solver="saga".
-    """
-
-    solver: LogRegSolver
-    penalty: LogRegPenalty
-    C: float
-    max_iter: int
-    tol: float
-    class_weight_balanced: bool
-    train_ratio: float
-    val_ratio: float
-    test_ratio: float
-    random_state: int
-    l1_ratio: float
 
 
 # Random Forest backend configuration
-class RandomForestConfig(TypedDict, total=True):
-    """Configuration for Random Forest backend training.
-
-    Random Forest is an ensemble of decision trees using bagging and
-    feature randomization. Provides robust predictions and natural
-    probability estimates (though often overconfident without calibration).
-
-    Args:
-        n_estimators: Number of trees in the forest.
-        max_depth: Maximum tree depth. None means nodes expand until pure
-            or min_samples_split is reached.
-        min_samples_split: Minimum samples to split an internal node.
-        min_samples_leaf: Minimum samples required in a leaf node.
-        max_features: Features to consider for best split.
-            "sqrt" = sqrt(n_features), "log2" = log2(n_features),
-            float = fraction, int = count, None = all features.
-        bootstrap: Whether to use bootstrap samples for trees.
-        class_weight_balanced: If True, weights inversely proportional to
-            class frequencies. Equivalent to class_weight="balanced".
-        n_jobs: Number of parallel workers (-1 = all cores).
-        train_ratio: Fraction of data for training.
-        val_ratio: Fraction of data for validation.
-        test_ratio: Fraction of data for testing.
-        random_state: Random seed for reproducibility.
-        oob_score: Whether to compute out-of-bag score (requires bootstrap).
-    """
-
-    n_estimators: int
-    max_depth: int | None
-    min_samples_split: int
-    min_samples_leaf: int
-    max_features: Literal["sqrt", "log2"] | float | int | None
-    bootstrap: bool
-    class_weight_balanced: bool
-    n_jobs: int
-    train_ratio: float
-    val_ratio: float
-    test_ratio: float
-    random_state: int
-    oob_score: bool
 
 
 # Union of backend-specific train configs
-ClassifierTrainConfig = (
-    TrainConfig
-    | MLPConfig
-    | LSTMConfig
-    | LightGBMConfig
-    | ClearGBMConfig
-    | LogRegConfig
-    | RandomForestConfig
-)
 
 
 # =============================================================================
@@ -358,106 +107,7 @@ ClassifierTrainConfig = (
 # models from saved state dicts (MLP/LSTM) or verify model compatibility.
 
 
-class MLPModelMeta(TypedDict, total=True):
-    """Metadata required to reconstruct an MLP model for inference.
-
-    Stored as JSON alongside the .pt state dict file. Contains only the
-    architecture parameters needed to call _build_model() before loading
-    the state dict.
-
-    Args:
-        backend: Literal discriminator for union type narrowing.
-        n_features: Number of input features the model was trained on.
-        hidden_sizes: List of hidden layer sizes (JSON doesn't support tuples).
-        dropout: Dropout rate used in the model architecture.
-    """
-
-    backend: Literal["mlp"]
-    n_features: int
-    hidden_sizes: list[int]
-    dropout: float
-
-
-class LSTMModelMeta(TypedDict, total=True):
-    """Metadata required to reconstruct an LSTM model for inference.
-
-    Stored as JSON alongside the .pt state dict file. Contains the full
-    architecture specification needed to rebuild the LSTM network.
-
-    Args:
-        backend: Literal discriminator for union type narrowing.
-        n_features: Number of input features per time step.
-        sequence_length: Number of time steps in each sequence.
-        hidden_size: LSTM hidden state dimension.
-        num_layers: Number of stacked LSTM layers.
-        bidirectional: Whether LSTM processes sequences in both directions.
-        dropout: Dropout rate between LSTM layers.
-    """
-
-    backend: Literal["lstm"]
-    n_features: int
-    sequence_length: int
-    hidden_size: int
-    num_layers: int
-    bidirectional: bool
-    dropout: float
-
-
-class LightGBMModelMeta(TypedDict, total=True):
-    """Metadata for LightGBM model.
-
-    LightGBM's .txt format is self-describing, so minimal metadata is needed.
-    The backend field enables consistent discriminated union handling.
-
-    Args:
-        backend: Literal discriminator for union type narrowing.
-    """
-
-    backend: Literal["lightgbm"]
-
-
-class LogRegModelMeta(TypedDict, total=True):
-    """Metadata for Logistic Regression model.
-
-    Stores architecture info for model reconstruction. Logistic regression
-    models are saved as joblib files with the full sklearn estimator.
-
-    Args:
-        backend: Literal discriminator for union type narrowing.
-        n_features: Number of input features the model was trained on.
-        penalty: Regularization type used during training.
-        solver: Optimization algorithm used.
-    """
-
-    backend: Literal["logreg"]
-    n_features: int
-    penalty: LogRegPenalty
-    solver: LogRegSolver
-
-
-class RandomForestModelMeta(TypedDict, total=True):
-    """Metadata for Random Forest model.
-
-    Stores architecture info for model reconstruction. Random forest
-    models are saved as joblib files with the full sklearn estimator.
-
-    Args:
-        backend: Literal discriminator for union type narrowing.
-        n_features: Number of input features the model was trained on.
-        n_estimators: Number of trees in the forest.
-        max_depth: Maximum tree depth (None if unlimited).
-    """
-
-    backend: Literal["random_forest"]
-    n_features: int
-    n_estimators: int
-    max_depth: int | None
-
-
 # Union of model metadata types for type-safe dispatch
-ModelMeta = (
-    MLPModelMeta | LSTMModelMeta | LightGBMModelMeta | LogRegModelMeta | RandomForestModelMeta
-)
 
 
 class TrainProgress(TypedDict, total=True):
@@ -583,187 +233,252 @@ class DMatrixFactory(Protocol):
     def __call__(self, data: NDArray[np.float64]) -> DMatrixProtocol: ...
 
 
-class XGBRegressorModelProtocol(Protocol):
-    """Protocol for XGBoost regressor interface.
-
-    Parallel to XGBModelProtocol for classifiers. Key differences:
-    - fit() takes float64 y_targets instead of int64 y_labels.
-    - predict() returns 1D float64 instead of predict_proba() returning 2D.
-    - No get_xgb_params() (not needed for regression training).
-    """
-
-    @property
-    def feature_importances_(self) -> NDArray[np.float32]:
-        """Feature importance scores (gain-based by default)."""
-        ...
-
-    def fit(
-        self,
-        x_features: NDArray[np.float64],
-        y_targets: NDArray[np.float64],
-        *,
-        verbose: bool = False,
-    ) -> XGBRegressorModelProtocol:
-        """Fit the regressor on training data.
-
-        Args:
-            x_features: Feature matrix, shape (n_samples, n_features).
-            y_targets: Continuous target values, shape (n_samples,).
-            verbose: Whether to print training progress.
-
-        Returns:
-            The fitted regressor (self).
-        """
-        ...
-
-    def predict(
-        self,
-        x: NDArray[np.float64],
-    ) -> NDArray[np.float64]:
-        """Predict continuous values.
-
-        Args:
-            x: Feature matrix, shape (n_samples, n_features).
-
-        Returns:
-            Predicted values, shape (n_samples,).
-        """
-        ...
-
-    def get_booster(self) -> XGBBoosterProtocol:
-        """Return the underlying Booster object."""
-        ...
-
-    def save_model(self, fname: str) -> None:
-        """Save the regressor model to file."""
-        ...
-
-    def load_model(self, fname: str) -> None:
-        """Load a regressor model from file."""
-        ...
-
-
-class XGBRegressorFactory(Protocol):
-    """Protocol for XGBRegressor constructor.
-
-    Parallel to XGBClassifierFactory. No scale_pos_weight parameter
-    (regression has no class imbalance concept).
-    """
-
-    def __call__(
-        self,
-        *,
-        learning_rate: float,
-        max_depth: int,
-        n_estimators: int,
-        subsample: float,
-        colsample_bytree: float,
-        random_state: int,
-        objective: str,
-        eval_metric: str,
-        n_jobs: int,
-        tree_method: str,
-        device: str,
-        reg_alpha: float = 0.0,
-        reg_lambda: float = 1.0,
-    ) -> XGBRegressorModelProtocol:
-        """Construct an XGBRegressor with the given hyperparameters.
-
-        Args:
-            learning_rate: Boosting learning rate.
-            max_depth: Maximum tree depth.
-            n_estimators: Number of boosting rounds.
-            subsample: Row subsampling ratio.
-            colsample_bytree: Column subsampling ratio.
-            random_state: Random seed.
-            objective: XGBoost objective function.
-            eval_metric: Evaluation metric.
-            n_jobs: Number of parallel workers.
-            tree_method: Tree construction algorithm.
-            device: Device for training ('cpu' or 'cuda').
-            reg_alpha: L1 regularization.
-            reg_lambda: L2 regularization.
-
-        Returns:
-            Configured XGBRegressor instance.
-        """
-        ...
-
-
 # =============================================================================
 # Regression Types (parallel to classification — no shared base)
 # =============================================================================
-
-RegressorBackendName = Literal["xgboost_reg", "lightgbm_reg", "mlp_reg", "lstm_reg"]
-
-
-class RegressionMetrics(TypedDict, total=True):
-    """Evaluation metrics for regression models.
-
-    All metrics are computed from continuous predictions vs continuous targets.
-    No thresholding or class-based logic.
-
-    Args:
-        mse: Mean squared error (lower is better).
-        rmse: Root mean squared error (lower is better).
-        mae: Mean absolute error (lower is better).
-        r_squared: Coefficient of determination (higher is better, max 1.0).
-        mape: Mean absolute percentage error (lower is better).
-    """
-
-    mse: float
-    rmse: float
-    mae: float
-    r_squared: float
-    mape: float
-
-
-class RegressionTrainProgress(TypedDict, total=True):
-    """Progress update during regression training.
-
-    Args:
-        round: Current training round (1-indexed).
-        total_rounds: Total rounds configured.
-        train_rmse: Training RMSE at this round.
-        val_rmse: Validation RMSE at this round, None if no validation set.
-    """
-
-    round: int
-    total_rounds: int
-    train_rmse: float
-    val_rmse: float | None
 
 
 # Reuses existing config TypedDicts — hyperparameters are task-agnostic.
 # TrainConfig: XGBoost regressor ignores optional scale_pos_weight.
 # MLPConfig, LSTMConfig, LightGBMConfig: identical for classification and regression.
-RegressorTrainConfig = TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig
 
 
-class RegressionTrainOutcome(TypedDict, total=True):
-    """Complete training outcome for a regression model.
+MLPPrecision = Literal["fp32", "fp16", "bf16", "auto"]
 
-    Parallel to TrainOutcome for classification. Uses RegressionMetrics
-    instead of EvalMetrics, best_val_rmse instead of best_val_auc,
-    and no scale_pos_weight_computed.
+MLPOptimizer = Literal["adamw", "adam", "sgd"]
+
+
+class MLPConfig(TypedDict, total=True):
+    """Strict configuration for MLP backend training.
+
+    Includes explicit train/val/test splits, deterministic seed, and early stopping.
+    Optimizer is pluggable and narrowed to a small, supported set.
+    """
+
+    device: RequestedDevice
+    precision: MLPPrecision
+    optimizer: MLPOptimizer
+    hidden_sizes: tuple[int, ...]
+    learning_rate: float
+    batch_size: int
+    n_epochs: int
+    dropout: float
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    early_stopping_patience: int
+
+
+LSTMPrecision = Literal["fp32", "fp16", "bf16", "auto"]
+
+
+class LSTMConfig(TypedDict, total=True):
+    """Strict configuration for LSTM backend training.
+
+    LSTM processes temporal sequences of financial data for bankruptcy prediction.
+    Each sequence contains multiple years of data for a single company.
+
+    The backend accepts either:
+    - Pre-sequenced data: (n_sequences, seq_len, n_features) with sequence_length set
+    - Flat data: (n_samples, n_features) reshaped to pseudo-sequences internally
+
+    For proper temporal modeling, use SequenceBuilder to prepare data with
+    entity_ids and years before training.
+    """
+
+    device: RequestedDevice
+    precision: LSTMPrecision
+    hidden_size: int  # LSTM hidden state dimension
+    num_layers: int  # Number of stacked LSTM layers
+    dropout: float  # Dropout between LSTM layers (only if num_layers > 1)
+    bidirectional: bool  # Process sequences in both directions
+    sequence_length: int  # Number of time periods in each sequence
+    learning_rate: float
+    batch_size: int
+    n_epochs: int
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    early_stopping_patience: int
+
+
+class LightGBMConfig(TypedDict, total=True):
+    """Strict configuration for LightGBM backend training.
+
+    LightGBM is a gradient boosting framework that uses tree-based learning.
+    It's faster than XGBoost and handles large datasets efficiently.
+
+    Key differences from XGBoost:
+    - num_leaves: Controls tree complexity (instead of just max_depth)
+    - min_child_samples: Minimum data in a leaf
+    - Uses leaf-wise tree growth (vs level-wise in XGBoost)
+    """
+
+    device: RequestedDevice
+    learning_rate: float
+    max_depth: int
+    n_estimators: int
+    num_leaves: int  # LightGBM-specific: controls complexity
+    min_child_samples: int  # LightGBM-specific: minimum data in leaf
+    subsample: float
+    colsample_bytree: float
+    reg_alpha: float  # L1 regularization
+    reg_lambda: float  # L2 regularization
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    early_stopping_rounds: int
+
+
+class ClearGBMConfig(TypedDict, total=True):
+    """Configuration for ClearGBM backend training.
+
+    ClearGBM is a numpy-based gradient boosting implementation with
+    built-in interpretability features (rule extraction, feature contributions).
+    No external C++ dependencies required.
 
     Args:
-        model_path: Path to saved model file.
-        model_id: Unique identifier for this trained model.
-        samples_total: Total number of samples in dataset.
-        samples_train: Number of training samples.
-        samples_val: Number of validation samples.
-        samples_test: Number of test samples.
-        train_metrics: Regression metrics on training set.
-        val_metrics: Regression metrics on validation set.
-        test_metrics: Regression metrics on test set.
-        best_val_rmse: Best validation RMSE achieved (lower is better).
-        best_round: Round that achieved best validation RMSE.
-        total_rounds: Total training rounds executed.
-        early_stopped: Whether training stopped early.
-        config: The regressor configuration used for training.
-        feature_importances: Feature importances sorted descending.
+        n_estimators: Number of boosting rounds.
+        max_depth: Maximum tree depth.
+        learning_rate: Shrinkage factor for updates.
+        min_samples_split: Minimum samples required to split a node.
+        min_samples_leaf: Minimum samples required in a leaf.
+        max_features: Max features per split (None = all, int = count, float = fraction).
+        max_bins: Histogram bins for O(K) split finding (default: 64).
+        subsample: Row subsampling ratio (1.0 = no subsampling).
+        random_state: Random seed for reproducibility.
+        track_contributions: Enable per-prediction feature contribution tracking.
+        monotonic_constraints: Dict mapping feature names to +1 (increasing) or -1 (decreasing).
+        reg_alpha: L1 regularization term on leaf weights.
+        reg_lambda: L2 regularization term on leaf weights.
+        n_jobs: Number of parallel workers (-1 = all cores, 1 = sequential).
+        train_ratio: Fraction of data for training.
+        val_ratio: Fraction of data for validation.
+        test_ratio: Fraction of data for testing.
+        early_stopping_rounds: Rounds without improvement to stop.
     """
+
+    n_estimators: int
+    max_depth: int
+    learning_rate: float
+    min_samples_split: int
+    min_samples_leaf: int
+    max_features: int | float | None
+    max_bins: int
+    subsample: float
+    random_state: int
+    track_contributions: bool
+    monotonic_constraints: dict[str, int] | None
+    reg_alpha: float
+    reg_lambda: float
+    n_jobs: int
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    early_stopping_rounds: int
+
+
+LogRegSolver = Literal["lbfgs", "liblinear", "newton-cg", "newton-cholesky", "sag", "saga"]
+
+LogRegPenalty = Literal["l1", "l2", "elasticnet", "none"]
+
+
+class LogRegConfig(TypedDict, total=True):
+    """Configuration for Logistic Regression backend training.
+
+    Logistic regression provides a simple, interpretable linear classifier
+    with probabilistic outputs. It serves as a strong baseline and is useful
+    for calibration benchmarking since its outputs are naturally calibrated.
+
+    Args:
+        solver: Optimization algorithm. "lbfgs" is default for small datasets.
+            "saga" supports all penalty types including elasticnet.
+        penalty: Regularization type. "l2" (ridge) is default.
+            "l1" (lasso) for sparsity, "elasticnet" requires saga solver.
+        C: Inverse regularization strength. Smaller values = stronger reg.
+        max_iter: Maximum iterations for solver convergence.
+        tol: Tolerance for stopping criteria.
+        class_weight_balanced: If True, weights inversely proportional to
+            class frequencies. Equivalent to class_weight="balanced".
+        train_ratio: Fraction of data for training.
+        val_ratio: Fraction of data for validation.
+        test_ratio: Fraction of data for testing.
+        random_state: Random seed for reproducibility.
+        l1_ratio: ElasticNet mixing parameter (0=L2, 1=L1). Only used with
+            penalty="elasticnet" and solver="saga".
+    """
+
+    solver: LogRegSolver
+    penalty: LogRegPenalty
+    C: float
+    max_iter: int
+    tol: float
+    class_weight_balanced: bool
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    l1_ratio: float
+
+
+class RandomForestConfig(TypedDict, total=True):
+    """Configuration for Random Forest backend training.
+
+    Random Forest is an ensemble of decision trees using bagging and
+    feature randomization. Provides robust predictions and natural
+    probability estimates (though often overconfident without calibration).
+
+    Args:
+        n_estimators: Number of trees in the forest.
+        max_depth: Maximum tree depth. None means nodes expand until pure
+            or min_samples_split is reached.
+        min_samples_split: Minimum samples to split an internal node.
+        min_samples_leaf: Minimum samples required in a leaf node.
+        max_features: Features to consider for best split.
+            "sqrt" = sqrt(n_features), "log2" = log2(n_features),
+            float = fraction, int = count, None = all features.
+        bootstrap: Whether to use bootstrap samples for trees.
+        class_weight_balanced: If True, weights inversely proportional to
+            class frequencies. Equivalent to class_weight="balanced".
+        n_jobs: Number of parallel workers (-1 = all cores).
+        train_ratio: Fraction of data for training.
+        val_ratio: Fraction of data for validation.
+        test_ratio: Fraction of data for testing.
+        random_state: Random seed for reproducibility.
+        oob_score: Whether to compute out-of-bag score (requires bootstrap).
+    """
+
+    n_estimators: int
+    max_depth: int | None
+    min_samples_split: int
+    min_samples_leaf: int
+    max_features: Literal["sqrt", "log2"] | float | int | None
+    bootstrap: bool
+    class_weight_balanced: bool
+    n_jobs: int
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    oob_score: bool
+
+
+ClassifierTrainConfig = (
+    TrainConfig
+    | MLPConfig
+    | LSTMConfig
+    | LightGBMConfig
+    | ClearGBMConfig
+    | LogRegConfig
+    | RandomForestConfig
+)
+
+
+class TrainOutcome(TypedDict, total=True):
+    """Complete training outcome with metrics from all splits."""
 
     model_path: str
     model_id: str
@@ -771,15 +486,26 @@ class RegressionTrainOutcome(TypedDict, total=True):
     samples_train: int
     samples_val: int
     samples_test: int
-    train_metrics: RegressionMetrics
-    val_metrics: RegressionMetrics
-    test_metrics: RegressionMetrics
-    best_val_rmse: float
+    train_metrics: EvalMetrics
+    val_metrics: EvalMetrics
+    test_metrics: EvalMetrics
+    best_val_auc: float
     best_round: int
     total_rounds: int
     early_stopped: bool
-    config: RegressorTrainConfig
-    feature_importances: list[FeatureImportance]
+    # Union inlined to avoid forward ref
+    config: (
+        TrainConfig
+        | MLPConfig
+        | LSTMConfig
+        | LightGBMConfig
+        | ClearGBMConfig
+        | LogRegConfig
+        | RandomForestConfig
+    )
+    feature_importances: list[FeatureImportance]  # Sorted by importance (descending)
+    # Class weight used for training (auto-calculated if not provided in config)
+    scale_pos_weight_computed: float
 
 
 __all__ = [
@@ -792,27 +518,17 @@ __all__ = [
     "EvalMetrics",
     "FeatureImportance",
     "LSTMConfig",
-    "LSTMModelMeta",
     "LSTMPrecision",
     "LightGBMConfig",
-    "LightGBMModelMeta",
     "LogRegConfig",
-    "LogRegModelMeta",
     "LogRegPenalty",
     "LogRegSolver",
     "MLPConfig",
-    "MLPModelMeta",
+    "MLPOptimizer",
     "MLPPrecision",
-    "ModelMeta",
     "PredictorProtocol",
     "Proba2DProtocol",
     "RandomForestConfig",
-    "RandomForestModelMeta",
-    "RegressionMetrics",
-    "RegressionTrainOutcome",
-    "RegressionTrainProgress",
-    "RegressorBackendName",
-    "RegressorTrainConfig",
     "TrainConfig",
     "TrainConfigRequired",
     "TrainOutcome",
@@ -821,6 +537,4 @@ __all__ = [
     "XGBClassifierFactory",
     "XGBClassifierLoader",
     "XGBModelProtocol",
-    "XGBRegressorFactory",
-    "XGBRegressorModelProtocol",
 ]

@@ -13,18 +13,19 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 
-from ..optimizer.types import (
-    SampledFloatParams,
-    SampledIntParams,
-    SearchSpace,
-)
-from ..types import (
-    FeatureImportance,
+from covenant_ml.types import FeatureImportance
+from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
     RegressionTrainProgress,
     RegressorBackendName,
     RegressorTrainConfig,
+)
+
+from ..optimizer.types import (
+    SampledFloatParams,
+    SampledIntParams,
+    SearchSpace,
 )
 from .protocol import BackendCapabilities
 

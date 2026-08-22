@@ -23,7 +23,11 @@ from covenant_ml.ensemble.regression_types import (
     RegressionOptimizationResult,
 )
 from covenant_ml.ensemble.types import EnsembleWeights
-from covenant_ml.metrics import compute_mae, compute_r_squared, compute_rmse
+from covenant_ml.metrics_regression import (
+    compute_mae,
+    compute_r_squared,
+    compute_rmse,
+)
 
 _log = get_logger(__name__)
 

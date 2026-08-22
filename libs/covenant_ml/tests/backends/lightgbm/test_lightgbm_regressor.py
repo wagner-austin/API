@@ -22,6 +22,8 @@ from covenant_ml.backends.regressor_registry import default_regressor_registry
 from covenant_ml.types import (
     LightGBMConfig,
     MLPConfig,
+)
+from covenant_ml.types_regression import (
     RegressionTrainOutcome,
     RegressionTrainProgress,
     RegressorTrainConfig,

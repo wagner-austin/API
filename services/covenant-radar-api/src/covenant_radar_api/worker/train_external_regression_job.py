@@ -19,10 +19,12 @@ from covenant_ml.backends.regressor_registry import RegressorRegistry
 from covenant_ml.types import (
     FeatureImportance,
     LightGBMConfig,
+    TrainConfig,
+)
+from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
     RegressorBackendName,
-    TrainConfig,
 )
 from platform_core.json_utils import JSONValue, dump_json_str
 from platform_core.logging import get_logger

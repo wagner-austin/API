@@ -280,7 +280,10 @@ class TestRealXgboostLoader:
         """Test _real_xgboost_loader loads real XGBoost model."""
         import numpy as np
         from covenant_ml.testing import make_train_config
-        from covenant_ml.trainer import save_model, train_model
+        from covenant_ml.trainer_fit import (
+            save_model,
+            train_model,
+        )
         from numpy.typing import NDArray
 
         from covenant_radar_api.streaming_worker_entry_hooks import (

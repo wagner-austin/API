@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from covenant_ml.datasets.types import encode_temporal_feature_state
+from covenant_ml.datasets.types_temporal import encode_temporal_feature_state
 from platform_core.json_utils import InvalidJsonError, JSONTypeError, dump_json_str
 
 from covenant_radar_api.generic_worker_entry_hooks import (

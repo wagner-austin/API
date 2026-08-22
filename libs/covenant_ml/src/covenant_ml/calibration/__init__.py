@@ -12,13 +12,13 @@ from __future__ import annotations
 
 from .calibrator import (
     CalibratedPredictions,
-    CalibrationMethod,
     CalibrationResult,
     Calibrator,
     create_isotonic_calibrator,
     create_platt_calibrator,
 )
 from .types import (
+    CalibrationMethod,
     CalibratorConfig,
     CalibratorState,
     decode_calibrator_state,

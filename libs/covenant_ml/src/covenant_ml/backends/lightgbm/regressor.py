@@ -17,19 +17,22 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
-from ...metrics import compute_all_regression_metrics
-from ...optimizer.search_spaces import make_lightgbm_default_space, make_lightgbm_focused_space
-from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
-from ...trainer import regression_split
-from ...types import (
+from covenant_ml.metrics_regression import compute_all_regression_metrics
+from covenant_ml.types import (
     FeatureImportance,
     LightGBMConfig,
+)
+from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
     RegressionTrainProgress,
     RegressorBackendName,
     RegressorTrainConfig,
 )
+
+from ...optimizer.search_spaces import make_lightgbm_default_space, make_lightgbm_focused_space
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
+from ...trainer import regression_split
 from ..protocol import BackendCapabilities
 from ..regressor_protocol import (
     PreparedRegressor,

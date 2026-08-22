@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,

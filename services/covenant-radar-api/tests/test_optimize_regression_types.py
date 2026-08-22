@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
 from covenant_radar_api.worker.optimize_regression_types import (

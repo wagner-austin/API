@@ -16,17 +16,19 @@ from platform_ml.explainers.protocol import (
     RegressorPredictorProtocol,
 )
 
-from covenant_ml.explainers.regression_registry import (
-    RegressionExplainerRegistration,
-    RegressionExplainerRegistry,
+from covenant_ml.explainers.regression_adapters import (
     _get_importance_from_pair,
     _rank_features,
     _RegressionGradientAdapter,
     _RegressionGradientModelWrapper,
     _RegressionIntegratedGradientsAdapter,
+)
+from covenant_ml.explainers.regression_registry import (
+    RegressionExplainerRegistration,
+    RegressionExplainerRegistry,
     default_regression_explainer_registry,
 )
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 
 
 class _TrainableRegressorProto(Protocol):
@@ -451,18 +453,14 @@ class TestRegressionShapTreeAdapter:
 
     def test_explainer_name(self) -> None:
         """Returns 'shap_tree'."""
-        from covenant_ml.explainers.regression_registry import (
-            _RegressionShapTreeAdapter,
-        )
+        from covenant_ml.explainers.regression_adapters import _RegressionShapTreeAdapter
 
         adapter = _RegressionShapTreeAdapter()
         assert adapter.explainer_name() == "shap_tree"
 
     def test_capabilities(self) -> None:
         """Capabilities do not require gradients."""
-        from covenant_ml.explainers.regression_registry import (
-            _RegressionShapTreeAdapter,
-        )
+        from covenant_ml.explainers.regression_adapters import _RegressionShapTreeAdapter
 
         adapter = _RegressionShapTreeAdapter()
         caps = adapter.capabilities()
@@ -471,9 +469,7 @@ class TestRegressionShapTreeAdapter:
 
     def test_compute_importance_with_raw_xgboost(self) -> None:
         """SHAP tree adapter works with a raw XGBRegressor."""
-        from covenant_ml.explainers.regression_registry import (
-            _RegressionShapTreeAdapter,
-        )
+        from covenant_ml.explainers.regression_adapters import _RegressionShapTreeAdapter
 
         xgb_mod = __import__("xgboost")
         regressor: _TrainableRegressorProto = xgb_mod.XGBRegressor(
@@ -501,10 +497,8 @@ class TestRegressionShapTreeAdapter:
     def test_compute_importance_with_wrapped_xgboost(self) -> None:
         """SHAP tree adapter unwraps _XGBRegressorPrepared to get raw model."""
         from covenant_ml.backends.xgboost.regressor import _XGBRegressorPrepared
-        from covenant_ml.explainers.regression_registry import (
-            _RegressionShapTreeAdapter,
-        )
-        from covenant_ml.types import XGBRegressorModelProtocol
+        from covenant_ml.explainers.regression_adapters import _RegressionShapTreeAdapter
+        from covenant_ml.types_regression import XGBRegressorModelProtocol
 
         xgb_mod = __import__("xgboost")
         xgb_model: XGBRegressorModelProtocol = xgb_mod.XGBRegressor(

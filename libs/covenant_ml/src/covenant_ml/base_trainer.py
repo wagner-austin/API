@@ -10,9 +10,14 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.types import (
+    BackendName,
+    ClassifierTrainConfig,
+    TrainOutcome,
+)
+
 from .backends.protocol import ProgressCallback
 from .backends.registry import ClassifierRegistry
-from .types import BackendName, ClassifierTrainConfig, TrainOutcome
 
 
 class BaseTabularTrainer:

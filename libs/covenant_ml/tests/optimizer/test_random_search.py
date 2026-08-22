@@ -16,13 +16,18 @@ from covenant_ml.optimizer.strategies import (
     create_random_search_optimizer,
 )
 from covenant_ml.optimizer.types import OptimizationConfig
-
-from .conftest import (
+from tests.optimizer._objective_fixtures import (
     dummy_objective,
     lightgbm_dart_no_params_objective,
     lightgbm_dart_objective,
     lightgbm_objective,
     lstm_objective,
+    mlp_objective,
+    slow_objective,
+    xgboost_dart_no_params_objective,
+    xgboost_dart_objective,
+)
+from tests.optimizer._space_fixtures import (
     make_features,
     make_labels,
     make_lightgbm_dart_no_params_space,
@@ -38,10 +43,6 @@ from .conftest import (
     make_xgboost_dart_search_space,
     make_xgboost_log_scale_space,
     make_xgboost_search_space,
-    mlp_objective,
-    slow_objective,
-    xgboost_dart_no_params_objective,
-    xgboost_dart_objective,
 )
 
 # =============================================================================

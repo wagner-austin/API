@@ -5,78 +5,20 @@ Uses real lightgbm library for integration testing. No mocks.
 
 from __future__ import annotations
 
-import numpy as np
-from numpy.typing import NDArray
-
 from covenant_ml.optimizer.objectives.lightgbm_objective import (
     LightGBMObjective,
     _get_lgb_dataset_and_train,
     _resolve_lightgbm_device,
     create_lightgbm_objective,
 )
-from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
-
-# =============================================================================
-# Test Data Helpers
-# =============================================================================
-
-
-def _make_test_data(
-    n_samples: int = 100, n_features: int = 5, seed: int = 42
-) -> tuple[NDArray[np.float64], NDArray[np.int64], list[str]]:
-    """Create test dataset for optimization."""
-    rng = np.random.default_rng(seed)
-    x = rng.standard_normal((n_samples, n_features)).astype(np.float64)
-    # Create imbalanced labels: ~30% positive
-    n_positive = n_samples // 3
-    y = np.zeros(n_samples, dtype=np.int64)
-    y[:n_positive] = 1
-    rng.shuffle(y)
-    return x, y, [f"feat_{i}" for i in range(n_features)]
-
-
-def _make_positive_data(x: NDArray[np.float64], offset: float) -> NDArray[np.float64]:
-    """Make data positive by taking absolute value and adding offset.
-
-    Uses direct type annotation to satisfy mypy, same pattern as features.py.
-    """
-    abs_x: NDArray[np.float64] = np.abs(x)
-    result: NDArray[np.float64] = abs_x + offset
-    return result
-
-
-def _make_default_int_params() -> SampledIntParams:
-    """Create default integer parameters for testing.
-
-    Note: max_depth is not included because LightGBM optimization uses
-    fixed max_depth=-1 (unlimited) to let num_leaves control tree complexity.
-    """
-    return SampledIntParams(
-        n_estimators=10,
-        num_leaves=8,
-        min_child_samples=5,
-    )
-
-
-def _make_default_float_params() -> SampledFloatParams:
-    """Create default float parameters for testing."""
-    return SampledFloatParams(
-        learning_rate=0.1,
-        reg_alpha=0.0,
-        reg_lambda=1.0,
-        subsample=0.8,
-        colsample_bytree=0.8,
-    )
-
-
-def _make_default_string_params() -> SampledStringParams:
-    """Create default string parameters for testing (empty for LightGBM)."""
-    return SampledStringParams()
-
-
-# =============================================================================
-# Tests: Dynamic Import Helpers
-# =============================================================================
+from covenant_ml.optimizer.types import SampledIntParams
+from tests.optimizer._lightgbm_objective_fixtures import (
+    _make_default_float_params,
+    _make_default_int_params,
+    _make_default_string_params,
+    _make_positive_data,
+    _make_test_data,
+)
 
 
 def test_get_lgb_dataset_and_train_returns_valid_types() -> None:
@@ -112,11 +54,6 @@ def test_get_lgb_dataset_and_train_returns_valid_types() -> None:
     # Verify booster can make predictions
     preds = booster.predict(x, num_iteration=None)
     assert len(preds) == 30
-
-
-# =============================================================================
-# Tests: LightGBMObjective Initialization
-# =============================================================================
 
 
 def test_lightgbm_objective_init_stores_feature_count() -> None:
@@ -178,11 +115,6 @@ def test_lightgbm_objective_init_with_early_stopping_rounds() -> None:
         x, y, names, device="cpu", feature_preset="none", early_stopping_rounds=20
     )
     assert objective.n_features == 4
-
-
-# =============================================================================
-# Tests: LightGBMObjective Call
-# =============================================================================
 
 
 def test_lightgbm_objective_call_returns_auc() -> None:
@@ -323,11 +255,6 @@ def test_lightgbm_objective_multiple_calls_deterministic() -> None:
     assert auc1 == auc2
 
 
-# =============================================================================
-# Tests: Factory Function
-# =============================================================================
-
-
 def test_create_lightgbm_objective_returns_objective() -> None:
     """create_lightgbm_objective returns callable with n_features property."""
     x, y, names = _make_test_data(n_samples=50, n_features=4)
@@ -398,11 +325,6 @@ def test_create_lightgbm_objective_with_early_stopping_rounds() -> None:
     assert 0.0 <= auc <= 1.0
 
 
-# =============================================================================
-# Tests: n_features Property
-# =============================================================================
-
-
 def test_n_features_property_matches_original() -> None:
     """n_features matches input when no engineering applied."""
     x, y, names = _make_test_data(n_samples=50, n_features=7)
@@ -417,11 +339,6 @@ def test_n_features_property_reflects_engineering() -> None:
     objective = LightGBMObjective(x_positive, y, names, device="cpu", feature_preset="log_only")
     # log_only typically doubles features (original + log)
     assert objective.n_features > 4
-
-
-# =============================================================================
-# Tests: Device Resolution
-# =============================================================================
 
 
 def test_resolve_lightgbm_device_auto_returns_cpu() -> None:
@@ -464,176 +381,3 @@ def test_resolve_lightgbm_device_returns_valid_type_for_all_inputs() -> None:
     for device_input in inputs:
         result = _resolve_lightgbm_device(device_input)
         assert result in valid_outputs
-
-
-# =============================================================================
-# Tests: DART Boosting
-# =============================================================================
-
-
-def test_lightgbm_objective_with_dart_boosting() -> None:
-    """LightGBMObjective uses DART params when boosting_type is 'dart'."""
-    x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
-
-    int_params = _make_default_int_params()
-    float_params = SampledFloatParams(
-        learning_rate=0.1,
-        reg_alpha=0.0,
-        reg_lambda=1.0,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        drop_rate=0.1,  # DART param
-        skip_drop=0.5,  # DART param
-    )
-    string_params = SampledStringParams(boosting_type="dart")
-
-    auc = objective(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        int_params=int_params,
-        float_params=float_params,
-        string_params=string_params,
-        train_ratio=0.7,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        random_state=42,
-    )
-
-    # AUC must be between 0 and 1
-    assert 0.0 <= auc <= 1.0
-
-
-def test_lightgbm_objective_with_dart_partial_params() -> None:
-    """LightGBMObjective handles partial DART params (only drop_rate, no skip_drop)."""
-    x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
-
-    int_params = _make_default_int_params()
-    float_params = SampledFloatParams(
-        learning_rate=0.1,
-        reg_alpha=0.0,
-        reg_lambda=1.0,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        drop_rate=0.1,  # Only drop_rate, no skip_drop
-    )
-    string_params = SampledStringParams(boosting_type="dart")
-
-    auc = objective(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        int_params=int_params,
-        float_params=float_params,
-        string_params=string_params,
-        train_ratio=0.7,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        random_state=42,
-    )
-
-    # AUC must be between 0 and 1
-    assert 0.0 <= auc <= 1.0
-
-
-def test_lightgbm_objective_with_dart_skip_drop_only() -> None:
-    """LightGBMObjective handles DART with only skip_drop (no drop_rate)."""
-    x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
-
-    int_params = _make_default_int_params()
-    float_params = SampledFloatParams(
-        learning_rate=0.1,
-        reg_alpha=0.0,
-        reg_lambda=1.0,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        skip_drop=0.5,  # Only skip_drop, no drop_rate
-    )
-    string_params = SampledStringParams(boosting_type="dart")
-
-    auc = objective(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        int_params=int_params,
-        float_params=float_params,
-        string_params=string_params,
-        train_ratio=0.7,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        random_state=42,
-    )
-
-    # AUC must be between 0 and 1
-    assert 0.0 <= auc <= 1.0
-
-
-def test_lightgbm_objective_with_dart_feature_fraction() -> None:
-    """LightGBMObjective uses feature_fraction when boosting_type is 'dart' (Phase 6)."""
-    x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
-
-    int_params = _make_default_int_params()
-    float_params = SampledFloatParams(
-        learning_rate=0.1,
-        reg_alpha=0.0,
-        reg_lambda=1.0,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        drop_rate=0.1,
-        skip_drop=0.5,
-        feature_fraction=0.05,  # Phase 6: aggressive feature subsampling for DART
-    )
-    string_params = SampledStringParams(boosting_type="dart")
-
-    auc = objective(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        int_params=int_params,
-        float_params=float_params,
-        string_params=string_params,
-        train_ratio=0.7,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        random_state=42,
-    )
-
-    # AUC must be between 0 and 1
-    assert 0.0 <= auc <= 1.0
-
-
-def test_lightgbm_objective_with_dart_feature_fraction_only() -> None:
-    """LightGBMObjective uses feature_fraction without other DART params."""
-    x, y, names = _make_test_data(n_samples=100, n_features=5)
-    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
-
-    int_params = _make_default_int_params()
-    float_params = SampledFloatParams(
-        learning_rate=0.1,
-        reg_alpha=0.0,
-        reg_lambda=1.0,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        feature_fraction=0.05,  # Only feature_fraction, no drop_rate/skip_drop
-    )
-    string_params = SampledStringParams(boosting_type="dart")
-
-    auc = objective(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        int_params=int_params,
-        float_params=float_params,
-        string_params=string_params,
-        train_ratio=0.7,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        random_state=42,
-    )
-
-    # AUC must be between 0 and 1
-    assert 0.0 <= auc <= 1.0

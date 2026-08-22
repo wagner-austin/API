@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.datasets.loaders._parquet_cache_io import _CacheLock
 from covenant_ml.datasets.loaders._parsing import (
     build_categorical_encodings,
     build_encoding_lookup,
@@ -26,7 +27,6 @@ from covenant_ml.datasets.loaders._parsing import (
 )
 from covenant_ml.datasets.loaders.chunked_csv_reader import read_csv_with_progress
 from covenant_ml.datasets.loaders.parquet_cache import (
-    _CacheLock,
     _compute_config_hash,
     check_cache,
     get_cache_dir,

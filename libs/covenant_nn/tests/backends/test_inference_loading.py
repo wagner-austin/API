@@ -26,7 +26,10 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from covenant_ml.types import LSTMConfig, MLPConfig
+from covenant_ml.types import (
+    LSTMConfig,
+    MLPConfig,
+)
 from numpy.typing import NDArray
 
 from covenant_nn.backends.lstm.backend import LSTMBackend, load_lstm_for_inference

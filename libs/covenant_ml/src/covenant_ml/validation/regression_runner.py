@@ -18,7 +18,7 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
-from covenant_ml.metrics import compute_rmse
+from covenant_ml.metrics_regression import compute_rmse
 from covenant_ml.preprocessing import AutoPreprocessor, PreprocessingState
 from covenant_ml.validation.regression_types import RegressionCVResult, RegressionFoldResult
 from covenant_ml.validation.types import CVSplit, CVSplitInfo

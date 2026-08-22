@@ -27,7 +27,7 @@ from covenant_ml.features import (
     engineer_features,
     get_feature_config_for_preset,
 )
-from covenant_ml.metrics import compute_rmse
+from covenant_ml.metrics_regression import compute_rmse
 from covenant_ml.optimizer.types import (
     DeviceRequest,
     LightGBMDevice,

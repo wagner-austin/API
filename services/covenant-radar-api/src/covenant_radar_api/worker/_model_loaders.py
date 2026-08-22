@@ -13,10 +13,10 @@ from pathlib import Path
 from typing import Protocol
 
 import numpy as np
-from covenant_ml.types import (
+from covenant_ml.types import PredictorProtocol
+from covenant_ml.types_model_meta import (
     LSTMModelMeta,
     MLPModelMeta,
-    PredictorProtocol,
 )
 from covenant_nn.backends.lstm.sequences import (
     compute_features_per_step,

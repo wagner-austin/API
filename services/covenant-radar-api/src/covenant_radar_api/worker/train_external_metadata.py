@@ -7,15 +7,17 @@ from pathlib import Path
 
 from covenant_ml.types import (
     BackendName,
-    LightGBMModelMeta,
     LogRegConfig,
-    LogRegModelMeta,
     LSTMConfig,
-    LSTMModelMeta,
     MLPConfig,
+    RandomForestConfig,
+)
+from covenant_ml.types_model_meta import (
+    LightGBMModelMeta,
+    LogRegModelMeta,
+    LSTMModelMeta,
     MLPModelMeta,
     ModelMeta,
-    RandomForestConfig,
     RandomForestModelMeta,
 )
 from platform_core.json_utils import dump_json_str

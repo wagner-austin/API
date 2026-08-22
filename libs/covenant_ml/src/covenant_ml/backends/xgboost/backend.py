@@ -12,10 +12,11 @@ from typing import Protocol, TypeGuard
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.trainer_fit import train_model_with_validation
+
 from ...metrics import compute_all_metrics
 from ...optimizer.search_spaces import make_xgboost_default_space, make_xgboost_focused_space
 from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
-from ...trainer import train_model_with_validation
 from ...types import (
     BackendName,
     ClassifierTrainConfig,

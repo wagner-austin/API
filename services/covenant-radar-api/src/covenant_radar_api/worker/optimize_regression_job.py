@@ -17,7 +17,7 @@ import numpy as np
 from covenant_ml.datasets.types import LoadProgress
 from covenant_ml.optimizer import OptimizationSummary, SearchSpace, TrialResult
 from covenant_ml.optimizer.protocol import TrialCallbackProtocol as _TrialCallbackProtocol
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 from numpy.typing import NDArray
 from platform_core.json_utils import (
     JSONTypeError,

@@ -7,7 +7,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 
 from covenant_radar_api.worker.optimize_regression_results import (
     UnifiedRegressionOptimizationResult,

@@ -21,7 +21,10 @@ from covenant_ml.features import (
     get_feature_config_for_preset,
 )
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
-from covenant_ml.types import LSTMConfig, LSTMPrecision
+from covenant_ml.types import (
+    LSTMConfig,
+    LSTMPrecision,
+)
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 

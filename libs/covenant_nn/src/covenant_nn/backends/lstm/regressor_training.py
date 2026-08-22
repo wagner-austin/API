@@ -11,11 +11,11 @@ import numpy as np
 from covenant_ml.backends.regressor_protocol import (
     RegressorProgressCallback,
 )
-from covenant_ml.metrics import compute_all_regression_metrics
+from covenant_ml.metrics_regression import compute_all_regression_metrics
 from covenant_ml.preprocessing import AutoPreprocessor
 from covenant_ml.trainer import RegressionDataSplits
-from covenant_ml.types import (
-    LSTMConfig,
+from covenant_ml.types import LSTMConfig
+from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainProgress,
 )

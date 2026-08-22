@@ -8,7 +8,10 @@ from typing import Protocol
 import numpy as np
 from covenant_domain import Deal, DealId, Measurement
 from covenant_ml.testing import make_train_config
-from covenant_ml.trainer import save_model, train_model
+from covenant_ml.trainer_fit import (
+    save_model,
+    train_model,
+)
 from fastapi.testclient import TestClient
 from numpy.typing import NDArray
 

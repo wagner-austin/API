@@ -19,6 +19,17 @@ from numpy.typing import NDArray
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 
+from covenant_ml.types import (
+    BackendName,
+    ClassifierTrainConfig,
+    EvalMetrics,
+    FeatureImportance,
+    RandomForestConfig,
+    TrainOutcome,
+    TrainProgress,
+)
+from covenant_ml.types_model_meta import RandomForestModelMeta
+
 from ...metrics import compute_all_metrics
 from ...optimizer.search_spaces import (
     make_random_forest_default_space,
@@ -26,16 +37,6 @@ from ...optimizer.search_spaces import (
 )
 from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from ...trainer import stratified_split
-from ...types import (
-    BackendName,
-    ClassifierTrainConfig,
-    EvalMetrics,
-    FeatureImportance,
-    RandomForestConfig,
-    RandomForestModelMeta,
-    TrainOutcome,
-    TrainProgress,
-)
 from ..protocol import (
     BackendCapabilities,
     ClassifierBackend,

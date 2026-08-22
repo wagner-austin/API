@@ -16,8 +16,12 @@ from typing import Literal, Protocol
 import numpy as np
 from covenant_domain.features import LoanFeatures, extract_features
 from covenant_domain.models import CovenantResult, Deal
-from covenant_ml.trainer import train_model_with_validation
-from covenant_ml.types import EvalMetrics, TrainConfig, TrainOutcome
+from covenant_ml.trainer_fit import train_model_with_validation
+from covenant_ml.types import (
+    EvalMetrics,
+    TrainConfig,
+    TrainOutcome,
+)
 from covenant_persistence import (
     CovenantResultRepository,
     DealRepository,

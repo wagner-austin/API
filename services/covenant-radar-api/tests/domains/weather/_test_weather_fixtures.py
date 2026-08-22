@@ -9,7 +9,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs, no mocks.
 
 from __future__ import annotations
 
-from covenant_ml.datasets.types import (
+from covenant_ml.datasets.types_temporal import (
     SeasonalCycleCoefficients,
     TailThresholds,
     TemporalFeatureConfig,

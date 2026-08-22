@@ -26,8 +26,8 @@ from covenant_ml.optimizer.search_spaces import (
     make_xgboost_focused_space,
 )
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
-from covenant_ml.types import (
-    FeatureImportance,
+from covenant_ml.types import FeatureImportance
+from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
     RegressorBackendName,

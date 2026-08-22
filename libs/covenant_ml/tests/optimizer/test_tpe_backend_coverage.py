@@ -22,7 +22,10 @@ import math
 import pytest
 
 from covenant_ml.backends.registry import default_registry
-from covenant_ml.optimizer.strategies.optuna_tpe import _extract_best_params, _sample_params
+from covenant_ml.optimizer.strategies._tpe_params import (
+    _extract_best_params,
+    _sample_params,
+)
 from covenant_ml.optimizer.type_guards import (
     is_cleargbm_search_space,
     is_lightgbm_search_space,

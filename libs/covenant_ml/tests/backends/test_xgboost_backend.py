@@ -13,7 +13,12 @@ from numpy.typing import NDArray
 
 from covenant_ml.backends.protocol import ClassifierBackend
 from covenant_ml.backends.xgboost import create_xgboost_backend
-from covenant_ml.types import ClassifierTrainConfig, MLPConfig, TrainConfig, TrainOutcome
+from covenant_ml.types import (
+    ClassifierTrainConfig,
+    MLPConfig,
+    TrainConfig,
+    TrainOutcome,
+)
 
 
 def _invoke_backend_train(

@@ -19,7 +19,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from covenant_ml.datasets.types import TemporalFeatureState
+from covenant_ml.datasets.types_temporal import TemporalFeatureState
 from numpy.typing import NDArray
 
 from .schemas import WeatherEventV1

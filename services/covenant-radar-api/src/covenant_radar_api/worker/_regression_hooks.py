@@ -36,7 +36,7 @@ from covenant_ml.explainers.regression_registry import (
     default_regression_explainer_registry,
 )
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types import RegressorBackendName
+from covenant_ml.types_regression import RegressorBackendName
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker._test_hooks import ObjectiveWithFeatureCount

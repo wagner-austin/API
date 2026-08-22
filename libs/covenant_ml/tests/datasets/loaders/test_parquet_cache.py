@@ -11,20 +11,22 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from covenant_ml.datasets.loaders.parquet_cache import (
-    CACHE_DIR_NAME,
-    FEATURES_FILE_NAME,
-    LABELS_FILE_NAME,
-    METADATA_FILE_NAME,
+from covenant_ml.datasets.loaders._parquet_cache_io import (
     _CacheLock,
-    _compute_config_hash,
-    _get_polars_dataframe,
-    _get_polars_read_parquet,
     _parse_encodings,
     _parse_string_tuple,
     _serialize_encodings,
     _serialize_string_tuple,
     _split_escaped,
+)
+from covenant_ml.datasets.loaders.parquet_cache import (
+    CACHE_DIR_NAME,
+    FEATURES_FILE_NAME,
+    LABELS_FILE_NAME,
+    METADATA_FILE_NAME,
+    _compute_config_hash,
+    _get_polars_dataframe,
+    _get_polars_read_parquet,
     check_cache,
     get_cache_dir,
     invalidate_cache,

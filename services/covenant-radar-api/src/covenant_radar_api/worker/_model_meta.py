@@ -5,10 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from covenant_ml.types import (
-    LightGBMModelMeta,
-    LogRegModelMeta,
     LogRegPenalty,
     LogRegSolver,
+)
+from covenant_ml.types_model_meta import (
+    LightGBMModelMeta,
+    LogRegModelMeta,
     LSTMModelMeta,
     MLPModelMeta,
     ModelMeta,

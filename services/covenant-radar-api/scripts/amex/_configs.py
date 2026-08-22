@@ -8,7 +8,11 @@ from typing import Literal
 import numpy as np
 from covenant_ml.backends.protocol import ClassifierBackend
 from covenant_ml.datasets import TimeSeriesDatasetConfig
-from covenant_ml.types import BackendName, LightGBMConfig, TrainConfig
+from covenant_ml.types import (
+    BackendName,
+    LightGBMConfig,
+    TrainConfig,
+)
 from covenant_ml.validation.runner import TrainedModel
 from numpy.typing import NDArray
 
