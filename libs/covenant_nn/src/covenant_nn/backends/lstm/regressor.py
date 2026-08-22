@@ -62,8 +62,8 @@ from covenant_nn.backends.lstm.regressor_training import (
     _LSTMRegressorPrepared,
     _prepare_regression_components,
     _preprocess_regression_splits,
-    _run_regression_training_loop,
 )
+from covenant_nn.backends.lstm.regressor_training_loop import _run_regression_training_loop
 
 _log = get_logger(__name__)
 
