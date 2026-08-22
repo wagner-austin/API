@@ -168,8 +168,12 @@ def _build_cleargbm_config(
         subsample=float_params["subsample"],
         random_state=42,
         monotonic_constraints=None,
-        reg_alpha=float_params["reg_alpha"],
-        reg_lambda=float_params["reg_lambda"],
+        # The ClearGBM search space does not sample regularization; every
+        # trial trains at 0.0/0.0 (see covenant_ml's _build_trial_config),
+        # so the saved model must too — requiring the keys here crashed
+        # save_best_model at the end of every ClearGBM sweep.
+        reg_alpha=float_params.get("reg_alpha", 0.0),
+        reg_lambda=float_params.get("reg_lambda", 0.0),
         n_jobs=-1,
         growth_strategy="depth_wise",
         num_leaves=None,

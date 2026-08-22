@@ -1,0 +1,1 @@
+{"backend":"cleargbm","dataset":"taiwan","feature_preset":"full","best_val_auc":0.9325987144168961,"saved_at":"2026-08-22T21:35:29.727347+00:00","model_path":"C:\\Users\\Test\\PROJECTS\\API\\services\\covenant-radar-api\\models\\cleargbm\\taiwan_cleargbm_best.json","n_features":880,"n_samples":6819}
