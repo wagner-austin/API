@@ -6,6 +6,7 @@ import pytest
 from platform_core.json_utils import JSONValue
 
 from covenant_ml.benchmarking.types import (
+    BENCHMARK_MODEL_NAMES,
     ERR_INVALID_REPEATS,
     ERR_NOT_BOOL,
     ERR_NOT_FLOAT,
@@ -119,7 +120,7 @@ def make_seed_result() -> SeedResult:
     return {
         "model": "cleargbm",
         "seed": 42,
-        "ran_first": True,
+        "position": 0,
         "timing": make_timing(),
         "quality": make_quality(),
         "mean_leaves": 57.9,
@@ -135,7 +136,7 @@ def make_manifest() -> BenchmarkManifest:
     second: SeedResult = {
         "model": "lightgbm",
         "seed": 42,
-        "ran_first": False,
+        "position": 1,
         "timing": make_timing(),
         "quality": make_quality(),
         "mean_leaves": 31.0,
@@ -234,14 +235,27 @@ def test_require_int_list_reports_element_index() -> None:
         _require_int_list(["x"], "f")
 
 
-def test_require_model_name_accepts_both_models() -> None:
-    assert _require_model_name("cleargbm", "f") == "cleargbm"
-    assert _require_model_name("lightgbm", "f") == "lightgbm"
+def test_require_model_name_accepts_every_enumerated_arm() -> None:
+    """Driven off the literal's own members, so adding an arm cannot leave
+    this validator a version behind."""
+    for name in BENCHMARK_MODEL_NAMES:
+        assert _require_model_name(name, "f") == name
+
+
+def test_require_model_name_enumerates_the_arms_it_admits() -> None:
+    assert BENCHMARK_MODEL_NAMES == (
+        "cleargbm",
+        "cleargbm@leaf_wise",
+        "lightgbm",
+        "xgboost",
+    )
 
 
 def test_require_model_name_rejects_unknown() -> None:
-    with pytest.raises(ValueError, match=ERR_UNKNOWN_MODEL):
-        _require_model_name("xgboost", "f")
+    """A typo must fail at the boundary rather than open a nameless series."""
+    with pytest.raises(ValueError, match=ERR_UNKNOWN_MODEL) as caught:
+        _require_model_name("catboost", "f")
+    assert "'cleargbm@leaf_wise'" in str(caught.value)
 
 
 def test_require_estimator_accepts_median() -> None:

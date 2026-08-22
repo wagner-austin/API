@@ -125,6 +125,33 @@ def summarize_gap(manifest: BenchmarkManifest) -> GapSummary:
     )
 
 
+def summarize_every_model(manifest: BenchmarkManifest) -> list[ModelSummary]:
+    """Aggregate every arm the manifest actually contains.
+
+    Driven off the records rather than a fixed pair, so an arm added to a run
+    cannot appear in the per-seed detail and then vanish from the summary --
+    which would read as though it had not been measured.
+
+    Args:
+        manifest: A finished benchmark manifest.
+
+    Returns:
+        One aggregate per arm, in first-appearance order.
+
+    Raises:
+        ValueError: If the manifest holds no records at all.
+    """
+    results = manifest["results"]
+    if len(results) == 0:
+        raise ValueError(f"[{ERR_NO_RESULTS}] Manifest holds no results")
+
+    ordered: list[BenchmarkModelName] = []
+    for result in results:
+        if result["model"] not in ordered:
+            ordered.append(result["model"])
+    return [summarize_model(results, model) for model in ordered]
+
+
 def render_seed_line(result: SeedResult) -> str:
     """Render one per-model per-seed record.
 
@@ -175,9 +202,10 @@ def render_report(manifest: BenchmarkManifest) -> str:
     lines.extend(render_seed_line(result) for result in manifest["results"])
     lines.append("")
 
-    for summary in (gap.lightgbm, gap.cleargbm):
+    # Every arm in the manifest, not just the two the ratios compare.
+    for summary in summarize_every_model(manifest):
         lines.append(
-            f"{summary.model:<9} fit={summary.mean_fit_s:.4f}s "
+            f"{summary.model:<18} fit={summary.mean_fit_s:.4f}s "
             f"+/- {summary.stdev_fit_s:.4f}s  "
             f"leaves={summary.mean_leaves:.2f}  "
             f"auc_roc={summary.mean_auc_roc:.4f}  auc_pr={summary.mean_auc_pr:.4f}"
@@ -199,6 +227,7 @@ __all__ = [
     "ModelSummary",
     "render_report",
     "render_seed_line",
+    "summarize_every_model",
     "summarize_gap",
     "summarize_model",
 ]

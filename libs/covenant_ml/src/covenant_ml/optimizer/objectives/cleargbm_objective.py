@@ -194,6 +194,8 @@ class ClearGBMObjective:
             reg_lambda=0.0,
             n_jobs=1,  # Sequential for stability
             early_stopping_rounds=self._early_stopping_rounds,
+            growth_strategy="depth_wise",
+            num_leaves=None,
         )
 
         model = train_gradient_boosting(

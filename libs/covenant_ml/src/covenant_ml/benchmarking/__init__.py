@@ -37,11 +37,20 @@ from .factory import (
     DEFAULT_REPEATS,
     DEFAULT_SEEDS,
     DEFAULT_WARMUPS,
+    make_baseline_trainers,
     make_benchmark_config,
     make_split_factory,
     make_trainers,
 )
-from .protocols import DataSplit, SplitFactoryProto, TrainedModelProto, TrainerProto
+from .power import disable_power_throttling, opt_out_of_power_throttling
+from .protocols import (
+    DataSplit,
+    PowerThrottlingOptOutProto,
+    ProcessInformationSetterProto,
+    SplitFactoryProto,
+    TrainedModelProto,
+    TrainerProto,
+)
 from .quality import compute_quality
 from .reporting import GapSummary, ModelSummary, render_report, summarize_gap
 from .runner import measure_trainer, run_benchmark
@@ -73,6 +82,8 @@ __all__ = [
     "GapSummary",
     "LoadedDataset",
     "ModelSummary",
+    "PowerThrottlingOptOutProto",
+    "ProcessInformationSetterProto",
     "QualityMetrics",
     "SeedResult",
     "SplitFactoryProto",
@@ -82,12 +93,15 @@ __all__ = [
     "company_disjoint_split",
     "compute_quality",
     "decode_benchmark_manifest",
+    "disable_power_throttling",
     "encode_benchmark_manifest",
     "load_bankruptcy_dataset",
+    "make_baseline_trainers",
     "make_benchmark_config",
     "make_split_factory",
     "make_trainers",
     "measure_trainer",
+    "opt_out_of_power_throttling",
     "render_report",
     "run_benchmark",
     "summarize_gap",

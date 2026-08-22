@@ -7,12 +7,18 @@ protocol is exercisable from fakes and real learners alike.
 
 Two properties of the protocol are deliberate and load-bearing:
 
-* **Both learners are measured in the same run.** A fixed reference measured
-  now is the only way to tell a code change from a machine-state change; a
-  number carried forward from an older manifest cannot distinguish them.
-* **Order alternates across seeds.** Whichever learner runs first at a seed
-  gets the coolest CPU, so a fixed order hands one of them a systematic
-  advantage.
+* **Every arm is measured in the same run.** A fixed reference measured now is
+  the only way to tell a code change from a machine-state change; a number
+  carried forward from an older manifest cannot distinguish them.
+* **Order rotates across seeds.** Whichever arm runs first at a seed gets the
+  coolest CPU, so a fixed order hands one of them a systematic advantage.
+  With ``k`` arms the order rotates by one slot per seed, so over any ``k``
+  consecutive seeds each arm occupies each slot exactly once.
+
+Arms are a list rather than a fixed pair so a variant of one learner can be
+compared against its own baseline and against the reference implementation in
+a single manifest — which is the point of a variant axis. Two arms remains the
+common case and is not special-cased.
 """
 
 from __future__ import annotations
@@ -24,8 +30,10 @@ from .protocols import DataSplit, SplitFactoryProto, TrainerProto
 from .quality import compute_quality
 from .timing import summarize_timings
 from .types import (
+    ERR_DUPLICATE_TRAINER,
     ERR_INVALID_REPEATS,
     ERR_NO_SEEDS,
+    ERR_TOO_FEW_TRAINERS,
     MANIFEST_SCHEMA_VERSION,
     BenchmarkConfig,
     BenchmarkManifest,
@@ -39,7 +47,7 @@ def measure_trainer(
     split: DataSplit,
     seed: int,
     config: BenchmarkConfig,
-    ran_first: bool,
+    position: int,
 ) -> SeedResult:
     """Measure one learner at one seed.
 
@@ -51,8 +59,7 @@ def measure_trainer(
         split: The partition to train and score on.
         seed: Seed for the split and the model's internal randomness.
         config: Shared hyperparameters, including repeat and warm-up counts.
-        ran_first: Whether this learner was measured before the other at this
-            seed.
+        position: Zero-based slot this arm occupied at this seed.
 
     Returns:
         The learner's record for this seed.
@@ -86,7 +93,7 @@ def measure_trainer(
     return {
         "model": trainer.model_name,
         "seed": seed,
-        "ran_first": ran_first,
+        "position": position,
         "timing": summarize_timings(samples_s),
         "quality": compute_quality(split.y_test, positive_proba),
         "mean_leaves": fitted.mean_leaves(),
@@ -94,18 +101,17 @@ def measure_trainer(
 
 
 def run_benchmark(
-    first_trainer: TrainerProto,
-    second_trainer: TrainerProto,
+    trainers: Sequence[TrainerProto],
     build_split: SplitFactoryProto,
     seeds: Sequence[int],
     config: BenchmarkConfig,
     dataset: DatasetInfo,
 ) -> BenchmarkManifest:
-    """Measure both learners across every seed and assemble the manifest.
+    """Measure every arm across every seed and assemble the manifest.
 
     Args:
-        first_trainer: The learner measured first at even-indexed seeds.
-        second_trainer: The learner measured first at odd-indexed seeds.
+        trainers: The arms to compare, at least two. Their order sets the
+            rotation at the first seed.
         build_split: Produces the partition for a seed.
         seeds: Seeds to measure, in execution order.
         config: Shared hyperparameters.
@@ -115,21 +121,50 @@ def run_benchmark(
         The complete manifest for this invocation.
 
     Raises:
-        ValueError: If ``seeds`` is empty, or if ``config["repeats"]`` is less
+        ValueError: If fewer than two arms are given, if two arms share a
+            name, if ``seeds`` is empty, or if ``config["repeats"]`` is less
             than one.
+        RuntimeError: If the process cannot opt out of power throttling, which
+            would leave every fit time attributable to an unknown mix of two
+            power regimes.
     """
+    if len(trainers) < 2:
+        raise ValueError(
+            f"[{ERR_TOO_FEW_TRAINERS}] At least two arms are required to compare, "
+            f"got {len(trainers)}"
+        )
+
+    # A manifest is grouped by arm name, so two arms sharing one is not a
+    # comparison with a duplicate — it is two different configurations merged
+    # into one series, silently.
+    names = [trainer.model_name for trainer in trainers]
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        joined = ", ".join(f"'{name}'" for name in duplicates)
+        raise ValueError(
+            f"[{ERR_DUPLICATE_TRAINER}] Each arm must have a distinct name; repeated: {joined}"
+        )
+
     if len(seeds) == 0:
         raise ValueError(f"[{ERR_NO_SEEDS}] At least one seed is required, got none")
+
+    # Once, before the first fit. Windows otherwise demotes this process to a
+    # throttled power regime a few seconds in -- measured at up to 13x on this
+    # workload, arriving mid-run and never lifting. See `power` for the data;
+    # the short version is that rotation cannot cancel a one-way step change,
+    # so the opt-out has to happen before anything is timed.
+    _test_hooks.power_throttling_opt_out()
 
     results: list[SeedResult] = []
     for index, seed in enumerate(seeds):
         split = build_split(seed)
-        first_leads = index % 2 == 0
-        leader = first_trainer if first_leads else second_trainer
-        follower = second_trainer if first_leads else first_trainer
-
-        results.append(measure_trainer(leader, split, seed, config, ran_first=True))
-        results.append(measure_trainer(follower, split, seed, config, ran_first=False))
+        # Rotate by one slot per seed. Over any len(trainers) consecutive
+        # seeds every arm occupies every slot exactly once, which is what
+        # makes the cold-CPU slot cancel instead of favouring one arm.
+        offset = index % len(trainers)
+        rotated = list(trainers[offset:]) + list(trainers[:offset])
+        for position, trainer in enumerate(rotated):
+            results.append(measure_trainer(trainer, split, seed, config, position=position))
 
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,

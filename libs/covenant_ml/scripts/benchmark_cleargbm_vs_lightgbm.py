@@ -23,6 +23,7 @@ from covenant_ml.benchmarking import (
     DEFAULT_WARMUPS,
     encode_benchmark_manifest,
     load_bankruptcy_dataset,
+    make_baseline_trainers,
     make_benchmark_config,
     make_split_factory,
     make_trainers,
@@ -75,7 +76,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--trees", type=int, default=200, help="Boosting rounds.")
     parser.add_argument("--max-depth", type=int, default=6, help="Maximum tree depth.")
     parser.add_argument("--max-bins", type=int, default=64, help="Histogram bin count.")
-    parser.add_argument("--num-leaves", type=int, default=31, help="LightGBM leaf cap.")
+    parser.add_argument(
+        "--num-leaves",
+        type=int,
+        default=31,
+        help="Leaf cap for every leaf-wise arm (LightGBM and cleargbm@leaf_wise).",
+    )
+    parser.add_argument(
+        "--variants",
+        action="store_true",
+        help="Include ClearGBM variant arms (adds cleargbm@leaf_wise).",
+    )
     parser.add_argument("--out", type=Path, default=None, help="Manifest JSON output path.")
     return parser
 
@@ -115,7 +126,8 @@ def main(argv: list[str] | None = None) -> int:
     dataset = load_bankruptcy_dataset(csv_path)
     _write(f"  rows={dataset.info['n_rows']} features={dataset.info['n_features']}\n\n")
 
-    cleargbm_trainer, lightgbm_trainer = make_trainers(config)
+    include_variants: bool = parsed.variants
+    trainers = make_trainers(config) if include_variants else make_baseline_trainers(config)
     split_factory = make_split_factory(
         dataset.features,
         dataset.labels,
@@ -123,8 +135,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     manifest = run_benchmark(
-        cleargbm_trainer,
-        lightgbm_trainer,
+        trainers,
         split_factory,
         seeds,
         config,

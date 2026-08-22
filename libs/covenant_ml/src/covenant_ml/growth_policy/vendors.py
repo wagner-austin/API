@@ -7,7 +7,7 @@ stylistic: ``lightgbm`` and ``scikit-learn`` ship no ``py.typed`` marker, so a
 direct import would pull untyped modules into a package configured with
 ``disallow_any_unimported`` and ``disallow_any_expr``.
 
-LightGBM's classifier Protocol is imported from
+The LightGBM and XGBoost Protocols are imported from
 :mod:`covenant_ml.benchmarking.adapters` rather than restated. Two declarations
 of one vendor signature can drift into disagreeing about a surface only one of
 them has checked, and the drift is silent because each type-checks alone.
@@ -20,87 +20,13 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 
-from ..benchmarking.adapters import LGBMClassifierProto
-
-
-class XgbBoosterProto(Protocol):
-    """Protocol for the fitted XGBoost booster members this package reads."""
-
-    def get_dump(self) -> list[str]:
-        """Dump every tree in the ensemble to text.
-
-        Returns:
-            One text representation per boosted tree.
-        """
-        ...
-
-
-class XgbClassifierProto(Protocol):
-    """Protocol for the fitted XGBoost classifier members this package uses."""
-
-    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Predict class probabilities.
-
-        Args:
-            x: Feature matrix, shape (n_samples, n_features).
-
-        Returns:
-            Class probabilities, shape (n_samples, 2), column 1 positive.
-        """
-        ...
-
-    def get_booster(self) -> XgbBoosterProto:
-        """Return the underlying booster.
-
-        Returns:
-            The fitted booster.
-        """
-        ...
-
-
-class XgbFittableProto(Protocol):
-    """Protocol for an unfitted XGBoost classifier."""
-
-    def fit(self, x: NDArray[np.float64], y: NDArray[np.int64]) -> XgbClassifierProto:
-        """Fit the classifier.
-
-        Args:
-            x: Training features, shape (n_samples, n_features).
-            y: Training labels (0 or 1), shape (n_samples,).
-
-        Returns:
-            The fitted classifier.
-        """
-        ...
-
-
-class XgbClassifierCtor(Protocol):
-    """Protocol for XGBoost's classifier constructor.
-
-    Mirrors the keyword surface ``XGBClassifier`` accepts for this experiment.
-    ``max_depth`` and ``max_leaves`` are both always passed: XGBoost treats
-    ``0`` as "no bound", so a depth-wise arm passes ``max_leaves=0`` and a
-    leaf-wise arm passes ``max_depth=0``, and neither arm leaves a budget
-    implicit.
-    """
-
-    def __call__(
-        self,
-        *,
-        n_estimators: int,
-        learning_rate: float,
-        max_bin: int,
-        min_child_weight: int,
-        tree_method: str,
-        grow_policy: str,
-        max_depth: int,
-        max_leaves: int,
-        reg_alpha: float,
-        reg_lambda: float,
-        n_jobs: int,
-        random_state: int,
-        eval_metric: str,
-    ) -> XgbFittableProto: ...
+from ..benchmarking.adapters import (
+    LGBMClassifierProto,
+    XgbBoosterProto,
+    XgbClassifierCtor,
+    XgbClassifierProto,
+    XgbFittableProto,
+)
 
 
 class LgbClassifierCtor(Protocol):

@@ -100,6 +100,8 @@ def _make_config() -> GradientBoostingConfig:
         reg_lambda=1.0,
         n_jobs=1,
         early_stopping_rounds=10,
+        growth_strategy="depth_wise",
+        num_leaves=None,
     )
     return config
 
@@ -661,6 +663,8 @@ def _train_native_binary_model(
         "reg_lambda": 0.0,
         "n_jobs": 1,
         "early_stopping_rounds": None,
+        "growth_strategy": "depth_wise",
+        "num_leaves": None,
     }
     native_model = train_gradient_boosting(
         x_train=x_train,

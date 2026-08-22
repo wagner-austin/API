@@ -1095,6 +1095,8 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         reg_lambda=1.0,
         n_jobs=1,
         early_stopping_rounds=10,
+        growth_strategy="depth_wise",
+        num_leaves=None,
     )
 
     native_model = train_gradient_boosting(

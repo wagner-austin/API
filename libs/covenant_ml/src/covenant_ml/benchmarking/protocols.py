@@ -11,6 +11,7 @@ they are constructed and injected by
 
 from __future__ import annotations
 
+import ctypes
 from typing import NamedTuple, Protocol
 
 import numpy as np
@@ -55,6 +56,88 @@ class MonotonicClockProto(Protocol):
         Returns:
             Seconds from an arbitrary fixed origin. Only differences between
             two readings are meaningful.
+        """
+        ...
+
+
+class SetProcessInformationProto(Protocol):
+    """Protocol for the ``kernel32!SetProcessInformation`` foreign function.
+
+    ``ctypes`` types a DLL attribute as a function pointer whose call returns
+    ``Any``; assigning it to this Protocol is where a concrete return type
+    comes from, the same way vendor constructors are typed in
+    :mod:`covenant_ml.benchmarking.adapters`.
+
+    The parameters are spelled as the exact ``ctypes`` instances the call is
+    made with, rather than as a loose varargs signature. That is what removes
+    the need for a ``restype``/``argtypes`` declaration: each argument
+    marshals at its own declared width, so nothing falls back to a default
+    that would truncate a 64-bit handle to 32 bits.
+    """
+
+    def __call__(
+        self,
+        process: ctypes.c_void_p,
+        info_class: ctypes.c_int,
+        info: ctypes.c_void_p,
+        info_size: ctypes.c_uint32,
+    ) -> int:
+        """Set one class of information on a process.
+
+        Args:
+            process: Handle to the target process.
+            info_class: Which ``PROCESS_INFORMATION_CLASS`` is being set.
+            info_size: Byte length of the buffer at ``info``.
+            info: Pointer to the class-specific structure.
+
+        Returns:
+            Non-zero when the request was accepted.
+        """
+        ...
+
+
+class ProcessInformationSetterProto(Protocol):
+    """Protocol for the Win32 boundary that sets a process power state.
+
+    Carries the three mask fields as plain integers rather than a ``ctypes``
+    structure, so building and reading the structure stays inside the one
+    function that talks to Win32 and no test has to reach through a field
+    descriptor.
+    """
+
+    def __call__(self, version: int, control_mask: int, state_mask: int) -> int:
+        """Apply a power-throttling state to the current process.
+
+        Args:
+            version: ``PROCESS_POWER_THROTTLING_STATE.Version``.
+            control_mask: Which policies the process expresses a preference
+                about.
+            state_mask: The preference itself, for the policies named by
+                ``control_mask``.
+
+        Returns:
+            The Win32 error code, or ``0`` when the request was accepted.
+        """
+        ...
+
+
+class PowerThrottlingOptOutProto(Protocol):
+    """Protocol for opting the measuring process out of power throttling.
+
+    Injected so the timing protocol can be exercised without touching the
+    host's power state, and so a test can assert the opt-out is requested
+    exactly once per run rather than inferring it from a wall-clock effect.
+    """
+
+    def __call__(self) -> None:
+        """Opt the current process out of system-managed power throttling.
+
+        Returns:
+            None. The call is made for its effect on the process.
+
+        Raises:
+            RuntimeError: If the platform refuses the request, which makes the
+                run's fit times unattributable.
         """
         ...
 
@@ -132,6 +215,9 @@ class SplitFactoryProto(Protocol):
 __all__ = [
     "DataSplit",
     "MonotonicClockProto",
+    "PowerThrottlingOptOutProto",
+    "ProcessInformationSetterProto",
+    "SetProcessInformationProto",
     "SplitFactoryProto",
     "TrainedModelProto",
     "TrainerProto",

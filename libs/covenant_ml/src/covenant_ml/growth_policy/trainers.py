@@ -21,7 +21,7 @@ from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
 
 from ..benchmarking.adapters import ClearGbmTrainedModel, LightGbmTrainedModel
-from .model_shape import mean_leaves_from_xgb_dump
+from ..benchmarking.model_shape import mean_leaves_from_xgb_dump
 from .protocols import ArmSpec, TrainedModelProto, TwoWaySplit
 from .types import ExperimentConfig
 from .vendors import LgbClassifierCtor, XgbClassifierCtor, XgbClassifierProto
@@ -234,6 +234,8 @@ class ClearGbmAnchorTrainer:
             "reg_lambda": self._config["reg_lambda"],
             "n_jobs": self._config["n_jobs"],
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         feature_count = int(split.x_train.shape[1])
         feature_names = tuple(f"X{index + 1}" for index in range(feature_count))

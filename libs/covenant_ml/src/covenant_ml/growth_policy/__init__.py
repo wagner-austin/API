@@ -55,7 +55,6 @@ from .factory import (
     make_xgb_trainers,
 )
 from .metrics import SklearnMetrics
-from .model_shape import mean_leaves_from_xgb_dump
 from .protocols import (
     ArmSpec,
     ArmTrainerProto,
@@ -128,7 +127,6 @@ __all__ = [
     "make_metrics",
     "make_stratified_split_factory",
     "make_xgb_trainers",
-    "mean_leaves_from_xgb_dump",
     "measure_arm",
     "render_dataset_line",
     "render_report",

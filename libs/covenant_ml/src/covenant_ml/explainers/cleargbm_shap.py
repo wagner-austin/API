@@ -30,6 +30,7 @@ from cleargbm.types import (
     GradientBoostingConfig,
     GradientBoostingModel,
     TreeNode,
+    require_growth_strategy,
 )
 from numpy.typing import NDArray
 from platform_core.json_utils import (
@@ -511,6 +512,13 @@ def _decode_rust_config(raw: JSONValue) -> GradientBoostingConfig:
         reg_lambda=narrow_json_to_float(cfg["reg_lambda"]),
         n_jobs=1,
         early_stopping_rounds=_optional_int(cfg.get("early_stopping_rounds")),
+        # Read from the payload rather than hardcoded: the Rust config
+        # serializes the policy it actually trained under, and a decoder that
+        # asserted "depth_wise" would silently relabel any future arm.
+        growth_strategy=require_growth_strategy(
+            narrow_json_to_str(cfg["growth_strategy"]), "growth_strategy"
+        ),
+        num_leaves=_optional_int(cfg.get("num_leaves")),
     )
 
 

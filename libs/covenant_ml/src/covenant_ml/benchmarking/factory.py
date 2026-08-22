@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from .adapters import ClearGbmTrainer, LightGbmTrainer
+from .adapters import ClearGbmTrainer, LightGbmTrainer, XgBoostTrainer
 from .protocols import DataSplit, SplitFactoryProto, TrainerProto
 from .splitting import company_disjoint_split
 from .types import BenchmarkConfig
@@ -95,16 +95,50 @@ def make_benchmark_config(
     }
 
 
-def make_trainers(config: BenchmarkConfig) -> tuple[TrainerProto, TrainerProto]:
-    """Construct both learners under the shared configuration.
+def make_baseline_trainers(config: BenchmarkConfig) -> tuple[TrainerProto, ...]:
+    """Construct the reference arms every run compares against.
+
+    Three independent implementations rather than two: LightGBM grows
+    leaf-wise and XGBoost grows depth-wise here, so a ClearGBM result that
+    looks slow can be attributed to the implementation rather than to the
+    growth policy without configuring anything further.
+
+    A separate entry point rather than a flag on :func:`make_trainers`: a run
+    that deliberately excludes the variants should say so at the call site, so
+    a manifest missing a series is never mistaken for a run whose arm failed.
 
     Args:
-        config: Hyperparameters held identical across both learners.
+        config: Hyperparameters held identical across every learner.
 
     Returns:
-        The ClearGBM and LightGBM trainers, in that order.
+        The ClearGBM depth-wise baseline, LightGBM and XGBoost, in that order.
     """
-    return ClearGbmTrainer(config), LightGbmTrainer(config)
+    return (
+        ClearGbmTrainer(config, growth_strategy="depth_wise"),
+        LightGbmTrainer(config),
+        XgBoostTrainer(config),
+    )
+
+
+def make_trainers(config: BenchmarkConfig) -> tuple[TrainerProto, ...]:
+    """Construct every arm, including the ClearGBM variants.
+
+    Built by inserting the variant arms into the baseline set rather than by
+    re-listing it, so the baseline's composition is stated in exactly one
+    place. The ClearGBM baseline stays first, occupying slot 0 at the first
+    seed exactly as every pre-variant manifest recorded; the rotation in
+    :func:`covenant_ml.benchmarking.runner.run_benchmark` moves it from there.
+
+    Args:
+        config: Hyperparameters held identical across every arm.
+
+    Returns:
+        The ClearGBM baseline, the ClearGBM leaf-wise variant, then the
+        remaining reference arms.
+    """
+    baseline, *references = make_baseline_trainers(config)
+    variant = ClearGbmTrainer(config, growth_strategy="leaf_wise")
+    return (baseline, variant, *references)
 
 
 def make_split_factory(
@@ -129,6 +163,7 @@ __all__ = [
     "DEFAULT_REPEATS",
     "DEFAULT_SEEDS",
     "DEFAULT_WARMUPS",
+    "make_baseline_trainers",
     "make_benchmark_config",
     "make_split_factory",
     "make_trainers",

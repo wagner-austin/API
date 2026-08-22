@@ -351,6 +351,8 @@ class ClearGBMBackend(ClassifierBackend):
             reg_lambda=0.0,
             n_jobs=1,
             early_stopping_rounds=cfg["early_stopping_rounds"],
+            growth_strategy="depth_wise",
+            num_leaves=None,
         )
 
         # Train model

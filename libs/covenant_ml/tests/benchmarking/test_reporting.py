@@ -7,6 +7,7 @@ import pytest
 from covenant_ml.benchmarking.reporting import (
     render_report,
     render_seed_line,
+    summarize_every_model,
     summarize_gap,
     summarize_model,
 )
@@ -39,7 +40,7 @@ def make_result(
     return {
         "model": model,
         "seed": seed,
-        "ran_first": True,
+        "position": 0,
         "timing": {
             "canonical_s": canonical_s,
             "min_s": canonical_s - 0.1,
@@ -182,3 +183,47 @@ def test_report_records_the_dataset_and_config() -> None:
     assert "rows=78682" in report
     assert "trees=200" in report
     assert "median" in report
+
+
+def test_every_model_is_listed_once_across_many_seeds() -> None:
+    """Each arm gets one aggregate however many seeds it was measured at."""
+    manifest = make_manifest(
+        [
+            make_result("cleargbm", 42, 2.0, 60.0),
+            make_result("lightgbm", 42, 1.0, 30.0),
+            make_result("cleargbm", 43, 2.2, 62.0),
+            make_result("lightgbm", 43, 1.1, 31.0),
+        ]
+    )
+    summaries = summarize_every_model(manifest)
+    assert [summary.model for summary in summaries] == ["cleargbm", "lightgbm"]
+    # Aggregated across both seeds, not just the first record seen.
+    assert summaries[0].mean_fit_s == pytest.approx(2.1)
+    assert summaries[1].mean_fit_s == pytest.approx(1.05)
+
+
+def test_a_variant_arm_reaches_the_summary_block() -> None:
+    """The regression this guards: a third arm rendering per-seed but not in
+    the summary, which reads as though it had never been measured."""
+    manifest = make_manifest(
+        [
+            make_result("cleargbm", 42, 2.0, 60.0),
+            make_result("cleargbm@leaf_wise", 42, 1.5, 31.0),
+            make_result("lightgbm", 42, 1.0, 30.0),
+        ]
+    )
+    summaries = summarize_every_model(manifest)
+    assert [summary.model for summary in summaries] == [
+        "cleargbm",
+        "cleargbm@leaf_wise",
+        "lightgbm",
+    ]
+    report = render_report(manifest)
+    # Present in the aggregate block, not merely in a per-seed line.
+    assert "cleargbm@leaf_wise fit=" in report
+
+
+def test_summarize_every_model_rejects_an_empty_manifest() -> None:
+    manifest = make_manifest([])
+    with pytest.raises(ValueError, match=ERR_NO_RESULTS):
+        summarize_every_model(manifest)

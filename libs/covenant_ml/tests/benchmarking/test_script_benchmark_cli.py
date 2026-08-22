@@ -95,7 +95,8 @@ def read_manifest(path: Path) -> BenchmarkManifest:
     return decode_benchmark_manifest(document)
 
 
-def test_run_measures_both_models_at_the_requested_seed(tmp_path: Path) -> None:
+def test_run_measures_every_reference_arm_at_the_requested_seed(tmp_path: Path) -> None:
+    """Without ``--variants`` the run is the reference set and nothing else."""
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
     exit_code = main([*cli_args(csv_path), "--out", str(out_path)])
@@ -103,7 +104,24 @@ def test_run_measures_both_models_at_the_requested_seed(tmp_path: Path) -> None:
 
     assert exit_code == 0
     measured = {(result["model"], result["seed"]) for result in manifest["results"]}
-    assert measured == {("cleargbm", 42), ("lightgbm", 42)}
+    assert measured == {("cleargbm", 42), ("lightgbm", 42), ("xgboost", 42)}
+
+
+def test_variants_flag_adds_the_leaf_wise_arm(tmp_path: Path) -> None:
+    """``--variants`` is what puts a ClearGBM variant in the manifest.
+
+    Without this the flag could be wired to nothing and every run would look
+    identical, which is exactly the mislabelled-arm failure the axis exists to
+    prevent.
+    """
+    csv_path = write_dataset(tmp_path)
+    out_path = tmp_path / "manifest.json"
+    exit_code = main([*cli_args(csv_path), "--variants", "--out", str(out_path)])
+    manifest = read_manifest(out_path)
+
+    assert exit_code == 0
+    measured = {result["model"] for result in manifest["results"]}
+    assert measured == {"cleargbm", "cleargbm@leaf_wise", "lightgbm", "xgboost"}
 
 
 def test_run_records_exactly_one_leading_model_per_seed(tmp_path: Path) -> None:
@@ -112,7 +130,7 @@ def test_run_records_exactly_one_leading_model_per_seed(tmp_path: Path) -> None:
     main([*cli_args(csv_path), "--out", str(out_path)])
     manifest = read_manifest(out_path)
 
-    leaders = [result for result in manifest["results"] if result["ran_first"]]
+    leaders = [result for result in manifest["results"] if result["position"] == 0]
     assert len(leaders) == 1
 
 
@@ -128,7 +146,7 @@ def test_run_writes_a_decodable_manifest(tmp_path: Path) -> None:
     assert manifest["schema_version"] == MANIFEST_SCHEMA_VERSION
     assert manifest["estimator"] == "median"
     assert manifest["seeds"] == [42]
-    assert len(manifest["results"]) == 2
+    assert len(manifest["results"]) == 3
 
 
 def test_run_applies_the_requested_hyperparameters(tmp_path: Path) -> None:

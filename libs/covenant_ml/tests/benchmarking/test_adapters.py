@@ -1,7 +1,7 @@
-"""Tests for the concrete ClearGBM and LightGBM trainers.
+"""Tests for the concrete ClearGBM, LightGBM and XGBoost trainers.
 
-Both learners are real dependencies of this library, so these tests train
-real models on small data rather than substituting a double for either one.
+Every learner is a real dependency of this library, so these tests train real
+models on small data rather than substituting a double for any of them.
 """
 
 from __future__ import annotations
@@ -9,7 +9,11 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from covenant_ml.benchmarking.adapters import ClearGbmTrainer, LightGbmTrainer
+from covenant_ml.benchmarking.adapters import (
+    ClearGbmTrainer,
+    LightGbmTrainer,
+    XgBoostTrainer,
+)
 from covenant_ml.benchmarking.protocols import DataSplit
 from covenant_ml.benchmarking.types import BenchmarkConfig
 
@@ -63,16 +67,54 @@ def make_learnable_split(n_rows: int = 400) -> DataSplit:
 
 
 def test_cleargbm_trainer_reports_its_name() -> None:
-    assert ClearGbmTrainer(make_config()).model_name == "cleargbm"
+    trainer = ClearGbmTrainer(make_config(), growth_strategy="depth_wise")
+    assert trainer.model_name == "cleargbm"
+
+
+def test_cleargbm_leaf_wise_arm_reports_a_distinct_name() -> None:
+    """The variant must not share the baseline's name.
+
+    A manifest groups records by arm name, so two arms answering "cleargbm"
+    would merge into one series and silently average two growth policies.
+    """
+    trainer = ClearGbmTrainer(make_config(), growth_strategy="leaf_wise")
+    assert trainer.model_name == "cleargbm@leaf_wise"
 
 
 def test_lightgbm_trainer_reports_its_name() -> None:
     assert LightGbmTrainer(make_config()).model_name == "lightgbm"
 
 
+def test_xgboost_trainer_reports_its_name() -> None:
+    assert XgBoostTrainer(make_config()).model_name == "xgboost"
+
+
+def test_xgboost_grows_depth_wise_like_the_cleargbm_baseline() -> None:
+    """XGBoost is here to separate "ClearGBM is slow" from "depth-wise is slow".
+
+    That only holds if it actually grows depth-wise, so the arm is pinned to a
+    depth-shaped tree rather than to LightGBM's leaf budget: at max_depth 4
+    with the leaf budget released it must exceed the 3-leaf cap the config
+    carries for the leaf-wise arms.
+    """
+    split = make_learnable_split()
+    config = make_config(max_depth=4, num_leaves=3)
+    leaves = XgBoostTrainer(config).fit(split, seed=42).mean_leaves()
+    assert leaves > 3.0
+
+
+def test_xgboost_predicts_a_probability_per_row() -> None:
+    split = make_learnable_split()
+    fitted = XgBoostTrainer(make_config()).fit(split, seed=42)
+    proba = fitted.predict_positive_proba(split.x_test)
+    assert len(proba) == len(split.y_test)
+    within_unit: NDArray[np.bool_] = (proba >= 0.0) & (proba <= 1.0)
+    assert int(np.sum(within_unit)) == len(proba)
+
+
 def test_cleargbm_predicts_a_probability_per_row() -> None:
     split = make_learnable_split()
-    fitted = ClearGbmTrainer(make_config()).fit(split, seed=42)
+    fitted = ClearGbmTrainer(make_config(), growth_strategy="depth_wise").fit(split, seed=42)
     proba = fitted.predict_positive_proba(split.x_test)
 
     assert len(proba) == len(split.y_test)
@@ -92,7 +134,7 @@ def test_lightgbm_predicts_a_probability_per_row() -> None:
 
 def test_cleargbm_reports_a_positive_leaf_count() -> None:
     split = make_learnable_split()
-    fitted = ClearGbmTrainer(make_config()).fit(split, seed=42)
+    fitted = ClearGbmTrainer(make_config(), growth_strategy="depth_wise").fit(split, seed=42)
     assert fitted.mean_leaves() > 1.0
 
 
@@ -112,7 +154,8 @@ def test_cleargbm_grows_depth_wise_beyond_the_leaf_cap() -> None:
     split = make_learnable_split()
     config = make_config(max_depth=4, num_leaves=3)
 
-    cleargbm_leaves = ClearGbmTrainer(config).fit(split, seed=42).mean_leaves()
+    cleargbm = ClearGbmTrainer(config, growth_strategy="depth_wise")
+    cleargbm_leaves = cleargbm.fit(split, seed=42).mean_leaves()
     lightgbm_leaves = LightGbmTrainer(config).fit(split, seed=42).mean_leaves()
 
     assert lightgbm_leaves <= 3.0
@@ -121,7 +164,7 @@ def test_cleargbm_grows_depth_wise_beyond_the_leaf_cap() -> None:
 
 def test_cleargbm_is_deterministic_for_a_seed() -> None:
     split = make_learnable_split()
-    trainer = ClearGbmTrainer(make_config())
+    trainer = ClearGbmTrainer(make_config(), growth_strategy="depth_wise")
     first = trainer.fit(split, seed=42).predict_positive_proba(split.x_test)
     second = trainer.fit(split, seed=42).predict_positive_proba(split.x_test)
     assert np.array_equal(first, second)
@@ -138,7 +181,13 @@ def test_lightgbm_is_deterministic_for_a_seed() -> None:
 def test_both_learners_beat_chance_on_separable_data() -> None:
     split = make_learnable_split()
     config = make_config()
-    for trainer in (ClearGbmTrainer(config), LightGbmTrainer(config)):
+    arms = (
+        ClearGbmTrainer(config, growth_strategy="depth_wise"),
+        ClearGbmTrainer(config, growth_strategy="leaf_wise"),
+        LightGbmTrainer(config),
+        XgBoostTrainer(config),
+    )
+    for trainer in arms:
         proba = trainer.fit(split, seed=42).predict_positive_proba(split.x_test)
         positive_mask: NDArray[np.bool_] = split.y_test == 1
         negative_mask: NDArray[np.bool_] = split.y_test == 0
@@ -151,8 +200,10 @@ def test_both_learners_beat_chance_on_separable_data() -> None:
 
 def test_cleargbm_respects_a_deeper_max_depth() -> None:
     split = make_learnable_split()
-    shallow = ClearGbmTrainer(make_config(max_depth=2)).fit(split, seed=1).mean_leaves()
-    deep = ClearGbmTrainer(make_config(max_depth=4)).fit(split, seed=1).mean_leaves()
+    shallow_trainer = ClearGbmTrainer(make_config(max_depth=2), growth_strategy="depth_wise")
+    deep_trainer = ClearGbmTrainer(make_config(max_depth=4), growth_strategy="depth_wise")
+    shallow = shallow_trainer.fit(split, seed=1).mean_leaves()
+    deep = deep_trainer.fit(split, seed=1).mean_leaves()
     assert deep > shallow
 
 
@@ -165,7 +216,13 @@ def test_lightgbm_respects_its_leaf_cap() -> None:
 def test_probabilities_are_finite() -> None:
     split = make_learnable_split()
     config = make_config()
-    for trainer in (ClearGbmTrainer(config), LightGbmTrainer(config)):
+    arms = (
+        ClearGbmTrainer(config, growth_strategy="depth_wise"),
+        ClearGbmTrainer(config, growth_strategy="leaf_wise"),
+        LightGbmTrainer(config),
+        XgBoostTrainer(config),
+    )
+    for trainer in arms:
         proba = trainer.fit(split, seed=42).predict_positive_proba(split.x_test)
         finite: NDArray[np.bool_] = np.isfinite(proba)
         assert int(np.sum(finite)) == len(proba)
@@ -173,7 +230,7 @@ def test_probabilities_are_finite() -> None:
 
 def test_cleargbm_scores_rows_it_was_not_trained_on() -> None:
     split = make_learnable_split()
-    fitted = ClearGbmTrainer(make_config()).fit(split, seed=42)
+    fitted = ClearGbmTrainer(make_config(), growth_strategy="depth_wise").fit(split, seed=42)
     held_out: NDArray[np.float64] = split.x_test[:10]
     proba = fitted.predict_positive_proba(held_out)
     assert len(proba) == 10

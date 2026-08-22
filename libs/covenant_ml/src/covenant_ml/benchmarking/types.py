@@ -11,7 +11,7 @@ Decoding never softens a malformed document: the first invalid field raises
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, TypedDict, get_args
 
 from platform_core.json_utils import JSONValue
 
@@ -34,13 +34,26 @@ ERR_NO_TREES = "CVML-BENCH-014"
 ERR_INVALID_REPEATS = "CVML-BENCH-015"
 ERR_NO_SEEDS = "CVML-BENCH-016"
 ERR_NO_RESULTS = "CVML-BENCH-017"
+ERR_TOO_FEW_TRAINERS = "CVML-BENCH-018"
+ERR_DUPLICATE_TRAINER = "CVML-BENCH-019"
+ERR_POWER_THROTTLING = "CVML-BENCH-020"
 
 #: Schema version of :class:`BenchmarkManifest`. Bump on any field change so
 #: an old manifest is rejected loudly instead of decoded into wrong types.
-MANIFEST_SCHEMA_VERSION = 1
+#: Bumped to 2 when the harness stopped being a two-model comparison:
+#: ``ran_first: bool`` cannot describe an ordering over three or more arms, so
+#: it became ``position: int``.
+MANIFEST_SCHEMA_VERSION = 2
 
-#: The two models this benchmark compares.
-BenchmarkModelName = Literal["cleargbm", "lightgbm"]
+#: The arms this benchmark can compare.
+#:
+#: A closed literal, not an open string: an arm name is what a manifest is read
+#: by, so a typo must fail at the boundary rather than silently produce a
+#: fourth, nameless series. Variant arms are spelled ``<model>@<variant>``.
+BenchmarkModelName = Literal["cleargbm", "cleargbm@leaf_wise", "lightgbm", "xgboost"]
+
+#: Every accepted :data:`BenchmarkModelName`, for validation and iteration.
+BENCHMARK_MODEL_NAMES: tuple[BenchmarkModelName, ...] = get_args(BenchmarkModelName)
 
 #: The statistic taken as each seed's canonical fit time.
 #:
@@ -146,11 +159,14 @@ class SeedResult(TypedDict, total=True):
     """One model's outcome at one seed.
 
     Args:
-        model: Which model produced this record.
+        model: Which arm produced this record.
         seed: Split and model seed.
-        ran_first: Whether this model was measured before the other at this
-            seed. Order alternates across seeds so neither model
-            systematically occupies the cold-CPU slot.
+        position: Zero-based slot this arm occupied at this seed. The order
+            rotates across seeds so no arm systematically occupies the
+            cold-CPU slot. This replaced a ``ran_first`` boolean in schema 2:
+            with three or more arms, "was it first" no longer describes where
+            an arm ran, and averaging over an unrecorded position hides a
+            systematic warm-up advantage rather than cancelling it.
         timing: Fit-time statistics.
         quality: Predictive-quality metrics.
         mean_leaves: Mean leaves per tree. The work-per-tree normalizer that
@@ -159,7 +175,7 @@ class SeedResult(TypedDict, total=True):
 
     model: BenchmarkModelName
     seed: int
-    ran_first: bool
+    position: int
     timing: TimingSummary
     quality: QualityMetrics
     mean_leaves: float
@@ -355,15 +371,17 @@ def _require_model_name(value: JSONValue, field: str) -> BenchmarkModelName:
         The validated model name.
 
     Raises:
-        ValueError: If the value is not ``"cleargbm"`` or ``"lightgbm"``.
+        ValueError: If the value is not one of :data:`BENCHMARK_MODEL_NAMES`.
     """
     name = _require_str(value, field)
-    if name == "cleargbm":
-        return "cleargbm"
-    if name == "lightgbm":
-        return "lightgbm"
+    # Driven off the literal's own members rather than a hand-written chain,
+    # so adding an arm cannot leave this validator a version behind.
+    for candidate in BENCHMARK_MODEL_NAMES:
+        if name == candidate:
+            return candidate
+    accepted = ", ".join(f"'{candidate}'" for candidate in BENCHMARK_MODEL_NAMES)
     raise ValueError(
-        f"[{ERR_UNKNOWN_MODEL}] Field '{field}' must be 'cleargbm' or 'lightgbm', got '{name}'"
+        f"[{ERR_UNKNOWN_MODEL}] Field '{field}' must be one of {accepted}, got '{name}'"
     )
 
 
@@ -571,7 +589,7 @@ def encode_seed_result(result: SeedResult) -> dict[str, JSONValue]:
     return {
         "model": result["model"],
         "seed": result["seed"],
-        "ran_first": result["ran_first"],
+        "position": result["position"],
         "timing": encode_timing_summary(result["timing"]),
         "quality": encode_quality_metrics(result["quality"]),
         "mean_leaves": result["mean_leaves"],
@@ -596,7 +614,7 @@ def decode_seed_result(data: dict[str, JSONValue], field: str) -> SeedResult:
     return {
         "model": _require_model_name(data.get("model"), f"{field}.model"),
         "seed": _require_int(data.get("seed"), f"{field}.seed"),
-        "ran_first": _require_bool(data.get("ran_first"), f"{field}.ran_first"),
+        "position": _require_int(data.get("position"), f"{field}.position"),
         "timing": decode_timing_summary(timing_raw, f"{field}.timing"),
         "quality": decode_quality_metrics(quality_raw, f"{field}.quality"),
         "mean_leaves": _require_float(data.get("mean_leaves"), f"{field}.mean_leaves"),
@@ -664,6 +682,8 @@ def decode_benchmark_manifest(data: dict[str, JSONValue]) -> BenchmarkManifest:
 
 
 __all__ = [
+    "BENCHMARK_MODEL_NAMES",
+    "ERR_DUPLICATE_TRAINER",
     "ERR_EMPTY_SPLIT",
     "ERR_INVALID_REPEATS",
     "ERR_LENGTH_MISMATCH",
@@ -678,7 +698,9 @@ __all__ = [
     "ERR_NO_SEEDS",
     "ERR_NO_TIMING_SAMPLES",
     "ERR_NO_TREES",
+    "ERR_POWER_THROTTLING",
     "ERR_SCHEMA_VERSION",
+    "ERR_TOO_FEW_TRAINERS",
     "ERR_UNKNOWN_ESTIMATOR",
     "ERR_UNKNOWN_MODEL",
     "MANIFEST_SCHEMA_VERSION",

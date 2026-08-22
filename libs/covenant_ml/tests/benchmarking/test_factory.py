@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.benchmarking.factory import (
+    make_baseline_trainers,
     make_benchmark_config,
     make_split_factory,
     make_trainers,
@@ -54,10 +55,28 @@ def test_config_overrides_are_applied() -> None:
     assert config["warmups"] == 1
 
 
-def test_trainers_are_built_in_cleargbm_then_lightgbm_order() -> None:
-    cleargbm, lightgbm = make_trainers(make_benchmark_config())
-    assert cleargbm.model_name == "cleargbm"
-    assert lightgbm.model_name == "lightgbm"
+def test_trainers_are_built_baseline_variant_then_references() -> None:
+    """Arm order sets the rotation's starting point, so it is part of the API.
+
+    The ClearGBM baseline stays first so it occupies slot 0 at the first seed,
+    matching every manifest written before variant arms existed.
+    """
+    trainers = make_trainers(make_benchmark_config())
+    names = [trainer.model_name for trainer in trainers]
+    assert names == ["cleargbm", "cleargbm@leaf_wise", "lightgbm", "xgboost"]
+
+
+def test_baseline_trainers_exclude_every_variant_arm() -> None:
+    """The reference set stays reachable as its own entry point."""
+    trainers = make_baseline_trainers(make_benchmark_config())
+    names = [trainer.model_name for trainer in trainers]
+    assert names == ["cleargbm", "lightgbm", "xgboost"]
+
+
+def test_every_arm_has_a_distinct_name() -> None:
+    """A manifest groups by arm name, so a repeat would merge two series."""
+    names = [trainer.model_name for trainer in make_trainers(make_benchmark_config())]
+    assert len(names) == len(set(names))
 
 
 def test_split_factory_partitions_for_a_seed() -> None:
