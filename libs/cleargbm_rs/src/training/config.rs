@@ -99,6 +99,9 @@ pub struct GradientBoostingConfigParams {
     /// Leaf budget for `LeafWise` growth. Must be `Some(n)` with `n >= 2`
     /// under `LeafWise` and `None` under `DepthWise`.
     pub num_leaves: Option<usize>,
+    /// Weight applied to positive samples in the loss, its gradients and
+    /// the base score (finite, > 0.0; 1.0 = unweighted).
+    pub scale_pos_weight: f64,
 }
 
 /// Configuration for gradient boosting training.
@@ -135,6 +138,9 @@ pub struct GradientBoostingConfig {
     growth_strategy: GrowthStrategy,
     /// Leaf budget, present exactly when `growth_strategy` is `LeafWise`.
     num_leaves: Option<usize>,
+    /// Weight applied to positive samples in the loss, its gradients and
+    /// the base score (finite, > 0.0; 1.0 = unweighted).
+    scale_pos_weight: f64,
 }
 
 impl GradientBoostingConfig {
@@ -163,6 +169,7 @@ impl GradientBoostingConfig {
             early_stopping_rounds,
             growth_strategy,
             num_leaves,
+            scale_pos_weight,
         } = params;
 
         if n_estimators < 1_usize {
@@ -236,6 +243,12 @@ impl GradientBoostingConfig {
                 });
             }
         }
+        if !scale_pos_weight.is_finite() || scale_pos_weight <= 0.0_f64 {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "scale_pos_weight".to_string(),
+                reason: format!("must be a finite positive number, got {scale_pos_weight}"),
+            });
+        }
         // `num_leaves` is paired with the policy rather than merely ignored
         // under the wrong one. A leaf budget silently doing nothing under
         // depth-wise growth is the same class of defect as a missing
@@ -285,6 +298,7 @@ impl GradientBoostingConfig {
             early_stopping_rounds,
             growth_strategy,
             num_leaves,
+            scale_pos_weight,
         })
     }
 
@@ -364,6 +378,12 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn growth_strategy(&self) -> GrowthStrategy {
         self.growth_strategy
+    }
+
+    /// Returns the positive-class weight applied to the loss and gradients.
+    #[must_use]
+    pub fn scale_pos_weight(&self) -> f64 {
+        self.scale_pos_weight
     }
 
     /// Returns the leaf budget, set exactly under `LeafWise` growth.

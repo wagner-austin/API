@@ -51,6 +51,26 @@ pub(crate) fn validate_lengths(y_true: &[u8], y_pred: &[f64]) -> Result<(), Clea
     Ok(())
 }
 
+/// Validates that a positive-class weight is a finite positive number.
+///
+/// # Args
+///
+/// * `scale_pos_weight` - Weight applied to positive samples.
+///
+/// # Errors
+///
+/// Returns `ClearGbmError::InvalidParameter` if the weight is NaN,
+/// infinite, zero or negative.
+pub(crate) fn validate_scale_pos_weight(scale_pos_weight: f64) -> Result<(), ClearGbmError> {
+    if !scale_pos_weight.is_finite() || scale_pos_weight <= 0.0_f64 {
+        return Err(ClearGbmError::InvalidParameter {
+            name: "scale_pos_weight".to_string(),
+            reason: format!("must be a finite positive number, got {scale_pos_weight}"),
+        });
+    }
+    Ok(())
+}
+
 /// Converts a `usize` count to `f64` for arithmetic.
 ///
 /// Uses `u32` as an intermediate to guarantee lossless conversion

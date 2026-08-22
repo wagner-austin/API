@@ -73,7 +73,7 @@ impl Serialize for GradientBoostingConfig {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 14) {
+        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 15) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -136,6 +136,10 @@ impl Serialize for GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match state.serialize_field("scale_pos_weight", &self.scale_pos_weight()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
         state.end()
     }
 }
@@ -173,6 +177,8 @@ pub(crate) enum GradientBoostingConfigField {
     GrowthStrategy,
     /// The leaf budget (optional; set exactly under leaf-wise growth).
     NumLeaves,
+    /// The positive-class weight applied to the loss and gradients.
+    ScalePosWeight,
 }
 
 /// Visitor for deserializing `GradientBoostingConfigField` from string.
@@ -207,6 +213,7 @@ impl<'de> Visitor<'de> for GradientBoostingConfigFieldVisitor {
             "early_stopping_rounds" => Ok(GradientBoostingConfigField::EarlyStoppingRounds),
             "growth_strategy" => Ok(GradientBoostingConfigField::GrowthStrategy),
             "num_leaves" => Ok(GradientBoostingConfigField::NumLeaves),
+            "scale_pos_weight" => Ok(GradientBoostingConfigField::ScalePosWeight),
             _ => Err(E::unknown_field(value, GRADIENT_BOOSTING_CONFIG_FIELDS)),
         }
     }
@@ -237,6 +244,7 @@ const GRADIENT_BOOSTING_CONFIG_FIELDS: &[&str] = &[
     "early_stopping_rounds",
     "growth_strategy",
     "num_leaves",
+    "scale_pos_weight",
 ];
 
 impl<'de> Deserialize<'de> for GradientBoostingConfig {
@@ -271,6 +279,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                 let mut early_stopping_rounds: Option<Option<usize>> = None;
                 let mut growth_strategy: Option<GrowthStrategy> = None;
                 let mut num_leaves: Option<Option<usize>> = None;
+                let mut scale_pos_weight: Option<f64> = None;
 
                 loop {
                     let key: Option<GradientBoostingConfigField> = match map.next_key() {
@@ -366,6 +375,12 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                                 Err(e) => return Err(e),
                             });
                         }
+                        GradientBoostingConfigField::ScalePosWeight => {
+                            scale_pos_weight = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
                     }
                 }
 
@@ -425,6 +440,10 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("num_leaves")),
                 };
+                let scale_pos_weight = match scale_pos_weight {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("scale_pos_weight")),
+                };
 
                 let params = GradientBoostingConfigParams {
                     n_estimators,
@@ -441,6 +460,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     early_stopping_rounds,
                     growth_strategy,
                     num_leaves,
+                    scale_pos_weight,
                 };
                 match GradientBoostingConfig::new(params) {
                     Ok(cfg) => Ok(cfg),

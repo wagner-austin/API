@@ -44,6 +44,7 @@ fn train_single_informative_feature_model(
         early_stopping_rounds: None,
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
+        scale_pos_weight: 1.0_f64,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -157,6 +158,7 @@ fn test_importances_all_zero_when_only_root_leaves() -> Result<(), ClearGbmError
         early_stopping_rounds: None,
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
+        scale_pos_weight: 1.0_f64,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -300,5 +302,6 @@ fn default_importance_params() -> GradientBoostingConfigParams {
         early_stopping_rounds: None,
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
+        scale_pos_weight: 1.0_f64,
     }
 }

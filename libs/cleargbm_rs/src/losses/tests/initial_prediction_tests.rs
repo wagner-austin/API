@@ -8,7 +8,7 @@ use crate::losses::binary_log_loss_initial_prediction;
 #[test]
 fn test_initial_prediction_balanced() -> Result<(), ClearGbmError> {
     // 50% positive → log(0.5/0.5) = log(1) = 0.0
-    let result = match binary_log_loss_initial_prediction(&[0_u8, 1_u8]) {
+    let result = match binary_log_loss_initial_prediction(&[0_u8, 1_u8], 1.0_f64) {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
@@ -23,7 +23,7 @@ fn test_initial_prediction_balanced() -> Result<(), ClearGbmError> {
 fn test_initial_prediction_balanced_larger() -> Result<(), ClearGbmError> {
     // 50% positive with more samples
     let labels = [0_u8, 1_u8, 0_u8, 1_u8, 0_u8, 1_u8];
-    let result = match binary_log_loss_initial_prediction(&labels) {
+    let result = match binary_log_loss_initial_prediction(&labels, 1.0_f64) {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
@@ -38,7 +38,7 @@ fn test_initial_prediction_balanced_larger() -> Result<(), ClearGbmError> {
 fn test_initial_prediction_mostly_positive() -> Result<(), ClearGbmError> {
     // 75% positive → log(0.75/0.25) = log(3) ≈ 1.0986
     let labels = [1_u8, 1_u8, 1_u8, 0_u8];
-    let result = match binary_log_loss_initial_prediction(&labels) {
+    let result = match binary_log_loss_initial_prediction(&labels, 1.0_f64) {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
@@ -54,7 +54,7 @@ fn test_initial_prediction_mostly_positive() -> Result<(), ClearGbmError> {
 fn test_initial_prediction_mostly_negative() -> Result<(), ClearGbmError> {
     // 25% positive → log(0.25/0.75) = log(1/3) ≈ -1.0986
     let labels = [0_u8, 0_u8, 0_u8, 1_u8];
-    let result = match binary_log_loss_initial_prediction(&labels) {
+    let result = match binary_log_loss_initial_prediction(&labels, 1.0_f64) {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
@@ -70,7 +70,7 @@ fn test_initial_prediction_mostly_negative() -> Result<(), ClearGbmError> {
 fn test_initial_prediction_positive_when_majority_positive() -> Result<(), ClearGbmError> {
     // More positives → positive log-odds
     let labels = [1_u8, 1_u8, 1_u8, 1_u8, 0_u8];
-    let result = match binary_log_loss_initial_prediction(&labels) {
+    let result = match binary_log_loss_initial_prediction(&labels, 1.0_f64) {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
@@ -85,7 +85,7 @@ fn test_initial_prediction_positive_when_majority_positive() -> Result<(), Clear
 fn test_initial_prediction_negative_when_majority_negative() -> Result<(), ClearGbmError> {
     // More negatives → negative log-odds
     let labels = [0_u8, 0_u8, 0_u8, 0_u8, 1_u8];
-    let result = match binary_log_loss_initial_prediction(&labels) {
+    let result = match binary_log_loss_initial_prediction(&labels, 1.0_f64) {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
@@ -101,11 +101,11 @@ fn test_initial_prediction_antisymmetric() -> Result<(), ClearGbmError> {
     // log(p/(1-p)) and log((1-p)/p) should be negatives of each other
     let mostly_pos = [1_u8, 1_u8, 1_u8, 0_u8];
     let mostly_neg = [0_u8, 0_u8, 0_u8, 1_u8];
-    let result_pos = match binary_log_loss_initial_prediction(&mostly_pos) {
+    let result_pos = match binary_log_loss_initial_prediction(&mostly_pos, 1.0_f64) {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
-    let result_neg = match binary_log_loss_initial_prediction(&mostly_neg) {
+    let result_neg = match binary_log_loss_initial_prediction(&mostly_neg, 1.0_f64) {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
@@ -120,7 +120,7 @@ fn test_initial_prediction_antisymmetric() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_initial_prediction_empty() -> Result<(), ClearGbmError> {
-    let result = binary_log_loss_initial_prediction(&[]);
+    let result = binary_log_loss_initial_prediction(&[], 1.0_f64);
     match result {
         Err(ClearGbmError::EmptyInput { context }) => {
             assert!(context.contains("y_true"));
@@ -134,7 +134,7 @@ fn test_initial_prediction_empty() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_initial_prediction_all_zeros() -> Result<(), ClearGbmError> {
-    let result = binary_log_loss_initial_prediction(&[0_u8, 0_u8, 0_u8]);
+    let result = binary_log_loss_initial_prediction(&[0_u8, 0_u8, 0_u8], 1.0_f64);
     match result {
         Err(ClearGbmError::InvalidParameter { name, reason }) => {
             assert_eq!(name, "y_true");
@@ -149,7 +149,7 @@ fn test_initial_prediction_all_zeros() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_initial_prediction_all_ones() -> Result<(), ClearGbmError> {
-    let result = binary_log_loss_initial_prediction(&[1_u8, 1_u8, 1_u8]);
+    let result = binary_log_loss_initial_prediction(&[1_u8, 1_u8, 1_u8], 1.0_f64);
     match result {
         Err(ClearGbmError::InvalidParameter { name, reason }) => {
             assert_eq!(name, "y_true");
@@ -164,7 +164,7 @@ fn test_initial_prediction_all_ones() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_initial_prediction_invalid_label() -> Result<(), ClearGbmError> {
-    let result = binary_log_loss_initial_prediction(&[0_u8, 1_u8, 5_u8]);
+    let result = binary_log_loss_initial_prediction(&[0_u8, 1_u8, 5_u8], 1.0_f64);
     match result {
         Err(ClearGbmError::InvalidLabel { value, index }) => {
             assert_eq!(value, 5_u8);
@@ -173,6 +173,48 @@ fn test_initial_prediction_invalid_label() -> Result<(), ClearGbmError> {
         }
         other => Err(ClearGbmError::TreeConstructionFailed {
             reason: format!("expected InvalidLabel, got {other:?}"),
+        }),
+    }
+}
+
+#[test]
+fn test_initial_prediction_weighted_balances_imbalance() -> Result<(), ClearGbmError> {
+    // One positive against three negatives at weight 3 gives a weighted
+    // prevalence of exactly 3/(3+3) = 0.5, whose log-odds is exactly 0.
+    let labels = [1_u8, 0_u8, 0_u8, 0_u8];
+    let result = match binary_log_loss_initial_prediction(&labels, 3.0_f64) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(result, 0.0_f64);
+    Ok(())
+}
+
+#[test]
+fn test_initial_prediction_rejects_nonpositive_weight() -> Result<(), ClearGbmError> {
+    let result = binary_log_loss_initial_prediction(&[0_u8, 1_u8], 0.0_f64);
+    match result {
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "scale_pos_weight");
+            assert!(reason.contains("finite positive"));
+            Ok(())
+        }
+        other => Err(ClearGbmError::TreeConstructionFailed {
+            reason: format!("expected InvalidParameter for zero weight, got {other:?}"),
+        }),
+    }
+}
+
+#[test]
+fn test_initial_prediction_rejects_nan_weight() -> Result<(), ClearGbmError> {
+    let result = binary_log_loss_initial_prediction(&[0_u8, 1_u8], f64::NAN);
+    match result {
+        Err(ClearGbmError::InvalidParameter { name, .. }) => {
+            assert_eq!(name, "scale_pos_weight");
+            Ok(())
+        }
+        other => Err(ClearGbmError::TreeConstructionFailed {
+            reason: format!("expected InvalidParameter for NaN weight, got {other:?}"),
         }),
     }
 }

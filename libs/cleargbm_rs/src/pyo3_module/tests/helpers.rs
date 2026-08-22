@@ -178,6 +178,10 @@ pub(super) fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict
         Ok(()) => {}
         Err(e) => return Err(wrap_py_err(&e)),
     };
+    match set_config_f64(&config, "scale_pos_weight", 1.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    };
     Ok(config)
 }
 

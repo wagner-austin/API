@@ -546,6 +546,7 @@ fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoostingConfig> 
     let early_stopping_rounds = propagate!(extract_early_stopping_rounds(dict));
     let growth_strategy = propagate!(extract_growth_strategy(dict));
     let num_leaves = propagate!(extract_num_leaves(dict));
+    let scale_pos_weight = propagate!(dict_get_f64(dict, "scale_pos_weight"));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -562,6 +563,7 @@ fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoostingConfig> 
         early_stopping_rounds,
         growth_strategy,
         num_leaves,
+        scale_pos_weight,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))

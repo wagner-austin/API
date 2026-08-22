@@ -21,6 +21,7 @@ fn default_params() -> GradientBoostingConfigParams {
         early_stopping_rounds: None,
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
+        scale_pos_weight: 1.0_f64,
     }
 }
 
@@ -525,5 +526,50 @@ fn test_config_depth_wise_carries_no_budget() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     assert_eq!(config.num_leaves(), None);
+    Ok(())
+}
+
+#[test]
+fn test_config_rejects_zero_scale_pos_weight() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.scale_pos_weight = 0.0_f64;
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected error for zero scale_pos_weight".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "scale_pos_weight");
+            assert!(reason.contains("finite positive"));
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_config_rejects_nan_scale_pos_weight() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.scale_pos_weight = f64::NAN;
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected error for NaN scale_pos_weight".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, .. }) => {
+            assert_eq!(name, "scale_pos_weight");
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_config_scale_pos_weight_getter() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.scale_pos_weight = 2.5_f64;
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(config.scale_pos_weight(), 2.5_f64);
     Ok(())
 }

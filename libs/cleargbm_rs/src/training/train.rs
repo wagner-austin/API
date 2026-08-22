@@ -111,8 +111,9 @@ pub fn train_gradient_boosting(
         }
     };
 
-    // 3. Compute initial prediction (log-odds of class prevalence)
-    let base_prediction = match binary_log_loss_initial_prediction(y_train) {
+    // 3. Compute initial prediction (log-odds of weighted class prevalence)
+    let scale_pos_weight = config.scale_pos_weight();
+    let base_prediction = match binary_log_loss_initial_prediction(y_train, scale_pos_weight) {
         Ok(p) => p,
         Err(e) => return Err(e),
     };
@@ -206,12 +207,34 @@ pub fn train_gradient_boosting(
             // L2, so there is no bandwidth to save, and every element then pays a
             // widening conversion before its accumulate. See the wiki page
             // `cleargbm-f32-score-narrowing-reverted`.
+            //
+            // Positive samples carry `scale_pos_weight`: the objective is the
+            // weighted log loss, so its first and second derivatives scale
+            // together. At weight 1.0 the multiply is by exactly `1.0`, which
+            // IEEE 754 makes an identity — the unweighted history is the
+            // weighted path's special case, bit for bit.
             let gradients: Vec<f64> = probas
                 .iter()
                 .zip(y_train.iter())
-                .map(|(&p, &y)| p - f64::from(y))
+                .map(|(&p, &y)| {
+                    if y == 1_u8 {
+                        scale_pos_weight * (p - 1.0_f64)
+                    } else {
+                        p
+                    }
+                })
                 .collect();
-            let hessians: Vec<f64> = probas.iter().map(|&p| p * (1.0_f64 - p)).collect();
+            let hessians: Vec<f64> = probas
+                .iter()
+                .zip(y_train.iter())
+                .map(|(&p, &y)| {
+                    if y == 1_u8 {
+                        scale_pos_weight * (p * (1.0_f64 - p))
+                    } else {
+                        p * (1.0_f64 - p)
+                    }
+                })
+                .collect();
 
             // c. Get sample indices (subsampling)
             let sample_indices =
@@ -279,7 +302,7 @@ pub fn train_gradient_boosting(
                         raw_preds_val[i] += config.learning_rate() * val_preds[i];
                     }
                     let val_probas = sigmoid_array(&raw_preds_val);
-                    let val_loss = propagate!(binary_log_loss(yv, &val_probas));
+                    let val_loss = propagate!(binary_log_loss(yv, &val_probas, scale_pos_weight));
                     match es_state {
                         Some(ref mut es) => {
                             if es.update(val_loss, round) {

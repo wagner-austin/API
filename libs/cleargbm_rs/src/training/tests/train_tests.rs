@@ -43,6 +43,7 @@ fn default_params() -> GradientBoostingConfigParams {
         early_stopping_rounds: None,
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
+        scale_pos_weight: 1.0_f64,
     }
 }
 
@@ -296,7 +297,7 @@ fn test_training_loss_decreases() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     let probas_1 = sigmoid_array(&raw_1);
-    let loss_1 = match binary_log_loss(&y_train, &probas_1) {
+    let loss_1 = match binary_log_loss(&y_train, &probas_1, 1.0_f64) {
         Ok(l) => l,
         Err(e) => return Err(e),
     };
@@ -306,7 +307,7 @@ fn test_training_loss_decreases() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     let probas_10 = sigmoid_array(&raw_10);
-    let loss_10 = match binary_log_loss(&y_train, &probas_10) {
+    let loss_10 = match binary_log_loss(&y_train, &probas_10, 1.0_f64) {
         Ok(l) => l,
         Err(e) => return Err(e),
     };
@@ -868,6 +869,7 @@ fn test_training_reports_a_worker_pool_that_cannot_be_built() -> Result<(), Clea
         early_stopping_rounds: None,
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
+        scale_pos_weight: 1.0_f64,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -924,5 +926,73 @@ fn test_default_pool_builder_produces_a_usable_pool() -> Result<(), ClearGbmErro
         }
     };
     assert_eq!(pool.current_num_threads(), 2_usize);
+    Ok(())
+}
+
+#[test]
+fn test_scale_pos_weight_changes_the_trained_model() -> Result<(), ClearGbmError> {
+    // The knob-sensitivity check this crate's history demands: a weighted
+    // config must produce a different model than the unweighted one, or the
+    // knob is decorative. A weight of 5 shifts the base score and every
+    // positive gradient, so raw predictions cannot coincide.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+
+    let unweighted = match make_config(3_usize) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let mut weighted_params = default_params();
+    weighted_params.n_estimators = 3_usize;
+    weighted_params.scale_pos_weight = 5.0_f64;
+    let weighted = match GradientBoostingConfig::new(weighted_params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let runtime = TrainingRuntime {
+        parallelism: Parallelism::Single,
+        hooks: &Hooks::default(),
+    };
+    let model_unweighted = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &unweighted,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let model_weighted = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &weighted,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+
+    let preds_unweighted = match model_unweighted.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    let preds_weighted = match model_weighted.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    assert!(
+        preds_unweighted != preds_weighted,
+        "scale_pos_weight=5 produced the same predictions as unweighted"
+    );
+    // The weighted base score is higher: positives count five-fold in the
+    // prevalence, so every raw prediction starts from larger log-odds.
+    assert!(preds_weighted.iter().sum::<f64>() > preds_unweighted.iter().sum::<f64>());
     Ok(())
 }
