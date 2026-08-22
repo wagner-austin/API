@@ -1,1 +1,21 @@
-{"n_estimators":227,"max_depth":3,"learning_rate":0.028145092716060652,"min_samples_split":49,"min_samples_leaf":17,"max_features":null,"max_bins":32,"subsample":0.8099025726528951,"random_state":42,"track_contributions":true,"monotonic_constraints":null,"reg_alpha":0.0,"reg_lambda":0.0,"n_jobs":1,"train_ratio":0.7,"val_ratio":0.15,"test_ratio":0.15,"early_stopping_rounds":10}
+{
+  "n_estimators": 227,
+  "max_depth": 3,
+  "learning_rate": 0.028145092716060652,
+  "min_samples_split": 49,
+  "min_samples_leaf": 17,
+  "max_features": null,
+  "max_bins": 32,
+  "subsample": 0.8099025726528951,
+  "random_state": 42,
+  "monotonic_constraints": null,
+  "reg_alpha": 0.0,
+  "reg_lambda": 0.0,
+  "n_jobs": 1,
+  "growth_strategy": "depth_wise",
+  "num_leaves": null,
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
+  "early_stopping_rounds": 10
+}
