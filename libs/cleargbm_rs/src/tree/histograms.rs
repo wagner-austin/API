@@ -21,6 +21,57 @@ use crate::types::{HistogramBuffer, SplitConfig};
 /// dominates the work; above it parallelism pays off.
 const RAYON_PER_FEATURE_MIN_SAMPLES: usize = 4096;
 
+/// Reusable scratch for the node-scoped ordered gradient/hessian streams.
+///
+/// Every node build permutes gradients and hessians into position-space
+/// before its per-feature histogram passes. Allocating that scratch per node
+/// cost a heap round-trip and — worse — a `vec![0.0; n]` zero-fill that the
+/// reorder pass immediately overwrote: roughly 1.5 GB of pointless memset
+/// across a 200-tree fit on the benchmark workload. One pair of buffers is
+/// allocated per tree at root size instead; each node overwrites exactly the
+/// prefix it reads, so no zeroing between nodes is needed.
+pub(super) struct OrderedScratch {
+    /// Ordered-gradient scratch; length is the tree's root sample count.
+    ordered_gradients: Vec<f64>,
+
+    /// Ordered-hessian scratch; same length.
+    ordered_hessians: Vec<f64>,
+}
+
+impl OrderedScratch {
+    /// Creates scratch sized for a tree whose root holds `n_samples` samples.
+    ///
+    /// # Args
+    ///
+    /// * `n_samples` - Sample count at the tree's root; every node's sample
+    ///   set is a subset, so this bounds every per-node prefix.
+    ///
+    /// # Returns
+    ///
+    /// Scratch ready for [`build_feature_histograms`] and
+    /// [`compute_child_histograms`].
+    pub(super) fn new(n_samples: usize) -> Self {
+        Self {
+            ordered_gradients: vec![0.0_f64; n_samples],
+            ordered_hessians: vec![0.0_f64; n_samples],
+        }
+    }
+
+    /// Borrows the first `n` elements of both buffers, mutably.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `n` exceeds the root sample count the scratch was created
+    /// with — a caller bug, since every node's sample set is a subset of the
+    /// root's.
+    fn prefixes(&mut self, n: usize) -> (&mut [f64], &mut [f64]) {
+        (
+            &mut self.ordered_gradients[..n],
+            &mut self.ordered_hessians[..n],
+        )
+    }
+}
+
 /// Configuration for building feature histograms.
 pub(super) struct BuildHistogramConfig<'a> {
     /// Sample indices.
@@ -39,15 +90,15 @@ pub(super) struct BuildHistogramConfig<'a> {
     pub(super) n_bins: usize,
     /// Dependency injection hooks.
     pub(super) hooks: &'a Hooks,
-    /// Cached histograms from parent's sibling subtraction (for 2x speedup).
-    pub(super) cached_histograms: Option<&'a [HistogramBuffer]>,
 }
 
 /// Builds histograms for all features.
 ///
-/// Uses cached histograms from parent's sibling subtraction when available,
-/// otherwise builds histograms from scratch by dispatching to the histogram
-/// hook with a per-feature contiguous bin slice.
+/// Always builds from scratch by dispatching to the histogram hook with a
+/// per-feature contiguous bin slice. The sibling-subtraction cache is the
+/// caller's concern: the depth-wise builder takes the cached vector off its
+/// pending node and uses it directly instead of calling here, so no clone
+/// of an already-owned cache ever happens.
 ///
 /// # Column-major fast path
 ///
@@ -67,14 +118,8 @@ pub(super) struct BuildHistogramConfig<'a> {
 /// still indexes the right feature.
 pub(super) fn build_feature_histograms(
     config: &BuildHistogramConfig<'_>,
+    scratch: &mut OrderedScratch,
 ) -> Result<Vec<HistogramBuffer>, ClearGbmError> {
-    // Use cached histograms if available (from parent's sibling subtraction)
-    if let Some(cached) = config.cached_histograms {
-        if cached.len() == config.n_features {
-            return Ok(cached.to_vec());
-        }
-    }
-
     // Reorder gradients + hessians into position-space ONCE for this node,
     // then dispatch the per-feature hook (which reads them sequentially).
     // Amortization = 2 gathers per sample per node (one on gradients, one on
@@ -82,18 +127,17 @@ pub(super) fn build_feature_histograms(
     // that's an 18x reduction in the input-side gather count. See wiki page
     // `lightgbm-construct-histogram-inner`.
     let n_at_node = config.sample_indices.len();
-    let mut ordered_gradients: Vec<f64> = vec![0.0_f64; n_at_node];
-    let mut ordered_hessians: Vec<f64> = vec![0.0_f64; n_at_node];
+    let (ordered_gradients, ordered_hessians) = scratch.prefixes(n_at_node);
     reorder_grad_hess_into(
         config.sample_indices,
         config.gradients,
         config.hessians,
-        &mut ordered_gradients,
-        &mut ordered_hessians,
+        ordered_gradients,
+        ordered_hessians,
     );
 
-    let ordered_g = ordered_gradients.as_slice();
-    let ordered_h = ordered_hessians.as_slice();
+    let ordered_g: &[f64] = ordered_gradients;
+    let ordered_h: &[f64] = ordered_hessians;
     let build_feat = |feat_idx: usize| -> Result<HistogramBuffer, ClearGbmError> {
         let feat_col_start = feat_idx * config.n_samples;
         let feat_col_end = feat_col_start + config.n_samples;
@@ -198,6 +242,7 @@ pub(super) struct ChildHistogramConfig<'a> {
 /// parallelized across features via rayon.
 pub(super) fn compute_child_histograms(
     config: &ChildHistogramConfig<'_>,
+    scratch: &mut OrderedScratch,
 ) -> Result<(Vec<HistogramBuffer>, Vec<HistogramBuffer>), ClearGbmError> {
     let n_left = config.left_indices.len();
     let n_right = config.right_indices.len();
@@ -216,18 +261,17 @@ pub(super) fn compute_child_histograms(
     // `lightgbm-sibling-subtraction-trick`), so the reorder cost pays off
     // n_features times just as in the root-histogram case.
     let n_at_smaller = smaller_indices.len();
-    let mut ordered_gradients: Vec<f64> = vec![0.0_f64; n_at_smaller];
-    let mut ordered_hessians: Vec<f64> = vec![0.0_f64; n_at_smaller];
+    let (ordered_gradients, ordered_hessians) = scratch.prefixes(n_at_smaller);
     reorder_grad_hess_into(
         smaller_indices,
         config.gradients,
         config.hessians,
-        &mut ordered_gradients,
-        &mut ordered_hessians,
+        ordered_gradients,
+        ordered_hessians,
     );
 
-    let ordered_g = ordered_gradients.as_slice();
-    let ordered_h = ordered_hessians.as_slice();
+    let ordered_g: &[f64] = ordered_gradients;
+    let ordered_h: &[f64] = ordered_hessians;
     let build_pair =
         |feat_idx: usize| -> Result<(HistogramBuffer, HistogramBuffer), ClearGbmError> {
             let feat_col_start = feat_idx * config.n_samples;

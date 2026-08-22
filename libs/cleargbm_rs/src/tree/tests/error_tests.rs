@@ -6,7 +6,7 @@ use crate::hooks::Hooks;
 use crate::split::MonotonicConstraint;
 use crate::tree::histograms::{
     build_feature_histograms, compute_child_histograms, find_best_split_across_features_internal,
-    BuildHistogramConfig, ChildHistogramConfig,
+    BuildHistogramConfig, ChildHistogramConfig, OrderedScratch,
 };
 use crate::tree::nodes::{finalize_nodes, BuildNode};
 use crate::tree::{build_tree, BuildTreeInput, TreeBuildConfig};
@@ -181,9 +181,11 @@ fn test_build_feature_histograms_empty_features() -> Result<(), ClearGbmError> {
         n_features: 0_usize,
         n_bins: 3_usize,
         hooks: &hooks,
-        cached_histograms: None,
     };
-    let result = build_feature_histograms(&config);
+    let result = build_feature_histograms(
+        &config,
+        &mut OrderedScratch::new(config.sample_indices.len()),
+    );
 
     // Should return Ok with empty vec (no error, but no histograms)
     assert!(matches!(result, Ok(ref h) if h.is_empty()));
@@ -288,7 +290,10 @@ fn test_compute_child_histograms_parent_histograms_too_short() -> Result<(), Cle
         hooks: &hooks,
     };
 
-    let result = compute_child_histograms(&config);
+    let result = compute_child_histograms(
+        &config,
+        &mut OrderedScratch::new(config.left_indices.len() + config.right_indices.len()),
+    );
     assert!(matches!(
         result,
         Err(ClearGbmError::FeatureIndexOutOfBounds { .. })
@@ -333,7 +338,10 @@ fn test_compute_child_histograms_success() -> Result<(), ClearGbmError> {
         hooks: &hooks,
     };
 
-    let (left_hists, right_hists) = match compute_child_histograms(&config) {
+    let (left_hists, right_hists) = match compute_child_histograms(
+        &config,
+        &mut OrderedScratch::new(config.left_indices.len() + config.right_indices.len()),
+    ) {
         Ok(h) => h,
         Err(e) => return Err(e),
     };
@@ -467,84 +475,6 @@ fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmErr
 }
 
 #[test]
-fn test_build_feature_histograms_with_cached_histograms() -> Result<(), ClearGbmError> {
-    // Test that cached histograms are used when available
-    let sample_indices = vec![0_u32, 1_u32];
-    let gradients = vec![1.0_f64, 2.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64];
-    let bins: Vec<u8> = vec![0_u8, 1_u8];
-
-    // Create cached histograms
-    let mut cached = HistogramBuffer::new(3_usize);
-    match cached.accumulate(0_usize, 1.0_f64, 1.0_f64) {
-        Ok(_) => {}
-        Err(e) => return Err(e),
-    }
-    match cached.accumulate(1_usize, 2.0_f64, 1.0_f64) {
-        Ok(_) => {}
-        Err(e) => return Err(e),
-    }
-    let cached_histograms = vec![cached];
-
-    let hooks = Hooks::default();
-    let config = BuildHistogramConfig {
-        sample_indices: &sample_indices,
-        gradients: &gradients,
-        hessians: &hessians,
-        bins: &bins,
-        n_samples: 2_usize,
-        n_features: 1_usize,
-        n_bins: 3_usize,
-        hooks: &hooks,
-        cached_histograms: Some(&cached_histograms),
-    };
-
-    let result = match build_feature_histograms(&config) {
-        Ok(r) => r,
-        Err(e) => return Err(e),
-    };
-
-    // Should return the cached histograms
-    assert_eq!(result.len(), 1_usize);
-    Ok(())
-}
-
-#[test]
-fn test_build_feature_histograms_with_wrong_size_cache() -> Result<(), ClearGbmError> {
-    // Test that wrong-size cache is ignored and histograms are built fresh
-    let sample_indices = vec![0_u32, 1_u32];
-    let gradients = vec![1.0_f64, 2.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64];
-    // 2 samples, 2 features column-major flat.
-    let bins: Vec<u8> = vec![0_u8, 1_u8, 1_u8, 0_u8];
-
-    // Create cache with wrong size (1 instead of 2)
-    let cached = HistogramBuffer::new(3_usize);
-    let cached_histograms = vec![cached];
-
-    let hooks = Hooks::default();
-    let config = BuildHistogramConfig {
-        sample_indices: &sample_indices,
-        gradients: &gradients,
-        hessians: &hessians,
-        bins: &bins,
-        n_samples: 2_usize,
-        n_features: 2_usize, // 2 features
-        n_bins: 3_usize,
-        hooks: &hooks,
-        cached_histograms: Some(&cached_histograms), // but only 1 cached
-    };
-
-    // Should build from scratch since cache size doesn't match
-    let result = match build_feature_histograms(&config) {
-        Ok(r) => r,
-        Err(e) => return Err(e),
-    };
-    assert_eq!(result.len(), 2_usize);
-    Ok(())
-}
-
-#[test]
 fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
     // Test error propagation from hooks in compute_child_histograms
     let left_indices = vec![0_u32, 1_u32];
@@ -579,7 +509,10 @@ fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
         hooks: &error_hooks,
     };
 
-    let result = compute_child_histograms(&config);
+    let result = compute_child_histograms(
+        &config,
+        &mut OrderedScratch::new(config.left_indices.len() + config.right_indices.len()),
+    );
     assert!(result.is_err());
     assert!(matches!(
         result.err(),

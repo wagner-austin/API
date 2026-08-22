@@ -13,6 +13,7 @@ use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::tree::histograms::{
     build_feature_histograms, compute_child_histograms, BuildHistogramConfig, ChildHistogramConfig,
+    OrderedScratch,
 };
 use crate::types::HistogramBuffer;
 
@@ -137,9 +138,11 @@ fn parallel_threshold_is_what_these_tests_assume() -> Result<(), ClearGbmError> 
         n_features: N_FEATURES,
         n_bins: N_BINS,
         hooks: &hooks,
-        cached_histograms: None,
     };
-    let built = match build_feature_histograms(&config) {
+    let built = match build_feature_histograms(
+        &config,
+        &mut OrderedScratch::new(config.sample_indices.len()),
+    ) {
         Ok(h) => h,
         Err(e) => return Err(e),
     };
@@ -175,9 +178,11 @@ fn serial_and_parallel_paths_produce_the_same_histograms() -> Result<(), ClearGb
             n_features: N_FEATURES,
             n_bins: N_BINS,
             hooks: &hooks,
-            cached_histograms: None,
         };
-        let built = match build_feature_histograms(&config) {
+        let built = match build_feature_histograms(
+            &config,
+            &mut OrderedScratch::new(config.sample_indices.len()),
+        ) {
             Ok(h) => h,
             Err(e) => return Err(e),
         };
@@ -215,9 +220,11 @@ fn parallel_dispatch_preserves_feature_order() -> Result<(), ClearGbmError> {
         n_features: N_FEATURES,
         n_bins: N_BINS,
         hooks: &hooks,
-        cached_histograms: None,
     };
-    let built = match build_feature_histograms(&config) {
+    let built = match build_feature_histograms(
+        &config,
+        &mut OrderedScratch::new(config.sample_indices.len()),
+    ) {
         Ok(h) => h,
         Err(e) => return Err(e),
     };
@@ -280,7 +287,10 @@ fn parallel_child_histograms_satisfy_sibling_subtraction() -> Result<(), ClearGb
         parent_histograms: &parent,
         hooks: &hooks,
     };
-    let (left_hists, right_hists) = match compute_child_histograms(&config) {
+    let (left_hists, right_hists) = match compute_child_histograms(
+        &config,
+        &mut OrderedScratch::new(config.left_indices.len() + config.right_indices.len()),
+    ) {
         Ok(pair) => pair,
         Err(e) => return Err(e),
     };

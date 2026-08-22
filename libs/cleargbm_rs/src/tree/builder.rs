@@ -15,7 +15,7 @@ use crate::types::TreeNode;
 
 use super::histograms::{
     build_feature_histograms, compute_child_histograms, find_best_split_across_features_internal,
-    BuildHistogramConfig, ChildHistogramConfig,
+    BuildHistogramConfig, ChildHistogramConfig, OrderedScratch,
 };
 use super::nodes::{
     compute_sums, finalize_nodes, should_stop, split_samples, BuildNode, PendingNode,
@@ -257,6 +257,10 @@ pub fn build_tree_with_leaf_assignment(
     // Child pointer tracking: node_id -> (left_child, right_child)
     let mut child_pointers: Vec<(Option<usize>, Option<usize>)> = Vec::new();
 
+    // One pair of ordered-stream scratch buffers reused by every node in
+    // this tree; see `OrderedScratch` for the allocation-churn rationale.
+    let mut scratch = OrderedScratch::new(input.sample_indices.len());
+
     // Stack of pending nodes
     let mut stack: Vec<PendingNode> = Vec::new();
     stack.push(PendingNode {
@@ -267,7 +271,7 @@ pub fn build_tree_with_leaf_assignment(
         cached_histograms: None,
     });
 
-    while let Some(pending) = stack.pop() {
+    while let Some(mut pending) = stack.pop() {
         let node_id = next_node_id;
         next_node_id += 1_usize;
 
@@ -329,21 +333,28 @@ pub fn build_tree_with_leaf_assignment(
             continue;
         }
 
-        // Build histograms for all features (uses cache from sibling subtraction if available)
-        let hist_config = BuildHistogramConfig {
-            sample_indices: &pending.sample_indices,
-            gradients: input.gradients,
-            hessians: input.hessians,
-            bins: input.bins,
-            n_samples: input.n_samples,
-            n_features,
-            n_bins,
-            hooks,
-            cached_histograms: pending.cached_histograms.as_deref(),
-        };
-        let histograms = match build_feature_histograms(&hist_config) {
-            Ok(h) => h,
-            Err(e) => return Err(e),
+        // Histograms for all features: the sibling-subtraction cache is
+        // TAKEN from the pending node and used directly — it was cloned
+        // here before, 18 buffer allocations and ~27 KB of copying per
+        // cached node for values the node already owned.
+        let histograms = match pending.cached_histograms.take() {
+            Some(cache) => cache,
+            None => {
+                let hist_config = BuildHistogramConfig {
+                    sample_indices: &pending.sample_indices,
+                    gradients: input.gradients,
+                    hessians: input.hessians,
+                    bins: input.bins,
+                    n_samples: input.n_samples,
+                    n_features,
+                    n_bins,
+                    hooks,
+                };
+                match build_feature_histograms(&hist_config, &mut scratch) {
+                    Ok(h) => h,
+                    Err(e) => return Err(e),
+                }
+            }
         };
 
         // Find best split across all features
@@ -421,11 +432,11 @@ pub fn build_tree_with_leaf_assignment(
             parent_histograms: &histograms,
             hooks,
         };
-        let (left_histograms, right_histograms) = match compute_child_histograms(&child_hist_config)
-        {
-            Ok(h) => h,
-            Err(e) => return Err(e),
-        };
+        let (left_histograms, right_histograms) =
+            match compute_child_histograms(&child_hist_config, &mut scratch) {
+                Ok(h) => h,
+                Err(e) => return Err(e),
+            };
 
         // Push children to stack (right first so left is processed first)
         stack.push(PendingNode {

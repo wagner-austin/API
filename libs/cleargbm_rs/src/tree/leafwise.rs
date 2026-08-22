@@ -44,7 +44,7 @@ use crate::types::{HistogramBuffer, TreeNode};
 use super::builder::{record_leaf_values, validate_build_input, BuildTreeInput};
 use super::histograms::{
     build_feature_histograms, compute_child_histograms, find_best_split_across_features_internal,
-    BuildHistogramConfig, ChildHistogramConfig,
+    BuildHistogramConfig, ChildHistogramConfig, OrderedScratch,
 };
 use super::nodes::{
     compute_leaf_value, compute_sums, finalize_nodes, should_stop, split_samples, BuildNode,
@@ -292,6 +292,10 @@ pub fn build_tree_leaf_wise_with_leaf_assignment(
         &mut leaf_value_per_sample,
     );
 
+    // One pair of ordered-stream scratch buffers reused by every node in
+    // this tree; see `OrderedScratch` for the allocation-churn rationale.
+    let mut scratch = OrderedScratch::new(root_indices.len());
+
     let root_hist_config = BuildHistogramConfig {
         sample_indices: &root_indices,
         gradients: input.gradients,
@@ -301,9 +305,8 @@ pub fn build_tree_leaf_wise_with_leaf_assignment(
         n_features: input.n_features,
         n_bins: context.n_bins,
         hooks,
-        cached_histograms: None,
     };
-    let root_histograms = match build_feature_histograms(&root_hist_config) {
+    let root_histograms = match build_feature_histograms(&root_hist_config, &mut scratch) {
         Ok(h) => h,
         Err(e) => return Err(e),
     };
@@ -365,11 +368,11 @@ pub fn build_tree_leaf_wise_with_leaf_assignment(
             parent_histograms: &candidate.histograms,
             hooks,
         };
-        let (left_histograms, right_histograms) = match compute_child_histograms(&child_hist_config)
-        {
-            Ok(h) => h,
-            Err(e) => return Err(e),
-        };
+        let (left_histograms, right_histograms) =
+            match compute_child_histograms(&child_hist_config, &mut scratch) {
+                Ok(h) => h,
+                Err(e) => return Err(e),
+            };
 
         let child_depth = candidate.depth + 1_usize;
         if child_depth > max_depth_found {
