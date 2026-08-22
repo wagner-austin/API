@@ -78,6 +78,8 @@ def _make_cleargbm_config(
         "reg_alpha": 0.0,
         "reg_lambda": 0.0,
         "n_jobs": 1,
+        "growth_strategy": "depth_wise",
+        "num_leaves": None,
     }
 
 

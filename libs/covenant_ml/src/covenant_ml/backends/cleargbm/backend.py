@@ -144,8 +144,7 @@ def _is_cleargbm_config(cfg: ClassifierTrainConfig) -> TypeGuard[ClearGBMConfig]
     return (
         isinstance(cfg, dict)
         and "min_samples_split" in cfg
-        and "min_samples_leaf" in cfg
-        and "num_leaves" not in cfg  # Distinguish from LightGBM
+        and "min_samples_leaf" in cfg  # LightGBM has min_child_samples instead
     )
 
 
@@ -351,8 +350,8 @@ class ClearGBMBackend(ClassifierBackend):
             reg_lambda=0.0,
             n_jobs=1,
             early_stopping_rounds=cfg["early_stopping_rounds"],
-            growth_strategy="depth_wise",
-            num_leaves=None,
+            growth_strategy=cfg["growth_strategy"],
+            num_leaves=cfg["num_leaves"],
         )
 
         # Train model

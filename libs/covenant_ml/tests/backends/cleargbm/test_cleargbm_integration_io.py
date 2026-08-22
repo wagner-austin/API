@@ -224,6 +224,8 @@ def test_cleargbm_backend_us_bankruptcy_full_pipeline(tmp_path: Path) -> None:
         "reg_alpha": 0.0,
         "reg_lambda": 0.0,
         "n_jobs": 1,
+        "growth_strategy": "depth_wise",
+        "num_leaves": None,
     }
 
     # Train

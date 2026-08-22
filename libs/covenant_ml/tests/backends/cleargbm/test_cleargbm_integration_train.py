@@ -214,6 +214,26 @@ def test_cleargbm_backend_train_with_subsampling(tmp_path: Path) -> None:
     assert outcome["samples_total"] == 100
 
 
+def test_cleargbm_backend_train_leaf_wise(tmp_path: Path) -> None:
+    """ClearGBMBackend passes growth_strategy/num_leaves through to the core.
+
+    A leaf-wise train must complete and produce a loadable model; a broken
+    pass-through would surface as the Rust config validator rejecting the
+    depth_wise-shaped pair.
+    """
+    backend = create_cleargbm_backend()
+    x, y, names = _make_synthetic_dataset()
+
+    config = _make_cleargbm_config(n_estimators=5)
+    config["growth_strategy"] = "leaf_wise"
+    config["num_leaves"] = 8
+
+    outcome = _invoke_cleargbm_train(backend, x, y, names, config, tmp_path)
+
+    assert outcome["samples_total"] == 100
+    assert Path(outcome["model_path"]).exists()
+
+
 def test_cleargbm_backend_train_early_stopping(tmp_path: Path) -> None:
     """ClearGBMBackend tracks early stopping progress."""
     backend = create_cleargbm_backend()

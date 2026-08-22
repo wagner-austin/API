@@ -333,6 +333,9 @@ class LightGBMConfig(TypedDict, total=True):
     early_stopping_rounds: int
 
 
+ClearGBMGrowthStrategy = Literal["depth_wise", "leaf_wise"]
+
+
 class ClearGBMConfig(TypedDict, total=True):
     """Configuration for ClearGBM backend training.
 
@@ -355,6 +358,15 @@ class ClearGBMConfig(TypedDict, total=True):
         reg_alpha: L1 regularization term on leaf weights.
         reg_lambda: L2 regularization term on leaf weights.
         n_jobs: Number of parallel workers (-1 = all cores, 1 = sequential).
+        growth_strategy: Tree growth policy. "depth_wise" fills each level
+            (the historical behavior); "leaf_wise" expands the highest-gain
+            leaf first under a num_leaves budget, LightGBM's policy. Measured
+            2026-08-21/22: ~3% faster at statistically tied quality on the
+            bankruptcy benchmark, but it changes every model output — flip
+            per run, with a measured basis, not by habit.
+        num_leaves: Leaf budget per tree for leaf_wise growth. None means
+            unbudgeted (bounded by max_depth alone); required to be None for
+            depth_wise, which has no leaf budget concept.
         train_ratio: Fraction of data for training.
         val_ratio: Fraction of data for validation.
         test_ratio: Fraction of data for testing.
@@ -375,6 +387,8 @@ class ClearGBMConfig(TypedDict, total=True):
     reg_alpha: float
     reg_lambda: float
     n_jobs: int
+    growth_strategy: ClearGBMGrowthStrategy
+    num_leaves: int | None
     train_ratio: float
     val_ratio: float
     test_ratio: float
