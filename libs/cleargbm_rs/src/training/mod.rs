@@ -24,7 +24,7 @@ pub(crate) mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use config::{GradientBoostingConfig, GradientBoostingConfigParams};
+pub use config::{GradientBoostingConfig, GradientBoostingConfigParams, GrowthStrategy};
 pub use importance::feature_importances;
 pub use model::GradientBoostingModel;
 pub use parallelism::Parallelism;

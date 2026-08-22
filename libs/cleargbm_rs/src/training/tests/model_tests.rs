@@ -4,7 +4,7 @@ use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::training::{
     train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams,
-    GradientBoostingModel,
+    GradientBoostingModel, GrowthStrategy,
 };
 use crate::training::{Parallelism, TrainingRuntime};
 
@@ -38,6 +38,8 @@ fn make_test_model() -> Result<GradientBoostingModel, ClearGbmError> {
         reg_alpha: 0.0_f64,
         reg_lambda: 1.0_f64,
         early_stopping_rounds: None,
+        growth_strategy: GrowthStrategy::DepthWise,
+        num_leaves: None,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),

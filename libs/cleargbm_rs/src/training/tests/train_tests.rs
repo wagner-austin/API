@@ -5,7 +5,7 @@ use crate::hooks::Hooks;
 use crate::losses::{binary_log_loss, sigmoid_array};
 use crate::split::MonotonicConstraint;
 use crate::training::{
-    train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams,
+    train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams, GrowthStrategy,
 };
 use crate::training::{Parallelism, TrainingRuntime};
 
@@ -41,6 +41,8 @@ fn default_params() -> GradientBoostingConfigParams {
         reg_alpha: 0.0_f64,
         reg_lambda: 1.0_f64,
         early_stopping_rounds: None,
+        growth_strategy: GrowthStrategy::DepthWise,
+        num_leaves: None,
     }
 }
 
@@ -49,6 +51,141 @@ fn make_config(n_estimators: usize) -> Result<GradientBoostingConfig, ClearGbmEr
     let mut params = default_params();
     params.n_estimators = n_estimators;
     GradientBoostingConfig::new(params)
+}
+
+/// A dataset whose structure survives the first split.
+///
+/// Feature 0 separates a pure right half from a mixed left half, and feature 1
+/// separates the left half. Depth-wise growth at depth 2 therefore reaches
+/// three leaves, while a leaf budget of 2 stops at one split — which is what
+/// lets the two policies be told apart by tree shape. On the linearly
+/// separable `make_simple_dataset` they cannot: one split makes both sides
+/// pure, so every policy stops at two leaves.
+fn make_nested_dataset() -> (Vec<Vec<f64>>, Vec<u8>, Vec<String>) {
+    let rows: Vec<Vec<f64>> = vec![
+        vec![0.0_f64, 0.0_f64],
+        vec![0.1_f64, 0.1_f64],
+        vec![0.0_f64, 1.0_f64],
+        vec![0.1_f64, 0.9_f64],
+        vec![1.0_f64, 0.0_f64],
+        vec![0.9_f64, 0.1_f64],
+        vec![1.0_f64, 1.0_f64],
+        vec![0.9_f64, 0.9_f64],
+    ];
+    let y = vec![0_u8, 0_u8, 1_u8, 1_u8, 1_u8, 1_u8, 1_u8, 1_u8];
+    let names = vec!["f0".to_string(), "f1".to_string()];
+    (rows, y, names)
+}
+
+/// Helper: leaf-wise training config with the given leaf budget.
+fn make_leaf_wise_config(
+    n_estimators: usize,
+    num_leaves: usize,
+) -> Result<GradientBoostingConfig, ClearGbmError> {
+    let mut params = default_params();
+    params.n_estimators = n_estimators;
+    params.growth_strategy = GrowthStrategy::LeafWise;
+    params.num_leaves = Some(num_leaves);
+    GradientBoostingConfig::new(params)
+}
+
+#[test]
+fn test_training_dispatches_to_leaf_wise_growth() -> Result<(), ClearGbmError> {
+    // The dispatch in `train` is the only thing that routes a config's policy
+    // to a builder. A regression there would silently train depth-wise, which
+    // is exactly the mislabelled-arm failure the axis exists to prevent — so
+    // this asserts a shape only the leaf budget can produce.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let config = match make_leaf_wise_config(3_usize, 2_usize) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let model = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &config,
+        &feature_names,
+        &TrainingRuntime {
+            parallelism: Parallelism::Single,
+            hooks: &Hooks::default(),
+        },
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(model.n_trees(), 3_usize);
+    // A budget of 2 permits exactly one split per tree. Depth-wise growth on
+    // this dataset at max_depth 2 reaches three leaves, so the counts separate
+    // the two policies rather than merely confirming training ran.
+    for tree in model.trees() {
+        assert_eq!(tree.n_leaves(), 2_usize);
+    }
+    Ok(())
+}
+
+#[test]
+fn test_leaf_wise_and_depth_wise_produce_different_trees() -> Result<(), ClearGbmError> {
+    // Guards against a dispatch that compiles but routes both policies to the
+    // same builder: with a binding budget the two must not agree.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let runtime = TrainingRuntime {
+        parallelism: Parallelism::Single,
+        hooks: &Hooks::default(),
+    };
+
+    let depth_config = match make_config(1_usize) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let leaf_config = match make_leaf_wise_config(1_usize, 2_usize) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let depth_model = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &depth_config,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let leaf_model = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &leaf_config,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+
+    let depth_leaves: Vec<usize> = depth_model
+        .trees()
+        .iter()
+        .map(crate::tree::Tree::n_leaves)
+        .collect();
+    let leaf_leaves: Vec<usize> = leaf_model
+        .trees()
+        .iter()
+        .map(crate::tree::Tree::n_leaves)
+        .collect();
+    assert_ne!(
+        depth_leaves, leaf_leaves,
+        "a binding leaf budget must change the tree shape"
+    );
+    Ok(())
 }
 
 #[test]
@@ -729,6 +866,8 @@ fn test_training_reports_a_worker_pool_that_cannot_be_built() -> Result<(), Clea
         reg_alpha: 0.0_f64,
         reg_lambda: 1.0_f64,
         early_stopping_rounds: None,
+        growth_strategy: GrowthStrategy::DepthWise,
+        num_leaves: None,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),

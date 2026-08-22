@@ -4,7 +4,7 @@ use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::training::{
     feature_importances, train_gradient_boosting, GradientBoostingConfig,
-    GradientBoostingConfigParams,
+    GradientBoostingConfigParams, GrowthStrategy,
 };
 use crate::training::{Parallelism, TrainingRuntime};
 
@@ -42,6 +42,8 @@ fn train_single_informative_feature_model(
         reg_alpha: 0.0_f64,
         reg_lambda: 1.0_f64,
         early_stopping_rounds: None,
+        growth_strategy: GrowthStrategy::DepthWise,
+        num_leaves: None,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -153,6 +155,8 @@ fn test_importances_all_zero_when_only_root_leaves() -> Result<(), ClearGbmError
         reg_alpha: 0.0_f64,
         reg_lambda: 1.0_f64,
         early_stopping_rounds: None,
+        growth_strategy: GrowthStrategy::DepthWise,
+        num_leaves: None,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -294,5 +298,7 @@ fn default_importance_params() -> GradientBoostingConfigParams {
         reg_alpha: 0.0_f64,
         reg_lambda: 1.0_f64,
         early_stopping_rounds: None,
+        growth_strategy: GrowthStrategy::DepthWise,
+        num_leaves: None,
     }
 }

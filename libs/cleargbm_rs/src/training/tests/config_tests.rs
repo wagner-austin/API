@@ -2,7 +2,7 @@
 
 use crate::error::ClearGbmError;
 use crate::split::MonotonicConstraint;
-use crate::training::{GradientBoostingConfig, GradientBoostingConfigParams};
+use crate::training::{GradientBoostingConfig, GradientBoostingConfigParams, GrowthStrategy};
 
 /// Creates default valid params for reuse in tests.
 fn default_params() -> GradientBoostingConfigParams {
@@ -19,6 +19,8 @@ fn default_params() -> GradientBoostingConfigParams {
         reg_alpha: 0.0_f64,
         reg_lambda: 1.0_f64,
         early_stopping_rounds: None,
+        growth_strategy: GrowthStrategy::DepthWise,
+        num_leaves: None,
     }
 }
 
@@ -384,5 +386,144 @@ fn test_config_accepts_max_bins_at_the_u8_ceiling() -> Result<(), ClearGbmError>
         Err(e) => return Err(e),
     };
     assert_eq!(config.max_bins(), 255_usize);
+    Ok(())
+}
+
+// =============================================================================
+// Growth strategy
+// =============================================================================
+
+#[test]
+fn test_growth_strategy_wire_spellings_round_trip() -> Result<(), ClearGbmError> {
+    assert_eq!(GrowthStrategy::DepthWise.as_str(), "depth_wise");
+    assert_eq!(GrowthStrategy::LeafWise.as_str(), "leaf_wise");
+    assert_eq!(
+        propagate!(GrowthStrategy::from_wire("depth_wise")),
+        GrowthStrategy::DepthWise
+    );
+    assert_eq!(
+        propagate!(GrowthStrategy::from_wire("leaf_wise")),
+        GrowthStrategy::LeafWise
+    );
+    Ok(())
+}
+
+#[test]
+fn test_growth_strategy_rejects_unknown_spelling() -> Result<(), ClearGbmError> {
+    // `lossguide` is XGBoost's name for the same policy. Naming the offending
+    // value back to the caller is what turns a silent default into a fixable
+    // typo.
+    match GrowthStrategy::from_wire("lossguide") {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected error for unknown growth_strategy".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "growth_strategy");
+            assert!(
+                reason.contains("lossguide"),
+                "rejection should quote the offending value, got: {reason}"
+            );
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_config_defaults_to_depth_wise_growth() -> Result<(), ClearGbmError> {
+    let config = match GradientBoostingConfig::new(default_params()) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(config.growth_strategy(), GrowthStrategy::DepthWise);
+    Ok(())
+}
+
+#[test]
+fn test_config_accepts_leaf_wise_with_a_budget() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.growth_strategy = GrowthStrategy::LeafWise;
+    params.num_leaves = Some(31_usize);
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(config.growth_strategy(), GrowthStrategy::LeafWise);
+    assert_eq!(config.num_leaves(), Some(31_usize));
+    Ok(())
+}
+
+#[test]
+fn test_config_rejects_leaf_wise_without_a_budget() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.growth_strategy = GrowthStrategy::LeafWise;
+    params.num_leaves = None;
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "leaf_wise without num_leaves must be rejected".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "num_leaves");
+            assert!(
+                reason.contains("must be set"),
+                "rejection should say the budget is required, got: {reason}"
+            );
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_config_rejects_a_leaf_budget_below_two() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.growth_strategy = GrowthStrategy::LeafWise;
+    params.num_leaves = Some(1_usize);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "a budget of 1 must be rejected".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "num_leaves");
+            assert!(
+                reason.contains(">= 2"),
+                "rejection should name the minimum, got: {reason}"
+            );
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_config_rejects_a_budget_under_depth_wise() -> Result<(), ClearGbmError> {
+    // Accepting and ignoring it is the defect this rejects: the run would
+    // report a leaf budget it never honoured.
+    let mut params = default_params();
+    params.growth_strategy = GrowthStrategy::DepthWise;
+    params.num_leaves = Some(31_usize);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "num_leaves under depth_wise must be rejected".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "num_leaves");
+            assert!(
+                reason.contains("would ignore it"),
+                "rejection should say why the pairing is wrong, got: {reason}"
+            );
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_config_depth_wise_carries_no_budget() -> Result<(), ClearGbmError> {
+    let config = match GradientBoostingConfig::new(default_params()) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(config.num_leaves(), None);
     Ok(())
 }

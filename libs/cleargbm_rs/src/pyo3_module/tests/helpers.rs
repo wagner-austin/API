@@ -84,6 +84,28 @@ pub(super) fn set_config_f64(
     }
 }
 
+/// Sets a string value in a config dict.
+///
+/// # Args
+///
+/// * `dict` - The config dict to mutate.
+/// * `key` - The config key to set.
+/// * `val` - The value to store.
+///
+/// # Errors
+///
+/// Returns [`ClearGbmError::TreeConstructionFailed`] if the insert fails.
+pub(super) fn set_config_str(
+    dict: &Bound<'_, PyDict>,
+    key: &str,
+    val: &str,
+) -> Result<(), ClearGbmError> {
+    match dict.set_item(key, val) {
+        Ok(()) => Ok(()),
+        Err(e) => Err(wrap_py_err(&e)),
+    }
+}
+
 /// Builds a config dict with valid training hyperparameters.
 ///
 /// `n_jobs` is pinned to `1` so tests are deterministic and do not spawn a
@@ -145,6 +167,16 @@ pub(super) fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict
     match set_config_i64(&config, "n_jobs", 1_i64) {
         Ok(()) => {}
         Err(e) => return Err(e),
+    };
+    match set_config_str(&config, "growth_strategy", "depth_wise") {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    };
+    // Present and null: depth-wise growth carries no leaf budget, and the
+    // extractor requires the key rather than inferring absence as "no budget".
+    match config.set_item("num_leaves", py.None()) {
+        Ok(()) => {}
+        Err(e) => return Err(wrap_py_err(&e)),
     };
     Ok(config)
 }

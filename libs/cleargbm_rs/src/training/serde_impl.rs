@@ -13,8 +13,55 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::split::MonotonicConstraint;
 use crate::tree::Tree;
 
-use super::config::{GradientBoostingConfig, GradientBoostingConfigParams};
+use super::config::{GradientBoostingConfig, GradientBoostingConfigParams, GrowthStrategy};
 use super::model::GradientBoostingModel;
+
+// =============================================================================
+// GrowthStrategy Serialization
+// =============================================================================
+
+impl Serialize for GrowthStrategy {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+/// Visitor for deserializing `GrowthStrategy` from its wire spelling.
+///
+/// `pub(crate)` so [`crate::training::tests`] can drive its `expecting`
+/// formatter directly, matching the convention used by the field visitors
+/// below.
+pub(crate) struct GrowthStrategyVisitor;
+
+impl<'de> Visitor<'de> for GrowthStrategyVisitor {
+    type Value = GrowthStrategy;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("\"depth_wise\" or \"leaf_wise\"")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match GrowthStrategy::from_wire(value) {
+            Ok(strategy) => Ok(strategy),
+            Err(e) => Err(E::custom(e.to_string())),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for GrowthStrategy {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(GrowthStrategyVisitor)
+    }
+}
 
 // =============================================================================
 // GradientBoostingConfig Serialization
@@ -26,7 +73,7 @@ impl Serialize for GradientBoostingConfig {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 12) {
+        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 14) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -81,6 +128,14 @@ impl Serialize for GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match state.serialize_field("growth_strategy", &self.growth_strategy()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("num_leaves", &self.num_leaves()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
         state.end()
     }
 }
@@ -114,6 +169,10 @@ pub(crate) enum GradientBoostingConfigField {
     RegLambda,
     /// The early stopping patience (optional).
     EarlyStoppingRounds,
+    /// The tree growth policy.
+    GrowthStrategy,
+    /// The leaf budget (optional; set exactly under leaf-wise growth).
+    NumLeaves,
 }
 
 /// Visitor for deserializing `GradientBoostingConfigField` from string.
@@ -146,6 +205,8 @@ impl<'de> Visitor<'de> for GradientBoostingConfigFieldVisitor {
             "reg_alpha" => Ok(GradientBoostingConfigField::RegAlpha),
             "reg_lambda" => Ok(GradientBoostingConfigField::RegLambda),
             "early_stopping_rounds" => Ok(GradientBoostingConfigField::EarlyStoppingRounds),
+            "growth_strategy" => Ok(GradientBoostingConfigField::GrowthStrategy),
+            "num_leaves" => Ok(GradientBoostingConfigField::NumLeaves),
             _ => Err(E::unknown_field(value, GRADIENT_BOOSTING_CONFIG_FIELDS)),
         }
     }
@@ -174,6 +235,8 @@ const GRADIENT_BOOSTING_CONFIG_FIELDS: &[&str] = &[
     "reg_alpha",
     "reg_lambda",
     "early_stopping_rounds",
+    "growth_strategy",
+    "num_leaves",
 ];
 
 impl<'de> Deserialize<'de> for GradientBoostingConfig {
@@ -206,6 +269,8 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                 let mut reg_alpha: Option<f64> = None;
                 let mut reg_lambda: Option<f64> = None;
                 let mut early_stopping_rounds: Option<Option<usize>> = None;
+                let mut growth_strategy: Option<GrowthStrategy> = None;
+                let mut num_leaves: Option<Option<usize>> = None;
 
                 loop {
                     let key: Option<GradientBoostingConfigField> = match map.next_key() {
@@ -289,6 +354,18 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                                 Err(e) => return Err(e),
                             });
                         }
+                        GradientBoostingConfigField::GrowthStrategy => {
+                            growth_strategy = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        GradientBoostingConfigField::NumLeaves => {
+                            num_leaves = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
                     }
                 }
 
@@ -340,6 +417,14 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("early_stopping_rounds")),
                 };
+                let growth_strategy = match growth_strategy {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("growth_strategy")),
+                };
+                let num_leaves = match num_leaves {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("num_leaves")),
+                };
 
                 let params = GradientBoostingConfigParams {
                     n_estimators,
@@ -354,6 +439,8 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     reg_alpha,
                     reg_lambda,
                     early_stopping_rounds,
+                    growth_strategy,
+                    num_leaves,
                 };
                 match GradientBoostingConfig::new(params) {
                     Ok(cfg) => Ok(cfg),

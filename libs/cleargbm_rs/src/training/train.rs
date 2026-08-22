@@ -9,10 +9,13 @@ use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::losses::{binary_log_loss, binary_log_loss_initial_prediction, sigmoid_array};
 use crate::predict::predict_tree;
-use crate::tree::{build_tree_with_leaf_assignment, BuildTreeInput, Tree, TreeBuildConfig};
+use crate::tree::{
+    build_tree_leaf_wise_with_leaf_assignment, build_tree_with_leaf_assignment, BuildTreeInput,
+    Tree, TreeBuildConfig,
+};
 use crate::types::SplitConfig;
 
-use super::config::GradientBoostingConfig;
+use super::config::{GradientBoostingConfig, GrowthStrategy};
 use super::early_stopping::EarlyStoppingState;
 use super::model::GradientBoostingModel;
 use super::parallelism::Parallelism;
@@ -143,9 +146,15 @@ pub fn train_gradient_boosting(
         0.0_f64,
     ));
 
+    // Under depth-wise growth the leaf count is left unbounded (0) and
+    // `max_depth` does the bounding, which is what every manifest recorded
+    // before the growth axis existed. Under leaf-wise there is no depth to
+    // bound the shape, so the validated `num_leaves` becomes the budget.
+    let max_leaves = config.num_leaves().unwrap_or_default();
+
     let tree_build_config = propagate!(TreeBuildConfig::new(
         config.max_depth(),
-        0_usize, // max_leaves = 0 (unlimited, matches Python)
+        max_leaves,
         config.reg_alpha(),
         config.reg_lambda(),
         split_config,
@@ -223,9 +232,18 @@ pub fn train_gradient_boosting(
             };
 
             // e. Build tree (and capture per-sample leaf assignments as a
-            // side effect — see build_tree_with_leaf_assignment docs)
-            let (tree, leaf_value_per_sample) =
-                propagate!(build_tree_with_leaf_assignment(&input, hooks));
+            // side effect — see build_tree_with_leaf_assignment docs).
+            // The growth policy is dispatched here, the one place that holds
+            // the full `GradientBoostingConfig`; the tree module exposes the
+            // two growers and stays free of the policy vocabulary.
+            let (tree, leaf_value_per_sample) = match config.growth_strategy() {
+                GrowthStrategy::DepthWise => {
+                    propagate!(build_tree_with_leaf_assignment(&input, hooks))
+                }
+                GrowthStrategy::LeafWise => {
+                    propagate!(build_tree_leaf_wise_with_leaf_assignment(&input, hooks))
+                }
+            };
 
             // f. Update training predictions.
             // Fast path: for samples covered by sample_indices (leaf_value not

@@ -5,7 +5,7 @@ use crate::hooks::Hooks;
 use crate::split::MonotonicConstraint;
 use crate::training::{
     train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams,
-    GradientBoostingModel,
+    GradientBoostingModel, GrowthStrategy,
 };
 use crate::training::{Parallelism, TrainingRuntime};
 
@@ -27,6 +27,8 @@ fn default_params() -> GradientBoostingConfigParams {
         reg_alpha: 0.0_f64,
         reg_lambda: 1.0_f64,
         early_stopping_rounds: None,
+        growth_strategy: GrowthStrategy::DepthWise,
+        num_leaves: None,
     }
 }
 
@@ -58,6 +60,8 @@ fn make_test_model() -> Result<GradientBoostingModel, ClearGbmError> {
         reg_alpha: 0.0_f64,
         reg_lambda: 1.0_f64,
         early_stopping_rounds: None,
+        growth_strategy: GrowthStrategy::DepthWise,
+        num_leaves: None,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -126,6 +130,8 @@ fn test_config_serialize_contains_all_field_names() -> Result<(), ClearGbmError>
         "reg_alpha",
         "reg_lambda",
         "early_stopping_rounds",
+        "growth_strategy",
+        "num_leaves",
     ] {
         assert!(json.contains(field), "missing field {field} in {json}");
     }
@@ -168,6 +174,95 @@ fn test_config_serialize_with_monotonic_constraints() -> Result<(), ClearGbmErro
 // =============================================================================
 // GradientBoostingConfig — deserialize (happy paths)
 // =============================================================================
+
+#[test]
+fn test_growth_strategy_serializes_to_its_wire_spelling() -> Result<(), ClearGbmError> {
+    // Both variants serialize, including the one no config can currently
+    // hold — the enum's wire contract is independent of whether the builder
+    // implements the policy.
+    assert_eq!(
+        propagate!(to_json(&GrowthStrategy::DepthWise)),
+        "\"depth_wise\""
+    );
+    assert_eq!(
+        propagate!(to_json(&GrowthStrategy::LeafWise)),
+        "\"leaf_wise\""
+    );
+    Ok(())
+}
+
+#[test]
+fn test_growth_strategy_deserializes_from_its_wire_spelling() -> Result<(), ClearGbmError> {
+    let depth: GrowthStrategy = propagate!(from_json("\"depth_wise\""));
+    let leaf: GrowthStrategy = propagate!(from_json("\"leaf_wise\""));
+    assert_eq!(depth, GrowthStrategy::DepthWise);
+    assert_eq!(leaf, GrowthStrategy::LeafWise);
+    Ok(())
+}
+
+#[test]
+fn test_growth_strategy_deserialize_rejects_unknown_spelling() -> Result<(), ClearGbmError> {
+    let err = match serde_json::from_str::<GrowthStrategy>("\"lossguide\"") {
+        Ok(v) => {
+            return Err(ClearGbmError::DeserializationFailed {
+                reason: format!("expected rejection of unknown spelling, got {v:?}"),
+            })
+        }
+        Err(e) => e.to_string(),
+    };
+    assert!(
+        err.contains("lossguide"),
+        "deserialize error should quote the offending value, got: {err}"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_config_deserialize_rejects_a_policy_budget_mismatch() -> Result<(), ClearGbmError> {
+    // The deserializer routes through `GradientBoostingConfig::new`, so the
+    // policy/budget pairing is enforced on persisted payloads too. A stored
+    // model claiming leaf_wise with no budget must not load as anything.
+    let config = match GradientBoostingConfig::new(default_params()) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let json = propagate!(to_json(&config));
+    let leaf_json = json.replace(
+        r#""growth_strategy":"depth_wise""#,
+        r#""growth_strategy":"leaf_wise""#,
+    );
+    assert_ne!(leaf_json, json, "the payload rewrite must have applied");
+    let err = match serde_json::from_str::<GradientBoostingConfig>(&leaf_json) {
+        Ok(c) => {
+            return Err(ClearGbmError::DeserializationFailed {
+                reason: format!("expected rejection of a budgetless leaf_wise payload, got {c:?}"),
+            })
+        }
+        Err(e) => e.to_string(),
+    };
+    assert!(
+        err.contains("num_leaves"),
+        "rejection should name the missing budget, got: {err}"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_config_roundtrips_a_leaf_wise_payload() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.growth_strategy = GrowthStrategy::LeafWise;
+    params.num_leaves = Some(31_usize);
+    let original = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let json = propagate!(to_json(&original));
+    assert!(json.contains(r#""growth_strategy":"leaf_wise""#));
+    assert!(json.contains(r#""num_leaves":31"#));
+    let decoded: GradientBoostingConfig = propagate!(from_json(&json));
+    assert_eq!(decoded, original);
+    Ok(())
+}
 
 #[test]
 fn test_config_deserialize_roundtrip_default() -> Result<(), ClearGbmError> {
@@ -390,6 +485,8 @@ const CONFIG_FIELDS: &[&str] = &[
     "reg_alpha",
     "reg_lambda",
     "early_stopping_rounds",
+    "growth_strategy",
+    "num_leaves",
 ];
 
 /// The fields `GradientBoostingModel` serializes, in declaration order.
@@ -674,6 +771,20 @@ fn test_model_deserialize_rejects_each_wrong_value_type() -> Result<(), ClearGbm
 // -----------------------------------------------------------------------------
 // Field-identifier visitors
 // -----------------------------------------------------------------------------
+
+#[test]
+fn test_growth_strategy_visitor_expecting_names_both_spellings() -> Result<(), ClearGbmError> {
+    use crate::testkit::test_expecting_write_success;
+    use crate::training::serde_impl::GrowthStrategyVisitor;
+
+    // The message names both accepted spellings and is 30 bytes; 50 is ample.
+    match test_expecting_write_success(&GrowthStrategyVisitor, 50_usize) {
+        Ok(()) => Ok(()),
+        Err(_) => Err(ClearGbmError::SerializationFailed {
+            reason: "expecting() failed with a sufficient buffer".to_string(),
+        }),
+    }
+}
 
 #[test]
 fn test_config_field_visitor_expecting_describes_a_field_identifier() -> Result<(), ClearGbmError> {

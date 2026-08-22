@@ -14,7 +14,7 @@ use crate::pyo3_module::array_helpers::{i64_to_usize, try_convert_int};
 use crate::split::MonotonicConstraint;
 use crate::training::{
     feature_importances, train_gradient_boosting, GradientBoostingConfig,
-    GradientBoostingConfigParams, GradientBoostingModel,
+    GradientBoostingConfigParams, GradientBoostingModel, GrowthStrategy,
 };
 use crate::training::{Parallelism, TrainingRuntime};
 
@@ -544,6 +544,8 @@ fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoostingConfig> 
     let reg_lambda = propagate!(dict_get_f64(dict, "reg_lambda"));
     let monotonic_constraints = propagate!(extract_monotonic_constraints(dict));
     let early_stopping_rounds = propagate!(extract_early_stopping_rounds(dict));
+    let growth_strategy = propagate!(extract_growth_strategy(dict));
+    let num_leaves = propagate!(extract_num_leaves(dict));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -558,9 +560,72 @@ fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoostingConfig> 
         reg_alpha,
         reg_lambda,
         early_stopping_rounds,
+        growth_strategy,
+        num_leaves,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))
+}
+
+/// Extracts the optional leaf budget from a config dict.
+///
+/// The key `"num_leaves"` is required to be present; its value may be `None`.
+/// Presence is mandatory for the same reason `growth_strategy` is: an absent
+/// key would read as "no budget" and quietly turn a bounded leaf-wise arm into
+/// an unbounded one. Whether the value pairs correctly with the growth policy
+/// is decided by `GradientBoostingConfig::new`, not here.
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing or the value is neither `None` nor a
+/// non-negative integer.
+fn extract_num_leaves(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
+    let opt = propagate!(dict.get_item("num_leaves"));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "num_leaves".to_string(),
+                reason: "missing required key 'num_leaves'".to_string(),
+            }
+            .into())
+        }
+    };
+
+    if item.is_none() {
+        return Ok(None);
+    }
+
+    let val: i64 = propagate!(item.extract());
+    Ok(Some(propagate_into!(i64_to_usize(val, "num_leaves"))))
+}
+
+/// Extracts the tree growth policy from a config dict.
+///
+/// The key `"growth_strategy"` is required and must be the string
+/// `"depth_wise"` or `"leaf_wise"`. Unlike `monotonic_constraints`, a missing
+/// key is an error rather than a default: a benchmark arm that meant to name a
+/// policy and silently got another one is exactly the failure this axis exists
+/// to prevent.
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing, is not a string, or is not one of
+/// the two spellings.
+fn extract_growth_strategy(dict: &Bound<'_, PyDict>) -> PyResult<GrowthStrategy> {
+    let opt = propagate!(dict.get_item("growth_strategy"));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "growth_strategy".to_string(),
+                reason: "missing required key 'growth_strategy'".to_string(),
+            }
+            .into())
+        }
+    };
+    let value: String = propagate!(item.extract());
+    Ok(propagate_into!(GrowthStrategy::from_wire(&value)))
 }
 
 /// Extracts optional monotonic constraints from a config dict.

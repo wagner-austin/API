@@ -102,56 +102,24 @@ pub(super) fn record_leaf_values(
     }
 }
 
-/// Builds a decision tree using histogram-based split finding.
+/// Validates the shapes and index ranges a tree build depends on.
 ///
-/// Uses depth-first traversal with the sibling histogram subtraction trick
-/// for 2x speedup on histogram building.
+/// Shared by both growth policies — the preconditions are properties of the
+/// input, not of the order nodes get split in, so a second copy in
+/// [`super::leafwise`] could only drift out of step with this one.
 ///
 /// # Args
 ///
 /// * `input` - Build tree input configuration.
-/// * `hooks` - Dependency injection hooks for histogram building.
-///
-/// # Returns
-///
-/// Built decision tree.
 ///
 /// # Errors
 ///
-/// Returns error if:
-/// - Input validation fails
-/// - Histogram building fails
-/// - Split finding fails
-pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, ClearGbmError> {
-    match build_tree_with_leaf_assignment(input, hooks) {
-        Ok((tree, _leaf_assignment)) => Ok(tree),
-        Err(e) => Err(e),
-    }
-}
-
-/// Builds a tree AND returns a per-sample-index → leaf-value mapping.
-///
-/// The mapping is populated as leaves are finalized during construction:
-/// for every sample that ends up in a leaf, `leaf_value_per_sample[sample_idx]`
-/// records that leaf's prediction value. Callers whose sample_indices cover
-/// the full training set (i.e. `subsample = 1.0`) can use this to skip
-/// `predict_tree` on those samples entirely — direct O(N) lookup + add
-/// instead of an O(N × depth) tree walk. Samples NOT in the input
-/// `sample_indices` (subsampled-out) will not be updated here and are
-/// left at the caller-supplied initial value (typically `f64::NAN` as a
-/// sentinel so the caller knows to fall back to tree-walk).
-///
-/// The caller passes a pre-sized `Vec<f64>` of length ≥ the max
-/// sample-index encountered in the tree. It's populated in place as a
-/// side effect of tree construction.
-///
-/// # Errors
-///
-/// Same as [`build_tree`].
-pub fn build_tree_with_leaf_assignment(
-    input: &BuildTreeInput<'_>,
-    hooks: &Hooks,
-) -> Result<(Tree, Vec<f64>), ClearGbmError> {
+/// Returns `ClearGbmError::EmptyInput` for an empty sample set or zero
+/// features, `ClearGbmError::ShapeMismatch` if the gradient, hessian or bin
+/// slices do not match the declared shape, and
+/// `ClearGbmError::SampleIndexOutOfBounds` if any sample index falls outside
+/// the per-sample output.
+pub(super) fn validate_build_input(input: &BuildTreeInput<'_>) -> Result<(), ClearGbmError> {
     let n_samples = input.sample_indices.len();
 
     // Handle empty input
@@ -207,6 +175,66 @@ pub fn build_tree_with_leaf_assignment(
             got: format!("bins length {}", input.bins.len()),
         });
     }
+
+    Ok(())
+}
+
+/// Builds a decision tree using histogram-based split finding.
+///
+/// Uses depth-first traversal with the sibling histogram subtraction trick
+/// for 2x speedup on histogram building.
+///
+/// # Args
+///
+/// * `input` - Build tree input configuration.
+/// * `hooks` - Dependency injection hooks for histogram building.
+///
+/// # Returns
+///
+/// Built decision tree.
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Input validation fails
+/// - Histogram building fails
+/// - Split finding fails
+pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, ClearGbmError> {
+    match build_tree_with_leaf_assignment(input, hooks) {
+        Ok((tree, _leaf_assignment)) => Ok(tree),
+        Err(e) => Err(e),
+    }
+}
+
+/// Builds a tree AND returns a per-sample-index → leaf-value mapping.
+///
+/// The mapping is populated as leaves are finalized during construction:
+/// for every sample that ends up in a leaf, `leaf_value_per_sample[sample_idx]`
+/// records that leaf's prediction value. Callers whose sample_indices cover
+/// the full training set (i.e. `subsample = 1.0`) can use this to skip
+/// `predict_tree` on those samples entirely — direct O(N) lookup + add
+/// instead of an O(N × depth) tree walk. Samples NOT in the input
+/// `sample_indices` (subsampled-out) will not be updated here and are
+/// left at the caller-supplied initial value (typically `f64::NAN` as a
+/// sentinel so the caller knows to fall back to tree-walk).
+///
+/// The caller passes a pre-sized `Vec<f64>` of length ≥ the max
+/// sample-index encountered in the tree. It's populated in place as a
+/// side effect of tree construction.
+///
+/// # Errors
+///
+/// Same as [`build_tree`].
+pub fn build_tree_with_leaf_assignment(
+    input: &BuildTreeInput<'_>,
+    hooks: &Hooks,
+) -> Result<(Tree, Vec<f64>), ClearGbmError> {
+    match validate_build_input(input) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+
+    let n_features = input.n_features;
 
     // Number of bins in histogram (regular + 1 for NaN)
     let n_bins = input.n_regular_bins + 1_usize;

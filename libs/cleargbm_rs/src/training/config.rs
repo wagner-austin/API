@@ -5,6 +5,64 @@
 use crate::error::ClearGbmError;
 use crate::split::MonotonicConstraint;
 
+/// Tree growth policy: the order in which nodes are chosen for splitting.
+///
+/// This is a genuine algorithm parameter, not a fallback switch. The two
+/// policies build different trees from identical data:
+///
+/// * [`Self::DepthWise`] expands every node at depth `d` before any node at
+///   depth `d + 1`, bounded by `max_depth`.
+/// * [`Self::LeafWise`] repeatedly splits whichever leaf promises the largest
+///   gain, bounded by a leaf budget (best-first induction, Shi 2007).
+///
+/// The wire spelling is `"depth_wise"` / `"leaf_wise"` at BOTH boundaries —
+/// the Python config dict and the serialized model JSON. Deliberately unlike
+/// [`MonotonicConstraint`], which spells itself as ints across pyo3 and as
+/// variant names in JSON; one value with two spellings is a trap, not a
+/// feature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GrowthStrategy {
+    /// Level-order expansion bounded by `max_depth`.
+    DepthWise,
+    /// Best-first expansion bounded by `num_leaves`.
+    LeafWise,
+}
+
+impl GrowthStrategy {
+    /// Returns the wire spelling of this policy.
+    ///
+    /// # Returns
+    ///
+    /// `"depth_wise"` or `"leaf_wise"`.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::DepthWise => "depth_wise",
+            Self::LeafWise => "leaf_wise",
+        }
+    }
+
+    /// Parses a policy from its wire spelling.
+    ///
+    /// # Args
+    ///
+    /// * `value` - `"depth_wise"` or `"leaf_wise"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ClearGbmError::InvalidParameter` if `value` is neither.
+    pub fn from_wire(value: &str) -> Result<Self, ClearGbmError> {
+        match value {
+            "depth_wise" => Ok(Self::DepthWise),
+            "leaf_wise" => Ok(Self::LeafWise),
+            other => Err(ClearGbmError::InvalidParameter {
+                name: "growth_strategy".to_string(),
+                reason: format!("expected \"depth_wise\" or \"leaf_wise\", got {other:?}"),
+            }),
+        }
+    }
+}
+
 /// Unvalidated parameters for constructing a [`GradientBoostingConfig`].
 ///
 /// Groups all hyperparameters into a single struct to avoid
@@ -36,6 +94,11 @@ pub struct GradientBoostingConfigParams {
     pub reg_lambda: f64,
     /// Early stopping patience (None = disabled, Some(n) where n >= 1).
     pub early_stopping_rounds: Option<usize>,
+    /// Tree growth policy.
+    pub growth_strategy: GrowthStrategy,
+    /// Leaf budget for `LeafWise` growth. Must be `Some(n)` with `n >= 2`
+    /// under `LeafWise` and `None` under `DepthWise`.
+    pub num_leaves: Option<usize>,
 }
 
 /// Configuration for gradient boosting training.
@@ -68,6 +131,10 @@ pub struct GradientBoostingConfig {
     reg_lambda: f64,
     /// Early stopping patience (None = disabled, Some(n) where n >= 1).
     early_stopping_rounds: Option<usize>,
+    /// Tree growth policy.
+    growth_strategy: GrowthStrategy,
+    /// Leaf budget, present exactly when `growth_strategy` is `LeafWise`.
+    num_leaves: Option<usize>,
 }
 
 impl GradientBoostingConfig {
@@ -94,6 +161,8 @@ impl GradientBoostingConfig {
             reg_alpha,
             reg_lambda,
             early_stopping_rounds,
+            growth_strategy,
+            num_leaves,
         } = params;
 
         if n_estimators < 1_usize {
@@ -167,6 +236,39 @@ impl GradientBoostingConfig {
                 });
             }
         }
+        // `num_leaves` is paired with the policy rather than merely ignored
+        // under the wrong one. A leaf budget silently doing nothing under
+        // depth-wise growth is the same class of defect as a missing
+        // growth_strategy: the run reports a knob it did not honour.
+        match (growth_strategy, num_leaves) {
+            (GrowthStrategy::LeafWise, None) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "num_leaves".to_string(),
+                    reason: "must be set when growth_strategy is \"leaf_wise\" — best-first \
+                             growth has no depth to bound it, so the leaf budget is its only \
+                             capacity limit"
+                        .to_string(),
+                })
+            }
+            (GrowthStrategy::LeafWise, Some(budget)) => {
+                if budget < 2_usize {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "num_leaves".to_string(),
+                        reason: format!("must be >= 2, got {budget}"),
+                    });
+                }
+            }
+            (GrowthStrategy::DepthWise, Some(budget)) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "num_leaves".to_string(),
+                    reason: format!(
+                        "must be unset when growth_strategy is \"depth_wise\" (got {budget}); \
+                         depth-wise growth is bounded by max_depth and would ignore it"
+                    ),
+                })
+            }
+            (GrowthStrategy::DepthWise, None) => {}
+        }
 
         Ok(Self {
             n_estimators,
@@ -181,6 +283,8 @@ impl GradientBoostingConfig {
             reg_alpha,
             reg_lambda,
             early_stopping_rounds,
+            growth_strategy,
+            num_leaves,
         })
     }
 
@@ -254,5 +358,17 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn early_stopping_rounds(&self) -> Option<usize> {
         self.early_stopping_rounds
+    }
+
+    /// Returns the tree growth policy.
+    #[must_use]
+    pub fn growth_strategy(&self) -> GrowthStrategy {
+        self.growth_strategy
+    }
+
+    /// Returns the leaf budget, set exactly under `LeafWise` growth.
+    #[must_use]
+    pub fn num_leaves(&self) -> Option<usize> {
+        self.num_leaves
     }
 }
