@@ -172,6 +172,8 @@ def _build_cleargbm_config(
         reg_alpha=float_params["reg_alpha"],
         reg_lambda=float_params["reg_lambda"],
         n_jobs=-1,
+        growth_strategy="depth_wise",
+        num_leaves=None,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,

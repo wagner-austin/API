@@ -6,6 +6,7 @@ from typing import Literal
 
 from covenant_ml.types import (
     ClearGBMConfig,
+    ClearGBMGrowthStrategy,
     LightGBMConfig,
     LogRegConfig,
     LogRegPenalty,
@@ -220,6 +221,12 @@ def _parse_cleargbm_config(
     track_val = raw.get("track_contributions")
     if not isinstance(track_val, bool):
         raise JSONTypeError("track_contributions must be a boolean")
+    growth_strategy = _parse_cleargbm_growth_strategy(raw)
+    num_leaves = _parse_cleargbm_num_leaves(raw)
+    if growth_strategy == "leaf_wise" and num_leaves is None:
+        raise JSONTypeError("leaf_wise growth requires num_leaves")
+    if growth_strategy == "depth_wise" and num_leaves is not None:
+        raise JSONTypeError("depth_wise growth takes no num_leaves budget")
     return {
         "n_estimators": require_int(raw, "n_estimators"),
         "max_depth": require_int(raw, "max_depth"),
@@ -235,11 +242,56 @@ def _parse_cleargbm_config(
         "reg_alpha": _optional_float(raw, "reg_alpha", 0.0),
         "reg_lambda": _optional_float(raw, "reg_lambda", 1.0),
         "n_jobs": _optional_int(raw, "n_jobs", -1),
+        "growth_strategy": growth_strategy,
+        "num_leaves": num_leaves,
         "train_ratio": train_ratio,
         "val_ratio": val_ratio,
         "test_ratio": test_ratio,
         "early_stopping_rounds": _optional_int(raw, "early_stopping_rounds", 10),
     }
+
+
+def _parse_cleargbm_growth_strategy(raw: JSONObject) -> ClearGBMGrowthStrategy:
+    """Parse and validate the ClearGBM growth_strategy field.
+
+    Args:
+        raw: JSON object that may contain a growth_strategy field.
+
+    Returns:
+        Validated growth strategy; absent defaults to "depth_wise", the
+        historical behavior.
+
+    Raises:
+        JSONTypeError: If a present value is not a valid strategy.
+    """
+    val = raw.get("growth_strategy")
+    if val is None:
+        return "depth_wise"
+    if val == "depth_wise":
+        return "depth_wise"
+    if val == "leaf_wise":
+        return "leaf_wise"
+    raise JSONTypeError("growth_strategy must be one of: depth_wise, leaf_wise")
+
+
+def _parse_cleargbm_num_leaves(raw: JSONObject) -> int | None:
+    """Parse the ClearGBM num_leaves field.
+
+    Args:
+        raw: JSON object that may contain a num_leaves field.
+
+    Returns:
+        The leaf budget, or None when absent or explicitly null.
+
+    Raises:
+        JSONTypeError: If a present value is not an integer.
+    """
+    val = raw.get("num_leaves")
+    if val is None:
+        return None
+    if isinstance(val, bool) or not isinstance(val, int):
+        raise JSONTypeError("num_leaves must be an integer or null")
+    return val
 
 
 # =============================================================================

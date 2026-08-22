@@ -12,6 +12,7 @@ import runpy
 import sys
 from collections.abc import Generator
 from pathlib import Path
+from typing import TypeGuard
 
 import numpy as np
 import pytest
@@ -38,6 +39,7 @@ from covenant_ml.optimizer.types import (
 from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
+    ClearGBMConfig,
     EvalMetrics,
     FeatureImportance,
     TrainOutcome,
@@ -109,11 +111,18 @@ class _FakePrepared:
         return stacked
 
 
+def _is_cleargbm_config(cfg: ClassifierTrainConfig) -> TypeGuard[ClearGBMConfig]:
+    """Narrow to ClearGBMConfig by its growth_strategy key, unique to it."""
+    return "growth_strategy" in cfg
+
+
 class _FakeCVBackend:
     """Records the grouped inner split and files a model like the real ones."""
 
     def __init__(self) -> None:
         self.inner_groups_seen: list[bool] = []
+        self.growth_strategies_seen: list[str] = []
+        self.num_leaves_seen: list[int | None] = []
 
     def train(
         self,
@@ -127,6 +136,9 @@ class _FakeCVBackend:
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         self.inner_groups_seen.append(groups is not None)
+        if _is_cleargbm_config(config):
+            self.growth_strategies_seen.append(config["growth_strategy"])
+            self.num_leaves_seen.append(config["num_leaves"])
         model_path = output_dir / "model.json"
         model_path.write_text("fake", encoding="utf-8")
         metrics: EvalMetrics = {
@@ -302,7 +314,21 @@ def test_unknown_dataset_and_backend_are_usage_errors(
         "dataset must be one of: flat_fake, grouped_fake (got missing)\n"
     )
     assert main(["grouped_fake", "catboost"], external_dir=tmp_path) == EXIT_BAD_USAGE
-    assert capsys.readouterr().out == "backend must be cleargbm or lightgbm (got catboost)\n"
+    assert capsys.readouterr().out == (
+        "backend must be cleargbm, cleargbm-leafwise or lightgbm (got catboost)\n"
+    )
+
+
+def test_leafwise_variant_runs_with_a_leaf_budget(
+    cv_hooks: _FakeCVBackend, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """The cleargbm-leafwise protocol variant trains under the cleargbm
+    backend name with leaf_wise growth and the fixed 31-leaf budget."""
+    assert main(["grouped_fake", "cleargbm-leafwise", "3", "7"], external_dir=tmp_path) == EXIT_OK
+    out = capsys.readouterr().out.splitlines()
+    assert "grouped_fake via cleargbm-leafwise: 120 rows, 12 groups, 3 folds, seed 7" in out
+    assert cv_hooks.growth_strategies_seen == ["leaf_wise", "leaf_wise", "leaf_wise"]
+    assert cv_hooks.num_leaves_seen == [31, 31, 31]
 
 
 def test_a_bad_argument_count_prints_usage(capsys: pytest.CaptureFixture[str]) -> None:

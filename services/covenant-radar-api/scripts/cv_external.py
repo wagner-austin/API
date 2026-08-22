@@ -32,6 +32,7 @@ from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
     ClearGBMConfig,
+    ClearGBMGrowthStrategy,
     LightGBMConfig,
 )
 from covenant_ml.validation.splitter import group_stratified_kfold_split
@@ -52,19 +53,25 @@ DEFAULT_SEED = 42
 INNER_RATIOS = (0.70, 0.15, 0.15)
 
 
-def _cleargbm_config(seed: int) -> ClearGBMConfig:
+def _cleargbm_config(seed: int, growth_strategy: ClearGBMGrowthStrategy) -> ClearGBMConfig:
     """Fixed ClearGBM hyperparameters for the evaluation protocol.
 
     Deliberately not tunable from the command line: this script measures the
     evaluation spread, and a per-run hyperparameter surface would turn every
-    comparison into a two-variable experiment.
+    comparison into a two-variable experiment. The one exception is the
+    growth strategy, selected by backend NAME (``cleargbm`` vs
+    ``cleargbm-leafwise``) rather than a knob — a protocol variant, not a
+    hyperparameter. The leaf-wise budget is fixed at 31, matching the
+    LightGBM arm's ``num_leaves`` so the two policies build same-sized trees.
 
     Args:
         seed: Random seed for the fold's training.
+        growth_strategy: Tree growth policy for every fold's training.
 
     Returns:
         The training configuration.
     """
+    num_leaves = 31 if growth_strategy == "leaf_wise" else None
     return ClearGBMConfig(
         n_estimators=300,
         max_depth=5,
@@ -80,6 +87,8 @@ def _cleargbm_config(seed: int) -> ClearGBMConfig:
         reg_alpha=0.0,
         reg_lambda=1.0,
         n_jobs=-1,
+        growth_strategy=growth_strategy,
+        num_leaves=num_leaves,
         train_ratio=INNER_RATIOS[0],
         val_ratio=INNER_RATIOS[1],
         test_ratio=INNER_RATIOS[2],
@@ -127,7 +136,9 @@ def _config_for(backend: str, seed: int) -> tuple[BackendName, ClassifierTrainCo
         this protocol does not cover.
     """
     if backend == "cleargbm":
-        return "cleargbm", _cleargbm_config(seed)
+        return "cleargbm", _cleargbm_config(seed, "depth_wise")
+    if backend == "cleargbm-leafwise":
+        return "cleargbm", _cleargbm_config(seed, "leaf_wise")
     if backend == "lightgbm":
         return "lightgbm", _lightgbm_config(seed)
     return None
@@ -164,7 +175,9 @@ def main(
         return EXIT_BAD_USAGE
     resolved = _config_for(backend, seed)
     if resolved is None:
-        sys.stdout.write(f"backend must be cleargbm or lightgbm (got {backend})\n")
+        sys.stdout.write(
+            f"backend must be cleargbm, cleargbm-leafwise or lightgbm (got {backend})\n"
+        )
         return EXIT_BAD_USAGE
     backend_name, config = resolved
 

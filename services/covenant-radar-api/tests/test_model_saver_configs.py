@@ -398,6 +398,8 @@ class TestBuildClearGBMConfig:
         assert config["track_contributions"] is False
         assert config["monotonic_constraints"] is None
         assert config["n_jobs"] == -1
+        assert config["growth_strategy"] == "depth_wise"
+        assert config["num_leaves"] is None
 
 
 class TestBuildLogRegConfig:

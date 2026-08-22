@@ -106,6 +106,8 @@ class TestClearGBMConfig:
         assert result["config"]["reg_lambda"] == 1.0
         assert result["config"]["n_jobs"] == -1
         assert result["config"]["early_stopping_rounds"] == 10
+        assert result["config"]["growth_strategy"] == "depth_wise"
+        assert result["config"]["num_leaves"] is None
 
     def test_with_monotonic_constraints(self) -> None:
         """Parse ClearGBM config with monotonic constraints."""
@@ -209,6 +211,140 @@ class TestClearGBMConfig:
         assert result["config"]["reg_lambda"] == 2.0
         assert result["config"]["n_jobs"] == 4
         assert result["config"]["early_stopping_rounds"] == 20
+
+    def test_leaf_wise_with_budget(self) -> None:
+        """leaf_wise growth with a num_leaves budget parses through."""
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 100,
+                "max_depth": 6,
+                "learning_rate": 0.1,
+                "min_samples_split": 10,
+                "min_samples_leaf": 5,
+                "max_features": None,
+                "subsample": 0.8,
+                "random_state": 42,
+                "track_contributions": False,
+                "growth_strategy": "leaf_wise",
+                "num_leaves": 31,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        if result["backend"] != "cleargbm":
+            raise AssertionError("Expected cleargbm backend")
+        assert result["config"]["growth_strategy"] == "leaf_wise"
+        assert result["config"]["num_leaves"] == 31
+
+    def test_explicit_depth_wise(self) -> None:
+        """An explicit depth_wise growth_strategy parses through unchanged."""
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 100,
+                "max_depth": 6,
+                "learning_rate": 0.1,
+                "min_samples_split": 10,
+                "min_samples_leaf": 5,
+                "max_features": None,
+                "subsample": 0.8,
+                "random_state": 42,
+                "track_contributions": False,
+                "growth_strategy": "depth_wise",
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        if result["backend"] != "cleargbm":
+            raise AssertionError("Expected cleargbm backend")
+        assert result["config"]["growth_strategy"] == "depth_wise"
+        assert result["config"]["num_leaves"] is None
+
+    def test_leaf_wise_without_budget_raises(self) -> None:
+        """leaf_wise growth without num_leaves is a config error."""
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 100,
+                "max_depth": 6,
+                "learning_rate": 0.1,
+                "min_samples_split": 10,
+                "min_samples_leaf": 5,
+                "max_features": None,
+                "subsample": 0.8,
+                "random_state": 42,
+                "track_contributions": False,
+                "growth_strategy": "leaf_wise",
+            }
+        )
+        with pytest.raises(JSONTypeError, match="leaf_wise growth requires num_leaves"):
+            _parse_external_train_config(config_json)
+
+    def test_depth_wise_with_budget_raises(self) -> None:
+        """depth_wise growth with a num_leaves budget is a config error."""
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 100,
+                "max_depth": 6,
+                "learning_rate": 0.1,
+                "min_samples_split": 10,
+                "min_samples_leaf": 5,
+                "max_features": None,
+                "subsample": 0.8,
+                "random_state": 42,
+                "track_contributions": False,
+                "num_leaves": 31,
+            }
+        )
+        with pytest.raises(JSONTypeError, match="depth_wise growth takes no num_leaves budget"):
+            _parse_external_train_config(config_json)
+
+    def test_unknown_growth_strategy_raises(self) -> None:
+        """An unrecognized growth_strategy value is a config error."""
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 100,
+                "max_depth": 6,
+                "learning_rate": 0.1,
+                "min_samples_split": 10,
+                "min_samples_leaf": 5,
+                "max_features": None,
+                "subsample": 0.8,
+                "random_state": 42,
+                "track_contributions": False,
+                "growth_strategy": "best_first",
+            }
+        )
+        with pytest.raises(JSONTypeError, match="growth_strategy must be one of"):
+            _parse_external_train_config(config_json)
+
+    def test_non_integer_num_leaves_raises(self) -> None:
+        """A non-integer num_leaves is a config error."""
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 100,
+                "max_depth": 6,
+                "learning_rate": 0.1,
+                "min_samples_split": 10,
+                "min_samples_leaf": 5,
+                "max_features": None,
+                "subsample": 0.8,
+                "random_state": 42,
+                "track_contributions": False,
+                "growth_strategy": "leaf_wise",
+                "num_leaves": True,
+            }
+        )
+        with pytest.raises(JSONTypeError, match="num_leaves must be an integer or null"):
+            _parse_external_train_config(config_json)
 
     def test_missing_track_contributions_raises(self) -> None:
         """Missing track_contributions raises JSONTypeError."""
