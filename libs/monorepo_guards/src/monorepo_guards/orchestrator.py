@@ -15,6 +15,7 @@ from monorepo_guards.env_rules import EnvRule
 from monorepo_guards.error_rules import ErrorsRule
 from monorepo_guards.exceptions_rules import ExceptionsRule
 from monorepo_guards.fake_redis_rules import FakeRedisRule
+from monorepo_guards.file_size_rules import FileSizeRule
 from monorepo_guards.hook_dispatch_rules import HookDispatchRule, NullableHookRule
 from monorepo_guards.httpx_rules import HttpxRule
 from monorepo_guards.imports_rules import ImportsRule
@@ -74,6 +75,7 @@ def _run_with_config(config: GuardConfig) -> int:
         MLTestQualityRule(),
         CapabilityDerivationRule(),
         FakeRedisRule(),
+        FileSizeRule(),
         MockBanRule(),
         MonkeyPatchBanRule(),
         EscapingPathDependencyRule(config),
