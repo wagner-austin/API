@@ -65,7 +65,7 @@ def _config_to_rust_dict(
 ) -> dict[str, int | float | bool | str | list[int] | None]:
     """Translate a Python ``GradientBoostingConfig`` into the Rust-side dict.
 
-    The Rust training function extracts 14 hyperparameter fields plus
+    The Rust training function extracts 15 hyperparameter fields plus
     ``n_jobs`` from the dict it receives. ``n_jobs`` selects the worker-thread
     policy for the run and is deliberately not part of the Rust
     ``GradientBoostingConfig``: it does not change the fitted model, and that
@@ -107,6 +107,7 @@ def _config_to_rust_dict(
         "n_jobs": config["n_jobs"],
         "growth_strategy": config["growth_strategy"],
         "num_leaves": config["num_leaves"],
+        "scale_pos_weight": config["scale_pos_weight"],
     }
 
 

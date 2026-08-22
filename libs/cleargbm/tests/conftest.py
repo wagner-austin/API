@@ -60,6 +60,7 @@ def make_config(
         early_stopping_rounds=early_stopping_rounds,
         growth_strategy=growth_strategy,
         num_leaves=num_leaves,
+        scale_pos_weight=1.0,
     )
 
 

@@ -91,6 +91,12 @@ class GradientBoostingConfig(TypedDict):
             against ``growth_strategy`` is enforced once, at the Rust
             boundary, so the cross-field rule has a single owner rather than
             two copies that can drift.
+        scale_pos_weight: Weight applied to positive samples in the loss,
+            its gradients and the base score. Must be a finite positive
+            number; ``1.0`` trains unweighted (and is bit-identical to the
+            pre-weighting behavior). Required, with no implicit default,
+            for the same reason ``growth_strategy`` is: the field exists
+            because a backend once reported a weight it never applied.
     """
 
     n_estimators: int
@@ -110,6 +116,7 @@ class GradientBoostingConfig(TypedDict):
     early_stopping_rounds: int | None
     growth_strategy: GrowthStrategy
     num_leaves: int | None
+    scale_pos_weight: float
 
 
 def require_leaf_budget(value: int, name: str) -> int:
@@ -184,6 +191,7 @@ def encode_gradient_boosting_config(
         "early_stopping_rounds": config["early_stopping_rounds"],
         "growth_strategy": config["growth_strategy"],
         "num_leaves": config["num_leaves"],
+        "scale_pos_weight": config["scale_pos_weight"],
     }
 
 
@@ -255,6 +263,10 @@ def decode_gradient_boosting_config(
     if num_leaves is not None:
         num_leaves = require_leaf_budget(num_leaves, "num_leaves")
 
+    scale_pos_weight = require_positive_float(
+        _require_float(raw, "scale_pos_weight"), "scale_pos_weight"
+    )
+
     return GradientBoostingConfig(
         n_estimators=n_estimators,
         max_depth=max_depth,
@@ -273,6 +285,7 @@ def decode_gradient_boosting_config(
         early_stopping_rounds=early_stopping_rounds,
         growth_strategy=growth_strategy,
         num_leaves=num_leaves,
+        scale_pos_weight=scale_pos_weight,
     )
 
 

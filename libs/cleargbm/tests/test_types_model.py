@@ -48,6 +48,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": 10,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         encoded = encode_gradient_boosting_config(original)
         decoded = decode_gradient_boosting_config(encoded)
@@ -90,6 +91,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         encoded = encode_gradient_boosting_config(original)
         decoded = decode_gradient_boosting_config(encoded)
@@ -121,6 +123,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         with pytest.raises(ValueError, match=r"monotonic_constraints\[0\] must be -1, 0, or 1"):
             decode_gradient_boosting_config(raw)
@@ -145,6 +148,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         with pytest.raises(JSONTypeError, match="monotonic_constraints must be list or None"):
             decode_gradient_boosting_config(raw)
@@ -169,6 +173,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         with pytest.raises(JSONTypeError, match=r"monotonic_constraints\[0\] must be int"):
             decode_gradient_boosting_config(raw)
@@ -193,6 +198,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         with pytest.raises(JSONTypeError, match=r"monotonic_constraints\[0\] must be int"):
             decode_gradient_boosting_config(raw)
@@ -217,6 +223,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         encoded = encode_gradient_boosting_config(original)
         decoded = decode_gradient_boosting_config(encoded)
@@ -243,6 +250,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         with pytest.raises(ValueError, match="n_jobs must be -1 or positive"):
             decode_gradient_boosting_config(raw)
@@ -291,6 +299,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": "lossguide",  # invalid
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         with pytest.raises(ValueError, match="growth_strategy must be one of"):
             decode_gradient_boosting_config(raw)
@@ -315,6 +324,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": 1,  # invalid
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         with pytest.raises(JSONTypeError, match="growth_strategy must be str"):
             decode_gradient_boosting_config(raw)
@@ -344,6 +354,7 @@ class TestGradientBoostingConfig:
             "early_stopping_rounds": None,
             "growth_strategy": "leaf_wise",
             "num_leaves": 31,
+            "scale_pos_weight": 1.0,
         }
         decoded = decode_gradient_boosting_config(raw)
         assert decoded["growth_strategy"] == "leaf_wise"
@@ -420,6 +431,7 @@ class TestGradientBoostingModel:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         original: GradientBoostingModel = {
             "trees": (tree,),

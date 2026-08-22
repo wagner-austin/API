@@ -51,6 +51,7 @@ def _make_config(
         early_stopping_rounds=early_stopping_rounds,
         growth_strategy=growth_strategy,
         num_leaves=num_leaves,
+        scale_pos_weight=1.0,
     )
 
 
@@ -106,8 +107,8 @@ class TestValidateTrainingInputs:
 class TestConfigToRustDict:
     """Config translation: Python-only fields are dropped, monotonic list is passed through."""
 
-    def test_carries_the_fourteen_hyperparameters_plus_n_jobs(self) -> None:
-        """The Rust-side dict has exactly the 15 keys the Rust trainer reads."""
+    def test_carries_the_fifteen_hyperparameters_plus_n_jobs(self) -> None:
+        """The Rust-side dict has exactly the 16 keys the Rust trainer reads."""
         result = _config_to_rust_dict(_make_config())
         expected = {
             "n_estimators",
@@ -125,6 +126,7 @@ class TestConfigToRustDict:
             "n_jobs",
             "growth_strategy",
             "num_leaves",
+            "scale_pos_weight",
         }
         assert set(result.keys()) == expected
 
