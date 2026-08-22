@@ -32,6 +32,21 @@ concrete implementation.
 
 from __future__ import annotations
 
+from covenant_ml.benchmarking.types import (
+    MANIFEST_SCHEMA_VERSION,
+    BenchmarkConfig,
+    BenchmarkManifest,
+    BenchmarkModelName,
+    DatasetInfo,
+    QualityMetrics,
+    SeedResult,
+    TimingSummary,
+)
+from covenant_ml.benchmarking.types_codec import (
+    decode_benchmark_manifest,
+    encode_benchmark_manifest,
+)
+
 from .dataset import LoadedDataset, load_bankruptcy_dataset
 from .factory import (
     DEFAULT_REPEATS,
@@ -56,18 +71,6 @@ from .reporting import GapSummary, ModelSummary, render_report, summarize_gap
 from .runner import measure_trainer, run_benchmark
 from .splitting import company_disjoint_split
 from .timing import summarize_timings
-from .types import (
-    MANIFEST_SCHEMA_VERSION,
-    BenchmarkConfig,
-    BenchmarkManifest,
-    BenchmarkModelName,
-    DatasetInfo,
-    QualityMetrics,
-    SeedResult,
-    TimingSummary,
-    decode_benchmark_manifest,
-    encode_benchmark_manifest,
-)
 
 __all__ = [
     "DEFAULT_REPEATS",

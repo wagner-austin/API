@@ -18,8 +18,8 @@ from scripts.benchmark_cleargbm_vs_lightgbm import DEFAULT_CSV, build_parser, ma
 from covenant_ml.benchmarking.types import (
     MANIFEST_SCHEMA_VERSION,
     BenchmarkManifest,
-    decode_benchmark_manifest,
 )
+from covenant_ml.benchmarking.types_codec import decode_benchmark_manifest
 
 
 def write_dataset(directory: Path, n_companies: int = 40) -> Path:

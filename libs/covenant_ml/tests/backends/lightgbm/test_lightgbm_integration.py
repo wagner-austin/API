@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 from covenant_ml.backends.lightgbm import LIGHTGBM_CAPABILITIES, create_lightgbm_backend
 from covenant_ml.backends.lightgbm.backend import _resolve_device
 from covenant_ml.backends.protocol import ClassifierBackend
-from covenant_ml.explainers.registry import try_extract_native_tree_model
+from covenant_ml.explainers.adapters import try_extract_native_tree_model
 from covenant_ml.types import (
     ClassifierTrainConfig,
     LightGBMConfig,

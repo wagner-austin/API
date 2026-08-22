@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from platform_core.json_utils import JSONValue, load_json_str
 
-from .types import (
-    ERR_NO_TREES,
+from covenant_ml.benchmarking.types import ERR_NO_TREES
+from covenant_ml.benchmarking.types_codec import (
     _require_bool,
     _require_int,
     _require_list,

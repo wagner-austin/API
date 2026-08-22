@@ -24,6 +24,8 @@ from covenant_ml.benchmarking.types import (
     QualityMetrics,
     SeedResult,
     TimingSummary,
+)
+from covenant_ml.benchmarking.types_codec import (
     _require_bool,
     _require_estimator,
     _require_float,

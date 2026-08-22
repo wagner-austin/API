@@ -18,7 +18,7 @@ from covenant_ml.backends.random_forest import (
     RandomForestBackend,
     create_random_forest_backend,
 )
-from covenant_ml.explainers.registry import try_extract_native_tree_model
+from covenant_ml.explainers.adapters import try_extract_native_tree_model
 from covenant_ml.types import (
     ClassifierTrainConfig,
     MLPConfig,
