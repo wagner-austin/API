@@ -1,7 +1,7 @@
 //! Error path tests for tree building internals.
 
 use crate::error::ClearGbmError;
-use crate::histogram::HistogramRequest;
+use crate::histogram::NodeHistogramRequest;
 use crate::hooks::Hooks;
 use crate::split::MonotonicConstraint;
 use crate::tree::histograms::{
@@ -172,12 +172,12 @@ fn test_build_feature_histograms_empty_features() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![];
 
     let hooks = Hooks::default();
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 2_usize, 0_usize);
     let config = BuildHistogramConfig {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
-        n_samples: 2_usize,
+        bins_rows: &bins_rows,
         n_features: 0_usize,
         n_bins: 3_usize,
         hooks: &hooks,
@@ -277,13 +277,13 @@ fn test_compute_child_histograms_parent_histograms_too_short() -> Result<(), Cle
     let parent_histograms = vec![HistogramBuffer::new(3_usize)];
 
     let hooks = Hooks::default();
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 2_usize);
     let config = ChildHistogramConfig {
         left_indices: &left_indices,
         right_indices: &right_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
-        n_samples: 4_usize,
+        bins_rows: &bins_rows,
         n_features: 2_usize, // 2 features, but only 1 parent histogram
         n_bins: 3_usize,
         parent_histograms: &parent_histograms,
@@ -325,13 +325,13 @@ fn test_compute_child_histograms_success() -> Result<(), ClearGbmError> {
     let parent_histograms = vec![parent_hist];
 
     let hooks = Hooks::default();
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let config = ChildHistogramConfig {
         left_indices: &left_indices,
         right_indices: &right_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
-        n_samples: 4_usize,
+        bins_rows: &bins_rows,
         n_features: 1_usize,
         n_bins: 3_usize,
         parent_histograms: &parent_histograms,
@@ -369,11 +369,12 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 100_usize, // Large but histogram will have n_bins = 101
@@ -425,7 +426,7 @@ fn test_is_increasing_is_decreasing_methods() -> Result<(), ClearGbmError> {
 // =========================================================================
 
 /// Histogram builder that always returns an error (for testing error propagation)
-fn error_histogram(_: HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError> {
+fn error_histogram(_: NodeHistogramRequest<'_>) -> Result<Vec<HistogramBuffer>, ClearGbmError> {
     Err(ClearGbmError::EmptyInput {
         context: "injected error from hook".to_string(),
     })
@@ -449,11 +450,12 @@ fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmErr
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,
@@ -496,13 +498,13 @@ fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
 
     // Inject error via hook
     let error_hooks = Hooks::with_histogram_builder(error_histogram);
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let config = ChildHistogramConfig {
         left_indices: &left_indices,
         right_indices: &right_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
-        n_samples: 4_usize,
+        bins_rows: &bins_rows,
         n_features: 1_usize,
         n_bins: 3_usize,
         parent_histograms: &parent_histograms,
@@ -522,10 +524,12 @@ fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
 }
 
 /// Histogram builder that returns undersized histogram (for testing error propagation)
-fn undersized_histogram(_: HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError> {
+fn undersized_histogram(
+    _: NodeHistogramRequest<'_>,
+) -> Result<Vec<HistogramBuffer>, ClearGbmError> {
     // Return a histogram with only 2 bins, regardless of requested size
     // This will cause find_best_split_from_histogram to fail when n_regular_bins > 2
-    Ok(HistogramBuffer::new(2_usize))
+    Ok(vec![HistogramBuffer::new(2_usize)])
 }
 
 #[test]
@@ -546,11 +550,12 @@ fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize, // 4 regular bins, but hook returns 2-bin histogram
@@ -586,11 +591,12 @@ fn test_build_tree_finalize_nodes_error_via_hook() -> Result<(), ClearGbmError> 
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,

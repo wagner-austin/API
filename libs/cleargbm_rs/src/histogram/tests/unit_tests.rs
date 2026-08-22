@@ -1,20 +1,26 @@
 //! Example-based unit tests for the histogram module.
 //!
-//! Tests target the trusted hot loop [`build_histogram_ordered_trusted`]
+//! Tests target the trusted hot loop [`build_node_histograms_single_pass`]
 //! directly — the one histogram-build entry point in the crate. Inputs are
 //! pre-permuted in the test (mimicking what the tree builder does via
 //! [`reorder_grad_hess_into`]). There is no validated public shim, so no
 //! error-path tests: the hot loop is trusted, and the tree builder
 //! establishes its invariants by construction.
+//!
+//! The single-feature cases carry the exact expected values the per-feature
+//! predecessor pinned, so they double as the equivalence record across the
+//! 2026-08-21 single-pass refactor: at `n_features = 1` the row-major and
+//! column-major layouts coincide, and every pinned sum is unchanged.
 
 use crate::error::ClearGbmError;
 use crate::histogram::{
-    build_histogram_ordered_trusted, reorder_grad_hess_into, subtract_histogram, HistogramRequest,
+    build_node_histograms_single_pass, reorder_grad_hess_into, subtract_histogram,
+    NodeHistogramRequest,
 };
 use crate::types::HistogramBuffer;
 
 // ============================================================================
-// build_histogram_ordered_trusted — the one trusted hot loop
+// build_node_histograms_single_pass — the one trusted hot loop
 // ============================================================================
 
 #[test]
@@ -26,13 +32,15 @@ fn test_build_histogram_ordered_simple() -> Result<(), ClearGbmError> {
     let bins = vec![0_u8, 1_u8, 0_u8];
     let n_bins = 3_usize;
 
-    let hist = build_histogram_ordered_trusted(HistogramRequest {
+    let hists = build_node_histograms_single_pass(NodeHistogramRequest {
         sample_indices: &sample_indices,
         ordered_gradients: &gradients,
         ordered_hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins,
+        n_features: 1_usize,
         n_bins,
     });
+    let hist = &hists[0_usize];
 
     // Bin 0: samples 0 and 2 (gradients 0.1 + 0.3 = 0.4).
     assert!((hist.gradient_sums()[0_usize] - 0.4_f64).abs() < 1e-6_f64);
@@ -67,13 +75,15 @@ fn test_build_histogram_ordered_subset_via_reorder() -> Result<(), ClearGbmError
         &mut ordered_h,
     );
 
-    let hist = build_histogram_ordered_trusted(HistogramRequest {
+    let hists = build_node_histograms_single_pass(NodeHistogramRequest {
         sample_indices: &sample_indices,
         ordered_gradients: &ordered_g,
         ordered_hessians: &ordered_h,
-        bins: &bins,
+        bins_rows: &bins,
+        n_features: 1_usize,
         n_bins,
     });
+    let hist = &hists[0_usize];
 
     // Only samples 0 and 2 count (both in bin 0).
     assert!((hist.gradient_sums()[0_usize] - 0.4_f64).abs() < 1e-6_f64);
@@ -98,13 +108,15 @@ fn test_build_histogram_ordered_large_unrolled_chunks() -> Result<(), ClearGbmEr
         .collect();
     let n_bins = 64_usize;
 
-    let hist = build_histogram_ordered_trusted(HistogramRequest {
+    let hists = build_node_histograms_single_pass(NodeHistogramRequest {
         sample_indices: &sample_indices,
         ordered_gradients: &ordered_g,
         ordered_hessians: &ordered_h,
-        bins: &bins,
+        bins_rows: &bins,
+        n_features: 1_usize,
         n_bins,
     });
+    let hist = &hists[0_usize];
 
     // Total count across all bins == n.
     let total_count: usize = hist.counts().iter().sum();
@@ -132,13 +144,15 @@ fn test_build_histogram_ordered_tail_remainder() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2];
     let n_bins = 4_usize;
 
-    let hist = build_histogram_ordered_trusted(HistogramRequest {
+    let hists = build_node_histograms_single_pass(NodeHistogramRequest {
         sample_indices: &sample_indices,
         ordered_gradients: &ordered_g,
         ordered_hessians: &ordered_h,
-        bins: &bins,
+        bins_rows: &bins,
+        n_features: 1_usize,
         n_bins,
     });
+    let hist = &hists[0_usize];
 
     // Bin 0: samples 0, 4, 8 (gradients 0 + 4 + 8 = 12).
     assert!((hist.gradient_sums()[0_usize] - 12.0_f64).abs() < 1e-6_f64);
@@ -172,13 +186,15 @@ fn test_build_histogram_ordered_permuted_non_monotonic() -> Result<(), ClearGbmE
         &mut ordered_h,
     );
 
-    let hist = build_histogram_ordered_trusted(HistogramRequest {
+    let hists = build_node_histograms_single_pass(NodeHistogramRequest {
         sample_indices: &sample_indices,
         ordered_gradients: &ordered_g,
         ordered_hessians: &ordered_h,
-        bins: &bins,
+        bins_rows: &bins,
+        n_features: 1_usize,
         n_bins,
     });
+    let hist = &hists[0_usize];
 
     // Sum of gradients equals the sum of full_gradients at the selected sample_indices.
     let expected_total: f64 = sample_indices
@@ -190,6 +206,88 @@ fn test_build_histogram_ordered_permuted_non_monotonic() -> Result<(), ClearGbmE
     // Total count == number of sample_indices.
     let total_count: usize = hist.counts().iter().sum();
     assert_eq!(total_count, sample_indices.len());
+    Ok(())
+}
+
+#[test]
+fn test_build_node_histograms_multi_feature_exact_values() -> Result<(), ClearGbmError> {
+    // Three samples, two features, row-major rows: sample i holds
+    // [bin_feat0, bin_feat1]. One walk must fill both features' histograms
+    // with exactly the sums the per-feature passes produced.
+    let sample_indices = vec![0_u32, 1_u32, 2_u32];
+    let gradients = vec![0.1_f64, 0.2_f64, 0.4_f64];
+    let hessians = vec![1.0_f64, 2.0_f64, 4.0_f64];
+    // feature 0 bins: [0, 1, 0]; feature 1 bins: [1, 1, 0]
+    let bins_rows: Vec<u8> = vec![0_u8, 1_u8, 1_u8, 1_u8, 0_u8, 0_u8];
+    let n_bins = 2_usize;
+
+    let hists = build_node_histograms_single_pass(NodeHistogramRequest {
+        sample_indices: &sample_indices,
+        ordered_gradients: &gradients,
+        ordered_hessians: &hessians,
+        bins_rows: &bins_rows,
+        n_features: 2_usize,
+        n_bins,
+    });
+
+    assert_eq!(hists.len(), 2_usize);
+    // Feature 0, bin 0: samples 0 and 2 (0.1 + 0.4 gradient, 1 + 4 hessian).
+    assert!((hists[0_usize].gradient_sums()[0_usize] - 0.5_f64).abs() < 1e-12_f64);
+    assert!((hists[0_usize].hessian_sums()[0_usize] - 5.0_f64).abs() < 1e-12_f64);
+    assert_eq!(hists[0_usize].counts()[0_usize], 2_usize);
+    // Feature 0, bin 1: sample 1 only.
+    assert!((hists[0_usize].gradient_sums()[1_usize] - 0.2_f64).abs() < 1e-12_f64);
+    assert_eq!(hists[0_usize].counts()[1_usize], 1_usize);
+    // Feature 1, bin 0: sample 2 only.
+    assert!((hists[1_usize].gradient_sums()[0_usize] - 0.4_f64).abs() < 1e-12_f64);
+    assert_eq!(hists[1_usize].counts()[0_usize], 1_usize);
+    // Feature 1, bin 1: samples 0 and 1.
+    assert!((hists[1_usize].gradient_sums()[1_usize] - 0.3_f64).abs() < 1e-12_f64);
+    assert_eq!(hists[1_usize].counts()[1_usize], 2_usize);
+    Ok(())
+}
+
+#[test]
+fn test_build_node_histograms_matches_per_feature_composition() -> Result<(), ClearGbmError> {
+    // Self-consistency: one multi-feature walk must equal n_features
+    // independent single-feature walks over that feature's own column.
+    let sample_indices = vec![4_u32, 1_u32, 3_u32, 0_u32];
+    let ordered_g = vec![0.7_f64, -0.3_f64, 0.9_f64, 0.05_f64];
+    let ordered_h = vec![1.5_f64, 0.5_f64, 2.0_f64, 1.0_f64];
+    let n_features = 3_usize;
+    let n_bins = 4_usize;
+    // 5 samples x 3 features, row-major.
+    let bins_rows: Vec<u8> = vec![
+        0_u8, 3_u8, 2_u8, // sample 0
+        1_u8, 1_u8, 0_u8, // sample 1
+        2_u8, 0_u8, 3_u8, // sample 2
+        3_u8, 2_u8, 1_u8, // sample 3
+        0_u8, 2_u8, 2_u8, // sample 4
+    ];
+
+    let combined = build_node_histograms_single_pass(NodeHistogramRequest {
+        sample_indices: &sample_indices,
+        ordered_gradients: &ordered_g,
+        ordered_hessians: &ordered_h,
+        bins_rows: &bins_rows,
+        n_features,
+        n_bins,
+    });
+
+    for feat_idx in 0_usize..n_features {
+        let column: Vec<u8> = (0_usize..5_usize)
+            .map(|s| bins_rows[s * n_features + feat_idx])
+            .collect();
+        let single = build_node_histograms_single_pass(NodeHistogramRequest {
+            sample_indices: &sample_indices,
+            ordered_gradients: &ordered_g,
+            ordered_hessians: &ordered_h,
+            bins_rows: &column,
+            n_features: 1_usize,
+            n_bins,
+        });
+        assert_eq!(combined[feat_idx], single[0_usize]);
+    }
     Ok(())
 }
 

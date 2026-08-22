@@ -6,20 +6,11 @@
 //! chosen `SplitResult`. This is the "histogram" half of the tree
 //! builder; the "structural" half lives in [`super::nodes`].
 
-use rayon::prelude::*;
-
 use crate::error::ClearGbmError;
-use crate::histogram::{reorder_grad_hess_into, subtract_histogram, HistogramRequest};
+use crate::histogram::{reorder_grad_hess_into, subtract_histogram, NodeHistogramRequest};
 use crate::hooks::Hooks;
 use crate::split::{find_best_split_from_histogram, MonotonicConstraint, SplitResult};
 use crate::types::{HistogramBuffer, SplitConfig};
-
-/// Minimum per-feature work below which rayon dispatch is skipped for the
-/// serial path. Empirically, rayon's steal-work + join overhead is ~1-5µs on
-/// modern x86, and one histogram build over N samples takes ~N/2 nanoseconds
-/// with the unrolled tight loop. Below this threshold the dispatch overhead
-/// dominates the work; above it parallelism pays off.
-const RAYON_PER_FEATURE_MIN_SAMPLES: usize = 4096;
 
 /// Reusable scratch for the node-scoped ordered gradient/hessian streams.
 ///
@@ -80,10 +71,9 @@ pub(super) struct BuildHistogramConfig<'a> {
     pub(super) gradients: &'a [f64],
     /// Hessians for all samples.
     pub(super) hessians: &'a [f64],
-    /// Bin assignments in flat column-major u8 layout, length `n_samples * n_features`.
-    pub(super) bins: &'a [u8],
-    /// Sample count (row count of the original feature matrix).
-    pub(super) n_samples: usize,
+    /// Row-major bin matrix (sample-major rows of `n_features` bytes),
+    /// length `n_samples * n_features`.
+    pub(super) bins_rows: &'a [u8],
     /// Number of features.
     pub(super) n_features: usize,
     /// Number of bins.
@@ -136,40 +126,14 @@ pub(super) fn build_feature_histograms(
         ordered_hessians,
     );
 
-    let ordered_g: &[f64] = ordered_gradients;
-    let ordered_h: &[f64] = ordered_hessians;
-    let build_feat = |feat_idx: usize| -> Result<HistogramBuffer, ClearGbmError> {
-        let feat_col_start = feat_idx * config.n_samples;
-        let feat_col_end = feat_col_start + config.n_samples;
-        let feat_bins = &config.bins[feat_col_start..feat_col_end];
-        (config.hooks.build_histogram)(HistogramRequest {
-            sample_indices: config.sample_indices,
-            ordered_gradients: ordered_g,
-            ordered_hessians: ordered_h,
-            bins: feat_bins,
-            n_bins: config.n_bins,
-        })
-    };
-
-    let results: Vec<Result<HistogramBuffer, ClearGbmError>> =
-        if config.sample_indices.len() >= RAYON_PER_FEATURE_MIN_SAMPLES {
-            (0_usize..config.n_features)
-                .into_par_iter()
-                .map(build_feat)
-                .collect()
-        } else {
-            (0_usize..config.n_features).map(build_feat).collect()
-        };
-
-    let mut histograms = Vec::with_capacity(config.n_features);
-    for r in results {
-        match r {
-            Ok(h) => histograms.push(h),
-            Err(e) => return Err(e),
-        }
-    }
-
-    Ok(histograms)
+    (config.hooks.build_node_histograms)(NodeHistogramRequest {
+        sample_indices: config.sample_indices,
+        ordered_gradients,
+        ordered_hessians,
+        bins_rows: config.bins_rows,
+        n_features: config.n_features,
+        n_bins: config.n_bins,
+    })
 }
 
 /// Finds best split across all features.
@@ -221,10 +185,9 @@ pub(super) struct ChildHistogramConfig<'a> {
     pub(super) gradients: &'a [f64],
     /// Hessians for all samples.
     pub(super) hessians: &'a [f64],
-    /// Bin assignments in flat column-major u8 layout, length `n_samples * n_features`.
-    pub(super) bins: &'a [u8],
-    /// Sample count (row count of the original feature matrix).
-    pub(super) n_samples: usize,
+    /// Row-major bin matrix (sample-major rows of `n_features` bytes),
+    /// length `n_samples * n_features`.
+    pub(super) bins_rows: &'a [u8],
     /// Number of features.
     pub(super) n_features: usize,
     /// Number of bins.
@@ -270,52 +233,45 @@ pub(super) fn compute_child_histograms(
         ordered_hessians,
     );
 
-    let ordered_g: &[f64] = ordered_gradients;
-    let ordered_h: &[f64] = ordered_hessians;
-    let build_pair =
-        |feat_idx: usize| -> Result<(HistogramBuffer, HistogramBuffer), ClearGbmError> {
-            let feat_col_start = feat_idx * config.n_samples;
-            let feat_col_end = feat_col_start + config.n_samples;
-            let feat_bins = &config.bins[feat_col_start..feat_col_end];
+    let smaller_histograms = match (config.hooks.build_node_histograms)(NodeHistogramRequest {
+        sample_indices: smaller_indices,
+        ordered_gradients,
+        ordered_hessians,
+        bins_rows: config.bins_rows,
+        n_features: config.n_features,
+        n_bins: config.n_bins,
+    }) {
+        Ok(h) => h,
+        Err(e) => return Err(e),
+    };
 
-            let smaller_hist = match (config.hooks.build_histogram)(HistogramRequest {
-                sample_indices: smaller_indices,
-                ordered_gradients: ordered_g,
-                ordered_hessians: ordered_h,
-                bins: feat_bins,
-                n_bins: config.n_bins,
-            }) {
-                Ok(h) => h,
-                Err(e) => return Err(e),
-            };
-
-            let parent_hist = match config.parent_histograms.get(feat_idx) {
-                Some(h) => h,
-                None => {
-                    return Err(ClearGbmError::FeatureIndexOutOfBounds {
-                        index: feat_idx,
-                        n_features: config.n_features,
-                    })
-                }
-            };
-
-            let larger_hist = match subtract_histogram(parent_hist, &smaller_hist) {
-                Ok(h) => h,
-                Err(e) => return Err(e),
-            };
-
-            Ok((smaller_hist, larger_hist))
+    let build_pair = |(feat_idx, smaller_hist): (usize, HistogramBuffer)| -> Result<
+        (HistogramBuffer, HistogramBuffer),
+        ClearGbmError,
+    > {
+        let parent_hist = match config.parent_histograms.get(feat_idx) {
+            Some(h) => h,
+            None => {
+                return Err(ClearGbmError::FeatureIndexOutOfBounds {
+                    index: feat_idx,
+                    n_features: config.n_features,
+                })
+            }
         };
 
-    let pairs: Vec<Result<(HistogramBuffer, HistogramBuffer), ClearGbmError>> =
-        if smaller_indices.len() >= RAYON_PER_FEATURE_MIN_SAMPLES {
-            (0_usize..config.n_features)
-                .into_par_iter()
-                .map(build_pair)
-                .collect()
-        } else {
-            (0_usize..config.n_features).map(build_pair).collect()
+        let larger_hist = match subtract_histogram(parent_hist, &smaller_hist) {
+            Ok(h) => h,
+            Err(e) => return Err(e),
         };
+
+        Ok((smaller_hist, larger_hist))
+    };
+
+    let pairs: Vec<Result<(HistogramBuffer, HistogramBuffer), ClearGbmError>> = smaller_histograms
+        .into_iter()
+        .enumerate()
+        .map(build_pair)
+        .collect();
 
     let mut left_histograms = Vec::with_capacity(config.n_features);
     let mut right_histograms = Vec::with_capacity(config.n_features);

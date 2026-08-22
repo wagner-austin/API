@@ -12,200 +12,116 @@
 //!
 //! # Entry points
 //!
-//! The tree builder calls [`build_histogram_ordered_trusted`] per feature
-//! after one node-scoped [`reorder_grad_hess_into`] pass; both functions
-//! establish invariants by construction (see the doc on each). There is no
-//! validated entry point — validation happens at the top-level pyo3
-//! boundary in `pyo3_module::training_fns`, not at the per-histogram level.
+//! The tree builder calls [`build_node_histograms_single_pass`] once per
+//! node after one node-scoped [`reorder_grad_hess_into`] pass; both
+//! functions establish invariants by construction (see the doc on each).
+//! There is no validated entry point — validation happens at the top-level
+//! pyo3 boundary in `pyo3_module::training_fns`, not at the per-histogram
+//! level.
 
 use crate::error::ClearGbmError;
 use crate::types::HistogramBuffer;
 
-/// The inputs one per-feature histogram build needs.
+/// The inputs one single-pass all-features node build needs.
 ///
-/// Grouped into a struct rather than passed as five positional arguments,
-/// matching the parameter-struct shape already used by
-/// [`crate::tree::histograms::BuildHistogramConfig`]. This keeps the
-/// dependency-injection hook in [`crate::hooks::Hooks`] a simple
-/// single-argument function pointer instead of a five-parameter one.
-///
-/// Borrowed, not owned: the caller's node-scoped buffers outlive every
-/// per-feature build, so this is a view and never copies sample data.
+/// The row-major sibling of [`HistogramRequest`]: instead of one feature's
+/// contiguous bin column, it carries the whole row-major bin matrix and
+/// builds every feature's histogram in one walk over the node's samples.
 #[derive(Debug, Clone, Copy)]
-pub struct HistogramRequest<'a> {
-    /// Indices of samples at this node, used only for the bin gather; NOT
+pub struct NodeHistogramRequest<'a> {
+    /// Indices of samples at this node, used for the bin-row gather; NOT
     /// indexed into `ordered_gradients` / `ordered_hessians`.
     pub sample_indices: &'a [u32],
 
-    /// Pre-permuted gradient stream: `ordered_gradients[i]` equals
-    /// `gradients[sample_indices[i]]`. Length equals `sample_indices.len()`.
+    /// Pre-permuted gradient stream, as in [`HistogramRequest`].
     pub ordered_gradients: &'a [f64],
 
-    /// Pre-permuted hessian stream, same shape as `ordered_gradients`.
+    /// Pre-permuted hessian stream, same shape.
     pub ordered_hessians: &'a [f64],
 
-    /// Pre-computed bin assignments (`u8` per sample) for one feature.
-    pub bins: &'a [u8],
+    /// Row-major bin matrix: sample `i`'s bins for all features are the
+    /// `n_features` contiguous bytes at `bins_rows[i * n_features..]`.
+    pub bins_rows: &'a [u8],
 
-    /// Number of bins, including the NaN bin.
+    /// Number of features (the row stride of `bins_rows`).
+    pub n_features: usize,
+
+    /// Number of bins per feature, including the NaN bin.
     pub n_bins: usize,
 }
 
-/// Histogram build fast path that reads gradients + hessians sequentially.
+/// Builds every feature's histogram for one node in a single sample walk.
 ///
-/// Assumes `ordered_gradients[i]` is the gradient for the sample at
-/// `sample_indices[i]` — i.e. the caller has pre-permuted the gradient and
-/// hessian streams into position-space instead of sample-space. The hot loop
-/// then reads `ordered_gradients[i]` and `ordered_hessians[i]` with pure
-/// sequential access; the bin lookup is the only random-index access (per
-/// LightGBM's own shape — see the wiki page `lightgbm-construct-histogram-inner`).
+/// The per-feature path reads each node's samples once per feature: the
+/// index, the bin byte, and both ordered streams are re-read `n_features`
+/// times per node (~378 bytes of reads per sample at 18 features). This
+/// walk reads the index, the 18-byte bin row, and each stream value once
+/// (~38 bytes per sample), updating all feature histograms as it goes —
+/// LightGBM's `ConstructHistograms` shape.
 ///
-/// Amortization: the caller does one reorder pass per node (cost:
-/// `sample_indices.len()` gathers on each of `gradients` + `hessians`), then
-/// reuses the two ordered arrays across all `n_features` histogram builds
-/// for that node. For 18 features per node the effective gather count on
-/// gradients + hessians drops 18×.
+/// Bit-identity with the per-feature path holds by construction: for every
+/// (feature, bin) pair the additions happen in `sample_indices` order in
+/// both shapes, so the floating-point sums are identical.
+///
+/// The accumulators live in one flat `n_features * n_bins` block during the
+/// walk (better locality than `n_features` separate buffers) and are carved
+/// into per-feature [`HistogramBuffer`]s at the end.
 ///
 /// # Args
 ///
-/// * `request` - The node-scoped inputs for this feature's build.
+/// * `request` - The node-scoped inputs.
 ///
 /// # Returns
 ///
-/// A populated [`HistogramBuffer`].
+/// One populated [`HistogramBuffer`] per feature, in feature order.
 ///
 /// # Panics
 ///
-/// Rust's safe indexing will panic if any invariant is violated. That is a
-/// bug in the caller, not a recoverable runtime error.
+/// Rust's safe indexing will panic if any invariant is violated (a row
+/// extending past `bins_rows`, a bin byte at or above `n_bins`, or stream
+/// lengths disagreeing with `sample_indices`). That is a bug in the caller,
+/// not a recoverable runtime error — the same trust contract as
+/// [`build_histogram_ordered_trusted`].
 #[must_use]
-#[inline]
-pub(crate) fn build_histogram_ordered_trusted(request: HistogramRequest<'_>) -> HistogramBuffer {
-    let HistogramRequest {
+pub(crate) fn build_node_histograms_single_pass(
+    request: NodeHistogramRequest<'_>,
+) -> Vec<crate::types::HistogramBuffer> {
+    let NodeHistogramRequest {
         sample_indices,
         ordered_gradients,
         ordered_hessians,
-        bins,
+        bins_rows,
+        n_features,
         n_bins,
     } = request;
-    let mut histogram = HistogramBuffer::new(n_bins);
-    let acc_bins = &mut histogram.bins;
 
-    // ------------------------------------------------------------
-    // Vectorized main loop: unrolled 8-wide, sequential reads on the
-    // pre-permuted gradient + hessian streams. The `bins[idx]` gather is
-    // the only random-index access — grouping all 8 gathers before the
-    // dependent RMW gives the compiler room to schedule them in parallel
-    // on modern out-of-order cores. Chunks not a multiple of 8 fall to
-    // the scalar tail.
-    //
-    // Grad/hess and the accumulator are both f64 — no widening at the write
-    // site. LightGBM's asymmetric `hist_t += score_t` shape (f32 in, f64
-    // accumulator) was implemented here and then reverted: narrowing the two
-    // input streams measured slower on this workload, because at the node
-    // sizes reached here both widths already fit in L2, so there is no
-    // bandwidth to save and each element pays a widening conversion before
-    // its accumulate. See the wiki page
-    // `cleargbm-f32-score-narrowing-reverted`.
-    // ------------------------------------------------------------
-    let chunks = sample_indices.chunks_exact(8_usize);
-    let remainder = chunks.remainder();
-    // Zip in the ordered streams; both are length == sample_indices.len().
-    let mut pos: usize = 0_usize;
-    for chunk in chunks {
-        // sample_indices are u32; widen for slice-indexing via the
-        // infallible `crate::narrow::index_widen` (see wiki page
-        // `lightgbm-score-t-float` and the `data_size_t = int32` pattern).
-        let idx0 = crate::narrow::index_widen(chunk[0_usize]);
-        let idx1 = crate::narrow::index_widen(chunk[1_usize]);
-        let idx2 = crate::narrow::index_widen(chunk[2_usize]);
-        let idx3 = crate::narrow::index_widen(chunk[3_usize]);
-        let idx4 = crate::narrow::index_widen(chunk[4_usize]);
-        let idx5 = crate::narrow::index_widen(chunk[5_usize]);
-        let idx6 = crate::narrow::index_widen(chunk[6_usize]);
-        let idx7 = crate::narrow::index_widen(chunk[7_usize]);
+    let mut flat: Vec<crate::types::BinAccumulator> =
+        vec![crate::types::BinAccumulator::ZERO; n_features * n_bins];
 
-        let b0 = usize::from(bins[idx0]);
-        let b1 = usize::from(bins[idx1]);
-        let b2 = usize::from(bins[idx2]);
-        let b3 = usize::from(bins[idx3]);
-        let b4 = usize::from(bins[idx4]);
-        let b5 = usize::from(bins[idx5]);
-        let b6 = usize::from(bins[idx6]);
-        let b7 = usize::from(bins[idx7]);
-
-        let g0 = ordered_gradients[pos];
-        let g1 = ordered_gradients[pos + 1_usize];
-        let g2 = ordered_gradients[pos + 2_usize];
-        let g3 = ordered_gradients[pos + 3_usize];
-        let g4 = ordered_gradients[pos + 4_usize];
-        let g5 = ordered_gradients[pos + 5_usize];
-        let g6 = ordered_gradients[pos + 6_usize];
-        let g7 = ordered_gradients[pos + 7_usize];
-
-        let h0 = ordered_hessians[pos];
-        let h1 = ordered_hessians[pos + 1_usize];
-        let h2 = ordered_hessians[pos + 2_usize];
-        let h3 = ordered_hessians[pos + 3_usize];
-        let h4 = ordered_hessians[pos + 4_usize];
-        let h5 = ordered_hessians[pos + 5_usize];
-        let h6 = ordered_hessians[pos + 6_usize];
-        let h7 = ordered_hessians[pos + 7_usize];
-
-        let acc0 = &mut acc_bins[b0];
-        acc0.gradient_sum += g0;
-        acc0.hessian_sum += h0;
-        acc0.count += 1_usize;
-
-        let acc1 = &mut acc_bins[b1];
-        acc1.gradient_sum += g1;
-        acc1.hessian_sum += h1;
-        acc1.count += 1_usize;
-
-        let acc2 = &mut acc_bins[b2];
-        acc2.gradient_sum += g2;
-        acc2.hessian_sum += h2;
-        acc2.count += 1_usize;
-
-        let acc3 = &mut acc_bins[b3];
-        acc3.gradient_sum += g3;
-        acc3.hessian_sum += h3;
-        acc3.count += 1_usize;
-
-        let acc4 = &mut acc_bins[b4];
-        acc4.gradient_sum += g4;
-        acc4.hessian_sum += h4;
-        acc4.count += 1_usize;
-
-        let acc5 = &mut acc_bins[b5];
-        acc5.gradient_sum += g5;
-        acc5.hessian_sum += h5;
-        acc5.count += 1_usize;
-
-        let acc6 = &mut acc_bins[b6];
-        acc6.gradient_sum += g6;
-        acc6.hessian_sum += h6;
-        acc6.count += 1_usize;
-
-        let acc7 = &mut acc_bins[b7];
-        acc7.gradient_sum += g7;
-        acc7.hessian_sum += h7;
-        acc7.count += 1_usize;
-
-        pos += 8_usize;
+    for (pos, &idx) in sample_indices.iter().enumerate() {
+        let row_start = crate::narrow::index_widen(idx) * n_features;
+        let row = &bins_rows[row_start..row_start + n_features];
+        let g = ordered_gradients[pos];
+        let h = ordered_hessians[pos];
+        let mut base = 0_usize;
+        for &bin in row {
+            let acc = &mut flat[base + usize::from(bin)];
+            acc.gradient_sum += g;
+            acc.hessian_sum += h;
+            acc.count += 1_usize;
+            base += n_bins;
+        }
     }
 
-    for &idx in remainder {
-        let idx_usize = crate::narrow::index_widen(idx);
-        let bin = usize::from(bins[idx_usize]);
-        let acc = &mut acc_bins[bin];
-        acc.gradient_sum += ordered_gradients[pos];
-        acc.hessian_sum += ordered_hessians[pos];
-        acc.count += 1_usize;
-        pos += 1_usize;
+    let mut out = Vec::with_capacity(n_features);
+    for feat_idx in 0_usize..n_features {
+        let mut histogram = crate::types::HistogramBuffer::new(n_bins);
+        histogram
+            .bins
+            .copy_from_slice(&flat[feat_idx * n_bins..(feat_idx + 1_usize) * n_bins]);
+        out.push(histogram);
     }
-
-    histogram
+    out
 }
 
 /// Fills the ordered scratch buffers `ordered_gradients[i] = gradients[sample_indices[i]]`

@@ -173,15 +173,17 @@ pub(super) fn compute_sums(
 /// pre-refactor behavior (missing per-row Vec → NaN) carried over.
 pub(super) fn split_samples(
     sample_indices: &[u32],
-    bins: &[u8],
-    n_samples: usize,
+    bins_rows: &[u8],
+    n_features: usize,
     feature_index: usize,
     split_bin: usize,
     nan_goes_left: bool,
     n_regular_bins: usize,
 ) -> (Vec<u32>, Vec<u32>) {
     let nan_bin = n_regular_bins;
-    let feat_col_start = feature_index * n_samples;
+    // The row count is implied by the matrix: its length is validated as
+    // n_samples * n_features at the build_tree boundary.
+    let n_samples = bins_rows.len() / n_features;
     // Reserve the node's full sample count for both sides up front. Growing
     // from empty reallocates and copies on every doubling — about sixteen
     // times for a root node of ~55k samples, per side, per split — and the
@@ -196,7 +198,7 @@ pub(super) fn split_samples(
     for &idx in sample_indices {
         let idx_usize = crate::narrow::index_widen(idx);
         let bin = if idx_usize < n_samples {
-            usize::from(bins[feat_col_start + idx_usize])
+            usize::from(bins_rows[idx_usize * n_features + feature_index])
         } else {
             nan_bin
         };

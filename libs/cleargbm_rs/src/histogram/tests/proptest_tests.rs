@@ -5,7 +5,9 @@ use super::helpers::{
     validate_subtraction_correctness,
 };
 use crate::error::ClearGbmError;
-use crate::histogram::{build_histogram_ordered_trusted, reorder_grad_hess_into, HistogramRequest};
+use crate::histogram::{
+    build_node_histograms_single_pass, reorder_grad_hess_into, NodeHistogramRequest,
+};
 use crate::types::HistogramBuffer;
 
 // =========================================================================
@@ -15,9 +17,10 @@ use crate::types::HistogramBuffer;
 /// Inner function for prop_histogram_sums - uses validate_histogram_sums.
 ///
 /// Reorders `gradients` / `hessians` into position-space (per
-/// [`reorder_grad_hess_into`]), then dispatches [`build_histogram_ordered_trusted`]
-/// — the same shape the tree builder uses in production. The tree-builder path
-/// is trusted (invariants established by construction), so this inner function
+/// [`reorder_grad_hess_into`]), then dispatches
+/// [`build_node_histograms_single_pass`] as a one-feature build — the same
+/// shape the tree builder uses in production. The tree-builder path is
+/// trusted (invariants established by construction), so this inner function
 /// is infallible.
 fn prop_histogram_sums_inner(
     sample_indices: &[u32],
@@ -36,18 +39,20 @@ fn prop_histogram_sums_inner(
         &mut ordered_g,
         &mut ordered_h,
     );
-    let hist = build_histogram_ordered_trusted(HistogramRequest {
+    let hists = build_node_histograms_single_pass(NodeHistogramRequest {
         sample_indices,
         ordered_gradients: &ordered_g,
         ordered_hessians: &ordered_h,
-        bins,
+        bins_rows: bins,
+        n_features: 1_usize,
         n_bins,
     });
+    let hist = &hists[0_usize];
 
     // Gradients, the accumulator and the sums are all f64, so the expected
     // total is an exact sum with no conversion anywhere in the path.
     let expected_grad: f64 = gradients.iter().sum();
-    validate_histogram_sums(&hist, expected_grad, sample_indices.len())
+    validate_histogram_sums(hist, expected_grad, sample_indices.len())
 }
 
 /// Inner function for prop_subtract_histogram_identity - uses validate_all_zeros.
@@ -81,9 +86,9 @@ fn prop_subtract_correctness_inner(
 // =========================================================================
 //
 // `prop_histogram_sums_inner` no longer has an error branch — the trusted
-// `build_histogram_ordered_trusted` is infallible (invariants established by
-// construction). Subtract-based inners still have shape-mismatch errors that
-// are worth covering.
+// `build_node_histograms_single_pass` is infallible (invariants established
+// by construction). Subtract-based inners still have shape-mismatch errors
+// that are worth covering.
 
 #[test]
 fn test_prop_subtract_identity_inner_error() -> Result<(), ClearGbmError> {

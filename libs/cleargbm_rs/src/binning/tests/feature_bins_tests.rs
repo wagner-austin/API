@@ -23,9 +23,9 @@ fn test_precompute_basic() -> Result<(), ClearGbmError> {
     assert_eq!(fb.n_features(), 2_usize);
     // Flat storage length = n_samples * n_features
     assert_eq!(fb.bins().len(), 8_usize);
-    // Per-feature slices are contiguous n_samples-long views
-    assert_eq!(fb.bins_for_feature(0_usize).len(), 4_usize);
-    assert_eq!(fb.bins_for_feature(1_usize).len(), 4_usize);
+    // Per-sample rows are contiguous n_features-long views
+    assert_eq!(fb.bins_for_sample(0_usize).len(), 2_usize);
+    assert_eq!(fb.bins_for_sample(3_usize).len(), 2_usize);
     Ok(())
 }
 
@@ -70,11 +70,10 @@ fn test_precompute_with_nan() -> Result<(), ClearGbmError> {
         }
     };
     // Feature 0, sample 1 has NaN → NaN bin.
-    let col0 = fb.bins_for_feature(0_usize);
-    assert_eq!(col0[1_usize], nan_bin_u8);
+    assert_eq!(fb.bins_for_sample(1_usize)[0_usize], nan_bin_u8);
     // Samples 0 and 2 are non-NaN → regular bin (< n_regular_bins).
-    assert!(col0[0_usize] < nan_bin_u8);
-    assert!(col0[2_usize] < nan_bin_u8);
+    assert!(fb.bins_for_sample(0_usize)[0_usize] < nan_bin_u8);
+    assert!(fb.bins_for_sample(2_usize)[0_usize] < nan_bin_u8);
     Ok(())
 }
 
@@ -95,8 +94,8 @@ fn test_precompute_all_nan_feature() -> Result<(), ClearGbmError> {
             })
         }
     };
-    for &b in fb.bins_for_feature(0_usize) {
-        assert_eq!(b, nan_bin_u8);
+    for sample_idx in 0_usize..fb.n_samples() {
+        assert_eq!(fb.bins_for_sample(sample_idx)[0_usize], nan_bin_u8);
     }
     let thresholds = fb.bin_thresholds();
     for &t in &thresholds[0] {
@@ -205,14 +204,14 @@ fn test_bin_thresholds_padding_with_fewer_edges() -> Result<(), ClearGbmError> {
 }
 
 #[test]
-fn test_bins_for_feature_out_of_range_returns_empty() -> Result<(), ClearGbmError> {
+fn test_bins_for_sample_out_of_range_returns_empty() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![2.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
     let fb = match precompute_feature_bins(&refs, 4_usize) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
-    assert!(fb.bins_for_feature(999_usize).is_empty());
+    assert!(fb.bins_for_sample(999_usize).is_empty());
     Ok(())
 }
 

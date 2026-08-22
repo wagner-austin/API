@@ -13,6 +13,5 @@ mod builder_tests;
 mod config_tests;
 mod error_tests;
 mod leafwise_tests;
-mod parallel_histogram_tests;
 mod proptest_tests;
 mod serde_tests;

@@ -31,9 +31,9 @@ pub use super::nodes::compute_leaf_value;
 ///
 /// # Bin storage
 ///
-/// `bins` is a flat column-major slice: bin `[feat_idx, sample_idx]` lives at
-/// `bins[feat_idx * n_samples + sample_idx]`. Each entry is a `u8` (bin index,
-/// `0..=n_regular_bins`). Column-major means a per-feature histogram scan
+/// `bins_rows` is a flat row-major slice: bin `[sample_idx, feat_idx]` lives
+/// at `bins_rows[sample_idx * n_features + feat_idx]`. Each entry is a `u8`
+/// (bin index, `0..=n_regular_bins`). Row-major means the single-pass node
 /// walks `n_samples` contiguous bytes — cache-friendly and SIMD-loadable —
 /// instead of striding through fragmented row-major heap allocations.
 #[derive(Debug, Clone)]
@@ -53,7 +53,7 @@ pub struct BuildTreeInput<'a> {
     ///
     /// Length must equal `n_samples * n_features`. Access as
     /// `bins[feat_idx * n_samples + sample_idx]`.
-    pub bins: &'a [u8],
+    pub bins_rows: &'a [u8],
 
     /// Sample count (row count of the original feature matrix).
     pub n_samples: usize,
@@ -166,13 +166,13 @@ pub(super) fn validate_build_input(input: &BuildTreeInput<'_>) -> Result<(), Cle
 
     // Validate that the flat bin slice matches the declared shape.
     let expected_bins_len = input.n_samples * n_features;
-    if input.bins.len() != expected_bins_len {
+    if input.bins_rows.len() != expected_bins_len {
         return Err(ClearGbmError::ShapeMismatch {
             expected: format!(
                 "bins length {expected_bins_len} (n_samples={} * n_features={})",
                 input.n_samples, n_features
             ),
-            got: format!("bins length {}", input.bins.len()),
+            got: format!("bins length {}", input.bins_rows.len()),
         });
     }
 
@@ -344,8 +344,7 @@ pub fn build_tree_with_leaf_assignment(
                     sample_indices: &pending.sample_indices,
                     gradients: input.gradients,
                     hessians: input.hessians,
-                    bins: input.bins,
-                    n_samples: input.n_samples,
+                    bins_rows: input.bins_rows,
                     n_features,
                     n_bins,
                     hooks,
@@ -411,8 +410,8 @@ pub fn build_tree_with_leaf_assignment(
         // Split samples into left and right
         let (left_indices, right_indices) = split_samples(
             &pending.sample_indices,
-            input.bins,
-            input.n_samples,
+            input.bins_rows,
+            input.n_features,
             split.feature_index(),
             split.split_bin(),
             split.nan_goes_left(),
@@ -425,8 +424,7 @@ pub fn build_tree_with_leaf_assignment(
             right_indices: &right_indices,
             gradients: input.gradients,
             hessians: input.hessians,
-            bins: input.bins,
-            n_samples: input.n_samples,
+            bins_rows: input.bins_rows,
             n_features,
             n_bins,
             parent_histograms: &histograms,

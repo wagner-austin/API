@@ -4,6 +4,9 @@
 //! configured to fail at specific points, enabling comprehensive testing
 //! of error handling in serde implementations.
 
+/// Bin-layout helpers for tests (column-major fixtures to row-major).
+pub mod binning;
+
 /// Failing deserializer for testing error paths.
 pub mod deserializer;
 

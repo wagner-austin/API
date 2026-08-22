@@ -5,10 +5,15 @@
 //!
 //! # Storage layout
 //!
-//! `sample_bins` is a flat, column-major `Vec<u8>`: bin `[feat_idx, sample_idx]`
-//! lives at `sample_bins[feat_idx * n_samples + sample_idx]`. A per-feature
-//! histogram scan walks `n_samples` contiguous bytes, so cache prefetching
-//! hits and a 256-bit AVX load pulls 32 bin values instead of 4. Bin values
+//! `sample_bins` is a flat, row-major `Vec<u8>`: bin `[sample_idx, feat_idx]`
+//! lives at `sample_bins[sample_idx * n_features + feat_idx]`. The
+//! single-pass node build reads one sample's bins for every feature as one
+//! contiguous `n_features`-byte row, so a node walk touches each sample's
+//! row once instead of visiting `n_features` separate columns (measured
+//! 2026-08-21: fusing the walks cut ClearGBM fit time ~13%). The
+//! column-major layout this replaced was itself measured in against a
+//! jagged `Vec<Vec>` on 2026-07-21 — see the wiki page
+//! `cleargbm-perf-column-major-sample-bins` for that history. Bin values
 //! are in `0..=n_regular_bins`; the NaN bin is at `n_regular_bins` and is
 //! representable in `u8` because the training config caps `max_bins ≤ 255`.
 
@@ -26,9 +31,9 @@ pub struct FeatureBins {
     /// One `BinEdges` per feature.
     bin_edges: Vec<BinEdges>,
 
-    /// Flat column-major bin index storage.
+    /// Flat row-major bin index storage.
     ///
-    /// `sample_bins[feat_idx * n_samples + sample_idx]`. Values in
+    /// `sample_bins[sample_idx * n_features + feat_idx]`. Values in
     /// `0..=n_regular_bins` (NaN bin at `n_regular_bins`).
     sample_bins: Vec<u8>,
 
@@ -49,27 +54,27 @@ impl FeatureBins {
         &self.bin_edges
     }
 
-    /// Returns the flat column-major bin storage.
+    /// Returns the flat row-major bin storage.
     ///
-    /// Access as `bins()[feat_idx * n_samples() + sample_idx]`. Callers that
-    /// want a per-feature slice should use [`Self::bins_for_feature`].
+    /// Access as `bins()[sample_idx * n_features() + feat_idx]`. Callers that
+    /// want one sample's row should use [`Self::bins_for_sample`].
     #[must_use]
     pub fn bins(&self) -> &[u8] {
         &self.sample_bins
     }
 
-    /// Returns the contiguous bin slice for a single feature.
+    /// Returns the contiguous bin row for a single sample.
     ///
-    /// Returns `&sample_bins[feat_idx * n_samples..(feat_idx + 1) * n_samples]`.
-    /// The slice is empty (and the return still valid) when the feature index
+    /// Returns `&sample_bins[sample_idx * n_features..][..n_features]`.
+    /// The slice is empty (and the return still valid) when the sample index
     /// is out of range; callers should validate before use.
     #[must_use]
-    pub fn bins_for_feature(&self, feat_idx: usize) -> &[u8] {
-        if feat_idx >= self.n_features {
+    pub fn bins_for_sample(&self, sample_idx: usize) -> &[u8] {
+        if sample_idx >= self.n_samples {
             return &[];
         }
-        let start = feat_idx * self.n_samples;
-        let end = start + self.n_samples;
+        let start = sample_idx * self.n_features;
+        let end = start + self.n_features;
         &self.sample_bins[start..end]
     }
 
@@ -139,7 +144,7 @@ impl FeatureBins {
 ///
 /// # Returns
 ///
-/// A `FeatureBins` containing edges, flat column-major u8 assignments, and
+/// A `FeatureBins` containing edges, flat row-major u8 assignments, and
 /// the bin count.
 ///
 /// # Errors
@@ -167,18 +172,19 @@ pub fn precompute_feature_bins(
     let n_features = bin_edges.len();
     let nan_bin_usize = max_bins;
 
-    // Flat column-major storage: sample_bins[feat_idx * n_samples + sample_idx]
+    // Flat row-major storage: sample_bins[sample_idx * n_features + feat_idx].
+    // Filled rows-outer, which also matches the input matrix's own row-major
+    // shape: each input row is read once, in order.
     let mut sample_bins = vec![0_u8; n_samples * n_features];
 
-    for (feat_idx, be) in bin_edges.iter().enumerate() {
-        let feat_edges = be.edges();
-        let feat_col_start = feat_idx * n_samples;
-        for (sample_idx, row) in x.iter().enumerate() {
+    for (sample_idx, row) in x.iter().enumerate() {
+        let row_start = sample_idx * n_features;
+        for (feat_idx, be) in bin_edges.iter().enumerate() {
             let val = row[feat_idx];
             let bin_idx_usize = if val.is_nan() {
                 nan_bin_usize
             } else {
-                assign_bin(val, feat_edges)
+                assign_bin(val, be.edges())
             };
             // `max_bins <= 255` is rejected at the top of this function, and
             // the NaN bin sits at `max_bins` — the largest index either branch
@@ -187,7 +193,7 @@ pub fn precompute_feature_bins(
             // because the error arm would be statically dead: the guard has
             // already run, so there is no input that reaches it.
             let bin_idx: u8 = u8::try_from(bin_idx_usize).unwrap_or(u8::MAX);
-            sample_bins[feat_col_start + sample_idx] = bin_idx;
+            sample_bins[row_start + feat_idx] = bin_idx;
         }
     }
 

@@ -15,14 +15,16 @@
 //! ```rust,no_run
 //! use cleargbm_rs::{Hooks, ClearGbmError, build_tree, BuildTreeInput};
 //! use cleargbm_rs::types::HistogramBuffer;
-//! use cleargbm_rs::histogram::HistogramRequest;
+//! use cleargbm_rs::histogram::NodeHistogramRequest;
 //!
 //! // Production: use default hooks (real implementations)
 //! let hooks = Hooks::default();
 //! // let result = build_tree(&input, &hooks);
 //!
 //! // Testing: inject custom behavior
-//! fn error_histogram(_: HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError> {
+//! fn error_histogram(
+//!     _: NodeHistogramRequest<'_>,
+//! ) -> Result<Vec<HistogramBuffer>, ClearGbmError> {
 //!     Err(ClearGbmError::EmptyInput { context: "injected".to_string() })
 //! }
 //! let test_hooks = Hooks::with_histogram_builder(error_histogram);
@@ -31,7 +33,7 @@
 //! ```
 
 use crate::error::ClearGbmError;
-use crate::histogram::HistogramRequest;
+use crate::histogram::NodeHistogramRequest;
 use crate::types::HistogramBuffer;
 
 /// Dependency injection hooks for tree building.
@@ -41,20 +43,21 @@ use crate::types::HistogramBuffer;
 /// the real implementations. Tests inject error-returning implementations to
 /// exercise error-propagation paths that would otherwise be unreachable.
 ///
-/// The per-feature histogram builder receives pre-reordered inputs — the tree
+/// The node histogram builder receives pre-reordered inputs — the tree
 /// builder does one node-scoped reorder pass (via
 /// [`crate::histogram::reorder_grad_hess_into`]) before dispatching this hook
-/// per feature, so every per-feature call gets sequential-access-shaped
-/// `ordered_gradients` + `ordered_hessians` streams. Returns a `Result` so
-/// error-injection tests can force failure through the same hook the production
-/// path uses — no separate injection surface.
+/// once per node, which builds every feature's histogram in a single sample
+/// walk. Returns a `Result` so error-injection tests can force failure
+/// through the same hook the production path uses — no separate injection
+/// surface.
 #[derive(Clone)]
 pub struct Hooks {
-    /// Hook for building one feature's histogram from pre-reordered inputs.
+    /// Hook for building all of one node's feature histograms in one pass.
     ///
-    /// Default: [`crate::histogram::build_histogram_ordered_trusted`] wrapped
-    /// in `Ok(...)`.
-    pub build_histogram: fn(HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError>,
+    /// Default: [`crate::histogram::build_node_histograms_single_pass`]
+    /// wrapped in `Ok(...)`.
+    pub build_node_histograms:
+        fn(NodeHistogramRequest<'_>) -> Result<Vec<HistogramBuffer>, ClearGbmError>,
 
     /// Optional error to inject in finalize_nodes.
     ///
@@ -84,8 +87,8 @@ impl Default for Hooks {
     /// This is what production code should use.
     fn default() -> Self {
         Self {
-            build_histogram: |request| {
-                Ok(crate::histogram::build_histogram_ordered_trusted(request))
+            build_node_histograms: |request| {
+                Ok(crate::histogram::build_node_histograms_single_pass(request))
             },
             finalize_nodes_error: None,
             build_pool: |threads| {
@@ -102,13 +105,15 @@ impl Hooks {
     ///
     /// Used by error-injection tests to force `?`-propagation paths in the
     /// tree builder — the injected function receives the same
-    /// [`HistogramRequest`] the default does, and returns `Err(...)` to
+    /// [`NodeHistogramRequest`] the default does, and returns `Err(...)` to
     /// trigger the failure path.
     pub fn with_histogram_builder(
-        build_histogram: fn(HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError>,
+        build_node_histograms: fn(
+            NodeHistogramRequest<'_>,
+        ) -> Result<Vec<HistogramBuffer>, ClearGbmError>,
     ) -> Self {
         Self {
-            build_histogram,
+            build_node_histograms,
             ..Self::default()
         }
     }
@@ -162,11 +167,12 @@ mod tests {
         let gradients = vec![1.0_f64, 2.0_f64];
         let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
-        let result = (hooks.build_histogram)(HistogramRequest {
+        let result = (hooks.build_node_histograms)(NodeHistogramRequest {
             sample_indices: &sample_indices,
             ordered_gradients: &gradients,
             ordered_hessians: &hessians,
-            bins: &bins,
+            bins_rows: &bins,
+            n_features: 1_usize,
             n_bins: 3_usize,
         });
         assert!(result.is_ok());
@@ -175,7 +181,9 @@ mod tests {
 
     #[test]
     fn test_hooks_with_custom_histogram_builder() -> Result<(), ClearGbmError> {
-        fn error_histogram(_: HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError> {
+        fn error_histogram(
+            _: NodeHistogramRequest<'_>,
+        ) -> Result<Vec<HistogramBuffer>, ClearGbmError> {
             Err(ClearGbmError::EmptyInput {
                 context: "test injected error".to_string(),
             })
@@ -186,11 +194,12 @@ mod tests {
         let gradients = vec![1.0_f64, 2.0_f64];
         let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
-        let result = (hooks.build_histogram)(HistogramRequest {
+        let result = (hooks.build_node_histograms)(NodeHistogramRequest {
             sample_indices: &sample_indices,
             ordered_gradients: &gradients,
             ordered_hessians: &hessians,
-            bins: &bins,
+            bins_rows: &bins,
+            n_features: 1_usize,
             n_bins: 3_usize,
         });
         assert!(result.is_err());
@@ -207,18 +216,20 @@ mod tests {
         let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
 
-        let result1 = (hooks1.build_histogram)(HistogramRequest {
+        let result1 = (hooks1.build_node_histograms)(NodeHistogramRequest {
             sample_indices: &sample_indices,
             ordered_gradients: &gradients,
             ordered_hessians: &hessians,
-            bins: &bins,
+            bins_rows: &bins,
+            n_features: 1_usize,
             n_bins: 3_usize,
         });
-        let result2 = (hooks2.build_histogram)(HistogramRequest {
+        let result2 = (hooks2.build_node_histograms)(NodeHistogramRequest {
             sample_indices: &sample_indices,
             ordered_gradients: &gradients,
             ordered_hessians: &hessians,
-            bins: &bins,
+            bins_rows: &bins,
+            n_features: 1_usize,
             n_bins: 3_usize,
         });
 
@@ -241,11 +252,12 @@ mod tests {
         let gradients = vec![1.0_f64, 2.0_f64];
         let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
-        let result = (hooks.build_histogram)(HistogramRequest {
+        let result = (hooks.build_node_histograms)(NodeHistogramRequest {
             sample_indices: &sample_indices,
             ordered_gradients: &gradients,
             ordered_hessians: &hessians,
-            bins: &bins,
+            bins_rows: &bins,
+            n_features: 1_usize,
             n_bins: 3_usize,
         });
         assert!(result.is_ok());
@@ -261,8 +273,10 @@ mod tests {
 
     #[test]
     fn test_hooks_with_histogram_builder_has_no_finalize_error() -> Result<(), ClearGbmError> {
-        fn custom_histogram(_: HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError> {
-            Ok(HistogramBuffer::new(3_usize))
+        fn custom_histogram(
+            _: NodeHistogramRequest<'_>,
+        ) -> Result<Vec<HistogramBuffer>, ClearGbmError> {
+            Ok(vec![HistogramBuffer::new(3_usize)])
         }
 
         let hooks = Hooks::with_histogram_builder(custom_histogram);
@@ -273,11 +287,12 @@ mod tests {
         let gradients = vec![1.0_f64, 2.0_f64];
         let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
-        let result = (hooks.build_histogram)(HistogramRequest {
+        let result = (hooks.build_node_histograms)(NodeHistogramRequest {
             sample_indices: &sample_indices,
             ordered_gradients: &gradients,
             ordered_hessians: &hessians,
-            bins: &bins,
+            bins_rows: &bins,
+            n_features: 1_usize,
             n_bins: 3_usize,
         });
         assert!(result.is_ok());

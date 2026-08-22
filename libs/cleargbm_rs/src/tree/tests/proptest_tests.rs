@@ -189,7 +189,7 @@ fn prop_split_samples_preserves_count() -> Result<(), ClearGbmError> {
                 let (left, right) = split_samples(
                     &sample_indices,
                     &bins,
-                    n_samples,
+                    1_usize,
                     0_usize,
                     split_bin,
                     nan_goes_left,

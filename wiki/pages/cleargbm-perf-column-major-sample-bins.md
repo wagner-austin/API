@@ -22,6 +22,8 @@ hubs: [libs]
 
 Reshapes `FeatureBins.sample_bins` from a per-row `Vec<Vec<usize>>` (each row heap-allocated separately)[^2] into a single flat column-major array indexed as `sample_bins[feat_idx * n_samples + sample_idx]`[^6].
 
+> **SUPERSEDED 2026-08-21 — the layout is row-major now.** The single-pass node build (`BENCHMARK_RESULTS_2026-08-21_single_pass.md`, board task `fb7206f1`) fuses the 18 per-feature walks into one walk over contiguous per-sample bin rows, cutting fit time a further ~14%; `FeatureBins.sample_bins` is `sample_bins[sample_idx * n_features + feat_idx]` and the per-feature column accessor is gone. The comparison this page recorded (flat column-major vs jagged `Vec<Vec>`) remains valid history — flat row-major single-pass was never one of its arms. Everything below is that record.
+>
 > **SHIPPED 2026-07-21 (Phase E) — this page was a roadmap item and is now a record.** The layout landed in the same lift as the `u8` dtype from [[cleargbm-perf-uint8-histogram-bins]], so the flat array is `Vec<u8>` rather than the `Vec<usize>` this page originally proposed[^6]. The forecast was met and then some: Phase E measured fit time 6.88s → 2.47s and the LightGBM gap 8.0× → 3.4× for the combined lift[^7]. Audited 2026-07-31.
 
 ## What was wrong (pre-Phase-E)

@@ -1,7 +1,7 @@
 //! Tests for tree building functions.
 
 use crate::error::ClearGbmError;
-use crate::histogram::HistogramRequest;
+use crate::histogram::NodeHistogramRequest;
 use crate::hooks::Hooks;
 use crate::split::MonotonicConstraint;
 use crate::tree::nodes::EPSILON;
@@ -153,7 +153,7 @@ fn test_split_samples_basic() -> Result<(), ClearGbmError> {
     let (left, right) = split_samples(
         &sample_indices,
         &bins,
-        5_usize,
+        1_usize,
         0_usize,
         0_usize,
         true,
@@ -185,7 +185,7 @@ fn test_split_samples_nan_handling() -> Result<(), ClearGbmError> {
     let (left, right) = split_samples(
         &sample_indices,
         &bins,
-        2_usize,
+        1_usize,
         0_usize,
         0_usize,
         true,
@@ -199,7 +199,7 @@ fn test_split_samples_nan_handling() -> Result<(), ClearGbmError> {
     let (left2, right2) = split_samples(
         &sample_indices,
         &bins,
-        2_usize,
+        1_usize,
         0_usize,
         0_usize,
         false,
@@ -220,7 +220,7 @@ fn test_split_samples_index_out_of_range_treated_as_nan() -> Result<(), ClearGbm
     let (left, right) = split_samples(
         &sample_indices,
         &bins,
-        2_usize,
+        1_usize,
         0_usize,
         0_usize,
         true,
@@ -233,7 +233,7 @@ fn test_split_samples_index_out_of_range_treated_as_nan() -> Result<(), ClearGbm
     let (left2, right2) = split_samples(
         &sample_indices,
         &bins,
-        2_usize,
+        1_usize,
         0_usize,
         0_usize,
         false,
@@ -268,11 +268,12 @@ fn test_build_tree_single_leaf() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 0_u8, 0_u8];
     let bin_thresholds = vec![vec![0.5_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 3_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 3_usize,
         n_features: 1_usize,
         n_regular_bins: 1_usize,
@@ -316,11 +317,12 @@ fn test_build_tree_with_split() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,
@@ -364,11 +366,12 @@ fn test_build_tree_empty_input() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![];
     let bin_thresholds: Vec<Vec<f64>> = vec![];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 0_usize, 4_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 0_usize,
         n_features: 4_usize,
         n_regular_bins: 4_usize,
@@ -404,11 +407,12 @@ fn test_build_tree_max_depth_constraint() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,
@@ -446,11 +450,12 @@ fn test_build_tree_max_leaves_constraint() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,
@@ -484,11 +489,12 @@ fn test_build_tree_gradients_too_short() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8];
     let bin_thresholds = vec![vec![0.5_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 3_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 3_usize,
         n_features: 1_usize,
         n_regular_bins: 3_usize,
@@ -523,11 +529,12 @@ fn test_build_tree_hessians_too_short() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8];
     let bin_thresholds = vec![vec![0.5_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 3_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 3_usize,
         n_features: 1_usize,
         n_regular_bins: 3_usize,
@@ -563,11 +570,12 @@ fn test_build_tree_no_features() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![];
     let bin_thresholds: Vec<Vec<f64>> = vec![];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 3_usize, 0_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 3_usize,
         n_features: 0_usize,
         n_regular_bins: 3_usize,
@@ -601,14 +609,16 @@ fn test_build_tree_bins_shape_mismatch() -> Result<(), ClearGbmError> {
     let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
     // Declared n_samples=3 * n_features=1 = 3, but supplied only 2 bytes.
-    let bins: Vec<u8> = vec![0_u8, 0_u8];
+    // Passed directly (not through a transpose) because the wrong length IS
+    // the subject: build_tree's shape check must reject it.
+    let bins_rows: Vec<u8> = vec![0_u8, 0_u8];
     let bin_thresholds: Vec<Vec<f64>> = vec![vec![0.5_f64]];
 
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 3_usize,
         n_features: 1_usize,
         n_regular_bins: 3_usize,
@@ -644,11 +654,12 @@ fn test_build_tree_with_monotonic_constraints() -> Result<(), ClearGbmError> {
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
     let constraints = vec![MonotonicConstraint::Increasing];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,
@@ -683,11 +694,12 @@ fn test_build_tree_with_l1_regularization() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,
@@ -724,11 +736,12 @@ fn test_build_tree_left_larger_than_right() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 0_u8, 1_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 6_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 6_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,
@@ -773,11 +786,12 @@ fn test_build_tree_deep_tree() -> Result<(), ClearGbmError> {
         0.125_f64, 0.25_f64, 0.375_f64, 0.5_f64, 0.625_f64, 0.75_f64, 0.875_f64, 1.0_f64,
     ]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 8_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 8_usize,
         n_features: 1_usize,
         n_regular_bins: 8_usize,
@@ -863,14 +877,14 @@ thread_local! {
 }
 
 fn counting_error_histogram(
-    request: HistogramRequest<'_>,
-) -> Result<crate::types::HistogramBuffer, ClearGbmError> {
+    request: NodeHistogramRequest<'_>,
+) -> Result<Vec<crate::types::HistogramBuffer>, ClearGbmError> {
     HISTOGRAM_CALL_COUNT.with(|count| {
         let current = count.get();
         count.set(current + 1_usize);
         // First call (root histogram) succeeds with real data, subsequent calls fail
         if current < 1_usize {
-            Ok(crate::histogram::build_histogram_ordered_trusted(request))
+            Ok(crate::histogram::build_node_histograms_single_pass(request))
         } else {
             Err(ClearGbmError::EmptyInput {
                 context: "injected histogram build error".to_string(),
@@ -900,11 +914,12 @@ fn test_build_tree_child_histogram_error() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,
@@ -927,20 +942,20 @@ thread_local! {
 }
 
 fn wrong_size_histogram(
-    request: HistogramRequest<'_>,
-) -> Result<crate::types::HistogramBuffer, ClearGbmError> {
+    request: NodeHistogramRequest<'_>,
+) -> Result<Vec<crate::types::HistogramBuffer>, ClearGbmError> {
     WRONG_SIZE_CALL_COUNT.with(|count| {
         let current = count.get();
         count.set(current + 1_usize);
         // First call (root histogram) succeeds with correct size
         // Second call (child histogram) returns wrong size to trigger subtract_histogram error
         if current < 1_usize {
-            Ok(crate::histogram::build_histogram_ordered_trusted(request))
+            Ok(crate::histogram::build_node_histograms_single_pass(request))
         } else {
             // Return histogram with wrong size to break sibling subtraction
-            Ok(crate::types::HistogramBuffer::new(
+            Ok(vec![crate::types::HistogramBuffer::new(
                 request.n_bins + 10_usize,
-            ))
+            )])
         }
     })
 }
@@ -966,11 +981,12 @@ fn test_build_tree_subtract_histogram_error() -> Result<(), ClearGbmError> {
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples: 4_usize,
         n_features: 1_usize,
         n_regular_bins: 4_usize,
@@ -1032,11 +1048,12 @@ fn test_build_tree_rejects_out_of_range_sample_index() -> Result<(), ClearGbmErr
 
     // Index 9 addresses no slot in a 4-sample buffer.
     let sample_indices = vec![0_u32, 1_u32, 9_u32];
+    let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, n_samples, n_features);
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
         gradients: &gradients,
         hessians: &hessians,
-        bins: &bins,
+        bins_rows: &bins_rows,
         n_samples,
         n_features,
         n_regular_bins: 4_usize,

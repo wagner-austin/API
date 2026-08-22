@@ -21,6 +21,8 @@ hubs: [libs]
 
 # ClearGBM perf — SIMD histogram accumulator
 
+> **Addendum 2026-08-21:** this page's meta-lesson (three consecutive losses from *splitting* fused hot-loop work into more passes) ran the other direction and won big: *fusing* the 18 per-feature histogram walks into one single pass over row-major bin rows cut fit time ~14% (`BENCHMARK_RESULTS_2026-08-21_single_pass.md`). The per-feature loop this page analyzes no longer exists; the accumulate operation's scatter-RMW structure — this page's core claim — is unchanged in the fused loop and remains the reason SIMD does not apply. Same day, the accumulators were interleaved into one record per bin (−16%) and a safe touch-ahead prefetch was measured at +2.5% and rejected, extending the recorded-losses list this page started.
+
 The last unshipped item from the 2026-07-21 perf roadmap[^8]. **Its original premise is now obsolete**: the roadmap was written against a scalar accumulate loop that no longer exists[^1], and the version of "SIMD" it proposed as Approach 1[^9] has effectively already shipped by hand. What remains is the harder Approach 2[^9], against a much smaller gap than the roadmap assumed[^7].
 
 ## What the code actually does now

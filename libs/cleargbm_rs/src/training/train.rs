@@ -222,7 +222,7 @@ pub fn train_gradient_boosting(
                 sample_indices: &sample_indices,
                 gradients: &gradients,
                 hessians: &hessians,
-                bins: feature_bins.bins(),
+                bins_rows: feature_bins.bins(),
                 n_samples: feature_bins.n_samples(),
                 n_features: feature_bins.n_features(),
                 n_regular_bins: feature_bins.n_regular_bins(),
