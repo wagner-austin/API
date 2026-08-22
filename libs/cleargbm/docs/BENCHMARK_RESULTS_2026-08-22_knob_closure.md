@@ -51,8 +51,11 @@ A statistical wash on the mean with real fold-level movement (fold 2
 +0.012, fold 3 −0.012) — the knob demonstrably changes which splits win
 without helping or hurting at this setting on this corpus. That is the
 expected price signal for a regularizer on a corpus this large: its value
-is as a tunable dial for the optimizer (whose sampled max_features values
-were decorative until today), not as a default.
+is as a tunable dial, not as a default. (Correction to an earlier claim:
+the ClearGBM optimizer search space never sampled max_features — the
+sampled max_features in the optimize builders belongs to RandomForest —
+so no trial was mispriced by the old drop; adding it to the ClearGBM
+search space is now possible and previously would have been meaningless.)
 
 ## The bug class, closed out
 
