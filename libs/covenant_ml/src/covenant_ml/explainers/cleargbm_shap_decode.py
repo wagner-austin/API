@@ -249,6 +249,10 @@ def _decode_rust_config(raw: JSONValue) -> GradientBoostingConfig:
             narrow_json_to_str(cfg["growth_strategy"]), "growth_strategy"
         ),
         num_leaves=_optional_int(cfg.get("num_leaves")),
+        # Read from the payload for the same reason as growth_strategy: the
+        # serialized config records the weight the model actually trained
+        # under.
+        scale_pos_weight=narrow_json_to_float(cfg["scale_pos_weight"]),
     )
 
 

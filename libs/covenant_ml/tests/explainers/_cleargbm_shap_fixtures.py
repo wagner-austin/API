@@ -74,6 +74,7 @@ def _make_config() -> GradientBoostingConfig:
         early_stopping_rounds=10,
         growth_strategy="depth_wise",
         num_leaves=None,
+        scale_pos_weight=1.0,
     )
     return config
 

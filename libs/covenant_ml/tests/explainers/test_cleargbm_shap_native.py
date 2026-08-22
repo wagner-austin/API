@@ -79,6 +79,7 @@ def _train_native_binary_model(
         "early_stopping_rounds": None,
         "growth_strategy": "depth_wise",
         "num_leaves": None,
+        "scale_pos_weight": 1.0,
     }
     native_model = train_gradient_boosting(
         x_train=x_train,

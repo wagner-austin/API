@@ -159,6 +159,7 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         early_stopping_rounds=10,
         growth_strategy="depth_wise",
         num_leaves=None,
+        scale_pos_weight=1.0,
     )
 
     native_model = train_gradient_boosting(

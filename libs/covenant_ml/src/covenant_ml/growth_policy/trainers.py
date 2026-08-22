@@ -236,6 +236,7 @@ class ClearGbmAnchorTrainer:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "scale_pos_weight": 1.0,
         }
         feature_count = int(split.x_train.shape[1])
         feature_names = tuple(f"X{index + 1}" for index in range(feature_count))

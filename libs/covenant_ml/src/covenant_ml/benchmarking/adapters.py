@@ -369,6 +369,10 @@ class ClearGbmTrainer:
             # The same shared `num_leaves` that binds LightGBM's leaf-wise
             # growth, so the two leaf-wise arms are held to one budget.
             "num_leaves": self._config["num_leaves"] if leaf_wise else None,
+            # Unweighted, matching the LightGBM/XGBoost benchmark arms which
+            # set no class weight — and keeping this arm bit-identical to
+            # every manifest recorded before the weighting axis existed.
+            "scale_pos_weight": 1.0,
         }
         n_features = int(split.x_train.shape[1])
         feature_names = tuple(f"f{index}" for index in range(n_features))

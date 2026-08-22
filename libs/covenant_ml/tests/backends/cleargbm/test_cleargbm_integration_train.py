@@ -10,6 +10,11 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from platform_core.json_utils import (
+    load_json_str,
+    narrow_json_to_dict,
+    narrow_json_to_float,
+)
 
 from covenant_ml.backends.cleargbm import (
     create_cleargbm_backend,
@@ -266,6 +271,30 @@ def test_resolve_max_features_translates_each_form() -> None:
     assert _resolve_max_features(4, 10) == 4
     assert _resolve_max_features(0.5, 10) == 5
     assert _resolve_max_features(0.01, 10) == 1
+
+
+def test_cleargbm_backend_applies_computed_class_weight(tmp_path: Path) -> None:
+    """The auto-computed scale_pos_weight reaches training, not just the log.
+
+    The backend computed and reported this weight while the core had no
+    weighting mechanism at all — the saved model's own config is the proof
+    the value now arrives: it must record the imbalance ratio of the
+    training split, not 1.0.
+    """
+    backend = create_cleargbm_backend()
+    x, y, names = _make_synthetic_dataset()
+
+    outcome = _invoke_cleargbm_train(
+        backend, x, y, names, _make_cleargbm_config(n_estimators=3), tmp_path
+    )
+
+    model_json = narrow_json_to_dict(
+        load_json_str(Path(outcome["model_path"]).read_text(encoding="utf-8"))
+    )
+    saved_config = narrow_json_to_dict(model_json["config"])
+    saved_weight = narrow_json_to_float(saved_config["scale_pos_weight"])
+    assert saved_weight == outcome["scale_pos_weight_computed"]
+    assert saved_weight != 1.0
 
 
 def test_cleargbm_backend_train_leaf_wise(tmp_path: Path) -> None:
