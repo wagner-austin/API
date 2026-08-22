@@ -200,7 +200,10 @@ pub struct HistogramBuffer {
 /// 24-byte record (one line, occasionally two when the record straddles a
 /// boundary) and pays a single bounds check. This is LightGBM's `hist_t`
 /// grad/hess interleaving, extended to carry the sample count this codebase
-/// also accumulates.
+/// also accumulates. Splitting the count into a parallel `u32` array to
+/// shrink the record to 16 bytes was measured 2026-08-22 at +20% fit time —
+/// the second memory touch per update costs far more than the straddle it
+/// removes — so the count stays fused.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct BinAccumulator {
     /// Sum of gradients in this bin.
