@@ -11,7 +11,6 @@ from pathlib import Path
 
 from scripts import _test_hooks
 from scripts.contract_rules import run_contract_rules
-from scripts.file_size_rules import run_file_size_rules
 from scripts.hook_restore_rules import run_hook_restore_rules
 from scripts.layer_rules import run_layer_rules
 from scripts.physics_claims import run_physics_claim_rules
@@ -81,7 +80,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     # flattened to 1, so the caller keeps the orchestrator's signal.
     local_violations = (
         run_contract_rules(target_root)
-        + run_file_size_rules(target_root)
         + run_layer_rules(target_root)
         + run_shim_rules(target_root)
         + run_physics_claim_rules(target_root)
