@@ -12,8 +12,7 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from covenant_radar_api.seeding import _test_hooks as seeding_hooks
-from covenant_radar_api.seeding import seed_database_with_defaults
-from covenant_radar_api.seeding.runner import SeedResult
+from covenant_radar_api.seeding.runner import SeedResult, seed_database_with_defaults
 
 
 class WriteFunc(Protocol):

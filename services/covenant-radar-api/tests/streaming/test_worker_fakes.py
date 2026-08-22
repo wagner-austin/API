@@ -10,13 +10,15 @@ import pytest
 from covenant_domain import CovenantId, DealId
 from numpy.typing import NDArray
 
-from covenant_radar_api.streaming._test_hooks import (
+from covenant_radar_api.streaming._test_hooks_model import (
+    FakeMetricsSink,
+    FakePredictor,
+)
+from covenant_radar_api.streaming._test_hooks_repositories import (
     FakeCovenantRepository,
     FakeCovenantResultRepository,
     FakeDealRepository,
     FakeMeasurementRepository,
-    FakeMetricsSink,
-    FakePredictor,
 )
 
 from ._test_worker_fixtures import (

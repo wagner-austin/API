@@ -6,16 +6,20 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
-from scripts.amex._test_hooks import (
+from scripts.amex._hook_protocols import (
+    FakeDatasetSpec,
+)
+from scripts.amex._test_fakes import (
     FakeBackend,
     FakeConsole,
-    FakeDatasetSpec,
     FakePreparedClassifier,
     FakeRegistry,
     FakeTimeseriesLoader,
-    configure_all_fakes,
     make_fake_dataset,
     make_fake_optimizer,
+)
+from scripts.amex._test_hooks import (
+    configure_all_fakes,
 )
 
 

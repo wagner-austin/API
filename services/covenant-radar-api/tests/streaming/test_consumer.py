@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import TypeVar
 
+from covenant_radar_api.streaming._hook_protocols import (
+    TopicPartitionOffset,
+)
 from covenant_radar_api.streaming._test_hooks import (
     FakeKafkaConsumer,
-    TopicPartitionOffset,
     get_fake_consumer,
     use_fake_kafka,
 )

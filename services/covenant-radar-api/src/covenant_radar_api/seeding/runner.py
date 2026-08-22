@@ -137,7 +137,7 @@ def seed_database_with_defaults(conn: ConnectionProtocol) -> SeedResult:
     Returns:
         SeedResult with counts of created entities.
     """
-    from .profiles import ALL_PROFILES
+    from .profiles_data_additional import ALL_PROFILES
 
     return seed_database(conn, ALL_PROFILES)
 

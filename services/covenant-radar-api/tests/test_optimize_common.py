@@ -9,190 +9,30 @@ from __future__ import annotations
 from pathlib import Path
 from shutil import copyfile
 
-import numpy as np
 import pytest
 from covenant_ml.datasets import (
     DatasetConfig,
-    DatasetMeta,
-    DatasetRegistry,
     LoadedDataset,
     TimeSeriesDatasetConfig,
-    TimeSeriesDatasetRegistry,
 )
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
-from numpy.typing import NDArray
-from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.worker import _test_hooks as hooks
 from covenant_radar_api.worker._optimize_common import (
     DatasetType,
-    build_optimization_config,
     get_dataset_type,
     load_any_dataset,
     load_dataset,
     load_dataset_with_progress,
     load_timeseries_dataset,
-    optional_int,
-    parse_backend_name,
     parse_dataset_name,
-    parse_device,
-    parse_feature_preset,
 )
-
-# =============================================================================
-# Fake Implementations for Testing
-# =============================================================================
-
-
-def _make_fake_standard_dataset(name: str = "taiwan") -> LoadedDataset:
-    """Create fake standard dataset for testing.
-
-    Args:
-        name: Dataset name.
-
-    Returns:
-        LoadedDataset with synthetic data.
-    """
-    rng = np.random.default_rng(42)
-    x: NDArray[np.float64] = rng.random((100, 10)).astype(np.float64)
-    y: NDArray[np.int64] = rng.integers(0, 2, size=100).astype(np.int64)
-    n_positive = int(np.sum(y))
-    meta: DatasetMeta = {
-        "name": name,
-        "n_samples": 100,
-        "n_features": 10,
-        "n_positive": n_positive,
-        "n_negative": 100 - n_positive,
-        "positive_ratio": n_positive / 100,
-        "feature_names": tuple(f"feature_{i}" for i in range(10)),
-        "categorical_encodings": (),
-    }
-    return {"meta": meta, "x": x, "y": y, "groups": None}
-
-
-def _make_fake_timeseries_dataset(name: str = "kaggle_amex_default") -> LoadedDataset:
-    """Create fake time-series dataset for testing.
-
-    Args:
-        name: Dataset name.
-
-    Returns:
-        LoadedDataset with synthetic aggregated time-series data.
-    """
-    rng = np.random.default_rng(123)
-    # Time-series datasets typically have more features after aggregation
-    x: NDArray[np.float64] = rng.random((500, 188)).astype(np.float64)
-    y: NDArray[np.int64] = rng.integers(0, 2, size=500).astype(np.int64)
-    n_positive = int(np.sum(y))
-    meta: DatasetMeta = {
-        "name": name,
-        "n_samples": 500,
-        "n_features": 188,
-        "n_positive": n_positive,
-        "n_negative": 500 - n_positive,
-        "positive_ratio": n_positive / 500,
-        "feature_names": tuple(f"ts_feature_{i}" for i in range(188)),
-        "categorical_encodings": (),
-    }
-    return {"meta": meta, "x": x, "y": y, "groups": None}
-
-
-def _make_fake_standard_config(name: str) -> DatasetConfig:
-    """Create fake standard dataset config.
-
-    Args:
-        name: Dataset name.
-
-    Returns:
-        DatasetConfig for standard dataset.
-    """
-    return {
-        "name": name,
-        "display_name": f"Fake {name}",
-        "folder": f"{name}_data",
-        "file_name": "data.csv",
-        "file_format": "csv",
-        "encoding": "utf-8",
-        "target": {
-            "column_name": "target",
-            "label_type": "binary_int",
-            "positive_values": (1,),
-            "negative_values": (0,),
-        },
-        "exclude_columns": (),
-        "n_samples_expected": 100,
-        "n_features_expected": 10,
-        "positive_class_ratio_expected": 0.3,
-    }
-
-
-def _make_fake_timeseries_config(name: str) -> TimeSeriesDatasetConfig:
-    """Create fake time-series dataset config.
-
-    Args:
-        name: Dataset name.
-
-    Returns:
-        TimeSeriesDatasetConfig for time-series dataset.
-    """
-    return TimeSeriesDatasetConfig(
-        name=name,
-        display_name=f"Fake {name} Time Series",
-        folder=f"{name}_data",
-        file_name="train_data.csv",
-        file_format="csv",
-        encoding="utf-8",
-        target={
-            "column_name": "target",
-            "label_type": "binary_int",
-            "positive_values": (1,),
-            "negative_values": (0,),
-        },
-        exclude_columns=(),
-        n_samples_expected=500,
-        n_features_expected=188,
-        positive_class_ratio_expected=0.26,
-        time_series={
-            "entity_column": "customer_ID",
-            "time_column": "S_2",
-            "aggregation": "last",
-            "labels_file": "train_labels.csv",
-            "labels_entity_column": "customer_ID",
-            "include_rank_features": False,
-            "include_diff_features": False,
-            "include_window_features": False,
-            "window_sizes": (),
-        },
-    )
-
-
-def _make_fake_standard_registry() -> DatasetRegistry:
-    """Create fake standard dataset registry.
-
-    Returns:
-        DatasetRegistry with taiwan, us, polish datasets.
-    """
-    configs = (
-        _make_fake_standard_config("taiwan"),
-        _make_fake_standard_config("us"),
-        _make_fake_standard_config("polish"),
-    )
-    return DatasetRegistry(configs)
-
-
-def _make_fake_timeseries_registry() -> TimeSeriesDatasetRegistry:
-    """Create fake time-series dataset registry.
-
-    Returns:
-        TimeSeriesDatasetRegistry with kaggle_amex_default dataset.
-    """
-    configs = (_make_fake_timeseries_config("kaggle_amex_default"),)
-    return TimeSeriesDatasetRegistry(configs)
-
-
-# =============================================================================
-# Tests for get_dataset_type
-# =============================================================================
+from tests._optimize_common_fixtures import (
+    _make_fake_standard_dataset,
+    _make_fake_standard_registry,
+    _make_fake_timeseries_dataset,
+    _make_fake_timeseries_registry,
+)
 
 
 class TestGetDatasetType:
@@ -255,11 +95,6 @@ class TestGetDatasetType:
             hooks.timeseries_registry_factory = orig_ts_registry
 
 
-# =============================================================================
-# Tests for parse_dataset_name
-# =============================================================================
-
-
 class TestParseDatasetName:
     """Tests for parse_dataset_name function with both registry types."""
 
@@ -310,11 +145,6 @@ class TestParseDatasetName:
             hooks.timeseries_registry_factory = orig_ts_registry
 
 
-# =============================================================================
-# Tests for load_timeseries_dataset
-# =============================================================================
-
-
 class TestLoadTimeseriesDataset:
     """Tests for load_timeseries_dataset function."""
 
@@ -347,11 +177,6 @@ class TestLoadTimeseriesDataset:
         finally:
             hooks.timeseries_registry_factory = orig_ts_registry
             hooks.timeseries_loader = orig_ts_loader
-
-
-# =============================================================================
-# Tests for load_any_dataset
-# =============================================================================
 
 
 class TestLoadAnyDataset:
@@ -463,11 +288,6 @@ class TestLoadAnyDataset:
             hooks.timeseries_registry_factory = orig_ts_registry
 
 
-# =============================================================================
-# Tests for load_dataset_with_progress
-# =============================================================================
-
-
 class TestLoadDatasetWithProgress:
     """Tests for load_dataset_with_progress helper function."""
 
@@ -502,11 +322,6 @@ class TestLoadDatasetWithProgress:
             hooks.dataset_loader = orig_loader
 
 
-# =============================================================================
-# Tests for Worker Time-Series Hooks
-# =============================================================================
-
-
 class TestWorkerTimeseriesHooks:
     """Tests for worker/_test_hooks.py time-series hooks."""
 
@@ -514,7 +329,7 @@ class TestWorkerTimeseriesHooks:
         """Test _real_timeseries_loader loads sample time-series dataset."""
         from shutil import copyfile
 
-        from covenant_radar_api.worker._test_hooks import _real_timeseries_loader
+        from covenant_radar_api.worker._hook_defaults import _real_timeseries_loader
 
         # Create a minimal time-series config for testing
         sample_config: TimeSeriesDatasetConfig = TimeSeriesDatasetConfig(
@@ -571,195 +386,6 @@ class TestWorkerTimeseriesHooks:
         assert dataset["meta"]["n_samples"] > 0
         assert dataset["meta"]["n_features"] > 0
         assert len(dataset["x"]) == len(dataset["y"])
-
-
-# =============================================================================
-# Tests for parse_device
-# =============================================================================
-
-
-class TestParseDevice:
-    """Tests for parse_device function."""
-
-    def test_parse_device_defaults_to_auto(self) -> None:
-        """None input returns 'auto'."""
-        assert parse_device(None) == "auto"
-
-    def test_parse_device_accepts_cpu(self) -> None:
-        """'cpu' is accepted."""
-        assert parse_device("cpu") == "cpu"
-
-    def test_parse_device_accepts_cuda(self) -> None:
-        """'cuda' is accepted."""
-        assert parse_device("cuda") == "cuda"
-
-    def test_parse_device_accepts_auto(self) -> None:
-        """'auto' is accepted."""
-        assert parse_device("auto") == "auto"
-
-    def test_parse_device_rejects_invalid_string(self) -> None:
-        """Invalid device string raises ValueError."""
-        with pytest.raises(ValueError, match="device must be one of"):
-            parse_device("tpu")
-
-    def test_parse_device_rejects_non_string(self) -> None:
-        """Non-string input raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match="device must be a string"):
-            parse_device(123)
-
-
-# =============================================================================
-# Tests for parse_feature_preset
-# =============================================================================
-
-
-class TestParseFeaturePreset:
-    """Tests for parse_feature_preset function."""
-
-    def test_parse_feature_preset_defaults_to_none(self) -> None:
-        """None input returns 'none'."""
-        assert parse_feature_preset(None) == "none"
-
-    def test_parse_feature_preset_accepts_none(self) -> None:
-        """'none' is accepted."""
-        assert parse_feature_preset("none") == "none"
-
-    def test_parse_feature_preset_accepts_log_only(self) -> None:
-        """'log_only' is accepted."""
-        assert parse_feature_preset("log_only") == "log_only"
-
-    def test_parse_feature_preset_accepts_ratios_only(self) -> None:
-        """'ratios_only' is accepted."""
-        assert parse_feature_preset("ratios_only") == "ratios_only"
-
-    def test_parse_feature_preset_accepts_full(self) -> None:
-        """'full' is accepted."""
-        assert parse_feature_preset("full") == "full"
-
-    def test_parse_feature_preset_rejects_invalid_string(self) -> None:
-        """Invalid feature_preset string raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match="feature_preset must be one of"):
-            parse_feature_preset("invalid")
-
-    def test_parse_feature_preset_rejects_non_string(self) -> None:
-        """Non-string input raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match="feature_preset must be a string"):
-            parse_feature_preset(123)
-
-
-# =============================================================================
-# Tests for parse_backend_name
-# =============================================================================
-
-
-class TestParseBackendName:
-    """Tests for parse_backend_name function."""
-
-    def test_parse_backend_name_defaults_to_xgboost(self) -> None:
-        """None input returns 'xgboost'."""
-        assert parse_backend_name(None) == "xgboost"
-
-    def test_parse_backend_name_accepts_xgboost(self) -> None:
-        """'xgboost' is accepted."""
-        assert parse_backend_name("xgboost") == "xgboost"
-
-    def test_parse_backend_name_accepts_mlp(self) -> None:
-        """'mlp' is accepted."""
-        assert parse_backend_name("mlp") == "mlp"
-
-    def test_parse_backend_name_accepts_lstm(self) -> None:
-        """'lstm' is accepted."""
-        assert parse_backend_name("lstm") == "lstm"
-
-    def test_parse_backend_name_accepts_lightgbm(self) -> None:
-        """'lightgbm' is accepted."""
-        assert parse_backend_name("lightgbm") == "lightgbm"
-
-    def test_parse_backend_name_accepts_cleargbm(self) -> None:
-        """'cleargbm' is accepted."""
-        assert parse_backend_name("cleargbm") == "cleargbm"
-
-    def test_parse_backend_name_accepts_logreg(self) -> None:
-        """'logreg' is accepted."""
-        assert parse_backend_name("logreg") == "logreg"
-
-    def test_parse_backend_name_accepts_random_forest(self) -> None:
-        """'random_forest' is accepted."""
-        assert parse_backend_name("random_forest") == "random_forest"
-
-    def test_parse_backend_name_rejects_invalid_string(self) -> None:
-        """Invalid backend name raises ValueError."""
-        with pytest.raises(ValueError, match="backend must be one of"):
-            parse_backend_name("invalid")
-
-    def test_parse_backend_name_rejects_non_string(self) -> None:
-        """Non-string input raises JSONTypeError."""
-        with pytest.raises(JSONTypeError, match="backend must be a string"):
-            parse_backend_name(123)
-
-
-# =============================================================================
-# Tests for optional_int
-# =============================================================================
-
-
-class TestOptionalInt:
-    """Tests for optional_int function."""
-
-    def test_optional_int_returns_default_on_missing(self) -> None:
-        """optional_int returns default when key is missing."""
-        assert optional_int({}, "missing", 10) == 10
-
-    def test_optional_int_returns_value_when_present(self) -> None:
-        """optional_int returns value when present."""
-        assert optional_int({"val": 20}, "val", 10) == 20
-
-    def test_optional_int_converts_float_to_int(self) -> None:
-        """optional_int converts float to int."""
-        assert optional_int({"val": 15.5}, "val", 0) == 15
-
-    def test_optional_int_raises_on_invalid_type(self) -> None:
-        """optional_int raises JSONTypeError on invalid type."""
-        with pytest.raises(JSONTypeError, match="must be a number"):
-            optional_int({"val": "string"}, "val", 0)
-
-
-# =============================================================================
-# Tests for build_optimization_config
-# =============================================================================
-
-
-class TestBuildOptimizationConfig:
-    """Tests for build_optimization_config function."""
-
-    def test_build_config_with_timeout(self) -> None:
-        """build_optimization_config creates config with timeout."""
-        config = build_optimization_config(
-            n_trials=50,
-            timeout_seconds=3600,
-            random_state=42,
-        )
-
-        assert config["n_trials"] == 50
-        assert config["timeout_seconds"] == 3600
-        assert config["random_state"] == 42
-
-    def test_build_config_without_timeout(self) -> None:
-        """build_optimization_config creates config without timeout."""
-        config = build_optimization_config(
-            n_trials=25,
-            timeout_seconds=None,
-            random_state=123,
-        )
-
-        assert config["n_trials"] == 25
-        assert config["timeout_seconds"] is None
-        assert config["random_state"] == 123
-
-
-# =============================================================================
-# Tests for load_dataset (standard)
-# =============================================================================
 
 
 def _copy_real_taiwan(external_root: Path) -> tuple[Path, int, list[str]]:

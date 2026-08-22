@@ -14,14 +14,20 @@ from typing import Literal, TypedDict
 from platform_core.json_utils import InvalidJsonError, JSONTypeError
 from platform_core.logging import get_logger
 
+from covenant_radar_api.streaming.schemas import (
+    MeasurementEventV1,
+)
+from covenant_radar_api.streaming.schemas_decode import (
+    decode_measurement_event,
+)
+
 from . import _test_hooks
+from ._hook_protocols import TopicPartitionOffset
 from ._test_hooks import (
     ConsumedMessageProtocol,
     KafkaConsumerProtocol,
-    TopicPartitionOffset,
 )
 from .config import ConfluentConfig, ConsumerConfig, StreamingConfig
-from .schemas import MeasurementEventV1, decode_measurement_event
 
 _log = get_logger(__name__)
 

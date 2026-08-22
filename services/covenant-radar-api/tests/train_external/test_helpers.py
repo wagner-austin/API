@@ -7,16 +7,20 @@ from covenant_ml.types import EvalMetrics
 from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.worker._train_external_parsers import (
+    _parse_device,
+)
+from covenant_radar_api.worker._train_external_parsers_tree import (
     _optional_float,
     _optional_int,
-    _parse_device,
     _parse_monotonic_constraints,
     _parse_optional_bool,
 )
 from covenant_radar_api.worker.train_external_job import (
+    _metrics_to_json,
+)
+from covenant_radar_api.worker.train_external_metadata import (
     _get_active_filename,
     _get_meta_filename,
-    _metrics_to_json,
 )
 
 

@@ -6,11 +6,13 @@ import pytest
 from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 
 from covenant_radar_api.seeding import _test_hooks
-from covenant_radar_api.seeding.profiles import (
-    ALL_PROFILES,
+from covenant_radar_api.seeding.profiles import DealProfile
+from covenant_radar_api.seeding.profiles_data import (
     FINANCEGROUP_PROFILE,
     TECHCORP_PROFILE,
-    DealProfile,
+)
+from covenant_radar_api.seeding.profiles_data_additional import (
+    ALL_PROFILES,
 )
 from covenant_radar_api.seeding.runner import (
     seed_database,

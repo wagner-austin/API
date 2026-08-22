@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from covenant_radar_api.seeding.profiles import (
-    ALL_PROFILES,
+from covenant_radar_api.seeding.profiles_data import (
     CLOUDTECH_PROFILE,
     FINANCEGROUP_PROFILE,
     HEALTHCARE_PROFILE,
     TECHCORP_PROFILE,
+)
+from covenant_radar_api.seeding.profiles_data_additional import (
+    ALL_PROFILES,
 )
 
 

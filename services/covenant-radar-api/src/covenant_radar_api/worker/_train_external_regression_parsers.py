@@ -27,10 +27,12 @@ from covenant_radar_api.worker._optimize_regression_common import (
     parse_regression_dataset_name,
 )
 from covenant_radar_api.worker._train_external_parsers import (
-    _optional_float,
     _parse_device,
-    _parse_lightgbm_config,
     _parse_xgboost_config,
+)
+from covenant_radar_api.worker._train_external_parsers_tree import (
+    _optional_float,
+    _parse_lightgbm_config,
 )
 
 # =============================================================================

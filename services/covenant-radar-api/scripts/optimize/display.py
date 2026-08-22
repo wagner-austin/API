@@ -17,7 +17,7 @@ from platform_core.rich_logging import (
     get_rich_console,
 )
 
-from covenant_radar_api.worker._optimize_common import (
+from covenant_radar_api.worker._optimize_param_codec import (
     encode_sampled_float_params,
     encode_sampled_int_params,
     encode_sampled_string_params,

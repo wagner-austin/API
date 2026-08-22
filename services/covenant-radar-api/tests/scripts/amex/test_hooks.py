@@ -5,6 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+from scripts.amex._hook_protocols import (
+    FakeDatasetSpec,
+)
 from scripts.amex._hooks import (
     ConsoleProtocol,
     _default_console_factory,
@@ -16,9 +19,10 @@ from scripts.amex._hooks import (
     get_registry,
     get_timeseries_loader,
 )
-from scripts.amex._test_hooks import (
+from scripts.amex._test_fakes import (
     FakeConsole,
-    FakeDatasetSpec,
+)
+from scripts.amex._test_hooks import (
     configure_fake_console,
     configure_fake_ensemble_optimizer,
     configure_fake_project_root,

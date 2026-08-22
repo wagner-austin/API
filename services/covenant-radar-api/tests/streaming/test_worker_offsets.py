@@ -14,7 +14,9 @@ from time import sleep
 
 from platform_core.json_utils import dump_json_str
 
-from covenant_radar_api.streaming._test_hooks import TopicPartitionOffset
+from covenant_radar_api.streaming._hook_protocols import (
+    TopicPartitionOffset,
+)
 
 from ._test_worker_fixtures import (
     REQUIRED_METRICS,

@@ -41,7 +41,8 @@ from .integrations.datadog import MetricsClient, MetricsConfig, create_metrics_c
 from .streaming.config import StreamingConfig, load_streaming_config
 from .streaming.consumer import StreamingConsumer, create_streaming_consumer
 from .streaming.producer import StreamingProducer, create_streaming_producer
-from .streaming.worker import StreamingWorker, WorkerConfig, make_default_worker_config
+from .streaming.worker import StreamingWorker
+from .streaming.worker_events import WorkerConfig, make_default_worker_config
 from .streaming_worker_entry_hooks import LoggerProtocol
 
 # =============================================================================

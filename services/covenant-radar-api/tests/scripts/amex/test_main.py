@@ -13,8 +13,10 @@ from scripts.amex.__main__ import (
     _parse_window_sizes,
     parse_args,
 )
-from scripts.amex._test_hooks import (
+from scripts.amex._hook_protocols import (
     FakeDatasetSpec,
+)
+from scripts.amex._test_hooks import (
     configure_all_fakes,
 )
 

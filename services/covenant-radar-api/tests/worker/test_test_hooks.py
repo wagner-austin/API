@@ -15,9 +15,11 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from covenant_radar_api.worker._test_hooks import (
+from covenant_radar_api.worker._hook_defaults import (
     _real_logreg_loader,
     _real_random_forest_loader,
+)
+from covenant_radar_api.worker._test_hooks import (
     logreg_loader,
     random_forest_loader,
 )
@@ -152,7 +154,7 @@ class TestRealTimeseriesRegistry:
 
     def test_returns_registry_with_kaggle_amex(self) -> None:
         """_real_timeseries_registry returns registry containing kaggle_amex_default."""
-        from covenant_radar_api.worker._test_hooks import _real_timeseries_registry
+        from covenant_radar_api.worker._hook_defaults import _real_timeseries_registry
 
         registry = _real_timeseries_registry()
         names = registry.list_names()
@@ -164,7 +166,7 @@ class TestRealOptimizerRegistry:
 
     def test_returns_registry_with_optuna_tpe(self) -> None:
         """_real_optimizer_registry returns registry containing optuna_tpe."""
-        from covenant_radar_api.worker._test_hooks import _real_optimizer_registry
+        from covenant_radar_api.worker._hook_defaults import _real_optimizer_registry
 
         registry = _real_optimizer_registry()
         # Registry supports .get() — optuna_tpe should be registered
@@ -220,7 +222,7 @@ class TestRealObjectiveFactory:
 
     def test_xgboost_objective(self) -> None:
         """_real_objective_factory creates XGBoost objective with n_features."""
-        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+        from covenant_radar_api.worker._hook_defaults import _real_objective_factory
 
         x, y, names = self._make_data()
         config = self._make_config()
@@ -229,7 +231,7 @@ class TestRealObjectiveFactory:
 
     def test_lightgbm_objective(self) -> None:
         """_real_objective_factory creates LightGBM objective with n_features."""
-        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+        from covenant_radar_api.worker._hook_defaults import _real_objective_factory
 
         x, y, names = self._make_data()
         config = self._make_config()
@@ -238,7 +240,7 @@ class TestRealObjectiveFactory:
 
     def test_cleargbm_objective(self) -> None:
         """_real_objective_factory creates ClearGBM objective with n_features."""
-        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+        from covenant_radar_api.worker._hook_defaults import _real_objective_factory
 
         x, y, names = self._make_data()
         config = self._make_config()
@@ -247,7 +249,7 @@ class TestRealObjectiveFactory:
 
     def test_logreg_objective(self) -> None:
         """_real_objective_factory creates LogReg objective with n_features."""
-        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+        from covenant_radar_api.worker._hook_defaults import _real_objective_factory
 
         x, y, names = self._make_data()
         config = self._make_config()
@@ -256,7 +258,7 @@ class TestRealObjectiveFactory:
 
     def test_random_forest_objective(self) -> None:
         """_real_objective_factory creates RandomForest objective with n_features."""
-        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+        from covenant_radar_api.worker._hook_defaults import _real_objective_factory
 
         x, y, names = self._make_data()
         config = self._make_config()
@@ -265,7 +267,7 @@ class TestRealObjectiveFactory:
 
     def test_mlp_objective(self) -> None:
         """_real_objective_factory creates MLP objective with n_features."""
-        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+        from covenant_radar_api.worker._hook_defaults import _real_objective_factory
 
         x, y, names = self._make_data()
         config = self._make_config()
@@ -274,7 +276,7 @@ class TestRealObjectiveFactory:
 
     def test_lstm_objective(self) -> None:
         """_real_objective_factory creates LSTM objective with n_features."""
-        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+        from covenant_radar_api.worker._hook_defaults import _real_objective_factory
 
         x, y, names = self._make_data()
         config = self._make_config()
@@ -297,7 +299,7 @@ class TestRealDataBankUploader:
 
         from platform_core.json_utils import dump_json_str
 
-        from covenant_radar_api.worker._test_hooks import _real_data_bank_uploader
+        from covenant_radar_api.worker._hook_defaults import _real_data_bank_uploader
 
         # Create a dummy model file
         model_path = tmp_path / "test_model.ubj"

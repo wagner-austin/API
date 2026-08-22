@@ -32,7 +32,8 @@ from covenant_radar_api.streaming._test_hooks import (
 from covenant_radar_api.streaming.consumer import StreamingConsumer
 from covenant_radar_api.streaming.producer import StreamingProducer
 from covenant_radar_api.streaming.schemas import MeasurementEventV1
-from covenant_radar_api.streaming.worker import StreamingWorker, WorkerConfig
+from covenant_radar_api.streaming.worker import StreamingWorker
+from covenant_radar_api.streaming.worker_events import WorkerConfig
 
 # Required metrics for extract_features
 REQUIRED_METRICS: dict[str, float] = {

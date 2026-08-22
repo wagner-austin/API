@@ -30,9 +30,6 @@ from platform_core.logging import get_logger
 
 from covenant_radar_api.worker._optimize_common import (
     build_optimization_config,
-    encode_sampled_float_params,
-    encode_sampled_int_params,
-    encode_sampled_string_params,
     load_any_dataset,
     optional_int,
     parse_backend_name,
@@ -42,6 +39,11 @@ from covenant_radar_api.worker._optimize_common import (
     parse_nn_optimizer,
     parse_precision,
     save_optimization_results,
+)
+from covenant_radar_api.worker._optimize_param_codec import (
+    encode_sampled_float_params,
+    encode_sampled_int_params,
+    encode_sampled_string_params,
 )
 from covenant_radar_api.worker.optimize_types import (
     LoadingProgressCallbackProtocol,

@@ -30,9 +30,6 @@ from platform_core.logging import get_logger
 
 from covenant_radar_api.worker._optimize_common import (
     build_optimization_config,
-    encode_sampled_float_params,
-    encode_sampled_int_params,
-    encode_sampled_string_params,
     optional_int,
     parse_bidirectional,
     parse_device,
@@ -41,12 +38,17 @@ from covenant_radar_api.worker._optimize_common import (
     parse_precision,
     save_optimization_results,
 )
+from covenant_radar_api.worker._optimize_param_codec import (
+    encode_sampled_float_params,
+    encode_sampled_int_params,
+    encode_sampled_string_params,
+)
 from covenant_radar_api.worker._optimize_regression_common import (
     load_regression_dataset,
     parse_regression_dataset_name,
     parse_regressor_backend_name,
 )
-from covenant_radar_api.worker.optimize_regression_types import (
+from covenant_radar_api.worker.optimize_regression_results import (
     RegressionLoadingProgressCallbackProtocol,
     RegressionLoadingProgressInfo,
     RegressionOptimizePhase,
@@ -55,8 +57,10 @@ from covenant_radar_api.worker.optimize_regression_types import (
     RegressionTrialProgressCallbackProtocol,
     RegressionTrialProgressInfo,
     UnifiedRegressionOptimizationResult,
-    UnifiedRegressionOptimizeParseResult,
     encode_unified_regression_optimization_result,
+)
+from covenant_radar_api.worker.optimize_regression_types import (
+    UnifiedRegressionOptimizeParseResult,
 )
 
 _log = get_logger(__name__)

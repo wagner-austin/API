@@ -5,7 +5,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from covenant_radar_api.streaming.worker import (
+from covenant_radar_api.streaming.worker_events import (
     _count_breaches,
     _current_iso_timestamp,
     _determine_alert_severity,
