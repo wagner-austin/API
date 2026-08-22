@@ -4692,3 +4692,5 @@ Both OPEN items above shipped, plus the class-level instrument the correction de
 **What the final sweep caught.** Two regressions that would have shipped silently without the lifted rule: a covenant_nn module grown to 677 by mechanical import-block rewires, and a Model-Trainer test committed at 618 under a "zero over" claim measured before the final format pass. The instrument caught its own installers.
 
 **Residual.** Five covenant_ml files remain over (1269/788/783/727/723), all inside or coupled to another session's uncommitted edit set; `make lint` there is deliberately red until that session lands and the five are split. Recorded on the board with an expiry condition.
+
+**Addendum, same day.** The operator confirmed no one else was on cleargbm, so the residual dissolved: the orphaned leaf-wise work was verified and landed (`2a55899c` cleargbm_rs, `1a04bb1e` cleargbm, `bd55e8d6` covenant_ml — best-first tree growth, N-arm benchmark manifest, EcoQoS power-throttle opt-out), the five held files were split on top (`bb4d5360`), and the monorepo-wide sweep reads **zero files over the ceiling**. Board task 21e173d7 closed done; every gate green.
