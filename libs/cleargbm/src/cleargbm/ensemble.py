@@ -62,14 +62,18 @@ def _validate_training_inputs(
 
 def _config_to_rust_dict(
     config: GradientBoostingConfig,
-) -> dict[str, int | float | bool | list[int] | None]:
+) -> dict[str, int | float | bool | str | list[int] | None]:
     """Translate a Python ``GradientBoostingConfig`` into the Rust-side dict.
 
-    The Rust training function extracts 12 hyperparameter fields plus
+    The Rust training function extracts 14 hyperparameter fields plus
     ``n_jobs`` from the dict it receives. ``n_jobs`` selects the worker-thread
     policy for the run and is deliberately not part of the Rust
     ``GradientBoostingConfig``: it does not change the fitted model, and that
     config is serialized into the saved model.
+
+    ``growth_strategy`` crosses as the same string on both sides
+    (``"depth_wise"`` / ``"leaf_wise"``) rather than being re-encoded, so the
+    policy has exactly one spelling everywhere it appears.
 
     The two remaining Python-only fields (``max_features``,
     ``track_contributions``) are dropped because the Rust core does not
@@ -101,6 +105,8 @@ def _config_to_rust_dict(
         "monotonic_constraints": mc_list,
         "early_stopping_rounds": config["early_stopping_rounds"],
         "n_jobs": config["n_jobs"],
+        "growth_strategy": config["growth_strategy"],
+        "num_leaves": config["num_leaves"],
     }
 
 

@@ -84,6 +84,122 @@ Everything performance-critical. Full list of primitives exposed at `cleargbm_rs
 
 For the Rust-side architecture, see [`cleargbm_rs/README.md`](../../cleargbm_rs/README.md).
 
+## Variant trialing
+
+Improvements land as *arms*, measured against a baseline, and the loser is
+deleted. This section is the procedure; it is a precondition for any
+performance or algorithm work, not documentation of one.
+
+### The variant axis
+
+`GradientBoostingConfig.growth_strategy` (`"depth_wise" | "leaf_wise"`) is the
+first algorithmic variant parameter, paired with `num_leaves`. It crosses every
+boundary as the same string — Python TypedDict, the dict handed to
+`train_gradient_boosting_rs`, and the config serialized inside a saved model —
+so a policy has exactly one spelling everywhere it appears. Contrast
+`monotonic_constraints`, which is ints in Python and variant names in JSON;
+that split is a wart, not a pattern to copy.
+
+Three rules make the axis trustworthy:
+
+- **No implicit default.** Both keys are required at every layer. A missing key
+  is an error, never a silent `depth_wise` run — an arm that meant to name a
+  policy and quietly got another one produces a mislabelled measurement, which
+  is worse than no measurement.
+- **The budget is paired with the policy, not ignored under the wrong one.**
+  `leaf_wise` without `num_leaves` is rejected (best-first growth has no depth
+  to bound its shape, so the budget is its only capacity limit), and
+  `num_leaves` under `depth_wise` is rejected rather than accepted and unused.
+  A run that reports a knob it did not honour is the same defect class as a
+  missing policy.
+- **Each rule has one owner.** Python validates each field's own type and
+  range; the cross-field pairing is enforced once, in Rust
+  (`GradientBoostingConfig::new`), so the two layers cannot drift.
+
+`depth_wise` behaviour is unchanged by the axis: it still passes an unbounded
+leaf count to the builder, so every manifest recorded before the axis existed
+remains comparable.
+
+### Best-first growth
+
+`leaf_wise` is implemented in `cleargbm_rs/src/tree/leafwise.rs`, the sibling of
+the depth-wise `builder.rs`. Both consume the same `BuildTreeInput` and produce
+the same `Tree`; they differ only in the order nodes are chosen for splitting.
+
+The loop keeps a frontier of splittable leaves, each carrying the best split it
+would make, takes the largest gain, and evaluates only the two new children —
+every other candidate's best split is unaffected by a split elsewhere in the
+tree, which is what makes best-first affordable (Shi 2007; the shape LightGBM's
+`SerialTreeLearner` uses). Sibling-subtraction is retained.
+
+A node that cannot be split — depth budget reached, too few samples, or no
+positive-gain split — is **removed** from candidacy rather than gain-poisoned.
+Shi and LightGBM differ here, and the two only differ when a blocked leaf could
+later become splittable. None can: depth never decreases, a node's sample count
+never grows, and its histograms never change once built. The cheaper handling
+is the equivalent one, not an approximation.
+
+The cost is memory: each frontier candidate retains its histograms, so peak
+histogram memory scales with the leaf budget rather than with tree depth.
+Depth-wise holds one root-to-node path; leaf-wise holds the whole frontier.
+
+The correctness anchor is
+`test_leaf_wise_matches_depth_wise_when_the_budget_never_binds`. Given a budget
+no tree of that depth can reach, both policies exhaust the same set of
+splittable nodes, so their predictions must agree bit for bit. That is the
+property making leaf-wise an ordering change rather than a different learner,
+and it is what any future edit to either builder has to keep true.
+
+### Two gate types
+
+Every lever declares which gate it is under **before** measurement. Choosing
+after the numbers arrive is how a quality regression gets reclassified as an
+acceptable tradeoff.
+
+| | Pure-perf lever | Algorithmic lever |
+|---|---|---|
+| Examples | prefetch, histogram buffer interleave, the Lever-1 ordered-gradients refactor | leaf-wise growth, GOSS, an added `gamma` term |
+| Gate | Output **bit-identical** to baseline | Quality **may** change |
+| Evidence | Extend the equivalence tests in `cleargbm_rs/src/histogram/tests/unit_tests.rs` — AUC and log-loss identical across ≥3 seeds | Paired per-seed comparison on identical company-disjoint splits (the ablation methodology) |
+| Failure | Any bit difference kills the lever | Judged on the declared objective, with quality regression as the guarded downside |
+
+For `leaf_wise` specifically, the objective is **fit time at statistically tied
+quality**, not a quality gain. That is a measured expectation, not a guess: see
+[`EXPERIMENT_2026-08-17_growth_policy_xgb_instrument.md`](EXPERIMENT_2026-08-17_growth_policy_xgb_instrument.md),
+where XGBoost was used as an instrument (it implements both policies, so
+everything but the policy is held constant) and leaf-wise growth monotonically
+*hurt* AUC on the bankruptcy workload.
+
+A variant arm should run on at least one large-n and one small-n dataset. On
+the small ones in that experiment, `min_child_weight` stopped growth before any
+leaf budget bound, so the policy never engaged and every arm came out
+bit-identical — a null that is only visible if the sweep includes it, and is
+otherwise silently averaged into a "no effect" conclusion.
+
+### Running an arm
+
+`covenant_ml.benchmarking` compares a *list* of arms, not a fixed pair.
+`make_trainers` returns the ClearGBM baseline, `cleargbm@leaf_wise`, and
+LightGBM; `make_baseline_trainers` returns only the two the pre-variant
+manifests compared, as a separate entry point so a two-series manifest is never
+mistaken for a three-arm run whose third arm failed.
+
+Manifest schema 2 records `position: int` per result rather than
+`ran_first: bool`. A boolean cannot describe an ordering over three arms, and
+the ordering matters: whichever arm runs first at a seed gets the coolest CPU.
+The runner rotates by one slot per seed, so over any `k` consecutive seeds each
+of `k` arms occupies each slot exactly once. Two arms sharing a name is
+rejected — a manifest is grouped by arm name, so duplicates would merge two
+configurations into one series silently.
+
+### The procedure
+
+**branch → measure → collapse to the winner.** Variants are experiment arms,
+not permanent forks. Lever 1 is the precedent: the `Option<>` fallback path was
+deleted in the same week it lost, and deleting it bought 9% on its own. A
+variant left in place after its arm loses is a second compute path that every
+later change has to keep alive.
+
 ## What the Python surface does NOT do
 
 The following used to live in cleargbm and were retired in Phase C (2026-07-21):
@@ -117,6 +233,7 @@ libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py
 
 ## Related documents
 
+- [`BENCHMARK_RESULTS_2026-08-19_growth_variants.md`](BENCHMARK_RESULTS_2026-08-19_growth_variants.md) — first `cleargbm@leaf_wise` measurement, and the EcoQoS throttling defect that invalidates earlier agent-run fit times
 - [`BENCHMARK_RESULTS_2026-07-21.md`](BENCHMARK_RESULTS_2026-07-21.md) — post-refactor performance vs LightGBM
 - [`VALIDATION_REPORT_2026-07-20.md`](VALIDATION_REPORT_2026-07-20.md) — correctness audit (bit-for-bit checks, sibling subtraction verification)
 - [`RUST_ONLY_REFACTOR.md`](RUST_ONLY_REFACTOR.md) — the completed refactor plan

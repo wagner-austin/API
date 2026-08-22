@@ -53,8 +53,10 @@ from cleargbm._types_json import (
     require_unit_float,
 )
 from cleargbm._types_model import (
+    GROWTH_STRATEGIES,
     GradientBoostingConfig,
     GradientBoostingModel,
+    GrowthStrategy,
     TrainingProgress,
     decode_gradient_boosting_config,
     decode_gradient_boosting_model,
@@ -62,6 +64,8 @@ from cleargbm._types_model import (
     encode_gradient_boosting_config,
     encode_gradient_boosting_model,
     encode_training_progress,
+    require_growth_strategy,
+    require_leaf_budget,
 )
 from cleargbm._types_tree import (
     BinEdges,
@@ -90,6 +94,7 @@ from cleargbm._types_tuning import (
 )
 
 __all__ = [
+    "GROWTH_STRATEGIES",
     "BinEdges",
     "DecisionTree",
     "FeatureBins",
@@ -97,6 +102,7 @@ __all__ = [
     "FloatBufferData",
     "GradientBoostingConfig",
     "GradientBoostingModel",
+    "GrowthStrategy",
     "HistogramBufferData",
     "IntBufferData",
     "JSONDict",
@@ -141,6 +147,8 @@ __all__ = [
     "encode_tree_node",
     "encode_tree_prediction_explanation",
     "encode_tuning_report",
+    "require_growth_strategy",
+    "require_leaf_budget",
     "require_n_jobs",
     "require_non_negative_float",
     "require_non_negative_int",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy
 
 
 def make_config(
@@ -18,6 +18,8 @@ def make_config(
     reg_lambda: float = 0.0,
     n_jobs: int = 1,
     early_stopping_rounds: int | None = None,
+    growth_strategy: GrowthStrategy = "depth_wise",
+    num_leaves: int | None = None,
 ) -> GradientBoostingConfig:
     """Create a test config.
 
@@ -34,6 +36,8 @@ def make_config(
         reg_lambda: L2 regularization term.
         n_jobs: Number of parallel workers.
         early_stopping_rounds: Rounds without improvement before stopping (None = disabled).
+        growth_strategy: Tree growth policy.
+        num_leaves: Leaf budget, required under leaf-wise growth.
 
     Returns:
         Test configuration.
@@ -54,6 +58,8 @@ def make_config(
         reg_lambda=reg_lambda,
         n_jobs=n_jobs,
         early_stopping_rounds=early_stopping_rounds,
+        growth_strategy=growth_strategy,
+        num_leaves=num_leaves,
     )
 
 

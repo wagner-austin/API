@@ -177,6 +177,8 @@ class TestTuningReport:
             "reg_lambda": 0.0,
             "n_jobs": 2,
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         timing_result: TimingResult = {
             "n_jobs": 2,
@@ -226,6 +228,8 @@ class TestTuningReport:
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
             "n_jobs": 1,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         raw: JSONDict = {
             "best_config": config_raw,
@@ -257,6 +261,8 @@ class TestTuningReport:
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
             "n_jobs": 1,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         raw: JSONDict = {
             "best_config": config_raw,
@@ -288,6 +294,8 @@ class TestTuningReport:
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
             "n_jobs": 1,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         raw: JSONDict = {
             "best_config": config_raw,
@@ -319,6 +327,8 @@ class TestTuningReport:
             "reg_alpha": 0.0,
             "reg_lambda": 0.0,
             "n_jobs": 1,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         raw: JSONDict = {
             "best_config": config_raw,

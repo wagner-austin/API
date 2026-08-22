@@ -8,7 +8,7 @@ This module is private (underscore prefix) — not for external use.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Literal, TypedDict, get_args
 
 from cleargbm._types_json import (
     JSONDict,
@@ -19,6 +19,7 @@ from cleargbm._types_json import (
     _require_bool,
     _require_float,
     _require_int,
+    _require_str,
     require_n_jobs,
     require_non_negative_float,
     require_non_negative_int,
@@ -35,6 +36,22 @@ from cleargbm._types_tree import (
 # =============================================================================
 # Configuration
 # =============================================================================
+
+GrowthStrategy = Literal["depth_wise", "leaf_wise"]
+"""Tree growth policy — the order in which nodes are chosen for splitting.
+
+``depth_wise`` expands every node at one depth before the next, bounded by
+``max_depth``. ``leaf_wise`` repeatedly splits the highest-gain leaf, bounded
+by a leaf budget. The two build different trees from identical data, so this
+is an algorithm parameter and not a fallback switch.
+
+A closed literal on purpose: variants are enumerated here and rejected at the
+Rust boundary if unimplemented, so a mistyped arm name fails rather than
+quietly training the default policy.
+"""
+
+GROWTH_STRATEGIES: tuple[GrowthStrategy, ...] = get_args(GrowthStrategy)
+"""Every accepted :data:`GrowthStrategy` value, for validation and iteration."""
 
 
 class GradientBoostingConfig(TypedDict):
@@ -59,6 +76,21 @@ class GradientBoostingConfig(TypedDict):
         early_stopping_rounds: Stop training after this many rounds without
             improvement on validation loss. None disables early stopping.
             Requires validation data to be provided during training.
+        growth_strategy: Tree growth policy, ``"depth_wise"`` or
+            ``"leaf_wise"``. Required, with no implicit default: a benchmark
+            arm that meant to name a policy and silently got another one is
+            the failure this axis exists to prevent.
+        num_leaves: Leaf budget for ``"leaf_wise"`` growth. Must be an int
+            >= 2 under ``"leaf_wise"`` and ``None`` under ``"depth_wise"`` —
+            paired with the policy rather than ignored under the wrong one,
+            so a run can never report a knob it did not honour. Best-first
+            growth has no depth to bound its shape, which is why the budget
+            is mandatory there.
+
+            This layer checks the field's own type and range. The *pairing*
+            against ``growth_strategy`` is enforced once, at the Rust
+            boundary, so the cross-field rule has a single owner rather than
+            two copies that can drift.
     """
 
     n_estimators: int
@@ -76,6 +108,47 @@ class GradientBoostingConfig(TypedDict):
     reg_lambda: float
     n_jobs: int
     early_stopping_rounds: int | None
+    growth_strategy: GrowthStrategy
+    num_leaves: int | None
+
+
+def require_leaf_budget(value: int, name: str) -> int:
+    """Validate a leaf budget.
+
+    Args:
+        value: Candidate budget.
+        name: Field name, used in the error message.
+
+    Returns:
+        The validated budget.
+
+    Raises:
+        ValueError: If ``value`` is below 2. A budget of 1 cannot describe a
+            tree containing a split, so it is rejected here rather than left
+            to produce a confusing error inside the builder.
+    """
+    if value < 2:
+        raise ValueError(f"{name} must be >= 2, got {value}")
+    return value
+
+
+def require_growth_strategy(value: str, name: str) -> GrowthStrategy:
+    """Narrow a string to a :data:`GrowthStrategy`.
+
+    Args:
+        value: Candidate policy name.
+        name: Field name, used in the error message.
+
+    Returns:
+        The value, narrowed to the literal type.
+
+    Raises:
+        ValueError: If ``value`` is not one of :data:`GROWTH_STRATEGIES`.
+    """
+    for strategy in GROWTH_STRATEGIES:
+        if value == strategy:
+            return strategy
+    raise ValueError(f"{name} must be one of {list(GROWTH_STRATEGIES)}, got {value!r}")
 
 
 def encode_gradient_boosting_config(
@@ -109,6 +182,8 @@ def encode_gradient_boosting_config(
         "reg_lambda": config["reg_lambda"],
         "n_jobs": config["n_jobs"],
         "early_stopping_rounds": config["early_stopping_rounds"],
+        "growth_strategy": config["growth_strategy"],
+        "num_leaves": config["num_leaves"],
     }
 
 
@@ -172,6 +247,14 @@ def decode_gradient_boosting_config(
     if early_stopping_rounds is not None:
         early_stopping_rounds = require_positive_int(early_stopping_rounds, "early_stopping_rounds")
 
+    growth_strategy = require_growth_strategy(
+        _require_str(raw, "growth_strategy"), "growth_strategy"
+    )
+
+    num_leaves = _get_optional_int(raw, "num_leaves")
+    if num_leaves is not None:
+        num_leaves = require_leaf_budget(num_leaves, "num_leaves")
+
     return GradientBoostingConfig(
         n_estimators=n_estimators,
         max_depth=max_depth,
@@ -188,6 +271,8 @@ def decode_gradient_boosting_config(
         reg_lambda=reg_lambda,
         n_jobs=n_jobs,
         early_stopping_rounds=early_stopping_rounds,
+        growth_strategy=growth_strategy,
+        num_leaves=num_leaves,
     )
 
 
@@ -339,8 +424,10 @@ def decode_training_progress(raw: JSONDict) -> TrainingProgress:
 
 
 __all__ = [
+    "GROWTH_STRATEGIES",
     "GradientBoostingConfig",
     "GradientBoostingModel",
+    "GrowthStrategy",
     "TrainingProgress",
     "decode_gradient_boosting_config",
     "decode_gradient_boosting_model",
@@ -348,4 +435,6 @@ __all__ = [
     "encode_gradient_boosting_config",
     "encode_gradient_boosting_model",
     "encode_training_progress",
+    "require_growth_strategy",
+    "require_leaf_budget",
 ]

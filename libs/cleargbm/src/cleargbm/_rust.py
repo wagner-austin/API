@@ -38,7 +38,7 @@ class _TrainProto(Protocol):
         y_train: NDArray[np.int64],
         x_val: NDArray[np.float64] | None,
         y_val: NDArray[np.int64] | None,
-        config: dict[str, int | float | bool | list[int] | None],
+        config: dict[str, int | float | bool | str | list[int] | None],
         feature_names: list[str],
     ) -> PyGbmModelProto:
         """Train a native gradient boosting model.

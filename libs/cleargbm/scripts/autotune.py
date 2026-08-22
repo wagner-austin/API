@@ -104,6 +104,8 @@ def make_config(
         reg_lambda=0.0,
         n_jobs=n_jobs,
         early_stopping_rounds=None,
+        growth_strategy="depth_wise",
+        num_leaves=None,
     )
 
 

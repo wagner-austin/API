@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from cleargbm.types import (
+    GROWTH_STRATEGIES,
     DecisionTree,
     GradientBoostingConfig,
     GradientBoostingModel,
@@ -15,6 +16,8 @@ from cleargbm.types import (
     decode_gradient_boosting_model,
     encode_gradient_boosting_config,
     encode_gradient_boosting_model,
+    require_growth_strategy,
+    require_leaf_budget,
 )
 
 # =============================================================================
@@ -43,6 +46,8 @@ class TestGradientBoostingConfig:
             "reg_lambda": 1.0,
             "n_jobs": 4,
             "early_stopping_rounds": 10,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         encoded = encode_gradient_boosting_config(original)
         decoded = decode_gradient_boosting_config(encoded)
@@ -62,6 +67,8 @@ class TestGradientBoostingConfig:
         assert decoded["reg_lambda"] == 1.0
         assert decoded["n_jobs"] == 4
         assert decoded["early_stopping_rounds"] == 10
+        assert decoded["growth_strategy"] == "depth_wise"
+        assert decoded["num_leaves"] is None
 
     def test_encode_decode_with_none_optionals(self) -> None:
         """None values for optional fields should roundtrip."""
@@ -81,6 +88,8 @@ class TestGradientBoostingConfig:
             "reg_lambda": 0.0,
             "n_jobs": 1,
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         encoded = encode_gradient_boosting_config(original)
         decoded = decode_gradient_boosting_config(encoded)
@@ -110,6 +119,8 @@ class TestGradientBoostingConfig:
             "reg_lambda": 0.0,
             "n_jobs": 1,
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         with pytest.raises(ValueError, match=r"monotonic_constraints\[0\] must be -1, 0, or 1"):
             decode_gradient_boosting_config(raw)
@@ -132,6 +143,8 @@ class TestGradientBoostingConfig:
             "reg_lambda": 0.0,
             "n_jobs": 1,
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         with pytest.raises(JSONTypeError, match="monotonic_constraints must be list or None"):
             decode_gradient_boosting_config(raw)
@@ -154,6 +167,8 @@ class TestGradientBoostingConfig:
             "reg_lambda": 0.0,
             "n_jobs": 1,
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         with pytest.raises(JSONTypeError, match=r"monotonic_constraints\[0\] must be int"):
             decode_gradient_boosting_config(raw)
@@ -176,6 +191,8 @@ class TestGradientBoostingConfig:
             "reg_lambda": 0.0,
             "n_jobs": 1,
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         with pytest.raises(JSONTypeError, match=r"monotonic_constraints\[0\] must be int"):
             decode_gradient_boosting_config(raw)
@@ -198,6 +215,8 @@ class TestGradientBoostingConfig:
             "reg_lambda": 0.0,
             "n_jobs": -1,
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         encoded = encode_gradient_boosting_config(original)
         decoded = decode_gradient_boosting_config(encoded)
@@ -222,8 +241,136 @@ class TestGradientBoostingConfig:
             "reg_lambda": 0.0,
             "n_jobs": 0,  # invalid
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         with pytest.raises(ValueError, match="n_jobs must be -1 or positive"):
+            decode_gradient_boosting_config(raw)
+
+    def test_growth_strategies_enumerates_both_policies(self) -> None:
+        """The closed literal and its runtime tuple must not drift apart."""
+        assert GROWTH_STRATEGIES == ("depth_wise", "leaf_wise")
+
+    def test_require_growth_strategy_accepts_every_enumerated_value(self) -> None:
+        """Every value in the tuple must survive narrowing."""
+        narrowed = [
+            require_growth_strategy(value, "growth_strategy") for value in GROWTH_STRATEGIES
+        ]
+        assert narrowed == ["depth_wise", "leaf_wise"]
+
+    def test_require_growth_strategy_rejects_unknown_value(self) -> None:
+        """An unknown policy names itself and the accepted set."""
+        with pytest.raises(ValueError, match="growth_strategy must be one of"):
+            require_growth_strategy("lossguide", "growth_strategy")
+
+    def test_require_leaf_budget_accepts_the_smallest_usable_budget(self) -> None:
+        """Two leaves is one split: the smallest tree that is not a stump."""
+        assert require_leaf_budget(2, "num_leaves") == 2
+
+    def test_require_leaf_budget_rejects_a_budget_of_one(self) -> None:
+        with pytest.raises(ValueError, match="num_leaves must be >= 2"):
+            require_leaf_budget(1, "num_leaves")
+
+    def test_decode_growth_strategy_invalid(self) -> None:
+        """An unknown policy in a payload should raise ValueError."""
+        raw: JSONDict = {
+            "n_estimators": 10,
+            "max_depth": 2,
+            "learning_rate": 0.5,
+            "min_samples_split": 2,
+            "min_samples_leaf": 1,
+            "max_features": None,
+            "max_bins": 64,
+            "subsample": 1.0,
+            "random_state": 0,
+            "track_contributions": False,
+            "monotonic_constraints": None,
+            "reg_alpha": 0.0,
+            "reg_lambda": 0.0,
+            "n_jobs": 1,
+            "early_stopping_rounds": None,
+            "growth_strategy": "lossguide",  # invalid
+            "num_leaves": None,
+        }
+        with pytest.raises(ValueError, match="growth_strategy must be one of"):
+            decode_gradient_boosting_config(raw)
+
+    def test_decode_growth_strategy_wrong_type(self) -> None:
+        """A non-string policy should raise JSONTypeError."""
+        raw: JSONDict = {
+            "n_estimators": 10,
+            "max_depth": 2,
+            "learning_rate": 0.5,
+            "min_samples_split": 2,
+            "min_samples_leaf": 1,
+            "max_features": None,
+            "max_bins": 64,
+            "subsample": 1.0,
+            "random_state": 0,
+            "track_contributions": False,
+            "monotonic_constraints": None,
+            "reg_alpha": 0.0,
+            "reg_lambda": 0.0,
+            "n_jobs": 1,
+            "early_stopping_rounds": None,
+            "growth_strategy": 1,  # invalid
+            "num_leaves": None,
+        }
+        with pytest.raises(JSONTypeError, match="growth_strategy must be str"):
+            decode_gradient_boosting_config(raw)
+
+    def test_decode_leaf_wise_is_accepted_by_the_python_layer(self) -> None:
+        """Python validates the vocabulary; Rust owns the implementation gate.
+
+        ``leaf_wise`` decodes cleanly here and is refused at the Rust boundary.
+        Keeping the rejection in one place means the Python layer never has to
+        be edited when the builder gains the policy.
+        """
+        raw: JSONDict = {
+            "n_estimators": 10,
+            "max_depth": 2,
+            "learning_rate": 0.5,
+            "min_samples_split": 2,
+            "min_samples_leaf": 1,
+            "max_features": None,
+            "max_bins": 64,
+            "subsample": 1.0,
+            "random_state": 0,
+            "track_contributions": False,
+            "monotonic_constraints": None,
+            "reg_alpha": 0.0,
+            "reg_lambda": 0.0,
+            "n_jobs": 1,
+            "early_stopping_rounds": None,
+            "growth_strategy": "leaf_wise",
+            "num_leaves": 31,
+        }
+        decoded = decode_gradient_boosting_config(raw)
+        assert decoded["growth_strategy"] == "leaf_wise"
+        assert decoded["num_leaves"] == 31
+
+    def test_decode_num_leaves_below_two(self) -> None:
+        """A leaf budget of 1 cannot describe a tree with a split."""
+        raw: JSONDict = {
+            "n_estimators": 10,
+            "max_depth": 2,
+            "learning_rate": 0.5,
+            "min_samples_split": 2,
+            "min_samples_leaf": 1,
+            "max_features": None,
+            "max_bins": 64,
+            "subsample": 1.0,
+            "random_state": 0,
+            "track_contributions": False,
+            "monotonic_constraints": None,
+            "reg_alpha": 0.0,
+            "reg_lambda": 0.0,
+            "n_jobs": 1,
+            "early_stopping_rounds": None,
+            "growth_strategy": "leaf_wise",
+            "num_leaves": 1,  # invalid
+        }
+        with pytest.raises(ValueError, match="num_leaves must be >= 2"):
             decode_gradient_boosting_config(raw)
 
 
@@ -271,6 +418,8 @@ class TestGradientBoostingModel:
             "reg_lambda": 0.0,
             "n_jobs": 1,
             "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
         }
         original: GradientBoostingModel = {
             "trees": (tree,),

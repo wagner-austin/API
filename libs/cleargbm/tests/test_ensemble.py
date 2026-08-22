@@ -19,7 +19,7 @@ from cleargbm.ensemble import (
     predict_raw,
     train_gradient_boosting,
 )
-from cleargbm.types import GradientBoostingConfig
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy
 
 
 def _make_config(
@@ -29,6 +29,8 @@ def _make_config(
     monotonic_constraints: tuple[int, ...] | None = None,
     early_stopping_rounds: int | None = None,
     n_jobs: int = 1,
+    growth_strategy: GrowthStrategy = "depth_wise",
+    num_leaves: int | None = None,
 ) -> GradientBoostingConfig:
     """Return a minimal valid training config."""
     return GradientBoostingConfig(
@@ -47,6 +49,8 @@ def _make_config(
         reg_lambda=reg_lambda,
         n_jobs=n_jobs,
         early_stopping_rounds=early_stopping_rounds,
+        growth_strategy=growth_strategy,
+        num_leaves=num_leaves,
     )
 
 
@@ -102,8 +106,8 @@ class TestValidateTrainingInputs:
 class TestConfigToRustDict:
     """Config translation: Python-only fields are dropped, monotonic list is passed through."""
 
-    def test_carries_the_twelve_hyperparameters_plus_n_jobs(self) -> None:
-        """The Rust-side dict has exactly the 13 keys the Rust trainer reads."""
+    def test_carries_the_fourteen_hyperparameters_plus_n_jobs(self) -> None:
+        """The Rust-side dict has exactly the 15 keys the Rust trainer reads."""
         result = _config_to_rust_dict(_make_config())
         expected = {
             "n_estimators",
@@ -119,8 +123,20 @@ class TestConfigToRustDict:
             "monotonic_constraints",
             "early_stopping_rounds",
             "n_jobs",
+            "growth_strategy",
+            "num_leaves",
         }
         assert set(result.keys()) == expected
+
+    def test_carries_the_growth_policy_and_its_budget(self) -> None:
+        """Both halves of the growth axis must reach Rust.
+
+        Dropping either one is silent: the trainer would fall back to its own
+        reading of the config and report an arm it did not run.
+        """
+        result = _config_to_rust_dict(_make_config(growth_strategy="leaf_wise", num_leaves=31))
+        assert result["growth_strategy"] == "leaf_wise"
+        assert result["num_leaves"] == 31
 
     def test_forwards_n_jobs_to_the_rust_core(self) -> None:
         """n_jobs must reach Rust, where it bounds the worker pool.
