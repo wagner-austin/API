@@ -102,6 +102,10 @@ pub struct GradientBoostingConfigParams {
     /// Weight applied to positive samples in the loss, its gradients and
     /// the base score (finite, > 0.0; 1.0 = unweighted).
     pub scale_pos_weight: f64,
+    /// Features each split may consider (None = all; Some(k) with k >= 1).
+    /// The k <= n_features bound is checked at train time where the
+    /// feature count is known.
+    pub max_features: Option<usize>,
 }
 
 /// Configuration for gradient boosting training.
@@ -141,6 +145,8 @@ pub struct GradientBoostingConfig {
     /// Weight applied to positive samples in the loss, its gradients and
     /// the base score (finite, > 0.0; 1.0 = unweighted).
     scale_pos_weight: f64,
+    /// Features each split may consider (None = all).
+    max_features: Option<usize>,
 }
 
 impl GradientBoostingConfig {
@@ -170,6 +176,7 @@ impl GradientBoostingConfig {
             growth_strategy,
             num_leaves,
             scale_pos_weight,
+            max_features,
         } = params;
 
         if n_estimators < 1_usize {
@@ -249,6 +256,14 @@ impl GradientBoostingConfig {
                 reason: format!("must be a finite positive number, got {scale_pos_weight}"),
             });
         }
+        if let Some(k) = max_features {
+            if k < 1_usize {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "max_features".to_string(),
+                    reason: "must be >= 1 when set".to_string(),
+                });
+            }
+        }
         // `num_leaves` is paired with the policy rather than merely ignored
         // under the wrong one. A leaf budget silently doing nothing under
         // depth-wise growth is the same class of defect as a missing
@@ -299,6 +314,7 @@ impl GradientBoostingConfig {
             growth_strategy,
             num_leaves,
             scale_pos_weight,
+            max_features,
         })
     }
 
@@ -384,6 +400,12 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn scale_pos_weight(&self) -> f64 {
         self.scale_pos_weight
+    }
+
+    /// Returns the per-split feature budget (None = all features).
+    #[must_use]
+    pub fn max_features(&self) -> Option<usize> {
+        self.max_features
     }
 
     /// Returns the leaf budget, set exactly under `LeafWise` growth.

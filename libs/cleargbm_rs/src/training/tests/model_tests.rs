@@ -41,6 +41,7 @@ fn make_test_model() -> Result<GradientBoostingModel, ClearGbmError> {
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
         scale_pos_weight: 1.0_f64,
+        max_features: None,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),

@@ -280,6 +280,7 @@ fn test_build_tree_single_leaf() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -329,6 +330,7 @@ fn test_build_tree_with_split() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -378,6 +380,7 @@ fn test_build_tree_empty_input() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -419,6 +422,7 @@ fn test_build_tree_max_depth_constraint() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -462,6 +466,7 @@ fn test_build_tree_max_leaves_constraint() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -501,6 +506,7 @@ fn test_build_tree_gradients_too_short() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -541,6 +547,7 @@ fn test_build_tree_hessians_too_short() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -582,6 +589,7 @@ fn test_build_tree_no_features() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -625,6 +633,7 @@ fn test_build_tree_bins_shape_mismatch() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -666,6 +675,7 @@ fn test_build_tree_with_monotonic_constraints() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: Some(&constraints),
+        feature_subsample: None,
     };
 
     // Should succeed (constraint may or may not affect the split)
@@ -706,6 +716,7 @@ fn test_build_tree_with_l1_regularization() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let _ = match build_tree(&input, &Hooks::default()) {
@@ -748,6 +759,7 @@ fn test_build_tree_left_larger_than_right() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -798,6 +810,7 @@ fn test_build_tree_deep_tree() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -926,6 +939,7 @@ fn test_build_tree_child_histogram_error() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     // Inject hook that fails on child histogram building
@@ -993,6 +1007,7 @@ fn test_build_tree_subtract_histogram_error() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     // Inject hook that returns wrong-sized histogram
@@ -1060,6 +1075,7 @@ fn test_build_tree_rejects_out_of_range_sample_index() -> Result<(), ClearGbmErr
         bin_thresholds: &thresholds,
         config: &config,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     match build_tree(&input, &Hooks::default()) {

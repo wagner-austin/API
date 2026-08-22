@@ -73,7 +73,7 @@ impl Serialize for GradientBoostingConfig {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 15) {
+        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 16) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -140,6 +140,10 @@ impl Serialize for GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match state.serialize_field("max_features", &self.max_features()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
         state.end()
     }
 }
@@ -179,6 +183,8 @@ pub(crate) enum GradientBoostingConfigField {
     NumLeaves,
     /// The positive-class weight applied to the loss and gradients.
     ScalePosWeight,
+    /// The per-split feature budget (optional).
+    MaxFeatures,
 }
 
 /// Visitor for deserializing `GradientBoostingConfigField` from string.
@@ -214,6 +220,7 @@ impl<'de> Visitor<'de> for GradientBoostingConfigFieldVisitor {
             "growth_strategy" => Ok(GradientBoostingConfigField::GrowthStrategy),
             "num_leaves" => Ok(GradientBoostingConfigField::NumLeaves),
             "scale_pos_weight" => Ok(GradientBoostingConfigField::ScalePosWeight),
+            "max_features" => Ok(GradientBoostingConfigField::MaxFeatures),
             _ => Err(E::unknown_field(value, GRADIENT_BOOSTING_CONFIG_FIELDS)),
         }
     }
@@ -245,6 +252,7 @@ const GRADIENT_BOOSTING_CONFIG_FIELDS: &[&str] = &[
     "growth_strategy",
     "num_leaves",
     "scale_pos_weight",
+    "max_features",
 ];
 
 impl<'de> Deserialize<'de> for GradientBoostingConfig {
@@ -280,6 +288,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                 let mut growth_strategy: Option<GrowthStrategy> = None;
                 let mut num_leaves: Option<Option<usize>> = None;
                 let mut scale_pos_weight: Option<f64> = None;
+                let mut max_features: Option<Option<usize>> = None;
 
                 loop {
                     let key: Option<GradientBoostingConfigField> = match map.next_key() {
@@ -381,6 +390,12 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                                 Err(e) => return Err(e),
                             });
                         }
+                        GradientBoostingConfigField::MaxFeatures => {
+                            max_features = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
                     }
                 }
 
@@ -444,6 +459,10 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("scale_pos_weight")),
                 };
+                let max_features = match max_features {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("max_features")),
+                };
 
                 let params = GradientBoostingConfigParams {
                     n_estimators,
@@ -461,6 +480,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     growth_strategy,
                     num_leaves,
                     scale_pos_weight,
+                    max_features,
                 };
                 match GradientBoostingConfig::new(params) {
                     Ok(cfg) => Ok(cfg),

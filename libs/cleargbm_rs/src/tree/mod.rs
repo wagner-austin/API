@@ -15,6 +15,7 @@
 //! 3. Return completed tree with all nodes
 
 mod builder;
+mod feature_subsample;
 mod histograms;
 mod leafwise;
 mod nodes;
@@ -23,6 +24,7 @@ mod serde_impl;
 pub use builder::{
     build_tree, build_tree_with_leaf_assignment, compute_leaf_value, BuildTreeInput,
 };
+pub use feature_subsample::FeatureSubsample;
 pub use leafwise::{build_tree_leaf_wise, build_tree_leaf_wise_with_leaf_assignment};
 
 use crate::error::ClearGbmError;

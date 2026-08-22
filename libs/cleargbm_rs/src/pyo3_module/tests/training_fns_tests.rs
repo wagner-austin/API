@@ -1460,3 +1460,105 @@ fn test_train_accepts_depth_wise_growth_strategy() -> Result<(), ClearGbmError> 
         }
     })
 }
+
+/// `max_features` with an in-range count trains through the real binding.
+#[test]
+fn test_train_accepts_max_features_count() -> Result<(), ClearGbmError> {
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let args = match make_training_args(py) {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+        let item = match args.get_item(4_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let config: Bound<'_, PyDict> = match item.extract() {
+            Ok(d) => d,
+            Err(e) => return Err(fail(format!("config arg is not a dict: {e}"))),
+        };
+        match config.set_item("max_features", 1_i64) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match train_gradient_boosting_from_args(&args) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(wrap_py_err(&e)),
+        }
+    })
+}
+
+/// A missing `max_features` key is an error, not "all features".
+#[test]
+fn test_train_rejects_missing_max_features_key() -> Result<(), ClearGbmError> {
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let args = match make_training_args(py) {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+        let item = match args.get_item(4_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let config: Bound<'_, PyDict> = match item.extract() {
+            Ok(d) => d,
+            Err(e) => return Err(fail(format!("config arg is not a dict: {e}"))),
+        };
+        match config.del_item("max_features") {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match train_gradient_boosting_from_args(&args) {
+            Ok(_) => Err(fail(
+                "a missing max_features key must be rejected".to_string(),
+            )),
+            Err(e) => {
+                let text = e.to_string();
+                assert!(
+                    text.contains("missing required key 'max_features'"),
+                    "error should name the missing key, got: {text}"
+                );
+                Ok(())
+            }
+        }
+    })
+}
+
+/// A non-integer `max_features` fails at extraction.
+#[test]
+fn test_train_rejects_non_integer_max_features() -> Result<(), ClearGbmError> {
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let args = match make_training_args(py) {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+        let item = match args.get_item(4_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let config: Bound<'_, PyDict> = match item.extract() {
+            Ok(d) => d,
+            Err(e) => return Err(fail(format!("config arg is not a dict: {e}"))),
+        };
+        match config.set_item("max_features", "half") {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match train_gradient_boosting_from_args(&args) {
+            Ok(_) => Err(fail(
+                "a non-integer max_features must be rejected".to_string(),
+            )),
+            Err(e) => {
+                let text = e.to_string();
+                assert!(
+                    text.contains("TypeError") || text.contains("int"),
+                    "error should report the type mismatch, got: {text}"
+                );
+                Ok(())
+            }
+        }
+    })
+}

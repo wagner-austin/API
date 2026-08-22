@@ -136,16 +136,26 @@ pub(super) fn build_feature_histograms(
     })
 }
 
-/// Finds best split across all features.
+/// Finds the best split across the features a node may consider.
+///
+/// `allowed_features`, when present, is the per-node `max_features` mask —
+/// masked-out features are skipped entirely. `None` scans every feature in
+/// the same order as before the mask existed.
 pub(super) fn find_best_split_across_features_internal(
     histograms: &[HistogramBuffer],
     config: &SplitConfig,
     n_regular_bins: usize,
     monotonic_constraints: Option<&[MonotonicConstraint]>,
+    allowed_features: Option<&[bool]>,
 ) -> Result<Option<SplitResult>, ClearGbmError> {
     let mut best_split: Option<SplitResult> = None;
 
     for (feature_idx, histogram) in histograms.iter().enumerate() {
+        if let Some(mask) = allowed_features {
+            if !mask[feature_idx] {
+                continue;
+            }
+        }
         let constraint = monotonic_constraints
             .and_then(|constraints| constraints.get(feature_idx).copied())
             .unwrap_or(MonotonicConstraint::None);

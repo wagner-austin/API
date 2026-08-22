@@ -22,6 +22,7 @@ fn default_params() -> GradientBoostingConfigParams {
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
         scale_pos_weight: 1.0_f64,
+        max_features: None,
     }
 }
 
@@ -571,5 +572,34 @@ fn test_config_scale_pos_weight_getter() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     assert_eq!(config.scale_pos_weight(), 2.5_f64);
+    Ok(())
+}
+
+#[test]
+fn test_config_rejects_zero_max_features() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.max_features = Some(0_usize);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected error for zero max_features".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "max_features");
+            assert!(reason.contains(">= 1"));
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_config_max_features_getter() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.max_features = Some(3_usize);
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(config.max_features(), Some(3_usize));
     Ok(())
 }

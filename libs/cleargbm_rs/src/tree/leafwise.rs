@@ -209,11 +209,15 @@ fn evaluate_candidate(
         return Ok(None);
     }
 
+    let feature_mask = context.input.feature_subsample.map(|fs| {
+        super::feature_subsample::select_split_features(fs, context.input.n_features, node_id)
+    });
     let best_split = match find_best_split_across_features_internal(
         &histograms,
         split_config,
         context.input.n_regular_bins,
         context.input.monotonic_constraints,
+        feature_mask.as_deref(),
     ) {
         Ok(s) => s,
         Err(e) => return Err(e),

@@ -182,6 +182,12 @@ pub(super) fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict
         Ok(()) => {}
         Err(e) => return Err(e),
     };
+    // Present and null, like num_leaves: absence must be an error, not a
+    // silent "all features".
+    match config.set_item("max_features", py.None()) {
+        Ok(()) => {}
+        Err(e) => return Err(wrap_py_err(&e)),
+    };
     Ok(config)
 }
 

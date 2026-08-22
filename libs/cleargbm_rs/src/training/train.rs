@@ -11,7 +11,7 @@ use crate::losses::{binary_log_loss, binary_log_loss_initial_prediction, sigmoid
 use crate::predict::predict_tree;
 use crate::tree::{
     build_tree_leaf_wise_with_leaf_assignment, build_tree_with_leaf_assignment, BuildTreeInput,
-    Tree, TreeBuildConfig,
+    FeatureSubsample, Tree, TreeBuildConfig,
 };
 use crate::types::SplitConfig;
 
@@ -182,6 +182,17 @@ pub fn train_gradient_boosting(
         }
     }
 
+    // 9b. Validate the per-split feature budget against the feature count
+    // (the config layer cannot: it does not know n_features).
+    if let Some(k) = config.max_features() {
+        if k > n_features {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "max_features".to_string(),
+                reason: format!("must be <= n_features ({n_features}), got {k}"),
+            });
+        }
+    }
+
     // 10. Boosting loop, run inside the run-scoped pool so the caller's
     // `n_jobs` actually bounds the worker count. Tree building owns every
     // rayon dispatch in the crate (per-feature histogram construction), so
@@ -240,7 +251,18 @@ pub fn train_gradient_boosting(
             let sample_indices =
                 propagate!(get_sample_indices(n_train, config.subsample(), &mut rng));
 
-            // d. Build tree input
+            // d. Build tree input. The feature-subsample seed mixes the
+            // boosting round into the run seed so the same node id draws a
+            // different subset in every tree; the derivation is stream-free
+            // (see `FeatureSubsample`), so the row-subsampling RNG above is
+            // untouched and unsubsampled runs stay bit-identical.
+            let round_u64 = u64::try_from(round).unwrap_or(u64::MAX);
+            let feature_subsample = config.max_features().map(|k| FeatureSubsample {
+                k,
+                seed: config
+                    .random_state()
+                    .wrapping_add(round_u64.wrapping_mul(0x9E37_79B9_7F4A_7C15_u64)),
+            });
             let input = BuildTreeInput {
                 sample_indices: &sample_indices,
                 gradients: &gradients,
@@ -252,6 +274,7 @@ pub fn train_gradient_boosting(
                 bin_thresholds: &bin_thresholds,
                 config: &tree_build_config,
                 monotonic_constraints: config.monotonic_constraints(),
+                feature_subsample,
             };
 
             // e. Build tree (and capture per-sample leaf assignments as a

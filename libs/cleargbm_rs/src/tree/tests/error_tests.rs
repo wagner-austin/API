@@ -208,6 +208,7 @@ fn test_find_best_split_across_features_internal_error() -> Result<(), ClearGbmE
         &config,
         10_usize, // n_regular_bins > n_bins (3)
         None,
+        None,
     );
 
     assert!(result.is_err());
@@ -251,11 +252,11 @@ fn test_find_best_split_across_features_internal_multiple_features() -> Result<(
         Err(e) => return Err(e),
     };
 
-    let result = match find_best_split_across_features_internal(&histograms, &config, 3_usize, None)
-    {
-        Ok(r) => r,
-        Err(e) => return Err(e),
-    };
+    let result =
+        match find_best_split_across_features_internal(&histograms, &config, 3_usize, None, None) {
+            Ok(r) => r,
+            Err(e) => return Err(e),
+        };
 
     // Should find the best split (feature 0 has higher gain due to larger gradient magnitude)
     assert!(matches!(result, Some(ref s) if s.feature_index() == 0_usize));
@@ -381,6 +382,7 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     // This succeeds because histogram.n_bins() = n_regular_bins + 1 = 101 > 100
@@ -462,6 +464,7 @@ fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmErr
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     // Inject error via hook
@@ -562,6 +565,7 @@ fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     // Inject undersized histogram via hook - this causes split finding error
@@ -603,6 +607,7 @@ fn test_build_tree_finalize_nodes_error_via_hook() -> Result<(), ClearGbmError> 
         bin_thresholds: &bin_thresholds,
         config: &cfg,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     // Inject error via finalize_nodes hook

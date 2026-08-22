@@ -44,6 +44,7 @@ fn default_params() -> GradientBoostingConfigParams {
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
         scale_pos_weight: 1.0_f64,
+        max_features: None,
     }
 }
 
@@ -870,6 +871,7 @@ fn test_training_reports_a_worker_pool_that_cannot_be_built() -> Result<(), Clea
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
         scale_pos_weight: 1.0_f64,
+        max_features: None,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -994,5 +996,226 @@ fn test_scale_pos_weight_changes_the_trained_model() -> Result<(), ClearGbmError
     // The weighted base score is higher: positives count five-fold in the
     // prevalence, so every raw prediction starts from larger log-odds.
     assert!(preds_weighted.iter().sum::<f64>() > preds_unweighted.iter().sum::<f64>());
+    Ok(())
+}
+
+#[test]
+fn test_max_features_changes_the_trained_model() -> Result<(), ClearGbmError> {
+    // Knob-sensitivity: restricting every split to one of the two features
+    // must alter which splits win somewhere across the trees.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+
+    let unrestricted = match make_config(5_usize) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let mut restricted_params = default_params();
+    restricted_params.n_estimators = 5_usize;
+    restricted_params.max_features = Some(1_usize);
+    let restricted = match GradientBoostingConfig::new(restricted_params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let runtime = TrainingRuntime {
+        parallelism: Parallelism::Single,
+        hooks: &Hooks::default(),
+    };
+    let model_all = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &unrestricted,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let model_one = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &restricted,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+
+    let preds_all = match model_all.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    let preds_one = match model_one.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    assert!(
+        preds_all != preds_one,
+        "max_features=1 produced the same predictions as all-features"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_max_features_deterministic_across_runs() -> Result<(), ClearGbmError> {
+    // The subset derivation is a pure function of (seed, round, node), so
+    // two identical runs must agree bit for bit.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+
+    let mut params = default_params();
+    params.n_estimators = 4_usize;
+    params.max_features = Some(1_usize);
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let runtime = TrainingRuntime {
+        parallelism: Parallelism::Single,
+        hooks: &Hooks::default(),
+    };
+    let first = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &config,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let second = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &config,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+
+    let preds_first = match first.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    let preds_second = match second.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(preds_first, preds_second);
+    Ok(())
+}
+
+#[test]
+fn test_max_features_above_feature_count_is_rejected() -> Result<(), ClearGbmError> {
+    let (rows, y_train, feature_names) = make_simple_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+
+    let mut params = default_params();
+    params.max_features = Some(3_usize); // dataset has 2 features
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let result = train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &config,
+        &feature_names,
+        &TrainingRuntime {
+            parallelism: Parallelism::Single,
+            hooks: &Hooks::default(),
+        },
+    );
+    match result {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected rejection of max_features > n_features".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "max_features");
+            assert!(reason.contains("n_features"));
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_max_features_applies_under_leaf_wise_growth() -> Result<(), ClearGbmError> {
+    // Both growers must consult the same per-node subset derivation; this
+    // drives the leaf-wise path's mask construction.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+
+    let mut restricted_params = default_params();
+    restricted_params.n_estimators = 3_usize;
+    restricted_params.growth_strategy = GrowthStrategy::LeafWise;
+    restricted_params.num_leaves = Some(3_usize);
+    restricted_params.max_features = Some(1_usize);
+    let restricted = match GradientBoostingConfig::new(restricted_params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let unrestricted = match make_leaf_wise_config(3_usize, 3_usize) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let runtime = TrainingRuntime {
+        parallelism: Parallelism::Single,
+        hooks: &Hooks::default(),
+    };
+    let model_restricted = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &restricted,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let model_unrestricted = match train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &unrestricted,
+        &feature_names,
+        &runtime,
+    ) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+
+    let preds_restricted = match model_restricted.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    let preds_unrestricted = match model_unrestricted.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    assert!(
+        preds_restricted != preds_unrestricted,
+        "leaf-wise max_features=1 produced the same predictions as all-features"
+    );
     Ok(())
 }

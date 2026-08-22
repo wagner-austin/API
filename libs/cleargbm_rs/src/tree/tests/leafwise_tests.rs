@@ -99,6 +99,7 @@ fn grow_leaf_wise(
         bin_thresholds: &bin_thresholds,
         config,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     build_tree_leaf_wise_with_leaf_assignment(&input, &Hooks::default())
@@ -124,6 +125,7 @@ fn grow_depth_wise(config: &TreeBuildConfig) -> Result<crate::tree::Tree, ClearG
         bin_thresholds: &bin_thresholds,
         config,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     build_tree(&input, &Hooks::default())
@@ -393,6 +395,7 @@ fn test_leaf_wise_rejects_empty_sample_indices() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &config,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     match build_tree_leaf_wise(&input, &Hooks::default()) {
@@ -434,6 +437,7 @@ fn grow_with_hooks(
         bin_thresholds: &bin_thresholds,
         config,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     build_tree_leaf_wise_with_leaf_assignment(&input, hooks)
@@ -574,6 +578,7 @@ fn test_leaf_wise_handles_an_unsplittable_root() -> Result<(), ClearGbmError> {
         bin_thresholds: &bin_thresholds,
         config: &config,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let (tree, _assignment) =
@@ -611,6 +616,7 @@ fn test_build_tree_leaf_wise_discards_the_assignment() -> Result<(), ClearGbmErr
         bin_thresholds: &bin_thresholds,
         config: &config,
         monotonic_constraints: None,
+        feature_subsample: None,
     };
 
     let tree = match build_tree_leaf_wise(&input, &Hooks::default()) {

@@ -547,6 +547,7 @@ fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoostingConfig> 
     let growth_strategy = propagate!(extract_growth_strategy(dict));
     let num_leaves = propagate!(extract_num_leaves(dict));
     let scale_pos_weight = propagate!(dict_get_f64(dict, "scale_pos_weight"));
+    let max_features = propagate!(extract_max_features(dict));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -564,6 +565,7 @@ fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoostingConfig> 
         growth_strategy,
         num_leaves,
         scale_pos_weight,
+        max_features,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))
@@ -600,6 +602,37 @@ fn extract_num_leaves(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
 
     let val: i64 = propagate!(item.extract());
     Ok(Some(propagate_into!(i64_to_usize(val, "num_leaves"))))
+}
+
+/// Extracts the optional per-split feature budget from a config dict.
+///
+/// The key `"max_features"` is required to be present; its value may be
+/// `None` (all features). The same presence contract as `num_leaves`: an
+/// absent key would silently read as "all features".
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing or the value is neither `None`
+/// nor a non-negative integer.
+fn extract_max_features(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
+    let opt = propagate!(dict.get_item("max_features"));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "max_features".to_string(),
+                reason: "missing required key 'max_features'".to_string(),
+            }
+            .into())
+        }
+    };
+
+    if item.is_none() {
+        return Ok(None);
+    }
+
+    let val: i64 = propagate!(item.extract());
+    Ok(Some(propagate_into!(i64_to_usize(val, "max_features"))))
 }
 
 /// Extracts the tree growth policy from a config dict.

@@ -72,6 +72,11 @@ pub struct BuildTreeInput<'a> {
 
     /// Optional monotonic constraints per feature.
     pub monotonic_constraints: Option<&'a [MonotonicConstraint]>,
+
+    /// Optional per-split feature subsampling (`max_features`). `None`
+    /// considers every feature at every split, bit-identical to the
+    /// history before this axis existed.
+    pub feature_subsample: Option<super::feature_subsample::FeatureSubsample>,
 }
 
 /// Records a leaf's value against every sample that reached it.
@@ -356,12 +361,16 @@ pub fn build_tree_with_leaf_assignment(
             }
         };
 
-        // Find best split across all features
+        // Find best split across the features this node may consider
+        let feature_mask = input
+            .feature_subsample
+            .map(|fs| super::feature_subsample::select_split_features(fs, n_features, node_id));
         let best_split = match find_best_split_across_features_internal(
             &histograms,
             split_config,
             input.n_regular_bins,
             input.monotonic_constraints,
+            feature_mask.as_deref(),
         ) {
             Ok(s) => s,
             Err(e) => return Err(e),

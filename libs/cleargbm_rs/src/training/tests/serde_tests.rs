@@ -30,6 +30,7 @@ fn default_params() -> GradientBoostingConfigParams {
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
         scale_pos_weight: 1.0_f64,
+        max_features: None,
     }
 }
 
@@ -64,6 +65,7 @@ fn make_test_model() -> Result<GradientBoostingModel, ClearGbmError> {
         growth_strategy: GrowthStrategy::DepthWise,
         num_leaves: None,
         scale_pos_weight: 1.0_f64,
+        max_features: None,
     }) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -490,6 +492,7 @@ const CONFIG_FIELDS: &[&str] = &[
     "growth_strategy",
     "num_leaves",
     "scale_pos_weight",
+    "max_features",
 ];
 
 /// The fields `GradientBoostingModel` serializes, in declaration order.
