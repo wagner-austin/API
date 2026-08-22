@@ -4679,3 +4679,16 @@ Both OPEN items above shipped, plus the class-level instrument the correction de
 985 s solo gatherer session (arterial, exit `completed`). **Acceptance passed exactly:** 53 clearance shots on the wire, **53 `shoot:fired`** resolutions — zero superseded, zero liveness alarms — at durations pinned to the server tick (2,033–2,043 ms; the same one-tick law the scope confirm follows). The report tally reads `shoot=53/53` beside `scan=88/88 teleport=40/40 map_open=40/40` (collect 116/115, move 2/1, scope 81/80 — the teardown truncation tail, each with completions > 0 so correctly unflagged). One `scope:stall_timeout` — the known sub-1-per-run residual, self-healed and surfaced. The kind that read `13/0` this morning is at parity on live wire.
 
 **The run's own catch, fixed same hour:** the report initially flagged "combat futility: 53 shots produced 0 observed kills" — a working gatherer mislabeled as a broken fighter, because the futility rule predates roles and counted every wire shoot. With `shoot:fired` now distinguishable, the rule counts only tank-targeted shots (`shots − fired`) and names the excluded clearance count. The very first live artifact of the new outcome exposed the next analyzer inaccuracy — the instrument sharpening itself. Re-rendered, the run's summary carries exactly one line: the scope stall. Gate: **6,222 tests, 100.00%**.
+
+
+---
+
+## 2026-08-22 — The file-size rule leaves home: FileSizeRule enforced monorepo-wide
+
+**What happened.** Board task 21e173d7 closed its arc: TankpitBot's `scripts/file_size_rules.py` — written 2026-08-07 as the only enforcement of the 400-600 ceiling anywhere in the monorepo — is deleted, replaced by `FileSizeRule` in `libs/monorepo_guards`, registered in the orchestrator so all 39 packages now fail their gate on any file over 600 lines. Same law: no allowlist, no baseline, worst offender first.
+
+**The backlog that had to die first.** 137 files over the ceiling across 12 packages (the submitter's 134 was already stale; my own first recount of 89 was a measurement artifact — PowerShell `Measure-Object -Line` skips blank lines). All split by role over two days: handwriting-ai's 2641-line hooks monolith, covenant-radar-api's 32 files (2353-line test_decode.py included), covenant_ml's 36 less 4 held because a concurrent session's uncommitted edits sat inside them. TankpitBot itself was already clean — the rule worked here first.
+
+**What the final sweep caught.** Two regressions that would have shipped silently without the lifted rule: a covenant_nn module grown to 677 by mechanical import-block rewires, and a Model-Trainer test committed at 618 under a "zero over" claim measured before the final format pass. The instrument caught its own installers.
+
+**Residual.** Five covenant_ml files remain over (1269/788/783/727/723), all inside or coupled to another session's uncommitted edit set; `make lint` there is deliberately red until that session lands and the five are split. Recorded on the board with an expiry condition.
