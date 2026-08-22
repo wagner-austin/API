@@ -90,14 +90,8 @@ from platform_calendar.config import (
 )
 
 # Testing
-from platform_calendar.testing import (
-    CalendarClientProtocol,
-    ConsoleInputHook,
-    ConsoleOutputHook,
+from platform_calendar.fakes import (
     FakeCalendarClient,
-    HooksContainer,
-    HTTPErrorProtocol,
-    hooks,
     make_fake_calendar,
     make_fake_console,
     make_fake_credentials,
@@ -110,6 +104,14 @@ from platform_calendar.testing import (
     make_fake_tokens,
     make_raising_http_get,
     make_raising_http_post,
+)
+from platform_calendar.testing import (
+    CalendarClientProtocol,
+    ConsoleInputHook,
+    ConsoleOutputHook,
+    HooksContainer,
+    HTTPErrorProtocol,
+    hooks,
     reset_hooks,
 )
 from platform_calendar.types import (

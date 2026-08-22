@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from platform_calendar.testing import (
-    hooks,
+from platform_calendar.fakes import (
     make_fake_calendar,
     make_fake_console,
     make_fake_credentials,
@@ -22,6 +21,9 @@ from platform_calendar.testing import (
     make_raising_http_get,
     make_raising_http_patch,
     make_raising_http_post,
+)
+from platform_calendar.testing import (
+    hooks,
     reset_hooks,
 )
 from platform_calendar.types import (

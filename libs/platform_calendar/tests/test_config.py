@@ -12,7 +12,12 @@ from platform_calendar.config import (
     get_tokens_path,
     load_credentials,
 )
-from platform_calendar.testing import hooks, make_fake_credentials
+from platform_calendar.fakes import (
+    make_fake_credentials,
+)
+from platform_calendar.testing import (
+    hooks,
+)
 from platform_calendar.types import OAuthCredentials
 
 

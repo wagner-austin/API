@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, CalendarErrorCode
 
-from platform_calendar.testing import (
+from platform_calendar.fakes import (
     FakeCalendarClient,
     make_fake_event,
 )
