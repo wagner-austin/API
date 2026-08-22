@@ -12,7 +12,13 @@ from platform_email.auth.common import (
     generate_state,
     is_token_expired,
 )
-from platform_email.testing import hooks, make_fake_current_time, reset_hooks
+from platform_email.fake_hooks import (
+    make_fake_current_time,
+)
+from platform_email.testing import (
+    hooks,
+    reset_hooks,
+)
 from platform_email.types import OAuthTokens
 
 

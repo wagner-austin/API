@@ -16,8 +16,7 @@ from platform_email.auth.gmail import (
     gmail_load_or_authorize,
     refresh_gmail_access_token,
 )
-from platform_email.testing import (
-    hooks,
+from platform_email.fake_hooks import (
     make_fake_console,
     make_fake_current_time,
     make_fake_gmail_credentials,
@@ -25,6 +24,9 @@ from platform_email.testing import (
     make_fake_no_tokens,
     make_fake_tokens,
     make_raising_http_post,
+)
+from platform_email.testing import (
+    hooks,
     reset_hooks,
 )
 from platform_email.types import OAuthCredentials, OAuthTokens

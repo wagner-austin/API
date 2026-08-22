@@ -9,15 +9,19 @@ import pytest
 from platform_core.errors import AppError, EmailErrorCode
 from platform_core.json_utils import dump_json_str
 
-from platform_email.testing import (
+from platform_email._prod_hooks import (
     _prod_load_gmail_credentials,
     _prod_load_gmail_tokens,
     _prod_load_outlook_config,
     _prod_load_outlook_tokens,
     _prod_save_gmail_tokens,
     _prod_save_outlook_tokens,
-    hooks,
+)
+from platform_email.fake_hooks import (
     make_fake_path,
+)
+from platform_email.testing import (
+    hooks,
     reset_hooks,
 )
 from platform_email.types import OAuthTokens, encode_oauth_tokens

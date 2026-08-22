@@ -16,8 +16,7 @@ from platform_email.auth.outlook import (
     outlook_load_or_authorize,
     refresh_outlook_access_token,
 )
-from platform_email.testing import (
-    hooks,
+from platform_email.fake_hooks import (
     make_fake_console,
     make_fake_current_time,
     make_fake_http_post,
@@ -25,6 +24,9 @@ from platform_email.testing import (
     make_fake_outlook_config,
     make_fake_tokens,
     make_raising_http_post,
+)
+from platform_email.testing import (
+    hooks,
     reset_hooks,
 )
 from platform_email.types import OAuthTokens, OutlookOAuthConfig

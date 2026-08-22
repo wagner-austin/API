@@ -5,11 +5,13 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, EmailErrorCode
 
-from platform_email.testing import (
-    FakeEmailClient,
+from platform_email.fake_hooks import (
     make_fake_attachment,
     make_fake_email,
     make_fake_folder,
+)
+from platform_email.fakes import (
+    FakeEmailClient,
 )
 
 
@@ -346,7 +348,9 @@ class TestFakeEmailClientAddDraft:
 
     def test_add_draft_then_send(self) -> None:
         """Test adding a draft and then sending it."""
-        from platform_email.testing import make_fake_draft
+        from platform_email.fake_hooks import (
+            make_fake_draft,
+        )
 
         client = FakeEmailClient()
         draft = make_fake_draft(draft_id="pre_added_draft", subject="Pre-added Draft")

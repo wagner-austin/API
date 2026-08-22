@@ -7,21 +7,18 @@ from __future__ import annotations
 
 import urllib.parse
 
-from platform_core.errors import AppError, EmailErrorCode
 from platform_core.json_utils import (
-    InvalidJsonError,
     JSONObject,
-    JSONTypeError,
     JSONValue,
-    dump_json_str,
-    load_json_str,
-    narrow_json_to_dict,
     optional_str,
     require_str,
 )
 
-from platform_email.config import OUTLOOK_API_BASE
-from platform_email.testing import HTTPErrorProtocol, hooks
+from platform_email.providers.outlook_decode import (
+    _decode_folder_type,
+    _decode_message,
+)
+from platform_email.providers.outlook_http import _OutlookHttp
 from platform_email.types import (
     Attachment,
     BodyType,
@@ -30,330 +27,10 @@ from platform_email.types import (
     EmailAddress,
     EmailListResult,
     Folder,
-    FolderType,
 )
 
 
-def _decode_email_address(data: JSONObject) -> EmailAddress:
-    """Decode an email address from Graph API format.
-
-    Args:
-        data: JSON object with emailAddress field.
-
-    Returns:
-        EmailAddress.
-    """
-    email_addr_raw = data.get("emailAddress")
-    if not isinstance(email_addr_raw, dict):
-        return EmailAddress(address="", name="")
-    return EmailAddress(
-        address=optional_str(email_addr_raw, "address") or "",
-        name=optional_str(email_addr_raw, "name") or "",
-    )
-
-
-def _decode_recipients(items: list[JSONValue]) -> tuple[EmailAddress, ...]:
-    """Decode a list of recipients from Graph API format.
-
-    Args:
-        items: List of recipient JSON objects.
-
-    Returns:
-        Tuple of EmailAddress.
-    """
-    result: list[EmailAddress] = []
-    for item in items:
-        if isinstance(item, dict):
-            result.append(_decode_email_address(item))
-    return tuple(result)
-
-
-def _decode_folder_type(display_name: str) -> FolderType:
-    """Map Outlook folder display name to FolderType.
-
-    Args:
-        display_name: Folder display name from Graph API.
-
-    Returns:
-        FolderType literal.
-    """
-    lower_name = display_name.lower()
-    if lower_name == "inbox":
-        return "inbox"
-    if lower_name in ("sent items", "sent"):
-        return "sent"
-    if lower_name == "drafts":
-        return "drafts"
-    if lower_name in ("deleted items", "trash"):
-        return "trash"
-    if lower_name in ("junk email", "spam", "junk"):
-        return "spam"
-    if lower_name == "archive":
-        return "archive"
-    return "custom"
-
-
-def _decode_importance(value: str | None) -> BodyType:
-    """Decode importance level.
-
-    Args:
-        value: Importance value from Graph API.
-
-    Returns:
-        EmailImportance literal.
-    """
-    # This is actually mapping body type not importance - fix
-    if value == "html":
-        return "html"
-    return "text"
-
-
-class _OutlookEmailClient:
-    """Microsoft Outlook email client using Graph API."""
-
-    def __init__(self, *, access_token: str) -> None:
-        """Initialize the client.
-
-        Args:
-            access_token: OAuth access token.
-        """
-        self._access_token = access_token
-
-    def _headers(self) -> dict[str, str]:
-        """Get standard request headers.
-
-        Returns:
-            Headers dict with Authorization and Content-Type.
-        """
-        return {
-            "Authorization": f"Bearer {self._access_token}",
-            "Content-Type": "application/json",
-        }
-
-    def _handle_error(self, status_code: int, message: str, context: str) -> None:
-        """Handle HTTP error response.
-
-        Args:
-            status_code: HTTP status code.
-            message: Error message.
-            context: Context for error (URL path).
-
-        Raises:
-            AppError[EmailErrorCode]: Always raises.
-        """
-        if status_code == 404:
-            if "messages" in context or "message" in context:
-                msg = f"Email not found: {message}"
-                raise AppError(EmailErrorCode.EMAIL_NOT_FOUND, msg, http_status=404)
-            if "folder" in context.lower():
-                msg = f"Folder not found: {message}"
-                raise AppError(EmailErrorCode.FOLDER_NOT_FOUND, msg, http_status=404)
-            if "draft" in context.lower():
-                msg = f"Draft not found: {message}"
-                raise AppError(EmailErrorCode.DRAFT_NOT_FOUND, msg, http_status=404)
-            msg = f"Resource not found: {message}"
-            raise AppError(EmailErrorCode.EMAIL_NOT_FOUND, msg, http_status=404)
-        msg = f"API error ({status_code}): {message}"
-        raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=status_code)
-
-    def _get(self, path: str) -> JSONObject:
-        """Make a GET request to Graph API.
-
-        Args:
-            path: API path (appended to base URL).
-
-        Returns:
-            Parsed JSON response.
-
-        Raises:
-            AppError[EmailErrorCode]: On request failure.
-        """
-        url = f"{OUTLOOK_API_BASE}{path}"
-        try:
-            response = hooks.http_get(url, self._headers())
-        except ConnectionError as e:
-            msg = f"Request failed: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-        except OSError as e:
-            if isinstance(e, HTTPErrorProtocol):
-                status_code: int = e.code
-                body_text: str = e.read().decode("utf-8")
-                self._handle_error(status_code, body_text, path)
-            msg = f"Request failed: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-
-        try:
-            raw_value = load_json_str(response)
-            data = narrow_json_to_dict(raw_value)
-        except (InvalidJsonError, JSONTypeError) as e:
-            msg = f"Invalid response from API: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-
-        return data
-
-    def _post(self, path: str, body: JSONObject) -> JSONObject:
-        """Make a POST request to Graph API.
-
-        Args:
-            path: API path.
-            body: Request body.
-
-        Returns:
-            Parsed JSON response.
-
-        Raises:
-            AppError[EmailErrorCode]: On request failure.
-        """
-        url = f"{OUTLOOK_API_BASE}{path}"
-        body_str = dump_json_str(body)
-        try:
-            response = hooks.http_post(url, self._headers(), body_str)
-        except ConnectionError as e:
-            msg = f"Request failed: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-        except OSError as e:
-            if isinstance(e, HTTPErrorProtocol):
-                status_code = e.code
-                resp_body: str = e.read().decode("utf-8")
-                self._handle_error(status_code, resp_body, path)
-            msg = f"Request failed: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-
-        try:
-            raw_value = load_json_str(response)
-            data = narrow_json_to_dict(raw_value)
-        except (InvalidJsonError, JSONTypeError) as e:
-            msg = f"Invalid response from API: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-
-        return data
-
-    def _patch(self, path: str, body: JSONObject) -> JSONObject:
-        """Make a PATCH request to Graph API.
-
-        Args:
-            path: API path.
-            body: Request body.
-
-        Returns:
-            Parsed JSON response.
-
-        Raises:
-            AppError[EmailErrorCode]: On request failure.
-        """
-        url = f"{OUTLOOK_API_BASE}{path}"
-        body_str = dump_json_str(body)
-        try:
-            response = hooks.http_patch(url, self._headers(), body_str)
-        except ConnectionError as e:
-            msg = f"Request failed: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-        except OSError as e:
-            if isinstance(e, HTTPErrorProtocol):
-                status_code = e.code
-                resp_body: str = e.read().decode("utf-8")
-                self._handle_error(status_code, resp_body, path)
-            msg = f"Request failed: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-
-        try:
-            raw_value = load_json_str(response)
-            data = narrow_json_to_dict(raw_value)
-        except (InvalidJsonError, JSONTypeError) as e:
-            msg = f"Invalid response from API: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-
-        return data
-
-    def _delete(self, path: str) -> None:
-        """Make a DELETE request to Graph API.
-
-        Args:
-            path: API path.
-
-        Raises:
-            AppError[EmailErrorCode]: On request failure.
-        """
-        url = f"{OUTLOOK_API_BASE}{path}"
-        try:
-            hooks.http_delete(url, self._headers())
-        except ConnectionError as e:
-            msg = f"Delete request failed: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-        except OSError as e:
-            if isinstance(e, HTTPErrorProtocol):
-                status_code: int = e.code
-                resp_body: str = e.read().decode("utf-8")
-                self._handle_error(status_code, resp_body, path)
-            msg = f"Delete request failed: {e}"
-            raise AppError(EmailErrorCode.EMAIL_API_ERROR, msg, http_status=500) from e
-
-    def _decode_message(self, data: JSONObject) -> Email:
-        """Decode a message from Graph API format.
-
-        Args:
-            data: JSON object representing a message.
-
-        Returns:
-            Email.
-        """
-        # Get sender
-        from_raw = data.get("from")
-        from_addr: EmailAddress
-        if isinstance(from_raw, dict):
-            from_addr = _decode_email_address(from_raw)
-        else:
-            from_addr = EmailAddress(address="", name="")
-
-        # Get recipients
-        to_raw = data.get("toRecipients")
-        to_list: list[JSONValue] = to_raw if isinstance(to_raw, list) else []
-        cc_raw = data.get("ccRecipients")
-        cc_list: list[JSONValue] = cc_raw if isinstance(cc_raw, list) else []
-        bcc_raw = data.get("bccRecipients")
-        bcc_list: list[JSONValue] = bcc_raw if isinstance(bcc_raw, list) else []
-
-        # Get body
-        body_raw = data.get("body")
-        body_content = ""
-        body_type: BodyType = "text"
-        if isinstance(body_raw, dict):
-            body_content = optional_str(body_raw, "content") or ""
-            content_type = optional_str(body_raw, "contentType") or "text"
-            if content_type.lower() == "html":
-                body_type = "html"
-
-        # Get importance
-        importance_raw = optional_str(data, "importance") or "normal"
-        from platform_email.types.email import EmailImportance
-
-        final_importance: EmailImportance
-        if importance_raw == "low":
-            final_importance = "low"
-        elif importance_raw == "high":
-            final_importance = "high"
-        else:
-            final_importance = "normal"
-
-        return Email(
-            id=require_str(data, "id"),
-            thread_id=optional_str(data, "conversationId") or "",
-            folder_id=optional_str(data, "parentFolderId") or "",
-            subject=optional_str(data, "subject") or "",
-            body=body_content,
-            body_type=body_type,
-            from_address=from_addr,
-            to=_decode_recipients(to_list),
-            cc=_decode_recipients(cc_list),
-            bcc=_decode_recipients(bcc_list),
-            sent_at=optional_str(data, "sentDateTime") or "",
-            received_at=optional_str(data, "receivedDateTime") or "",
-            is_read=data.get("isRead") is True,
-            is_draft=data.get("isDraft") is True,
-            has_attachments=data.get("hasAttachments") is True,
-            importance=final_importance,
-        )
-
+class _OutlookEmailClient(_OutlookHttp):
     def send_email(
         self,
         *,
@@ -478,7 +155,7 @@ class _OutlookEmailClient:
         """
         path = f"/me/messages/{email_id}"
         data = self._get(path)
-        return self._decode_message(data)
+        return _decode_message(data)
 
     def list_emails(
         self,
@@ -521,7 +198,7 @@ class _OutlookEmailClient:
         if isinstance(messages_raw, list):
             for msg in messages_raw:
                 if isinstance(msg, dict):
-                    emails.append(self._decode_message(msg))
+                    emails.append(_decode_message(msg))
 
         next_link = optional_str(data, "@odata.nextLink")
         next_token: str | None = None
@@ -744,7 +421,7 @@ class _OutlookEmailClient:
         """
         body: JSONObject = {"destinationId": destination_folder_id}
         data = self._post(f"/me/messages/{email_id}/move", body)
-        return self._decode_message(data)
+        return _decode_message(data)
 
     def list_folders(self) -> tuple[Folder, ...]:
         """List all email folders.

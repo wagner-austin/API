@@ -99,22 +99,7 @@ from platform_email.config.outlook import (
     outlook_auth_url,
     outlook_token_url,
 )
-
-# Testing
-from platform_email.testing import (
-    ConsoleInputHook,
-    ConsoleOutputHook,
-    CurrentTimeHook,
-    EmailClientProtocol,
-    FakeEmailClient,
-    FileExistsHook,
-    HooksContainer,
-    HttpDeleteHook,
-    HTTPErrorProtocol,
-    HttpGetHook,
-    HttpPatchHook,
-    HttpPostHook,
-    hooks,
+from platform_email.fake_hooks import (
     make_fake_attachment,
     make_fake_console,
     make_fake_current_time,
@@ -134,6 +119,25 @@ from platform_email.testing import (
     make_raising_http_get,
     make_raising_http_patch,
     make_raising_http_post,
+)
+
+# Testing
+from platform_email.fakes import (
+    FakeEmailClient,
+)
+from platform_email.testing import (
+    ConsoleInputHook,
+    ConsoleOutputHook,
+    CurrentTimeHook,
+    EmailClientProtocol,
+    FileExistsHook,
+    HooksContainer,
+    HttpDeleteHook,
+    HTTPErrorProtocol,
+    HttpGetHook,
+    HttpPatchHook,
+    HttpPostHook,
+    hooks,
     reset_hooks,
 )
 

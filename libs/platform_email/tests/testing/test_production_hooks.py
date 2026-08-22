@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from platform_email.testing import (
+from platform_email._prod_hooks import (
     _prod_cli_get_env,
     _prod_cli_get_now,
     _prod_cli_set_env,
@@ -31,6 +31,8 @@ from platform_email.testing import (
     _prod_read_file,
     _prod_read_file_bytes,
     _prod_write_file,
+)
+from platform_email.testing import (
     reset_hooks,
 )
 

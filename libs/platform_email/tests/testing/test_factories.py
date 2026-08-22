@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from platform_email.testing import (
+from platform_email.fake_hooks import (
     make_fake_attachment,
     make_fake_console,
     make_fake_current_time,
