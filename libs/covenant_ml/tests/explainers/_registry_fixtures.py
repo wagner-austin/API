@@ -151,7 +151,6 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         max_bins=64,
         subsample=1.0,
         random_state=42,
-        track_contributions=False,
         monotonic_constraints=None,
         reg_alpha=0.0,
         reg_lambda=1.0,

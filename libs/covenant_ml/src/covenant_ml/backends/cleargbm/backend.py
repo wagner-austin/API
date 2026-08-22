@@ -296,7 +296,7 @@ class ClearGBMBackend(ClassifierBackend):
             resolved_names = tuple(feature_names)
 
         # Build ClearGBM config. Every field comes from cfg — this method
-        # hardcoded max_features/track_contributions/monotonic_constraints/
+        # hardcoded max_features/monotonic_constraints/
         # reg_alpha/reg_lambda/n_jobs until 2026-08-22, silently training
         # with different regularization than the caller stated.
         gbm_config: GradientBoostingConfig = GradientBoostingConfig(
@@ -309,7 +309,6 @@ class ClearGBMBackend(ClassifierBackend):
             max_bins=cfg["max_bins"],
             subsample=cfg["subsample"],
             random_state=cfg["random_state"],
-            track_contributions=cfg["track_contributions"],
             monotonic_constraints=_resolve_monotonic_constraints(
                 cfg["monotonic_constraints"], resolved_names
             ),

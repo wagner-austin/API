@@ -228,7 +228,6 @@ class ClearGbmAnchorTrainer:
             "max_bins": self._config["max_bins"],
             "subsample": 1.0,
             "random_state": seed,
-            "track_contributions": False,
             "monotonic_constraints": None,
             "reg_alpha": self._config["reg_alpha"],
             "reg_lambda": self._config["reg_lambda"],

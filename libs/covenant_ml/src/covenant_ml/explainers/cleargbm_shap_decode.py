@@ -209,11 +209,10 @@ def _decode_rust_monotonic_constraints(raw: JSONValue) -> tuple[int, ...] | None
 def _decode_rust_config(raw: JSONValue) -> GradientBoostingConfig:
     """Translate a Rust-shape ``GradientBoostingConfig`` JSON dict into the Python TypedDict.
 
-    Fills in defaults for the three fields the Rust core does not carry:
+    Fills in a default for the one field the Rust core does not carry:
 
-    - ``max_features`` defaults to ``None`` (Rust always uses all features).
-    - ``track_contributions`` defaults to ``False`` (Python-only bookkeeping).
-    - ``n_jobs`` defaults to ``1`` (Rust core handles parallelism internally).
+    - ``n_jobs`` defaults to ``1`` (a runtime knob, deliberately not part of
+      the serialized model config).
 
     Args:
         raw: Decoded Rust JSON config object.
@@ -232,11 +231,12 @@ def _decode_rust_config(raw: JSONValue) -> GradientBoostingConfig:
         learning_rate=narrow_json_to_float(cfg["learning_rate"]),
         min_samples_split=narrow_json_to_int(cfg["min_samples_split"]),
         min_samples_leaf=narrow_json_to_int(cfg["min_samples_leaf"]),
-        max_features=None,
+        # Read from the payload: the serialized config records the budget
+        # the model actually trained under.
+        max_features=_optional_int(cfg.get("max_features")),
         max_bins=narrow_json_to_int(cfg["max_bins"]),
         subsample=narrow_json_to_float(cfg["subsample"]),
         random_state=narrow_json_to_int(cfg["random_state"]),
-        track_contributions=False,
         monotonic_constraints=_decode_rust_monotonic_constraints(cfg.get("monotonic_constraints")),
         reg_alpha=narrow_json_to_float(cfg["reg_alpha"]),
         reg_lambda=narrow_json_to_float(cfg["reg_lambda"]),

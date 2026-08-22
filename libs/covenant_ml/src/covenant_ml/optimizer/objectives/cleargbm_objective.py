@@ -188,7 +188,6 @@ class ClearGBMObjective:
             max_bins=max_bins,
             subsample=subsample,
             random_state=random_state,
-            track_contributions=False,  # Disabled for speed during optimization
             monotonic_constraints=None,
             reg_alpha=0.0,
             reg_lambda=0.0,

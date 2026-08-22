@@ -73,7 +73,6 @@ def _make_cleargbm_config(
         "test_ratio": 0.2,
         "random_state": 42,
         "early_stopping_rounds": 3,
-        "track_contributions": False,
         "monotonic_constraints": None,
         "reg_alpha": 0.0,
         "reg_lambda": 0.0,

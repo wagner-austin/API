@@ -71,7 +71,6 @@ def _train_native_binary_model(
         "max_bins": 8,
         "subsample": 1.0,
         "random_state": random_state,
-        "track_contributions": False,
         "monotonic_constraints": None,
         "reg_alpha": 0.0,
         "reg_lambda": 0.0,

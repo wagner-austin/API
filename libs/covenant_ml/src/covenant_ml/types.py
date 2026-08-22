@@ -353,7 +353,6 @@ class ClearGBMConfig(TypedDict, total=True):
         max_bins: Histogram bins for O(K) split finding (default: 64).
         subsample: Row subsampling ratio (1.0 = no subsampling).
         random_state: Random seed for reproducibility.
-        track_contributions: Enable per-prediction feature contribution tracking.
         monotonic_constraints: Dict mapping feature names to +1 (increasing) or -1 (decreasing).
         reg_alpha: L1 regularization term on leaf weights.
         reg_lambda: L2 regularization term on leaf weights.
@@ -382,7 +381,6 @@ class ClearGBMConfig(TypedDict, total=True):
     max_bins: int
     subsample: float
     random_state: int
-    track_contributions: bool
     monotonic_constraints: dict[str, int] | None
     reg_alpha: float
     reg_lambda: float

@@ -219,7 +219,6 @@ def test_cleargbm_backend_us_bankruptcy_full_pipeline(tmp_path: Path) -> None:
         "test_ratio": 0.15,
         "random_state": 42,
         "early_stopping_rounds": 5,
-        "track_contributions": False,
         "monotonic_constraints": None,
         "reg_alpha": 0.0,
         "reg_lambda": 0.0,
