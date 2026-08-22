@@ -8,150 +8,24 @@ from pathlib import Path
 
 import pytest
 import torch
+from tests.core.services.model.backends.char_lstm._train_branches_support import (
+    _LM,
+    _make_cfg,
+    _make_prepared,
+    _make_settings,
+)
 
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel
-from model_trainer.core.encoding import Encoder, ListEncoded
+from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.services.training import base_trainer as bt
 from model_trainer.core.services.training import trainer_grad_utils as bt_grad
 from model_trainer.core.services.training.dataloader import DataLoader
 from model_trainer.core.types import (
-    ConfigLike,
-    ForwardOutProto,
     LMModelProto,
-    LoadStateDictResultProto,
     NamedParameter,
     OptimizerProto,
-    ParameterLike,
     TorchStateValue,
 )
-
-
-class _MiniEnc(Encoder):
-    def encode(self: _MiniEnc, text: str) -> ListEncoded:
-        return ListEncoded([1, 2])
-
-    def token_to_id(self: _MiniEnc, token: str) -> int | None:
-        return 0
-
-    def get_vocab_size(self: _MiniEnc) -> int:
-        return 4
-
-    def decode(self: _MiniEnc, ids: list[int]) -> str:
-        return "".join(str(i) for i in ids)
-
-
-class _LM(LMModelProto):
-    def __init__(self: _LM) -> None:
-        self._p = torch.nn.Parameter(torch.zeros(1))
-
-    def train(self: _LM) -> None:
-        return None
-
-    def eval(self: _LM) -> None:
-        return None
-
-    def forward(self: _LM, *, input_ids: torch.Tensor, labels: torch.Tensor) -> ForwardOutProto:
-        # Capture parameter reference for use in nested class
-        param = self._p
-
-        class _Out(ForwardOutProto):
-            @property
-            def loss(self: _Out) -> torch.Tensor:
-                # Loss must depend on model parameter for gradients to flow
-                return (param * 0.0).sum() + 0.1
-
-        return _Out()
-
-    def forward_logits(self: _LM, *, input_ids: torch.Tensor) -> torch.Tensor:
-        """Return dummy logits for inference."""
-        batch_size = int(input_ids.size(0))
-        seq_len = int(input_ids.size(1))
-        vocab_size = 4
-        return torch.zeros(batch_size, seq_len, vocab_size)
-
-    def parameters(self: _LM) -> Sequence[ParameterLike]:
-        return [self._p]
-
-    def named_parameters(self: _LM) -> Sequence[tuple[str, NamedParameter]]:
-        return []
-
-    def to(self: _LM, device: str) -> LMModelProto:
-        return self
-
-    def save_pretrained(self: _LM, out_dir: str) -> None:
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
-
-    def gradient_checkpointing_enable(self: _LM) -> None:
-        return None
-
-    @property
-    def config(self: _LM) -> ConfigLike:
-        class _C(ConfigLike):
-            n_positions = 8
-
-        return _C()
-
-    @classmethod
-    def from_pretrained(cls: type[_LM], path: str) -> LMModelProto:
-        return cls()
-
-    def state_dict(self: _LM) -> dict[str, torch.Tensor]:
-        return {}
-
-    def load_state_dict(self: _LM, state_dict: dict[str, torch.Tensor]) -> LoadStateDictResultProto:
-        _ = state_dict
-        return self
-
-
-def _make_cfg() -> ModelTrainConfig:
-    return {
-        "model_family": "char_lstm",
-        "model_size": "tiny",
-        "max_seq_len": 8,
-        "num_epochs": 1,
-        "batch_size": 1,
-        "learning_rate": 1e-3,
-        "tokenizer_id": "tok",
-        "corpus_path": "",
-        "holdout_fraction": 0.01,
-        "seed": 42,
-        "pretrained_run_id": None,
-        "freeze_embed": False,
-        "gradient_clipping": 1.0,
-        "optimizer": "adamw",
-        "device": "cpu",
-        "data_num_workers": 0,
-        "data_pin_memory": False,
-        "early_stopping_patience": 0,
-        "test_split_ratio": 0.0,
-        "finetune_lr_cap": 0.0,
-        "loss_mask_prefix_separator": None,
-        "precision": "fp32",
-        "finetuning_strategy": "full",
-        "hub_model_id": None,
-        "lora": None,
-        "quantization": None,
-        "gguf_export": None,
-    }
-
-
-def _make_prepared() -> PreparedLMModel:
-    return PreparedLMModel(
-        model=_LM(),
-        tokenizer_id="tok",
-        eos_id=1,
-        pad_id=0,
-        max_seq_len=8,
-        tok_for_dataset=_MiniEnc(),
-    )
-
-
-def _make_settings() -> Settings:
-    """Create minimal test settings."""
-    from model_trainer.core.config.settings import load_settings
-
-    return load_settings()
 
 
 def test_trainer_train_one_epoch_progress_none_inside_loop() -> None:
@@ -491,9 +365,6 @@ def test_setup_device_cuda_not_available() -> None:
 
     with pytest.raises(RuntimeError, match="CUDA requested but not available"):
         _ = trainer._setup_device()
-
-
-# ===== AMP (Automatic Mixed Precision) Tests =====
 
 
 def test_get_autocast_context_fp32_returns_nullcontext() -> None:

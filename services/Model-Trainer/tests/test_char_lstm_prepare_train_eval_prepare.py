@@ -11,46 +11,15 @@ from platform_core.errors import AppError, ModelTrainerErrorCode
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
-from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.backend_factory import create_char_lstm_backend
 from model_trainer.core.services.tokenizer.char_backend import CharBackend
-
-
-def _write_tiny_corpus(root: Path) -> str:
-    out_dir = root / "corpus"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    fp = out_dir / "tiny.txt"
-    # Expanded corpus for meaningful training - original 10 bytes was too small
-    # Need multiple batches to show loss reduction across training steps
-    corpus_lines = ["aba", "abbaba", "abaaba", "babbab", "ababab", "bababa"]
-    corpus_text = "\n".join(corpus_lines * 10) + "\n"  # ~300 bytes
-    fp.write_text(corpus_text, encoding="utf-8")
-    return str(out_dir)
-
-
-def _train_char_tokenizer(root: Path, corpus_path: str) -> tuple[str, str]:
-    tok_out = root / "artifacts" / "tokenizers" / "tok1"
-    cfg = TokenizerTrainConfig(
-        method="char",
-        vocab_size=0,
-        min_frequency=1,
-        corpus_path=corpus_path,
-        holdout_fraction=0.05,
-        seed=42,
-        out_dir=str(tok_out),
-    )
-    stats = CharBackend().train(cfg)
-    assert stats.token_count >= 4
-    return "tok1", str(tok_out)
-
-
-def _noop(_: float) -> None:
-    return None
-
-
-def _never() -> bool:
-    return False
+from tests._char_lstm_prepare_support import (
+    _never,
+    _noop,
+    _train_char_tokenizer,
+    _write_tiny_corpus,
+)
 
 
 def test_char_lstm_end_to_end_small(settings_with_paths: Settings, tmp_path: Path) -> None:

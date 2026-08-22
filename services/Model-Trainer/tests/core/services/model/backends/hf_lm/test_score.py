@@ -13,7 +13,8 @@ from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import Hooks, reset_hooks
 from model_trainer.core.services.model.backends.hf_lm.score import _read_text_or_path, score_hf_lm
 
-from .testing import FakeEncoder, FakeScoreModel, FakeSinglePositionScoreModel, make_score_config
+from .testing import FakeEncoder, make_score_config
+from .testing_models import FakeScoreModel, FakeSinglePositionScoreModel
 
 
 class _SettingsFactory(Protocol):

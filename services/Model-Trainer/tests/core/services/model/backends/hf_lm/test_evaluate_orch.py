@@ -25,12 +25,14 @@ from model_trainer.core.services.model.backends.hf_lm.evaluate import (
 )
 
 from .testing import (
-    FakeDataLoader,
-    FakeDataset,
     FakeEncoder,
-    FakeEvalModel,
     fake_load_tokenizer,
     make_test_config,
+)
+from .testing_models import (
+    FakeDataLoader,
+    FakeDataset,
+    FakeEvalModel,
 )
 
 
