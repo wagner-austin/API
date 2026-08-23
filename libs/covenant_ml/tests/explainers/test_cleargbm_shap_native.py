@@ -18,8 +18,10 @@ from covenant_ml.explainers.cleargbm_shap import (
 )
 from covenant_ml.explainers.cleargbm_shap_decode import (
     _decode_rust_categorical_features,
+    _decode_rust_json_to_python_model,
     _decode_rust_monotonic_constraints,
     _decode_rust_node,
+    _py_gbm_model_to_json,
 )
 from tests.explainers._cleargbm_shap_fixtures import (
     _make_deeper_tree,
@@ -71,6 +73,7 @@ def _train_native_binary_model(
         "max_features": None,
         "colsample_bytree": None,
         "categorical_features": None,
+        "n_classes": None,
         "max_bins": 8,
         "subsample": 1.0,
         "random_state": random_state,
@@ -234,3 +237,46 @@ def test_decode_rust_categorical_features_rejects_non_list() -> None:
     """A scalar is neither null nor an index list."""
     with pytest.raises(TypeError, match="categorical_features must be list or null"):
         _decode_rust_categorical_features("zero")
+
+
+class TestDecodeRefusesMulticlass:
+    """The Rust-JSON decoder refuses multiclass payloads at the model level."""
+
+    def test_decode_refuses_a_multiclass_model(self) -> None:
+        """A real native multiclass model's JSON is rejected with a clear error."""
+        from cleargbm.ensemble_multiclass import train_gradient_boosting_multiclass
+
+        x_train: NDArray[np.float64] = np.zeros((9, 2), dtype=np.float64)
+        y_train: NDArray[np.int64] = np.zeros(9, dtype=np.int64)
+        for i in range(9):
+            x_train[i, 0] = float(10 * (i // 3) + i % 3)
+            y_train[i] = i // 3
+        cfg: GradientBoostingConfig = {
+            "n_estimators": 2,
+            "max_depth": 2,
+            "learning_rate": 0.3,
+            "min_samples_split": 2,
+            "min_samples_leaf": 1,
+            "max_features": None,
+            "colsample_bytree": None,
+            "categorical_features": None,
+            "n_classes": 3,
+            "max_bins": 16,
+            "subsample": 1.0,
+            "random_state": 42,
+            "monotonic_constraints": None,
+            "reg_alpha": 0.0,
+            "reg_lambda": 0.0,
+            "n_jobs": 1,
+            "early_stopping_rounds": None,
+            "growth_strategy": "depth_wise",
+            "num_leaves": None,
+            "objective": "multiclass_softmax",
+            "scale_pos_weight": None,
+        }
+        native_model = train_gradient_boosting_multiclass(
+            x_train, y_train, None, None, cfg, ("f0", "f1")
+        )
+        json_str = _py_gbm_model_to_json(native_model)
+        with pytest.raises(ValueError, match="does not support multiclass models"):
+            _decode_rust_json_to_python_model(json_str)

@@ -44,6 +44,44 @@ def compute_log_loss(
     return -total / len(cross_entropy)
 
 
+def compute_multiclass_log_loss(
+    y_true: NDArray[np.int64],
+    proba: NDArray[np.float64],
+    eps: float = 1e-15,
+) -> float:
+    """Compute multiclass cross-entropy (log loss).
+
+    Args:
+        y_true: True class indices in ``[0, n_classes)``, shape (n_samples,)
+        proba: Predicted class probabilities, shape (n_samples, n_classes)
+        eps: Small value to avoid log(0)
+
+    Returns:
+        Log loss (lower is better)
+
+    Raises:
+        ValueError: If the label count does not match the probability rows,
+            or a label indexes past the probability columns.
+    """
+    n_samples = int(proba.shape[0])
+    n_classes = int(proba.shape[1])
+    if len(y_true) != n_samples:
+        raise ValueError(
+            f"y_true and proba must have equal length, got {len(y_true)} and {n_samples}"
+        )
+    picked: list[float] = []
+    for i in range(n_samples):
+        label = int(y_true.flat[i].item())
+        if label < 0 or label >= n_classes:
+            raise ValueError(f"label {label} at index {i} outside [0, {n_classes})")
+        p = float(proba.flat[i * n_classes + label].item())
+        picked.append(min(max(p, eps), 1.0 - eps))
+    picked_arr: NDArray[np.float64] = np.asarray(picked, dtype=np.float64)
+    log_p: NDArray[np.float64] = np.log(picked_arr)
+    total = float(np.sum(log_p))
+    return -total / n_samples
+
+
 def compute_auc(
     y_true: NDArray[np.int64],
     y_prob: NDArray[np.float64],
@@ -441,6 +479,7 @@ __all__ = [
     "compute_auc",
     "compute_f1_score",
     "compute_log_loss",
+    "compute_multiclass_log_loss",
     "compute_precision",
     "compute_recall",
     "format_metrics_str",

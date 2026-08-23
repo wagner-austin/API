@@ -227,6 +227,7 @@ class ClearGbmAnchorTrainer:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": self._config["max_bins"],
             "subsample": 1.0,
             "random_state": seed,

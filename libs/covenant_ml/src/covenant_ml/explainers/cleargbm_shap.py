@@ -264,10 +264,14 @@ def convert_cleargbm_to_shap_format(model: GradientBoostingModel) -> ShapModelFo
         ShapModelFormat dictionary compatible with SHAP TreeExplainer.
 
     Raises:
-        ValueError: If model has no trees.
+        ValueError: If model has no trees, or if the model is multiclass —
+            SHAP conversion here is single-output.
     """
     if len(model["trees"]) == 0:
         raise ValueError("Cannot convert model with no trees")
+    base_prediction = model["base_prediction"]
+    if base_prediction is None:
+        raise ValueError("Cannot convert a multiclass model: SHAP conversion is single-output")
 
     # Convert each tree
     shap_trees: list[ShapTreeArrays] = []
@@ -278,7 +282,7 @@ def convert_cleargbm_to_shap_format(model: GradientBoostingModel) -> ShapModelFo
     return ShapModelFormat(
         trees=shap_trees,
         num_outputs=1,  # Binary classification
-        base_offset=model["base_prediction"],
+        base_offset=base_prediction,
         objective="binary:logistic",
         tree_output="raw",
         input_dtype=np.float64,

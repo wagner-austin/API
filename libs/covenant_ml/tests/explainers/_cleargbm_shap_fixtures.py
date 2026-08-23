@@ -65,6 +65,7 @@ def _make_config() -> GradientBoostingConfig:
         max_features=None,
         colsample_bytree=None,
         categorical_features=None,
+        n_classes=None,
         max_bins=64,
         subsample=1.0,
         random_state=42,
@@ -199,6 +200,7 @@ def _make_model(trees: list[DecisionTree]) -> GradientBoostingModel:
     return GradientBoostingModel(
         trees=tuple(trees),
         base_prediction=0.0,
+        class_base_predictions=None,
         learning_rate=0.1,
         feature_names=("feature_0", "feature_1"),
         config=_make_config(),

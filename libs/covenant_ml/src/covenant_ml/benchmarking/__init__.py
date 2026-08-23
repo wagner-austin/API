@@ -57,6 +57,15 @@ from .factory import (
     make_split_factory,
     make_trainers,
 )
+from .multiclass_quality import (
+    MulticlassArmResult,
+    MulticlassBenchConfig,
+    MulticlassManifest,
+    MulticlassQuality,
+    encode_multiclass_manifest,
+    make_synthetic_multiclass,
+    run_multiclass_benchmark,
+)
 from .power import disable_power_throttling, opt_out_of_power_throttling
 from .protocols import (
     DataSplit,
@@ -85,6 +94,10 @@ __all__ = [
     "GapSummary",
     "LoadedDataset",
     "ModelSummary",
+    "MulticlassArmResult",
+    "MulticlassBenchConfig",
+    "MulticlassManifest",
+    "MulticlassQuality",
     "PowerThrottlingOptOutProto",
     "ProcessInformationSetterProto",
     "QualityMetrics",
@@ -98,15 +111,18 @@ __all__ = [
     "decode_benchmark_manifest",
     "disable_power_throttling",
     "encode_benchmark_manifest",
+    "encode_multiclass_manifest",
     "load_bankruptcy_dataset",
     "make_baseline_trainers",
     "make_benchmark_config",
     "make_split_factory",
+    "make_synthetic_multiclass",
     "make_trainers",
     "measure_trainer",
     "opt_out_of_power_throttling",
     "render_report",
     "run_benchmark",
+    "run_multiclass_benchmark",
     "summarize_gap",
     "summarize_timings",
 ]

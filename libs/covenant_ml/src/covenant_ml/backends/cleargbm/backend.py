@@ -311,6 +311,7 @@ class ClearGBMBackend(ClassifierBackend):
             categorical_features=_resolve_categorical_features(
                 cfg["categorical_features"], resolved_names
             ),
+            n_classes=None,
             max_bins=cfg["max_bins"],
             subsample=cfg["subsample"],
             random_state=cfg["random_state"],

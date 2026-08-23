@@ -266,6 +266,7 @@ def _decode_rust_config(raw: JSONValue) -> GradientBoostingConfig:
         max_features=_optional_int(cfg.get("max_features")),
         colsample_bytree=_optional_float(cfg.get("colsample_bytree")),
         categorical_features=_decode_rust_categorical_features(cfg.get("categorical_features")),
+        n_classes=_optional_int(cfg.get("n_classes")),
         max_bins=narrow_json_to_int(cfg["max_bins"]),
         subsample=narrow_json_to_float(cfg["subsample"]),
         random_state=narrow_json_to_int(cfg["random_state"]),
@@ -308,9 +309,17 @@ def _decode_rust_json_to_python_model(json_str: str) -> GradientBoostingModel:
         TypeError: On any field-shape mismatch at the model, tree, or node
             level.
         ValueError: If any node references a feature index outside the
-            model-level ``feature_names`` list.
+            model-level ``feature_names`` list, or if the payload is a
+            multiclass model — SHAP's tree walker is single-output, so a
+            model carrying per-class base scores is refused loudly rather
+            than half-walked.
     """
     raw = narrow_json_to_dict(load_json_str(json_str))
+    if raw.get("class_base_predictions") is not None:
+        raise ValueError(
+            "the SHAP explainer does not support multiclass models; "
+            "this model carries per-class base scores (multiclass_softmax)"
+        )
     feature_names_raw = narrow_json_to_list(raw["feature_names"])
     feature_names: tuple[str, ...] = tuple(narrow_json_to_str(name) for name in feature_names_raw)
     trees_raw = narrow_json_to_list(raw["trees"])
@@ -318,6 +327,7 @@ def _decode_rust_json_to_python_model(json_str: str) -> GradientBoostingModel:
     return GradientBoostingModel(
         trees=trees,
         base_prediction=narrow_json_to_float(raw["base_prediction"]),
+        class_base_predictions=None,
         learning_rate=narrow_json_to_float(raw["learning_rate"]),
         feature_names=feature_names,
         config=_decode_rust_config(raw["config"]),

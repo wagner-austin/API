@@ -311,12 +311,28 @@ class TestConvertClearGBMToShapFormat:
         model = GradientBoostingModel(
             trees=(),
             base_prediction=0.0,
+            class_base_predictions=None,
             learning_rate=0.1,
             feature_names=("f0",),
             config=_make_config(),
         )
 
         with pytest.raises(ValueError, match="Cannot convert model with no trees"):
+            convert_cleargbm_to_shap_format(model)
+
+    def test_raises_on_a_multiclass_model(self) -> None:
+        """A model with per-class base scores is refused: SHAP is single-output."""
+        tree = _make_simple_tree()
+        model = GradientBoostingModel(
+            trees=(tree,),
+            base_prediction=None,
+            class_base_predictions=(0.1, 0.2, 0.3),
+            learning_rate=0.1,
+            feature_names=("f0",),
+            config=_make_config(),
+        )
+
+        with pytest.raises(ValueError, match="Cannot convert a multiclass model"):
             convert_cleargbm_to_shap_format(model)
 
     def test_converts_single_tree_model(self) -> None:
@@ -354,6 +370,7 @@ class TestConvertClearGBMToShapFormat:
         model = GradientBoostingModel(
             trees=(tree,),
             base_prediction=-0.5,
+            class_base_predictions=None,
             learning_rate=0.1,
             feature_names=("f0", "f1"),
             config=_make_config(),
