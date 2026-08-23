@@ -98,6 +98,15 @@ class GradientBoostingConfig(TypedDict):
             the pair scan and the max-DCG normalizer) and ``None`` under
             every other objective. The pairing itself is enforced at the
             Rust boundary.
+        goss_top_rate: GOSS top rate — the fraction of rows kept outright
+            by |gradient x hessian| rank. Paired with ``goss_other_rate``
+            (both-or-neither); each in (0, 1), summing to at most 1. GOSS
+            replaces row subsampling, so it requires ``subsample = 1.0``;
+            single-score objectives only. All pairings are enforced at
+            the Rust boundary.
+        goss_other_rate: GOSS other rate — the fraction of the remaining
+            rows sampled and reweighted by ``(1 - top) / other``. See
+            ``goss_top_rate``.
         max_bins: Number of histogram bins for split finding (64-256 typical).
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -148,6 +157,8 @@ class GradientBoostingConfig(TypedDict):
     categorical_features: tuple[int, ...] | None
     n_classes: int | None
     lambdarank_truncation_level: int | None
+    goss_top_rate: float | None
+    goss_other_rate: float | None
     max_bins: int
     subsample: float
     random_state: int
@@ -246,6 +257,8 @@ def encode_gradient_boosting_config(
         ),
         "n_classes": config["n_classes"],
         "lambdarank_truncation_level": config["lambdarank_truncation_level"],
+        "goss_top_rate": config["goss_top_rate"],
+        "goss_other_rate": config["goss_other_rate"],
         "max_bins": config["max_bins"],
         "subsample": config["subsample"],
         "random_state": config["random_state"],
@@ -372,6 +385,12 @@ def decode_gradient_boosting_config(
         lambdarank_truncation_level = require_positive_int(
             lambdarank_truncation_level, "lambdarank_truncation_level"
         )
+    goss_top_rate = _get_optional_float(raw, "goss_top_rate")
+    if goss_top_rate is not None:
+        goss_top_rate = require_open_unit_float(goss_top_rate, "goss_top_rate")
+    goss_other_rate = _get_optional_float(raw, "goss_other_rate")
+    if goss_other_rate is not None:
+        goss_other_rate = require_open_unit_float(goss_other_rate, "goss_other_rate")
     max_bins = require_positive_int(_require_int(raw, "max_bins"), "max_bins")
     subsample = require_unit_float(_require_float(raw, "subsample"), "subsample")
     random_state = _require_int(raw, "random_state")
@@ -412,6 +431,8 @@ def decode_gradient_boosting_config(
         categorical_features=categorical_features,
         n_classes=n_classes,
         lambdarank_truncation_level=lambdarank_truncation_level,
+        goss_top_rate=goss_top_rate,
+        goss_other_rate=goss_other_rate,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,

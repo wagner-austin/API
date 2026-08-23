@@ -15,6 +15,8 @@ def make_config(
     categorical_features: tuple[int, ...] | None = None,
     n_classes: int | None = None,
     lambdarank_truncation_level: int | None = None,
+    goss_top_rate: float | None = None,
+    goss_other_rate: float | None = None,
     max_bins: int = 64,
     subsample: float = 1.0,
     random_state: int = 42,
@@ -41,6 +43,8 @@ def make_config(
             ``None`` under every other objective.
         lambdarank_truncation_level: NDCG truncation position, required
             (>= 1) under ``"lambdarank"``, ``None`` otherwise.
+        goss_top_rate: GOSS top rate, paired with goss_other_rate.
+        goss_other_rate: GOSS other rate, paired with goss_top_rate.
         max_bins: Number of histogram bins.
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -68,6 +72,8 @@ def make_config(
         categorical_features=categorical_features,
         n_classes=n_classes,
         lambdarank_truncation_level=lambdarank_truncation_level,
+        goss_top_rate=goss_top_rate,
+        goss_other_rate=goss_other_rate,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,

@@ -30,6 +30,8 @@ def _make_raw_config(n_classes: int | None, objective: str) -> JSONDict:
         "categorical_features": None,
         "n_classes": n_classes,
         "lambdarank_truncation_level": None,
+        "goss_top_rate": None,
+        "goss_other_rate": None,
         "max_bins": 64,
         "subsample": 1.0,
         "random_state": 0,
@@ -96,6 +98,8 @@ class TestGradientBoostingModel:
             "categorical_features": None,
             "n_classes": None,
             "lambdarank_truncation_level": None,
+            "goss_top_rate": None,
+            "goss_other_rate": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -175,6 +179,29 @@ class TestConfigNClasses:
         raw = _make_raw_config(None, "lambdarank")
         raw["lambdarank_truncation_level"] = 0
         with pytest.raises(ValueError, match="lambdarank_truncation_level must be positive"):
+            decode_gradient_boosting_config(raw)
+
+    def test_decode_carries_valid_goss_rates(self) -> None:
+        """Both GOSS rates pass through the decode unchanged."""
+        raw = _make_raw_config(None, "binary_log_loss")
+        raw["scale_pos_weight"] = 1.0
+        raw["goss_top_rate"] = 0.2
+        raw["goss_other_rate"] = 0.1
+        decoded = decode_gradient_boosting_config(raw)
+        assert decoded["goss_top_rate"] == 0.2
+        assert decoded["goss_other_rate"] == 0.1
+
+    def test_decode_rejects_goss_rates_outside_the_open_unit(self) -> None:
+        """Each GOSS rate must lie strictly between 0 and 1 when set."""
+        raw = _make_raw_config(None, "binary_log_loss")
+        raw["scale_pos_weight"] = 1.0
+        raw["goss_top_rate"] = 1.0
+        raw["goss_other_rate"] = 0.1
+        with pytest.raises(ValueError, match="goss_top_rate"):
+            decode_gradient_boosting_config(raw)
+        raw["goss_top_rate"] = 0.2
+        raw["goss_other_rate"] = 0.0
+        with pytest.raises(ValueError, match="goss_other_rate"):
             decode_gradient_boosting_config(raw)
 
 

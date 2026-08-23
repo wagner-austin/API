@@ -133,6 +133,8 @@ def _config_to_rust_dict(
         ),
         "n_classes": config["n_classes"],
         "lambdarank_truncation_level": config["lambdarank_truncation_level"],
+        "goss_top_rate": config["goss_top_rate"],
+        "goss_other_rate": config["goss_other_rate"],
     }
 
 

@@ -37,6 +37,8 @@ def _make_multiclass_config(
         categorical_features=None,
         n_classes=n_classes,
         lambdarank_truncation_level=None,
+        goss_top_rate=None,
+        goss_other_rate=None,
         max_bins=16,
         subsample=1.0,
         random_state=42,
