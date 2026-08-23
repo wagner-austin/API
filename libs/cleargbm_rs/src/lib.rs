@@ -61,8 +61,8 @@ pub use error::ClearGbmError;
 pub use histogram::subtract_histogram;
 pub use hooks::Hooks;
 pub use losses::{
-    binary_log_loss, binary_log_loss_gradients, binary_log_loss_hessians,
-    binary_log_loss_initial_prediction, sigmoid_array,
+    binary_log_loss, binary_log_loss_initial_prediction, sigmoid_array,
+    squared_error_initial_prediction, squared_error_loss,
 };
 pub use predict::{
     predict_ensemble, predict_proba, predict_single, predict_tree, sigmoid, PredictEnsembleConfig,
@@ -74,7 +74,7 @@ pub use split::{
 };
 pub use training::{
     train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams,
-    GradientBoostingModel, Parallelism,
+    GradientBoostingModel, Objective, Parallelism, TrainingLabels, ValidationData,
 };
 pub use tree::{build_tree, compute_leaf_value, BuildTreeInput, Tree, TreeBuildConfig};
 pub use types::{HistogramBuffer, SplitConfig, TreeNode, TreeNodeConfig};

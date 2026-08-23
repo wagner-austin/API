@@ -63,6 +63,65 @@ impl GrowthStrategy {
     }
 }
 
+/// Training objective: the loss whose gradients the trees descend.
+///
+/// The objective decides four things behind one seam — the base score, the
+/// per-round gradients and hessians, the early-stopping evaluation loss, and
+/// the prediction transform:
+///
+/// * [`Self::BinaryLogLoss`] — binary classification. Labels are 0/1, the
+///   base score is weighted log-odds, gradients come from the sigmoid of the
+///   raw score, and probabilities are read through the sigmoid.
+/// * [`Self::SquaredError`] — regression. Labels are continuous, the base
+///   score is the label mean, `gradient = prediction - y`, `hessian = 1`,
+///   and raw scores are the predictions (identity transform).
+///
+/// The wire spelling is `"binary_log_loss"` / `"squared_error"` at BOTH
+/// boundaries — the Python config dict and the serialized model JSON — the
+/// same one-value-one-spelling rule as [`GrowthStrategy`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Objective {
+    /// Binary classification under (optionally class-weighted) log loss.
+    BinaryLogLoss,
+    /// Regression under squared error.
+    SquaredError,
+}
+
+impl Objective {
+    /// Returns the wire spelling of this objective.
+    ///
+    /// # Returns
+    ///
+    /// `"binary_log_loss"` or `"squared_error"`.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::BinaryLogLoss => "binary_log_loss",
+            Self::SquaredError => "squared_error",
+        }
+    }
+
+    /// Parses an objective from its wire spelling.
+    ///
+    /// # Args
+    ///
+    /// * `value` - `"binary_log_loss"` or `"squared_error"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ClearGbmError::InvalidParameter` if `value` is neither.
+    pub fn from_wire(value: &str) -> Result<Self, ClearGbmError> {
+        match value {
+            "binary_log_loss" => Ok(Self::BinaryLogLoss),
+            "squared_error" => Ok(Self::SquaredError),
+            other => Err(ClearGbmError::InvalidParameter {
+                name: "objective".to_string(),
+                reason: format!("expected \"binary_log_loss\" or \"squared_error\", got {other:?}"),
+            }),
+        }
+    }
+}
+
 /// Unvalidated parameters for constructing a [`GradientBoostingConfig`].
 ///
 /// Groups all hyperparameters into a single struct to avoid
@@ -99,9 +158,13 @@ pub struct GradientBoostingConfigParams {
     /// Leaf budget for `LeafWise` growth. Must be `Some(n)` with `n >= 2`
     /// under `LeafWise` and `None` under `DepthWise`.
     pub num_leaves: Option<usize>,
+    /// Training objective.
+    pub objective: Objective,
     /// Weight applied to positive samples in the loss, its gradients and
-    /// the base score (finite, > 0.0; 1.0 = unweighted).
-    pub scale_pos_weight: f64,
+    /// the base score. Must be `Some(w)` with `w` finite and positive under
+    /// `BinaryLogLoss` (`1.0` = unweighted) and `None` under `SquaredError`,
+    /// which has no positive class to weight.
+    pub scale_pos_weight: Option<f64>,
     /// Features each split may consider (None = all; Some(k) with k >= 1).
     /// The k <= n_features bound is checked at train time where the
     /// feature count is known.
@@ -142,9 +205,11 @@ pub struct GradientBoostingConfig {
     growth_strategy: GrowthStrategy,
     /// Leaf budget, present exactly when `growth_strategy` is `LeafWise`.
     num_leaves: Option<usize>,
-    /// Weight applied to positive samples in the loss, its gradients and
-    /// the base score (finite, > 0.0; 1.0 = unweighted).
-    scale_pos_weight: f64,
+    /// Training objective.
+    objective: Objective,
+    /// Positive-class weight, present exactly when `objective` is
+    /// `BinaryLogLoss`.
+    scale_pos_weight: Option<f64>,
     /// Features each split may consider (None = all).
     max_features: Option<usize>,
 }
@@ -175,6 +240,7 @@ impl GradientBoostingConfig {
             early_stopping_rounds,
             growth_strategy,
             num_leaves,
+            objective,
             scale_pos_weight,
             max_features,
         } = params;
@@ -250,11 +316,37 @@ impl GradientBoostingConfig {
                 });
             }
         }
-        if !scale_pos_weight.is_finite() || scale_pos_weight <= 0.0_f64 {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "scale_pos_weight".to_string(),
-                reason: format!("must be a finite positive number, got {scale_pos_weight}"),
-            });
+        // `scale_pos_weight` is paired with the objective rather than merely
+        // ignored under the wrong one — same rule as `num_leaves` below. A
+        // class weight silently doing nothing under squared error would be a
+        // config field training does not honour.
+        match (objective, scale_pos_weight) {
+            (Objective::BinaryLogLoss, None) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "scale_pos_weight".to_string(),
+                    reason: "must be set when objective is \"binary_log_loss\"; state 1.0 \
+                             explicitly for unweighted training"
+                        .to_string(),
+                })
+            }
+            (Objective::BinaryLogLoss, Some(w)) => {
+                if !w.is_finite() || w <= 0.0_f64 {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "scale_pos_weight".to_string(),
+                        reason: format!("must be a finite positive number, got {w}"),
+                    });
+                }
+            }
+            (Objective::SquaredError, Some(w)) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "scale_pos_weight".to_string(),
+                    reason: format!(
+                        "must be unset when objective is \"squared_error\" (got {w}); squared \
+                         error has no positive class to weight"
+                    ),
+                })
+            }
+            (Objective::SquaredError, None) => {}
         }
         if let Some(k) = max_features {
             if k < 1_usize {
@@ -272,7 +364,7 @@ impl GradientBoostingConfig {
             (GrowthStrategy::LeafWise, None) => {
                 return Err(ClearGbmError::InvalidParameter {
                     name: "num_leaves".to_string(),
-                    reason: "must be set when growth_strategy is \"leaf_wise\" — best-first \
+                    reason: "must be set when growth_strategy is \"leaf_wise\"; best-first \
                              growth has no depth to bound it, so the leaf budget is its only \
                              capacity limit"
                         .to_string(),
@@ -313,6 +405,7 @@ impl GradientBoostingConfig {
             early_stopping_rounds,
             growth_strategy,
             num_leaves,
+            objective,
             scale_pos_weight,
             max_features,
         })
@@ -396,9 +489,15 @@ impl GradientBoostingConfig {
         self.growth_strategy
     }
 
-    /// Returns the positive-class weight applied to the loss and gradients.
+    /// Returns the training objective.
     #[must_use]
-    pub fn scale_pos_weight(&self) -> f64 {
+    pub fn objective(&self) -> Objective {
+        self.objective
+    }
+
+    /// Returns the positive-class weight, set exactly under `BinaryLogLoss`.
+    #[must_use]
+    pub fn scale_pos_weight(&self) -> Option<f64> {
         self.scale_pos_weight
     }
 

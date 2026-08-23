@@ -1,12 +1,9 @@
 //! Tests for feature_importances.
 
 use crate::error::ClearGbmError;
-use crate::hooks::Hooks;
-use crate::training::{
-    feature_importances, train_gradient_boosting, GradientBoostingConfig,
-    GradientBoostingConfigParams, GrowthStrategy,
-};
-use crate::training::{Parallelism, TrainingRuntime};
+use crate::training::{feature_importances, GradientBoostingConfig, GradientBoostingConfigParams};
+
+use super::train_helpers::{default_params, train_binary};
 
 /// Trains a small model where feature 0 is the only informative feature.
 fn train_single_informative_feature_model(
@@ -29,40 +26,12 @@ fn train_single_informative_feature_model(
         "noise_b".to_string(),
     ];
 
-    let config = match GradientBoostingConfig::new(GradientBoostingConfigParams {
-        n_estimators: 5_usize,
-        max_depth: 2_usize,
-        learning_rate: 0.3_f64,
-        min_samples_split: 2_usize,
-        min_samples_leaf: 1_usize,
-        max_bins: 4_usize,
-        subsample: 1.0_f64,
-        random_state: 42_u64,
-        monotonic_constraints: None,
-        reg_alpha: 0.0_f64,
-        reg_lambda: 1.0_f64,
-        early_stopping_rounds: None,
-        growth_strategy: GrowthStrategy::DepthWise,
-        num_leaves: None,
-        scale_pos_weight: 1.0_f64,
-        max_features: None,
-    }) {
+    let config = match GradientBoostingConfig::new(default_params()) {
         Ok(c) => c,
         Err(e) => return Err(e),
     };
 
-    train_gradient_boosting(
-        &x_train,
-        &y_train,
-        None,
-        None,
-        &config,
-        &feature_names,
-        &TrainingRuntime {
-            parallelism: Parallelism::Single,
-            hooks: &Hooks::default(),
-        },
-    )
+    train_binary(&x_train, &y_train, None, &config, &feature_names)
 }
 
 #[test]
@@ -144,39 +113,14 @@ fn test_importances_all_zero_when_only_root_leaves() -> Result<(), ClearGbmError
     // 3-row dataset — no internal nodes, so no splits at all.
     let y_train: Vec<u8> = vec![0_u8, 1_u8, 0_u8];
     let feature_names: Vec<String> = vec!["a".to_string(), "b".to_string()];
-    let config = match GradientBoostingConfig::new(GradientBoostingConfigParams {
-        n_estimators: 3_usize,
-        max_depth: 2_usize,
-        learning_rate: 0.3_f64,
-        min_samples_split: 100_usize,
-        min_samples_leaf: 1_usize,
-        max_bins: 4_usize,
-        subsample: 1.0_f64,
-        random_state: 42_u64,
-        monotonic_constraints: None,
-        reg_alpha: 0.0_f64,
-        reg_lambda: 1.0_f64,
-        early_stopping_rounds: None,
-        growth_strategy: GrowthStrategy::DepthWise,
-        num_leaves: None,
-        scale_pos_weight: 1.0_f64,
-        max_features: None,
-    }) {
+    let mut params = default_params();
+    params.n_estimators = 3_usize;
+    params.min_samples_split = 100_usize;
+    let config = match GradientBoostingConfig::new(params) {
         Ok(c) => c,
         Err(e) => return Err(e),
     };
-    let model = match train_gradient_boosting(
-        &x_train,
-        &y_train,
-        None,
-        None,
-        &config,
-        &feature_names,
-        &TrainingRuntime {
-            parallelism: Parallelism::Single,
-            hooks: &Hooks::default(),
-        },
-    ) {
+    let model = match train_binary(&x_train, &y_train, None, &config, &feature_names) {
         Ok(m) => m,
         Err(e) => return Err(e),
     };
@@ -265,7 +209,6 @@ fn test_importances_skip_internal_nodes_without_a_feature_index() -> Result<(), 
         0.0_f64,
         0.1_f64,
         vec!["f0".to_string(), "f1".to_string()],
-        2_usize,
         config,
     );
 
@@ -289,22 +232,10 @@ fn test_importances_skip_internal_nodes_without_a_feature_index() -> Result<(), 
 
 /// Config for the hand-built model above; values are irrelevant to importance.
 fn default_importance_params() -> GradientBoostingConfigParams {
-    GradientBoostingConfigParams {
-        n_estimators: 1_usize,
-        max_depth: 2_usize,
-        learning_rate: 0.1_f64,
-        min_samples_split: 2_usize,
-        min_samples_leaf: 1_usize,
-        max_bins: 8_usize,
-        subsample: 1.0_f64,
-        random_state: 0_u64,
-        monotonic_constraints: None,
-        reg_alpha: 0.0_f64,
-        reg_lambda: 1.0_f64,
-        early_stopping_rounds: None,
-        growth_strategy: GrowthStrategy::DepthWise,
-        num_leaves: None,
-        scale_pos_weight: 1.0_f64,
-        max_features: None,
-    }
+    let mut params = default_params();
+    params.n_estimators = 1_usize;
+    params.learning_rate = 0.1_f64;
+    params.max_bins = 8_usize;
+    params.random_state = 0_u64;
+    params
 }

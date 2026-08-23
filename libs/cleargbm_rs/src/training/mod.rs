@@ -13,6 +13,7 @@
 pub(crate) mod config;
 pub(crate) mod early_stopping;
 pub(crate) mod importance;
+pub(crate) mod labels;
 pub(crate) mod model;
 pub(crate) mod parallelism;
 pub(crate) mod rng;
@@ -24,8 +25,9 @@ pub(crate) mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use config::{GradientBoostingConfig, GradientBoostingConfigParams, GrowthStrategy};
+pub use config::{GradientBoostingConfig, GradientBoostingConfigParams, GrowthStrategy, Objective};
 pub use importance::feature_importances;
+pub use labels::{TrainingLabels, ValidationData};
 pub use model::GradientBoostingModel;
 pub use parallelism::Parallelism;
 pub use train::{train_gradient_boosting, TrainingRuntime};

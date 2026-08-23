@@ -1,8 +1,11 @@
-//! PyO3 bindings for gradient boosting training and model inference.
+//! PyO3 bindings for gradient boosting training and prediction.
 //!
-//! Wraps [`crate::training`] functions for calling from Python.
-//! The trained model is exposed as a [`PyGbmModel`] opaque class that
-//! can be passed back to Rust for prediction without serialization overhead.
+//! Wraps [`crate::training`] functions for calling from Python. Two training
+//! entry points exist, one per label kind: `train_gradient_boosting_rs`
+//! takes integer 0/1 labels for the `binary_log_loss` objective, and
+//! `train_gradient_boosting_regression_rs` takes float targets for
+//! `squared_error`. The config's `objective` must agree with the entry
+//! called — the core's objective resolution rejects the mismatch.
 
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
@@ -11,62 +14,13 @@ use pyo3::types::{PyDict, PyList, PyTuple};
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::pyo3_module::array_helpers::{i64_to_usize, try_convert_int};
+use crate::pyo3_module::model_fns::PyGbmModel;
 use crate::split::MonotonicConstraint;
 use crate::training::{
-    feature_importances, train_gradient_boosting, GradientBoostingConfig,
-    GradientBoostingConfigParams, GradientBoostingModel, GrowthStrategy,
+    train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams, GrowthStrategy,
+    Objective, TrainingLabels, ValidationData,
 };
 use crate::training::{Parallelism, TrainingRuntime};
-
-/// Opaque Python wrapper around a trained [`GradientBoostingModel`].
-///
-/// Created by [`train_gradient_boosting_rs`] and consumed by
-/// [`predict_model_rs`] and [`predict_proba_model_rs`].
-///
-/// JSON persistence and feature-importance extraction are exposed as
-/// module-level functions (`py_gbm_model_to_json_rs`,
-/// `py_gbm_model_from_json_rs`, `py_gbm_model_feature_importances_rs`,
-/// `py_gbm_model_n_trees_rs`, `py_gbm_model_n_classes_rs`) rather than
-/// `#[pymethods]` so the crate's `question_mark_used` / `useless_conversion`
-/// forbids stay clean (`#[pymethods]` expansion is incompatible).
-#[pyclass]
-#[derive(Debug, Clone)]
-pub(crate) struct PyGbmModel {
-    /// The underlying trained model.
-    inner: GradientBoostingModel,
-}
-
-/// Converts a serialization failure description into a [`PyErr`].
-///
-/// # Args
-///
-/// * `reason` - Human-readable description of the serialization failure.
-///
-/// # Returns
-///
-/// A Python `RuntimeError` wrapping the serialization error.
-///
-/// `pub(super)` rather than private so [`crate::pyo3_module::tests`] can assert
-/// the mapping directly. `serde_json::to_string` cannot fail for
-/// [`GradientBoostingModel`] — the type contains no non-string map keys, and
-/// writing to a `String` is infallible — so this arm is unreachable through
-/// [`py_gbm_model_to_json_rs`] and can only be covered by calling it.
-pub(super) fn ser_err(reason: String) -> PyErr {
-    ClearGbmError::SerializationFailed { reason }.into()
-}
-
-/// Converts a deserialization failure description into a [`PyErr`].
-///
-/// # Args
-///
-/// * `reason` - Human-readable description of the deserialization failure.
-///
-/// # Returns
-///
-/// A Python `RuntimeError` wrapping the deserialization error.
-pub(super) fn de_err(reason: String) -> PyErr {
-    ClearGbmError::DeserializationFailed { reason }.into()
-}
 
 /// Extracts a 2D numpy feature matrix into a `Vec<Vec<f64>>` for row-wise access.
 ///
@@ -106,211 +60,11 @@ fn extract_rows(features: &PyReadonlyArray2<'_, f64>) -> Result<Vec<Vec<f64>>, C
     Ok(rows)
 }
 
-/// Serializes a [`PyGbmModel`] to a JSON string.
-///
-/// # Args
-///
-/// * `model` - The `PyGbmModel` reference.
-///
-/// # Returns
-///
-/// JSON string representation of the model. Round-trips through
-/// [`py_gbm_model_from_json_rs`] without loss beyond one ULP on float text
-/// representation; see the Rust unit test
-/// `test_model_roundtrip_predictions_identical` for the per-sample prediction
-/// preservation guarantee at 1e-15.
-///
-/// # Errors
-///
-/// Returns `RuntimeError` if serialization fails.
-pub(crate) fn py_gbm_model_to_json_rs(model: &PyGbmModel) -> PyResult<String> {
-    serde_json::to_string(&model.inner).map_err(|e| ser_err(e.to_string()))
-}
-
-/// Deserializes a [`PyGbmModel`] from a JSON string.
-///
-/// # Args
-///
-/// * `json_str` - JSON string previously produced by [`py_gbm_model_to_json_rs`].
-///
-/// # Returns
-///
-/// A new `PyGbmModel` instance.
-///
-/// # Errors
-///
-/// Returns `RuntimeError` on parse failures or on validation errors from the
-/// model's config validator (e.g. an invalid `learning_rate` value in the
-/// payload).
-pub(crate) fn py_gbm_model_from_json_rs(json_str: &str) -> PyResult<PyGbmModel> {
-    let inner: GradientBoostingModel = match serde_json::from_str(json_str) {
-        Ok(m) => m,
-        Err(e) => return Err(de_err(e.to_string())),
-    };
-    Ok(PyGbmModel { inner })
-}
-
-/// Returns per-feature split-count importance from a [`PyGbmModel`], normalized
-/// to sum to 1.0.
-///
-/// A feature that never appears at an internal (split) node has importance 0.0.
-/// If the ensemble has zero internal nodes (every tree is a single leaf), every
-/// feature has importance 0.0.
-///
-/// # Args
-///
-/// * `model` - The `PyGbmModel` reference.
-///
-/// # Returns
-///
-/// A list of `(feature_name, importance)` pairs in feature-index order.
-pub(crate) fn py_gbm_model_feature_importances_rs(model: &PyGbmModel) -> Vec<(String, f64)> {
-    feature_importances(&model.inner)
-}
-
-/// Returns the number of trees in a [`PyGbmModel`] ensemble.
-///
-/// # Args
-///
-/// * `model` - The `PyGbmModel` reference.
-///
-/// # Returns
-///
-/// Tree count (equal to `n_estimators` unless early stopping trimmed the
-/// ensemble).
-pub(crate) fn py_gbm_model_n_trees_rs(model: &PyGbmModel) -> usize {
-    model.inner.n_trees()
-}
-
-/// Returns the number of classes in a [`PyGbmModel`].
-///
-/// Always `2` for binary classification; the current library only trains
-/// binary classifiers.
-///
-/// # Args
-///
-/// * `model` - The `PyGbmModel` reference.
-///
-/// # Returns
-///
-/// Class count (2).
-pub(crate) fn py_gbm_model_n_classes_rs(model: &PyGbmModel) -> usize {
-    model.inner.n_classes()
-}
-
-/// Extracts a [`PyGbmModel`] from arg 0 and serializes it to JSON.
-///
-/// # Args (positional)
-///
-/// 0. `model` (`PyGbmModel`)
-///
-/// # Errors
-///
-/// Returns `PyErr` if argument extraction or serialization fails.
-pub(crate) fn py_gbm_model_to_json_from_args(args: &Bound<'_, PyTuple>) -> PyResult<String> {
-    let arg0 = match args.get_item(0_usize) {
-        Ok(obj) => obj,
-        Err(e) => return Err(e),
-    };
-    let model: PyRef<'_, PyGbmModel> = match arg0.extract() {
-        Ok(v) => v,
-        Err(e) => return Err(e.into()),
-    };
-    py_gbm_model_to_json_rs(&model)
-}
-
-/// Extracts a JSON string from arg 0 and deserializes it into a [`PyGbmModel`].
-///
-/// # Args (positional)
-///
-/// 0. `json_str` (str)
-///
-/// # Errors
-///
-/// Returns `PyErr` if argument extraction or deserialization fails.
-pub(crate) fn py_gbm_model_from_json_from_args(args: &Bound<'_, PyTuple>) -> PyResult<PyGbmModel> {
-    let arg0 = match args.get_item(0_usize) {
-        Ok(obj) => obj,
-        Err(e) => return Err(e),
-    };
-    let json_str: String = match arg0.extract() {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
-    py_gbm_model_from_json_rs(&json_str)
-}
-
-/// Extracts a [`PyGbmModel`] from arg 0 and returns its feature-importance
-/// list.
-///
-/// # Args (positional)
-///
-/// 0. `model` (`PyGbmModel`)
-///
-/// # Errors
-///
-/// Returns `PyErr` if argument extraction fails.
-pub(crate) fn py_gbm_model_feature_importances_from_args(
-    args: &Bound<'_, PyTuple>,
-) -> PyResult<Vec<(String, f64)>> {
-    let arg0 = match args.get_item(0_usize) {
-        Ok(obj) => obj,
-        Err(e) => return Err(e),
-    };
-    let model: PyRef<'_, PyGbmModel> = match arg0.extract() {
-        Ok(v) => v,
-        Err(e) => return Err(e.into()),
-    };
-    Ok(py_gbm_model_feature_importances_rs(&model))
-}
-
-/// Extracts a [`PyGbmModel`] from arg 0 and returns its tree count.
-///
-/// # Args (positional)
-///
-/// 0. `model` (`PyGbmModel`)
-///
-/// # Errors
-///
-/// Returns `PyErr` if argument extraction fails.
-pub(crate) fn py_gbm_model_n_trees_from_args(args: &Bound<'_, PyTuple>) -> PyResult<usize> {
-    let arg0 = match args.get_item(0_usize) {
-        Ok(obj) => obj,
-        Err(e) => return Err(e),
-    };
-    let model: PyRef<'_, PyGbmModel> = match arg0.extract() {
-        Ok(v) => v,
-        Err(e) => return Err(e.into()),
-    };
-    Ok(py_gbm_model_n_trees_rs(&model))
-}
-
-/// Extracts a [`PyGbmModel`] from arg 0 and returns its class count.
-///
-/// # Args (positional)
-///
-/// 0. `model` (`PyGbmModel`)
-///
-/// # Errors
-///
-/// Returns `PyErr` if argument extraction fails.
-pub(crate) fn py_gbm_model_n_classes_from_args(args: &Bound<'_, PyTuple>) -> PyResult<usize> {
-    let arg0 = match args.get_item(0_usize) {
-        Ok(obj) => obj,
-        Err(e) => return Err(e),
-    };
-    let model: PyRef<'_, PyGbmModel> = match arg0.extract() {
-        Ok(v) => v,
-        Err(e) => return Err(e.into()),
-    };
-    Ok(py_gbm_model_n_classes_rs(&model))
-}
-
 // =============================================================================
 // Core wrappers
 // =============================================================================
 
-/// Trains a gradient boosting model from Python data.
+/// Trains a binary-classification gradient boosting model from Python data.
 ///
 /// # Args
 ///
@@ -319,7 +73,8 @@ pub(crate) fn py_gbm_model_n_classes_from_args(args: &Bound<'_, PyTuple>) -> PyR
 /// * `y_train` - 1D numpy array (i64) of binary labels (0/1).
 /// * `x_val` - Optional 2D numpy array (f64) of validation features.
 /// * `y_val` - Optional 1D numpy array (i64) of validation labels.
-/// * `config_dict` - Python dict with training hyperparameters.
+/// * `config_dict` - Python dict with training hyperparameters; its
+///   `objective` must be `"binary_log_loss"`.
 /// * `feature_names` - Python list of feature name strings.
 ///
 /// # Returns
@@ -345,7 +100,9 @@ pub(crate) fn train_gradient_boosting_rs(
     // Extract training labels
     let y_train_u8 = propagate!(extract_labels(y_train));
 
-    // Extract optional validation data
+    // Extract optional validation data (both-or-neither: the typed core
+    // takes features and labels as one value, so the pairing is checked
+    // here, where they arrive as separate arguments).
     let val_rows: Option<Vec<Vec<f64>>> = match x_val {
         Some(xv) => Some(propagate_into!(extract_rows(xv))),
         None => None,
@@ -357,6 +114,16 @@ pub(crate) fn train_gradient_boosting_rs(
     let y_val_u8: Option<Vec<u8>> = match y_val {
         Some(yv) => Some(propagate!(extract_labels(yv))),
         None => None,
+    };
+
+    let validation: Option<ValidationData<'_>> = match (&val_slices, &y_val_u8) {
+        (Some(xv), Some(yv)) => Some(ValidationData {
+            x: xv,
+            y: TrainingLabels::Binary(yv),
+        }),
+        (None, None) => None,
+        (Some(_), None) => return Err(missing_val_pair("y_val", "x_val")),
+        (None, Some(_)) => return Err(missing_val_pair("x_val", "y_val")),
     };
 
     // Extract config
@@ -376,9 +143,97 @@ pub(crate) fn train_gradient_boosting_rs(
     // Call training
     let model = propagate_into!(train_gradient_boosting(
         &train_slices,
-        &y_train_u8,
-        val_slices.as_deref(),
-        y_val_u8.as_deref(),
+        TrainingLabels::Binary(&y_train_u8),
+        validation,
+        &config,
+        &names,
+        &TrainingRuntime {
+            parallelism,
+            hooks: &Hooks::default(),
+        },
+    ));
+
+    Py::new(py, PyGbmModel { inner: model })
+}
+
+/// Trains a squared-error regression gradient boosting model from Python data.
+///
+/// # Args
+///
+/// * `py` - Python GIL token.
+/// * `x_train` - 2D numpy array (f64) of training features.
+/// * `y_train` - 1D numpy array (f64) of continuous targets.
+/// * `x_val` - Optional 2D numpy array (f64) of validation features.
+/// * `y_val` - Optional 1D numpy array (f64) of validation targets.
+/// * `config_dict` - Python dict with training hyperparameters; its
+///   `objective` must be `"squared_error"`.
+/// * `feature_names` - Python list of feature name strings.
+///
+/// # Returns
+///
+/// A [`PyGbmModel`] wrapping the trained model.
+///
+/// # Errors
+///
+/// Returns `PyErr` on argument extraction, validation, or training errors.
+pub(crate) fn train_gradient_boosting_regression_rs(
+    py: Python<'_>,
+    x_train: &PyReadonlyArray2<'_, f64>,
+    y_train: &PyReadonlyArray1<'_, f64>,
+    x_val: Option<&PyReadonlyArray2<'_, f64>>,
+    y_val: Option<&PyReadonlyArray1<'_, f64>>,
+    config_dict: &Bound<'_, PyDict>,
+    feature_names: &Bound<'_, PyList>,
+) -> PyResult<Py<PyGbmModel>> {
+    // Extract training features
+    let train_rows = propagate_into!(extract_rows(x_train));
+    let train_slices: Vec<&[f64]> = train_rows.iter().map(Vec::as_slice).collect();
+
+    // Extract training targets
+    let y_train_f64 = propagate!(extract_targets(y_train));
+
+    // Extract optional validation data (both-or-neither, as in the binary
+    // entry).
+    let val_rows: Option<Vec<Vec<f64>>> = match x_val {
+        Some(xv) => Some(propagate_into!(extract_rows(xv))),
+        None => None,
+    };
+    let val_slices: Option<Vec<&[f64]>> = val_rows
+        .as_ref()
+        .map(|rows| rows.iter().map(Vec::as_slice).collect());
+
+    let y_val_f64: Option<Vec<f64>> = match y_val {
+        Some(yv) => Some(propagate!(extract_targets(yv))),
+        None => None,
+    };
+
+    let validation: Option<ValidationData<'_>> = match (&val_slices, &y_val_f64) {
+        (Some(xv), Some(yv)) => Some(ValidationData {
+            x: xv,
+            y: TrainingLabels::Continuous(yv),
+        }),
+        (None, None) => None,
+        (Some(_), None) => return Err(missing_val_pair("y_val", "x_val")),
+        (None, Some(_)) => return Err(missing_val_pair("x_val", "y_val")),
+    };
+
+    // Extract config
+    let config = propagate!(extract_config(config_dict));
+
+    // Extract feature names
+    let names = propagate!(extract_feature_names(feature_names));
+
+    // Extract the worker-thread policy (same contract as the binary entry).
+    let parallelism = propagate_into!(Parallelism::from_n_jobs(propagate!(dict_get_i64(
+        config_dict,
+        "n_jobs"
+    ))));
+
+    // Call training
+    let model = propagate_into!(train_gradient_boosting(
+        &train_slices,
+        TrainingLabels::Continuous(&y_train_f64),
+        validation,
         &config,
         &names,
         &TrainingRuntime {
@@ -405,7 +260,8 @@ pub(crate) fn train_gradient_boosting_rs(
 ///
 /// # Errors
 ///
-/// Returns `PyErr` on validation or prediction errors.
+/// Returns `PyErr` on validation or prediction errors, including a model
+/// trained under `squared_error` (probabilities do not exist for it).
 pub(crate) fn predict_proba_model_rs<'py>(
     py: Python<'py>,
     model: &PyGbmModel,
@@ -421,7 +277,11 @@ pub(crate) fn predict_proba_model_rs<'py>(
     Ok(propagate_into!(PyArray2::from_vec2(py, &rows_2d)))
 }
 
-/// Predicts raw log-odds using a trained model.
+/// Predicts raw scores using a trained model.
+///
+/// Under `binary_log_loss` the raw score is a log-odds; under
+/// `squared_error` it is the prediction itself — this is the regression
+/// inference function.
 ///
 /// # Args
 ///
@@ -431,7 +291,7 @@ pub(crate) fn predict_proba_model_rs<'py>(
 ///
 /// # Returns
 ///
-/// 1D numpy array (f64) of raw predictions (log-odds).
+/// 1D numpy array (f64) of raw predictions.
 ///
 /// # Errors
 ///
@@ -453,6 +313,20 @@ pub(crate) fn predict_raw_model_rs<'py>(
 // Helpers
 // =============================================================================
 
+/// Builds the both-or-neither validation-pairing error.
+///
+/// # Args
+///
+/// * `missing` - The absent argument.
+/// * `present` - The provided argument that requires it.
+fn missing_val_pair(missing: &str, present: &str) -> PyErr {
+    ClearGbmError::InvalidParameter {
+        name: missing.to_string(),
+        reason: format!("{missing} must be provided when {present} is provided"),
+    }
+    .into()
+}
+
 /// Extracts binary labels from a numpy i64 array to `Vec<u8>`.
 ///
 /// # Errors
@@ -466,6 +340,19 @@ fn extract_labels(labels: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<u8>> {
         result.push(converted);
     }
     Ok(result)
+}
+
+/// Extracts continuous regression targets from a numpy f64 array.
+///
+/// Finiteness is validated by the core's objective resolution, which owns
+/// label semantics; this only materializes the values.
+///
+/// # Errors
+///
+/// Returns `PyErr` if the array is non-contiguous.
+fn extract_targets(targets: &PyReadonlyArray1<'_, f64>) -> PyResult<Vec<f64>> {
+    let slice = propagate_into!(targets.as_slice());
+    Ok(slice.to_vec())
 }
 
 /// Extracts a required i64 value from a Python dict.
@@ -546,7 +433,8 @@ fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoostingConfig> 
     let early_stopping_rounds = propagate!(extract_early_stopping_rounds(dict));
     let growth_strategy = propagate!(extract_growth_strategy(dict));
     let num_leaves = propagate!(extract_num_leaves(dict));
-    let scale_pos_weight = propagate!(dict_get_f64(dict, "scale_pos_weight"));
+    let objective = propagate!(extract_objective(dict));
+    let scale_pos_weight = propagate!(extract_scale_pos_weight(dict));
     let max_features = propagate!(extract_max_features(dict));
 
     let params = GradientBoostingConfigParams {
@@ -564,6 +452,7 @@ fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoostingConfig> 
         early_stopping_rounds,
         growth_strategy,
         num_leaves,
+        objective,
         scale_pos_weight,
         max_features,
     };
@@ -633,6 +522,65 @@ fn extract_max_features(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
 
     let val: i64 = propagate!(item.extract());
     Ok(Some(propagate_into!(i64_to_usize(val, "max_features"))))
+}
+
+/// Extracts the optional positive-class weight from a config dict.
+///
+/// The key `"scale_pos_weight"` is required to be present; its value may be
+/// `None` (regression) or a float (binary classification). Whether the value
+/// pairs correctly with the objective is decided by
+/// `GradientBoostingConfig::new`, not here.
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing or the value is neither `None` nor
+/// a float.
+fn extract_scale_pos_weight(dict: &Bound<'_, PyDict>) -> PyResult<Option<f64>> {
+    let opt = propagate!(dict.get_item("scale_pos_weight"));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "scale_pos_weight".to_string(),
+                reason: "missing required key 'scale_pos_weight'".to_string(),
+            }
+            .into())
+        }
+    };
+
+    if item.is_none() {
+        return Ok(None);
+    }
+
+    let val: f64 = propagate!(item.extract());
+    Ok(Some(val))
+}
+
+/// Extracts the training objective from a config dict.
+///
+/// The key `"objective"` is required and must be the string
+/// `"binary_log_loss"` or `"squared_error"`. A missing key is an error
+/// rather than a default, per the same rule as `growth_strategy`: a run
+/// must name the loss it descends.
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing, is not a string, or is not one of
+/// the two spellings.
+fn extract_objective(dict: &Bound<'_, PyDict>) -> PyResult<Objective> {
+    let opt = propagate!(dict.get_item("objective"));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "objective".to_string(),
+                reason: "missing required key 'objective'".to_string(),
+            }
+            .into())
+        }
+    };
+    let value: String = propagate!(item.extract());
+    Ok(propagate_into!(Objective::from_wire(&value)))
 }
 
 /// Extracts the tree growth policy from a config dict.
@@ -792,6 +740,63 @@ pub(crate) fn train_gradient_boosting_from_args(args: &Bound<'_, PyTuple>) -> Py
         propagate_into!(propagate!(args.get_item(5_usize)).extract());
 
     let model = propagate!(train_gradient_boosting_rs(
+        py,
+        &x_train,
+        &y_train,
+        x_val.as_ref(),
+        y_val.as_ref(),
+        &config_dict,
+        &feature_names,
+    ));
+
+    Ok(model.into_any())
+}
+
+/// Extracts arguments and delegates to
+/// [`train_gradient_boosting_regression_rs`].
+///
+/// # Args (positional)
+///
+/// 0. `x_train` (numpy f64 2D array) - Training features.
+/// 1. `y_train` (numpy f64 1D array) - Continuous training targets.
+/// 2. `x_val` (numpy f64 2D array or None) - Optional validation features.
+/// 3. `y_val` (numpy f64 1D array or None) - Optional validation targets.
+/// 4. `config` (dict) - Training hyperparameters.
+/// 5. `feature_names` (list of str) - Feature names.
+///
+/// # Errors
+///
+/// Returns `PyErr` if argument extraction or training fails.
+pub(crate) fn train_gradient_boosting_regression_from_args(
+    args: &Bound<'_, PyTuple>,
+) -> PyResult<Py<PyAny>> {
+    let py = args.py();
+
+    let x_train: PyReadonlyArray2<'_, f64> =
+        propagate_into!(propagate!(args.get_item(0_usize)).extract());
+    let y_train: PyReadonlyArray1<'_, f64> =
+        propagate_into!(propagate!(args.get_item(1_usize)).extract());
+
+    let arg2 = propagate!(args.get_item(2_usize));
+    let x_val: Option<PyReadonlyArray2<'_, f64>> = if arg2.is_none() {
+        None
+    } else {
+        Some(propagate_into!(arg2.extract()))
+    };
+
+    let arg3 = propagate!(args.get_item(3_usize));
+    let y_val: Option<PyReadonlyArray1<'_, f64>> = if arg3.is_none() {
+        None
+    } else {
+        Some(propagate_into!(arg3.extract()))
+    };
+
+    let config_dict: Bound<'_, PyDict> =
+        propagate_into!(propagate!(args.get_item(4_usize)).extract());
+    let feature_names: Bound<'_, PyList> =
+        propagate_into!(propagate!(args.get_item(5_usize)).extract());
+
+    let model = propagate!(train_gradient_boosting_regression_rs(
         py,
         &x_train,
         &y_train,

@@ -43,13 +43,13 @@ fn test_module_registers_every_public_entry_point() -> Result<(), ClearGbmError>
         for name in [
             "PyGbmModel",
             "train_gradient_boosting_rs",
+            "train_gradient_boosting_regression_rs",
             "predict_proba_model_rs",
             "predict_raw_model_rs",
             "py_gbm_model_to_json_rs",
             "py_gbm_model_from_json_rs",
             "py_gbm_model_feature_importances_rs",
             "py_gbm_model_n_trees_rs",
-            "py_gbm_model_n_classes_rs",
         ] {
             let present = match module.hasattr(name) {
                 Ok(v) => v,

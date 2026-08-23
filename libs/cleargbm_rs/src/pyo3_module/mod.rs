@@ -2,8 +2,10 @@
 //!
 //! Exposes the training + inference surface used by `cleargbm.ensemble`. The
 //! entire live Python API is eight functions plus the [`PyGbmModel`] class —
-//! everything else runs internally to the single native `train_gradient_boosting_rs`
-//! call. Subprimitive-level functions (per-histogram, per-tree, per-loss)
+//! everything else runs internally to the two native training entries
+//! (`train_gradient_boosting_rs` for binary classification,
+//! `train_gradient_boosting_regression_rs` for squared-error regression).
+//! Subprimitive-level functions (per-histogram, per-tree, per-loss)
 //! from the Python-computed era are gone; the migration to "Rust is the only
 //! compute path" (see `libs/cleargbm/src/cleargbm/ensemble.py`) made them
 //! unreachable from Python.
@@ -23,10 +25,12 @@
 //!
 //! - [`error_conversion`] — Maps [`ClearGbmError`](crate::error::ClearGbmError) to Python exceptions
 //! - [`array_helpers`] — Numpy ↔ Rust type conversions (no `as` casts)
-//! - [`training_fns`] — Training loop + the [`PyGbmModel`] class + model serde + importances
+//! - [`training_fns`] — Training entries (binary + regression) and prediction
+//! - [`model_fns`] — The [`PyGbmModel`] class + model serde + importances
 
 pub(crate) mod array_helpers;
 mod error_conversion;
+pub(crate) mod model_fns;
 pub(crate) mod training_fns;
 
 #[cfg(test)]
@@ -35,7 +39,7 @@ mod tests;
 use pyo3::prelude::*;
 use pyo3::types::{PyCFunction, PyDict, PyTuple};
 
-use training_fns::PyGbmModel;
+use model_fns::PyGbmModel;
 
 /// Registers all Python-callable functions and classes in the `cleargbm_rs` module.
 ///
@@ -81,6 +85,17 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     .and_then(|()| {
         PyCFunction::new_closure(
             py,
+            Some(c"train_gradient_boosting_regression_rs"),
+            Some(c"Train a gradient boosting model on regression data (squared error)."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                training_fns::train_gradient_boosting_regression_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
             Some(c"predict_proba_model_rs"),
             Some(c"Predict class probabilities using a trained model."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
@@ -106,7 +121,7 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"py_gbm_model_to_json_rs"),
             Some(c"Serialize a PyGbmModel to a JSON string."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
-                training_fns::py_gbm_model_to_json_from_args(args)
+                model_fns::py_gbm_model_to_json_from_args(args)
             },
         )
     })
@@ -117,7 +132,7 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"py_gbm_model_from_json_rs"),
             Some(c"Deserialize a PyGbmModel from a JSON string."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
-                training_fns::py_gbm_model_from_json_from_args(args)
+                model_fns::py_gbm_model_from_json_from_args(args)
             },
         )
     })
@@ -128,7 +143,7 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"py_gbm_model_feature_importances_rs"),
             Some(c"Return per-feature split-count importance for a PyGbmModel."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
-                training_fns::py_gbm_model_feature_importances_from_args(args)
+                model_fns::py_gbm_model_feature_importances_from_args(args)
             },
         )
     })
@@ -139,18 +154,7 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"py_gbm_model_n_trees_rs"),
             Some(c"Return the number of trees in a PyGbmModel."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
-                training_fns::py_gbm_model_n_trees_from_args(args)
-            },
-        )
-    })
-    .and_then(|f| m.add_function(f))
-    .and_then(|()| {
-        PyCFunction::new_closure(
-            py,
-            Some(c"py_gbm_model_n_classes_rs"),
-            Some(c"Return the number of classes in a PyGbmModel."),
-            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
-                training_fns::py_gbm_model_n_classes_from_args(args)
+                model_fns::py_gbm_model_n_trees_from_args(args)
             },
         )
     })

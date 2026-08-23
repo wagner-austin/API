@@ -1,7 +1,9 @@
 //! Tests for label/length validation and usize-to-f64 conversion.
 
 use crate::error::ClearGbmError;
-use crate::losses::validation::{usize_to_f64, validate_labels, validate_lengths};
+use crate::losses::validation::{
+    usize_to_f64, validate_continuous_labels, validate_labels, validate_lengths,
+};
 
 // --- validate_labels ---
 
@@ -66,6 +68,48 @@ fn test_validate_labels_first_invalid() -> Result<(), ClearGbmError> {
         }
         other => Err(ClearGbmError::TreeConstructionFailed {
             reason: format!("expected InvalidLabel, got {other:?}"),
+        }),
+    }
+}
+
+// --- validate_continuous_labels ---
+
+#[test]
+fn test_validate_continuous_labels_finite() -> Result<(), ClearGbmError> {
+    validate_continuous_labels(&[-1.5_f64, 0.0_f64, 3.25_f64], "y_true")
+}
+
+#[test]
+fn test_validate_continuous_labels_empty() -> Result<(), ClearGbmError> {
+    validate_continuous_labels(&[], "y_true")
+}
+
+#[test]
+fn test_validate_continuous_labels_nan() -> Result<(), ClearGbmError> {
+    let result = validate_continuous_labels(&[0.0_f64, f64::NAN], "y_train");
+    match result {
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "y_train");
+            assert!(reason.contains("index 1"));
+            Ok(())
+        }
+        other => Err(ClearGbmError::TreeConstructionFailed {
+            reason: format!("expected InvalidParameter, got {other:?}"),
+        }),
+    }
+}
+
+#[test]
+fn test_validate_continuous_labels_neg_infinity() -> Result<(), ClearGbmError> {
+    let result = validate_continuous_labels(&[f64::NEG_INFINITY, 0.0_f64], "y_val");
+    match result {
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "y_val");
+            assert!(reason.contains("index 0"));
+            Ok(())
+        }
+        other => Err(ClearGbmError::TreeConstructionFailed {
+            reason: format!("expected InvalidParameter, got {other:?}"),
         }),
     }
 }

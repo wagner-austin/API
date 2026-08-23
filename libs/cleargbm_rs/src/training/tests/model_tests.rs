@@ -1,64 +1,19 @@
 //! Tests for GradientBoostingModel.
 
 use crate::error::ClearGbmError;
-use crate::hooks::Hooks;
-use crate::training::{
-    train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams,
-    GradientBoostingModel, GrowthStrategy,
-};
-use crate::training::{Parallelism, TrainingRuntime};
+use crate::training::GradientBoostingModel;
+
+use super::train_helpers::{make_config, make_simple_dataset, train_binary};
 
 /// Builds a small trained model for testing.
 fn make_test_model() -> Result<GradientBoostingModel, ClearGbmError> {
-    // Simple linearly separable dataset: class 0 has low values, class 1 has high values
-    let rows: Vec<Vec<f64>> = vec![
-        vec![0.0_f64, 0.1_f64],
-        vec![0.1_f64, 0.0_f64],
-        vec![0.2_f64, 0.2_f64],
-        vec![0.3_f64, 0.1_f64],
-        vec![0.8_f64, 0.9_f64],
-        vec![0.9_f64, 0.8_f64],
-        vec![1.0_f64, 1.0_f64],
-        vec![0.7_f64, 0.9_f64],
-    ];
+    let (rows, y_train, feature_names) = make_simple_dataset();
     let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
-    let y_train: Vec<u8> = vec![0_u8, 0_u8, 0_u8, 0_u8, 1_u8, 1_u8, 1_u8, 1_u8];
-    let feature_names: Vec<String> = vec!["f0".to_string(), "f1".to_string()];
-
-    let config = match GradientBoostingConfig::new(GradientBoostingConfigParams {
-        n_estimators: 5_usize,
-        max_depth: 2_usize,
-        learning_rate: 0.3_f64,
-        min_samples_split: 2_usize,
-        min_samples_leaf: 1_usize,
-        max_bins: 4_usize,
-        subsample: 1.0_f64,
-        random_state: 42_u64,
-        monotonic_constraints: None,
-        reg_alpha: 0.0_f64,
-        reg_lambda: 1.0_f64,
-        early_stopping_rounds: None,
-        growth_strategy: GrowthStrategy::DepthWise,
-        num_leaves: None,
-        scale_pos_weight: 1.0_f64,
-        max_features: None,
-    }) {
+    let config = match make_config(5_usize) {
         Ok(c) => c,
         Err(e) => return Err(e),
     };
-
-    train_gradient_boosting(
-        &x_train,
-        &y_train,
-        None,
-        None,
-        &config,
-        &feature_names,
-        &TrainingRuntime {
-            parallelism: Parallelism::Single,
-            hooks: &Hooks::default(),
-        },
-    )
+    train_binary(&x_train, &y_train, None, &config, &feature_names)
 }
 
 #[test]
@@ -69,7 +24,6 @@ fn test_model_accessors() -> Result<(), ClearGbmError> {
     };
     assert_eq!(model.n_trees(), 5_usize);
     assert_eq!(model.trees().len(), 5_usize);
-    assert_eq!(model.n_classes(), 2_usize);
     assert!((model.learning_rate() - 0.3_f64).abs() < 1e-15_f64);
     assert_eq!(model.feature_names(), &["f0".to_string(), "f1".to_string()]);
     // base_prediction is the log-odds of the training labels (50% positive → ~0.0)
@@ -184,7 +138,6 @@ fn test_predict_raw_invalid_learning_rate() -> Result<(), ClearGbmError> {
         valid_model.base_prediction(),
         0.0_f64,
         valid_model.feature_names().to_vec(),
-        valid_model.n_classes(),
         valid_model.config().clone(),
     );
     let rows: Vec<Vec<f64>> = vec![vec![0.5_f64, 0.5_f64]];

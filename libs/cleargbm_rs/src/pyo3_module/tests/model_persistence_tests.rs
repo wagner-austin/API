@@ -1,9 +1,9 @@
 //! Tests for the model persistence and introspection bindings.
 //!
 //! Covers `py_gbm_model_to_json_rs`, `py_gbm_model_from_json_rs`,
-//! `py_gbm_model_feature_importances_rs`, `py_gbm_model_n_trees_rs` and
-//! `py_gbm_model_n_classes_rs` — the surface `cleargbm.ensemble` uses to save,
-//! reload and inspect a trained model.
+//! `py_gbm_model_feature_importances_rs` and `py_gbm_model_n_trees_rs` — the
+//! surface `cleargbm.ensemble` uses to save, reload and inspect a trained
+//! model.
 //!
 //! Each function is exercised twice: once through the registered module
 //! attribute (which runs the registration closure in
@@ -17,10 +17,9 @@ use pyo3::types::{PyAnyMethods, PyTuple};
 
 use super::helpers::{fail, init_module, module_fn, train_model, wrap_py_err};
 use crate::error::ClearGbmError;
-use crate::pyo3_module::training_fns::{
+use crate::pyo3_module::model_fns::{
     de_err, py_gbm_model_feature_importances_from_args, py_gbm_model_from_json_from_args,
-    py_gbm_model_n_classes_from_args, py_gbm_model_n_trees_from_args,
-    py_gbm_model_to_json_from_args, ser_err,
+    py_gbm_model_n_trees_from_args, py_gbm_model_to_json_from_args, ser_err,
 };
 
 /// Builds a one-element positional args tuple.
@@ -169,11 +168,13 @@ fn test_model_json_contains_required_fields() -> Result<(), ClearGbmError> {
             "base_prediction",
             "learning_rate",
             "feature_names",
-            "n_classes",
             "config",
         ] {
             assert!(json.contains(field), "serialized model lacks '{field}'");
         }
+        // The objective travels inside the embedded config — a saved model
+        // must state the loss it was trained under.
+        assert!(json.contains(r#""objective":"binary_log_loss""#));
         Ok(())
     })
 }
@@ -209,36 +210,6 @@ fn test_n_trees_matches_configured_estimators() -> Result<(), ClearGbmError> {
         };
         // The shared config sets n_estimators = 2 with no early stopping.
         assert_eq!(n_trees, 2_usize);
-        Ok(())
-    })
-}
-
-/// Binary classification reports exactly two classes.
-#[test]
-fn test_n_classes_is_two_for_binary() -> Result<(), ClearGbmError> {
-    pyo3::Python::initialize();
-    pyo3::Python::attach(|py| {
-        let module = match init_module(py) {
-            Ok(m) => m,
-            Err(e) => return Err(e),
-        };
-        let model = match train_model(py) {
-            Ok(m) => m,
-            Err(e) => return Err(e),
-        };
-        let n_classes_fn = match module_fn(&module, "py_gbm_model_n_classes_rs") {
-            Ok(f) => f,
-            Err(e) => return Err(e),
-        };
-        let out = match n_classes_fn.call1((model,)) {
-            Ok(v) => v,
-            Err(e) => return Err(wrap_py_err(&e)),
-        };
-        let n_classes = match out.extract::<usize>() {
-            Ok(v) => v,
-            Err(e) => return Err(wrap_py_err(&e)),
-        };
-        assert_eq!(n_classes, 2_usize);
         Ok(())
     })
 }
@@ -325,7 +296,7 @@ fn test_from_json_rejects_missing_required_field() -> Result<(), ClearGbmError> 
             Err(e) => return Err(e),
         };
         // Valid JSON, valid field names, but `config` is absent.
-        let json = r#"{"trees":[],"base_prediction":0.0,"learning_rate":0.1,"feature_names":[],"n_classes":2}"#;
+        let json = r#"{"trees":[],"base_prediction":0.0,"learning_rate":0.1,"feature_names":[]}"#;
         match from_json.call1((json,)) {
             Ok(_) => Err(fail(
                 "document missing 'config' must not deserialize".to_string(),
@@ -385,7 +356,6 @@ fn test_accessors_reject_missing_argument() -> Result<(), ClearGbmError> {
         assert!(py_gbm_model_from_json_from_args(&empty).is_err());
         assert!(py_gbm_model_feature_importances_from_args(&empty).is_err());
         assert!(py_gbm_model_n_trees_from_args(&empty).is_err());
-        assert!(py_gbm_model_n_classes_from_args(&empty).is_err());
         Ok(())
     })
 }
@@ -404,7 +374,6 @@ fn test_accessors_reject_wrong_argument_type() -> Result<(), ClearGbmError> {
         assert!(py_gbm_model_to_json_from_args(&tuple).is_err());
         assert!(py_gbm_model_feature_importances_from_args(&tuple).is_err());
         assert!(py_gbm_model_n_trees_from_args(&tuple).is_err());
-        assert!(py_gbm_model_n_classes_from_args(&tuple).is_err());
         Ok(())
     })
 }

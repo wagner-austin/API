@@ -1,16 +1,18 @@
 //! Input validation for gradient boosting training.
 //!
-//! Validates feature matrices, labels, and feature names before training.
+//! Validates feature-matrix shapes, label counts, and feature names before
+//! training. Label *content* (0/1 for binary, finite for continuous) is
+//! validated by [`super::labels::resolve_objective`], which knows the label
+//! kind; these functions own everything label-kind-agnostic.
 
 use crate::error::ClearGbmError;
-use crate::losses::validation::validate_labels;
 
-/// Validates training inputs and returns the number of features.
+/// Validates training input shapes and returns the number of features.
 ///
 /// # Args
 ///
 /// * `x_train` - Training feature matrix `[n_samples][n_features]`.
-/// * `y_train` - Training labels (binary: 0 or 1).
+/// * `n_labels` - Number of training labels.
 /// * `feature_names` - Feature names (one per feature).
 ///
 /// # Returns
@@ -21,12 +23,11 @@ use crate::losses::validation::validate_labels;
 ///
 /// * `ClearGbmError::EmptyInput` if `x_train` is empty or has zero features.
 /// * `ClearGbmError::ShapeMismatch` if `x_train` rows differ in length,
-///   or `y_train` length doesn't match `x_train`, or `feature_names` length
+///   or the label count doesn't match `x_train`, or `feature_names` length
 ///   doesn't match.
-/// * `ClearGbmError::InvalidLabel` if labels are not 0/1.
 pub(crate) fn validate_training_inputs(
     x_train: &[&[f64]],
-    y_train: &[u8],
+    n_labels: usize,
     feature_names: &[String],
 ) -> Result<usize, ClearGbmError> {
     if x_train.is_empty() {
@@ -52,19 +53,13 @@ pub(crate) fn validate_training_inputs(
         }
     }
 
-    // Validate y_train length matches x_train
-    if y_train.len() != n_samples {
+    // Validate label count matches x_train
+    if n_labels != n_samples {
         return Err(ClearGbmError::ShapeMismatch {
             expected: format!("{n_samples} labels"),
-            got: format!("{} labels", y_train.len()),
+            got: format!("{n_labels} labels"),
         });
     }
-
-    // Validate labels are binary 0/1
-    match validate_labels(y_train) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
 
     // Validate feature_names length
     if feature_names.len() != n_features {
@@ -77,22 +72,21 @@ pub(crate) fn validate_training_inputs(
     Ok(n_features)
 }
 
-/// Validates optional validation inputs against the training dimensions.
+/// Validates optional validation-input shapes against the training dimensions.
 ///
 /// # Args
 ///
 /// * `x_val` - Validation feature matrix `[n_val_samples][n_features]`.
-/// * `y_val` - Validation labels.
+/// * `n_labels` - Number of validation labels.
 /// * `n_features` - Expected number of features (from training data).
 ///
 /// # Errors
 ///
 /// * `ClearGbmError::EmptyInput` if `x_val` is empty.
 /// * `ClearGbmError::ShapeMismatch` if dimensions don't match.
-/// * `ClearGbmError::InvalidLabel` if labels are not 0/1.
 pub(crate) fn validate_validation_inputs(
     x_val: &[&[f64]],
-    y_val: &[u8],
+    n_labels: usize,
     n_features: usize,
 ) -> Result<(), ClearGbmError> {
     if x_val.is_empty() {
@@ -118,19 +112,13 @@ pub(crate) fn validate_validation_inputs(
         }
     }
 
-    // Validate y_val length matches x_val
-    if y_val.len() != x_val.len() {
+    // Validate label count matches x_val
+    if n_labels != x_val.len() {
         return Err(ClearGbmError::ShapeMismatch {
             expected: format!("{} validation labels", x_val.len()),
-            got: format!("{} validation labels", y_val.len()),
+            got: format!("{n_labels} validation labels"),
         });
     }
-
-    // Validate labels
-    match validate_labels(y_val) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
 
     Ok(())
 }

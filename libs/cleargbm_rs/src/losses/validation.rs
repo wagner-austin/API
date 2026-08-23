@@ -51,6 +51,34 @@ pub(crate) fn validate_lengths(y_true: &[u8], y_pred: &[f64]) -> Result<(), Clea
     Ok(())
 }
 
+/// Validates that all continuous regression targets are finite.
+///
+/// A NaN or infinite label would poison the base score, every gradient it
+/// touches, and the evaluation loss, so it is rejected at the boundary with
+/// its index rather than surfacing later as a NaN model.
+///
+/// # Args
+///
+/// * `y_true` - Slice of continuous regression targets.
+/// * `name` - The caller's argument name (`"y_true"`, `"y_train"`,
+///   `"y_val"`), used in the error so it points at the offending input.
+///
+/// # Errors
+///
+/// Returns `ClearGbmError::InvalidParameter` naming the first non-finite
+/// label and its index.
+pub(crate) fn validate_continuous_labels(y_true: &[f64], name: &str) -> Result<(), ClearGbmError> {
+    for (i, &label) in y_true.iter().enumerate() {
+        if !label.is_finite() {
+            return Err(ClearGbmError::InvalidParameter {
+                name: name.to_string(),
+                reason: format!("label at index {i} must be finite, got {label}"),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Validates that a positive-class weight is a finite positive number.
 ///
 /// # Args

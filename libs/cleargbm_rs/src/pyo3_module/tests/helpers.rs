@@ -10,7 +10,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::error::ClearGbmError;
-use crate::pyo3_module::training_fns::train_gradient_boosting_from_args;
+use crate::pyo3_module::training_fns::{
+    train_gradient_boosting_from_args, train_gradient_boosting_regression_from_args,
+};
 
 /// Wraps a [`PyErr`] into a [`ClearGbmError`] so tests can return `Result`.
 ///
@@ -178,6 +180,10 @@ pub(super) fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict
         Ok(()) => {}
         Err(e) => return Err(wrap_py_err(&e)),
     };
+    match set_config_str(&config, "objective", "binary_log_loss") {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    };
     match set_config_f64(&config, "scale_pos_weight", 1.0_f64) {
         Ok(()) => {}
         Err(e) => return Err(e),
@@ -185,6 +191,40 @@ pub(super) fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict
     // Present and null, like num_leaves: absence must be an error, not a
     // silent "all features".
     match config.set_item("max_features", py.None()) {
+        Ok(()) => {}
+        Err(e) => return Err(wrap_py_err(&e)),
+    };
+    Ok(config)
+}
+
+/// Builds a config dict with valid squared-error regression hyperparameters.
+///
+/// Same shape as [`make_config_dict`] with the objective pairing flipped:
+/// `objective` is `"squared_error"` and `scale_pos_weight` is present-and-null.
+///
+/// # Args
+///
+/// * `py` - Python GIL token.
+///
+/// # Returns
+///
+/// A dict accepted by `train_gradient_boosting_regression_rs`.
+///
+/// # Errors
+///
+/// Returns [`ClearGbmError::TreeConstructionFailed`] if any insert fails.
+pub(super) fn make_regression_config_dict<'py>(
+    py: Python<'py>,
+) -> Result<Bound<'py, PyDict>, ClearGbmError> {
+    let config = match make_config_dict(py) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    match set_config_str(&config, "objective", "squared_error") {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    };
+    match config.set_item("scale_pos_weight", py.None()) {
         Ok(()) => {}
         Err(e) => return Err(wrap_py_err(&e)),
     };
@@ -286,6 +326,93 @@ pub(super) fn train_model(py: Python<'_>) -> Result<Py<PyAny>, ClearGbmError> {
         Err(e) => return Err(e),
     };
     match train_gradient_boosting_from_args(&args) {
+        Ok(m) => Ok(m),
+        Err(e) => Err(wrap_py_err(&e)),
+    }
+}
+
+/// The continuous targets paired with [`training_rows`] for regression tests.
+///
+/// `y = f0 + f1`, noiseless, so a small ensemble fits it tightly.
+///
+/// # Returns
+///
+/// Six continuous targets.
+pub(super) fn regression_targets() -> Vec<f64> {
+    training_rows()
+        .iter()
+        .map(|r| r[0_usize] + r[1_usize])
+        .collect()
+}
+
+/// Builds the positional args tuple for
+/// `train_gradient_boosting_regression_from_args`.
+///
+/// # Args
+///
+/// * `py` - Python GIL token.
+///
+/// # Returns
+///
+/// A six-element tuple `(x_train, y_train, None, None, config, feature_names)`
+/// with `f64` targets and a squared-error config.
+///
+/// # Errors
+///
+/// Returns [`ClearGbmError::TreeConstructionFailed`] if any Python object
+/// construction fails.
+pub(super) fn make_regression_training_args<'py>(
+    py: Python<'py>,
+) -> Result<Bound<'py, PyTuple>, ClearGbmError> {
+    let x_train = match PyArray2::from_vec2(py, &training_rows()) {
+        Ok(f) => f,
+        Err(e) => return Err(fail(format!("PyArray2 creation failed: {e}"))),
+    };
+    let y_train = PyArray1::from_vec(py, regression_targets());
+    let config = match make_regression_config_dict(py) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let names = match PyList::new(py, ["f0", "f1"]) {
+        Ok(l) => l,
+        Err(e) => return Err(wrap_py_err(&e)),
+    };
+
+    match PyTuple::new(
+        py,
+        [
+            x_train.into_any(),
+            y_train.into_any(),
+            py.None().into_bound(py).into_any(),
+            py.None().into_bound(py).into_any(),
+            config.into_any(),
+            names.into_any(),
+        ],
+    ) {
+        Ok(t) => Ok(t),
+        Err(e) => Err(wrap_py_err(&e)),
+    }
+}
+
+/// Trains a regression model through the real binding.
+///
+/// # Args
+///
+/// * `py` - Python GIL token.
+///
+/// # Returns
+///
+/// The trained `PyGbmModel` as an opaque Python object.
+///
+/// # Errors
+///
+/// Returns [`ClearGbmError::TreeConstructionFailed`] if training fails.
+pub(super) fn train_regression_model(py: Python<'_>) -> Result<Py<PyAny>, ClearGbmError> {
+    let args = match make_regression_training_args(py) {
+        Ok(a) => a,
+        Err(e) => return Err(e),
+    };
+    match train_gradient_boosting_regression_from_args(&args) {
         Ok(m) => Ok(m),
         Err(e) => Err(wrap_py_err(&e)),
     }

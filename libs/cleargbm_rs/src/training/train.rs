@@ -1,13 +1,16 @@
 //! Core training loop for gradient boosting.
 //!
-//! Orchestrates the full training pipeline: validation, binning,
-//! iterative tree construction with gradient/hessian updates,
-//! optional early stopping, and model assembly.
+//! Orchestrates the full training pipeline: validation, objective
+//! resolution, binning, iterative tree construction with gradient/hessian
+//! updates, optional early stopping, and model assembly.
 
 use crate::binning::precompute_feature_bins;
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
-use crate::losses::{binary_log_loss, binary_log_loss_initial_prediction, sigmoid_array};
+use crate::losses::{
+    binary_log_loss, binary_log_loss_initial_prediction, sigmoid_array,
+    squared_error_initial_prediction, squared_error_loss,
+};
 use crate::predict::predict_tree;
 use crate::tree::{
     build_tree_leaf_wise_with_leaf_assignment, build_tree_with_leaf_assignment, BuildTreeInput,
@@ -17,6 +20,7 @@ use crate::types::SplitConfig;
 
 use super::config::{GradientBoostingConfig, GrowthStrategy};
 use super::early_stopping::EarlyStoppingState;
+use super::labels::{resolve_objective, ResolvedObjective, TrainingLabels, ValidationData};
 use super::model::GradientBoostingModel;
 use super::parallelism::Parallelism;
 use super::rng::SimpleRng;
@@ -37,23 +41,27 @@ pub struct TrainingRuntime<'a> {
     pub hooks: &'a Hooks,
 }
 
-/// Trains a gradient boosting model on binary classification data.
+/// Trains a gradient boosting model under the configured objective.
 ///
 /// Orchestrates the full training pipeline:
-/// 1. Validates inputs (shapes, labels, feature names)
-/// 2. Computes initial prediction (log-odds of class prevalence)
-/// 3. Pre-bins features into histogram indices
-/// 4. Iterates boosting rounds: compute gradients/hessians, subsample,
-///    build tree, update predictions
-/// 5. Optionally applies early stopping based on validation loss
-/// 6. Returns the trained model
+/// 1. Validates input shapes (rows, labels, feature names)
+/// 2. Resolves the objective against the label kind (binary `u8` labels for
+///    `binary_log_loss`, continuous `f64` targets for `squared_error`) and
+///    validates label contents
+/// 3. Computes the objective's base score (weighted log-odds / label mean)
+/// 4. Pre-bins features into histogram indices
+/// 5. Iterates boosting rounds: compute the objective's gradients/hessians,
+///    subsample, build tree, update predictions
+/// 6. Optionally applies early stopping based on the objective's validation
+///    loss
+/// 7. Returns the trained model
 ///
 /// # Args
 ///
 /// * `x_train` - Training feature matrix `[n_samples][n_features]`.
-/// * `y_train` - Training labels (binary: 0 or 1).
-/// * `x_val` - Optional validation feature matrix.
-/// * `y_val` - Optional validation labels.
+/// * `y_train` - Training labels, typed by kind ([`TrainingLabels`]).
+/// * `validation` - Validation features paired with labels of the same kind,
+///   or `None`.
 /// * `config` - Training hyperparameters.
 /// * `feature_names` - Feature names (one per feature).
 /// * `runtime` - Worker-thread policy and injection hooks. Does not affect the
@@ -67,63 +75,61 @@ pub struct TrainingRuntime<'a> {
 ///
 /// * `ClearGbmError::EmptyInput` if training data is empty.
 /// * `ClearGbmError::ShapeMismatch` if dimensions are inconsistent.
-/// * `ClearGbmError::InvalidLabel` if labels are not 0/1.
-/// * `ClearGbmError::InvalidParameter` if only one of x_val/y_val is provided,
-///   or on configuration errors.
+/// * `ClearGbmError::InvalidLabel` if binary labels are not 0/1.
+/// * `ClearGbmError::InvalidParameter` if the label kind does not match the
+///   objective, a continuous label is not finite, or on configuration errors.
 /// * Any tree construction or prediction error.
 pub fn train_gradient_boosting(
     x_train: &[&[f64]],
-    y_train: &[u8],
-    x_val: Option<&[&[f64]]>,
-    y_val: Option<&[u8]>,
+    y_train: TrainingLabels<'_>,
+    validation: Option<ValidationData<'_>>,
     config: &GradientBoostingConfig,
     feature_names: &[String],
     runtime: &TrainingRuntime<'_>,
 ) -> Result<GradientBoostingModel, ClearGbmError> {
     let hooks = runtime.hooks;
-    // 1. Validate training inputs
-    let n_features = match validate_training_inputs(x_train, y_train, feature_names) {
+    // 1. Validate training input shapes
+    let n_features = match validate_training_inputs(x_train, y_train.len(), feature_names) {
         Ok(n) => n,
         Err(e) => return Err(e),
     };
 
-    // 2. Validate optional validation inputs (both or neither required)
-    let validation_data: Option<(&[&[f64]], &[u8])> = match (x_val, y_val) {
-        (Some(xv), Some(yv)) => {
-            match validate_validation_inputs(xv, yv, n_features) {
-                Ok(()) => {}
-                Err(e) => return Err(e),
-            };
-            Some((xv, yv))
+    // 2. Validate validation input shapes if provided
+    if let Some(v) = validation {
+        match validate_validation_inputs(v.x, v.y.len(), n_features) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
         }
-        (None, None) => None,
-        (Some(_), None) => {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "y_val".to_string(),
-                reason: "y_val must be provided when x_val is provided".to_string(),
-            });
-        }
-        (None, Some(_)) => {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "x_val".to_string(),
-                reason: "x_val must be provided when y_val is provided".to_string(),
-            });
-        }
-    };
+    }
 
-    // 3. Compute initial prediction (log-odds of weighted class prevalence)
-    let scale_pos_weight = config.scale_pos_weight();
-    let base_prediction = match binary_log_loss_initial_prediction(y_train, scale_pos_weight) {
-        Ok(p) => p,
-        Err(e) => return Err(e),
+    // 2b. Resolve the objective against the label kinds. Past this point an
+    // objective/label mismatch is unrepresentable, so the boosting loop
+    // dispatches with total matches.
+    let resolved = propagate!(resolve_objective(
+        config.objective(),
+        config.scale_pos_weight(),
+        y_train,
+        validation,
+    ));
+
+    // 3. Compute the objective's base score
+    let base_prediction = match &resolved {
+        ResolvedObjective::Binary {
+            y_train: yt,
+            scale_pos_weight,
+            ..
+        } => propagate!(binary_log_loss_initial_prediction(yt, *scale_pos_weight)),
+        ResolvedObjective::SquaredError { y_train: yt, .. } => {
+            propagate!(squared_error_initial_prediction(yt))
+        }
     };
 
     let n_train = x_train.len();
     let mut raw_preds_train = vec![base_prediction; n_train];
 
     // 4. Initialize validation predictions if needed
-    let mut raw_preds_val: Vec<f64> = match validation_data {
-        Some((xv, _)) => vec![base_prediction; xv.len()],
+    let mut raw_preds_val: Vec<f64> = match resolved.val_features() {
+        Some(xv) => vec![base_prediction; xv.len()],
         None => Vec::new(),
     };
 
@@ -208,44 +214,65 @@ pub fn train_gradient_boosting(
         let mut trees: Vec<Tree> = Vec::with_capacity(config.n_estimators());
 
         for round in 0_usize..config.n_estimators() {
-            // a. Compute probabilities from current raw predictions
-            let probas = sigmoid_array(&raw_preds_train);
-
-            // b. Compute gradients and hessians (inline — lengths match by
-            // construction). Kept in f64 end to end. Narrowing these two streams
-            // to f32 for the histogram hot loop was measured 8% SLOWER on this
-            // workload: at the node sizes reached here both widths already fit in
-            // L2, so there is no bandwidth to save, and every element then pays a
-            // widening conversion before its accumulate. See the wiki page
+            // a/b. Compute gradients and hessians under the objective
+            // (inline — lengths match by construction). Kept in f64 end to
+            // end. Narrowing these two streams to f32 for the histogram hot
+            // loop was measured 8% SLOWER on this workload: at the node sizes
+            // reached here both widths already fit in L2, so there is no
+            // bandwidth to save, and every element then pays a widening
+            // conversion before its accumulate. See the wiki page
             // `cleargbm-f32-score-narrowing-reverted`.
-            //
-            // Positive samples carry `scale_pos_weight`: the objective is the
-            // weighted log loss, so its first and second derivatives scale
-            // together. At weight 1.0 the multiply is by exactly `1.0`, which
-            // IEEE 754 makes an identity — the unweighted history is the
-            // weighted path's special case, bit for bit.
-            let gradients: Vec<f64> = probas
-                .iter()
-                .zip(y_train.iter())
-                .map(|(&p, &y)| {
-                    if y == 1_u8 {
-                        scale_pos_weight * (p - 1.0_f64)
-                    } else {
-                        p
-                    }
-                })
-                .collect();
-            let hessians: Vec<f64> = probas
-                .iter()
-                .zip(y_train.iter())
-                .map(|(&p, &y)| {
-                    if y == 1_u8 {
-                        scale_pos_weight * (p * (1.0_f64 - p))
-                    } else {
-                        p * (1.0_f64 - p)
-                    }
-                })
-                .collect();
+            let (gradients, hessians): (Vec<f64>, Vec<f64>) = match &resolved {
+                ResolvedObjective::Binary {
+                    y_train: yt,
+                    scale_pos_weight,
+                    ..
+                } => {
+                    // Probabilities come from the sigmoid of the running raw
+                    // scores. Positive samples carry `scale_pos_weight`: the
+                    // objective is the weighted log loss, so its first and
+                    // second derivatives scale together. At weight 1.0 the
+                    // multiply is by exactly `1.0`, which IEEE 754 makes an
+                    // identity — the unweighted history is the weighted
+                    // path's special case, bit for bit.
+                    let scale_pos_weight = *scale_pos_weight;
+                    let probas = sigmoid_array(&raw_preds_train);
+                    let gradients: Vec<f64> = probas
+                        .iter()
+                        .zip(yt.iter())
+                        .map(|(&p, &y)| {
+                            if y == 1_u8 {
+                                scale_pos_weight * (p - 1.0_f64)
+                            } else {
+                                p
+                            }
+                        })
+                        .collect();
+                    let hessians: Vec<f64> = probas
+                        .iter()
+                        .zip(yt.iter())
+                        .map(|(&p, &y)| {
+                            if y == 1_u8 {
+                                scale_pos_weight * (p * (1.0_f64 - p))
+                            } else {
+                                p * (1.0_f64 - p)
+                            }
+                        })
+                        .collect();
+                    (gradients, hessians)
+                }
+                ResolvedObjective::SquaredError { y_train: yt, .. } => {
+                    // Squared error differentiates in raw-score space
+                    // directly: gradient = prediction - y, hessian = 1.
+                    let gradients: Vec<f64> = raw_preds_train
+                        .iter()
+                        .zip(yt.iter())
+                        .map(|(&pred, &y)| pred - y)
+                        .collect();
+                    let hessians: Vec<f64> = vec![1.0_f64; n_train];
+                    (gradients, hessians)
+                }
+            };
 
             // c. Get sample indices (subsampling)
             let sample_indices =
@@ -317,26 +344,49 @@ pub fn train_gradient_boosting(
                 }
             }
 
-            // g. Early stopping check on validation set (before push, so we can borrow tree)
-            let stop_at_round: Option<usize> = match validation_data {
-                Some((xv, yv)) => {
+            // g. Early stopping check on the objective's validation loss
+            // (before push, so we can borrow tree)
+            let val_loss: Option<f64> = match &resolved {
+                ResolvedObjective::Binary {
+                    val: Some((xv, yv)),
+                    scale_pos_weight,
+                    ..
+                } => {
                     let val_preds = propagate!(predict_tree(&tree, xv));
                     for i in 0_usize..raw_preds_val.len() {
                         raw_preds_val[i] += config.learning_rate() * val_preds[i];
                     }
                     let val_probas = sigmoid_array(&raw_preds_val);
-                    let val_loss = propagate!(binary_log_loss(yv, &val_probas, scale_pos_weight));
-                    match es_state {
-                        Some(ref mut es) => {
-                            if es.update(val_loss, round) {
-                                Some(es.best_round())
-                            } else {
-                                None
-                            }
-                        }
-                        None => None,
-                    }
+                    Some(propagate!(binary_log_loss(
+                        yv,
+                        &val_probas,
+                        *scale_pos_weight
+                    )))
                 }
+                ResolvedObjective::SquaredError {
+                    val: Some((xv, yv)),
+                    ..
+                } => {
+                    let val_preds = propagate!(predict_tree(&tree, xv));
+                    for i in 0_usize..raw_preds_val.len() {
+                        raw_preds_val[i] += config.learning_rate() * val_preds[i];
+                    }
+                    Some(propagate!(squared_error_loss(yv, &raw_preds_val)))
+                }
+                ResolvedObjective::Binary { val: None, .. }
+                | ResolvedObjective::SquaredError { val: None, .. } => None,
+            };
+            let stop_at_round: Option<usize> = match val_loss {
+                Some(loss) => match es_state {
+                    Some(ref mut es) => {
+                        if es.update(loss, round) {
+                            Some(es.best_round())
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
+                },
                 None => None,
             };
 
@@ -359,7 +409,6 @@ pub fn train_gradient_boosting(
         base_prediction,
         config.learning_rate(),
         feature_names.to_vec(),
-        2_usize, // n_classes = 2 for binary classification
         config.clone(),
     ))
 }
