@@ -97,6 +97,7 @@ class TestResolveRun:
             "accept_billing": False,
             "env_path": "/pub/envs/abl-pinned",
             "pinned_packages": {},
+            "deterministic": False,
             "experiment": {"arm": "B", "seed": "42"},
             "command": "python train.py --arm B",
         }

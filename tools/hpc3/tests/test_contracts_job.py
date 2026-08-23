@@ -43,6 +43,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "accept_billing": False,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
         "pinned_packages": {},
+        "deterministic": False,
         "experiment": {"arm": "B", "seed": "42"},
         "command": "python train.py",
     }
@@ -62,6 +63,7 @@ class TestValidSpec:
             "checkpoint_steps",
             "command",
             "cpus",
+            "deterministic",
             "env_path",
             "experiment",
             "gpu",

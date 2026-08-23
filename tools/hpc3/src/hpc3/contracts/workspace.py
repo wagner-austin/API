@@ -82,6 +82,16 @@ class ProjectConfig(TypedDict):
             to pin, and declaring ``{}`` says so deliberately rather than
             leaving the question unasked. When non-empty, preflight asks the
             environment itself instead of trusting its path.
+        deterministic: Whether this project's runs are configured for
+            kernel-level numerical determinism. Required and explicit,
+            because it partitions results rather than improving them:
+            measured on this stack, two same-seed runs of a 6-layer model
+            diverge by the sixth significant figure of the loss without the
+            controls, and the deterministic value is a *different* number
+            from the nondeterministic one. Runs on either side of that
+            setting form separate records and comparing across them
+            reintroduces the confound the controls remove -- so the setting
+            has to be part of what a run IS, not a flag someone remembers.
     """
 
     partition: str
@@ -95,6 +105,7 @@ class ProjectConfig(TypedDict):
     accept_billing: bool
     env_path: str
     pinned_packages: dict[str, str]
+    deterministic: bool
 
 
 class Workspace(TypedDict):
@@ -138,6 +149,7 @@ PROJECT_FIELDS = (
     "accept_billing",
     "env_path",
     "pinned_packages",
+    "deterministic",
 )
 """The fields a project declares, and exactly the fields a run may override.
 
@@ -228,6 +240,7 @@ def decode_project_config(value: JSONValue, cluster: ClusterFacts) -> ProjectCon
         accept_billing=require_bool(value, "accept_billing"),
         env_path=_require_nonempty_str(value, "env_path"),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
+        deterministic=require_bool(value, "deterministic"),
     )
 
 
@@ -252,6 +265,7 @@ def encode_project_config(config: ProjectConfig) -> dict[str, JSONValue]:
         "accept_billing": config["accept_billing"],
         "env_path": config["env_path"],
         "pinned_packages": encode_pinned_packages(config["pinned_packages"]),
+        "deterministic": config["deterministic"],
     }
 
 

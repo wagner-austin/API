@@ -126,6 +126,7 @@ def submit(
             partition=spec["partition"],
             submitted_at=submitted_at,
             log_dir=log_dir,
+            deterministic=spec["deterministic"],
             experiment=spec["experiment"],
         ),
     )

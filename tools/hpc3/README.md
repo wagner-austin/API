@@ -217,6 +217,39 @@ Free-form because what identifies a source differs per project, and a fixed
 schema would mean writing `"none"` into fields that do not apply. It is the
 record; `--expect-from` is the enforcement.
 
+### The run's numerical determinism is declared and recorded
+
+`deterministic` is required on every project, and it is not a quality setting —
+it **partitions results**. Measured on this exact stack (RTX 3090 Ti, torch
+2.6.0+cu124, transformers 4.46.3): two same-seed runs of a 6-layer model
+diverge at the sixth significant figure of the loss without the controls, and
+the deterministic loss is a *different number* from the nondeterministic one.
+Runs on either side form separate records, and comparing across them measures
+the setting rather than the thing under test.
+
+So the posture travels with the run — into `--comment` as `det=on|off` and into
+the ledger — and two arms that differ only in it can never be silently mixed.
+
+The work itself is split, because only one half is a submitter's to do:
+
+| half | who | why |
+| --- | --- | --- |
+| `CUBLAS_WORKSPACE_CONFIG` | **this tool**, in the batch script | cuBLAS reads it once when its handle is created; setting it after CUDA has started is accepted in silence and does nothing. Exported from the script it cannot be too late, and cannot be forgotten. |
+| `torch.use_deterministic_algorithms(True)`, cuDNN and TF32 flags | **the payload** | they are torch calls in the payload's own process. This tool has no torch and does not pretend to make them. |
+
+The payload reads `HPC3_DETERMINISTIC` (`0` or `1`, always exported) and applies
+its half — `platform_ml.apply_determinism` does exactly this, and Model-Trainer
+already calls it in `setup_env`. The two halves are safe to split because
+PyTorch *enforces* the pairing: deterministic mode raises a `RuntimeError`
+naming the missing variable, so a payload that does its half without the
+launcher's half fails loudly rather than training quietly non-reproducible
+numbers.
+
+The variable's name and value are defined once, in
+`platform_core.determinism_env`, and imported by both the trainer and this
+submitter. A duplicated literal would be the worst kind: the copies drift,
+nothing fails, and the runs stop being comparable.
+
 ### The result can be traced back to the run
 
 ```bash

@@ -17,6 +17,11 @@ a successful job.
 
 from __future__ import annotations
 
+from platform_core.determinism_env import (
+    CUBLAS_DETERMINISTIC_WORKSPACE,
+    CUBLAS_WORKSPACE_ENV_VAR,
+)
+
 from hpc3.contracts.experiment import comment_fragment
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
@@ -68,8 +73,31 @@ def job_comment(spec: JobSpec) -> str:
         f";gpu={spec['gpu']}x{spec['gpu_count']}"
         f";cpus={spec['cpus']}"
         f";env={spec['env_path']}"
+        f";det={'on' if spec['deterministic'] else 'off'}"
         f";exp={comment_fragment(spec['experiment'])}"
     )
+
+
+def _determinism_exports(spec: JobSpec) -> list[str]:
+    """Build the environment lines a deterministic run needs before it starts.
+
+    Args:
+        spec: The spec being rendered.
+
+    Returns:
+        Export lines when the project declared determinism, and an empty list
+        otherwise. ``HPC3_DETERMINISTIC`` is exported either way so the
+        payload can read what was asked of it rather than inferring it from
+        the presence of the cuBLAS variable -- absent is a state, not a
+        message, and a payload that guessed would silently train the other
+        record.
+    """
+    if not spec["deterministic"]:
+        return ['export HPC3_DETERMINISTIC="0"']
+    return [
+        'export HPC3_DETERMINISTIC="1"',
+        f'export {CUBLAS_WORKSPACE_ENV_VAR}="{CUBLAS_DETERMINISTIC_WORKSPACE}"',
+    ]
 
 
 def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
@@ -120,6 +148,16 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
         f'export HPC3_PROJECT="{spec["project"]}"',
         f'export HPC3_JOB_NAME="{label}"',
         f'export HPC3_CHECKPOINT_STEPS="{spec["checkpoint_steps"]}"',
+        # Determinism is declared here and applied by the payload, because the
+        # switch that matters is a torch call this submitter cannot make. What
+        # the submitter CAN do is guarantee the half that must precede the
+        # process: cuBLAS reads its workspace variable once, when the handle is
+        # created, so setting it after CUDA has started is accepted in silence
+        # and does nothing. Exported here it cannot be too late, and it cannot
+        # be forgotten by a payload that only remembers the torch half --
+        # which fails loudly, because deterministic mode raises when the
+        # variable is absent.
+        *_determinism_exports(spec),
         # Slurm increments SLURM_RESTART_COUNT each time it requeues a job,
         # so a preempted run re-enters here with a non-zero value. This
         # package cannot resume on the payload's behalf -- only the payload

@@ -44,6 +44,7 @@ def _entry(job_id: str) -> LedgerEntry:
             "partition": "free-gpu",
             "submitted_at": _AT,
             "log_dir": "/pub/logs",
+            "deterministic": False,
             "experiment": {"arm": "B"},
         }
     )

@@ -48,8 +48,15 @@ from typing import Protocol, TypedDict
 # by the CUDA runtime when the cuBLAS handle is created, which happens on
 # first use, so it must be in the environment BEFORE any CUDA work -- setting
 # it afterwards is accepted silently and has no effect.
-CUBLAS_WORKSPACE_ENV_VAR = "CUBLAS_WORKSPACE_CONFIG"
-CUBLAS_DETERMINISTIC_WORKSPACE = ":4096:8"
+#
+# Imported rather than defined here: a job submitter writes the same variable
+# into a batch script and must not depend on torch to know its value. The pair
+# lives in platform_core so the two tiers cannot drift apart -- if they did,
+# nothing would fail and the runs would simply stop being comparable.
+from platform_core.determinism_env import (
+    CUBLAS_DETERMINISTIC_WORKSPACE,
+    CUBLAS_WORKSPACE_ENV_VAR,
+)
 
 
 class DeterminismReport(TypedDict):

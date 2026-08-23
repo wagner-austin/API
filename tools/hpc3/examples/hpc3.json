@@ -23,7 +23,8 @@
       "pinned_packages": {
         "torch": "2.6.0+cu124",
         "transformers": "4.46.3"
-      }
+      },
+      "deterministic": true
     }
   }
 }

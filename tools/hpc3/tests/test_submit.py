@@ -53,6 +53,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
+        "deterministic": False,
         "experiment": {"arm": "B", "seed": "42"},
         "command": "python train.py",
     }
@@ -186,6 +187,7 @@ class TestSubmitRecordsTheJob:
                 partition="free-gpu",
                 submitted_at=_AT,
                 log_dir="/pub/wagnera3/logs",
+                deterministic=False,
                 experiment={"arm": "B", "seed": "42"},
             )
         ]

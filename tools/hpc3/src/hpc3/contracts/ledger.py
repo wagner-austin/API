@@ -23,6 +23,7 @@ from __future__ import annotations
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
+    require_bool,
     require_str,
 )
 from typing_extensions import TypedDict
@@ -50,6 +51,13 @@ class LedgerEntry(TypedDict):
             reads the clock cannot be tested for what it records.
         log_dir: Absolute directory holding the job's output, so the logs are
             findable without reconstructing the submission.
+        deterministic: Whether the run was configured for kernel-level
+            numerical determinism. Recorded because runs on either side of
+            this setting are separate records: the deterministic loss is a
+            different number from the nondeterministic one, so a comparison
+            that crosses the boundary measures the setting rather than the
+            thing under test. A ledger that did not carry it could not tell
+            the two apart afterwards.
         experiment: What this run was -- corpus digest, seed, base model, or
             whatever identifies a run in this project. The fields above find
             the job; this one says which result it produced, which is the
@@ -64,6 +72,7 @@ class LedgerEntry(TypedDict):
     partition: str
     submitted_at: str
     log_dir: str
+    deterministic: bool
     experiment: dict[str, str]
 
 
@@ -105,6 +114,7 @@ def encode_ledger_entry(entry: LedgerEntry) -> dict[str, JSONValue]:
         "partition": entry["partition"],
         "submitted_at": entry["submitted_at"],
         "log_dir": entry["log_dir"],
+        "deterministic": entry["deterministic"],
         "experiment": encode_experiment(entry["experiment"]),
     }
 
@@ -138,6 +148,7 @@ def decode_ledger_entry(value: JSONValue, cluster: ClusterFacts) -> LedgerEntry:
         partition=require_partition(cluster, value, "partition"),
         submitted_at=_require_nonempty_str(value, "submitted_at"),
         log_dir=_require_nonempty_str(value, "log_dir"),
+        deterministic=require_bool(value, "deterministic"),
         experiment=require_experiment(value, "experiment"),
     )
 

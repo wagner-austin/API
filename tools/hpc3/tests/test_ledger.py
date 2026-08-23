@@ -36,6 +36,7 @@ def _entry(**overrides: str) -> LedgerEntry:
         "partition": "free-gpu",
         "submitted_at": "2026-08-22T16:00:00+00:00",
         "log_dir": "/pub/wagnera3/logs",
+        "deterministic": False,
         "experiment": {"arm": "B", "seed": "42"},
     }
     base.update(overrides)
@@ -110,6 +111,7 @@ class TestLedgerEntryContract:
             "partition": "free-gpu",
             "submitted_at": "2026-08-22T16:00:00+00:00",
             "log_dir": "/pub/wagnera3/logs",
+            "deterministic": False,
             "experiment": {"arm": "B", "seed": "42"},
         }
         assert encode_ledger_entry(decode_ledger_entry(payload)) == payload
@@ -130,6 +132,7 @@ class TestLedgerEntryContract:
                     "partition": "turbo",
                     "submitted_at": "t",
                     "log_dir": "/l",
+                    "deterministic": False,
                     "experiment": {"arm": "B"},
                 }
             )
@@ -147,6 +150,7 @@ class TestLedgerEntryContract:
                     "partition": "free-gpu",
                     "submitted_at": "t",
                     "log_dir": "/l",
+                    "deterministic": False,
                     "experiment": {"arm": "B"},
                 }
             )
@@ -160,6 +164,7 @@ class TestLedgerEntryContract:
             "partition": "free-gpu",
             "submitted_at": "t",
             "log_dir": "/l",
+            "deterministic": False,
             "experiment": {"arm": "B"},
         }
         for key in ("job_id", "project", "name", "host", "submitted_at", "log_dir"):

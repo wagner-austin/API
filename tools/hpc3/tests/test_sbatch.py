@@ -8,6 +8,10 @@ from contract to script: the GPU model always appears in ``--gres``, and
 
 from __future__ import annotations
 
+from platform_core.determinism_env import (
+    CUBLAS_DETERMINISTIC_WORKSPACE,
+    CUBLAS_WORKSPACE_ENV_VAR,
+)
 from platform_core.json_utils import JSONValue
 
 from hpc3.contracts.job import JobSpec
@@ -40,6 +44,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "accept_billing": False,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
         "pinned_packages": {},
+        "deterministic": False,
         "experiment": {"arm": "B", "seed": "42"},
         "command": "python train.py --seed 42",
     }
@@ -146,8 +151,14 @@ class TestJobIsSelfDescribing:
 
     def test_the_comment_carries_project_hardware_environment_and_experiment(self) -> None:
         assert job_comment(_spec()) == (
-            "project=abl;gpu=A100x1;cpus=8;env=/pub/wagnera3/envs/abl-pinned;exp=arm=B,seed=42"
+            "project=abl;gpu=A100x1;cpus=8;env=/pub/wagnera3/envs/abl-pinned"
+            ";det=off;exp=arm=B,seed=42"
         )
+
+    def test_the_comment_states_the_determinism_posture(self) -> None:
+        """Two arms differing only in this are two records, not two samples."""
+        assert ";det=off;" in job_comment(_spec())
+        assert ";det=on;" in job_comment(_spec(deterministic=True))
 
     def test_a_queue_row_says_which_experiment_it_is(self) -> None:
         """So a row found in squeue answers the question without a ledger."""
@@ -178,6 +189,46 @@ class TestJobIsSelfDescribing:
         theirs = render_sbatch(_spec(project="sirius"), log_dir=_LOG_DIR)
         assert "#SBATCH -J abl.arm-b-42" in mine
         assert "#SBATCH -J sirius.arm-b-42" in theirs
+
+
+class TestDeterminismIsDeclaredBeforeTheProcessStarts:
+    """The half a submitter can guarantee, and the half it cannot.
+
+    cuBLAS reads its workspace variable once, when the handle is created on
+    first use, so setting it after CUDA has started is accepted in silence and
+    does nothing. Exported from the batch script it cannot be too late. The
+    switch that actually enables determinism is a torch call in the payload's
+    own process, which this package neither makes nor pretends to.
+    """
+
+    def test_a_deterministic_run_carries_the_cublas_workspace(self) -> None:
+        script = render_sbatch(_spec(deterministic=True), log_dir=_LOG_DIR)
+        assert f'export {CUBLAS_WORKSPACE_ENV_VAR}="{CUBLAS_DETERMINISTIC_WORKSPACE}"' in script
+
+    def test_the_workspace_value_is_the_shared_one_not_a_copy(self) -> None:
+        """Trainer and submitter must write the same string or the two runs
+        silently stop being comparable; there is one definition."""
+        assert CUBLAS_WORKSPACE_ENV_VAR == "CUBLAS_WORKSPACE_CONFIG"
+        assert CUBLAS_DETERMINISTIC_WORKSPACE == ":4096:8"
+
+    def test_a_nondeterministic_run_does_not_carry_it(self) -> None:
+        assert CUBLAS_WORKSPACE_ENV_VAR not in render_sbatch(_spec(), log_dir=_LOG_DIR)
+
+    def test_the_posture_is_exported_either_way(self) -> None:
+        """Absent is a state, not a message. A payload inferring determinism
+        from a missing variable would silently train the other record."""
+        assert 'export HPC3_DETERMINISTIC="0"' in render_sbatch(_spec(), log_dir=_LOG_DIR)
+        assert 'export HPC3_DETERMINISTIC="1"' in render_sbatch(
+            _spec(deterministic=True), log_dir=_LOG_DIR
+        )
+
+    def test_it_is_exported_before_the_payload_runs(self) -> None:
+        """After CUDA starts the variable is accepted and ignored."""
+        script = render_sbatch(_spec(deterministic=True), log_dir=_LOG_DIR)
+        lines = script.splitlines()
+        exported = next(i for i, line in enumerate(lines) if CUBLAS_WORKSPACE_ENV_VAR in line)
+        payload = next(i for i, line in enumerate(lines) if line == "python train.py --seed 42")
+        assert exported < payload
 
 
 class TestResumeSurface:

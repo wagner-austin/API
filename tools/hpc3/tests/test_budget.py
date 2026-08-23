@@ -47,6 +47,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "accept_billing": False,
         "env_path": "/pub/envs/abl",
         "pinned_packages": {},
+        "deterministic": False,
         "experiment": {"arm": "B"},
         "command": "python train.py",
     }

@@ -42,6 +42,7 @@ def _base(**overrides: JSONValue) -> dict[str, JSONValue]:
         "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
+        "deterministic": False,
         "experiment": {"rung": "774M"},
         "command": "python train.py",
     }

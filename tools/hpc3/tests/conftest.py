@@ -307,6 +307,7 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
         "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
+        "deterministic": False,
     }
     config.update(overrides)
     return config

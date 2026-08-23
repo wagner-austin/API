@@ -84,6 +84,11 @@ class JobSpec(TypedDict):
             contain. Checked at preflight against the environment's own
             report, because a path proves the directory exists and nothing
             about what is in it. Empty means the project declared no pins.
+        deterministic: Whether kernel-level numerical determinism is
+            configured for this run. Rendered into the batch script and
+            recorded in the ledger, because it partitions results rather
+            than improving them -- see
+            :mod:`hpc3.contracts.workspace`.
         experiment: What this run IS, as free-form key/value pairs -- the
             corpus digest it trains on, its seed, the model it starts from.
             Required and never empty, and carried into the ledger, because a
@@ -106,6 +111,7 @@ class JobSpec(TypedDict):
     accept_billing: bool
     env_path: str
     pinned_packages: dict[str, str]
+    deterministic: bool
     experiment: dict[str, str]
     command: str
 
@@ -270,6 +276,7 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
         "accept_billing": spec["accept_billing"],
         "env_path": spec["env_path"],
         "pinned_packages": encode_pinned_packages(spec["pinned_packages"]),
+        "deterministic": spec["deterministic"],
         "experiment": encode_experiment(spec["experiment"]),
         "command": spec["command"],
     }
@@ -329,6 +336,7 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
         accept_billing=accept_billing,
         env_path=_require_nonempty_str(value, "env_path"),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
+        deterministic=require_bool(value, "deterministic"),
         experiment=require_experiment(value, "experiment"),
         command=_require_nonempty_str(value, "command"),
     )

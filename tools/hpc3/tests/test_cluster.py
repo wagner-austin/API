@@ -83,6 +83,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "accept_billing": True,
         "env_path": "/scratch/env",
         "pinned_packages": {},
+        "deterministic": False,
         "experiment": {"arm": "B"},
         "command": "python train.py",
     }
