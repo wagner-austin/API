@@ -97,6 +97,7 @@ pub(super) fn grow_leaf_wise(
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     build_tree_leaf_wise_with_leaf_assignment(&input, &Hooks::default())
@@ -126,6 +127,7 @@ pub(super) fn grow_depth_wise(
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     build_tree(&input, &Hooks::default())

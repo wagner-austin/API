@@ -1,7 +1,8 @@
 //! Combined binning result for training.
 //!
-//! Wraps bin edges and sample bin assignments into a single struct
-//! that produces output compatible with `BuildTreeInput`.
+//! Wraps per-feature binning (quantile edges for numeric features, category
+//! maps for categorical ones) and sample bin assignments into a single
+//! struct that produces output compatible with `BuildTreeInput`.
 //!
 //! # Storage layout
 //!
@@ -20,16 +21,30 @@
 use crate::error::ClearGbmError;
 
 use super::assignment::assign_bin;
-use super::edges::{compute_bin_edges, BinEdges};
+use super::categorical::{categorical_column_bins, CategoryMap};
+use super::edges::{compute_feature_edges, BinEdges};
 
-/// Combined binning result: edges + sample assignments.
+/// How one feature is binned.
+///
+/// An enum rather than parallel optional tables so a feature can never
+/// carry both quantile edges and a category map, and a consumer can never
+/// read the wrong one silently.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FeatureBinning {
+    /// Ordered quantile bins over a numeric feature.
+    Numeric(BinEdges),
+    /// One bin per distinct category code.
+    Categorical(CategoryMap),
+}
+
+/// Combined binning result: per-feature binning + sample assignments.
 ///
 /// Produced once per training run by `precompute_feature_bins`, then
 /// referenced by every boosting iteration.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FeatureBins {
-    /// One `BinEdges` per feature.
-    bin_edges: Vec<BinEdges>,
+    /// One binning per feature.
+    per_feature: Vec<FeatureBinning>,
 
     /// Flat row-major bin index storage.
     ///
@@ -48,10 +63,10 @@ pub struct FeatureBins {
 }
 
 impl FeatureBins {
-    /// Returns the bin edges per feature.
+    /// Returns the per-feature binning.
     #[must_use]
-    pub fn bin_edges(&self) -> &[BinEdges] {
-        &self.bin_edges
+    pub fn per_feature(&self) -> &[FeatureBinning] {
+        &self.per_feature
     }
 
     /// Returns the flat row-major bin storage.
@@ -96,27 +111,32 @@ impl FeatureBins {
         self.n_regular_bins
     }
 
-    /// Converts bin edges to the `BuildTreeInput.bin_thresholds` format.
+    /// Converts per-feature binning to the `BuildTreeInput.bin_thresholds` format.
     ///
     /// Returns `[n_features][n_regular_bins]` where each inner Vec contains
     /// the actual edge thresholds padded with `f64::INFINITY` to length
     /// `n_regular_bins`.
     ///
-    /// The tree builder reads `bin_thresholds[feature][split_bin]` to get
-    /// the split threshold. Unused bin slots (from features with fewer
-    /// unique values) get `f64::INFINITY` — these bins have zero histogram
-    /// counts and are never selected as split points.
+    /// The tree builder reads `bin_thresholds[feature][split_bin]` to get a
+    /// THRESHOLD split's boundary. Unused bin slots (from features with
+    /// fewer unique values) get `f64::INFINITY` — these bins have zero
+    /// histogram counts and are never selected as split points. A
+    /// categorical feature's row is entirely `f64::INFINITY`: no threshold
+    /// split can ever name it, because the split search partitions its bins
+    /// by set membership and node finalization reads the category map, not
+    /// this table.
     #[must_use]
     pub fn bin_thresholds(&self) -> Vec<Vec<f64>> {
-        let mut thresholds = Vec::with_capacity(self.bin_edges.len());
-        for be in &self.bin_edges {
-            let edges = be.edges();
+        let mut thresholds = Vec::with_capacity(self.per_feature.len());
+        for binning in &self.per_feature {
             let mut feat_thresholds = Vec::with_capacity(self.n_regular_bins);
-            // First edges.len() entries are the actual thresholds
-            for &e in edges {
-                feat_thresholds.push(e);
+            if let FeatureBinning::Numeric(be) = binning {
+                for &e in be.edges() {
+                    feat_thresholds.push(e);
+                }
             }
-            // Pad remaining with INFINITY (last regular bin + unused bins)
+            // Pad remaining with INFINITY (last regular bin + unused bins;
+            // the whole row for categorical features).
             while feat_thresholds.len() < self.n_regular_bins {
                 feat_thresholds.push(f64::INFINITY);
             }
@@ -126,12 +146,13 @@ impl FeatureBins {
     }
 }
 
-/// Precomputes bin edges and sample bin assignments for all features.
+/// Precomputes per-feature binning and sample bin assignments.
 ///
-/// This is the single entry point called once per training run. It computes
-/// quantile-based bin edges, then assigns each sample to its bin. The output
-/// is a flat column-major `Vec<u8>` — see the module-level docs for the
-/// layout rationale.
+/// This is the single entry point called once per training run. Numeric
+/// features get quantile-based bin edges; features flagged in
+/// `categorical_mask` get one bin per distinct category code. Each sample
+/// is then assigned to its bin. The output is a flat row-major `Vec<u8>` —
+/// see the module-level docs for the layout rationale.
 ///
 /// # Args
 ///
@@ -141,64 +162,119 @@ impl FeatureBins {
 ///   [`GradientBoostingConfig::new`](crate::training::GradientBoostingConfig::new)
 ///   before this function is called; this function relies on the invariant to
 ///   pack bin indices into `u8`.
+/// * `categorical_mask` - `Some(mask)` flags categorical features by
+///   position; `None` bins every feature numerically, bit-identical to the
+///   history before the categorical axis existed.
 ///
 /// # Returns
 ///
-/// A `FeatureBins` containing edges, flat row-major u8 assignments, and
-/// the bin count.
+/// A `FeatureBins` containing per-feature binning, flat row-major u8
+/// assignments, and the bin count.
 ///
 /// # Errors
 ///
-/// * Propagates errors from `compute_bin_edges`.
-/// * Returns `ClearGbmError::InvalidParameter` if `max_bins > 255` — the u8
-///   bin-index invariant is broken.
+/// * Returns `ClearGbmError::InvalidParameter` if `max_bins < 2` or
+///   `max_bins > 255`, if the mask length disagrees with the feature count,
+///   or if a categorical column holds a non-integer value or more distinct
+///   categories than `max_bins`.
+/// * Returns `ClearGbmError::EmptyInput` / `ClearGbmError::ShapeMismatch`
+///   for an empty or ragged matrix.
 pub fn precompute_feature_bins(
     x: &[&[f64]],
     max_bins: usize,
+    categorical_mask: Option<&[bool]>,
 ) -> Result<FeatureBins, ClearGbmError> {
+    if max_bins < 2_usize {
+        return Err(ClearGbmError::InvalidParameter {
+            name: "max_bins".to_string(),
+            reason: "must be >= 2".to_string(),
+        });
+    }
     if max_bins > 255_usize {
         return Err(ClearGbmError::InvalidParameter {
             name: "max_bins".to_string(),
             reason: format!("must be <= 255 (u8 bin index), got {max_bins}"),
         });
     }
-
-    let bin_edges = match compute_bin_edges(x, max_bins) {
-        Ok(e) => e,
-        Err(e) => return Err(e),
-    };
+    if x.is_empty() {
+        return Err(ClearGbmError::EmptyInput {
+            context: "x must not be empty".to_string(),
+        });
+    }
+    let n_features = x[0].len();
+    if n_features == 0_usize {
+        return Err(ClearGbmError::EmptyInput {
+            context: "x has zero features".to_string(),
+        });
+    }
+    for (i, row) in x.iter().enumerate() {
+        if row.len() != n_features {
+            return Err(ClearGbmError::ShapeMismatch {
+                expected: format!("all rows with {n_features} features"),
+                got: format!("row {i} has {} features", row.len()),
+            });
+        }
+    }
+    if let Some(mask) = categorical_mask {
+        if mask.len() != n_features {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "categorical_features".to_string(),
+                reason: format!(
+                    "categorical mask covers {} features but the matrix has {n_features}",
+                    mask.len()
+                ),
+            });
+        }
+    }
 
     let n_samples = x.len();
-    let n_features = bin_edges.len();
-    let nan_bin_usize = max_bins;
+    let nan_bin = u8::try_from(max_bins).unwrap_or(u8::MAX);
 
     // Flat row-major storage: sample_bins[sample_idx * n_features + feat_idx].
-    // Filled rows-outer, which also matches the input matrix's own row-major
-    // shape: each input row is read once, in order.
-    let mut sample_bins = vec![0_u8; n_samples * n_features];
+    // Initialized to the NaN bin so each feature's pass only writes the
+    // non-missing rows it assigned.
+    let mut sample_bins = vec![nan_bin; n_samples * n_features];
+    let mut per_feature: Vec<FeatureBinning> = Vec::with_capacity(n_features);
 
-    for (sample_idx, row) in x.iter().enumerate() {
-        let row_start = sample_idx * n_features;
-        for (feat_idx, be) in bin_edges.iter().enumerate() {
-            let val = row[feat_idx];
-            let bin_idx_usize = if val.is_nan() {
-                nan_bin_usize
-            } else {
-                assign_bin(val, be.edges())
+    for feat_idx in 0_usize..n_features {
+        let is_categorical = categorical_mask.is_some_and(|mask| mask[feat_idx]);
+        if is_categorical {
+            let column: Vec<f64> = x.iter().map(|row| row[feat_idx]).collect();
+            let (map, column_bins) = match categorical_column_bins(&column, feat_idx, max_bins) {
+                Ok(pair) => pair,
+                Err(e) => return Err(e),
             };
-            // `max_bins <= 255` is rejected at the top of this function, and
-            // the NaN bin sits at `max_bins` — the largest index either branch
-            // above can produce — so every value here is already in u8 range.
-            // Written as a saturating conversion rather than a fallible one
-            // because the error arm would be statically dead: the guard has
-            // already run, so there is no input that reaches it.
-            let bin_idx: u8 = u8::try_from(bin_idx_usize).unwrap_or(u8::MAX);
-            sample_bins[row_start + feat_idx] = bin_idx;
+            for (sample_idx, bin) in column_bins.iter().enumerate() {
+                if let Some(bin_usize) = bin {
+                    // Bounded by max_bins <= 255 via the distinct-count check
+                    // inside categorical_column_bins, so the u8 conversion's
+                    // error arm is statically dead — saturate like the
+                    // numeric path below.
+                    sample_bins[sample_idx * n_features + feat_idx] =
+                        u8::try_from(*bin_usize).unwrap_or(u8::MAX);
+                }
+            }
+            per_feature.push(FeatureBinning::Categorical(map));
+        } else {
+            let be = compute_feature_edges(x, feat_idx, max_bins);
+            for (sample_idx, row) in x.iter().enumerate() {
+                let val = row[feat_idx];
+                if !val.is_nan() {
+                    let bin_idx_usize = assign_bin(val, be.edges());
+                    // max_bins <= 255 is enforced above and assign_bin's
+                    // result is < max_bins, so every value here is already
+                    // in u8 range; saturating conversion because the error
+                    // arm would be statically dead.
+                    sample_bins[sample_idx * n_features + feat_idx] =
+                        u8::try_from(bin_idx_usize).unwrap_or(u8::MAX);
+                }
+            }
+            per_feature.push(FeatureBinning::Numeric(be));
         }
     }
 
     Ok(FeatureBins {
-        bin_edges,
+        per_feature,
         sample_bins,
         n_samples,
         n_features,

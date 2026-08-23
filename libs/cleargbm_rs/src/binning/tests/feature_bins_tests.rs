@@ -1,7 +1,16 @@
 //! Tests for FeatureBins and precompute_feature_bins.
 
-use crate::binning::feature_bins::precompute_feature_bins;
+use crate::binning::feature_bins::{precompute_feature_bins, FeatureBinning, FeatureBins};
 use crate::error::ClearGbmError;
+
+/// Returns a numeric feature's edges, failing the assertion if the feature
+/// is categorical (these tests only bin numerically).
+fn numeric_edges(fb: &FeatureBins, feature_index: usize) -> &[f64] {
+    match &fb.per_feature()[feature_index] {
+        FeatureBinning::Numeric(be) => be.edges(),
+        FeatureBinning::Categorical(_) => &[],
+    }
+}
 
 #[test]
 fn test_precompute_basic() -> Result<(), ClearGbmError> {
@@ -12,12 +21,12 @@ fn test_precompute_basic() -> Result<(), ClearGbmError> {
         vec![4.0_f64, 40.0_f64],
     ];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let fb = match precompute_feature_bins(&refs, 4_usize) {
+    let fb = match precompute_feature_bins(&refs, 4_usize, None) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
 
-    assert_eq!(fb.bin_edges().len(), 2_usize);
+    assert_eq!(fb.per_feature().len(), 2_usize);
     assert_eq!(fb.n_regular_bins(), 4_usize);
     assert_eq!(fb.n_samples(), 4_usize);
     assert_eq!(fb.n_features(), 2_usize);
@@ -33,7 +42,7 @@ fn test_precompute_basic() -> Result<(), ClearGbmError> {
 fn test_precompute_bin_thresholds_format() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![2.0_f64], vec![3.0_f64], vec![4.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let fb = match precompute_feature_bins(&refs, 4_usize) {
+    let fb = match precompute_feature_bins(&refs, 4_usize, None) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
@@ -41,7 +50,7 @@ fn test_precompute_bin_thresholds_format() -> Result<(), ClearGbmError> {
 
     assert_eq!(thresholds.len(), 1_usize);
     assert_eq!(thresholds[0].len(), 4_usize);
-    let actual_edge_count = fb.bin_edges()[0].edges().len();
+    let actual_edge_count = numeric_edges(&fb, 0_usize).len();
     for (i, &t) in thresholds[0].iter().enumerate() {
         if i < actual_edge_count {
             assert!(t.is_finite());
@@ -56,7 +65,7 @@ fn test_precompute_bin_thresholds_format() -> Result<(), ClearGbmError> {
 fn test_precompute_with_nan() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![f64::NAN], vec![3.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let fb = match precompute_feature_bins(&refs, 4_usize) {
+    let fb = match precompute_feature_bins(&refs, 4_usize, None) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
@@ -81,7 +90,7 @@ fn test_precompute_with_nan() -> Result<(), ClearGbmError> {
 fn test_precompute_all_nan_feature() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![f64::NAN], vec![f64::NAN]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let fb = match precompute_feature_bins(&refs, 4_usize) {
+    let fb = match precompute_feature_bins(&refs, 4_usize, None) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
@@ -112,7 +121,7 @@ fn test_precompute_roundtrip_with_build_tree_input() -> Result<(), ClearGbmError
         vec![3.0_f64, 300.0_f64],
     ];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let fb = match precompute_feature_bins(&refs, 8_usize) {
+    let fb = match precompute_feature_bins(&refs, 8_usize, None) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
@@ -144,12 +153,12 @@ fn test_precompute_roundtrip_with_build_tree_input() -> Result<(), ClearGbmError
 fn test_precompute_max_bins_2() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![2.0_f64], vec![3.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let fb = match precompute_feature_bins(&refs, 2_usize) {
+    let fb = match precompute_feature_bins(&refs, 2_usize, None) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
     assert_eq!(fb.n_regular_bins(), 2_usize);
-    assert!(fb.bin_edges()[0].edges().len() <= 1_usize);
+    assert!(numeric_edges(&fb, 0_usize).len() <= 1_usize);
     Ok(())
 }
 
@@ -157,7 +166,7 @@ fn test_precompute_max_bins_2() -> Result<(), ClearGbmError> {
 fn test_precompute_error_max_bins_1() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let result = precompute_feature_bins(&refs, 1_usize);
+    let result = precompute_feature_bins(&refs, 1_usize, None);
     assert!(result.is_err());
     Ok(())
 }
@@ -167,7 +176,7 @@ fn test_precompute_error_max_bins_over_255() -> Result<(), ClearGbmError> {
     // The u8 bin-index invariant caps max_bins at 255.
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let result = precompute_feature_bins(&refs, 256_usize);
+    let result = precompute_feature_bins(&refs, 256_usize, None);
     assert!(matches!(
         result,
         Err(ClearGbmError::InvalidParameter { .. })
@@ -178,7 +187,7 @@ fn test_precompute_error_max_bins_over_255() -> Result<(), ClearGbmError> {
 #[test]
 fn test_precompute_error_empty() -> Result<(), ClearGbmError> {
     let refs: Vec<&[f64]> = Vec::new();
-    let result = precompute_feature_bins(&refs, 4_usize);
+    let result = precompute_feature_bins(&refs, 4_usize, None);
     assert!(result.is_err());
     Ok(())
 }
@@ -187,14 +196,14 @@ fn test_precompute_error_empty() -> Result<(), ClearGbmError> {
 fn test_bin_thresholds_padding_with_fewer_edges() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![0.0_f64], vec![0.0_f64], vec![1.0_f64], vec![1.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let fb = match precompute_feature_bins(&refs, 8_usize) {
+    let fb = match precompute_feature_bins(&refs, 8_usize, None) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
 
     let thresholds = fb.bin_thresholds();
     assert_eq!(thresholds[0].len(), 8_usize);
-    let n_actual_edges = fb.bin_edges()[0].edges().len();
+    let n_actual_edges = numeric_edges(&fb, 0_usize).len();
     assert!(n_actual_edges >= 1_usize);
     assert!(thresholds[0][0].is_finite());
     for item in thresholds[0].iter().skip(n_actual_edges) {
@@ -207,7 +216,7 @@ fn test_bin_thresholds_padding_with_fewer_edges() -> Result<(), ClearGbmError> {
 fn test_bins_for_sample_out_of_range_returns_empty() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![2.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let fb = match precompute_feature_bins(&refs, 4_usize) {
+    let fb = match precompute_feature_bins(&refs, 4_usize, None) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
@@ -229,7 +238,7 @@ fn test_precompute_rejects_max_bins_above_u8_range() -> Result<(), ClearGbmError
         .collect();
     let rows: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
 
-    match precompute_feature_bins(&rows, 300_usize) {
+    match precompute_feature_bins(&rows, 300_usize, None) {
         Ok(_) => Err(ClearGbmError::InvalidParameter {
             name: "max_bins".to_string(),
             reason: "max_bins of 300 must be rejected".to_string(),
@@ -258,7 +267,7 @@ fn test_precompute_accepts_the_maximum_supported_bin_count() -> Result<(), Clear
         .collect();
     let rows: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
 
-    let bins = match precompute_feature_bins(&rows, 255_usize) {
+    let bins = match precompute_feature_bins(&rows, 255_usize, None) {
         Ok(b) => b,
         Err(e) => return Err(e),
     };

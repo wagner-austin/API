@@ -82,6 +82,13 @@ pub struct BuildTreeInput<'a> {
     /// per boosting round. `None` lets the tree use every feature. When
     /// both axes are set, the per-split draw selects within this mask.
     pub tree_feature_mask: Option<&'a [bool]>,
+
+    /// Optional per-feature category tables. `None` treats every feature
+    /// as numeric, bit-identical to the history before the categorical
+    /// axis existed. Required whenever a feature is categorical: the split
+    /// search partitions its bins by set membership and finalization
+    /// translates the winning bins into raw codes.
+    pub categorical: Option<&'a super::categorical::CategoricalLayout>,
 }
 
 /// Records a leaf's value against every sample that reached it.
@@ -334,7 +341,7 @@ pub fn build_tree_with_leaf_assignment(
                 node_id,
                 is_leaf: true,
                 feature_index: None,
-                split_bin: None,
+                decision: None,
                 value: leaf_value,
                 n_samples: current_n_samples,
                 nan_goes_left: true,
@@ -384,6 +391,7 @@ pub fn build_tree_with_leaf_assignment(
             input.n_regular_bins,
             input.monotonic_constraints,
             feature_mask.as_deref(),
+            input.categorical,
         ) {
             Ok(s) => s,
             Err(e) => return Err(e),
@@ -406,7 +414,7 @@ pub fn build_tree_with_leaf_assignment(
                 node_id,
                 is_leaf: true,
                 feature_index: None,
-                split_bin: None,
+                decision: None,
                 value: leaf_value,
                 n_samples: current_n_samples,
                 nan_goes_left: true,
@@ -423,7 +431,7 @@ pub fn build_tree_with_leaf_assignment(
             node_id,
             is_leaf: false,
             feature_index: Some(split.feature_index()),
-            split_bin: Some(split.split_bin()),
+            decision: Some(split.decision()),
             value: node_value,
             n_samples: current_n_samples,
             nan_goes_left: split.nan_goes_left(),
@@ -435,7 +443,7 @@ pub fn build_tree_with_leaf_assignment(
             input.bins_rows,
             input.n_features,
             split.feature_index(),
-            split.split_bin(),
+            split.decision(),
             split.nan_goes_left(),
             input.n_regular_bins,
         );
@@ -476,11 +484,16 @@ pub fn build_tree_with_leaf_assignment(
     }
 
     // Finalize nodes with child pointers and convert to TreeNode
-    let final_nodes: Vec<TreeNode> =
-        match finalize_nodes(&nodes, &child_pointers, input.bin_thresholds, hooks) {
-            Ok(n) => n,
-            Err(e) => return Err(e),
-        };
+    let final_nodes: Vec<TreeNode> = match finalize_nodes(
+        &nodes,
+        &child_pointers,
+        input.bin_thresholds,
+        input.categorical,
+        hooks,
+    ) {
+        Ok(n) => n,
+        Err(e) => return Err(e),
+    };
 
     Ok((
         Tree::new(final_nodes, max_depth_found, n_leaves),

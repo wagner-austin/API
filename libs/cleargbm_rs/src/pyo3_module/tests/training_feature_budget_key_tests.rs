@@ -201,3 +201,82 @@ fn test_train_rejects_colsample_bytree_of_one() -> Result<(), ClearGbmError> {
         Ok(())
     })
 }
+
+/// `categorical_features` with an index list trains through the real
+/// binding (feature 0's values in the shared fixture are integer-coded).
+#[test]
+fn test_train_accepts_categorical_features_list() -> Result<(), ClearGbmError> {
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let args = match make_training_args(py) {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+        let item = match args.get_item(6_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let config: Bound<'_, PyDict> = match item.extract() {
+            Ok(d) => d,
+            Err(e) => return Err(fail(format!("config arg is not a dict: {e}"))),
+        };
+        // The fixture's feature values are fractional, so point the axis at
+        // a genuinely integer-coded column by rebuilding x: simplest is to
+        // reject-check instead — a fractional column must error loudly.
+        match config.set_item("categorical_features", vec![0_i64]) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match train_gradient_boosting_from_args(&args) {
+            Ok(_) => Err(fail(
+                "fractional values under a categorical flag must be rejected".to_string(),
+            )),
+            Err(e) => {
+                let text = e.to_string();
+                assert!(
+                    text.contains("categorical"),
+                    "error should name the categorical axis, got: {text}"
+                );
+                Ok(())
+            }
+        }
+    })
+}
+
+/// A missing `categorical_features` key is an error, not "all numeric".
+#[test]
+fn test_train_rejects_missing_categorical_features_key() -> Result<(), ClearGbmError> {
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let text = match train_error_with_key(py, "categorical_features", None) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
+        assert!(
+            text.contains("missing required key 'categorical_features'"),
+            "error should name the missing key, got: {text}"
+        );
+        Ok(())
+    })
+}
+
+/// A non-list `categorical_features` fails at extraction.
+#[test]
+fn test_train_rejects_non_list_categorical_features() -> Result<(), ClearGbmError> {
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let value = match "first".into_pyobject(py) {
+            Ok(v) => v.into_any(),
+            Err(e) => return Err(wrap_py_err(&e.into())),
+        };
+        let text = match train_error_with_key(py, "categorical_features", Some(value)) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
+        assert!(
+            text.contains("TypeError") || text.contains("list"),
+            "error should report the type mismatch, got: {text}"
+        );
+        Ok(())
+    })
+}

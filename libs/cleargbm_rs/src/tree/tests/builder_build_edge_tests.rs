@@ -41,6 +41,7 @@ fn test_build_tree_no_features() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -86,6 +87,7 @@ fn test_build_tree_bins_shape_mismatch() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -129,6 +131,7 @@ fn test_build_tree_with_monotonic_constraints() -> Result<(), ClearGbmError> {
         monotonic_constraints: Some(&constraints),
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     // Should succeed (constraint may or may not affect the split)
@@ -171,6 +174,7 @@ fn test_build_tree_with_l1_regularization() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let _ = match build_tree(&input, &Hooks::default()) {
@@ -215,6 +219,7 @@ fn test_build_tree_left_larger_than_right() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -267,6 +272,7 @@ fn test_build_tree_deep_tree() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -346,6 +352,7 @@ fn test_build_tree_child_histogram_error() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     // Inject hook that fails on child histogram building
@@ -415,6 +422,7 @@ fn test_build_tree_subtract_histogram_error() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     // Inject hook that returns wrong-sized histogram

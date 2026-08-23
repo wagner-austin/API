@@ -5,6 +5,7 @@
 
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
+use crate::split::SplitDecision;
 use crate::tree::nodes::EPSILON;
 use crate::tree::nodes::{compute_leaf_value, compute_sums, should_stop, split_samples};
 use crate::tree::{build_tree, BuildTreeInput, TreeBuildConfig};
@@ -156,7 +157,7 @@ fn test_split_samples_basic() -> Result<(), ClearGbmError> {
         &bins,
         1_usize,
         0_usize,
-        0_usize,
+        SplitDecision::Threshold { split_bin: 0_usize },
         true,
         3_usize,
     );
@@ -188,7 +189,7 @@ fn test_split_samples_nan_handling() -> Result<(), ClearGbmError> {
         &bins,
         1_usize,
         0_usize,
-        0_usize,
+        SplitDecision::Threshold { split_bin: 0_usize },
         true,
         3_usize,
     );
@@ -202,7 +203,7 @@ fn test_split_samples_nan_handling() -> Result<(), ClearGbmError> {
         &bins,
         1_usize,
         0_usize,
-        0_usize,
+        SplitDecision::Threshold { split_bin: 0_usize },
         false,
         3_usize,
     );
@@ -223,7 +224,7 @@ fn test_split_samples_index_out_of_range_treated_as_nan() -> Result<(), ClearGbm
         &bins,
         1_usize,
         0_usize,
-        0_usize,
+        SplitDecision::Threshold { split_bin: 0_usize },
         true,
         3_usize,
     );
@@ -236,7 +237,7 @@ fn test_split_samples_index_out_of_range_treated_as_nan() -> Result<(), ClearGbm
         &bins,
         1_usize,
         0_usize,
-        0_usize,
+        SplitDecision::Threshold { split_bin: 0_usize },
         false,
         3_usize,
     );
@@ -355,6 +356,7 @@ fn test_build_tree_rejects_out_of_range_sample_index() -> Result<(), ClearGbmErr
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     match build_tree(&input, &Hooks::default()) {

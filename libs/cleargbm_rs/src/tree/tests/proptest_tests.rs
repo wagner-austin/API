@@ -191,7 +191,7 @@ fn prop_split_samples_preserves_count() -> Result<(), ClearGbmError> {
                     &bins,
                     1_usize,
                     0_usize,
-                    split_bin,
+                    crate::split::SplitDecision::Threshold { split_bin },
                     nan_goes_left,
                     n_regular_bins,
                 );

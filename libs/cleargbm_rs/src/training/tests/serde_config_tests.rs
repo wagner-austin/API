@@ -30,6 +30,7 @@ const CONFIG_FIELDS: &[&str] = &[
     "scale_pos_weight",
     "max_features",
     "colsample_bytree",
+    "categorical_features",
 ];
 
 // =============================================================================
@@ -549,5 +550,30 @@ fn test_config_roundtrips_a_colsample_payload() -> Result<(), ClearGbmError> {
     };
     let unset_json = propagate!(to_json(&unset));
     assert!(unset_json.contains(r#""colsample_bytree":null"#));
+    Ok(())
+}
+
+#[test]
+fn test_config_roundtrips_a_categorical_payload() -> Result<(), ClearGbmError> {
+    // The categorical axis must survive the wire in both spellings: a real
+    // index list round-trips exactly, and the reference config (axis unset)
+    // serializes an explicit null rather than omitting the key.
+    let mut p = default_params();
+    p.categorical_features = Some(vec![0_usize, 3_usize]);
+    let original = match GradientBoostingConfig::new(p) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let json = propagate!(to_json(&original));
+    assert!(json.contains(r#""categorical_features":[0,3]"#));
+    let decoded: GradientBoostingConfig = propagate!(from_json(&json));
+    assert_eq!(decoded, original);
+
+    let unset = match reference_config() {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let unset_json = propagate!(to_json(&unset));
+    assert!(unset_json.contains(r#""categorical_features":null"#));
     Ok(())
 }

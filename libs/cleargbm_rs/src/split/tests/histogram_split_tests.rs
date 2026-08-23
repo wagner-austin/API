@@ -2,7 +2,7 @@
 
 use super::helpers::{helper_find_split_with_config, TestSplitParams};
 use crate::error::ClearGbmError;
-use crate::split::{MonotonicConstraint, SplitResult};
+use crate::split::{MonotonicConstraint, SplitDecision, SplitResult};
 use crate::types::HistogramBuffer;
 
 #[test]
@@ -57,7 +57,10 @@ fn test_find_best_split_simple() -> Result<(), ClearGbmError> {
     };
     assert_eq!(split.feature_index(), 0_usize);
     assert!(split.gain() > 0.0_f64);
-    assert_eq!(split.split_bin(), 1_usize);
+    assert_eq!(
+        split.decision(),
+        SplitDecision::Threshold { split_bin: 1_usize }
+    );
     // Cover Err path (invalid min_samples_split)
     assert!(inner(0_usize).is_err());
     Ok(())
@@ -466,6 +469,9 @@ fn test_find_best_split_early_bin_wins() -> Result<(), ClearGbmError> {
     };
 
     // Best split should be after bin 0
-    assert_eq!(split.split_bin(), 0_usize);
+    assert_eq!(
+        split.decision(),
+        SplitDecision::Threshold { split_bin: 0_usize }
+    );
     Ok(())
 }

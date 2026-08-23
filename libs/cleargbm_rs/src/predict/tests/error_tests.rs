@@ -61,6 +61,7 @@ fn test_predict_single_missing_feature_index() -> Result<(), ClearGbmError> {
         left_child: Some(1_usize),
         right_child: Some(2_usize),
         nan_goes_left: true,
+        categories_goes_left: None,
     };
     let tree = Tree::new(vec![bad_node], 0_usize, 0_usize);
     let features = [0.3_f64];
@@ -87,6 +88,7 @@ fn test_predict_single_missing_threshold() -> Result<(), ClearGbmError> {
         left_child: Some(1_usize),
         right_child: Some(2_usize),
         nan_goes_left: true,
+        categories_goes_left: None,
     };
     let tree = Tree::new(vec![bad_node], 0_usize, 0_usize);
     let features = [0.3_f64];
@@ -113,6 +115,7 @@ fn test_predict_single_missing_left_child() -> Result<(), ClearGbmError> {
         left_child: None,
         right_child: Some(2_usize),
         nan_goes_left: true,
+        categories_goes_left: None,
     };
     let tree = Tree::new(vec![bad_node], 0_usize, 0_usize);
     let features = [0.3_f64];
@@ -139,6 +142,7 @@ fn test_predict_single_missing_right_child() -> Result<(), ClearGbmError> {
         left_child: Some(1_usize),
         right_child: None,
         nan_goes_left: true,
+        categories_goes_left: None,
     };
     let leaf = TreeNode::new_leaf(1_usize, -1.0_f64, 5_usize);
     let tree = Tree::new(vec![bad_node, leaf], 0_usize, 0_usize);

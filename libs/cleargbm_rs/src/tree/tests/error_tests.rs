@@ -3,6 +3,7 @@
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::split::MonotonicConstraint;
+use crate::split::SplitDecision;
 use crate::tree::histograms::{
     build_feature_histograms, compute_child_histograms, find_best_split_across_features_internal,
     BuildHistogramConfig, ChildHistogramConfig, OrderedScratch,
@@ -24,7 +25,7 @@ fn test_finalize_nodes_internal_node_missing_feature_index() -> Result<(), Clear
         value: 0.0_f64,
         n_samples: 10_usize,
         feature_index: None, // missing!
-        split_bin: Some(1_usize),
+        decision: Some(SplitDecision::Threshold { split_bin: 1_usize }),
         nan_goes_left: true,
     }];
     let child_pointers = vec![(Some(1_usize), Some(2_usize))];
@@ -34,6 +35,7 @@ fn test_finalize_nodes_internal_node_missing_feature_index() -> Result<(), Clear
         &build_nodes,
         &child_pointers,
         &bin_thresholds,
+        None,
         &Hooks::default(),
     );
     assert!(matches!(
@@ -52,7 +54,7 @@ fn test_finalize_nodes_internal_node_missing_split_bin() -> Result<(), ClearGbmE
         value: 0.0_f64,
         n_samples: 10_usize,
         feature_index: Some(0_usize),
-        split_bin: None, // missing!
+        decision: None, // missing!
         nan_goes_left: true,
     }];
     let child_pointers = vec![(Some(1_usize), Some(2_usize))];
@@ -62,6 +64,7 @@ fn test_finalize_nodes_internal_node_missing_split_bin() -> Result<(), ClearGbmE
         &build_nodes,
         &child_pointers,
         &bin_thresholds,
+        None,
         &Hooks::default(),
     );
     assert!(matches!(
@@ -80,7 +83,7 @@ fn test_finalize_nodes_internal_node_missing_left_child() -> Result<(), ClearGbm
         value: 0.0_f64,
         n_samples: 10_usize,
         feature_index: Some(0_usize),
-        split_bin: Some(0_usize),
+        decision: Some(SplitDecision::Threshold { split_bin: 0_usize }),
         nan_goes_left: true,
     }];
     let child_pointers = vec![(None, Some(2_usize))]; // left is None!
@@ -90,6 +93,7 @@ fn test_finalize_nodes_internal_node_missing_left_child() -> Result<(), ClearGbm
         &build_nodes,
         &child_pointers,
         &bin_thresholds,
+        None,
         &Hooks::default(),
     );
     assert!(matches!(
@@ -108,7 +112,7 @@ fn test_finalize_nodes_internal_node_missing_right_child() -> Result<(), ClearGb
         value: 0.0_f64,
         n_samples: 10_usize,
         feature_index: Some(0_usize),
-        split_bin: Some(0_usize),
+        decision: Some(SplitDecision::Threshold { split_bin: 0_usize }),
         nan_goes_left: true,
     }];
     let child_pointers = vec![(Some(1_usize), None)]; // right is None!
@@ -118,6 +122,7 @@ fn test_finalize_nodes_internal_node_missing_right_child() -> Result<(), ClearGb
         &build_nodes,
         &child_pointers,
         &bin_thresholds,
+        None,
         &Hooks::default(),
     );
     assert!(matches!(
@@ -136,7 +141,7 @@ fn test_finalize_nodes_leaf_node_success() -> Result<(), ClearGbmError> {
         value: 1.5_f64,
         n_samples: 10_usize,
         feature_index: None,
-        split_bin: None,
+        decision: None,
         nan_goes_left: false,
     }];
     let child_pointers = vec![(None, None)];
@@ -146,6 +151,7 @@ fn test_finalize_nodes_leaf_node_success() -> Result<(), ClearGbmError> {
         &build_nodes,
         &child_pointers,
         &bin_thresholds,
+        None,
         &Hooks::default(),
     ) {
         Ok(n) => n,
@@ -208,6 +214,7 @@ fn test_find_best_split_across_features_internal_error() -> Result<(), ClearGbmE
         10_usize, // n_regular_bins > n_bins (3)
         None,
         None,
+        None,
     );
 
     assert!(result.is_err());
@@ -251,11 +258,17 @@ fn test_find_best_split_across_features_internal_multiple_features() -> Result<(
         Err(e) => return Err(e),
     };
 
-    let result =
-        match find_best_split_across_features_internal(&histograms, &config, 3_usize, None, None) {
-            Ok(r) => r,
-            Err(e) => return Err(e),
-        };
+    let result = match find_best_split_across_features_internal(
+        &histograms,
+        &config,
+        3_usize,
+        None,
+        None,
+        None,
+    ) {
+        Ok(r) => r,
+        Err(e) => return Err(e),
+    };
 
     // Should find the best split (feature 0 has higher gain due to larger gradient magnitude)
     assert!(matches!(result, Some(ref s) if s.feature_index() == 0_usize));
@@ -383,6 +396,7 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     // This succeeds because histogram.n_bins() = n_regular_bins + 1 = 101 > 100

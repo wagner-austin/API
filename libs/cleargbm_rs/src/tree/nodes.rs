@@ -8,7 +8,10 @@
 
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
-use crate::types::{HistogramBuffer, TreeNode, TreeNodeConfig};
+use crate::split::SplitDecision;
+use crate::types::{CategoricalNodeConfig, HistogramBuffer, TreeNode, TreeNodeConfig};
+
+use super::categorical::CategoricalLayout;
 
 /// Epsilon for floating-point comparisons.
 pub(crate) const EPSILON: f64 = 1e-10_f64;
@@ -46,8 +49,8 @@ pub(super) struct BuildNode {
     /// Feature index for split (None for leaf).
     pub(super) feature_index: Option<usize>,
 
-    /// Split bin index (None for leaf).
-    pub(super) split_bin: Option<usize>,
+    /// How the split partitions samples (None for leaf).
+    pub(super) decision: Option<SplitDecision>,
 
     /// Node value (leaf value or intermediate).
     pub(super) value: f64,
@@ -176,7 +179,7 @@ pub(super) fn split_samples(
     bins_rows: &[u8],
     n_features: usize,
     feature_index: usize,
-    split_bin: usize,
+    decision: SplitDecision,
     nan_goes_left: bool,
     n_regular_bins: usize,
 ) -> (Vec<u32>, Vec<u32>) {
@@ -210,7 +213,13 @@ pub(super) fn split_samples(
             } else {
                 right.push(idx);
             }
-        } else if bin <= split_bin {
+            continue;
+        }
+        let goes_left = match decision {
+            SplitDecision::Threshold { split_bin } => bin <= split_bin,
+            SplitDecision::CategorySubset { left_bins } => left_bins.contains(bin),
+        };
+        if goes_left {
             left.push(idx);
         } else {
             right.push(idx);
@@ -220,11 +229,16 @@ pub(super) fn split_samples(
     (left, right)
 }
 
-/// Finalizes build nodes into TreeNode with proper child pointers and thresholds.
+/// Finalizes build nodes into TreeNode with proper child pointers.
+///
+/// Threshold splits read their boundary from `bin_thresholds`; categorical
+/// splits translate their left-routed bins into raw category codes through
+/// `categorical` (required whenever such a split exists).
 pub(super) fn finalize_nodes(
     build_nodes: &[BuildNode],
     child_pointers: &[(Option<usize>, Option<usize>)],
     bin_thresholds: &[Vec<f64>],
+    categorical: Option<&CategoricalLayout>,
     hooks: &Hooks,
 ) -> Result<Vec<TreeNode>, ClearGbmError> {
     // Check for injected error (for testing error propagation)
@@ -252,21 +266,14 @@ pub(super) fn finalize_nodes(
                     })
                 }
             };
-            let split_bin = match node.split_bin {
-                Some(s) => s,
+            let decision = match node.decision {
+                Some(d) => d,
                 None => {
                     return Err(ClearGbmError::TreeConstructionFailed {
-                        reason: "internal node missing split_bin".to_string(),
+                        reason: "internal node missing split decision".to_string(),
                     })
                 }
             };
-
-            // Get threshold from bin_thresholds
-            // Threshold is the upper bound of the split_bin
-            let threshold = bin_thresholds
-                .get(feature_index)
-                .and_then(|thresholds| thresholds.get(split_bin).copied())
-                .unwrap_or(0.0_f64);
 
             let left_id = match left_child {
                 Some(l) => l,
@@ -285,16 +292,54 @@ pub(super) fn finalize_nodes(
                 }
             };
 
-            final_nodes.push(TreeNode::new_internal(TreeNodeConfig {
-                node_id: node.node_id,
-                feature_index,
-                threshold,
-                value: node.value,
-                n_samples: node.n_samples,
-                left_child: left_id,
-                right_child: right_id,
-                nan_goes_left: node.nan_goes_left,
-            }));
+            match decision {
+                SplitDecision::Threshold { split_bin } => {
+                    // Get threshold from bin_thresholds
+                    // Threshold is the upper bound of the split_bin
+                    let threshold = bin_thresholds
+                        .get(feature_index)
+                        .and_then(|thresholds| thresholds.get(split_bin).copied())
+                        .unwrap_or(0.0_f64);
+
+                    final_nodes.push(TreeNode::new_internal(TreeNodeConfig {
+                        node_id: node.node_id,
+                        feature_index,
+                        threshold,
+                        value: node.value,
+                        n_samples: node.n_samples,
+                        left_child: left_id,
+                        right_child: right_id,
+                        nan_goes_left: node.nan_goes_left,
+                    }));
+                }
+                SplitDecision::CategorySubset { left_bins } => {
+                    let layout = match categorical {
+                        Some(layout) => layout,
+                        None => {
+                            return Err(ClearGbmError::TreeConstructionFailed {
+                                reason: format!(
+                                    "node {} split categorically but no categorical                                      layout was provided",
+                                    node.node_id
+                                ),
+                            })
+                        }
+                    };
+                    let categories_goes_left = match layout.left_codes(feature_index, left_bins) {
+                        Ok(codes) => codes,
+                        Err(e) => return Err(e),
+                    };
+                    final_nodes.push(TreeNode::new_categorical_internal(CategoricalNodeConfig {
+                        node_id: node.node_id,
+                        feature_index,
+                        categories_goes_left,
+                        value: node.value,
+                        n_samples: node.n_samples,
+                        left_child: left_id,
+                        right_child: right_id,
+                        nan_goes_left: node.nan_goes_left,
+                    }));
+                }
+            }
         }
     }
 

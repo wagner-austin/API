@@ -21,7 +21,7 @@ impl Serialize for GradientBoostingConfig {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 18) {
+        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 19) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -100,6 +100,10 @@ impl Serialize for GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match state.serialize_field("categorical_features", &self.categorical_features()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
         state.end()
     }
 }
@@ -146,6 +150,8 @@ pub(crate) enum GradientBoostingConfigField {
     MaxFeatures,
     /// The per-tree feature fraction (optional).
     ColsampleBytree,
+    /// The categorical feature indices (optional).
+    CategoricalFeatures,
 }
 
 /// Visitor for deserializing `GradientBoostingConfigField` from string.
@@ -184,6 +190,7 @@ impl<'de> Visitor<'de> for GradientBoostingConfigFieldVisitor {
             "scale_pos_weight" => Ok(GradientBoostingConfigField::ScalePosWeight),
             "max_features" => Ok(GradientBoostingConfigField::MaxFeatures),
             "colsample_bytree" => Ok(GradientBoostingConfigField::ColsampleBytree),
+            "categorical_features" => Ok(GradientBoostingConfigField::CategoricalFeatures),
             _ => Err(E::unknown_field(value, GRADIENT_BOOSTING_CONFIG_FIELDS)),
         }
     }
@@ -218,6 +225,7 @@ const GRADIENT_BOOSTING_CONFIG_FIELDS: &[&str] = &[
     "scale_pos_weight",
     "max_features",
     "colsample_bytree",
+    "categorical_features",
 ];
 
 impl<'de> Deserialize<'de> for GradientBoostingConfig {
@@ -256,6 +264,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                 let mut scale_pos_weight: Option<Option<f64>> = None;
                 let mut max_features: Option<Option<usize>> = None;
                 let mut colsample_bytree: Option<Option<f64>> = None;
+                let mut categorical_features: Option<Option<Vec<usize>>> = None;
 
                 loop {
                     let key: Option<GradientBoostingConfigField> = match map.next_key() {
@@ -375,6 +384,12 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                                 Err(e) => return Err(e),
                             });
                         }
+                        GradientBoostingConfigField::CategoricalFeatures => {
+                            categorical_features = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
                     }
                 }
 
@@ -450,6 +465,10 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("colsample_bytree")),
                 };
+                let categorical_features = match categorical_features {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("categorical_features")),
+                };
 
                 let params = GradientBoostingConfigParams {
                     n_estimators,
@@ -470,6 +489,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     scale_pos_weight,
                     max_features,
                     colsample_bytree,
+                    categorical_features,
                 };
                 match GradientBoostingConfig::new(params) {
                     Ok(cfg) => Ok(cfg),

@@ -9,8 +9,13 @@
 use crate::error::ClearGbmError;
 use crate::histogram::{reorder_grad_hess_into, subtract_histogram, NodeHistogramRequest};
 use crate::hooks::Hooks;
-use crate::split::{find_best_split_from_histogram, MonotonicConstraint, SplitResult};
+use crate::split::{
+    find_best_categorical_split_from_histogram, find_best_split_from_histogram,
+    MonotonicConstraint, SplitResult,
+};
 use crate::types::{HistogramBuffer, SplitConfig};
+
+use super::categorical::CategoricalLayout;
 
 /// Reusable scratch for the node-scoped ordered gradient/hessian streams.
 ///
@@ -140,13 +145,16 @@ pub(super) fn build_feature_histograms(
 ///
 /// `allowed_features`, when present, is the per-node `max_features` mask —
 /// masked-out features are skipped entirely. `None` scans every feature in
-/// the same order as before the mask existed.
+/// the same order as before the mask existed. Features marked categorical
+/// in `categorical` run the many-vs-many subset search instead of the
+/// threshold scan; the best split overall wins on gain regardless of kind.
 pub(super) fn find_best_split_across_features_internal(
     histograms: &[HistogramBuffer],
     config: &SplitConfig,
     n_regular_bins: usize,
     monotonic_constraints: Option<&[MonotonicConstraint]>,
     allowed_features: Option<&[bool]>,
+    categorical: Option<&CategoricalLayout>,
 ) -> Result<Option<SplitResult>, ClearGbmError> {
     let mut best_split: Option<SplitResult> = None;
 
@@ -156,19 +164,32 @@ pub(super) fn find_best_split_across_features_internal(
                 continue;
             }
         }
+        let n_categories = categorical.and_then(|layout| layout.n_categories(feature_idx));
         let constraint = monotonic_constraints
             .and_then(|constraints| constraints.get(feature_idx).copied())
             .unwrap_or(MonotonicConstraint::None);
 
-        let maybe_split = match find_best_split_from_histogram(
-            histogram,
-            feature_idx,
-            config,
-            n_regular_bins,
-            constraint,
-        ) {
-            Ok(s) => s,
-            Err(e) => return Err(e),
+        let maybe_split = match n_categories {
+            Some(n_cats) => match find_best_categorical_split_from_histogram(
+                histogram,
+                feature_idx,
+                config,
+                n_cats,
+                n_regular_bins,
+            ) {
+                Ok(s) => s,
+                Err(e) => return Err(e),
+            },
+            None => match find_best_split_from_histogram(
+                histogram,
+                feature_idx,
+                config,
+                n_regular_bins,
+                constraint,
+            ) {
+                Ok(s) => s,
+                Err(e) => return Err(e),
+            },
         };
 
         if let Some(split) = maybe_split {

@@ -161,15 +161,6 @@ pub fn predict_single(tree: &Tree, features: &[f64]) -> Result<f64, ClearGbmErro
             });
         }
 
-        let threshold = match current.threshold() {
-            Some(t) => t,
-            None => {
-                return Err(ClearGbmError::TreeConstructionFailed {
-                    reason: format!("internal node {} missing threshold", current.node_id()),
-                })
-            }
-        };
-
         let left_child_id = match current.left_child() {
             Some(id) => id,
             None => {
@@ -195,10 +186,35 @@ pub fn predict_single(tree: &Tree, features: &[f64]) -> Result<f64, ClearGbmErro
             } else {
                 right_child_id
             }
-        } else if feature_value <= threshold {
-            left_child_id
+        } else if let Some(categories) = current.categories_goes_left() {
+            // Categorical set-split: left exactly when the value matches a
+            // left-routed code. `+ 0.0` normalizes -0.0 to 0.0, matching the
+            // normalization binning applied when the codes were recorded;
+            // any value that is not a recorded code — including unseen
+            // categories and non-integer values — routes right.
+            let normalized = feature_value + 0.0_f64;
+            let is_member = categories
+                .binary_search_by(|code| code.total_cmp(&normalized))
+                .is_ok();
+            if is_member {
+                left_child_id
+            } else {
+                right_child_id
+            }
         } else {
-            right_child_id
+            let threshold = match current.threshold() {
+                Some(t) => t,
+                None => {
+                    return Err(ClearGbmError::TreeConstructionFailed {
+                        reason: format!("internal node {} missing threshold", current.node_id()),
+                    })
+                }
+            };
+            if feature_value <= threshold {
+                left_child_id
+            } else {
+                right_child_id
+            }
         };
 
         current = match tree.node(next_id) {

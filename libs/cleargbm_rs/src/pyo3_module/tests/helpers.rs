@@ -200,6 +200,12 @@ pub(super) fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict
         Ok(()) => {}
         Err(e) => return Err(wrap_py_err(&e)),
     };
+    // Present and null: absence must be an error, not a silent "all
+    // features are numeric".
+    match config.set_item("categorical_features", py.None()) {
+        Ok(()) => {}
+        Err(e) => return Err(wrap_py_err(&e)),
+    };
     Ok(config)
 }
 

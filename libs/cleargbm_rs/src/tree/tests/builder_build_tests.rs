@@ -43,6 +43,7 @@ fn test_build_tree_single_leaf() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -94,6 +95,7 @@ fn test_build_tree_with_split() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -145,6 +147,7 @@ fn test_build_tree_empty_input() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -188,6 +191,7 @@ fn test_build_tree_max_depth_constraint() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -233,6 +237,7 @@ fn test_build_tree_max_leaves_constraint() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -274,6 +279,7 @@ fn test_build_tree_gradients_too_short() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -316,6 +322,7 @@ fn test_build_tree_hessians_too_short() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     let result = build_tree(&input, &Hooks::default());

@@ -99,6 +99,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
     let scale_pos_weight = propagate!(extract_scale_pos_weight(dict));
     let max_features = propagate!(extract_max_features(dict));
     let colsample_bytree = propagate!(extract_colsample_bytree(dict));
+    let categorical_features = propagate!(extract_categorical_features(dict));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -119,6 +120,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
         scale_pos_weight,
         max_features,
         colsample_bytree,
+        categorical_features,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))
@@ -186,6 +188,38 @@ fn extract_max_features(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
 
     let val: i64 = propagate!(item.extract());
     Ok(Some(propagate_into!(i64_to_usize(val, "max_features"))))
+}
+
+/// Extracts the optional categorical feature indices from a config dict.
+///
+/// The key `"categorical_features"` is required to be present; its value
+/// may be `None` (every feature numeric) or a list of feature indices.
+/// Same presence contract as `max_features`: an absent key would silently
+/// read as "all numeric".
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing or the value is neither `None`
+/// nor a list of non-negative integers.
+fn extract_categorical_features(dict: &Bound<'_, PyDict>) -> PyResult<Option<Vec<usize>>> {
+    let opt = propagate!(dict.get_item("categorical_features"));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "categorical_features".to_string(),
+                reason: "missing required key 'categorical_features'".to_string(),
+            }
+            .into())
+        }
+    };
+
+    if item.is_none() {
+        return Ok(None);
+    }
+
+    let indices: Vec<usize> = propagate!(item.extract());
+    Ok(Some(indices))
 }
 
 /// Extracts the optional per-tree feature fraction from a config dict.

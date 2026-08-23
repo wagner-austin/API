@@ -5,7 +5,7 @@ use crate::types::TreeNode;
 
 #[test]
 fn test_tree_node_deserialize_missing_is_leaf() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -13,7 +13,7 @@ fn test_tree_node_deserialize_missing_is_leaf() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_tree_node_deserialize_missing_node_id() -> Result<(), ClearGbmError> {
-    let json = r#"{"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -21,7 +21,7 @@ fn test_tree_node_deserialize_missing_node_id() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_tree_node_deserialize_missing_feature_index() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":true,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":true,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -29,7 +29,7 @@ fn test_tree_node_deserialize_missing_feature_index() -> Result<(), ClearGbmErro
 
 #[test]
 fn test_tree_node_deserialize_missing_threshold() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -37,7 +37,7 @@ fn test_tree_node_deserialize_missing_threshold() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_tree_node_deserialize_missing_value() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -45,7 +45,7 @@ fn test_tree_node_deserialize_missing_value() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_tree_node_deserialize_missing_n_samples() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -53,7 +53,7 @@ fn test_tree_node_deserialize_missing_n_samples() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_tree_node_deserialize_missing_left_child() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -61,7 +61,7 @@ fn test_tree_node_deserialize_missing_left_child() -> Result<(), ClearGbmError> 
 
 #[test]
 fn test_tree_node_deserialize_missing_right_child() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -85,7 +85,7 @@ fn test_tree_node_deserialize_unknown_field() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_tree_node_deserialize_leaf_all_fields() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let node: TreeNode = match serde_json::from_str(json) {
         Ok(n) => n,
         Err(e) => {
@@ -103,7 +103,7 @@ fn test_tree_node_deserialize_leaf_all_fields() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_tree_node_deserialize_internal_all_fields() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":false,"feature_index":1,"threshold":0.5,"value":0.0,"n_samples":100,"left_child":1,"right_child":2,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":false,"feature_index":1,"threshold":0.5,"value":0.0,"n_samples":100,"left_child":1,"right_child":2,"nan_goes_left":true,"categories_goes_left":null}"#;
     let node: TreeNode = match serde_json::from_str(json) {
         Ok(n) => n,
         Err(e) => {
@@ -135,7 +135,7 @@ fn test_tree_node_deserialize_internal_all_fields() -> Result<(), ClearGbmError>
 
 #[test]
 fn test_tree_node_serde_json_invalid_node_id_type() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":"not_a_number","is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":"not_a_number","is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -143,7 +143,7 @@ fn test_tree_node_serde_json_invalid_node_id_type() -> Result<(), ClearGbmError>
 
 #[test]
 fn test_tree_node_serde_json_invalid_is_leaf_type() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":"not_a_bool","feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":"not_a_bool","feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -151,7 +151,7 @@ fn test_tree_node_serde_json_invalid_is_leaf_type() -> Result<(), ClearGbmError>
 
 #[test]
 fn test_tree_node_serde_json_invalid_value_type() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":"not_a_number","n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":"not_a_number","n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -159,7 +159,7 @@ fn test_tree_node_serde_json_invalid_value_type() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_tree_node_serde_json_invalid_n_samples_type() -> Result<(), ClearGbmError> {
-    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":"not_a_number","left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":"not_a_number","left_child":null,"right_child":null,"nan_goes_left":true,"categories_goes_left":null}"#;
     let result: Result<TreeNode, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
@@ -471,4 +471,30 @@ fn test_tree_node_serialize_fail_on_end() -> Result<(), ClearGbmError> {
     let result = node.serialize(&mut ser);
     assert!(result.is_err());
     Ok(())
+}
+
+#[test]
+fn test_tree_node_deserialize_wrong_categories_type() {
+    use crate::testkit::WrongValueDeserializer;
+    use serde::Deserialize;
+
+    let deser = WrongValueDeserializer::new("categories_goes_left");
+    let result = TreeNode::deserialize(deser);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_tree_node_deserialize_missing_categories_field() {
+    // Nine complete fields but no categories_goes_left: pre-categorical
+    // node payloads are rejected, not silently read as numeric.
+    let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
+    let result: Result<TreeNode, _> = serde_json::from_str(json);
+    let err_text = match result {
+        Ok(_) => String::new(),
+        Err(e) => e.to_string(),
+    };
+    assert!(
+        err_text.contains("categories_goes_left"),
+        "a payload without categories_goes_left must be rejected, got: {err_text:?}"
+    );
 }

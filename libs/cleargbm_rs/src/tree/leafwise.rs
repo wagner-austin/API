@@ -154,7 +154,7 @@ fn push_leaf_record(
         node_id,
         is_leaf: true,
         feature_index: None,
-        split_bin: None,
+        decision: None,
         value,
         n_samples: sample_indices.len(),
         nan_goes_left: true,
@@ -224,6 +224,7 @@ fn evaluate_candidate(
         context.input.n_regular_bins,
         context.input.monotonic_constraints,
         feature_mask.as_deref(),
+        context.input.categorical,
     ) {
         Ok(s) => s,
         Err(e) => return Err(e),
@@ -352,7 +353,7 @@ pub fn build_tree_leaf_wise_with_leaf_assignment(
         // already this node's optimal value and does not change.
         nodes[candidate.node_id].is_leaf = false;
         nodes[candidate.node_id].feature_index = Some(split.feature_index());
-        nodes[candidate.node_id].split_bin = Some(split.split_bin());
+        nodes[candidate.node_id].decision = Some(split.decision());
         nodes[candidate.node_id].nan_goes_left = split.nan_goes_left();
 
         let (left_indices, right_indices) = split_samples(
@@ -360,7 +361,7 @@ pub fn build_tree_leaf_wise_with_leaf_assignment(
             input.bins_rows,
             input.n_features,
             split.feature_index(),
-            split.split_bin(),
+            split.decision(),
             split.nan_goes_left(),
             input.n_regular_bins,
         );
@@ -410,11 +411,16 @@ pub fn build_tree_leaf_wise_with_leaf_assignment(
         to_evaluate.push((right_id, right_indices, child_depth, right_histograms));
     }
 
-    let final_nodes: Vec<TreeNode> =
-        match finalize_nodes(&nodes, &child_pointers, input.bin_thresholds, hooks) {
-            Ok(n) => n,
-            Err(e) => return Err(e),
-        };
+    let final_nodes: Vec<TreeNode> = match finalize_nodes(
+        &nodes,
+        &child_pointers,
+        input.bin_thresholds,
+        input.categorical,
+        hooks,
+    ) {
+        Ok(n) => n,
+        Err(e) => return Err(e),
+    };
 
     Ok((
         Tree::new(final_nodes, max_depth_found, n_leaves),

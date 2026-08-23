@@ -5,7 +5,10 @@
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{MonotonicConstraint, NanDirection, SplitResult, SplitResultConfig};
+use super::{
+    CategoryBinSet, MonotonicConstraint, NanDirection, SplitDecision, SplitResult,
+    SplitResultConfig,
+};
 
 // =============================================================================
 // MonotonicConstraint Serialization
@@ -115,15 +118,27 @@ impl Serialize for SplitResult {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("SplitResult", 10) {
+        let mut state = match serializer.serialize_struct("SplitResult", 11) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
+        // The decision flattens to two mutually exclusive nullable fields:
+        // a threshold split carries split_bin, a categorical split carries
+        // its left-routed bins. Exactly one is non-null by construction.
+        let (split_bin, categories_left_bins): (Option<usize>, Option<Vec<usize>>) =
+            match self.decision() {
+                SplitDecision::Threshold { split_bin } => (Some(split_bin), None),
+                SplitDecision::CategorySubset { left_bins } => (None, Some(left_bins.bins())),
+            };
         match state.serialize_field("feature_index", &self.feature_index()) {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
-        match state.serialize_field("split_bin", &self.split_bin()) {
+        match state.serialize_field("split_bin", &split_bin) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("categories_left_bins", &categories_left_bins) {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
@@ -167,8 +182,10 @@ impl Serialize for SplitResult {
 enum SplitResultField {
     /// The feature index field.
     FeatureIndex,
-    /// The split bin field.
+    /// The split bin field (threshold splits; null otherwise).
     SplitBin,
+    /// The left-routed category bins field (categorical splits; null otherwise).
+    CategoriesLeftBins,
     /// The gain field.
     Gain,
     /// The left gradient sum field.
@@ -204,6 +221,7 @@ impl<'de> Visitor<'de> for SplitResultFieldVisitor {
         match value {
             "feature_index" => Ok(SplitResultField::FeatureIndex),
             "split_bin" => Ok(SplitResultField::SplitBin),
+            "categories_left_bins" => Ok(SplitResultField::CategoriesLeftBins),
             "gain" => Ok(SplitResultField::Gain),
             "left_gradient_sum" => Ok(SplitResultField::LeftGradientSum),
             "left_hessian_sum" => Ok(SplitResultField::LeftHessianSum),
@@ -230,6 +248,7 @@ impl<'de> Deserialize<'de> for SplitResultField {
 const SPLIT_RESULT_FIELDS: &[&str] = &[
     "feature_index",
     "split_bin",
+    "categories_left_bins",
     "gain",
     "left_gradient_sum",
     "left_hessian_sum",
@@ -259,7 +278,8 @@ impl<'de> Deserialize<'de> for SplitResult {
                 V: de::MapAccess<'de>,
             {
                 let mut feature_index = None;
-                let mut split_bin = None;
+                let mut split_bin: Option<Option<usize>> = None;
+                let mut categories_left_bins: Option<Option<Vec<usize>>> = None;
                 let mut gain = None;
                 let mut left_gradient_sum = None;
                 let mut left_hessian_sum = None;
@@ -287,6 +307,12 @@ impl<'de> Deserialize<'de> for SplitResult {
                         }
                         SplitResultField::SplitBin => {
                             split_bin = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::CategoriesLeftBins => {
+                            categories_left_bins = Some(match map.next_value() {
                                 Ok(v) => v,
                                 Err(e) => return Err(e),
                             });
@@ -350,6 +376,24 @@ impl<'de> Deserialize<'de> for SplitResult {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("split_bin")),
                 };
+                let categories_left_bins = match categories_left_bins {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("categories_left_bins")),
+                };
+                let decision =
+                    match (split_bin, categories_left_bins) {
+                        (Some(bin), None) => SplitDecision::Threshold { split_bin: bin },
+                        (None, Some(bins)) => {
+                            let mut left_bins = CategoryBinSet::new();
+                            for bin in bins {
+                                left_bins.insert(bin);
+                            }
+                            SplitDecision::CategorySubset { left_bins }
+                        }
+                        _ => return Err(de::Error::custom(
+                            "exactly one of split_bin and categories_left_bins must be non-null",
+                        )),
+                    };
                 let gain = match gain {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("gain")),
@@ -385,7 +429,7 @@ impl<'de> Deserialize<'de> for SplitResult {
 
                 Ok(SplitResult::new(SplitResultConfig {
                     feature_index,
-                    split_bin,
+                    decision,
                     gain,
                     left_gradient_sum,
                     left_hessian_sum,

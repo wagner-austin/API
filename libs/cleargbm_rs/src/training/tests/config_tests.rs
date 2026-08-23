@@ -490,3 +490,55 @@ fn test_config_colsample_bytree_getter() -> Result<(), ClearGbmError> {
     assert!((fraction - 0.5_f64).abs() < 1e-15_f64);
     Ok(())
 }
+
+#[test]
+fn test_config_rejects_empty_categorical_features() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.categorical_features = Some(Vec::new());
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected error for empty categorical_features".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "categorical_features");
+            assert!(reason.contains("non-empty"));
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_config_rejects_unsorted_categorical_features() -> Result<(), ClearGbmError> {
+    // Strictly ascending is the one canonical spelling of a set; a
+    // duplicate or out-of-order index is rejected, not silently normalized.
+    for indices in [vec![2_usize, 1_usize], vec![1_usize, 1_usize]] {
+        let mut params = default_params();
+        params.categorical_features = Some(indices);
+        match GradientBoostingConfig::new(params) {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error for unsorted categorical_features".to_string(),
+                })
+            }
+            Err(ClearGbmError::InvalidParameter { name, reason }) => {
+                assert_eq!(name, "categorical_features");
+                assert!(reason.contains("strictly ascending"));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_config_categorical_features_getter() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.categorical_features = Some(vec![1_usize, 4_usize]);
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(config.categorical_features(), Some(&[1_usize, 4_usize][..]));
+    Ok(())
+}

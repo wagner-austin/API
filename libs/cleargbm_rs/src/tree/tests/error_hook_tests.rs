@@ -52,6 +52,7 @@ fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmErr
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     // Inject error via hook
@@ -154,6 +155,7 @@ fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     // Inject undersized histogram via hook - this causes split finding error
@@ -197,6 +199,7 @@ fn test_build_tree_finalize_nodes_error_via_hook() -> Result<(), ClearGbmError> 
         monotonic_constraints: None,
         feature_subsample: None,
         tree_feature_mask: None,
+        categorical: None,
     };
 
     // Inject error via finalize_nodes hook

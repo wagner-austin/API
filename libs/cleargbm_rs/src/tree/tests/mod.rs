@@ -20,6 +20,7 @@
 mod builder_build_edge_tests;
 mod builder_build_tests;
 mod builder_tests;
+mod categorical_tests;
 mod config_tests;
 mod error_hook_tests;
 mod error_tests;
@@ -28,4 +29,7 @@ mod leafwise_error_tests;
 mod leafwise_helpers;
 mod leafwise_tests;
 mod proptest_tests;
+mod serde_error_tests;
+mod serde_fail_deser_tests;
+mod serde_fail_ser_tests;
 mod serde_tests;

@@ -77,4 +77,4 @@ pub use training::{
     GradientBoostingModel, Objective, Parallelism, TrainingLabels, ValidationData,
 };
 pub use tree::{build_tree, compute_leaf_value, BuildTreeInput, Tree, TreeBuildConfig};
-pub use types::{HistogramBuffer, SplitConfig, TreeNode, TreeNodeConfig};
+pub use types::{CategoricalNodeConfig, HistogramBuffer, SplitConfig, TreeNode, TreeNodeConfig};

@@ -8,6 +8,7 @@
 //! - `error_tests`: Tests for error conditions and malformed trees
 
 mod batch_tests;
+mod categorical_tests;
 mod ensemble_tests;
 mod error_tests;
 mod sigmoid_tests;

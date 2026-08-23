@@ -2,13 +2,13 @@
 
 use super::helpers::EPSILON;
 use crate::error::ClearGbmError;
-use crate::split::{NanDirection, SplitResult, SplitResultConfig};
+use crate::split::{NanDirection, SplitDecision, SplitResult, SplitResultConfig};
 
 #[test]
 fn test_split_result_new() -> Result<(), ClearGbmError> {
     let config = SplitResultConfig {
         feature_index: 2_usize,
-        split_bin: 5_usize,
+        decision: SplitDecision::Threshold { split_bin: 5_usize },
         gain: 0.123_f64,
         left_gradient_sum: 1.0_f64,
         left_hessian_sum: 2.0_f64,
@@ -21,7 +21,10 @@ fn test_split_result_new() -> Result<(), ClearGbmError> {
     let result = SplitResult::new(config);
 
     assert_eq!(result.feature_index(), 2_usize);
-    assert_eq!(result.split_bin(), 5_usize);
+    assert_eq!(
+        result.decision(),
+        SplitDecision::Threshold { split_bin: 5_usize }
+    );
     assert!((result.gain() - 0.123_f64).abs() < EPSILON);
     assert!((result.left_gradient_sum() - 1.0_f64).abs() < EPSILON);
     assert!((result.left_hessian_sum() - 2.0_f64).abs() < EPSILON);
@@ -38,7 +41,7 @@ fn test_split_result_new() -> Result<(), ClearGbmError> {
 fn test_split_result_serialize_deserialize() -> Result<(), ClearGbmError> {
     let config = SplitResultConfig {
         feature_index: 1_usize,
-        split_bin: 3_usize,
+        decision: SplitDecision::Threshold { split_bin: 3_usize },
         gain: 0.5_f64,
         left_gradient_sum: 2.0_f64,
         left_hessian_sum: 4.0_f64,

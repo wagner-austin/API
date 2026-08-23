@@ -11,7 +11,7 @@ impl Serialize for TreeNode {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("TreeNode", 9) {
+        let mut state = match serializer.serialize_struct("TreeNode", 10) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -51,6 +51,10 @@ impl Serialize for TreeNode {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match state.serialize_field("categories_goes_left", &self.categories_goes_left()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
         state.end()
     }
 }
@@ -75,6 +79,8 @@ enum TreeNodeField {
     RightChild,
     /// The nan_goes_left field.
     NanGoesLeft,
+    /// The categories_goes_left field.
+    CategoriesGoesLeft,
 }
 
 /// Visitor for deserializing `TreeNodeField` from string.
@@ -101,6 +107,7 @@ impl<'de> Visitor<'de> for TreeNodeFieldVisitor {
             "left_child" => Ok(TreeNodeField::LeftChild),
             "right_child" => Ok(TreeNodeField::RightChild),
             "nan_goes_left" => Ok(TreeNodeField::NanGoesLeft),
+            "categories_goes_left" => Ok(TreeNodeField::CategoriesGoesLeft),
             _ => Err(E::unknown_field(value, TREE_NODE_FIELDS)),
         }
     }
@@ -126,6 +133,7 @@ const TREE_NODE_FIELDS: &[&str] = &[
     "left_child",
     "right_child",
     "nan_goes_left",
+    "categories_goes_left",
 ];
 
 impl<'de> Deserialize<'de> for TreeNode {
@@ -155,6 +163,7 @@ impl<'de> Deserialize<'de> for TreeNode {
                 let mut left_child = None;
                 let mut right_child = None;
                 let mut nan_goes_left = None;
+                let mut categories_goes_left: Option<Option<Vec<f64>>> = None;
 
                 loop {
                     let key: Option<TreeNodeField> = match map.next_key() {
@@ -220,6 +229,12 @@ impl<'de> Deserialize<'de> for TreeNode {
                                 Err(e) => return Err(e),
                             });
                         }
+                        TreeNodeField::CategoriesGoesLeft => {
+                            categories_goes_left = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
                     }
                 }
 
@@ -259,6 +274,10 @@ impl<'de> Deserialize<'de> for TreeNode {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("nan_goes_left")),
                 };
+                let categories_goes_left = match categories_goes_left {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("categories_goes_left")),
+                };
 
                 Ok(TreeNode {
                     node_id,
@@ -270,6 +289,7 @@ impl<'de> Deserialize<'de> for TreeNode {
                     left_child,
                     right_child,
                     nan_goes_left,
+                    categories_goes_left,
                 })
             }
         }

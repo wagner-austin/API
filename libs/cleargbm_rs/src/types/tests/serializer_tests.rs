@@ -207,8 +207,8 @@ fn test_tree_node_serialize_fail_each_field() -> Result<(), ClearGbmError> {
     use crate::testkit::FailingSerializer;
     use serde::Serialize;
     let node = TreeNode::new_leaf(0_usize, 0.5_f64, 100_usize);
-    // TreeNode has 9 fields
-    for fail_at in 0_usize..9_usize {
+    // TreeNode has 10 fields
+    for fail_at in 0_usize..10_usize {
         let mut ser = FailingSerializer::fail_after(fail_at);
         let result = node.serialize(&mut ser);
         assert!(result.is_err());

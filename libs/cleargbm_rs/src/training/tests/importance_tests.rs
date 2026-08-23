@@ -165,6 +165,7 @@ fn test_importances_skip_internal_nodes_without_a_feature_index() -> Result<(), 
         left_child: Some(3_usize),
         right_child: Some(4_usize),
         nan_goes_left: true,
+        categories_goes_left: None,
     };
     // Also from a corrupt payload: a split on a feature index past the end of
     // `feature_names`. Counting it would index out of bounds, so it must be

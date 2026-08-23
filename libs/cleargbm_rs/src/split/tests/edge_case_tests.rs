@@ -6,7 +6,7 @@ use super::helpers::{
 use crate::error::ClearGbmError;
 use crate::split::{
     check_monotonicity_constraint, find_best_split_across_features, find_best_split_from_histogram,
-    MonotonicConstraint, NanDirection, SplitResult, SplitResultConfig,
+    MonotonicConstraint, NanDirection, SplitDecision, SplitResult, SplitResultConfig,
 };
 use crate::types::{HistogramBuffer, SplitConfig};
 
@@ -213,7 +213,7 @@ fn test_coverage_option_to_result_conversion() -> Result<(), ClearGbmError> {
         let maybe: Option<SplitResult> = if find_split {
             Some(SplitResult::new(SplitResultConfig {
                 feature_index: 0_usize,
-                split_bin: 1_usize,
+                decision: SplitDecision::Threshold { split_bin: 1_usize },
                 gain: 1.0_f64,
                 left_gradient_sum: 0.5_f64,
                 left_hessian_sum: 1.0_f64,

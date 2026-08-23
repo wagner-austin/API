@@ -146,9 +146,64 @@ pub fn train_gradient_boosting(
         None => Vec::new(),
     };
 
-    // 5. Precompute feature bins
-    let feature_bins = propagate!(precompute_feature_bins(x_train, config.max_bins()));
+    // 5. Resolve the categorical axis, then precompute feature bins.
+    // The config lists categorical feature indices; binning needs a
+    // per-feature flag, and the bounds plus the no-monotonic-constraint
+    // pairing are checked here, where n_features is known.
+    let categorical_mask: Option<Vec<bool>> = match config.categorical_features() {
+        Some(indices) => {
+            let mut mask = vec![false; n_features];
+            for &idx in indices {
+                if idx >= n_features {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "categorical_features".to_string(),
+                        reason: format!("index {idx} is out of range for {n_features} features"),
+                    });
+                }
+                if let Some(mc) = config.monotonic_constraints() {
+                    let constrained = mc.get(idx).copied().is_some_and(|c| !c.is_none());
+                    if constrained {
+                        return Err(ClearGbmError::InvalidParameter {
+                            name: "categorical_features".to_string(),
+                            reason: format!(
+                                "feature {idx} is categorical but carries a monotonic \
+                                 constraint; category codes have no order to constrain"
+                            ),
+                        });
+                    }
+                }
+                mask[idx] = true;
+            }
+            Some(mask)
+        }
+        None => None,
+    };
+    let feature_bins = propagate!(precompute_feature_bins(
+        x_train,
+        config.max_bins(),
+        categorical_mask.as_deref()
+    ));
     let bin_thresholds = feature_bins.bin_thresholds();
+
+    // The per-feature category tables the tree layer consults: which
+    // features are categorical (split search) and the bin -> code mapping
+    // (node finalization). None when the axis is off, which keeps every
+    // numeric-only run bit-identical to history.
+    let categorical_layout: Option<crate::tree::CategoricalLayout> =
+        categorical_mask.as_ref().map(|_| {
+            crate::tree::CategoricalLayout::new(
+                feature_bins
+                    .per_feature()
+                    .iter()
+                    .map(|binning| match binning {
+                        crate::binning::FeatureBinning::Categorical(map) => {
+                            Some(map.codes().to_vec())
+                        }
+                        crate::binning::FeatureBinning::Numeric(_) => None,
+                    })
+                    .collect(),
+            )
+        });
 
     // 6. Initialize RNG for subsampling
     let mut rng = SimpleRng::new(config.random_state());
@@ -389,6 +444,7 @@ pub fn train_gradient_boosting(
                 monotonic_constraints: config.monotonic_constraints(),
                 feature_subsample,
                 tree_feature_mask: tree_mask.as_deref(),
+                categorical: categorical_layout.as_ref(),
             };
 
             // e. Build tree (and capture per-sample leaf assignments as a

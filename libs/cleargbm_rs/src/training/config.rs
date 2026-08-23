@@ -174,6 +174,14 @@ pub struct GradientBoostingConfigParams {
     /// spelling of "all features". The per-split `max_features` budget
     /// applies within the tree's sampled set.
     pub colsample_bytree: Option<f64>,
+    /// Feature indices treated as categorical (None = every feature is
+    /// numeric; Some(v) with v non-empty and strictly ascending — the one
+    /// canonical spelling of a set). Values must be non-negative integer
+    /// codes; splits partition categories by set membership rather than by
+    /// threshold. The idx < n_features bound is checked at train time
+    /// where the feature count is known, as is the pairing rule that a
+    /// categorical feature carries no monotonic constraint.
+    pub categorical_features: Option<Vec<usize>>,
 }
 
 /// Configuration for gradient boosting training.
@@ -219,6 +227,8 @@ pub struct GradientBoostingConfig {
     max_features: Option<usize>,
     /// Fraction of features each tree may consider (None = all).
     colsample_bytree: Option<f64>,
+    /// Feature indices treated as categorical (None = all numeric).
+    categorical_features: Option<Vec<usize>>,
 }
 
 impl GradientBoostingConfig {
@@ -251,6 +261,7 @@ impl GradientBoostingConfig {
             scale_pos_weight,
             max_features,
             colsample_bytree,
+            categorical_features,
         } = params;
 
         if n_estimators < 1_usize {
@@ -367,6 +378,25 @@ impl GradientBoostingConfig {
         // A fraction of exactly 1.0 is every feature, which already has a
         // spelling: null. Two spellings of one behavior is how a config
         // stops being self-describing, so the boundary is exclusive.
+        if let Some(ref indices) = categorical_features {
+            if indices.is_empty() {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "categorical_features".to_string(),
+                    reason: "must be non-empty when set (null = every feature numeric)".to_string(),
+                });
+            }
+            for pair in indices.windows(2_usize) {
+                if pair[1] <= pair[0] {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "categorical_features".to_string(),
+                        reason: format!(
+                            "must be strictly ascending, got {} after {}",
+                            pair[1], pair[0]
+                        ),
+                    });
+                }
+            }
+        }
         if let Some(f) = colsample_bytree {
             if !f.is_finite() || f <= 0.0_f64 || f >= 1.0_f64 {
                 return Err(ClearGbmError::InvalidParameter {
@@ -430,6 +460,7 @@ impl GradientBoostingConfig {
             scale_pos_weight,
             max_features,
             colsample_bytree,
+            categorical_features,
         })
     }
 
@@ -533,6 +564,12 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn colsample_bytree(&self) -> Option<f64> {
         self.colsample_bytree
+    }
+
+    /// Returns the categorical feature indices (None = all numeric).
+    #[must_use]
+    pub fn categorical_features(&self) -> Option<&[usize]> {
+        self.categorical_features.as_deref()
     }
 
     /// Returns the leaf budget, set exactly under `LeafWise` growth.

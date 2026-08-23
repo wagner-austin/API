@@ -151,60 +151,77 @@ pub fn compute_bin_edges(x: &[&[f64]], max_bins: usize) -> Result<Vec<BinEdges>,
     }
 
     let mut result = Vec::with_capacity(n_features);
-    let n_edges = max_bins - 1_usize;
-
     for feat_idx in 0_usize..n_features {
-        // Collect non-NaN values for this feature
-        let mut valid_values: Vec<f64> = Vec::new();
-        for row in x {
-            let val = row[feat_idx];
-            if !val.is_nan() {
-                valid_values.push(val);
-            }
-        }
-
-        // All NaN → empty edges (1 bin)
-        if valid_values.is_empty() {
-            result.push(BinEdges { edges: Vec::new() });
-            continue;
-        }
-
-        // Sort valid values
-        valid_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
-        let n_valid = valid_values.len();
-
-        // Single unique value → empty edges
-        if n_valid == 1_usize
-            || (valid_values[0] - valid_values[n_valid - 1_usize]).abs() < f64::EPSILON
-        {
-            result.push(BinEdges { edges: Vec::new() });
-            continue;
-        }
-
-        // Compute quantile edges using integer arithmetic.
-        // pos = floor(edge_idx / max_bins * (n_valid - 1))
-        // Equivalent to: edge_idx * (n_valid - 1) / max_bins (integer division).
-        let n_valid_minus_one = n_valid - 1_usize;
-        let mut edges_vec: Vec<f64> = Vec::new();
-
-        for edge_idx in 1_usize..=n_edges {
-            let pos = quantile_position(edge_idx, n_valid_minus_one, max_bins);
-            let edge_value = valid_values[pos];
-
-            // Deduplicate: only add if strictly greater than last edge
-            let should_add = match edges_vec.last() {
-                Some(&last) => edge_value > last,
-                None => true,
-            };
-            if should_add {
-                edges_vec.push(edge_value);
-            }
-        }
-
-        result.push(BinEdges { edges: edges_vec });
+        result.push(compute_feature_edges(x, feat_idx, max_bins));
     }
 
     Ok(result)
+}
+
+/// Computes the quantile bin edges for one feature column.
+///
+/// The per-feature body of [`compute_bin_edges`], extracted so mixed
+/// numeric/categorical binning can compute numeric edges only for the
+/// features that need them. Byte-identical to the pre-extraction loop.
+///
+/// # Args
+///
+/// * `x` - Row-major feature matrix, already shape-validated by the caller.
+/// * `feat_idx` - The feature to bin.
+/// * `max_bins` - Bin budget (>= 2, validated by the caller).
+///
+/// # Returns
+///
+/// The feature's `BinEdges` (empty for all-NaN or single-valued columns).
+pub(super) fn compute_feature_edges(x: &[&[f64]], feat_idx: usize, max_bins: usize) -> BinEdges {
+    let n_edges = max_bins - 1_usize;
+
+    // Collect non-NaN values for this feature
+    let mut valid_values: Vec<f64> = Vec::new();
+    for row in x {
+        let val = row[feat_idx];
+        if !val.is_nan() {
+            valid_values.push(val);
+        }
+    }
+
+    // All NaN → empty edges (1 bin)
+    if valid_values.is_empty() {
+        return BinEdges { edges: Vec::new() };
+    }
+
+    // Sort valid values
+    valid_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
+    let n_valid = valid_values.len();
+
+    // Single unique value → empty edges
+    if n_valid == 1_usize
+        || (valid_values[0] - valid_values[n_valid - 1_usize]).abs() < f64::EPSILON
+    {
+        return BinEdges { edges: Vec::new() };
+    }
+
+    // Compute quantile edges using integer arithmetic.
+    // pos = floor(edge_idx / max_bins * (n_valid - 1))
+    // Equivalent to: edge_idx * (n_valid - 1) / max_bins (integer division).
+    let n_valid_minus_one = n_valid - 1_usize;
+    let mut edges_vec: Vec<f64> = Vec::new();
+
+    for edge_idx in 1_usize..=n_edges {
+        let pos = quantile_position(edge_idx, n_valid_minus_one, max_bins);
+        let edge_value = valid_values[pos];
+
+        // Deduplicate: only add if strictly greater than last edge
+        let should_add = match edges_vec.last() {
+            Some(&last) => edge_value > last,
+            None => true,
+        };
+        if should_add {
+            edges_vec.push(edge_value);
+        }
+    }
+
+    BinEdges { edges: edges_vec }
 }
 
 /// Converts a non-negative integer-valued f64 to usize without `as` casts.
