@@ -1,12 +1,12 @@
 # API Platform Wiki
 
-**Read this first.** 4 topic hubs, 20 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions. This wiki documents the *api monorepo* — services, clients, shared libs, and the infrastructure that ties them together.
+**Read this first.** 4 topic hubs, 21 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions. This wiki documents the *api monorepo* — services, clients, shared libs, and the infrastructure that ties them together.
 
 ## Hubs
 
 [Services](hubs/services.md) -- the FastAPI ML/NLP/media services (data-bank, Model-Trainer, Art-Trainer, transcript, turkic, covenant-radar, grandma, handwriting-ai, qr, music-wrapped, github-stats, opportunity-radar, procart) (1 page)
 [Clients](hubs/clients.md) -- DiscordBot, TankpitBot and RustedWarfareBot, plus NavProbe, which is a simulator-determinism instrument rather than a user-facing client (0 pages; TankpitBot, RustedWarfareBot and NavProbe each maintain their own dedicated wiki under `clients/<name>/wiki/`)
-[Libs](hubs/libs.md) -- shared platform_* libraries (core, workers, ml, discord, music, email, calendar, codebase, devpost, kaggle, stt, langid, translate) + domain libs (covenant_domain/ml/nn/persistence, cleargbm, cleargbm_rs, procart) + instrument_io + monorepo_guards (18 pages)
+[Libs](hubs/libs.md) -- shared platform_* libraries (core, workers, ml, discord, music, email, calendar, codebase, devpost, kaggle, stt, langid, translate) + domain libs (covenant_domain/ml/nn/persistence, cleargbm, cleargbm_rs, procart) + instrument_io + monorepo_guards (19 pages)
 [Infrastructure](hubs/infrastructure.md) -- docker-compose, Traefik, Redis/RQ, PostgreSQL, monorepo build + test + lint conventions (1 page)
 
 ## How this works
