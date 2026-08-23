@@ -13,6 +13,7 @@
 pub(crate) mod config;
 mod continue_training;
 pub(crate) mod early_stopping;
+mod goss;
 pub(crate) mod importance;
 pub(crate) mod labels;
 pub(crate) mod model;

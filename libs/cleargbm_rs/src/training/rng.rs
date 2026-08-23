@@ -99,6 +99,17 @@ impl SimpleRng {
         x
     }
 
+    /// Generates a uniform random f64 in `[0, 1)`.
+    ///
+    /// Takes the xorshift word's high 32 bits (its strongest bits) and
+    /// divides by 2^32; `u32 -> f64` is exact, so the result is an
+    /// unbiased 32-bit-resolution uniform draw. The `try_from` error arm
+    /// is statically dead after the shift (the crate's dead-arm idiom).
+    pub(crate) fn next_f64(&mut self) -> f64 {
+        let hi = u32::try_from(self.next_u64() >> 32_u32).unwrap_or(u32::MAX);
+        f64::from(hi) / 4_294_967_296.0_f64
+    }
+
     /// Generates a uniform random usize in `[0, n)`.
     ///
     /// Converts `n` through u32 for portable, testable index arithmetic.

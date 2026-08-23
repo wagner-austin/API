@@ -288,3 +288,66 @@ fn test_train_accepts_depth_wise_growth_strategy() -> Result<(), ClearGbmError> 
         }
     })
 }
+#[test]
+fn test_train_accepts_goss_rates_and_rejects_a_missing_goss_key() -> Result<(), ClearGbmError> {
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        // A run with both GOSS rates set trains (rates as floats cross
+        // the boundary and validate).
+        let args = match make_training_args(py) {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+        let item = match args.get_item(6_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let config: Bound<'_, PyDict> = match item.extract() {
+            Ok(d) => d,
+            Err(e) => return Err(fail(format!("config arg is not a dict: {e}"))),
+        };
+        match config.set_item("goss_top_rate", 0.3_f64) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match config.set_item("goss_other_rate", 0.2_f64) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match train_gradient_boosting_from_args(&args) {
+            Ok(_) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        }
+
+        // A missing goss_top_rate key is an error, not a silent "off".
+        let args = match make_training_args(py) {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+        let item = match args.get_item(6_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let config: Bound<'_, PyDict> = match item.extract() {
+            Ok(d) => d,
+            Err(e) => return Err(fail(format!("config arg is not a dict: {e}"))),
+        };
+        match config.del_item("goss_top_rate") {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match train_gradient_boosting_from_args(&args) {
+            Ok(_) => Err(fail(
+                "a missing goss_top_rate key must be rejected".to_string(),
+            )),
+            Err(e) => {
+                let text = e.to_string();
+                assert!(
+                    text.contains("missing required key 'goss_top_rate'"),
+                    "got: {text}"
+                );
+                Ok(())
+            }
+        }
+    })
+}

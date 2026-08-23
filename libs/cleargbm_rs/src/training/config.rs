@@ -77,6 +77,14 @@ pub struct GradientBoostingConfigParams {
     /// loop and the max-DCG normalizer) and `None` under every other
     /// objective, which has no ranking cutoff to state.
     pub lambdarank_truncation_level: Option<usize>,
+    /// GOSS top rate: the fraction of rows kept outright by
+    /// |gradient x hessian| rank. Paired with `goss_other_rate`
+    /// (both-or-neither); each in (0, 1), summing to at most 1. GOSS
+    /// replaces row subsampling, so it requires `subsample = 1.0`.
+    pub goss_top_rate: Option<f64>,
+    /// GOSS other rate: the fraction of the remaining rows sampled and
+    /// reweighted by `(1 - top) / other`. See `goss_top_rate`.
+    pub goss_other_rate: Option<f64>,
 }
 
 /// Configuration for gradient boosting training.
@@ -129,6 +137,10 @@ pub struct GradientBoostingConfig {
     /// NDCG truncation position, present exactly when `objective` is
     /// `LambdaRank`.
     lambdarank_truncation_level: Option<usize>,
+    /// GOSS top rate, paired with `goss_other_rate` (both-or-neither).
+    goss_top_rate: Option<f64>,
+    /// GOSS other rate, paired with `goss_top_rate` (both-or-neither).
+    goss_other_rate: Option<f64>,
 }
 
 impl GradientBoostingConfig {
@@ -164,6 +176,8 @@ impl GradientBoostingConfig {
             categorical_features,
             n_classes,
             lambdarank_truncation_level,
+            goss_top_rate,
+            goss_other_rate,
         } = params;
 
         if n_estimators < 1_usize {
@@ -357,6 +371,61 @@ impl GradientBoostingConfig {
                 None,
             ) => {}
         }
+        // GOSS: both rates travel together, each in (0, 1), summing to
+        // at most 1, and GOSS replaces row subsampling outright — a run
+        // that stated both `subsample < 1` and GOSS would be sampling
+        // rows twice under two different laws.
+        match (goss_top_rate, goss_other_rate) {
+            (None, None) => {}
+            (Some(_), None) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "goss_other_rate".to_string(),
+                    reason: "must be set when goss_top_rate is set (the GOSS rates travel \
+                             together)"
+                        .to_string(),
+                })
+            }
+            (None, Some(_)) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "goss_top_rate".to_string(),
+                    reason: "must be set when goss_other_rate is set (the GOSS rates travel \
+                             together)"
+                        .to_string(),
+                })
+            }
+            (Some(top), Some(other)) => {
+                if !top.is_finite() || top <= 0.0_f64 || top >= 1.0_f64 {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "goss_top_rate".to_string(),
+                        reason: format!("must be in (0.0, 1.0) exclusive, got {top}"),
+                    });
+                }
+                if !other.is_finite() || other <= 0.0_f64 || other >= 1.0_f64 {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "goss_other_rate".to_string(),
+                        reason: format!("must be in (0.0, 1.0) exclusive, got {other}"),
+                    });
+                }
+                if top + other > 1.0_f64 {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "goss_top_rate".to_string(),
+                        reason: format!(
+                            "goss_top_rate + goss_other_rate must be <= 1.0, got {}",
+                            top + other
+                        ),
+                    });
+                }
+                if subsample < 1.0_f64 {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "subsample".to_string(),
+                        reason: format!(
+                            "must be 1.0 when GOSS is enabled (got {subsample}); GOSS \
+                             replaces row subsampling"
+                        ),
+                    });
+                }
+            }
+        }
         if let Some(k) = max_features {
             if k < 1_usize {
                 return Err(ClearGbmError::InvalidParameter {
@@ -453,6 +522,8 @@ impl GradientBoostingConfig {
             categorical_features,
             n_classes,
             lambdarank_truncation_level,
+            goss_top_rate,
+            goss_other_rate,
         })
     }
 
@@ -588,6 +659,18 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn lambdarank_truncation_level(&self) -> Option<usize> {
         self.lambdarank_truncation_level
+    }
+
+    /// Returns the GOSS top rate (None = GOSS off).
+    #[must_use]
+    pub fn goss_top_rate(&self) -> Option<f64> {
+        self.goss_top_rate
+    }
+
+    /// Returns the GOSS other rate (None = GOSS off).
+    #[must_use]
+    pub fn goss_other_rate(&self) -> Option<f64> {
+        self.goss_other_rate
     }
 
     /// Returns the leaf budget, set exactly under `LeafWise` growth.

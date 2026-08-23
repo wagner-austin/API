@@ -21,7 +21,7 @@ impl Serialize for GradientBoostingConfig {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 21) {
+        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 23) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -115,6 +115,14 @@ impl Serialize for GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match state.serialize_field("goss_top_rate", &self.goss_top_rate()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("goss_other_rate", &self.goss_other_rate()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
         state.end()
     }
 }
@@ -167,6 +175,10 @@ pub(crate) enum GradientBoostingConfigField {
     NClasses,
     /// The NDCG truncation position (optional).
     LambdarankTruncationLevel,
+    /// The GOSS top rate (optional).
+    GossTopRate,
+    /// The GOSS other rate (optional).
+    GossOtherRate,
 }
 
 /// Visitor for deserializing `GradientBoostingConfigField` from string.
@@ -210,6 +222,8 @@ impl<'de> Visitor<'de> for GradientBoostingConfigFieldVisitor {
             "lambdarank_truncation_level" => {
                 Ok(GradientBoostingConfigField::LambdarankTruncationLevel)
             }
+            "goss_top_rate" => Ok(GradientBoostingConfigField::GossTopRate),
+            "goss_other_rate" => Ok(GradientBoostingConfigField::GossOtherRate),
             _ => Err(E::unknown_field(value, GRADIENT_BOOSTING_CONFIG_FIELDS)),
         }
     }
@@ -247,6 +261,8 @@ const GRADIENT_BOOSTING_CONFIG_FIELDS: &[&str] = &[
     "categorical_features",
     "n_classes",
     "lambdarank_truncation_level",
+    "goss_top_rate",
+    "goss_other_rate",
 ];
 
 impl<'de> Deserialize<'de> for GradientBoostingConfig {
@@ -288,6 +304,8 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                 let mut categorical_features: Option<Option<Vec<usize>>> = None;
                 let mut n_classes: Option<Option<usize>> = None;
                 let mut lambdarank_truncation_level: Option<Option<usize>> = None;
+                let mut goss_top_rate: Option<Option<f64>> = None;
+                let mut goss_other_rate: Option<Option<f64>> = None;
 
                 loop {
                     let key: Option<GradientBoostingConfigField> = match map.next_key() {
@@ -425,6 +443,18 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                                 Err(e) => return Err(e),
                             });
                         }
+                        GradientBoostingConfigField::GossTopRate => {
+                            goss_top_rate = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        GradientBoostingConfigField::GossOtherRate => {
+                            goss_other_rate = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
                     }
                 }
 
@@ -512,6 +542,14 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("lambdarank_truncation_level")),
                 };
+                let goss_top_rate = match goss_top_rate {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("goss_top_rate")),
+                };
+                let goss_other_rate = match goss_other_rate {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("goss_other_rate")),
+                };
 
                 let params = GradientBoostingConfigParams {
                     n_estimators,
@@ -535,6 +573,8 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     categorical_features,
                     n_classes,
                     lambdarank_truncation_level,
+                    goss_top_rate,
+                    goss_other_rate,
                 };
                 match GradientBoostingConfig::new(params) {
                     Ok(cfg) => Ok(cfg),

@@ -33,6 +33,8 @@ const CONFIG_FIELDS: &[&str] = &[
     "categorical_features",
     "n_classes",
     "lambdarank_truncation_level",
+    "goss_top_rate",
+    "goss_other_rate",
 ];
 
 // =============================================================================

@@ -216,6 +216,14 @@ pub(super) fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict
         Ok(()) => {}
         Err(e) => return Err(wrap_py_err(&e)),
     };
+    match config.set_item("goss_top_rate", py.None()) {
+        Ok(()) => {}
+        Err(e) => return Err(wrap_py_err(&e)),
+    };
+    match config.set_item("goss_other_rate", py.None()) {
+        Ok(()) => {}
+        Err(e) => return Err(wrap_py_err(&e)),
+    };
     Ok(config)
 }
 

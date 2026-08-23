@@ -102,6 +102,8 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
     let categorical_features = propagate!(extract_categorical_features(dict));
     let n_classes = propagate!(extract_n_classes(dict));
     let lambdarank_truncation_level = propagate!(extract_lambdarank_truncation_level(dict));
+    let goss_top_rate = propagate!(extract_optional_f64_required_key(dict, "goss_top_rate"));
+    let goss_other_rate = propagate!(extract_optional_f64_required_key(dict, "goss_other_rate"));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -125,6 +127,8 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
         categorical_features,
         n_classes,
         lambdarank_truncation_level,
+        goss_top_rate,
+        goss_other_rate,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))
@@ -254,6 +258,37 @@ fn extract_lambdarank_truncation_level(dict: &Bound<'_, PyDict>) -> PyResult<Opt
     }
 
     let val: usize = propagate!(item.extract());
+    Ok(Some(val))
+}
+
+/// Extracts an optional float under a required key from a config dict.
+///
+/// The key must be present; its value may be `None` or a float. Same
+/// presence contract as `n_classes`: an absent key would silently read
+/// as "off".
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing or the value is neither `None`
+/// nor a float.
+fn extract_optional_f64_required_key(dict: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<f64>> {
+    let opt = propagate!(dict.get_item(key));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: key.to_string(),
+                reason: format!("missing required key '{key}'"),
+            }
+            .into())
+        }
+    };
+
+    if item.is_none() {
+        return Ok(None);
+    }
+
+    let val: f64 = propagate!(item.extract());
     Ok(Some(val))
 }
 

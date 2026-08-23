@@ -33,6 +33,8 @@ pub(super) fn default_params() -> GradientBoostingConfigParams {
         categorical_features: None,
         n_classes: None,
         lambdarank_truncation_level: None,
+        goss_top_rate: None,
+        goss_other_rate: None,
     }
 }
 

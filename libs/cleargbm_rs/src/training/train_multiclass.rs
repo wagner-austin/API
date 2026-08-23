@@ -73,6 +73,17 @@ pub(super) fn train_multiclass(
         }
     };
 
+    // GOSS is implemented for the single-score loop; a multiclass run
+    // stating it would carry a knob training does not honour.
+    if config.goss_top_rate().is_some() {
+        return Err(ClearGbmError::InvalidParameter {
+            name: "goss_top_rate".to_string(),
+            reason: "GOSS is implemented for the single-score objectives; \
+                     \"multiclass_softmax\" GOSS is not implemented"
+                .to_string(),
+        });
+    }
+
     let prepared = propagate!(prepare_training(x_train, n_features, config));
     let feature_bins = &prepared.feature_bins;
     let bin_thresholds = &prepared.bin_thresholds;

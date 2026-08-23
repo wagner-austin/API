@@ -21,6 +21,7 @@ use crate::tree::{
 
 use super::config::{GradientBoostingConfig, GrowthStrategy};
 use super::early_stopping::EarlyStoppingState;
+use super::goss::{goss_sample_indices, GossRates};
 use super::labels::ResolvedObjective;
 use super::rng::SimpleRng;
 use super::setup::PreparedTraining;
@@ -94,7 +95,7 @@ pub(super) fn run_single_score_rounds(
         // bandwidth to save, and every element then pays a widening
         // conversion before its accumulate. See the wiki page
         // `cleargbm-f32-score-narrowing-reverted`.
-        let (gradients, hessians): (Vec<f64>, Vec<f64>) = match run.resolved {
+        let (mut gradients, mut hessians): (Vec<f64>, Vec<f64>) = match run.resolved {
             ResolvedObjective::Binary {
                 y_train: yt,
                 weights,
@@ -204,8 +205,34 @@ pub(super) fn run_single_score_rounds(
             }
         };
 
-        // c. Get sample indices (subsampling)
-        let sample_indices = propagate!(get_sample_indices(n_train, config.subsample(), run.rng));
+        // c. Row selection: the GOSS pass when both rates are set and the
+        // warmup is over (the shipped semantics skip sampling while
+        // `round < 1 / learning_rate`, integer-truncated), otherwise the
+        // subsample draw. GOSS excludes `subsample < 1` at the config
+        // boundary, so exactly one sampler ever consumes the RNG.
+        let global_round_for_warmup = round + run.round_offset;
+        let sample_indices = match (config.goss_top_rate(), config.goss_other_rate()) {
+            (Some(top_rate), Some(other_rate)) => {
+                let warmup = (1.0_f64 / config.learning_rate()).trunc();
+                let round_u32 = u32::try_from(global_round_for_warmup).unwrap_or(u32::MAX);
+                if f64::from(round_u32) < warmup {
+                    propagate!(get_sample_indices(n_train, config.subsample(), run.rng))
+                } else {
+                    propagate!(goss_sample_indices(
+                        &mut gradients,
+                        &mut hessians,
+                        GossRates {
+                            top_rate,
+                            other_rate,
+                        },
+                        run.rng,
+                    ))
+                }
+            }
+            (None, None) | (Some(_), None) | (None, Some(_)) => {
+                propagate!(get_sample_indices(n_train, config.subsample(), run.rng))
+            }
+        };
 
         // d. Build tree input. The feature-subsample seed mixes the
         // GLOBAL tree index (the boosting round plus the continuation
