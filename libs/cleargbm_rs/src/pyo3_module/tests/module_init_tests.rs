@@ -11,8 +11,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAnyMethods, PyList};
 
 use super::helpers::{
-    fail, init_module, make_config_dict, set_config_str, training_labels, training_rows,
-    wrap_py_err,
+    fail, init_module, make_config_dict, make_regression_config_dict, set_config_str,
+    training_labels, training_rows, wrap_py_err,
 };
 use crate::error::ClearGbmError;
 
@@ -406,6 +406,133 @@ fn test_module_registers_the_ranking_surface() -> Result<(), ClearGbmError> {
         match score_func.call1((model, features_again)) {
             Ok(_) => Ok(()),
             Err(e) => Err(fail(format!("predict_raw call failed: {e}"))),
+        }
+    })
+}
+#[test]
+fn test_module_registers_the_continuation_surface() -> Result<(), ClearGbmError> {
+    // Both continuation registrations are callable through the module
+    // object itself: train, then continue, for binary and regression.
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let module = match init_module(py) {
+            Ok(m) => m,
+            Err(e) => return Err(e),
+        };
+        let x_rows = vec![
+            vec![0.0_f64, 0.1_f64],
+            vec![0.2_f64, 0.2_f64],
+            vec![0.8_f64, 0.9_f64],
+            vec![1.0_f64, 1.0_f64],
+        ];
+        let x_train = match numpy::PyArray2::from_vec2(py, &x_rows) {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("PyArray2 creation failed: {e}"))),
+        };
+        let y_train = numpy::PyArray1::from_vec(py, vec![0_i64, 0, 1, 1]);
+        let config = match make_config_dict(py) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let names = match pyo3::types::PyList::new(py, ["f0", "f1"]) {
+            Ok(l) => l,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let train_func = match module.getattr("train_gradient_boosting_rs") {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("getattr failed: {e}"))),
+        };
+        let model = match train_func.call1((
+            x_train,
+            y_train,
+            py.None(),
+            py.None(),
+            py.None(),
+            py.None(),
+            config,
+            names,
+        )) {
+            Ok(m) => m,
+            Err(e) => return Err(fail(format!("training call failed: {e}"))),
+        };
+
+        let continue_func = match module.getattr("continue_gradient_boosting_rs") {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("getattr continue failed: {e}"))),
+        };
+        let x_again = match numpy::PyArray2::from_vec2(py, &x_rows) {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("PyArray2 creation failed: {e}"))),
+        };
+        let y_again = numpy::PyArray1::from_vec(py, vec![0_i64, 0, 1, 1]);
+        match continue_func.call1((
+            model,
+            x_again,
+            y_again,
+            py.None(),
+            py.None(),
+            py.None(),
+            py.None(),
+            1_i64,
+            1_i64,
+        )) {
+            Ok(_) => {}
+            Err(e) => return Err(fail(format!("binary continuation call failed: {e}"))),
+        }
+
+        // Regression: train then continue through the module surface.
+        let reg_config = match make_regression_config_dict(py) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let reg_names = match pyo3::types::PyList::new(py, ["f0", "f1"]) {
+            Ok(l) => l,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let reg_x = match numpy::PyArray2::from_vec2(py, &x_rows) {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("PyArray2 creation failed: {e}"))),
+        };
+        let reg_y = numpy::PyArray1::from_vec(py, vec![0.0_f64, 0.2_f64, 0.8_f64, 1.0_f64]);
+        let reg_train_func = match module.getattr("train_gradient_boosting_regression_rs") {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("getattr failed: {e}"))),
+        };
+        let reg_model = match reg_train_func.call1((
+            reg_x,
+            reg_y,
+            py.None(),
+            py.None(),
+            py.None(),
+            py.None(),
+            reg_config,
+            reg_names,
+        )) {
+            Ok(m) => m,
+            Err(e) => return Err(fail(format!("regression training call failed: {e}"))),
+        };
+        let reg_continue_func = match module.getattr("continue_gradient_boosting_regression_rs") {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("getattr continue failed: {e}"))),
+        };
+        let reg_x2 = match numpy::PyArray2::from_vec2(py, &x_rows) {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("PyArray2 creation failed: {e}"))),
+        };
+        let reg_y2 = numpy::PyArray1::from_vec(py, vec![0.0_f64, 0.2_f64, 0.8_f64, 1.0_f64]);
+        match reg_continue_func.call1((
+            reg_model,
+            reg_x2,
+            reg_y2,
+            py.None(),
+            py.None(),
+            py.None(),
+            py.None(),
+            1_i64,
+            1_i64,
+        )) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(fail(format!("regression continuation call failed: {e}"))),
         }
     })
 }

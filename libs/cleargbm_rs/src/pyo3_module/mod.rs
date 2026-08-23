@@ -29,6 +29,7 @@
 //! - [`training_fns`] — Training entries (binary + regression) and prediction
 //! - [`training_multiclass_fns`] — The multiclass entry and its predict trio
 //! - [`training_ranking_fns`] — The LambdaMART ranking entry
+//! - [`training_continue_fns`] — The continued-training entries
 //! - [`entry_args`] — Positional-argument unpacking for the registrations
 //! - [`model_fns`] — The [`PyGbmModel`] class + model serde + importances
 
@@ -37,6 +38,7 @@ pub(crate) mod config_extract;
 pub(crate) mod entry_args;
 mod error_conversion;
 pub(crate) mod model_fns;
+pub(crate) mod training_continue_fns;
 pub(crate) mod training_fns;
 pub(crate) mod training_multiclass_fns;
 pub(crate) mod training_ranking_fns;
@@ -218,6 +220,28 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"Train a LambdaMART ranking model on query-grouped data."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
                 entry_args::train_gradient_boosting_ranking_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"continue_gradient_boosting_rs"),
+            Some(c"Continue a binary-classification model with more boosting rounds."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                entry_args::continue_gradient_boosting_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"continue_gradient_boosting_regression_rs"),
+            Some(c"Continue a regression model with more boosting rounds."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                entry_args::continue_gradient_boosting_regression_from_args(args)
             },
         )
     })

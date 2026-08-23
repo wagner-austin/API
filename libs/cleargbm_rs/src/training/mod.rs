@@ -11,6 +11,7 @@
 //! - [`GradientBoostingModel`] wraps the trained ensemble for prediction
 
 pub(crate) mod config;
+mod continue_training;
 pub(crate) mod early_stopping;
 pub(crate) mod importance;
 pub(crate) mod labels;
@@ -20,6 +21,7 @@ pub(crate) mod parallelism;
 pub(crate) mod rng;
 pub(crate) mod serde_impl;
 pub(crate) mod setup;
+mod single_score_rounds;
 pub(crate) mod subsampling;
 mod train;
 mod train_multiclass;
@@ -30,6 +32,7 @@ pub(crate) mod validation;
 mod tests;
 
 pub use config::{GradientBoostingConfig, GradientBoostingConfigParams, GrowthStrategy, Objective};
+pub use continue_training::continue_gradient_boosting;
 pub use importance::feature_importances;
 pub use labels::{TrainingLabels, ValidationData};
 pub use model::GradientBoostingModel;

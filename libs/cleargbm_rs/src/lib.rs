@@ -73,9 +73,9 @@ pub use split::{
     SplitResultConfig,
 };
 pub use training::{
-    train_gradient_boosting, train_gradient_boosting_ranking, GradientBoostingConfig,
-    GradientBoostingConfigParams, GradientBoostingModel, Objective, Parallelism,
-    RankingTrainingData, RankingValidationData, TrainingLabels, ValidationData,
+    continue_gradient_boosting, train_gradient_boosting, train_gradient_boosting_ranking,
+    GradientBoostingConfig, GradientBoostingConfigParams, GradientBoostingModel, Objective,
+    Parallelism, RankingTrainingData, RankingValidationData, TrainingLabels, ValidationData,
 };
 pub use tree::{build_tree, compute_leaf_value, BuildTreeInput, Tree, TreeBuildConfig};
 pub use types::{CategoricalNodeConfig, HistogramBuffer, SplitConfig, TreeNode, TreeNodeConfig};

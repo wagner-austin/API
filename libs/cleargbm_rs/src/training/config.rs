@@ -462,6 +462,19 @@ impl GradientBoostingConfig {
         self.n_estimators
     }
 
+    /// Returns a copy of this config with `n_estimators` replaced.
+    ///
+    /// Used by continued training so the continued artifact's config
+    /// states the total round budget the combined model trained under.
+    /// The caller guarantees `n_estimators >= 1`; every other field is
+    /// already validated, so no re-validation runs.
+    #[must_use]
+    pub(crate) fn with_n_estimators(&self, n_estimators: usize) -> Self {
+        let mut updated = self.clone();
+        updated.n_estimators = n_estimators;
+        updated
+    }
+
     /// Returns the maximum tree depth.
     #[must_use]
     pub fn max_depth(&self) -> usize {

@@ -6,17 +6,10 @@
 
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
-use crate::losses::{
-    binary_log_loss, binary_log_loss_initial_prediction, sigmoid_array,
-    squared_error_initial_prediction, squared_error_loss,
-};
-use crate::predict::predict_tree;
-use crate::tree::{
-    build_tree_leaf_wise_with_leaf_assignment, build_tree_with_leaf_assignment,
-    select_tree_features, BuildTreeInput, FeatureSubsample, Tree,
-};
+use crate::losses::{binary_log_loss_initial_prediction, squared_error_initial_prediction};
+use crate::tree::Tree;
 
-use super::config::{GradientBoostingConfig, GrowthStrategy};
+use super::config::GradientBoostingConfig;
 use super::early_stopping::EarlyStoppingState;
 use super::labels::{
     resolve_objective, ResolvedObjective, ResolvedTraining, TrainingLabels, ValidationData,
@@ -25,7 +18,7 @@ use super::model::{BaseScore, GradientBoostingModel};
 use super::parallelism::Parallelism;
 use super::rng::SimpleRng;
 use super::setup::prepare_training;
-use super::subsampling::get_sample_indices;
+use super::single_score_rounds::{run_single_score_rounds, SingleScoreRounds};
 use super::train_multiclass::train_multiclass;
 use super::validation::{validate_training_inputs, validate_validation_inputs};
 
@@ -159,11 +152,6 @@ pub fn train_gradient_boosting(
     // 5-9. Shared one-time preparation: feature-count-dependent config
     // validation, categorical resolution, binning, tree configuration.
     let prepared = propagate!(prepare_training(x_train, n_features, config));
-    let feature_bins = &prepared.feature_bins;
-    let bin_thresholds = &prepared.bin_thresholds;
-    let categorical_layout = prepared.categorical_layout.as_ref();
-    let tree_build_config = &prepared.tree_build_config;
-    let tree_column_budget = prepared.tree_column_budget;
 
     // Initialize RNG for subsampling and the early-stopping state.
     let mut rng = SimpleRng::new(config.random_state());
@@ -192,265 +180,22 @@ pub fn train_gradient_boosting(
     // Installed once for the whole run rather than once per tree: `install`
     // hands the closure to the pool and blocks the calling thread until it
     // finishes, so installing per boosting round adds one handoff per round.
-    let build_trees = || -> Result<Vec<Tree>, ClearGbmError> {
-        let mut trees: Vec<Tree> = Vec::with_capacity(config.n_estimators());
-
-        for round in 0_usize..config.n_estimators() {
-            // a/b. Compute gradients and hessians under the objective
-            // (inline — lengths match by construction). Kept in f64 end to
-            // end. Narrowing these two streams to f32 for the histogram hot
-            // loop was measured 8% SLOWER on this workload: at the node sizes
-            // reached here both widths already fit in L2, so there is no
-            // bandwidth to save, and every element then pays a widening
-            // conversion before its accumulate. See the wiki page
-            // `cleargbm-f32-score-narrowing-reverted`.
-            let (gradients, hessians): (Vec<f64>, Vec<f64>) = match &resolved {
-                ResolvedObjective::Binary {
-                    y_train: yt,
-                    weights,
-                    scale_pos_weight,
-                    ..
-                } => {
-                    // Probabilities come from the sigmoid of the running raw
-                    // scores. The effective row weight is the product of the
-                    // class term (`scale_pos_weight` for positives, 1 for
-                    // negatives) and the optional per-row sample weight; the
-                    // weighted log loss's first and second derivatives scale
-                    // by it together. The weightless arm keeps the exact
-                    // historical expressions - no synthesized `* 1.0` - so
-                    // every recorded manifest stays bit-valid, and at weight
-                    // 1.0 the class multiply is an IEEE identity: each
-                    // specialization is the general path's special case,
-                    // bit for bit.
-                    let scale_pos_weight = *scale_pos_weight;
-                    let probas = sigmoid_array(&raw_preds_train);
-                    match weights {
-                        Some(ws) => {
-                            let gradients: Vec<f64> = probas
-                                .iter()
-                                .zip(yt.iter())
-                                .zip(ws.iter())
-                                .map(|((&p, &y), &w)| {
-                                    if y == 1_u8 {
-                                        (scale_pos_weight * w) * (p - 1.0_f64)
-                                    } else {
-                                        w * p
-                                    }
-                                })
-                                .collect();
-                            let hessians: Vec<f64> = probas
-                                .iter()
-                                .zip(yt.iter())
-                                .zip(ws.iter())
-                                .map(|((&p, &y), &w)| {
-                                    if y == 1_u8 {
-                                        (scale_pos_weight * w) * (p * (1.0_f64 - p))
-                                    } else {
-                                        w * (p * (1.0_f64 - p))
-                                    }
-                                })
-                                .collect();
-                            (gradients, hessians)
-                        }
-                        None => {
-                            let gradients: Vec<f64> = probas
-                                .iter()
-                                .zip(yt.iter())
-                                .map(|(&p, &y)| {
-                                    if y == 1_u8 {
-                                        scale_pos_weight * (p - 1.0_f64)
-                                    } else {
-                                        p
-                                    }
-                                })
-                                .collect();
-                            let hessians: Vec<f64> = probas
-                                .iter()
-                                .zip(yt.iter())
-                                .map(|(&p, &y)| {
-                                    if y == 1_u8 {
-                                        scale_pos_weight * (p * (1.0_f64 - p))
-                                    } else {
-                                        p * (1.0_f64 - p)
-                                    }
-                                })
-                                .collect();
-                            (gradients, hessians)
-                        }
-                    }
-                }
-                ResolvedObjective::SquaredError {
-                    y_train: yt,
-                    weights,
-                    ..
-                } => {
-                    // Squared error differentiates in raw-score space
-                    // directly: gradient = w * (prediction - y), hessian = w,
-                    // with the weightless arm keeping the bare historical
-                    // expressions (gradient = pred - y, hessian = 1).
-                    match weights {
-                        Some(ws) => {
-                            let gradients: Vec<f64> = raw_preds_train
-                                .iter()
-                                .zip(yt.iter())
-                                .zip(ws.iter())
-                                .map(|((&pred, &y), &w)| w * (pred - y))
-                                .collect();
-                            let hessians: Vec<f64> = ws.to_vec();
-                            (gradients, hessians)
-                        }
-                        None => {
-                            let gradients: Vec<f64> = raw_preds_train
-                                .iter()
-                                .zip(yt.iter())
-                                .map(|(&pred, &y)| pred - y)
-                                .collect();
-                            let hessians: Vec<f64> = vec![1.0_f64; n_train];
-                            (gradients, hessians)
-                        }
-                    }
-                }
-            };
-
-            // c. Get sample indices (subsampling)
-            let sample_indices =
-                propagate!(get_sample_indices(n_train, config.subsample(), &mut rng));
-
-            // d. Build tree input. The feature-subsample seed mixes the
-            // boosting round into the run seed so the same node id draws a
-            // different subset in every tree; the derivation is stream-free
-            // (see `FeatureSubsample`), so the row-subsampling RNG above is
-            // untouched and unsubsampled runs stay bit-identical.
-            let round_u64 = u64::try_from(round).unwrap_or(u64::MAX);
-            let feature_subsample = config.max_features().map(|k| FeatureSubsample {
-                k,
-                seed: config
-                    .random_state()
-                    .wrapping_add(round_u64.wrapping_mul(0x9E37_79B9_7F4A_7C15_u64)),
-            });
-            // The per-tree column mask, when `colsample_bytree` is set: a
-            // pure function of (random_state, round) on its own stream (see
-            // TREE_MIX), so the other RNG consumers are untouched and the
-            // colsample-off path stays bit-identical.
-            let tree_mask: Option<Vec<bool>> = tree_column_budget
-                .map(|k| select_tree_features(config.random_state(), round, k, n_features));
-            let input = BuildTreeInput {
-                sample_indices: &sample_indices,
-                gradients: &gradients,
-                hessians: &hessians,
-                bins_rows: feature_bins.bins(),
-                n_samples: feature_bins.n_samples(),
-                n_features: feature_bins.n_features(),
-                n_regular_bins: feature_bins.n_regular_bins(),
-                bin_thresholds,
-                config: tree_build_config,
-                monotonic_constraints: config.monotonic_constraints(),
-                feature_subsample,
-                tree_feature_mask: tree_mask.as_deref(),
-                categorical: categorical_layout,
-            };
-
-            // e. Build tree (and capture per-sample leaf assignments as a
-            // side effect — see build_tree_with_leaf_assignment docs).
-            // The growth policy is dispatched here, the one place that holds
-            // the full `GradientBoostingConfig`; the tree module exposes the
-            // two growers and stays free of the policy vocabulary.
-            let (tree, leaf_value_per_sample) = match config.growth_strategy() {
-                GrowthStrategy::DepthWise => {
-                    propagate!(build_tree_with_leaf_assignment(&input, hooks))
-                }
-                GrowthStrategy::LeafWise => {
-                    propagate!(build_tree_leaf_wise_with_leaf_assignment(&input, hooks))
-                }
-            };
-
-            // f. Update training predictions.
-            // Fast path: for samples covered by sample_indices (leaf_value not
-            // NaN), the leaf-value is known from tree building — direct O(N)
-            // lookup + add, no tree walk. Fallback path: NaN samples
-            // (subsampled-out this round) need predict_tree. When subsample=1.0
-            // every sample is covered by the fast path.
-            let lr = config.learning_rate();
-            let mut needs_fallback: Vec<usize> = Vec::new();
-            for i in 0_usize..n_train {
-                let lv = leaf_value_per_sample[i];
-                if lv.is_nan() {
-                    needs_fallback.push(i);
-                } else {
-                    raw_preds_train[i] += lr * lv;
-                }
-            }
-            if !needs_fallback.is_empty() {
-                // Only walk the tree for samples the tree wasn't built on.
-                let fallback_features: Vec<&[f64]> =
-                    needs_fallback.iter().map(|&i| x_train[i]).collect();
-                let fallback_preds = propagate!(predict_tree(&tree, &fallback_features));
-                for (j, &i) in needs_fallback.iter().enumerate() {
-                    raw_preds_train[i] += lr * fallback_preds[j];
-                }
-            }
-
-            // g. Early stopping check on the objective's validation loss
-            // (before push, so we can borrow tree)
-            let val_loss: Option<f64> = match &resolved {
-                ResolvedObjective::Binary {
-                    val: Some(v),
-                    scale_pos_weight,
-                    ..
-                } => {
-                    let val_preds = propagate!(predict_tree(&tree, v.x));
-                    for i in 0_usize..raw_preds_val.len() {
-                        raw_preds_val[i] += config.learning_rate() * val_preds[i];
-                    }
-                    let val_probas = sigmoid_array(&raw_preds_val);
-                    Some(propagate!(binary_log_loss(
-                        v.y,
-                        &val_probas,
-                        *scale_pos_weight,
-                        v.weight
-                    )))
-                }
-                ResolvedObjective::SquaredError { val: Some(v), .. } => {
-                    let val_preds = propagate!(predict_tree(&tree, v.x));
-                    for i in 0_usize..raw_preds_val.len() {
-                        raw_preds_val[i] += config.learning_rate() * val_preds[i];
-                    }
-                    Some(propagate!(squared_error_loss(
-                        v.y,
-                        &raw_preds_val,
-                        v.weight
-                    )))
-                }
-                ResolvedObjective::Binary { val: None, .. }
-                | ResolvedObjective::SquaredError { val: None, .. } => None,
-            };
-            let stop_at_round: Option<usize> = match val_loss {
-                Some(loss) => match es_state {
-                    Some(ref mut es) => {
-                        if es.update(loss, round) {
-                            Some(es.best_round())
-                        } else {
-                            None
-                        }
-                    }
-                    None => None,
-                },
-                None => None,
-            };
-
-            // h. Store tree
-            trees.push(tree);
-
-            // i. If early stopping triggered, truncate and break
-            if let Some(best_round) = stop_at_round {
-                trees.truncate(best_round + 1_usize);
-                break;
-            }
-        }
-
-        Ok(trees)
+    // The rounds themselves live in `single_score_rounds`, shared with the
+    // continuation trainer.
+    let mut run = SingleScoreRounds {
+        x_train,
+        resolved: &resolved,
+        raw_preds_train: &mut raw_preds_train,
+        raw_preds_val: &mut raw_preds_val,
+        prepared: &prepared,
+        config,
+        n_rounds: config.n_estimators(),
+        round_offset: 0_usize,
+        rng: &mut rng,
+        es_state: &mut es_state,
+        hooks,
     };
-    let trees = propagate!(pool.install(build_trees));
+    let trees: Vec<Tree> = propagate!(pool.install(|| run_single_score_rounds(&mut run)));
 
     Ok(GradientBoostingModel::new(
         trees,

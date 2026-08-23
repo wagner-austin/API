@@ -10,6 +10,7 @@ mod model_persistence_tests;
 mod module_init_tests;
 mod predict_fns_tests;
 mod training_config_key_tests;
+mod training_continue_entry_tests;
 mod training_feature_budget_key_tests;
 mod training_fns_tests;
 mod training_multiclass_entry_tests;

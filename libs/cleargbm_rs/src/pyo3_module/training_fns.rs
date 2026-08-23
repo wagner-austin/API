@@ -394,7 +394,7 @@ pub(super) fn missing_val_pair(missing: &str, present: &str) -> PyErr {
 /// # Errors
 ///
 /// Returns `PyErr` if the array is non-contiguous or contains out-of-range values.
-fn extract_labels(labels: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<u8>> {
+pub(super) fn extract_labels(labels: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<u8>> {
     let slice = propagate_into!(labels.as_slice());
     let mut result = Vec::with_capacity(slice.len());
     for &val in slice {

@@ -141,6 +141,26 @@ pub(crate) enum ResolvedObjective<'a> {
     },
 }
 
+impl<'a> ResolvedTraining<'a> {
+    /// Narrows to the single-score task.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ClearGbmError::InvalidParameter` if this is the
+    /// multiclass task — callers that gated the objective beforehand
+    /// (continuation) surface the impossible arm as an error instead of
+    /// leaving an uncoverable match in their own body.
+    pub(crate) fn into_single_score(self) -> Result<ResolvedObjective<'a>, ClearGbmError> {
+        match self {
+            Self::SingleScore(resolved) => Ok(resolved),
+            Self::Multiclass(_) => Err(ClearGbmError::InvalidParameter {
+                name: "objective".to_string(),
+                reason: "expected a single-score task, resolved multiclass".to_string(),
+            }),
+        }
+    }
+}
+
 impl<'a> ResolvedObjective<'a> {
     /// Returns the validation feature matrix, when validation data was
     /// provided — used to size the running validation predictions before

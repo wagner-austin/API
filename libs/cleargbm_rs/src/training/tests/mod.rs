@@ -13,6 +13,7 @@ mod serde_helpers;
 mod serde_model_tests;
 mod subsampling_tests;
 mod train_categorical_tests;
+mod train_continue_tests;
 mod train_helpers;
 mod train_knob_tests;
 mod train_multiclass_edge_tests;

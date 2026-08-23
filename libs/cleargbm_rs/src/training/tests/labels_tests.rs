@@ -529,3 +529,41 @@ fn test_resolve_multiclass_ok_and_single_score_rejects_mc_labels() -> Result<(),
         Err(e) => Err(e),
     }
 }
+#[test]
+fn test_into_single_score_narrows_and_refuses_multiclass() -> Result<(), ClearGbmError> {
+    // The single-score arm narrows through.
+    let y = [0_u8, 1_u8];
+    let single = propagate!(resolve_objective(
+        Objective::BinaryLogLoss,
+        Some(1.0_f64),
+        None,
+        TrainingLabels::Binary(&y),
+        None,
+        None,
+    ));
+    assert!(single.into_single_score().is_ok());
+
+    // The multiclass arm is refused with the expectation named.
+    let y_mc = [0_u32, 1_u32];
+    let multiclass = propagate!(resolve_objective(
+        Objective::MulticlassSoftmax,
+        None,
+        Some(2_usize),
+        TrainingLabels::Multiclass(&y_mc),
+        None,
+        None,
+    ));
+    match multiclass.into_single_score() {
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "objective");
+            assert!(reason.contains("resolved multiclass"), "{reason}");
+            Ok(())
+        }
+        other => Err(ClearGbmError::TreeConstructionFailed {
+            reason: format!(
+                "multiclass must not narrow to single-score, got {:?}",
+                other.map(|_| "single-score")
+            ),
+        }),
+    }
+}
