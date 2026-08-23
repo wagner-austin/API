@@ -354,11 +354,21 @@ anything is found.
 
 ### Closures: why `unaccounted` doesn't rot
 
-`sacct` retention is finite. A job that ran perfectly a month ago eventually
-has no accounting row — which is character-for-character the same observation
-as a job that never existed. Left alone, every old job becomes a permanent
-`unaccounted` finding, the count climbs without bound, and triage exits
-non-zero forever. A board that is always red is the same as no board.
+Two Slurm components forget finished jobs, on very different schedules.
+
+`squeue` drops a job `MinJobAge` after it ends — **300 seconds on HPC3, read
+from `scontrol show config`**. Past that, `squeue -j <id>` does not return
+empty, it exits non-zero with `Invalid job id specified`. Triage therefore asks
+the queue only about ids accounting reports as `PENDING`; nothing else can be
+in it.
+
+`sacct` retention depends on `slurmdbd`'s purge settings, which a login node
+cannot read — and Slurm's default is to purge nothing, so on this cluster the
+expiry is **unverified**. The closure record is built for it anyway: if a site
+does enable `PurgeJobAfter`, every job past that window becomes a ledger entry
+with no accounting row — the same observation as a job that never existed —
+and triage would exit non-zero forever. A board that is always red is the same
+as no board, and a closure costs one line per job.
 
 So the moment accounting reports a terminal state, triage writes it to
 `<ledger>.closed` and never asks about that job again. The closure is written

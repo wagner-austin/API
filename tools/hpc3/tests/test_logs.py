@@ -63,7 +63,24 @@ class TestAgeCommand:
 
     def test_a_missing_log_emits_nothing_rather_than_a_zero(self) -> None:
         """A job whose output has not appeared has not been quiet."""
-        assert "test -f" in age_command([_entry("101")])
+        assert "if [ -f " in age_command([_entry("101")])
+
+    def test_a_missing_log_does_not_fail_the_whole_query(self) -> None:
+        """Measured on the real cluster, not deduced.
+
+        The first form was ``test -f PATH && echo ...``. It emits the right
+        thing, and when the LAST probe's file is missing the failed test
+        becomes the command's exit status, so the whole age query is reported
+        as a failed remote command. A job that was submitted and never ran has
+        no log -- which is exactly the job this reconciliation exists to find,
+        so the failure landed on the case that matters most.
+
+        An ``if`` block exits zero whether or not the file is there.
+        """
+        command = age_command([_entry("101"), _entry("102")])
+        assert "&&" not in command
+        assert command.count("if [ -f ") == 2
+        assert command.count("; fi") == 2
 
     def test_no_entries_is_refused(self) -> None:
         with pytest.raises(ValueError, match="at least one entry"):

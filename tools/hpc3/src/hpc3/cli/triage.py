@@ -29,6 +29,7 @@ import sys
 from collections.abc import Sequence
 
 from hpc3.cli import _argv, _config, _fatal, _test_hooks
+from hpc3.contracts.pending import PendingJob
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import ledger, logs
 from hpc3.core.remote import run_remote
@@ -93,7 +94,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     job_ids = [entry["job_id"] for entry in entries]
     statuses = parse_sacct_output(run_remote(host, sacct_command(job_ids)), cluster)
-    pending = parse_squeue_output(run_remote(host, squeue_command(job_ids)))
+
+    # squeue is asked ONLY about jobs accounting reports as queued. It holds a
+    # job for minutes after it ends and then forgets it, and `squeue -j` on an
+    # id it no longer holds exits non-zero with "Invalid job id specified" --
+    # measured on the real cluster against a job that had completed perfectly.
+    # That is not a triage failure, but asking would report it as one, and the
+    # blocked-job check only concerns pending jobs anyway.
+    pending_ids = [status["job_id"] for status in statuses if status["state"] == "PENDING"]
+    pending: list[PendingJob] = []
+    if pending_ids != []:
+        pending = parse_squeue_output(run_remote(host, squeue_command(pending_ids)))
 
     still_live = live_entries(entries, statuses)
     ages = logs.log_ages(host, still_live)

@@ -286,6 +286,62 @@ class TestTriageCli:
         assert emitted[-1] == "1 recorded, all closed; nothing left to reconcile"
         assert second.calls == []
 
+    def test_the_queue_is_not_asked_about_a_job_that_has_finished(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """Measured on the real cluster, not deduced.
+
+        squeue holds a job for minutes after it ends and then forgets it.
+        ``squeue -j`` on an id it no longer holds exits 1 with "Invalid job id
+        specified" -- observed against a job that had COMPLETED perfectly --
+        and that would be reported as a failed remote command. Since the
+        blocked-job check only concerns pending jobs, the queue is asked only
+        about ids accounting says are queued.
+        """
+        self._ledger(tmp_path)
+        fake_run.add("sacct", stdout="101|abl.arm|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n")
+
+        assert triage_cli.main(self._config(tmp_path)) == 0
+        assert not any("squeue" in command for command in fake_run.commands())
+
+    def test_the_queue_is_asked_only_about_the_ids_that_are_pending(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        write_file(
+            tmp_path / "ledger.jsonl",
+            b"".join(
+                dump_json_str(
+                    {
+                        "job_id": job_id,
+                        "project": "abl",
+                        "name": f"abl.arm-{job_id}",
+                        "host": "hpc3",
+                        "partition": "free-gpu",
+                        "submitted_at": "2026-08-22T16:00:00+00:00",
+                        "log_dir": "/pub/logs",
+                        "experiment": {"arm": "B"},
+                    }
+                ).encode("utf-8")
+                + b"\n"
+                for job_id in ("101", "102")
+            ),
+        )
+        fake_run.add(
+            "sacct",
+            stdout=(
+                "101|abl.arm-101|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n"
+                "102|abl.arm-102|free-gpu|PENDING|0||\n"
+            ),
+        )
+        fake_run.add("squeue", stdout="102|abl.arm-102|Resources\n")
+        fake_run.add("date +%s", stdout="now 1000\n")
+
+        triage_cli.main(self._config(tmp_path))
+        queue_calls = [c for c in fake_run.commands() if "squeue" in c]
+        assert len(queue_calls) == 1
+        assert "-j 102" in queue_calls[0]
+        assert "101" not in queue_calls[0]
+
     def test_a_blocked_job_is_found_and_exits_non_zero(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:

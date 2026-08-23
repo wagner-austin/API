@@ -47,6 +47,13 @@ def age_command(entries: Sequence[LedgerEntry]) -> str:
         exist yet emits nothing, which is correct: a job whose output file
         has not appeared has not been quiet, it has not started writing.
 
+        Each probe is an ``if`` block rather than ``test -f … && echo …``.
+        The ``&&`` form emits the same output but leaves the FAILED test as
+        the command's exit status whenever the last log is missing, so the
+        whole query is reported as a failed remote command. That is not a
+        rare case: a job that was submitted and never ran has no log, and
+        that is precisely the job this reconciliation exists to find.
+
     Raises:
         ValueError: If no entries are given.
     """
@@ -55,7 +62,8 @@ def age_command(entries: Sequence[LedgerEntry]) -> str:
     parts = [r'echo "now $(date +%s)"']
     for entry in entries:
         path = log_path(entry)
-        parts.append(f"test -f '{path}' && echo \"{entry['job_id']} $(stat -c %Y '{path}')\"")
+        emit = f"echo \"{entry['job_id']} $(stat -c %Y '{path}')\""
+        parts.append(f"if [ -f '{path}' ]; then {emit}; fi")
     return "; ".join(parts)
 
 
