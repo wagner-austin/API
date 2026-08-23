@@ -140,6 +140,98 @@ class _PredictRawProto(Protocol):
         ...
 
 
+class _TrainMulticlassProto(Protocol):
+    """Protocol for the native multiclass training entry."""
+
+    def __call__(
+        self,
+        x_train: NDArray[np.float64],
+        y_train: NDArray[np.int64],
+        sample_weight: NDArray[np.float64] | None,
+        x_val: NDArray[np.float64] | None,
+        y_val: NDArray[np.int64] | None,
+        val_sample_weight: NDArray[np.float64] | None,
+        config: dict[str, int | float | bool | str | list[int] | None],
+        feature_names: list[str],
+    ) -> PyGbmModelProto:
+        """Train a multiclass softmax ensemble.
+
+        Args:
+            x_train: Training feature matrix.
+            y_train: Class labels, each in ``[0, n_classes)``.
+            sample_weight: Optional per-row training weights.
+            x_val: Optional validation features.
+            y_val: Optional validation labels.
+            val_sample_weight: Optional per-row evaluation weights.
+            config: Training hyperparameters.
+            feature_names: Feature names.
+
+        Returns:
+            Trained native model handle.
+        """
+        ...
+
+
+class _PredictRawMulticlassProto(Protocol):
+    """Protocol for the native multiclass raw-score predictor."""
+
+    def __call__(
+        self,
+        model: PyGbmModelProto,
+        features: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Predict raw per-class scores, shape ``(n_samples, n_classes)``.
+
+        Args:
+            model: Trained native multiclass model handle.
+            features: Feature matrix.
+
+        Returns:
+            Raw score matrix.
+        """
+        ...
+
+
+class _PredictProbaMulticlassProto(Protocol):
+    """Protocol for the native multiclass probability predictor."""
+
+    def __call__(
+        self,
+        model: PyGbmModelProto,
+        features: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Predict per-class probabilities, shape ``(n_samples, n_classes)``.
+
+        Args:
+            model: Trained native multiclass model handle.
+            features: Feature matrix.
+
+        Returns:
+            Probability matrix; rows sum to 1.
+        """
+        ...
+
+
+class _PredictClassProto(Protocol):
+    """Protocol for the native argmax class predictor."""
+
+    def __call__(
+        self,
+        model: PyGbmModelProto,
+        features: NDArray[np.float64],
+    ) -> NDArray[np.int64]:
+        """Predict class labels (argmax; ties resolve to the lowest index).
+
+        Args:
+            model: Trained native multiclass model handle.
+            features: Feature matrix.
+
+        Returns:
+            Class index vector.
+        """
+        ...
+
+
 class _ToJsonProto(Protocol):
     """Signature of ``cleargbm_rs.py_gbm_model_to_json_rs``."""
 
@@ -207,8 +299,18 @@ train_gradient_boosting_rs: _TrainProto = _native_mod.train_gradient_boosting_rs
 train_gradient_boosting_regression_rs: _TrainRegressionProto = (
     _native_mod.train_gradient_boosting_regression_rs
 )
+train_gradient_boosting_multiclass_rs: _TrainMulticlassProto = (
+    _native_mod.train_gradient_boosting_multiclass_rs
+)
 predict_proba_model_rs: _PredictProbaProto = _native_mod.predict_proba_model_rs
 predict_raw_model_rs: _PredictRawProto = _native_mod.predict_raw_model_rs
+predict_raw_multiclass_model_rs: _PredictRawMulticlassProto = (
+    _native_mod.predict_raw_multiclass_model_rs
+)
+predict_proba_multiclass_model_rs: _PredictProbaMulticlassProto = (
+    _native_mod.predict_proba_multiclass_model_rs
+)
+predict_class_model_rs: _PredictClassProto = _native_mod.predict_class_model_rs
 py_gbm_model_to_json_rs: _ToJsonProto = _native_mod.py_gbm_model_to_json_rs
 py_gbm_model_from_json_rs: _FromJsonProto = _native_mod.py_gbm_model_from_json_rs
 py_gbm_model_feature_importances_rs: _FeatureImportancesProto = (
@@ -219,12 +321,16 @@ py_gbm_model_n_trees_rs: _NTreesProto = _native_mod.py_gbm_model_n_trees_rs
 
 __all__ = [
     "PyGbmModelProto",
+    "predict_class_model_rs",
     "predict_proba_model_rs",
+    "predict_proba_multiclass_model_rs",
     "predict_raw_model_rs",
+    "predict_raw_multiclass_model_rs",
     "py_gbm_model_feature_importances_rs",
     "py_gbm_model_from_json_rs",
     "py_gbm_model_n_trees_rs",
     "py_gbm_model_to_json_rs",
+    "train_gradient_boosting_multiclass_rs",
     "train_gradient_boosting_regression_rs",
     "train_gradient_boosting_rs",
 ]

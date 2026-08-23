@@ -5,8 +5,9 @@ validation helpers from the focused sub-modules:
 
 - ``_types_json`` — JSON aliases, JSONTypeError, validators, extractors
 - ``_types_tree`` — BinEdges, FeatureBins, tree structures, SplitCandidate
-- ``_types_model`` — GradientBoostingConfig, GradientBoostingModel,
-  TrainingProgress
+- ``_types_config`` — GrowthStrategy/Objective literals,
+  GradientBoostingConfig
+- ``_types_model`` — GradientBoostingModel, TrainingProgress
 - ``_types_explain`` — FeatureContribution, PredictionExplanation, Rule
 - ``_types_tuning`` — TimingResult, TuningReport
 - ``_types_buffer`` — FloatBufferData, IntBufferData, HistogramBufferData
@@ -29,6 +30,18 @@ from cleargbm._types_buffer import (
     encode_float_buffer_data,
     encode_histogram_buffer_data,
     encode_int_buffer_data,
+)
+from cleargbm._types_config import (
+    GROWTH_STRATEGIES,
+    OBJECTIVES,
+    GradientBoostingConfig,
+    GrowthStrategy,
+    Objective,
+    decode_gradient_boosting_config,
+    encode_gradient_boosting_config,
+    require_growth_strategy,
+    require_leaf_budget,
+    require_objective,
 )
 from cleargbm._types_explain import (
     FeatureContribution,
@@ -54,22 +67,12 @@ from cleargbm._types_json import (
     require_unit_float,
 )
 from cleargbm._types_model import (
-    GROWTH_STRATEGIES,
-    OBJECTIVES,
-    GradientBoostingConfig,
     GradientBoostingModel,
-    GrowthStrategy,
-    Objective,
     TrainingProgress,
-    decode_gradient_boosting_config,
     decode_gradient_boosting_model,
     decode_training_progress,
-    encode_gradient_boosting_config,
     encode_gradient_boosting_model,
     encode_training_progress,
-    require_growth_strategy,
-    require_leaf_budget,
-    require_objective,
 )
 from cleargbm._types_tree import (
     BinEdges,

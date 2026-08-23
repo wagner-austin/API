@@ -37,6 +37,7 @@ class TestGradientBoostingConfig:
             "max_features": 3,
             "colsample_bytree": 0.7,
             "categorical_features": (1, 3),
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 0.8,
             "random_state": 42,
@@ -83,6 +84,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -118,6 +120,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -145,6 +148,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -172,6 +176,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -199,6 +204,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -226,6 +232,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -255,6 +262,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -295,14 +303,14 @@ class TestGradientBoostingConfig:
         with pytest.raises(ValueError, match="num_leaves must be >= 2"):
             require_leaf_budget(1, "num_leaves")
 
-    def test_objectives_enumerates_both_losses(self) -> None:
+    def test_objectives_enumerates_every_loss(self) -> None:
         """The closed literal and its runtime tuple must not drift apart."""
-        assert OBJECTIVES == ("binary_log_loss", "squared_error")
+        assert OBJECTIVES == ("binary_log_loss", "squared_error", "multiclass_softmax")
 
     def test_require_objective_accepts_every_enumerated_value(self) -> None:
         """Every value in the tuple must survive narrowing."""
         narrowed = [require_objective(value, "objective") for value in OBJECTIVES]
-        assert narrowed == ["binary_log_loss", "squared_error"]
+        assert narrowed == ["binary_log_loss", "squared_error", "multiclass_softmax"]
 
     def test_require_objective_rejects_unknown_value(self) -> None:
         """An unknown objective names itself and the accepted set."""
@@ -324,6 +332,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -352,6 +361,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -379,6 +389,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -406,6 +417,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -433,6 +445,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -465,6 +478,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -493,6 +507,7 @@ class TestGradientBoostingConfig:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": None,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -527,6 +542,7 @@ class TestCategoricalFeaturesDecode:
             "max_features": None,
             "colsample_bytree": None,
             "categorical_features": value,
+            "n_classes": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,

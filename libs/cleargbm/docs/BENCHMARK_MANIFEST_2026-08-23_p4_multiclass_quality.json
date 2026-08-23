@@ -1,0 +1,84 @@
+{
+ "config": {
+  "n_samples": 6000,
+  "n_features": 8,
+  "n_classes": 5,
+  "n_estimators": 100,
+  "max_depth": 4,
+  "learning_rate": 0.1,
+  "max_bins": 64,
+  "min_samples_leaf": 20
+ },
+ "seeds": [
+  42,
+  43,
+  44,
+  45
+ ],
+ "results": [
+  {
+   "model": "cleargbm",
+   "seed": 42,
+   "quality": {
+    "log_loss": 0.6592254251366801,
+    "accuracy": 0.6286666666666667
+   }
+  },
+  {
+   "model": "lightgbm",
+   "seed": 42,
+   "quality": {
+    "log_loss": 0.6649905504046054,
+    "accuracy": 0.6326666666666667
+   }
+  },
+  {
+   "model": "cleargbm",
+   "seed": 43,
+   "quality": {
+    "log_loss": 0.6543488705117514,
+    "accuracy": 0.64
+   }
+  },
+  {
+   "model": "lightgbm",
+   "seed": 43,
+   "quality": {
+    "log_loss": 0.6610440665898033,
+    "accuracy": 0.6406666666666667
+   }
+  },
+  {
+   "model": "cleargbm",
+   "seed": 44,
+   "quality": {
+    "log_loss": 0.6737191694615012,
+    "accuracy": 0.626
+   }
+  },
+  {
+   "model": "lightgbm",
+   "seed": 44,
+   "quality": {
+    "log_loss": 0.674521487563885,
+    "accuracy": 0.628
+   }
+  },
+  {
+   "model": "cleargbm",
+   "seed": 45,
+   "quality": {
+    "log_loss": 0.6430138123465774,
+    "accuracy": 0.6486666666666666
+   }
+  },
+  {
+   "model": "lightgbm",
+   "seed": 45,
+   "quality": {
+    "log_loss": 0.645966615894614,
+    "accuracy": 0.6453333333333333
+   }
+  }
+ ]
+}

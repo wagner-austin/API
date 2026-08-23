@@ -18,6 +18,10 @@ Public API:
   ``binary_log_loss`` these are log-odds; under ``squared_error`` they ARE
   the predictions — this is the regression inference function.
 
+The ``multiclass_softmax`` surface (its training entry and prediction trio)
+lives in :mod:`cleargbm.ensemble_multiclass` — a different contract, not a
+variant of this one.
+
 Strict typing only: no ``Any``, no ``cast``, no ``type: ignore``.
 """
 
@@ -71,7 +75,7 @@ def _config_to_rust_dict(
 ) -> dict[str, int | float | bool | str | list[int] | None]:
     """Translate a Python ``GradientBoostingConfig`` into the Rust-side dict.
 
-    The Rust training entries extract 16 hyperparameter fields plus
+    The Rust training entries extract the full hyperparameter field set plus
     ``n_jobs`` from the dict they receive. ``n_jobs`` selects the
     worker-thread policy for the run and is deliberately not part of the Rust
     ``GradientBoostingConfig``: it does not change the fitted model, and that
@@ -125,6 +129,7 @@ def _config_to_rust_dict(
             if config["categorical_features"] is not None
             else None
         ),
+        "n_classes": config["n_classes"],
     }
 
 

@@ -10,6 +10,11 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+from cleargbm._types_config import (
+    GradientBoostingConfig,
+    decode_gradient_boosting_config,
+    encode_gradient_boosting_config,
+)
 from cleargbm._types_json import (
     JSONDict,
     JSONTypeError,
@@ -20,11 +25,6 @@ from cleargbm._types_json import (
     require_non_negative_float,
     require_positive_float,
     require_positive_int,
-)
-from cleargbm._types_model import (
-    GradientBoostingConfig,
-    decode_gradient_boosting_config,
-    encode_gradient_boosting_config,
 )
 
 # =============================================================================
