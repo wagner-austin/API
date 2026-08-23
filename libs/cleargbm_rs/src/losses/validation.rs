@@ -108,6 +108,36 @@ pub(crate) fn validate_sample_weights(weights: &[f64], name: &str) -> Result<(),
     Ok(())
 }
 
+/// Validates multiclass labels: every label must be `< n_classes`.
+///
+/// # Args
+///
+/// * `y` - Class labels.
+/// * `n_classes` - The configured class count.
+/// * `name` - Argument name, used in the error message.
+///
+/// # Errors
+///
+/// Returns `ClearGbmError::InvalidParameter` naming the first offending
+/// index and value.
+pub(crate) fn validate_multiclass_labels(
+    y: &[u32],
+    n_classes: usize,
+    name: &str,
+) -> Result<(), ClearGbmError> {
+    for (i, &label) in y.iter().enumerate() {
+        if crate::narrow::index_widen(label) >= n_classes {
+            return Err(ClearGbmError::InvalidParameter {
+                name: name.to_string(),
+                reason: format!(
+                    "labels must be < n_classes ({n_classes}), got {label} at index {i}"
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Validates a sample-weight slice against its labels: length must match
 /// and every weight must be finite and strictly positive.
 ///

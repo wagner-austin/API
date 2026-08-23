@@ -27,6 +27,7 @@
 //! - [`array_helpers`] — Numpy ↔ Rust type conversions (no `as` casts)
 //! - [`config_extract`] — Config-dict extraction for the training entries
 //! - [`training_fns`] — Training entries (binary + regression) and prediction
+//! - [`training_multiclass_fns`] — The multiclass entry and its predict trio
 //! - [`entry_args`] — Positional-argument unpacking for the registrations
 //! - [`model_fns`] — The [`PyGbmModel`] class + model serde + importances
 
@@ -36,6 +37,7 @@ pub(crate) mod entry_args;
 mod error_conversion;
 pub(crate) mod model_fns;
 pub(crate) mod training_fns;
+pub(crate) mod training_multiclass_fns;
 
 #[cfg(test)]
 mod tests;
@@ -159,6 +161,50 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"Return the number of trees in a PyGbmModel."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
                 model_fns::py_gbm_model_n_trees_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"train_gradient_boosting_multiclass_rs"),
+            Some(c"Train a gradient boosting model on multiclass data (softmax)."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                entry_args::train_gradient_boosting_multiclass_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"predict_raw_multiclass_model_rs"),
+            Some(c"Predict raw per-class scores using a trained multiclass model."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                entry_args::predict_raw_multiclass_model_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"predict_proba_multiclass_model_rs"),
+            Some(c"Predict per-class probabilities using a trained multiclass model."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                entry_args::predict_proba_multiclass_model_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"predict_class_model_rs"),
+            Some(c"Predict class labels (argmax) using a trained multiclass model."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                entry_args::predict_class_model_from_args(args)
             },
         )
     })

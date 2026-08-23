@@ -207,7 +207,7 @@ fn test_importances_skip_internal_nodes_without_a_feature_index() -> Result<(), 
     };
     let model = crate::training::GradientBoostingModel::new(
         vec![tree],
-        0.0_f64,
+        crate::training::model::BaseScore::Single(0.0_f64),
         0.1_f64,
         vec!["f0".to_string(), "f1".to_string()],
         config,

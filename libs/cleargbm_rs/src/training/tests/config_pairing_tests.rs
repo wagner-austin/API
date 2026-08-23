@@ -31,6 +31,7 @@ pub(super) fn default_params() -> GradientBoostingConfigParams {
         max_features: None,
         colsample_bytree: None,
         categorical_features: None,
+        n_classes: None,
     }
 }
 

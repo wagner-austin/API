@@ -60,10 +60,10 @@ fn test_regression_base_score_is_label_mean() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     let mean: f64 = y_train.iter().sum::<f64>() / 8.0_f64;
+    let base = model.base_prediction().unwrap_or(f64::NAN);
     assert!(
-        (model.base_prediction() - mean).abs() < 1e-15_f64,
-        "regression base score must be the label mean: got {}, want {mean}",
-        model.base_prediction()
+        (base - mean).abs() < 1e-15_f64,
+        "regression base score must be the label mean: got {base}, want {mean}",
     );
     Ok(())
 }

@@ -14,6 +14,7 @@ use super::serde_helpers::{
 const MODEL_FIELDS: &[&str] = &[
     "trees",
     "base_prediction",
+    "class_base_predictions",
     "learning_rate",
     "feature_names",
     "config",
@@ -45,7 +46,9 @@ fn test_model_roundtrip_preserves_accessors() -> Result<(), ClearGbmError> {
     // must match exactly; prediction preservation is proved in the sibling test
     // `test_model_roundtrip_predictions_identical` at 1e-15 tolerance.
     assert_eq!(decoded.n_trees(), original.n_trees());
-    assert!((decoded.base_prediction() - original.base_prediction()).abs() < 1e-15_f64);
+    let decoded_base = decoded.base_prediction().unwrap_or(f64::NAN);
+    let original_base = original.base_prediction().unwrap_or(f64::NAN);
+    assert!((decoded_base - original_base).abs() < 1e-15_f64);
     assert!((decoded.learning_rate() - original.learning_rate()).abs() < 1e-15_f64);
     assert_eq!(decoded.feature_names(), original.feature_names());
     assert_eq!(decoded.config(), original.config());
@@ -321,5 +324,116 @@ fn test_model_field_visitor_expecting_describes_a_field_identifier() -> Result<(
         Err(_) => Err(ClearGbmError::SerializationFailed {
             reason: "expecting() failed with a sufficient buffer".to_string(),
         }),
+    }
+}
+
+#[test]
+fn test_model_wire_rejects_base_score_mismatches() -> Result<(), ClearGbmError> {
+    // Craft payloads from a real single-score model's JSON: reassembly
+    // enforces the base-score/objective pairing, so a payload claiming
+    // both spellings (or the wrong one for its objective) is refused.
+    let model = match make_test_model() {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let json = propagate!(to_json(&model));
+
+    // Both set: scalar base plus fabricated per-class scores.
+    let both = json.replace(
+        r#""class_base_predictions":null"#,
+        r#""class_base_predictions":[0.1,0.2]"#,
+    );
+    let result: Result<GradientBoostingModel, ClearGbmError> = from_json(&both);
+    match result {
+        Ok(_) => {
+            return Err(ClearGbmError::TreeConstructionFailed {
+                reason: "both base spellings must be rejected".to_string(),
+            })
+        }
+        Err(ClearGbmError::DeserializationFailed { reason }) => {
+            assert!(reason.contains("base_prediction"), "got: {reason}");
+        }
+        Err(e) => return Err(e),
+    }
+
+    // Neither set.
+    let base = model.base_prediction().unwrap_or(f64::NAN);
+    let neither = json.replace(
+        &format!(r#""base_prediction":{base}"#),
+        r#""base_prediction":null"#,
+    );
+    let result: Result<GradientBoostingModel, ClearGbmError> = from_json(&neither);
+    assert!(result.is_err());
+    Ok(())
+}
+
+#[test]
+fn test_model_deserialize_wrong_class_base_type() {
+    use crate::testkit::WrongValueDeserializer;
+    use serde::Deserialize;
+
+    let deser = WrongValueDeserializer::new("class_base_predictions");
+    let result = GradientBoostingModel::deserialize(deser);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_from_parts_mismatch_arms_name_both_spellings() -> Result<(), ClearGbmError> {
+    use super::train_multiclass_tests::train_on_fixture;
+
+    // A multiclass config with a scalar base and no per-class scores.
+    let mc_model = match train_on_fixture(1_usize, None) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    match GradientBoostingModel::from_parts(
+        mc_model.trees().to_vec(),
+        Some(0.5_f64),
+        None,
+        mc_model.learning_rate(),
+        mc_model.feature_names().to_vec(),
+        mc_model.config().clone(),
+    ) {
+        Ok(_) => {
+            return Err(ClearGbmError::TreeConstructionFailed {
+                reason: "a scalar base under multiclass must be rejected".to_string(),
+            })
+        }
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "base_prediction");
+            assert!(
+                reason.contains("null base_prediction plus per-class scores"),
+                "got: {reason}"
+            );
+        }
+        Err(e) => return Err(e),
+    }
+
+    // A single-score config with neither spelling present.
+    let bin_model = match make_test_model() {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    match GradientBoostingModel::from_parts(
+        bin_model.trees().to_vec(),
+        None,
+        None,
+        bin_model.learning_rate(),
+        bin_model.feature_names().to_vec(),
+        bin_model.config().clone(),
+    ) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "a model with no base score must be rejected".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "base_prediction");
+            assert!(reason.contains("base_prediction null"), "got: {reason}");
+            assert!(
+                reason.contains("class_base_predictions null"),
+                "got: {reason}"
+            );
+            Ok(())
+        }
+        Err(e) => Err(e),
     }
 }

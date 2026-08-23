@@ -10,7 +10,10 @@ use numpy::{PyArray1, PyArray2};
 use pyo3::prelude::*;
 use pyo3::types::{PyAnyMethods, PyList};
 
-use super::helpers::{fail, init_module, make_config_dict, training_labels, training_rows};
+use super::helpers::{
+    fail, init_module, make_config_dict, set_config_str, training_labels, training_rows,
+    wrap_py_err,
+};
 use crate::error::ClearGbmError;
 
 // =============================================================================
@@ -232,6 +235,94 @@ fn test_module_call_predict_proba_and_raw() -> Result<(), ClearGbmError> {
                 "sample {i}: proba {} does not match sigmoid(raw) {expected}",
                 proba_rows[i][1_usize]
             );
+        }
+        Ok(())
+    })
+}
+
+#[test]
+fn test_module_registers_the_multiclass_surface() -> Result<(), ClearGbmError> {
+    // The four multiclass registrations are callable through the module
+    // object itself: train, then drive each predictor.
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let module = match init_module(py) {
+            Ok(m) => m,
+            Err(e) => return Err(e),
+        };
+        let x_rows = vec![
+            vec![0.0_f64, 0.0_f64],
+            vec![1.0_f64, 0.0_f64],
+            vec![10.0_f64, 0.0_f64],
+            vec![11.0_f64, 0.0_f64],
+            vec![20.0_f64, 0.0_f64],
+            vec![21.0_f64, 0.0_f64],
+        ];
+        let x_train = match numpy::PyArray2::from_vec2(py, &x_rows) {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("PyArray2 creation failed: {e}"))),
+        };
+        let y_train = numpy::PyArray1::from_vec(py, vec![0_i64, 0, 1, 1, 2, 2]);
+        let config = match make_config_dict(py) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        match set_config_str(&config, "objective", "multiclass_softmax") {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        };
+        match config.set_item("scale_pos_weight", py.None()) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match config.set_item("n_classes", 3_i64) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match config.set_item("max_bins", 16_i64) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let names = match pyo3::types::PyList::new(py, ["f0", "f1"]) {
+            Ok(l) => l,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+
+        let train_func = match module.getattr("train_gradient_boosting_multiclass_rs") {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("getattr failed: {e}"))),
+        };
+        let features_again = match numpy::PyArray2::from_vec2(py, &x_rows) {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("PyArray2 creation failed: {e}"))),
+        };
+        let model = match train_func.call1((
+            x_train,
+            y_train,
+            py.None(),
+            py.None(),
+            py.None(),
+            py.None(),
+            config,
+            names,
+        )) {
+            Ok(m) => m,
+            Err(e) => return Err(fail(format!("training call failed: {e}"))),
+        };
+
+        for func_name in [
+            "predict_raw_multiclass_model_rs",
+            "predict_proba_multiclass_model_rs",
+            "predict_class_model_rs",
+        ] {
+            let func = match module.getattr(func_name) {
+                Ok(f) => f,
+                Err(e) => return Err(fail(format!("getattr {func_name} failed: {e}"))),
+            };
+            match func.call1((model.clone(), features_again.clone())) {
+                Ok(_) => {}
+                Err(e) => return Err(fail(format!("{func_name} call failed: {e}"))),
+            }
         }
         Ok(())
     })

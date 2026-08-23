@@ -5,122 +5,7 @@
 use crate::error::ClearGbmError;
 use crate::split::MonotonicConstraint;
 
-/// Tree growth policy: the order in which nodes are chosen for splitting.
-///
-/// This is a genuine algorithm parameter, not a fallback switch. The two
-/// policies build different trees from identical data:
-///
-/// * [`Self::DepthWise`] expands every node at depth `d` before any node at
-///   depth `d + 1`, bounded by `max_depth`.
-/// * [`Self::LeafWise`] repeatedly splits whichever leaf promises the largest
-///   gain, bounded by a leaf budget (best-first induction, Shi 2007).
-///
-/// The wire spelling is `"depth_wise"` / `"leaf_wise"` at BOTH boundaries —
-/// the Python config dict and the serialized model JSON. Deliberately unlike
-/// [`MonotonicConstraint`], which spells itself as ints across pyo3 and as
-/// variant names in JSON; one value with two spellings is a trap, not a
-/// feature.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GrowthStrategy {
-    /// Level-order expansion bounded by `max_depth`.
-    DepthWise,
-    /// Best-first expansion bounded by `num_leaves`.
-    LeafWise,
-}
-
-impl GrowthStrategy {
-    /// Returns the wire spelling of this policy.
-    ///
-    /// # Returns
-    ///
-    /// `"depth_wise"` or `"leaf_wise"`.
-    #[must_use]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::DepthWise => "depth_wise",
-            Self::LeafWise => "leaf_wise",
-        }
-    }
-
-    /// Parses a policy from its wire spelling.
-    ///
-    /// # Args
-    ///
-    /// * `value` - `"depth_wise"` or `"leaf_wise"`.
-    ///
-    /// # Errors
-    ///
-    /// Returns `ClearGbmError::InvalidParameter` if `value` is neither.
-    pub fn from_wire(value: &str) -> Result<Self, ClearGbmError> {
-        match value {
-            "depth_wise" => Ok(Self::DepthWise),
-            "leaf_wise" => Ok(Self::LeafWise),
-            other => Err(ClearGbmError::InvalidParameter {
-                name: "growth_strategy".to_string(),
-                reason: format!("expected \"depth_wise\" or \"leaf_wise\", got {other:?}"),
-            }),
-        }
-    }
-}
-
-/// Training objective: the loss whose gradients the trees descend.
-///
-/// The objective decides four things behind one seam — the base score, the
-/// per-round gradients and hessians, the early-stopping evaluation loss, and
-/// the prediction transform:
-///
-/// * [`Self::BinaryLogLoss`] — binary classification. Labels are 0/1, the
-///   base score is weighted log-odds, gradients come from the sigmoid of the
-///   raw score, and probabilities are read through the sigmoid.
-/// * [`Self::SquaredError`] — regression. Labels are continuous, the base
-///   score is the label mean, `gradient = prediction - y`, `hessian = 1`,
-///   and raw scores are the predictions (identity transform).
-///
-/// The wire spelling is `"binary_log_loss"` / `"squared_error"` at BOTH
-/// boundaries — the Python config dict and the serialized model JSON — the
-/// same one-value-one-spelling rule as [`GrowthStrategy`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Objective {
-    /// Binary classification under (optionally class-weighted) log loss.
-    BinaryLogLoss,
-    /// Regression under squared error.
-    SquaredError,
-}
-
-impl Objective {
-    /// Returns the wire spelling of this objective.
-    ///
-    /// # Returns
-    ///
-    /// `"binary_log_loss"` or `"squared_error"`.
-    #[must_use]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::BinaryLogLoss => "binary_log_loss",
-            Self::SquaredError => "squared_error",
-        }
-    }
-
-    /// Parses an objective from its wire spelling.
-    ///
-    /// # Args
-    ///
-    /// * `value` - `"binary_log_loss"` or `"squared_error"`.
-    ///
-    /// # Errors
-    ///
-    /// Returns `ClearGbmError::InvalidParameter` if `value` is neither.
-    pub fn from_wire(value: &str) -> Result<Self, ClearGbmError> {
-        match value {
-            "binary_log_loss" => Ok(Self::BinaryLogLoss),
-            "squared_error" => Ok(Self::SquaredError),
-            other => Err(ClearGbmError::InvalidParameter {
-                name: "objective".to_string(),
-                reason: format!("expected \"binary_log_loss\" or \"squared_error\", got {other:?}"),
-            }),
-        }
-    }
-}
+pub use super::objective_enums::{GrowthStrategy, Objective};
 
 /// Unvalidated parameters for constructing a [`GradientBoostingConfig`].
 ///
@@ -182,6 +67,11 @@ pub struct GradientBoostingConfigParams {
     /// where the feature count is known, as is the pairing rule that a
     /// categorical feature carries no monotonic constraint.
     pub categorical_features: Option<Vec<usize>>,
+    /// Number of classes, paired with the objective: must be `Some(k)` with
+    /// `k >= 2` under `MulticlassSoftmax` (each round trains k trees) and
+    /// `None` under every other objective, which has no class count to
+    /// state.
+    pub n_classes: Option<usize>,
 }
 
 /// Configuration for gradient boosting training.
@@ -229,6 +119,8 @@ pub struct GradientBoostingConfig {
     colsample_bytree: Option<f64>,
     /// Feature indices treated as categorical (None = all numeric).
     categorical_features: Option<Vec<usize>>,
+    /// Class count, present exactly when `objective` is `MulticlassSoftmax`.
+    n_classes: Option<usize>,
 }
 
 impl GradientBoostingConfig {
@@ -262,6 +154,7 @@ impl GradientBoostingConfig {
             max_features,
             colsample_bytree,
             categorical_features,
+            n_classes,
         } = params;
 
         if n_estimators < 1_usize {
@@ -366,6 +259,45 @@ impl GradientBoostingConfig {
                 })
             }
             (Objective::SquaredError, None) => {}
+            (Objective::MulticlassSoftmax, Some(w)) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "scale_pos_weight".to_string(),
+                    reason: format!(
+                        "must be unset when objective is \"multiclass_softmax\" (got {w}); \
+                         softmax has no single positive class to weight"
+                    ),
+                })
+            }
+            (Objective::MulticlassSoftmax, None) => {}
+        }
+        // `n_classes` is paired with the objective the same way: stated
+        // exactly when softmax needs it, never carried decoratively.
+        match (objective, n_classes) {
+            (Objective::MulticlassSoftmax, None) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "n_classes".to_string(),
+                    reason: "must be set when objective is \"multiclass_softmax\"".to_string(),
+                })
+            }
+            (Objective::MulticlassSoftmax, Some(k)) => {
+                if k < 2_usize {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "n_classes".to_string(),
+                        reason: format!("must be >= 2, got {k}"),
+                    });
+                }
+            }
+            (Objective::BinaryLogLoss | Objective::SquaredError, Some(k)) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "n_classes".to_string(),
+                    reason: format!(
+                        "must be unset when objective is \"{}\" (got {k}); only \
+                         \"multiclass_softmax\" states a class count",
+                        objective.as_str()
+                    ),
+                })
+            }
+            (Objective::BinaryLogLoss | Objective::SquaredError, None) => {}
         }
         if let Some(k) = max_features {
             if k < 1_usize {
@@ -461,6 +393,7 @@ impl GradientBoostingConfig {
             max_features,
             colsample_bytree,
             categorical_features,
+            n_classes,
         })
     }
 
@@ -570,6 +503,12 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn categorical_features(&self) -> Option<&[usize]> {
         self.categorical_features.as_deref()
+    }
+
+    /// Returns the class count (present exactly under `MulticlassSoftmax`).
+    #[must_use]
+    pub fn n_classes(&self) -> Option<usize> {
+        self.n_classes
     }
 
     /// Returns the leaf budget, set exactly under `LeafWise` growth.

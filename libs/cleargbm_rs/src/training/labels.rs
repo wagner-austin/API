@@ -9,7 +9,8 @@
 
 use crate::error::ClearGbmError;
 use crate::losses::validation::{
-    validate_continuous_labels, validate_labels, validate_weight_pairing,
+    validate_continuous_labels, validate_labels, validate_multiclass_labels,
+    validate_weight_pairing,
 };
 
 use super::config::Objective;
@@ -27,6 +28,8 @@ pub enum TrainingLabels<'a> {
     Binary(&'a [u8]),
     /// Continuous regression targets, each finite.
     Continuous(&'a [f64]),
+    /// Multiclass labels, each a class index `< n_classes`.
+    Multiclass(&'a [u32]),
 }
 
 impl TrainingLabels<'_> {
@@ -36,6 +39,7 @@ impl TrainingLabels<'_> {
         match self {
             Self::Binary(y) => y.len(),
             Self::Continuous(y) => y.len(),
+            Self::Multiclass(y) => y.len(),
         }
     }
 
@@ -51,6 +55,7 @@ impl TrainingLabels<'_> {
         match self {
             Self::Binary(_) => "binary (u8) labels",
             Self::Continuous(_) => "continuous (f64) labels",
+            Self::Multiclass(_) => "multiclass (u32) labels",
         }
     }
 }
@@ -80,6 +85,30 @@ pub(crate) struct ResolvedValidation<'a, Y> {
     pub y: &'a [Y],
     /// Optional per-row evaluation weights; `None` weighs every row 1.
     pub weight: Option<&'a [f64]>,
+}
+
+/// A resolved multiclass training task: labels, class count, weights and
+/// the optional validation split, content-validated.
+pub(crate) struct ResolvedMulticlass<'a> {
+    /// Training labels, each `< n_classes`.
+    pub y_train: &'a [u32],
+    /// The configured class count.
+    pub n_classes: usize,
+    /// Optional per-row training weights; `None` weighs every row 1.
+    pub weights: Option<&'a [f64]>,
+    /// The validation split, when provided.
+    pub val: Option<ResolvedValidation<'a, u32>>,
+}
+
+/// The resolved training task: either one of the single-score objectives
+/// (one score per row, one tree per round) or the multiclass task (K
+/// scores per row, K trees per round). The split keeps the single-score
+/// boosting loop free of unreachable multiclass arms and vice versa.
+pub(crate) enum ResolvedTraining<'a> {
+    /// A single-score objective (binary log loss or squared error).
+    SingleScore(ResolvedObjective<'a>),
+    /// The multiclass softmax task.
+    Multiclass(ResolvedMulticlass<'a>),
 }
 
 /// The objective with its labels and objective-specific parameters, resolved
@@ -172,10 +201,11 @@ fn pairing_error(
 pub(crate) fn resolve_objective<'a>(
     objective: Objective,
     scale_pos_weight: Option<f64>,
+    n_classes: Option<usize>,
     y_train: TrainingLabels<'a>,
     sample_weight: Option<&'a [f64]>,
     validation: Option<ValidationData<'a>>,
-) -> Result<ResolvedObjective<'a>, ClearGbmError> {
+) -> Result<ResolvedTraining<'a>, ClearGbmError> {
     // Weight pairing is objective-independent: lengths against the labels
     // they accompany, values finite and strictly positive.
     if let Some(w) = sample_weight {
@@ -191,7 +221,7 @@ pub(crate) fn resolve_objective<'a>(
         Objective::BinaryLogLoss => {
             let yt = match y_train {
                 TrainingLabels::Binary(y) => y,
-                TrainingLabels::Continuous(_) => {
+                TrainingLabels::Continuous(_) | TrainingLabels::Multiclass(_) => {
                     return Err(pairing_error(
                         "y_train",
                         objective,
@@ -208,7 +238,7 @@ pub(crate) fn resolve_objective<'a>(
                     weight,
                 }) => Some(ResolvedValidation { x, y, weight }),
                 Some(ValidationData {
-                    y: labels @ TrainingLabels::Continuous(_),
+                    y: labels @ (TrainingLabels::Continuous(_) | TrainingLabels::Multiclass(_)),
                     ..
                 }) => {
                     return Err(pairing_error(
@@ -232,17 +262,76 @@ pub(crate) fn resolve_objective<'a>(
             if let Some(v) = &val {
                 propagate!(validate_labels(v.y));
             }
-            Ok(ResolvedObjective::Binary {
+            Ok(ResolvedTraining::SingleScore(ResolvedObjective::Binary {
                 y_train: yt,
                 weights: sample_weight,
                 val,
                 scale_pos_weight: w,
-            })
+            }))
+        }
+        Objective::MulticlassSoftmax => {
+            let yt = match y_train {
+                TrainingLabels::Multiclass(y) => y,
+                TrainingLabels::Binary(_) | TrainingLabels::Continuous(_) => {
+                    return Err(pairing_error(
+                        "y_train",
+                        objective,
+                        "multiclass (u32) labels",
+                        y_train,
+                    ))
+                }
+            };
+            let val = match validation {
+                None => None,
+                Some(ValidationData {
+                    x,
+                    y: TrainingLabels::Multiclass(y),
+                    weight,
+                }) => Some(ResolvedValidation { x, y, weight }),
+                Some(ValidationData {
+                    y: labels @ (TrainingLabels::Binary(_) | TrainingLabels::Continuous(_)),
+                    ..
+                }) => {
+                    return Err(pairing_error(
+                        "y_val",
+                        objective,
+                        "multiclass (u32) labels",
+                        labels,
+                    ))
+                }
+            };
+            if let Some(w) = scale_pos_weight {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "scale_pos_weight".to_string(),
+                    reason: format!(
+                        "must be unset when objective is \"multiclass_softmax\", got {w}"
+                    ),
+                });
+            }
+            let k = match n_classes {
+                Some(k) => k,
+                None => {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "n_classes".to_string(),
+                        reason: "must be set when objective is \"multiclass_softmax\"".to_string(),
+                    })
+                }
+            };
+            propagate!(validate_multiclass_labels(yt, k, "y_train"));
+            if let Some(v) = &val {
+                propagate!(validate_multiclass_labels(v.y, k, "y_val"));
+            }
+            Ok(ResolvedTraining::Multiclass(ResolvedMulticlass {
+                y_train: yt,
+                n_classes: k,
+                weights: sample_weight,
+                val,
+            }))
         }
         Objective::SquaredError => {
             let yt = match y_train {
                 TrainingLabels::Continuous(y) => y,
-                TrainingLabels::Binary(_) => {
+                TrainingLabels::Binary(_) | TrainingLabels::Multiclass(_) => {
                     return Err(pairing_error(
                         "y_train",
                         objective,
@@ -259,7 +348,7 @@ pub(crate) fn resolve_objective<'a>(
                     weight,
                 }) => Some(ResolvedValidation { x, y, weight }),
                 Some(ValidationData {
-                    y: labels @ TrainingLabels::Binary(_),
+                    y: labels @ (TrainingLabels::Binary(_) | TrainingLabels::Multiclass(_)),
                     ..
                 }) => {
                     return Err(pairing_error(
@@ -280,11 +369,13 @@ pub(crate) fn resolve_objective<'a>(
             if let Some(v) = &val {
                 propagate!(validate_continuous_labels(v.y, "y_val"));
             }
-            Ok(ResolvedObjective::SquaredError {
-                y_train: yt,
-                weights: sample_weight,
-                val,
-            })
+            Ok(ResolvedTraining::SingleScore(
+                ResolvedObjective::SquaredError {
+                    y_train: yt,
+                    weights: sample_weight,
+                    val,
+                },
+            ))
         }
     }
 }

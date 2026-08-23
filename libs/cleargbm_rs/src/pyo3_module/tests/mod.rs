@@ -12,6 +12,7 @@ mod predict_fns_tests;
 mod training_config_key_tests;
 mod training_feature_budget_key_tests;
 mod training_fns_tests;
+mod training_multiclass_entry_tests;
 mod training_objective_key_tests;
 mod training_options_tests;
 mod training_regression_entry_tests;

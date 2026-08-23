@@ -31,6 +31,7 @@ const CONFIG_FIELDS: &[&str] = &[
     "max_features",
     "colsample_bytree",
     "categorical_features",
+    "n_classes",
 ];
 
 // =============================================================================

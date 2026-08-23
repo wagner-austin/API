@@ -32,7 +32,9 @@ use crate::training::{Parallelism, TrainingRuntime};
 /// # Errors
 ///
 /// Returns [`ClearGbmError::EmptyInput`] if the matrix has zero rows.
-fn extract_rows(features: &PyReadonlyArray2<'_, f64>) -> Result<Vec<Vec<f64>>, ClearGbmError> {
+pub(super) fn extract_rows(
+    features: &PyReadonlyArray2<'_, f64>,
+) -> Result<Vec<Vec<f64>>, ClearGbmError> {
     let shape = features.shape();
     let n_rows = shape[0_usize];
     let n_cols = shape[1_usize];
@@ -379,7 +381,7 @@ pub(crate) fn predict_raw_model_rs<'py>(
 ///
 /// * `missing` - The absent argument.
 /// * `present` - The provided argument that requires it.
-fn missing_val_pair(missing: &str, present: &str) -> PyErr {
+pub(super) fn missing_val_pair(missing: &str, present: &str) -> PyErr {
     ClearGbmError::InvalidParameter {
         name: missing.to_string(),
         reason: format!("{missing} must be provided when {present} is provided"),
@@ -410,7 +412,7 @@ fn extract_labels(labels: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<u8>> {
 /// # Errors
 ///
 /// Returns `PyErr` if the array is non-contiguous.
-fn extract_targets(targets: &PyReadonlyArray1<'_, f64>) -> PyResult<Vec<f64>> {
+pub(super) fn extract_targets(targets: &PyReadonlyArray1<'_, f64>) -> PyResult<Vec<f64>> {
     let slice = propagate_into!(targets.as_slice());
     Ok(slice.to_vec())
 }
@@ -420,7 +422,7 @@ fn extract_targets(targets: &PyReadonlyArray1<'_, f64>) -> PyResult<Vec<f64>> {
 /// # Errors
 ///
 /// Returns `PyErr` if extraction fails.
-fn extract_feature_names(names: &Bound<'_, PyList>) -> PyResult<Vec<String>> {
+pub(super) fn extract_feature_names(names: &Bound<'_, PyList>) -> PyResult<Vec<String>> {
     let mut result = Vec::with_capacity(names.len());
     for i in 0_usize..names.len() {
         let item = propagate!(names.get_item(i));

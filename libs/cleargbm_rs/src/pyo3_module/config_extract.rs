@@ -100,6 +100,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
     let max_features = propagate!(extract_max_features(dict));
     let colsample_bytree = propagate!(extract_colsample_bytree(dict));
     let categorical_features = propagate!(extract_categorical_features(dict));
+    let n_classes = propagate!(extract_n_classes(dict));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -121,6 +122,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
         max_features,
         colsample_bytree,
         categorical_features,
+        n_classes,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))
@@ -188,6 +190,38 @@ fn extract_max_features(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
 
     let val: i64 = propagate!(item.extract());
     Ok(Some(propagate_into!(i64_to_usize(val, "max_features"))))
+}
+
+/// Extracts the optional class count from a config dict.
+///
+/// The key `"n_classes"` is required to be present; its value may be
+/// `None` (single-score objectives) or an integer (multiclass). Same
+/// presence contract as the other paired fields: an absent key would
+/// silently read as "not multiclass".
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing or the value is neither `None`
+/// nor an integer.
+fn extract_n_classes(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
+    let opt = propagate!(dict.get_item("n_classes"));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "n_classes".to_string(),
+                reason: "missing required key 'n_classes'".to_string(),
+            }
+            .into())
+        }
+    };
+
+    if item.is_none() {
+        return Ok(None);
+    }
+
+    let val: usize = propagate!(item.extract());
+    Ok(Some(val))
 }
 
 /// Extracts the optional categorical feature indices from a config dict.

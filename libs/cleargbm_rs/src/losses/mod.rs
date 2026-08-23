@@ -27,7 +27,10 @@ pub(crate) mod validation;
 #[cfg(test)]
 mod tests;
 
+pub mod multiclass;
+
 pub use initial_prediction::binary_log_loss_initial_prediction;
 pub use loss::binary_log_loss;
+pub use multiclass::{multiclass_initial_predictions, multiclass_log_loss};
 pub use sigmoid_arr::sigmoid_array;
 pub use squared_error::{squared_error_initial_prediction, squared_error_loss};

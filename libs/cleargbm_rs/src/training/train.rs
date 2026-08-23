@@ -4,7 +4,6 @@
 //! resolution, binning, iterative tree construction with gradient/hessian
 //! updates, optional early stopping, and model assembly.
 
-use crate::binning::precompute_feature_bins;
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::losses::{
@@ -14,17 +13,20 @@ use crate::losses::{
 use crate::predict::predict_tree;
 use crate::tree::{
     build_tree_leaf_wise_with_leaf_assignment, build_tree_with_leaf_assignment,
-    select_tree_features, BuildTreeInput, FeatureSubsample, Tree, TreeBuildConfig,
+    select_tree_features, BuildTreeInput, FeatureSubsample, Tree,
 };
-use crate::types::SplitConfig;
 
 use super::config::{GradientBoostingConfig, GrowthStrategy};
 use super::early_stopping::EarlyStoppingState;
-use super::labels::{resolve_objective, ResolvedObjective, TrainingLabels, ValidationData};
-use super::model::GradientBoostingModel;
+use super::labels::{
+    resolve_objective, ResolvedObjective, ResolvedTraining, TrainingLabels, ValidationData,
+};
+use super::model::{BaseScore, GradientBoostingModel};
 use super::parallelism::Parallelism;
 use super::rng::SimpleRng;
+use super::setup::prepare_training;
 use super::subsampling::get_sample_indices;
+use super::train_multiclass::train_multiclass;
 use super::validation::{validate_training_inputs, validate_validation_inputs};
 
 /// How a training run executes, as opposed to what it learns.
@@ -106,15 +108,23 @@ pub fn train_gradient_boosting(
     }
 
     // 2b. Resolve the objective against the label kinds. Past this point an
-    // objective/label mismatch is unrepresentable, so the boosting loop
-    // dispatches with total matches.
-    let resolved = propagate!(resolve_objective(
+    // objective/label mismatch is unrepresentable, so each boosting loop
+    // dispatches with total matches. The multiclass task gets its own
+    // trainer (K score columns, K trees per round); everything else runs
+    // the single-score loop below.
+    let resolved = match propagate!(resolve_objective(
         config.objective(),
         config.scale_pos_weight(),
+        config.n_classes(),
         y_train,
         sample_weight,
         validation,
-    ));
+    )) {
+        ResolvedTraining::Multiclass(mc) => {
+            return train_multiclass(x_train, n_features, &mc, config, feature_names, runtime)
+        }
+        ResolvedTraining::SingleScore(resolved) => resolved,
+    };
 
     // 3. Compute the objective's base score
     let base_prediction = match &resolved {
@@ -146,94 +156,19 @@ pub fn train_gradient_boosting(
         None => Vec::new(),
     };
 
-    // 5. Resolve the categorical axis, then precompute feature bins.
-    // The config lists categorical feature indices; binning needs a
-    // per-feature flag, and the bounds plus the no-monotonic-constraint
-    // pairing are checked here, where n_features is known.
-    let categorical_mask: Option<Vec<bool>> = match config.categorical_features() {
-        Some(indices) => {
-            let mut mask = vec![false; n_features];
-            for &idx in indices {
-                if idx >= n_features {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "categorical_features".to_string(),
-                        reason: format!("index {idx} is out of range for {n_features} features"),
-                    });
-                }
-                if let Some(mc) = config.monotonic_constraints() {
-                    let constrained = mc.get(idx).copied().is_some_and(|c| !c.is_none());
-                    if constrained {
-                        return Err(ClearGbmError::InvalidParameter {
-                            name: "categorical_features".to_string(),
-                            reason: format!(
-                                "feature {idx} is categorical but carries a monotonic \
-                                 constraint; category codes have no order to constrain"
-                            ),
-                        });
-                    }
-                }
-                mask[idx] = true;
-            }
-            Some(mask)
-        }
-        None => None,
-    };
-    let feature_bins = propagate!(precompute_feature_bins(
-        x_train,
-        config.max_bins(),
-        categorical_mask.as_deref()
-    ));
-    let bin_thresholds = feature_bins.bin_thresholds();
+    // 5-9. Shared one-time preparation: feature-count-dependent config
+    // validation, categorical resolution, binning, tree configuration.
+    let prepared = propagate!(prepare_training(x_train, n_features, config));
+    let feature_bins = &prepared.feature_bins;
+    let bin_thresholds = &prepared.bin_thresholds;
+    let categorical_layout = prepared.categorical_layout.as_ref();
+    let tree_build_config = &prepared.tree_build_config;
+    let tree_column_budget = prepared.tree_column_budget;
 
-    // The per-feature category tables the tree layer consults: which
-    // features are categorical (split search) and the bin -> code mapping
-    // (node finalization). None when the axis is off, which keeps every
-    // numeric-only run bit-identical to history.
-    let categorical_layout: Option<crate::tree::CategoricalLayout> =
-        categorical_mask.as_ref().map(|_| {
-            crate::tree::CategoricalLayout::new(
-                feature_bins
-                    .per_feature()
-                    .iter()
-                    .map(|binning| match binning {
-                        crate::binning::FeatureBinning::Categorical(map) => {
-                            Some(map.codes().to_vec())
-                        }
-                        crate::binning::FeatureBinning::Numeric(_) => None,
-                    })
-                    .collect(),
-            )
-        });
-
-    // 6. Initialize RNG for subsampling
+    // Initialize RNG for subsampling and the early-stopping state.
     let mut rng = SimpleRng::new(config.random_state());
-
-    // 7. Initialize early stopping state
     let mut es_state: Option<EarlyStoppingState> =
         config.early_stopping_rounds().map(EarlyStoppingState::new);
-
-    // 8. Build tree configuration
-    let split_config = propagate!(SplitConfig::new(
-        config.min_samples_split(),
-        config.min_samples_leaf(),
-        config.max_bins(),
-        config.reg_lambda(),
-        0.0_f64,
-    ));
-
-    // Under depth-wise growth the leaf count is left unbounded (0) and
-    // `max_depth` does the bounding, which is what every manifest recorded
-    // before the growth axis existed. Under leaf-wise there is no depth to
-    // bound the shape, so the validated `num_leaves` becomes the budget.
-    let max_leaves = config.num_leaves().unwrap_or_default();
-
-    let tree_build_config = propagate!(TreeBuildConfig::new(
-        config.max_depth(),
-        max_leaves,
-        config.reg_alpha(),
-        config.reg_lambda(),
-        split_config,
-    ));
 
     // Build the worker pool once for the whole run rather than per tree.
     let pool = match (hooks.build_pool)(runtime.parallelism.thread_count()) {
@@ -244,38 +179,6 @@ pub fn train_gradient_boosting(
                 reason: format!("could not build a worker pool: {e}"),
             })
         }
-    };
-
-    // 9. Validate monotonic constraints length if provided
-    if let Some(mc) = config.monotonic_constraints() {
-        if mc.len() != n_features {
-            return Err(ClearGbmError::ShapeMismatch {
-                expected: format!("{n_features} monotonic constraints"),
-                got: format!("{} monotonic constraints", mc.len()),
-            });
-        }
-    }
-
-    // 9b. Validate the per-split feature budget against the feature count
-    // (the config layer cannot: it does not know n_features).
-    if let Some(k) = config.max_features() {
-        if k > n_features {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "max_features".to_string(),
-                reason: format!("must be <= n_features ({n_features}), got {k}"),
-            });
-        }
-    }
-
-    // 9c. Resolve the per-tree column budget: k_tree = max(1,
-    // floor(colsample_bytree * n_features)), the row-subsampling convention.
-    // The count lives on [1, n_features] by construction (the fraction is
-    // validated in (0, 1) exclusive), so no further pairing check is needed.
-    let tree_column_budget: Option<usize> = match config.colsample_bytree() {
-        Some(fraction) => Some(propagate!(crate::tree::tree_column_budget(
-            fraction, n_features
-        ))),
-        None => None,
     };
 
     // 10. Boosting loop, run inside the run-scoped pool so the caller's
@@ -439,12 +342,12 @@ pub fn train_gradient_boosting(
                 n_samples: feature_bins.n_samples(),
                 n_features: feature_bins.n_features(),
                 n_regular_bins: feature_bins.n_regular_bins(),
-                bin_thresholds: &bin_thresholds,
-                config: &tree_build_config,
+                bin_thresholds,
+                config: tree_build_config,
                 monotonic_constraints: config.monotonic_constraints(),
                 feature_subsample,
                 tree_feature_mask: tree_mask.as_deref(),
-                categorical: categorical_layout.as_ref(),
+                categorical: categorical_layout,
             };
 
             // e. Build tree (and capture per-sample leaf assignments as a
@@ -551,7 +454,7 @@ pub fn train_gradient_boosting(
 
     Ok(GradientBoostingModel::new(
         trees,
-        base_prediction,
+        BaseScore::Single(base_prediction),
         config.learning_rate(),
         feature_names.to_vec(),
         config.clone(),

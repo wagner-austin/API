@@ -165,8 +165,8 @@ fn test_all_ones_weights_are_bit_identical_to_none_binary() -> Result<(), ClearG
     };
 
     assert_eq!(
-        none_model.base_prediction().to_bits(),
-        ones_model.base_prediction().to_bits(),
+        none_model.base_prediction().map(f64::to_bits),
+        ones_model.base_prediction().map(f64::to_bits),
         "base scores must agree bit for bit"
     );
     let preds_none = match none_model.predict_raw(&x_train) {
@@ -215,8 +215,8 @@ fn test_all_ones_weights_are_bit_identical_to_none_regression() -> Result<(), Cl
     };
 
     assert_eq!(
-        none_model.base_prediction().to_bits(),
-        ones_model.base_prediction().to_bits()
+        none_model.base_prediction().map(f64::to_bits),
+        ones_model.base_prediction().map(f64::to_bits)
     );
     let preds_none = match none_model.predict_raw(&x_train) {
         Ok(p) => p,
@@ -282,8 +282,8 @@ fn test_scale_pos_weight_is_the_derived_special_case() -> Result<(), ClearGbmErr
     };
 
     assert_eq!(
-        spw_model.base_prediction().to_bits(),
-        derived_model.base_prediction().to_bits(),
+        spw_model.base_prediction().map(f64::to_bits),
+        derived_model.base_prediction().map(f64::to_bits),
         "base scores must agree bit for bit between the two routes"
     );
     let preds_spw = match spw_model.predict_raw(&x_train) {

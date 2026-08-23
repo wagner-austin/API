@@ -15,11 +15,14 @@ pub(crate) mod early_stopping;
 pub(crate) mod importance;
 pub(crate) mod labels;
 pub(crate) mod model;
+pub(crate) mod objective_enums;
 pub(crate) mod parallelism;
 pub(crate) mod rng;
 pub(crate) mod serde_impl;
+pub(crate) mod setup;
 pub(crate) mod subsampling;
-pub(crate) mod train;
+mod train;
+mod train_multiclass;
 pub(crate) mod validation;
 
 #[cfg(test)]

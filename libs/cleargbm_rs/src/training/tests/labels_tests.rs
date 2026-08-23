@@ -7,7 +7,7 @@
 
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
-use crate::training::labels::{resolve_objective, ResolvedObjective};
+use crate::training::labels::{resolve_objective, ResolvedObjective, ResolvedTraining};
 use crate::training::{
     train_gradient_boosting, GrowthStrategy, Objective, TrainingLabels, ValidationData,
 };
@@ -15,16 +15,29 @@ use crate::training::{Parallelism, TrainingRuntime};
 
 use super::train_helpers::{make_config, make_simple_dataset, train_binary};
 
+/// Unwraps the single-score half of a resolution, failing on multiclass.
+fn expect_single_score(
+    resolved: ResolvedTraining<'_>,
+) -> Result<ResolvedObjective<'_>, ClearGbmError> {
+    match resolved {
+        ResolvedTraining::SingleScore(r) => Ok(r),
+        ResolvedTraining::Multiclass(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected a single-score resolution".to_string(),
+        }),
+    }
+}
+
 #[test]
 fn test_resolve_binary_ok() -> Result<(), ClearGbmError> {
     let y = [0_u8, 1_u8];
-    let resolved = propagate!(resolve_objective(
+    let resolved = propagate!(expect_single_score(propagate!(resolve_objective(
         Objective::BinaryLogLoss,
         Some(2.0_f64),
+        None,
         TrainingLabels::Binary(&y),
         None,
         None,
-    ));
+    ))));
     match resolved {
         ResolvedObjective::Binary {
             y_train,
@@ -50,8 +63,9 @@ fn test_resolve_squared_error_ok_with_val() -> Result<(), ClearGbmError> {
     let x_val_rows: Vec<Vec<f64>> = vec![vec![0.1_f64]];
     let x_val: Vec<&[f64]> = x_val_rows.iter().map(Vec::as_slice).collect();
     let y_val = [0.25_f64];
-    let resolved = propagate!(resolve_objective(
+    let resolved = propagate!(expect_single_score(propagate!(resolve_objective(
         Objective::SquaredError,
+        None,
         None,
         TrainingLabels::Continuous(&y),
         None,
@@ -60,7 +74,7 @@ fn test_resolve_squared_error_ok_with_val() -> Result<(), ClearGbmError> {
             y: TrainingLabels::Continuous(&y_val),
             weight: None,
         }),
-    ));
+    ))));
     assert!(resolved_has_val_features(&resolved));
     match &resolved {
         ResolvedObjective::SquaredError {
@@ -102,6 +116,7 @@ fn test_resolve_binary_missing_weight_is_error() -> Result<(), ClearGbmError> {
     let result = resolve_objective(
         Objective::BinaryLogLoss,
         None,
+        None,
         TrainingLabels::Binary(&y),
         None,
         None,
@@ -124,6 +139,7 @@ fn test_resolve_squared_error_with_weight_is_error() -> Result<(), ClearGbmError
     let result = resolve_objective(
         Objective::SquaredError,
         Some(3.0_f64),
+        None,
         TrainingLabels::Continuous(&y),
         None,
         None,
@@ -150,6 +166,7 @@ fn test_resolve_validates_binary_train_label_content() -> Result<(), ClearGbmErr
     let result = resolve_objective(
         Objective::BinaryLogLoss,
         Some(1.0_f64),
+        None,
         TrainingLabels::Binary(&y),
         None,
         None,
@@ -176,6 +193,7 @@ fn test_resolve_validates_binary_val_label_content() -> Result<(), ClearGbmError
     let result = resolve_objective(
         Objective::BinaryLogLoss,
         Some(1.0_f64),
+        None,
         TrainingLabels::Binary(&y),
         None,
         Some(ValidationData {
@@ -204,6 +222,7 @@ fn test_resolve_validates_continuous_val_label_content() -> Result<(), ClearGbmE
     let y_val = [f64::INFINITY];
     let result = resolve_objective(
         Objective::SquaredError,
+        None,
         None,
         TrainingLabels::Continuous(&y),
         None,
@@ -337,4 +356,174 @@ fn test_growth_strategy_debug_format() {
     // Keeps the derive covered without a dedicated serde path.
     let debug = format!("{:?}", GrowthStrategy::LeafWise);
     assert!(debug.contains("LeafWise"));
+}
+
+#[test]
+fn test_resolve_multiclass_pairing_arms() -> Result<(), ClearGbmError> {
+    // The multiclass objective rejects wrong-kind training labels...
+    let y_bin = [0_u8, 1_u8];
+    let result = resolve_objective(
+        Objective::MulticlassSoftmax,
+        None,
+        Some(3_usize),
+        TrainingLabels::Binary(&y_bin),
+        None,
+        None,
+    );
+    match result {
+        Ok(_) => {
+            return Err(ClearGbmError::TreeConstructionFailed {
+                reason: "binary labels under multiclass must be rejected".to_string(),
+            })
+        }
+        Err(ClearGbmError::InvalidParameter { reason, .. }) => {
+            assert!(reason.contains("multiclass (u32) labels"), "{reason}");
+            assert!(reason.contains("binary (u8) labels"), "{reason}");
+        }
+        Err(e) => return Err(e),
+    }
+
+    // ...and wrong-kind validation labels.
+    let y_mc = [0_u32, 1_u32, 2_u32];
+    let x_val_rows: Vec<Vec<f64>> = vec![vec![0.1_f64]];
+    let x_val: Vec<&[f64]> = x_val_rows.iter().map(Vec::as_slice).collect();
+    let y_val = [0.5_f64];
+    let result = resolve_objective(
+        Objective::MulticlassSoftmax,
+        None,
+        Some(3_usize),
+        TrainingLabels::Multiclass(&y_mc),
+        None,
+        Some(ValidationData {
+            x: &x_val,
+            y: TrainingLabels::Continuous(&y_val),
+            weight: None,
+        }),
+    );
+    match result {
+        Ok(_) => {
+            return Err(ClearGbmError::TreeConstructionFailed {
+                reason: "continuous val labels under multiclass must be rejected".to_string(),
+            })
+        }
+        Err(ClearGbmError::InvalidParameter { name, .. }) => assert_eq!(name, "y_val"),
+        Err(e) => return Err(e),
+    }
+
+    // A class weight is refused even when the config layer was bypassed...
+    let result = resolve_objective(
+        Objective::MulticlassSoftmax,
+        Some(2.0_f64),
+        Some(3_usize),
+        TrainingLabels::Multiclass(&y_mc),
+        None,
+        None,
+    );
+    match result {
+        Ok(_) => {
+            return Err(ClearGbmError::TreeConstructionFailed {
+                reason: "scale_pos_weight under multiclass must be rejected".to_string(),
+            })
+        }
+        Err(ClearGbmError::InvalidParameter { name, .. }) => {
+            assert_eq!(name, "scale_pos_weight");
+        }
+        Err(e) => return Err(e),
+    }
+
+    // ...and so is a missing class count.
+    let result = resolve_objective(
+        Objective::MulticlassSoftmax,
+        None,
+        None,
+        TrainingLabels::Multiclass(&y_mc),
+        None,
+        None,
+    );
+    match result {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "multiclass without n_classes must be rejected".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, .. }) => {
+            assert_eq!(name, "n_classes");
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_resolve_multiclass_ok_and_single_score_rejects_multiclass_labels(
+) -> Result<(), ClearGbmError> {
+    // A clean multiclass resolution carries everything through.
+    let y_mc = [0_u32, 2_u32, 1_u32];
+    let resolved = propagate!(resolve_objective(
+        Objective::MulticlassSoftmax,
+        None,
+        Some(3_usize),
+        TrainingLabels::Multiclass(&y_mc),
+        None,
+        None,
+    ));
+    match resolved {
+        ResolvedTraining::Multiclass(mc) => {
+            assert_eq!(mc.n_classes, 3_usize);
+            assert_eq!(mc.y_train, &y_mc);
+            assert!(mc.weights.is_none());
+            assert!(mc.val.is_none());
+        }
+        ResolvedTraining::SingleScore(_) => {
+            return Err(ClearGbmError::TreeConstructionFailed {
+                reason: "expected the multiclass resolution".to_string(),
+            })
+        }
+    }
+
+    // Multiclass labels under the single-score objectives are rejected in
+    // both training and validation position.
+    let result = resolve_objective(
+        Objective::BinaryLogLoss,
+        Some(1.0_f64),
+        None,
+        TrainingLabels::Multiclass(&y_mc),
+        None,
+        None,
+    );
+    match result {
+        Ok(_) => {
+            return Err(ClearGbmError::TreeConstructionFailed {
+                reason: "multiclass labels under binary must be rejected".to_string(),
+            })
+        }
+        Err(ClearGbmError::InvalidParameter { reason, .. }) => {
+            assert!(reason.contains("multiclass (u32) labels"), "{reason}");
+        }
+        Err(e) => return Err(e),
+    }
+    let y_cont = [0.5_f64, 1.5_f64];
+    let x_val_rows: Vec<Vec<f64>> = vec![vec![0.1_f64]];
+    let x_val: Vec<&[f64]> = x_val_rows.iter().map(Vec::as_slice).collect();
+    let y_val_mc = [0_u32];
+    let result = resolve_objective(
+        Objective::SquaredError,
+        None,
+        None,
+        TrainingLabels::Continuous(&y_cont),
+        None,
+        Some(ValidationData {
+            x: &x_val,
+            y: TrainingLabels::Multiclass(&y_val_mc),
+            weight: None,
+        }),
+    );
+    match result {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "multiclass val labels under squared error must be rejected".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, .. }) => {
+            assert_eq!(name, "y_val");
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }

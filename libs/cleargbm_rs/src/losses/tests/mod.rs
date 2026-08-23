@@ -9,6 +9,7 @@
 
 mod initial_prediction_tests;
 mod loss_tests;
+mod multiclass_tests;
 mod sigmoid_array_tests;
 mod squared_error_tests;
 mod validation_tests;
