@@ -17,7 +17,6 @@
       "minutes": 720,
       "requeue": true,
       "checkpoint_steps": 500,
-      "accept_billing": false,
       "env_path": "/pub/wagnera3/envs/abl-pinned",
       "pinned_packages": {
         "torch": "2.6.0+cu124",
@@ -33,7 +32,6 @@
       "minutes": 360,
       "requeue": true,
       "checkpoint_steps": 1,
-      "accept_billing": false,
       "env_path": "/pub/wagnera3/envs/sirius",
       "pinned_packages": {},
       "deterministic": false

@@ -296,23 +296,34 @@ class TestSubmitCli:
         assert fake_run.calls == []
         assert emitted == []
 
-    def test_a_billing_project_says_so_in_the_report(
+    def test_a_project_on_a_billing_partition_never_reaches_the_cluster(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
+        """There is no consent flag to set, so this is refused rather than
+        confirmed -- and refused before anything is sent."""
         _write_json(tmp_path / "run.json", _run_payload())
         config = write_workspace(
             tmp_path / "hpc3.json",
-            workspace_document(
-                projects={
-                    "abl": project_config(
-                        partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True
-                    )
-                }
-            ),
+            workspace_document(projects={"abl": project_config(partition="standard", gpu=None)}),
         )
-        script_healthy_cluster(fake_run, job_id="1")
-        submit_cli.main(["--config", config, "--run", str(tmp_path / "run.json")])
-        assert "BILLS service units" in emitted[1]
+        with pytest.raises(AppError) as excinfo:
+            submit_cli.main(["--config", config, "--run", str(tmp_path / "run.json")])
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS
+        assert fake_run.commands() == []
+
+    def test_the_refusal_names_the_free_partitions(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """The useful next step is which partition to use instead."""
+        _write_json(tmp_path / "run.json", _run_payload())
+        config = write_workspace(
+            tmp_path / "hpc3.json",
+            workspace_document(projects={"abl": project_config(partition="standard", gpu=None)}),
+        )
+        with pytest.raises(AppError) as excinfo:
+            submit_cli.main(["--config", config, "--run", str(tmp_path / "run.json")])
+        assert "'free'" in excinfo.value.message
+        assert "'free-gpu'" in excinfo.value.message
 
     def test_an_invalid_resolution_never_reaches_the_cluster(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -354,9 +365,22 @@ class TestWatchCli:
         fake_run.add("sacct", stdout=_ROW + "\n")
 
         assert watch_cli.main(_watch_args(tmp_path, "55519937")) == 0
+        assert emitted[0].startswith("final 55519937 abl-verify COMPLETED 48s 0.0000 SU")
+        assert emitted[1] == "total 0.0000 SU across 1 row(s)"
+        assert emitted[3] == "states COMPLETED=1"
+
+    def test_a_row_from_a_billing_partition_reports_its_real_cost(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """Watch reads accounting, which reports whatever ran under the
+        account -- not only what this package would have submitted. billing=11
+        for 48s at UsageFactor 1.0 is 0.1467 SU."""
+        billed = _ROW.replace("|free-gpu32|", "|gpu32|")
+        fake_run.add("sacct", stdout=billed + "\n")
+
+        assert watch_cli.main(_watch_args(tmp_path, "55519937")) == 0
         assert emitted[0].startswith("final 55519937 abl-verify COMPLETED 48s 0.1467 SU")
         assert emitted[1] == "total 0.1467 SU across 1 row(s)"
-        assert emitted[3] == "states COMPLETED=1"
 
     def test_it_reports_gpu_hours(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]

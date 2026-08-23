@@ -142,7 +142,7 @@ class TestSweepCli:
         assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING
         assert fake_run.calls == []
 
-    def test_a_billing_project_says_so(
+    def test_the_report_names_the_partition_and_that_it_is_free(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str
     ) -> None:
         _write(tmp_path / "s.json", _payload(count=2))
@@ -151,14 +151,10 @@ class TestSweepCli:
         sweep_cli.main(
             _args(
                 tmp_path,
-                projects={
-                    "abl": project_config(
-                        partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True
-                    )
-                },
+                projects={"abl": project_config(partition="free-gpu32", gpu=gpus("L40S"))},
             )
         )
-        assert any("BILLS service units" in line for line in emitted)
+        assert any("free-gpu32 (free)" in line for line in emitted)
 
     def test_the_config_flag_is_not_optional(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--config is required"):

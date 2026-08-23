@@ -76,9 +76,6 @@ class ProjectConfig(TypedDict):
         minutes: Wall-clock limit per job.
         requeue: Whether Slurm should resubmit after a preemption.
         checkpoint_steps: Training steps between checkpoints; 0 means none.
-        accept_billing: Standing consent to spend service units. Declared per
-            project rather than per job because whether a body of work is
-            allowed to cost money is a property of the work, not of one run.
         env_path: Absolute path to this project's Python environment on the
             cluster.
         pinned_packages: Distribution versions the environment must actually
@@ -106,7 +103,6 @@ class ProjectConfig(TypedDict):
     minutes: int
     requeue: bool
     checkpoint_steps: int
-    accept_billing: bool
     env_path: str
     pinned_packages: dict[str, str]
     deterministic: bool
@@ -149,7 +145,6 @@ PROJECT_FIELDS = (
     "minutes",
     "requeue",
     "checkpoint_steps",
-    "accept_billing",
     "env_path",
     "pinned_packages",
     "deterministic",
@@ -239,7 +234,6 @@ def decode_project_config(value: JSONValue, cluster: ClusterFacts) -> ProjectCon
         minutes=_require_positive(value, "minutes"),
         requeue=require_bool(value, "requeue"),
         checkpoint_steps=checkpoint_steps,
-        accept_billing=require_bool(value, "accept_billing"),
         env_path=_require_nonempty_str(value, "env_path"),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
         deterministic=require_bool(value, "deterministic"),
@@ -263,7 +257,6 @@ def encode_project_config(config: ProjectConfig) -> dict[str, JSONValue]:
         "minutes": config["minutes"],
         "requeue": config["requeue"],
         "checkpoint_steps": config["checkpoint_steps"],
-        "accept_billing": config["accept_billing"],
         "env_path": config["env_path"],
         "pinned_packages": encode_pinned_packages(config["pinned_packages"]),
         "deterministic": config["deterministic"],

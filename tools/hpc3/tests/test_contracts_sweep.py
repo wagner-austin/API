@@ -11,6 +11,8 @@ import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 
+from hpc3.clusters.hpc3 import HPC3
+from hpc3.contracts.cluster import partition_facts
 from hpc3.contracts.sweep import (
     decode_sweep_member,
     encode_sweep_spec,
@@ -39,10 +41,10 @@ def _base(**overrides: JSONValue) -> dict[str, JSONValue]:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,
+        "depends_on": None,
         "experiment": {"rung": "774M"},
         "command": "python train.py",
     }
@@ -150,7 +152,7 @@ class TestGpuCeiling:
 
     def test_free_gpu32_has_a_much_lower_ceiling(self) -> None:
         payload = _sweep(
-            base=_base(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True),
+            base=_base(partition="free-gpu32", gpu=gpus("L40S")),
             members=_members(5),
         )
         with pytest.raises(AppError) as excinfo:
@@ -158,27 +160,40 @@ class TestGpuCeiling:
         assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING
 
 
-class TestJobCeiling:
-    """``gpu`` is the only partition whose job ceiling (32) is below its GPU
-    ceiling (40), so it is the only place the job check can fire on its own.
+class TestJobCeilingCannotBindFirstOnThisCluster:
+    """It used to be tested against ``gpu`` (32 jobs under 40 GPUs), which is
+    a billing partition and no longer submittable.
+
+    On every FREE partition of HPC3 the resource ceiling binds first or at the
+    same point, so the job check cannot fire on its own here. That is a
+    property of the machine, not a gap: it is asserted below rather than left
+    implied, and the check itself is exercised on a synthetic cluster shaped
+    to reach it in ``test_cluster.py``.
     """
 
-    def test_exactly_the_job_ceiling_is_admitted(self) -> None:
-        payload = _sweep(
-            base=_base(partition="gpu", accept_billing=True),
-            members=_members(32),
-        )
-        assert len(decode_sweep_spec(payload)["members"]) == 32
+    def test_the_gpu_ceiling_fires_before_the_job_ceiling_on_free_gpu(self) -> None:
+        """24 GPUs and 24 jobs -- equal caps, and GPUs are checked first."""
+        with pytest.raises(AppError) as excinfo:
+            decode_sweep_spec(_sweep(members=_members(25)))
+        assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING
 
-    def test_one_over_the_job_ceiling_is_refused_while_gpus_still_fit(self) -> None:
-        payload = _sweep(
-            base=_base(partition="gpu", accept_billing=True),
-            members=_members(33),
-        )
+    def test_the_core_ceiling_fires_before_the_job_ceiling_on_free(self) -> None:
+        """3500 cores and 3500 jobs, so a one-core member hits both at once
+        and the core check is the one that reports."""
+        payload = _sweep(base=_base(partition="free", gpu=None, cpus=1), members=_members(3501))
         with pytest.raises(AppError) as excinfo:
             decode_sweep_spec(payload)
-        assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_JOB_CEILING
-        assert "33 members" in excinfo.value.message
+        assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_CPU_CEILING
+
+    def test_no_free_partition_lets_the_job_ceiling_bind_alone(self) -> None:
+        """The property this class is named for, asserted against the measured
+        facts rather than argued in a docstring."""
+        for name in ("free", "free-gpu", "free-gpu32"):
+            facts = partition_facts(HPC3, name)
+            resource = facts["max_gpus_per_user"] or facts["max_cpus_per_user"]
+            if resource is None:
+                raise AssertionError(f"{name} bounds neither GPUs nor cores")
+            assert resource <= facts["max_jobs_per_user"]
 
 
 class TestMemberValidation:

@@ -91,7 +91,7 @@ def _default_run(argv: Sequence[str], *, stdin_bytes: bytes | None = None) -> Co
 class LogEventProtocol(Protocol):
     """Protocol for emitting one structured audit event."""
 
-    def __call__(self, event: str, fields: Mapping[str, str | int | bool]) -> None:
+    def __call__(self, event: str, fields: Mapping[str, str | int | float | bool]) -> None:
         """Emit a structured event.
 
         Args:
@@ -103,7 +103,7 @@ class LogEventProtocol(Protocol):
         ...
 
 
-def _default_log_event(event: str, fields: Mapping[str, str | int | bool]) -> None:
+def _default_log_event(event: str, fields: Mapping[str, str | int | float | bool]) -> None:
     """Real implementation writing through the platform logger.
 
     Args:

@@ -22,6 +22,7 @@ from __future__ import annotations
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.cluster import ClusterFacts
+from hpc3.contracts.dependency import describe_dependency
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.preflight import PreflightResult, decode_preflight_result
@@ -150,6 +151,46 @@ def parse_test_only(output: str, cluster: ClusterFacts) -> PreflightResult:
     )
 
 
+_DEPENDENCY_REFUSALS = ("presently disabled", "Job dependency problem")
+"""What Slurm says when ``--test-only`` cannot evaluate a dependency.
+
+Measured on HPC3 2026-08-23, both against a real refusal:
+
+* ``afterok`` on a job that has already FAILED gives ``Requested operation is
+  presently disabled``.
+* ``afterok`` on a job the controller no longer holds -- anything past
+  ``MinJobAge``, 300 seconds here -- gives ``Job dependency problem``.
+
+Neither says anything about a dependency, and the first says nothing at all.
+"""
+
+
+def _dependency_hint(spec: JobSpec, output: str) -> str:
+    """Explain a refusal that is really about the job this one waits on.
+
+    Args:
+        spec: The spec that was refused.
+        output: Slurm's own output, already captured.
+
+    Returns:
+        A sentence naming the dependency, or an empty string when the refusal
+        was about something else. The hint is appended rather than replacing
+        Slurm's text: its wording is still the ground truth, and a translator
+        that swallowed it would hide any refusal this table guesses wrong.
+    """
+    depends_on = spec["depends_on"]
+    if depends_on is None:
+        return ""
+    if not any(phrase in output for phrase in _DEPENDENCY_REFUSALS):
+        return ""
+    return (
+        f" This job waits on {describe_dependency(depends_on)}, and Slurm cannot "
+        "evaluate that: the job it names has already failed, or is old enough that "
+        "the controller no longer holds it. In a chain that means an earlier stage "
+        "failed, and nothing after it was submitted."
+    )
+
+
 def preflight(
     spec: JobSpec, *, host: str, script_dir: str, log_dir: str, cluster: ClusterFacts
 ) -> PreflightResult:
@@ -197,7 +238,8 @@ def preflight(
     if "rc=0" not in output:
         raise AppError(
             Hpc3ErrorCode.PREFLIGHT_REJECTED,
-            f"Slurm would refuse {spec['name']!r}: {output.strip()}",
+            f"Slurm would refuse {spec['name']!r}: {output.strip()}"
+            + _dependency_hint(spec, output),
         )
     return parse_test_only(output, cluster)
 

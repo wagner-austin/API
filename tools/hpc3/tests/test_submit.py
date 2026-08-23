@@ -50,7 +50,6 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,
@@ -222,7 +221,7 @@ class TestSubmitAudit:
 
         assert [event.event for event in logged] == [audit.JOB_SUBMITTED]
         assert logged[0].fields["job_id"] == "55519937"
-        assert logged[0].fields["bills"] is False
+        assert logged[0].fields["usage_factor"] == 0.0
 
     def test_a_failed_submission_logs_nothing(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, logged: list[LoggedEvent]

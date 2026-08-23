@@ -37,7 +37,6 @@ def _sweep(count: int = 3, **overrides: JSONValue) -> SweepSpec:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,
@@ -188,7 +187,7 @@ class TestSweepAuditEvents:
         assert len(jobs) == 3
         assert jobs[0].fields["job_name"] == "abl.rung-s0"
         assert jobs[0].fields["project"] == "abl"
-        assert jobs[0].fields["bills"] is False
+        assert jobs[0].fields["usage_factor"] == 0.0
 
     def test_the_sweep_event_lands_once_after_every_member(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, logged: list[LoggedEvent]
@@ -210,14 +209,11 @@ class TestSweepAuditEvents:
         }
         assert logged[-1].event == audit.SWEEP_SUBMITTED
 
-    def test_a_billing_sweep_records_that_it_bills(
+    def test_every_member_records_the_factor_it_went_out_under(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, logged: list[LoggedEvent]
     ) -> None:
         _healthy(fake_run)
         fake_run.add("sbatch", stdout="Submitted batch job 1\n")
-        _run(
-            _sweep(count=2, partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True),
-            tmp_path,
-        )
+        _run(_sweep(count=2, partition="free-gpu32", gpu=gpus("L40S")), tmp_path)
         jobs = [e for e in logged if e.event == audit.JOB_SUBMITTED]
-        assert all(e.fields["bills"] is True for e in jobs)
+        assert [e.fields["usage_factor"] for e in jobs] == [0.0, 0.0]

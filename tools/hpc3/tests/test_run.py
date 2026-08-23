@@ -93,10 +93,10 @@ class TestResolveRun:
             "minutes": 30,
             "requeue": False,
             "checkpoint_steps": 0,
-            "accept_billing": False,
             "env_path": "/pub/envs/abl-pinned",
             "pinned_packages": {},
             "deterministic": False,
+            "depends_on": None,
             "experiment": {"arm": "B", "seed": "42"},
             "command": "python train.py --arm B",
         }
@@ -176,20 +176,28 @@ class TestOverridingCannotEvadeARule:
             resolve_run(_workspace(), _run(minutes=600))
         assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
 
-    def test_overriding_onto_a_billing_partition_still_needs_consent(self) -> None:
-        with pytest.raises(AppError) as excinfo:
-            resolve_run(
-                _workspace(),
-                _run(partition="free-gpu32", gpu={"model": "L40S", "count": 1}),
-            )
-        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS_WITHOUT_CONSENT
-
-    def test_a_project_consenting_to_billing_carries_that_consent(self) -> None:
-        """Whether a body of work may cost money is a property of the work."""
-        workspace = _workspace(
-            partition="free-gpu32", gpu={"model": "L40S", "count": 1}, accept_billing=True
+    def test_overriding_onto_a_free_32gb_partition_is_admitted(self) -> None:
+        """It was refused as billing until the factor was measured properly."""
+        resolved = resolve_run(
+            _workspace(),
+            _run(partition="free-gpu32", gpu={"model": "L40S", "count": 1}),
         )
-        assert resolve_run(workspace, _run())["accept_billing"] is True
+        assert resolved["partition"] == "free-gpu32"
+
+    def test_a_project_declaring_a_billing_partition_is_refused_at_resolution(self) -> None:
+        """The project cannot consent on the run's behalf, because there is
+        nothing to consent with."""
+        workspace = _workspace(partition="standard", gpu=None)
+        with pytest.raises(AppError) as excinfo:
+            resolve_run(workspace, _run())
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS
+
+    def test_an_override_onto_a_billing_partition_is_refused(self) -> None:
+        """The rule applies to the merged result, so a free project cannot be
+        overridden onto a partition that charges."""
+        with pytest.raises(AppError) as excinfo:
+            resolve_run(_workspace(), _run(partition="gpu"))
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS
 
     def test_an_override_onto_a_partition_without_that_gpu_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:

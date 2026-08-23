@@ -15,13 +15,14 @@ scraping captured output.
 
 from __future__ import annotations
 
-from hpc3.contracts.cluster import ClusterFacts, gpu_count, partition_bills
+from hpc3.contracts.cluster import ClusterFacts, gpu_count, partition_facts
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.core import _test_hooks
 
 JOB_SUBMITTED = "hpc3_job_submitted"
 SWEEP_SUBMITTED = "hpc3_sweep_submitted"
+CHAIN_SUBMITTED = "hpc3_chain_submitted"
 FILES_STAGED = "hpc3_files_staged"
 
 
@@ -52,7 +53,13 @@ def job_submitted(spec: JobSpec, *, host: str, job_id: str, cluster: ClusterFact
             "gpu_count": gpu_count(spec["gpu"]),
             "cpus": spec["cpus"],
             "minutes": spec["minutes"],
-            "bills": partition_bills(cluster, spec["partition"]),
+            # The measured factor rather than a bills/does-not-bill flag,
+            # which under a free-only policy could only ever be False. This
+            # records what the partition was BELIEVED to cost when the job
+            # went out -- and that belief has been wrong once already, so an
+            # entry carrying the number is worth more than one carrying a
+            # constant.
+            "usage_factor": partition_facts(cluster, spec["partition"])["usage_factor"],
             "requeue": spec["requeue"],
             "checkpoint_steps": spec["checkpoint_steps"],
         },
@@ -80,6 +87,28 @@ def sweep_submitted(*, host: str, project: str, base_name: str, job_ids: list[st
     )
 
 
+def chain_submitted(*, host: str, project: str, job_ids: list[str]) -> None:
+    """Record a completed chain.
+
+    Args:
+        host: SSH destination the stages went to.
+        project: Body of work the pipeline belongs to.
+        job_ids: Ids Slurm assigned, in execution order. Order is the content
+            here, not incidental: it is the record of which stage was waiting
+            on which, and it is not recoverable from the cluster once the jobs
+            age out of ``squeue``.
+    """
+    _test_hooks.log_event(
+        CHAIN_SUBMITTED,
+        {
+            "host": host,
+            "project": project,
+            "stages": len(job_ids),
+            "job_ids": ",".join(job_ids),
+        },
+    )
+
+
 def files_staged(*, host: str, destination: str, count: int, provenance: str) -> None:
     """Record a staging operation whose files all verified on the cluster.
 
@@ -99,9 +128,11 @@ def files_staged(*, host: str, destination: str, count: int, provenance: str) ->
 
 
 __all__ = [
+    "CHAIN_SUBMITTED",
     "FILES_STAGED",
     "JOB_SUBMITTED",
     "SWEEP_SUBMITTED",
+    "chain_submitted",
     "files_staged",
     "job_submitted",
     "sweep_submitted",

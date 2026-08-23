@@ -26,6 +26,7 @@ hpc3-preflight --config runs/hpc3.json --run runs/arm-b.json   # would it start?
 hpc3-submit    --config runs/hpc3.json --run runs/arm-b.json   # start it
 hpc3-watch     --config runs/hpc3.json --job 55519937          # what is it doing, what did it cost
 hpc3-triage    --config runs/hpc3.json                         # is anything wrong that looks fine?
+hpc3-chain     --config runs/hpc3.json --run runs/pipeline.json # stages, each after the last
 hpc3-trace     --config runs/hpc3.json --match 07ab4976…       # which job trained this?
 hpc3-cancel    --config runs/hpc3.json --job 55519937          # stop it, and say what actually stopped
 ```
@@ -56,7 +57,6 @@ address, the ledger, the budget and each project's resources are written down.
       "minutes": 720,
       "requeue": true,
       "checkpoint_steps": 500,
-      "accept_billing": false,
       "env_path": "/pub/wagnera3/envs/abl-pinned",
       "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" },
       "deterministic": true
@@ -69,7 +69,6 @@ address, the ledger, the budget and each project's resources are written down.
       "minutes": 360,
       "requeue": true,
       "checkpoint_steps": 1,
-      "accept_billing": false,
       "env_path": "/pub/wagnera3/envs/sirius",
       "pinned_packages": {},
       "deterministic": false
@@ -107,7 +106,6 @@ environment path:
   "partition": "free-gpu", "gpu": { "model": "V100", "count": 1 },
   "cpus": 4, "mem_gb": 32, "minutes": 240,
   "requeue": true, "checkpoint_steps": 200,
-  "accept_billing": false,
   "env_path": "/pub/wagnera3/envs/turkic",
   "pinned_packages": {},
   "deterministic": false
@@ -342,31 +340,54 @@ partitions 2026-08-23).
 | partition | GPUs | bills | preemptible | max hours | per-user ceiling |
 | --- | --- | --- | --- | --- | --- |
 | `free-gpu` | V100, A30, A100 | no | yes | 72 | 24 GPUs |
-| `free-gpu32` | L40S, RTX6000 | **yes** | yes | 72 | 4 GPUs |
-| `gpu` | V100, A30, A100 | yes | no | 336 | 40 GPUs |
-| `gpu32` | L40S, RTX6000 | yes | no | 336 | 12 GPUs |
+| `free-gpu32` | L40S, RTX6000 | no | yes | 72 | 4 GPUs |
 | `free` | — | no | yes | 72 | 3500 cores |
+| `gpu` | V100, A30, A100 | **yes** | no | 336 | 40 GPUs |
+| `gpu32` | L40S, RTX6000 | **yes** | no | 336 | 12 GPUs |
 | `standard` | — | **yes** | no | 336 | 2500 cores |
 
-**Two of those names lie, in opposite directions.** `free-gpu32` bills at
-`UsageFactor 1.0`. And `standard` is HPC3's *default* partition — the one
-marked `standard*` in `sinfo` — so a CPU job submitted without naming a
-partition bills. That is why the partition is required here and never defaulted.
+**This package submits to the free three and refuses the other three**, so the
+last two columns are what you get: 72 hours per attempt, and preemption.
 
-The billing figures are measured, not read off the QOS name, and the
-distinction is load-bearing: a QOS literally named `free-gpu` exists and
-carries `UsageFactor 1.000000`, but it is **not** what the `free-gpu` partition
-uses — that is `free-gpu-part`, at `0.000000`. Grepping the obvious name would
-have recorded the free partition as billing. Confirmed at the other end after
-a GPU run and a CPU run:
+### Billing follows the *job's* QOS, not the partition's
+
+This table said `free-gpu32` billed at `UsageFactor 1.0` for a day, and it was
+wrong. The 1.0 belongs to `free-gpu32-part`, which is the **partition** QOS and
+governs limits. Jobs there run under `low`, at `0.000000`, because every free
+partition declares `AllowQos=low,guest`. Reading a factor off the partition QOS
+is how that error was made.
+
+Measured, not reasoned — an 8-core, 1-GPU, 2-minute RTX6000 job on `free-gpu32`
+moved `sshare` `RawUsage` by **exactly zero**, on a meter that read 33,654,891
+for another user in the same account at the same moment:
 
 ```
-wagnera3 *         0 |    CJMAYER_LAB     9,396 |        96,921    87,525
+cjmayer_lab|akondur|33654891
+cjmayer_lab|wagnera3|0
 ```
+
+So the rule is `AllowQos`: `low,guest` (both `0.0`) is free, `normal,high`
+(`1.0` and `2.0`) bills. **L40S and RTX6000 are free**, which the old wrong
+fact had been hiding. The billing three are marked from the `AllowQos` rule
+rather than from a measurement, deliberately: the safe direction to be wrong is
+to refuse something that would have been free, never to spend on something
+recorded as free.
+
+There is also a QOS literally *named* `free-gpu` carrying `UsageFactor
+1.000000`, which is not what the `free-gpu` partition uses. Same lesson twice:
+a name containing "free" and a QOS containing a factor are two different
+questions, and only a job's own accounting answers either.
 
 `free` is the CPU twin of `free-gpu` — same `0.0`, same `PreemptMode=CANCEL`,
 same 72-hour cap — so the preemption-protection rule applies to it unchanged,
 with no new logic.
+
+### Free only, and not as a setting
+
+There is no `accept_billing`. A billing partition is refused outright with
+`PARTITION_BILLS`, which names the free ones. A consent flag would be a limit a
+run could switch off — the same shape as declaring `max_gpus_per_user: 999` to
+raise a ceiling. Both disable the check instead of changing the fact.
 
 Not carried, each for a measured reason: `standard-hbm` needs an explicit
 `--qos` this package does not emit; `gpu-hugemem` returns `Invalid account or
@@ -401,7 +422,6 @@ below is not a missing flag but a shape the contract cannot express.
 | --- | --- | --- |
 | **Multi-node / MPI** | no `--nodes`, `--ntasks`, `srun` or `mpirun` anywhere | anything that does not fit one node |
 | **Job array** | a sweep is N separate `sbatch` calls | a wide sweep is N ledger rows and N scheduler entries where `--array` would be one; correct, but heavier on the scheduler and on `squeue` |
-| **Job dependency** | no `--dependency` | a staged pipeline — train → eval, SIRIUS → ZODIAC — must be driven by hand, one stage submitted after watching the previous finish |
 | **Explicit `--qos`** | not emitted; the cluster auto-selects | `standard-hbm` on HPC3, which refuses the default QOS with `Invalid qos specification` |
 | **`--constraint` / `--exclusive`** | not emitted | node features cannot be selected beyond the GPU model |
 
@@ -409,6 +429,9 @@ None of these are hard to add, and the cluster-facts layer already carries what
 the checks would need. They are absent because they were never built, not
 because they were judged wrong — recorded here so the gap is a decision rather
 than a discovery.
+
+**Job dependencies were on this list and are not any more** — see
+[Chains](#chains-a-pipeline-that-stops-when-a-stage-fails).
 
 **CPU-only was on this list and is not any more.** `"gpu": null` on a CPU
 partition submits, so `cleargbm_rs`, SIRIUS and ZODIAC are reachable. One
@@ -429,7 +452,8 @@ both pass, the results aren't comparable" failure the pin check was built for.
 | `PARTITION_UNKNOWN` — the partition exists on this cluster | a workspace written for another machine, or a typo; either way the job would be refused at submission or land somewhere unintended |
 | `GPU_TYPE_UNPINNED` — a GPU request names its model and the cluster carries it | a bare `--gres=gpu:1` on `free-gpu` is roughly a two-in-five chance of a V100, whose `sm_70` the pinned torch does not target; the failure reads as a bug in the training code |
 | `PARTITION_GPU_MISMATCH` — the partition and the request agree, **both ways** | a GPU on a CPU partition pends forever; no GPU on a GPU partition *runs*, holding a card it never touches, so only this catches it |
-| `PARTITION_BILLS_WITHOUT_CONSENT` — a non-zero `UsageFactor` needs `accept_billing` | `free-gpu32` bills despite its name, and `standard` is the default partition and bills |
+| `PARTITION_BILLS` — the partition's `UsageFactor` is zero | this package submits free work only; `standard` is the default partition and charges, so the partition is required and never defaulted |
+| `DEPENDENCY` fields — a wait names real, distinct, numeric job ids | a typo'd id is not a slow job, it is a job that never existed, and under `--kill-on-invalid-dep` that cancels the dependent stage at once |
 | `ENV_PACKAGE_MISMATCH` — the environment contains what the project pinned | `envs/abl` and `envs/abl-pinned` both exist and differ by a transformers major version |
 | `PREEMPTIBLE_RUN_UNPROTECTED` — long preemptible runs carry requeue **and** checkpointing | `PreemptMode=CANCEL` gives 60 seconds of grace; requeue without checkpoints restarts from step zero, which is not protection |
 | `TIME_LIMIT_EXCEEDS_PARTITION` — the wall clock fits | rejected at submission otherwise |
@@ -478,6 +502,68 @@ anything is found.
 - **silent** — `RUNNING`, holding GPUs, and its log has stopped growing. Log
   age is measured against the cluster's own clock; a few minutes of skew would
   either invent staleness or hide it.
+
+## Chains: a pipeline that stops when a stage fails
+
+```bash
+hpc3-chain --config runs/hpc3.json --run examples/chain-sirius-zodiac.json
+```
+
+Stages run in order, each waiting on the one before it with `afterok`. They may
+differ in resources — a training stage holds a GPU, the evaluation reading its
+checkpoints often does not — so a stage overrides the same fields a run can, on
+top of anything the chain sets once:
+
+```json
+{
+  "project": "sirius", "name": "batch7",
+  "experiment": { "sample_set": "batch7" },
+  "stages": [
+    { "suffix": "sirius", "command": "sirius ... formula", "cpus": 16, "minutes": 360 },
+    { "suffix": "zodiac", "command": "sirius ... zodiac", "cpus": 32, "mem_gb": 128 }
+  ]
+}
+```
+
+**`--kill-on-invalid-dep=yes` is emitted with every dependency, never without
+it.** This is the whole reason chains are safe to use here. When a dependency
+cannot be satisfied Slurm does *not* reject the dependent job — it queues it
+forever on `DependencyNeverSatisfied`, holding a QOS slot, looking in `squeue`
+exactly like a job waiting its turn. That was **261 of 621** pending GPU jobs
+on HPC3 in one sample. With the flag, a stage whose predecessor failed is
+cancelled instead: the slot is freed, and the ledger gets a terminal state it
+can close rather than an entry that never resolves.
+
+Three things follow from the ids not existing until submission:
+
+- **Every stage is validated before the first is sent.** Otherwise a misspelled
+  partition in stage three surfaces an hour after stage one started running.
+- **A chain document may not write `depends_on`.** The chain wires its own, so
+  a hand-written one would be silently replaced. It is refused instead.
+- **The budget is checked against the whole pipeline, not stage by stage.**
+  Stages are sequential in *time* and simultaneous in *commitment*: submitting
+  the chain commits every hour of it.
+
+A chain is not a sweep. A sweep is one template run several ways at once, and
+is bounded by how many of your jobs may RUN concurrently. A chain runs one
+stage at a time, so that ceiling cannot bind it — what could is the submit
+ceiling, which on `free` is 3500. No ceiling check is applied to chains for
+that reason: a check that cannot fire still reads as protection.
+
+`depends_on` is also available on an ordinary run, for chaining onto a job that
+is already queued:
+
+```json
+{ "project": "abl", "name": "eval", "command": "...",
+  "experiment": { "of": "55519937" },
+  "depends_on": { "kind": "afterok", "job_ids": ["55519937"] } }
+```
+
+It is a run-level field and never a project default — a default would name ids
+from a previous session, and a stale `afterok` on a job that finished last week
+is satisfied instantly and silently.
+
+---
 
 ### The comment is live-only, and that is why the ledger exists
 

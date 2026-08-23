@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from platform_core.json_utils import load_json_str
 
 from hpc3.cli import _argv, _config, _fatal, _test_hooks
-from hpc3.contracts.cluster import describe_gpu_request, partition_bills
+from hpc3.contracts.cluster import describe_gpu_request
 from hpc3.contracts.layout import log_dir, script_dir
 from hpc3.contracts.run import resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
@@ -83,11 +83,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         cluster=cluster,
     )
 
-    cost = "BILLS service units" if partition_bills(cluster, base["partition"]) else "free"
     for member in submitted:
         _test_hooks.emit(f"submitted {member.job_id} {member.name}")
     _test_hooks.emit(
-        f"{len(submitted)} member(s) on {base['partition']} ({cost}), "
+        f"{len(submitted)} member(s) on {base['partition']} (free), "
         f"{describe_gpu_request(base['gpu'])} each, {base['minutes']} min"
     )
     _test_hooks.emit(f"logs {log_dir(root, project)}")

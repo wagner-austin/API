@@ -14,9 +14,12 @@ into a run.
    and the partition must agree in BOTH directions: a GPU on a CPU partition
    pends forever, and no GPU on a GPU partition runs happily while occupying
    a card it never touches.
-2. A billing partition requires explicit consent. A partition's name is not
-   evidence about its cost -- HPC3's ``free-gpu32`` bills at ``UsageFactor``
-   1.0 -- so silence must mean no.
+2. The partition does not charge. This package submits free work only, so a
+   billing partition is refused outright rather than gated behind a consent
+   flag -- a flag would be a limit a run could switch off. A partition's name
+   is not evidence either way: HPC3 has a QOS named ``free-gpu`` that charges
+   full rate, and a default partition named ``standard`` that charges too.
+   Only the measured usage factor decides.
 3. A preemptible run long enough to matter carries requeue and checkpointing.
    Under ``PreemptMode=CANCEL`` an eviction destroys unsaved work.
 4. The wall clock fits the partition. Slurm rejects the rest at submission.
@@ -46,8 +49,10 @@ from hpc3.contracts.cluster import (
     encode_gpu_request,
     partition_bills,
     partition_facts,
+    partition_names,
     require_partition,
 )
+from hpc3.contracts.dependency import Dependency, decode_dependency, encode_dependency
 from hpc3.contracts.experiment import encode_experiment, require_experiment
 from hpc3.contracts.layout import require_project
 from hpc3.contracts.pins import encode_pinned_packages, require_pinned_packages
@@ -82,8 +87,11 @@ class JobSpec(TypedDict):
         minutes: Wall-clock limit.
         requeue: Whether Slurm should resubmit the job after a preemption.
         checkpoint_steps: Training steps between checkpoints; 0 means none.
-        accept_billing: Explicit consent to spend service units. Must be True
-            for any partition whose QOS charges.
+        depends_on: Jobs that must finish before this one starts, or None for
+            a job that waits on nothing. Emitted alongside
+            ``--kill-on-invalid-dep=yes`` so an unsatisfiable wait cancels
+            rather than parking forever. See
+            :mod:`hpc3.contracts.dependency`.
         env_path: Absolute path on the cluster to a directory with a ``bin``
             holding the payload's interpreter or binary.
         pinned_packages: Distribution versions that environment must actually
@@ -113,7 +121,7 @@ class JobSpec(TypedDict):
     minutes: int
     requeue: bool
     checkpoint_steps: int
-    accept_billing: bool
+    depends_on: Dependency | None
     env_path: str
     pinned_packages: dict[str, str]
     deterministic: bool
@@ -209,27 +217,35 @@ def _check_partition_carries_gpu(
         )
 
 
-def _check_billing_consent(cluster: ClusterFacts, partition: str, accept_billing: bool) -> None:
-    """Reject a billing job that did not say so.
+def _check_partition_is_free(cluster: ClusterFacts, partition: str) -> None:
+    """Reject any partition that charges service units.
+
+    This package submits free work only. That is a standing decision, so it is
+    a refusal rather than a flag: an ``accept_billing`` field would make the
+    limit something a run could turn off, which is the same shape as declaring
+    ``max_gpus_per_user: 999`` to raise a ceiling. Both disable the check
+    instead of changing the fact.
 
     Args:
         cluster: The selected cluster.
         partition: Target partition.
-        accept_billing: Whether the caller consented to spend service units.
 
     Raises:
-        AppError: With ``PARTITION_BILLS_WITHOUT_CONSENT`` if the partition
-            charges and consent was not given. The message names the measured
-            usage factor, because a partition's name is not evidence about
-            its cost.
+        AppError: With ``PARTITION_BILLS`` if the partition's usage factor is
+            above zero. The message names the measured factor and lists the
+            free partitions, because the useful next step is which partition
+            to use instead.
     """
-    if partition_bills(cluster, partition) and not accept_billing:
-        factor = partition_facts(cluster, partition)["usage_factor"]
-        raise AppError(
-            Hpc3ErrorCode.PARTITION_BILLS_WITHOUT_CONSENT,
-            f"Partition {partition!r} on {cluster['slug']!r} charges service units "
-            f"(UsageFactor {factor}). Set 'accept_billing' to true to spend them.",
-        )
+    if not partition_bills(cluster, partition):
+        return
+    factor = partition_facts(cluster, partition)["usage_factor"]
+    free = [name for name in partition_names(cluster) if not partition_bills(cluster, name)]
+    raise AppError(
+        Hpc3ErrorCode.PARTITION_BILLS,
+        f"Partition {partition!r} on {cluster['slug']!r} charges service units "
+        f"(UsageFactor {factor}), and this package submits free work only. "
+        f"Free partitions on this cluster: {free}.",
+    )
 
 
 def _check_preemption_protection(
@@ -305,7 +321,7 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
         "minutes": spec["minutes"],
         "requeue": spec["requeue"],
         "checkpoint_steps": spec["checkpoint_steps"],
-        "accept_billing": spec["accept_billing"],
+        "depends_on": encode_dependency(spec["depends_on"]),
         "env_path": spec["env_path"],
         "pinned_packages": encode_pinned_packages(spec["pinned_packages"]),
         "deterministic": spec["deterministic"],
@@ -341,7 +357,6 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
     gpu = decode_gpu_request(cluster, value.get("gpu"), "gpu")
     minutes = _require_positive(value, "minutes")
     requeue = require_bool(value, "requeue")
-    accept_billing = require_bool(value, "accept_billing")
 
     checkpoint_steps = require_int(value, "checkpoint_steps")
     if checkpoint_steps < 0:
@@ -350,7 +365,7 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
         )
 
     _check_partition_carries_gpu(cluster, partition, gpu)
-    _check_billing_consent(cluster, partition, accept_billing)
+    _check_partition_is_free(cluster, partition)
     _check_time_limit(cluster, partition, minutes)
     _check_preemption_protection(cluster, partition, minutes, requeue, checkpoint_steps)
 
@@ -364,7 +379,7 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
         minutes=minutes,
         requeue=requeue,
         checkpoint_steps=checkpoint_steps,
-        accept_billing=accept_billing,
+        depends_on=decode_dependency(value.get("depends_on"), "depends_on"),
         env_path=_require_nonempty_str(value, "env_path"),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
         deterministic=require_bool(value, "deterministic"),

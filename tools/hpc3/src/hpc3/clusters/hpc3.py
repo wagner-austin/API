@@ -2,14 +2,27 @@
 
 Every value here was read off the machine with ``sinfo``, ``scontrol``,
 ``sacctmgr`` and a job on each card -- not from a spec sheet and not from the
-Slurm label. Two of those labels are actively misleading and are the reason
-this module exists rather than a README paragraph:
+Slurm label:
 
 * The GRES name ``RTX6000`` reads as the 2018 Turing Quadro. It is a current
   Blackwell server card with 96 GB and compute capability ``sm_120``.
-* ``free-gpu32`` is not free. Its QOS carries ``UsageFactor 1.000000`` where
-  ``free-gpu`` carries ``0.000000``, so it bills one service unit per
-  core-hour.
+* **Billing follows the JOB's QOS, not the partition's.** This module said
+  ``free-gpu32`` billed at ``UsageFactor 1.0`` from 2026-08-22 until it was
+  measured properly on 2026-08-23. It does not bill. The 1.0 belongs to
+  ``free-gpu32-part``, which is the partition QOS and governs *limits*; jobs
+  there run under ``low`` (``UsageFactor 0.000000``), because every free
+  partition declares ``AllowQos=low,guest``. Reading a factor off the
+  partition QOS is how that error was made.
+
+  Verified rather than reasoned: an 8-core, 1-GPU, 2-minute RTX6000 job on
+  ``free-gpu32`` moved ``sshare`` ``RawUsage`` by exactly zero, on a meter
+  that simultaneously read 33,654,891 for another user in the same account.
+
+So the rule is ``AllowQos``: ``low,guest`` (both 0.0) is free, ``normal,high``
+(1.0 and 2.0) bills. The billing partitions below are marked from that rule
+rather than from a measurement, deliberately: the safe direction to be wrong
+is to refuse a partition that would have been free, never to spend on one
+recorded as free.
 
 What is deliberately NOT here: per-card VRAM and compute capability. Both were
 measured, and neither is consulted by any rule this package enforces -- nothing
@@ -38,7 +51,7 @@ HPC3: ClusterFacts = ClusterFacts(
             max_jobs_per_user=24,
         ),
         "free-gpu32": PartitionFacts(
-            usage_factor=1.0,
+            usage_factor=0.0,
             preemptible=True,
             max_hours=72,
             gpus=("L40S", "RTX6000"),
@@ -84,24 +97,22 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
     },
 )
-"""The ``free-`` prefix describes priority, not always cost.
+"""The three ``free`` partitions are genuinely free; the other three bill.
 
-``standard`` is HPC3's DEFAULT partition -- it is the one marked ``standard*``
-in ``sinfo`` -- and it carries ``UsageFactor 1.0``. A CPU job submitted without
-naming a partition bills. That is the same class of mislabel as ``free-gpu32``
-pointing the other way, and it is why this package requires the partition to
-be stated rather than defaulted.
+``standard`` is HPC3's DEFAULT partition -- the one marked ``standard*`` in
+``sinfo`` -- and it bills. A CPU job submitted without naming a partition
+therefore spends service units, which is why this package requires the
+partition to be stated and never defaults it.
 
 ``free`` is the CPU twin of ``free-gpu``: ``UsageFactor 0.0``, the same
 ``PreemptMode=CANCEL``, and the same 72-hour ceiling. The preemption-protection
 rule therefore applies to it unchanged.
 
-The billing figures are measured rather than read off the QOS name, and the
-distinction is load-bearing. A QOS literally named ``free-gpu`` exists and
-carries ``UsageFactor 1.000000``; it is NOT what the ``free-gpu`` partition
-uses. The partition's QOS is ``free-gpu-part``, at ``0.000000``. Confirmed at
-the other end too: after a GPU run and a CPU run, ``sbank balance statement``
-reported 0 SUs consumed.
+There is also a QOS literally named ``free-gpu`` carrying ``UsageFactor
+1.000000``, which is not what the ``free-gpu`` partition uses. Between that and
+the ``-part`` QOS trap above, the lesson is the same one twice: **a name
+containing "free" and a QOS containing a factor are two different questions,
+and only a job's own accounting answers either.**
 
 Deliberately absent, each for a measured reason:
 

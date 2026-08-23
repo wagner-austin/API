@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.budget import Budget, Consumption
-from hpc3.contracts.cluster import ClusterFacts, gpu_count, partition_facts
+from hpc3.contracts.cluster import ClusterFacts, gpu_count
 from hpc3.contracts.job import MINUTES_PER_HOUR, JobSpec
 from hpc3.contracts.status import JobStatus, gpu_hours, service_units
 
@@ -32,21 +32,26 @@ def project(specs: Sequence[JobSpec], cluster: ClusterFacts) -> Consumption:
         cluster: The cluster whose measured usage factors apply.
 
     Returns:
-        Projected consumption. Service units are the core-hours scaled by the
-        partition's usage factor, matching what would actually be charged --
-        a sweep on a zero-factor partition projects real GPU-hours and zero
-        spend, and one on a half-rate partition projects half.
+        Projected consumption. Service units are always zero and that is
+        structural, not a simplification: every spec here has passed
+        :func:`~hpc3.contracts.job.decode_job_spec`, which refuses any
+        partition with a non-zero usage factor. Multiplying by a factor that
+        is provably zero, and then comparing the product against a cap, would
+        be a check that cannot fail -- and a check that cannot fail still
+        reads as protection.
+
+        The service-unit cap is enforced against OBSERVED usage instead, where
+        it is a real tripwire: a non-zero reading there means a partition this
+        package believes is free is not. That has happened once already --
+        ``free-gpu32`` was recorded as billing for a day when it does not --
+        so the direction it guards is worth guarding.
     """
     projected_gpu_hours = 0.0
-    projected_units = 0.0
     for spec in specs:
-        hours = spec["minutes"] / MINUTES_PER_HOUR
-        projected_gpu_hours += gpu_count(spec["gpu"]) * hours
-        factor = partition_facts(cluster, spec["partition"])["usage_factor"]
-        projected_units += factor * spec["cpus"] * hours
+        projected_gpu_hours += gpu_count(spec["gpu"]) * spec["minutes"] / MINUTES_PER_HOUR
     return Consumption(
         gpu_hours=projected_gpu_hours,
-        service_units=projected_units,
+        service_units=0.0,
         jobs=len(specs),
     )
 
@@ -86,9 +91,14 @@ def check_projection(
     Raises:
         AppError: With
             :attr:`~platform_core.errors.Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED`
-            if either cap would be broken. Raised before anything is
+            if the GPU-hour cap would be broken. Raised before anything is
             submitted, which is the whole point: a flood that has started is
             no longer a budget question.
+
+            The service-unit cap is not checked here -- see :func:`project`
+            for why it cannot be exceeded by anything this package will
+            submit. :func:`check_consumption` enforces it against what
+            actually ran.
     """
     projected = project(specs, cluster)
     if projected["gpu_hours"] > budget["max_gpu_hours"]:
@@ -96,13 +106,6 @@ def check_projection(
             Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED,
             f"{projected['jobs']} job(s) would use {projected['gpu_hours']:.1f} GPU-hours, "
             f"over the declared cap of {budget['max_gpu_hours']:.1f}. "
-            "Nothing was submitted.",
-        )
-    if projected["service_units"] > budget["max_service_units"]:
-        raise AppError(
-            Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED,
-            f"{projected['jobs']} job(s) would spend {projected['service_units']:.1f} SU, "
-            f"over the declared cap of {budget['max_service_units']:.1f}. "
             "Nothing was submitted.",
         )
     return projected
@@ -130,6 +133,10 @@ def check_consumption(
             overrun cannot be scrolled past.
     """
     observed = observe(statuses, cluster)
+    # Unlike the projection, BOTH caps are live here. A non-zero service-unit
+    # reading means a partition this package admitted as free is charging,
+    # which is a wrong fact in the cluster module rather than an overspend by
+    # the operator -- and the only place that can ever surface.
     if observed["gpu_hours"] > budget["max_gpu_hours"]:
         raise AppError(
             Hpc3ErrorCode.BUDGET_CONSUMPTION_EXCEEDED,

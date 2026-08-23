@@ -13,7 +13,7 @@ import pathlib
 
 from platform_core.json_utils import JSONValue, load_json_str
 
-from hpc3.contracts.run import resolve_run, resolve_sweep
+from hpc3.contracts.run import resolve_chain, resolve_run, resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import Workspace, decode_workspace
 from tests.against_hpc3 import decode_project_config
@@ -128,8 +128,8 @@ class TestTheReadmeIsAnExampleToo:
 
     def test_every_documented_json_block_parses(self) -> None:
         blocks = _readme_json_blocks()
-        assert len(blocks) == 6
-        assert [isinstance(load_json_str(block), dict) for block in blocks] == [True] * 6
+        assert len(blocks) == 8
+        assert [isinstance(load_json_str(block), dict) for block in blocks] == [True] * 8
 
     def test_every_documented_project_entry_decodes(self) -> None:
         """Including the standalone fragment, which is what a reader pastes."""
@@ -161,17 +161,18 @@ class TestTheReadmeIsAnExampleToo:
         """
         text = _README.read_text(encoding="utf-8")
         assert "## What this cannot submit" in text
-        for shape in ("Multi-node / MPI", "Job array", "Job dependency", "Explicit `--qos`"):
+        for shape in ("Multi-node / MPI", "Job array", "Explicit `--qos`"):
             assert shape in text
 
-    def test_a_limit_that_was_lifted_is_not_still_listed_as_one(self) -> None:
-        """This assertion named "CPU-only job" until CPU-only shipped, and
-        failed the moment the row came out -- which is the behaviour wanted
+    def test_limits_that_were_lifted_are_not_still_listed_as_limits(self) -> None:
+        """This assertion named "CPU-only job", then "Job dependency", and
+        failed each time the row came out -- which is the behaviour wanted
         from a list of limits. A stale entry there is worse than no list: it
         sends a reader looking for a workaround to something that works."""
         section = _README.read_text(encoding="utf-8").split("## What this cannot submit")[1]
         table = section.split("None of these")[0]
         assert "CPU-only" not in table
+        assert "Job dependency" not in table
 
 
 class TestExampleWorkspace:
@@ -206,6 +207,28 @@ class TestExampleRun:
         partition, the GPU, the cores, the environment -- is inherited.
         """
         assert _fields("run-arm-b.json") == ["command", "experiment", "name", "project"]
+
+
+class TestExampleChain:
+    def test_it_resolves_into_ordered_stages(self) -> None:
+        stages = resolve_chain(_workspace(), _load("chain-sirius-zodiac.json"))["stages"]
+        assert [stage["name"] for stage in stages] == ["batch7-sirius", "batch7-zodiac"]
+
+    def test_its_stages_differ_in_resources_as_a_real_pipeline_does(self) -> None:
+        stages = resolve_chain(_workspace(), _load("chain-sirius-zodiac.json"))["stages"]
+        assert [stage["cpus"] for stage in stages] == [16, 32]
+
+    def test_it_runs_on_the_free_cpu_partition_holding_no_gpu(self) -> None:
+        """SIRIUS and ZODIAC are JVM tools; a GPU here would be a GPU node
+        held to do CPU work."""
+        stages = resolve_chain(_workspace(), _load("chain-sirius-zodiac.json"))["stages"]
+        assert [stage["gpu"] for stage in stages] == [None, None]
+        assert {stage["partition"] for stage in stages} == {"free"}
+
+    def test_no_stage_declares_its_own_dependency(self) -> None:
+        """The chain wires those from ids Slurm has not issued yet."""
+        stages = resolve_chain(_workspace(), _load("chain-sirius-zodiac.json"))["stages"]
+        assert [stage["depends_on"] for stage in stages] == [None, None]
 
 
 class TestExampleSweep:

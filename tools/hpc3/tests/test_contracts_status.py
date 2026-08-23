@@ -34,7 +34,7 @@ def _status(**overrides: JSONValue) -> dict[str, JSONValue]:
     base: dict[str, JSONValue] = {
         "job_id": "55519937",
         "name": "abl-verify",
-        "partition": "free-gpu32",
+        "partition": "gpu32",
         "state": "COMPLETED",
         "elapsed_seconds": 48,
         "billing_tres": 11,
@@ -47,12 +47,12 @@ def _status(**overrides: JSONValue) -> dict[str, JSONValue]:
 
 
 class TestServiceUnits:
-    def test_the_measured_billed_job_costs_what_it_measured(self) -> None:
-        """Job 55519937: billing=11 for 48s on free-gpu32 = 0.1467 SU."""
+    def test_a_billed_job_costs_billing_tres_times_hours(self) -> None:
+        """billing=11 for 48s on a UsageFactor 1.0 partition = 0.1467 SU."""
         cost = service_units(decode_job_status(_status()))
         assert round(cost, 4) == 0.1467
 
-    def test_free_gpu_costs_nothing_however_long_it_ran(self) -> None:
+    def test_a_free_partition_costs_nothing_however_long_it_ran(self) -> None:
         status = decode_job_status(
             _status(partition="free-gpu", elapsed_seconds=72 * 3600, billing_tres=96)
         )
@@ -60,9 +60,15 @@ class TestServiceUnits:
 
     def test_the_same_shape_on_a_billing_partition_is_not_free(self) -> None:
         free = decode_job_status(_status(partition="free-gpu", elapsed_seconds=3600))
-        billed = decode_job_status(_status(partition="free-gpu32", elapsed_seconds=3600))
+        billed = decode_job_status(_status(partition="gpu32", elapsed_seconds=3600))
         assert service_units(free) == 0.0
         assert service_units(billed) == 11.0
+
+    def test_the_32gb_free_partition_costs_nothing(self) -> None:
+        """Measured against a real RTX6000 job, after this suite spent a day
+        asserting the opposite."""
+        status = decode_job_status(_status(partition="free-gpu32", elapsed_seconds=3600))
+        assert service_units(status) == 0.0
 
     def test_an_hour_of_the_billing_partition_costs_the_billing_rate(self) -> None:
         status = decode_job_status(_status(elapsed_seconds=3600, billing_tres=4))

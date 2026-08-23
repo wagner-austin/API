@@ -38,7 +38,6 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,
@@ -66,7 +65,7 @@ class TestJobSubmittedEvent:
             "gpu_count": 2,
             "cpus": 8,
             "minutes": 30,
-            "bills": False,
+            "usage_factor": 0.0,
             "requeue": False,
             "checkpoint_steps": 0,
         }
@@ -86,11 +85,17 @@ class TestJobSubmittedEvent:
         audit.job_submitted(_spec(project="sirius"), host="hpc3", job_id="1", cluster=cluster())
         assert logged[0].fields["job_name"] == "sirius.arm-b-42"
 
-    def test_a_billing_submission_is_marked_as_spending(self, logged: list[LoggedEvent]) -> None:
-        """A billed submission is a spending decision; the record must say so."""
-        spec = _spec(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True)
+    def test_the_record_carries_the_factor_the_job_went_out_under(
+        self, logged: list[LoggedEvent]
+    ) -> None:
+        """Not a bills/does-not-bill flag, which under a free-only policy
+        could only ever be False. The number records what the partition was
+        BELIEVED to cost at submission time -- and that belief was wrong about
+        free-gpu32 for a day, which is exactly when an audit trail earns its
+        keep."""
+        spec = _spec(partition="free-gpu32", gpu=gpus("L40S"))
         audit.job_submitted(spec, host="hpc3", job_id="1", cluster=cluster())
-        assert logged[0].fields["bills"] is True
+        assert logged[0].fields["usage_factor"] == 0.0
 
     def test_a_protected_run_records_its_protection(self, logged: list[LoggedEvent]) -> None:
         spec = _spec(minutes=600, requeue=True, checkpoint_steps=50)
@@ -145,7 +150,7 @@ class TestDefaultLogHook:
     ) -> None:
         captured: list[str] = []
 
-        def _capture(event: str, fields: Mapping[str, str | int | bool]) -> None:
+        def _capture(event: str, fields: Mapping[str, str | int | float | bool]) -> None:
             captured.append(event)
 
         _test_hooks.log_event = _capture

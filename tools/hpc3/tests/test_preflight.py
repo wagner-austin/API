@@ -42,7 +42,6 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "accept_billing": False,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,
@@ -122,6 +121,83 @@ class TestCheckEnvPath:
             check_env_path("hpc3", _spec())
         assert excinfo.value.code is Hpc3ErrorCode.ENV_PATH_MISSING
         assert "/pub/wagnera3/envs/abl-pinned/bin" in excinfo.value.message
+
+
+class TestADependencyRefusalIsTranslated:
+    """Slurm's own wording for these says nothing about a dependency.
+
+    Both phrases were measured against real refusals on HPC3: `afterok` on a
+    job that already FAILED gives "Requested operation is presently disabled",
+    and `afterok` on a job past MinJobAge gives "Job dependency problem". An
+    operator whose first chain stage failed fast reads the former, which names
+    neither the dependency nor the stage.
+    """
+
+    def _waiting(self) -> JobSpec:
+        """Build a spec that waits on one job.
+
+        Returns:
+            A validated spec carrying an afterok dependency.
+        """
+        return _spec(depends_on={"kind": "afterok", "job_ids": ["55533519"]})
+
+    def _refuse(self, fake_run: FakeRun, text: str) -> None:
+        """Script a cluster that refuses the preflight with given text.
+
+        Args:
+            fake_run: The runner to script.
+            text: Slurm's refusal wording.
+        """
+        fake_run.add("test -d", stdout="PRESENT\n")
+        fake_run.add("--test-only", stdout=f"allocation failure: {text}\nrc=1\n")
+
+    def test_the_already_failed_wording_is_explained(self, fake_run: FakeRun) -> None:
+        self._refuse(fake_run, "Requested operation is presently disabled")
+        with pytest.raises(AppError) as excinfo:
+            preflight(
+                self._waiting(),
+                host="hpc3",
+                script_dir="/j",
+                log_dir="/l",
+                cluster=cluster(),
+            )
+        assert excinfo.value.code is Hpc3ErrorCode.PREFLIGHT_REJECTED
+        assert "afterok 55533519" in excinfo.value.message
+        assert "an earlier stage failed" in excinfo.value.message
+
+    def test_the_aged_out_wording_is_explained_too(self, fake_run: FakeRun) -> None:
+        self._refuse(fake_run, "Job dependency problem")
+        with pytest.raises(AppError) as excinfo:
+            preflight(
+                self._waiting(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster()
+            )
+        assert "afterok 55533519" in excinfo.value.message
+
+    def test_slurms_own_words_are_kept_alongside_the_hint(self, fake_run: FakeRun) -> None:
+        """The hint is a guess about cause; Slurm's text is the ground truth,
+        and a translator that swallowed it would hide a wrong guess."""
+        self._refuse(fake_run, "Job dependency problem")
+        with pytest.raises(AppError) as excinfo:
+            preflight(
+                self._waiting(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster()
+            )
+        assert "Job dependency problem" in excinfo.value.message
+
+    def test_an_unrelated_refusal_gets_no_dependency_hint(self, fake_run: FakeRun) -> None:
+        """A bad account has nothing to do with the wait, and saying it might
+        would send the reader after the wrong thing."""
+        self._refuse(fake_run, "Invalid account")
+        with pytest.raises(AppError) as excinfo:
+            preflight(
+                self._waiting(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster()
+            )
+        assert "waits on" not in excinfo.value.message
+
+    def test_a_job_with_no_dependency_gets_no_hint(self, fake_run: FakeRun) -> None:
+        self._refuse(fake_run, "Requested operation is presently disabled")
+        with pytest.raises(AppError) as excinfo:
+            preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+        assert "waits on" not in excinfo.value.message
 
 
 class TestPreflight:

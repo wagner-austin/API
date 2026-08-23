@@ -58,7 +58,7 @@ OTHER: ClusterFacts = ClusterFacts(
             max_jobs_per_user=1,
         ),
         "serial": PartitionFacts(
-            usage_factor=0.25,
+            usage_factor=0.0,
             preemptible=False,
             max_hours=2,
             gpus=(),
@@ -69,7 +69,18 @@ OTHER: ClusterFacts = ClusterFacts(
     },
 )
 """Nothing about this overlaps HPC3: not a partition name, not a GPU, not a
-ceiling, and its billing partition charges half rate rather than full."""
+ceiling, and its billing partition charges half rate rather than full.
+
+It also reaches two states HPC3 cannot, which is now most of its value:
+
+* ``serial`` is free AND non-preemptible, so the "a long run here needs no
+  protection" branch has somewhere to run. Every free partition on HPC3 is
+  preemptible, so that branch is unreachable there without spending money.
+* ``serial``'s job ceiling (3) is below what its core ceiling (12) admits, so
+  ``SWEEP_EXCEEDS_JOB_CEILING`` can fire on its own. On HPC3's free partitions
+  the GPU or core ceiling always binds first, which used to be tested against
+  the billing ``gpu`` partition and no longer can be.
+"""
 
 
 def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -84,14 +95,13 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
     base: dict[str, JSONValue] = {
         "project": "abl",
         "name": "run",
-        "partition": "batch",
-        "gpu": gpus("H100"),
+        "partition": "scavenge",
+        "gpu": gpus("MI300X"),
         "cpus": 4,
         "mem_gb": 16,
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "accept_billing": True,
         "env_path": "/scratch/env",
         "pinned_packages": {},
         "deterministic": False,
@@ -107,10 +117,21 @@ class TestHpc3Facts:
         """Measured with sacctmgr: this is why a free-gpu job costs nothing."""
         assert partition_facts(HPC3, "free-gpu")["usage_factor"] == 0.0
 
-    def test_the_partition_that_reads_free_actually_bills(self) -> None:
-        """free-gpu32 carries UsageFactor 1.0 despite the name."""
-        assert partition_bills(HPC3, "free-gpu32") is True
-        assert partition_bills(HPC3, "free-gpu") is False
+    def test_every_free_prefixed_partition_really_is_free(self) -> None:
+        """This test asserted the OPPOSITE for a day: that free-gpu32 bills at
+        UsageFactor 1.0. The 1.0 belongs to `free-gpu32-part`, the partition
+        QOS, which governs limits. Jobs there run under `low`, at 0.0, because
+        every free partition declares AllowQos=low,guest. Measured with a real
+        RTX6000 job: sshare RawUsage moved by zero."""
+        for name in ("free", "free-gpu", "free-gpu32"):
+            assert partition_bills(HPC3, name) is False
+
+    def test_the_billing_partitions_are_still_marked_as_billing(self) -> None:
+        """Marked from AllowQos=normal,high rather than from a measurement.
+        The safe direction to be wrong is to refuse something that would have
+        been free, never to spend on something recorded as free."""
+        for name in ("gpu", "gpu32", "standard"):
+            assert partition_bills(HPC3, name) is True
 
     def test_every_partition_is_listed(self) -> None:
         assert partition_names(HPC3) == (
@@ -235,7 +256,7 @@ class TestTheRulesFollowTheCluster:
     """
 
     def test_a_spec_valid_on_the_other_cluster_decodes(self) -> None:
-        assert decode_job_spec(_spec(), OTHER)["partition"] == "batch"
+        assert decode_job_spec(_spec(), OTHER)["partition"] == "scavenge"
 
     def test_an_hpc3_partition_is_unknown_on_the_other_cluster(self) -> None:
         with pytest.raises(AppError) as excinfo:
@@ -248,26 +269,42 @@ class TestTheRulesFollowTheCluster:
         assert excinfo.value.code is Hpc3ErrorCode.GPU_TYPE_UNPINNED
 
     def test_the_other_clusters_shorter_walltime_ceiling_binds(self) -> None:
-        """8 hours there; the same 10-hour job fits HPC3's 72."""
+        """4 hours there; the same 10-hour job fits HPC3's 72."""
         with pytest.raises(AppError) as excinfo:
             decode_job_spec(_spec(minutes=600), OTHER)
         assert excinfo.value.code is Hpc3ErrorCode.TIME_LIMIT_EXCEEDS_PARTITION
 
     def test_its_preemptible_partition_still_demands_protection(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(
-                _spec(partition="scavenge", gpu=gpus("MI300X"), minutes=200, accept_billing=False),
-                OTHER,
-            )
+            decode_job_spec(_spec(minutes=200), OTHER)
         assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
 
-    def test_its_billing_partition_still_demands_consent(self) -> None:
+    def test_a_free_non_preemptible_partition_needs_no_protection(self) -> None:
+        """Unreachable on HPC3, where every free partition preempts. Without a
+        cluster shaped like this one the early return in the protection rule
+        would have no test that is not also a billing job."""
+        decoded = decode_job_spec(_spec(partition="serial", gpu=None, minutes=110), OTHER)
+        assert decoded["requeue"] is False
+
+    def test_its_billing_partition_is_refused_at_a_half_rate_too(self) -> None:
+        """0.5 is neither free nor full price, and the rule is "above zero"
+        rather than "equal to one"."""
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(accept_billing=False), OTHER)
-        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS_WITHOUT_CONSENT
+            decode_job_spec(_spec(partition="batch", gpu=gpus("H100")), OTHER)
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS
+        assert "0.5" in excinfo.value.message
+
+    def test_its_job_ceiling_can_bind_before_its_core_ceiling(self) -> None:
+        """4 single-core members is 4 cores against a 12-core cap, and 4 jobs
+        against a 3-job cap. Only the job ceiling can refuse this."""
+        members: list[JSONValue] = [{"suffix": f"s{i}", "command": "python t.py"} for i in range(4)]
+        base = _spec(partition="serial", gpu=None, cpus=1)
+        with pytest.raises(AppError) as excinfo:
+            decode_sweep_spec({"base": base, "members": members}, OTHER)
+        assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_JOB_CEILING
 
     def test_its_much_lower_sweep_ceiling_binds(self) -> None:
-        """Three members fit HPC3's 24 GPUs and not this cluster's 2."""
+        """Three members fit HPC3's 24 GPUs and not this cluster's 1."""
         members: list[JSONValue] = [{"suffix": f"s{i}", "command": "python t.py"} for i in range(3)]
         with pytest.raises(AppError) as excinfo:
             decode_sweep_spec({"base": _spec(), "members": members}, OTHER)

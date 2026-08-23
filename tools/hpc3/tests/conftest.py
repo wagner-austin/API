@@ -158,7 +158,7 @@ class LoggedEvent:
 
     __slots__ = ("event", "fields")
 
-    def __init__(self, event: str, fields: Mapping[str, str | int | bool]) -> None:
+    def __init__(self, event: str, fields: Mapping[str, str | int | float | bool]) -> None:
         """Record one event.
 
         Args:
@@ -189,7 +189,7 @@ def _make_logged() -> Generator[list[LoggedEvent], None, None]:
     """
     events: list[LoggedEvent] = []
 
-    def _record(event: str, fields: Mapping[str, str | int | bool]) -> None:
+    def _record(event: str, fields: Mapping[str, str | int | float | bool]) -> None:
         events.append(LoggedEvent(event, fields))
 
     core_hooks.log_event = _record
@@ -318,7 +318,6 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,

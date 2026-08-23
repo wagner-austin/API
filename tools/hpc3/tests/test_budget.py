@@ -44,7 +44,6 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "minutes": 600,
         "requeue": True,
         "checkpoint_steps": 50,
-        "accept_billing": False,
         "env_path": "/pub/envs/abl",
         "pinned_packages": {},
         "deterministic": False,
@@ -105,17 +104,28 @@ class TestProjection:
         assert projected["gpu_hours"] == 10.0
         assert projected["service_units"] == 0.0
 
-    def test_a_billing_partition_projects_cpu_hours_as_spend(self) -> None:
-        spec = _spec(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True, cpus=11)
-        assert project([spec])["service_units"] == 110.0
+    def test_a_projection_can_never_carry_spend(self) -> None:
+        """Structural, not a simplification: every spec that reaches here has
+        passed a decoder that refuses billing partitions, so there is no
+        submittable job whose projected spend is above zero. Asserted rather
+        than assumed, because the moment a billing partition became reachable
+        this would be the test that noticed."""
+        specs = [
+            _spec(partition="free-gpu32", gpu=gpus("L40S"), cpus=11),
+            _spec(partition="free", gpu=None, cpus=64),
+            _spec(),
+        ]
+        assert project(specs)["service_units"] == 0.0
 
     def test_multi_gpu_jobs_multiply(self) -> None:
         assert project([_spec(gpu=gpus("A100", 4))])["gpu_hours"] == 40.0
 
     def test_a_cpu_only_job_projects_no_gpu_hours(self) -> None:
-        """It still projects spend on a billing partition -- the two are
-        separate questions, and only one of them is about GPUs."""
-        assert project([_spec(partition="free", gpu=None)])["gpu_hours"] == 0.0
+        """It is still a job and still counted -- the GPU-hour axis is simply
+        not the one that measures it."""
+        projected = project([_spec(partition="free", gpu=None)])
+        assert projected["gpu_hours"] == 0.0
+        assert projected["jobs"] == 1
 
     def test_no_specs_project_nothing(self) -> None:
         assert project([]) == {"gpu_hours": 0.0, "service_units": 0.0, "jobs": 0}
@@ -139,12 +149,13 @@ class TestCheckProjection:
         assert excinfo.value.code is Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED
         assert "Nothing was submitted" in excinfo.value.message
 
-    def test_over_the_service_unit_cap_is_refused(self) -> None:
-        spec = _spec(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True, cpus=11)
-        with pytest.raises(AppError) as excinfo:
-            check_projection(_budget(1000.0, 100.0), [spec])
-        assert excinfo.value.code is Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED
-        assert "SU" in excinfo.value.message
+    def test_a_zero_service_unit_cap_admits_every_submittable_job(self) -> None:
+        """The cap the workspace actually carries. Nothing this package will
+        submit can breach it, which is the point rather than a gap -- the
+        same cap is live against OBSERVED usage, where a non-zero reading
+        would mean a partition believed free is charging."""
+        specs = [_spec(partition="free-gpu32", gpu=gpus("L40S"), cpus=11)]
+        assert check_projection(_budget(1000.0, 0.0), specs)["service_units"] == 0.0
 
     def test_the_free_ceiling_would_admit_what_a_budget_refuses(self) -> None:
         """24 GPUs for 3 days is inside every cluster limit and is 1,728 GPU-hours."""
@@ -163,8 +174,12 @@ class TestObservation:
     def test_free_partition_jobs_observe_zero_spend(self) -> None:
         assert observe([_status()])["service_units"] == 0.0
 
-    def test_billing_jobs_observe_real_spend(self) -> None:
-        observed = observe([_status(partition="free-gpu32", billing_tres=11)])
+    def test_a_job_on_a_billing_partition_observes_real_spend(self) -> None:
+        """Observation is not restricted to what this package would submit.
+        Accounting reports whatever ran under the account, including a job
+        submitted by hand -- and this is the surface that would reveal a
+        partition recorded as free that is not."""
+        observed = observe([_status(partition="gpu", billing_tres=11)])
         assert observed["service_units"] == 11.0
 
     def test_a_pending_job_holds_nothing(self) -> None:
@@ -185,7 +200,7 @@ class TestCheckConsumption:
         assert excinfo.value.code is Hpc3ErrorCode.BUDGET_CONSUMPTION_EXCEEDED
 
     def test_over_the_service_unit_cap_is_reported(self) -> None:
-        status = _status(partition="free-gpu32", billing_tres=11)
+        status = _status(partition="gpu", billing_tres=11)
         with pytest.raises(AppError) as excinfo:
             check_consumption(_budget(100.0, 5.0), [status])
         assert excinfo.value.code is Hpc3ErrorCode.BUDGET_CONSUMPTION_EXCEEDED

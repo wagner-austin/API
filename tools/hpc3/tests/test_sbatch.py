@@ -41,7 +41,6 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "accept_billing": False,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,
@@ -279,6 +278,59 @@ class TestCpuOnlyJobs:
     def test_a_gpu_job_on_the_same_cluster_still_gets_its_gres(self) -> None:
         """The CPU path must not be reachable by a job that asked for a GPU."""
         assert "#SBATCH --gres=gpu:A100:1" in render_sbatch(_spec(), log_dir=_LOG_DIR)
+
+
+class TestDependencyIsNeverEmittedWithoutItsSafetyPairing:
+    """The two directives are one decision, so they are tested as one.
+
+    Slurm does not reject an unsatisfiable dependency -- it queues it forever
+    on ``DependencyNeverSatisfied``, holding a QOS slot and looking exactly
+    like a job waiting its turn. That was 261 of 621 pending GPU jobs on HPC3
+    in one sample. ``--kill-on-invalid-dep=yes`` is what makes the failure
+    terminal and therefore visible.
+    """
+
+    def _waiting(self) -> JobSpec:
+        """Build a spec that waits on one job.
+
+        Returns:
+            A validated spec carrying an afterok dependency.
+        """
+        return _spec(depends_on={"kind": "afterok", "job_ids": ["55519937"]})
+
+    def test_the_dependency_reaches_the_script(self) -> None:
+        assert "#SBATCH --dependency=afterok:55519937" in render_sbatch(
+            self._waiting(), log_dir=_LOG_DIR
+        )
+
+    def test_the_kill_flag_is_emitted_with_it(self) -> None:
+        assert "#SBATCH --kill-on-invalid-dep=yes" in render_sbatch(
+            self._waiting(), log_dir=_LOG_DIR
+        )
+
+    def test_neither_appears_when_the_job_waits_on_nothing(self) -> None:
+        script = render_sbatch(_spec(), log_dir=_LOG_DIR)
+        assert "--dependency" not in script
+        assert "--kill-on-invalid-dep" not in script
+
+    def test_the_kill_flag_never_appears_alone(self) -> None:
+        """Alone it is inert, and its presence would imply a wait that is not
+        there. Asserted as a relation over both specs rather than as two
+        separate absences."""
+        for spec in (_spec(), self._waiting()):
+            script = render_sbatch(spec, log_dir=_LOG_DIR)
+            assert ("--kill-on-invalid-dep" in script) == ("--dependency" in script)
+
+    def test_several_ids_render_colon_joined(self) -> None:
+        spec = _spec(depends_on={"kind": "afterany", "job_ids": ["1", "2"]})
+        assert "#SBATCH --dependency=afterany:1:2" in render_sbatch(spec, log_dir=_LOG_DIR)
+
+    def test_the_wait_is_a_directive_not_a_body_line(self) -> None:
+        """A `#SBATCH` line after the first command is ignored by Slurm."""
+        lines = render_sbatch(self._waiting(), log_dir=_LOG_DIR).splitlines()
+        dependency = next(i for i, line in enumerate(lines) if "--dependency" in line)
+        first_body = next(i for i, line in enumerate(lines) if line == "set -u")
+        assert dependency < first_body
 
 
 class TestResumeSurface:

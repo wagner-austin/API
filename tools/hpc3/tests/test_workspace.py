@@ -172,11 +172,14 @@ class TestDecodeProjectConfig:
 
     def test_defaults_that_only_combine_badly_are_still_accepted(self) -> None:
         """A run may override any of these, so rejecting here refuses a
-        legitimate shape: the cross-field rules belong at resolution."""
-        config = decode_project_config(
-            project_config(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=False)
-        )
-        assert config["partition"] == "free-gpu32"
+        legitimate shape: the cross-field rules belong at resolution.
+
+        A billing partition declared as a default is admitted HERE and refused
+        when a run resolves against it -- the project config is a set of
+        values, not a submission.
+        """
+        config = decode_project_config(project_config(partition="standard", gpu=None))
+        assert config["partition"] == "standard"
 
 
 class TestRoundTrip:

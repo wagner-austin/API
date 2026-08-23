@@ -40,10 +40,10 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "accept_billing": False,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,
+        "depends_on": None,
         "experiment": {"arm": "B", "seed": "42"},
         "command": "python train.py",
     }
@@ -59,10 +59,10 @@ class TestValidSpec:
     def test_decode_returns_every_field(self) -> None:
         decoded = decode_job_spec(_spec())
         assert sorted(decoded.keys()) == [
-            "accept_billing",
             "checkpoint_steps",
             "command",
             "cpus",
+            "depends_on",
             "deterministic",
             "env_path",
             "experiment",
@@ -128,9 +128,7 @@ class TestRulePartitionMustCarryTheGpu:
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_GPU_MISMATCH
 
     def test_the_same_gpu_on_its_own_partition_is_admitted(self) -> None:
-        decoded = decode_job_spec(
-            _spec(gpu=gpus("RTX6000"), partition="free-gpu32", accept_billing=True)
-        )
+        decoded = decode_job_spec(_spec(gpu=gpus("RTX6000"), partition="free-gpu32"))
         assert decoded["partition"] == "free-gpu32"
 
     def test_asking_a_cpu_partition_for_a_gpu_is_refused(self) -> None:
@@ -151,20 +149,47 @@ class TestRulePartitionMustCarryTheGpu:
         assert decoded["partition"] == "free"
 
 
-class TestRuleBillingNeedsConsent:
-    def test_a_billing_partition_without_consent_is_refused(self) -> None:
+class TestRuleTheWorkIsFree:
+    """No consent flag exists, so these are refusals rather than prompts.
+
+    A flag would be a limit a run could switch off -- the same shape as
+    declaring a ceiling of 999 to raise it. There is nothing to set.
+    """
+
+    def test_a_billing_gpu_partition_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(partition="free-gpu32", gpu=gpus("L40S")))
-        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS_WITHOUT_CONSENT
+            decode_job_spec(_spec(partition="gpu32", gpu=gpus("L40S")))
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS
 
-    def test_consent_admits_it(self) -> None:
-        decoded = decode_job_spec(
-            _spec(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True)
+    def test_the_default_cpu_partition_is_refused_because_it_charges(self) -> None:
+        """`standard` is what a job gets by naming no partition at all, which
+        is why this package never defaults one."""
+        with pytest.raises(AppError) as excinfo:
+            decode_job_spec(_spec(partition="standard", gpu=None))
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS
+
+    def test_the_refusal_names_the_free_partitions_to_use_instead(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            decode_job_spec(_spec(partition="standard", gpu=None))
+        assert "'free'" in excinfo.value.message
+        assert "'free-gpu32'" in excinfo.value.message
+        assert "'standard'" not in excinfo.value.message.split("Free partitions")[1]
+
+    def test_the_32gb_free_partition_is_admitted_because_it_does_not_charge(self) -> None:
+        """Measured, and it contradicts this module's first answer: jobs there
+        run under QOS `low` at UsageFactor 0.0, not under the partition QOS's
+        1.0. L40S and RTX6000 are free."""
+        assert decode_job_spec(_spec(partition="free-gpu32", gpu=gpus("L40S")))["partition"] == (
+            "free-gpu32"
         )
-        assert decoded["accept_billing"] is True
 
-    def test_the_free_partition_needs_no_consent(self) -> None:
-        assert decode_job_spec(_spec(accept_billing=False))["partition"] == "free-gpu"
+    def test_every_free_partition_is_admitted(self) -> None:
+        for partition, gpu in (
+            ("free-gpu", gpus("A100")),
+            ("free-gpu32", gpus("L40S")),
+            ("free", None),
+        ):
+            assert decode_job_spec(_spec(partition=partition, gpu=gpu))["partition"] == partition
 
 
 class TestRulePreemptibleRunsMustBeProtected:
@@ -191,9 +216,19 @@ class TestRulePreemptibleRunsMustBeProtected:
         decoded = decode_job_spec(_spec(minutes=PREEMPTION_PROTECTION_THRESHOLD_MINUTES))
         assert decoded["requeue"] is False
 
-    def test_a_non_preemptible_partition_needs_no_protection(self) -> None:
-        decoded = decode_job_spec(_spec(partition="gpu", minutes=600, accept_billing=True))
-        assert decoded["partition"] == "gpu"
+    def test_no_free_partition_escapes_this_rule(self) -> None:
+        """Every partition this package will submit to is preemptible, so
+        there is no free long run that skips protection. The non-preemptible
+        branch is exercised against a synthetic cluster in test_cluster.py --
+        it cannot be reached on HPC3 without spending money."""
+        for partition, gpu in (
+            ("free-gpu", gpus("A100")),
+            ("free-gpu32", gpus("L40S")),
+            ("free", None),
+        ):
+            with pytest.raises(AppError) as excinfo:
+                decode_job_spec(_spec(partition=partition, gpu=gpu, minutes=600))
+            assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
 
 
 class TestRuleTimeLimitFitsThePartition:
@@ -259,8 +294,8 @@ class TestEncodeCpuOnly:
 
 
 class TestEncode:
-    def test_encode_preserves_a_billing_spec(self) -> None:
-        payload = _spec(partition="gpu32", gpu=gpus("RTX6000"), accept_billing=True)
+    def test_encode_preserves_the_32gb_partition_and_its_gpu(self) -> None:
+        payload = _spec(partition="free-gpu32", gpu=gpus("RTX6000"))
         spec: JobSpec = decode_job_spec(payload)
-        assert encode_job_spec(spec)["partition"] == "gpu32"
-        assert encode_job_spec(spec)["accept_billing"] is True
+        assert encode_job_spec(spec)["partition"] == "free-gpu32"
+        assert encode_job_spec(spec)["gpu"] == {"model": "RTX6000", "count": 1}

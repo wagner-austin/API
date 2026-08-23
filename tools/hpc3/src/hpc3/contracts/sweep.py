@@ -78,7 +78,10 @@ def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
             minutes=spec["base"]["minutes"],
             requeue=spec["base"]["requeue"],
             checkpoint_steps=spec["base"]["checkpoint_steps"],
-            accept_billing=spec["base"]["accept_billing"],
+            # Every member waits on the same thing. A sweep is one rung run
+            # several ways, so if the rung depends on a staging job then each
+            # of its members does.
+            depends_on=spec["base"]["depends_on"],
             env_path=spec["base"]["env_path"],
             pinned_packages=spec["base"]["pinned_packages"],
             deterministic=spec["base"]["deterministic"],

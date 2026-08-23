@@ -1,0 +1,23 @@
+{
+  "project": "sirius",
+  "name": "batch7",
+  "experiment": {
+    "sample_set": "batch7",
+    "spectra": "1284"
+  },
+  "stages": [
+    {
+      "suffix": "sirius",
+      "command": "sirius --input /pub/wagnera3/sirius/batch7 --output /pub/wagnera3/sirius/batch7/out formula",
+      "cpus": 16,
+      "minutes": 360
+    },
+    {
+      "suffix": "zodiac",
+      "command": "sirius --input /pub/wagnera3/sirius/batch7/out zodiac",
+      "cpus": 32,
+      "mem_gb": 128,
+      "minutes": 720
+    }
+  ]
+}

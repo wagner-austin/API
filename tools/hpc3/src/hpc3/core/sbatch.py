@@ -23,6 +23,7 @@ from platform_core.determinism_env import (
 )
 
 from hpc3.contracts.cluster import describe_gpu_request
+from hpc3.contracts.dependency import dependency_argument
 from hpc3.contracts.experiment import comment_fragment
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
@@ -148,6 +149,16 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
         f"#SBATCH -o {log_dir}/{label}-%j.out",
         f"#SBATCH -e {log_dir}/{label}-%j.err",
     ]
+    depends_on = spec["depends_on"]
+    if depends_on is not None:
+        directives.append(f"#SBATCH --dependency={dependency_argument(depends_on)}")
+        # Never emitted without the line above, and never omitted when it is
+        # present. Without it Slurm parks an unsatisfiable dependency in the
+        # queue forever on `DependencyNeverSatisfied` -- 261 of 621 pending
+        # GPU jobs on HPC3 in one sample -- where it holds a QOS slot and
+        # looks exactly like a job that is merely waiting its turn.
+        directives.append("#SBATCH --kill-on-invalid-dep=yes")
+
     if spec["requeue"]:
         directives.append("#SBATCH --requeue")
 
