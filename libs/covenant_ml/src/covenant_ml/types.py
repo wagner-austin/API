@@ -354,6 +354,11 @@ class ClearGBMConfig(TypedDict, total=True):
             all), drawn once per boosting round; the per-split max_features
             draw then selects within the tree's set. Strictly between 0 and
             1 when set — None is the only spelling of "all features".
+        categorical_features: Names of columns holding category codes
+            (None = every feature numeric). Values in those columns must be
+            non-negative integer codes; splits partition categories by set
+            membership (LightGBM's many-vs-many mechanism) rather than by
+            threshold, and a name that matches no feature is an error.
         max_bins: Histogram bins for O(K) split finding (default: 64).
         subsample: Row subsampling ratio (1.0 = no subsampling).
         random_state: Random seed for reproducibility.
@@ -383,6 +388,7 @@ class ClearGBMConfig(TypedDict, total=True):
     min_samples_leaf: int
     max_features: int | float | None
     colsample_bytree: float | None
+    categorical_features: list[str] | None
     max_bins: int
     subsample: float
     random_state: int

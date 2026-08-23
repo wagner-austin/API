@@ -113,6 +113,14 @@ def _decode_rust_node(
             ``feature_names``.
     """
     node = narrow_json_to_dict(raw)
+    # The path explainer walks threshold splits; a set-membership split has
+    # no threshold to walk, so a categorical model is refused loudly rather
+    # than silently mis-attributed.
+    if node.get("categories_goes_left") is not None:
+        raise ValueError(
+            "the SHAP path explainer does not support categorical splits; "
+            f"node {node.get('node_id')} routes by category membership"
+        )
     feature_index = _optional_int(node.get("feature_index"))
     feature_name: str | None
     if feature_index is None:
@@ -178,6 +186,27 @@ _MONOTONIC_STRING_TO_INT: dict[str, int] = {
 }
 
 
+def _decode_rust_categorical_features(raw: JSONValue) -> tuple[int, ...] | None:
+    """Decode the stored categorical feature indices.
+
+    Args:
+        raw: The config's ``categorical_features`` entry (list of ints or
+            null; absent only in pre-categorical payloads, which the Rust
+            loader already refuses).
+
+    Returns:
+        The indices as a tuple, or None.
+
+    Raises:
+        TypeError: If the value is neither null nor a list of ints.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        raise TypeError(f"categorical_features must be list or null, got {type(raw).__name__}")
+    return tuple(narrow_json_to_int(v) for v in raw)
+
+
 def _decode_rust_monotonic_constraints(raw: JSONValue) -> tuple[int, ...] | None:
     """Translate Rust-shape monotonic constraints into Python integers.
 
@@ -236,6 +265,7 @@ def _decode_rust_config(raw: JSONValue) -> GradientBoostingConfig:
         # the model actually trained under.
         max_features=_optional_int(cfg.get("max_features")),
         colsample_bytree=_optional_float(cfg.get("colsample_bytree")),
+        categorical_features=_decode_rust_categorical_features(cfg.get("categorical_features")),
         max_bins=narrow_json_to_int(cfg["max_bins"]),
         subsample=narrow_json_to_float(cfg["subsample"]),
         random_state=narrow_json_to_int(cfg["random_state"]),

@@ -213,6 +213,7 @@ def test_cleargbm_backend_us_bankruptcy_full_pipeline(tmp_path: Path) -> None:
         "min_samples_leaf": 2,
         "max_features": None,
         "colsample_bytree": None,
+        "categorical_features": None,
         "max_bins": 64,
         "subsample": 0.8,
         "train_ratio": 0.7,

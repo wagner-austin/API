@@ -149,6 +149,7 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         min_samples_leaf=1,
         max_features=None,
         colsample_bytree=None,
+        categorical_features=None,
         max_bins=64,
         subsample=1.0,
         random_state=42,

@@ -20,6 +20,7 @@ from covenant_ml.backends.cleargbm import (
     create_cleargbm_backend,
 )
 from covenant_ml.backends.cleargbm.config_resolution import (
+    _resolve_categorical_features,
     _resolve_max_features,
     _resolve_monotonic_constraints,
 )
@@ -263,6 +264,19 @@ def test_resolve_monotonic_constraints_maps_names_to_columns() -> None:
     resolved = _resolve_monotonic_constraints({"b": -1, "c": 1}, ("a", "b", "c"))
     assert resolved == (0, -1, 1)
     assert _resolve_monotonic_constraints(None, ("a", "b")) is None
+
+
+def test_resolve_categorical_features_translates_names_to_sorted_indices() -> None:
+    """Names resolve to strictly ascending indices; None passes through."""
+    names = ("alpha", "beta", "gamma")
+    assert _resolve_categorical_features(None, names) is None
+    assert _resolve_categorical_features(["gamma", "alpha"], names) == (0, 2)
+
+
+def test_resolve_categorical_features_rejects_unknown_names() -> None:
+    """A name that matches no feature is an error, never a silent drop."""
+    with pytest.raises(ValueError, match="categorical_features name unknown features: bogus"):
+        _resolve_categorical_features(["bogus"], ("alpha", "beta"))
 
 
 def test_resolve_max_features_translates_each_form() -> None:

@@ -83,6 +83,33 @@ def _resolve_monotonic_constraints(
     return tuple(constraints.get(name, 0) for name in feature_names)
 
 
+def _resolve_categorical_features(
+    categorical: list[str] | None,
+    feature_names: tuple[str, ...],
+) -> tuple[int, ...] | None:
+    """Translate categorical feature NAMES into cleargbm's sorted index tuple.
+
+    Args:
+        categorical: Names of the columns holding category codes, or None
+            when every feature is numeric.
+        feature_names: Resolved feature names, in column order.
+
+    Returns:
+        Strictly ascending feature indices, or None.
+
+    Raises:
+        ValueError: If a name matches no feature — silently dropping it
+            would train threshold splits over category codes.
+    """
+    if categorical is None:
+        return None
+    unknown = sorted(set(categorical) - set(feature_names))
+    if unknown:
+        raise ValueError(f"categorical_features name unknown features: {', '.join(unknown)}")
+    wanted = set(categorical)
+    return tuple(i for i, name in enumerate(feature_names) if name in wanted)
+
+
 def _resolve_max_features(max_features: int | float | None, n_features: int) -> int | None:
     """Translate the config's max_features into cleargbm's int-or-None form.
 

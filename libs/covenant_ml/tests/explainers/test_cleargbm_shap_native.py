@@ -17,6 +17,7 @@ from covenant_ml.explainers.cleargbm_shap import (
     _convert_decision_tree,
 )
 from covenant_ml.explainers.cleargbm_shap_decode import (
+    _decode_rust_categorical_features,
     _decode_rust_monotonic_constraints,
     _decode_rust_node,
 )
@@ -69,6 +70,7 @@ def _train_native_binary_model(
         "min_samples_leaf": 2,
         "max_features": None,
         "colsample_bytree": None,
+        "categorical_features": None,
         "max_bins": 8,
         "subsample": 1.0,
         "random_state": random_state,
@@ -202,3 +204,33 @@ class TestIntegration:
         # values must be 2D for SHAP
         values_shape = result["values"].shape
         assert len(values_shape) == 2
+
+
+def test_decode_rust_node_rejects_a_categorical_split() -> None:
+    """A set-membership split has no threshold for the path explainer to walk."""
+    node: JSONValue = {
+        "node_id": 0,
+        "is_leaf": False,
+        "feature_index": 0,
+        "threshold": None,
+        "value": 0.0,
+        "n_samples": 8,
+        "left_child": 1,
+        "right_child": 2,
+        "nan_goes_left": True,
+        "categories_goes_left": [0.0, 2.0],
+    }
+    with pytest.raises(ValueError, match="does not support categorical splits"):
+        _decode_rust_node(node, ("category",))
+
+
+def test_decode_rust_categorical_features_round_trips() -> None:
+    """A stored index list decodes to a tuple; null decodes to None."""
+    assert _decode_rust_categorical_features(None) is None
+    assert _decode_rust_categorical_features([0, 3]) == (0, 3)
+
+
+def test_decode_rust_categorical_features_rejects_non_list() -> None:
+    """A scalar is neither null nor an index list."""
+    with pytest.raises(TypeError, match="categorical_features must be list or null"):
+        _decode_rust_categorical_features("zero")

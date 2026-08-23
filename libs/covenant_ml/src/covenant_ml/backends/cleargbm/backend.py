@@ -39,6 +39,7 @@ from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifie
 from .config_resolution import (
     _compute_class_weight,
     _is_cleargbm_config,
+    _resolve_categorical_features,
     _resolve_max_features,
     _resolve_monotonic_constraints,
 )
@@ -307,6 +308,9 @@ class ClearGBMBackend(ClassifierBackend):
             min_samples_leaf=cfg["min_samples_leaf"],
             max_features=_resolve_max_features(cfg["max_features"], n_feats),
             colsample_bytree=cfg["colsample_bytree"],
+            categorical_features=_resolve_categorical_features(
+                cfg["categorical_features"], resolved_names
+            ),
             max_bins=cfg["max_bins"],
             subsample=cfg["subsample"],
             random_state=cfg["random_state"],
