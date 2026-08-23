@@ -75,15 +75,17 @@ The primary operator of this library is an AI session. Therefore:
   weights (data, not config; no artifact break); `scale_pos_weight` is
   now provably the derived special case, bit for bit; four-arm identity
   reproduced 56/56. GOSS (P5) and ranking (P4) are unblocked.
-- **P3 — Data realism.** Landing A DONE 2026-08-22 — see
-  [[cleargbm-nan-direction-and-colsample]]. The missing-value direction
-  was found ALREADY learned per split (the spec's "fixed policy" premise
-  was wrong; now pinned by a stump-discriminator test), and
-  `colsample_bytree` landed as a required-with-null (0,1)-exclusive
-  fraction — one mask per round on its own RNG stream, per-node
-  `max_features` selecting within it; identity 112/112, five artifacts
-  retrained exactly under the 18-field schema. Landing B remains: native
-  categorical splits.
+- **P3 — Data realism.** DONE 2026-08-23, in two landings. Landing A
+  (2026-08-22) — see [[cleargbm-nan-direction-and-colsample]]: the
+  missing-value direction was found ALREADY learned per split (the
+  spec's "fixed policy" premise was wrong; pinned by a
+  stump-discriminator test), and `colsample_bytree` landed as a
+  required-with-null (0,1)-exclusive per-round mask composed with
+  `max_features`. Landing B (2026-08-23) — see
+  [[cleargbm-categorical-splits]]: native many-vs-many categorical
+  splits by gradient-sorted prefix scan, set-membership nodes, SHAP
+  refusal. Both landings: identity 112/112, all five artifacts retrained
+  with exactly reproduced numbers.
 - **P4 — More objectives.** Multiclass (softmax, K trees per round) on the
   P1 seam; ranking (LambdaMART) on P1+P2.
 - **P5 — Accelerators through the quality gate.** Quantized training (the
