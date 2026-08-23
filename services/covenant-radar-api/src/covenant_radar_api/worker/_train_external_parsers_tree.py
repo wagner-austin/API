@@ -171,6 +171,29 @@ def _parse_max_features_nullable(
     raise JSONTypeError("max_features must be an int, float, or null")
 
 
+def _parse_colsample_bytree_nullable(
+    raw: JSONObject,
+) -> float | None:
+    """Parse colsample_bytree field accepting float or null.
+
+    Args:
+        raw: JSON object containing the field.
+
+    Returns:
+        The per-tree feature fraction, or None for all features. Range
+        validation ((0, 1) exclusive) is owned by the cleargbm boundary.
+
+    Raises:
+        JSONTypeError: If value is not a float or null.
+    """
+    val = raw.get("colsample_bytree")
+    if val is None:
+        return None
+    if isinstance(val, float):
+        return val
+    raise JSONTypeError("colsample_bytree must be a float or null")
+
+
 def _parse_monotonic_constraints(
     raw: JSONObject,
 ) -> dict[str, int] | None:
@@ -231,6 +254,7 @@ def _parse_cleargbm_config(
         "min_samples_split": require_int(raw, "min_samples_split"),
         "min_samples_leaf": require_int(raw, "min_samples_leaf"),
         "max_features": _parse_max_features_nullable(raw),
+        "colsample_bytree": _parse_colsample_bytree_nullable(raw),
         "max_bins": _optional_int(raw, "max_bins", 64),
         "subsample": require_float(raw, "subsample"),
         "random_state": require_int(raw, "random_state"),

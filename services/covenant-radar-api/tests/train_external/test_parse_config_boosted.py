@@ -361,6 +361,48 @@ class TestClearGBMConfig:
             raise AssertionError("Expected cleargbm backend")
         assert "track_contributions" not in result["config"]
 
+    def test_with_colsample_bytree_fraction(self) -> None:
+        """Parse ClearGBM config with a per-tree feature fraction."""
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 50,
+                "max_depth": 4,
+                "learning_rate": 0.05,
+                "min_samples_split": 5,
+                "min_samples_leaf": 3,
+                "max_features": None,
+                "colsample_bytree": 0.5,
+                "subsample": 0.9,
+                "random_state": 7,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        if result["backend"] != "cleargbm":
+            raise AssertionError("Expected cleargbm backend")
+        assert result["config"]["colsample_bytree"] == 0.5
+
+    def test_invalid_colsample_bytree_type_raises(self) -> None:
+        """Invalid colsample_bytree type raises JSONTypeError."""
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 50,
+                "max_depth": 4,
+                "learning_rate": 0.05,
+                "min_samples_split": 5,
+                "min_samples_leaf": 3,
+                "max_features": None,
+                "colsample_bytree": "half",
+                "subsample": 0.9,
+                "random_state": 7,
+            }
+        )
+        with pytest.raises(JSONTypeError, match="colsample_bytree must be"):
+            _parse_external_train_config(config_json)
+
     def test_invalid_max_features_type_raises(self) -> None:
         """Invalid max_features type raises JSONTypeError."""
         config_json = dump_json_str(
