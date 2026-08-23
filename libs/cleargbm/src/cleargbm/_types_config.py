@@ -43,7 +43,7 @@ quietly training the default policy.
 GROWTH_STRATEGIES: tuple[GrowthStrategy, ...] = get_args(GrowthStrategy)
 """Every accepted :data:`GrowthStrategy` value, for validation and iteration."""
 
-Objective = Literal["binary_log_loss", "squared_error", "multiclass_softmax"]
+Objective = Literal["binary_log_loss", "squared_error", "multiclass_softmax", "lambdarank"]
 """Training objective — the loss whose gradients the trees descend.
 
 ``binary_log_loss`` is binary classification: 0/1 labels, a log-odds base
@@ -51,7 +51,9 @@ score, sigmoid probabilities. ``squared_error`` is regression: continuous
 targets, a label-mean base score, raw scores that ARE the predictions.
 ``multiclass_softmax`` is K-class classification: integer class labels,
 one log-prior base score per class, ``n_classes`` trees per boosting round,
-softmax probabilities.
+softmax probabilities. ``lambdarank`` is learning-to-rank: integer
+relevance grades with query groups as data, zero base score, raw scores
+that are the ranking keys.
 
 A closed literal for the same reason :data:`GrowthStrategy` is: a mistyped
 objective fails at the Rust boundary rather than quietly training the wrong
@@ -91,6 +93,11 @@ class GradientBoostingConfig(TypedDict):
             under ``"multiclass_softmax"`` (each boosting round trains that
             many trees) and ``None`` under every other objective. The
             pairing itself is enforced at the Rust boundary.
+        lambdarank_truncation_level: NDCG truncation position, paired with
+            the objective: an int >= 1 under ``"lambdarank"`` (it bounds
+            the pair scan and the max-DCG normalizer) and ``None`` under
+            every other objective. The pairing itself is enforced at the
+            Rust boundary.
         max_bins: Number of histogram bins for split finding (64-256 typical).
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -117,8 +124,9 @@ class GradientBoostingConfig(TypedDict):
             boundary, so the cross-field rule has a single owner rather than
             two copies that can drift.
         objective: The loss to train under: ``"binary_log_loss"``,
-            ``"squared_error"``, or ``"multiclass_softmax"``. Required, with
-            no implicit default: a run must name the loss it descends.
+            ``"squared_error"``, ``"multiclass_softmax"`` or
+            ``"lambdarank"``. Required, with no implicit default: a run
+            must name the loss it descends.
         scale_pos_weight: Weight applied to positive samples in the loss,
             its gradients and the base score. Paired with the objective:
             must be a finite positive float under ``"binary_log_loss"``
@@ -139,6 +147,7 @@ class GradientBoostingConfig(TypedDict):
     colsample_bytree: float | None
     categorical_features: tuple[int, ...] | None
     n_classes: int | None
+    lambdarank_truncation_level: int | None
     max_bins: int
     subsample: float
     random_state: int
@@ -236,6 +245,7 @@ def encode_gradient_boosting_config(
             else None
         ),
         "n_classes": config["n_classes"],
+        "lambdarank_truncation_level": config["lambdarank_truncation_level"],
         "max_bins": config["max_bins"],
         "subsample": config["subsample"],
         "random_state": config["random_state"],
@@ -357,6 +367,11 @@ def decode_gradient_boosting_config(
     n_classes = _get_optional_int(raw, "n_classes")
     if n_classes is not None and n_classes < 2:
         raise ValueError(f"n_classes must be >= 2 when set, got {n_classes}")
+    lambdarank_truncation_level = _get_optional_int(raw, "lambdarank_truncation_level")
+    if lambdarank_truncation_level is not None:
+        lambdarank_truncation_level = require_positive_int(
+            lambdarank_truncation_level, "lambdarank_truncation_level"
+        )
     max_bins = require_positive_int(_require_int(raw, "max_bins"), "max_bins")
     subsample = require_unit_float(_require_float(raw, "subsample"), "subsample")
     random_state = _require_int(raw, "random_state")
@@ -396,6 +411,7 @@ def decode_gradient_boosting_config(
         colsample_bytree=colsample_bytree,
         categorical_features=categorical_features,
         n_classes=n_classes,
+        lambdarank_truncation_level=lambdarank_truncation_level,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,

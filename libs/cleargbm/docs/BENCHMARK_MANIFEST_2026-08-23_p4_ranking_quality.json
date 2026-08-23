@@ -1,0 +1,77 @@
+{
+ "config": {
+  "n_queries": 400,
+  "docs_per_query": 20,
+  "n_features": 8,
+  "n_estimators": 100,
+  "max_depth": 4,
+  "learning_rate": 0.1,
+  "max_bins": 64,
+  "min_samples_leaf": 20,
+  "truncation_level": 10
+ },
+ "seeds": [
+  42,
+  43,
+  44,
+  45
+ ],
+ "results": [
+  {
+   "model": "cleargbm",
+   "seed": 42,
+   "quality": {
+    "mean_ndcg": 0.9485140114157565
+   }
+  },
+  {
+   "model": "lightgbm",
+   "seed": 42,
+   "quality": {
+    "mean_ndcg": 0.9502668436221411
+   }
+  },
+  {
+   "model": "cleargbm",
+   "seed": 43,
+   "quality": {
+    "mean_ndcg": 0.9527554985721364
+   }
+  },
+  {
+   "model": "lightgbm",
+   "seed": 43,
+   "quality": {
+    "mean_ndcg": 0.9519678587210427
+   }
+  },
+  {
+   "model": "cleargbm",
+   "seed": 44,
+   "quality": {
+    "mean_ndcg": 0.9476045768282269
+   }
+  },
+  {
+   "model": "lightgbm",
+   "seed": 44,
+   "quality": {
+    "mean_ndcg": 0.9477411938209047
+   }
+  },
+  {
+   "model": "cleargbm",
+   "seed": 45,
+   "quality": {
+    "mean_ndcg": 0.9499229222591182
+   }
+  },
+  {
+   "model": "lightgbm",
+   "seed": 45,
+   "quality": {
+    "mean_ndcg": 0.9495700792529447
+   }
+  }
+ ]
+}

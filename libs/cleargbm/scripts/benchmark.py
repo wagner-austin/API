@@ -152,6 +152,7 @@ def make_config(
         colsample_bytree=None,
         categorical_features=None,
         n_classes=None,
+        lambdarank_truncation_level=None,
         max_bins=max_bins,
         subsample=1.0,
         random_state=random_state,

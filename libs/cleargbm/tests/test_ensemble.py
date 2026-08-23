@@ -46,6 +46,7 @@ def _make_config(
         colsample_bytree=None,
         categorical_features=None,
         n_classes=None,
+        lambdarank_truncation_level=None,
         max_bins=8,
         subsample=1.0,
         random_state=42,
@@ -124,10 +125,11 @@ class TestConfigToRustDict:
     """Config translation: every field crosses; monotonic list is passed through."""
 
     def test_carries_every_hyperparameter_plus_n_jobs(self) -> None:
-        """The Rust-side dict has exactly the 21 keys the Rust trainer reads."""
+        """The Rust-side dict has exactly the 22 keys the Rust trainer reads."""
         result = _config_to_rust_dict(_make_config())
         expected = {
             "n_classes",
+            "lambdarank_truncation_level",
             "n_estimators",
             "max_depth",
             "learning_rate",

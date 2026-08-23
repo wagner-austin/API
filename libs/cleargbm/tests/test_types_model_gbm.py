@@ -29,6 +29,7 @@ def _make_raw_config(n_classes: int | None, objective: str) -> JSONDict:
         "colsample_bytree": None,
         "categorical_features": None,
         "n_classes": n_classes,
+        "lambdarank_truncation_level": None,
         "max_bins": 64,
         "subsample": 1.0,
         "random_state": 0,
@@ -94,6 +95,7 @@ class TestGradientBoostingModel:
             "colsample_bytree": None,
             "categorical_features": None,
             "n_classes": None,
+            "lambdarank_truncation_level": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -160,6 +162,20 @@ class TestConfigNClasses:
         """One class cannot describe a classification problem."""
         with pytest.raises(ValueError, match="n_classes must be >= 2 when set, got 1"):
             decode_gradient_boosting_config(_make_raw_config(1, "multiclass_softmax"))
+
+    def test_decode_carries_a_valid_truncation_level(self) -> None:
+        """An int >= 1 passes through the decode unchanged."""
+        raw = _make_raw_config(None, "lambdarank")
+        raw["lambdarank_truncation_level"] = 10
+        decoded = decode_gradient_boosting_config(raw)
+        assert decoded["lambdarank_truncation_level"] == 10
+
+    def test_decode_rejects_a_zero_truncation_level(self) -> None:
+        """A truncation position must be positive when set."""
+        raw = _make_raw_config(None, "lambdarank")
+        raw["lambdarank_truncation_level"] = 0
+        with pytest.raises(ValueError, match="lambdarank_truncation_level must be positive"):
+            decode_gradient_boosting_config(raw)
 
 
 class TestClassBasePredictions:

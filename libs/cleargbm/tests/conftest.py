@@ -14,6 +14,7 @@ def make_config(
     colsample_bytree: float | None = None,
     categorical_features: tuple[int, ...] | None = None,
     n_classes: int | None = None,
+    lambdarank_truncation_level: int | None = None,
     max_bins: int = 64,
     subsample: float = 1.0,
     random_state: int = 42,
@@ -38,6 +39,8 @@ def make_config(
         categorical_features: Feature indices treated as categorical (None = all numeric).
         n_classes: Class count, required (>= 2) under ``"multiclass_softmax"``,
             ``None`` under every other objective.
+        lambdarank_truncation_level: NDCG truncation position, required
+            (>= 1) under ``"lambdarank"``, ``None`` otherwise.
         max_bins: Number of histogram bins.
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -64,6 +67,7 @@ def make_config(
         colsample_bytree=colsample_bytree,
         categorical_features=categorical_features,
         n_classes=n_classes,
+        lambdarank_truncation_level=lambdarank_truncation_level,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,

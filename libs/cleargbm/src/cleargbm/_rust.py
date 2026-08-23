@@ -232,6 +232,40 @@ class _PredictClassProto(Protocol):
         ...
 
 
+class _TrainRankingProto(Protocol):
+    """Protocol for the native LambdaMART ranking training entry."""
+
+    def __call__(
+        self,
+        x_train: NDArray[np.float64],
+        y_train: NDArray[np.int64],
+        group: NDArray[np.int64],
+        sample_weight: NDArray[np.float64] | None,
+        x_val: NDArray[np.float64] | None,
+        y_val: NDArray[np.int64] | None,
+        val_group: NDArray[np.int64] | None,
+        config: dict[str, int | float | bool | str | list[int] | None],
+        feature_names: list[str],
+    ) -> PyGbmModelProto:
+        """Train a LambdaMART ranking ensemble.
+
+        Args:
+            x_train: Training feature matrix.
+            y_train: Relevance grades, each in ``[0, 31]``.
+            group: Documents per query, in row order.
+            sample_weight: Optional per-row training weights.
+            x_val: Optional validation features.
+            y_val: Optional validation labels.
+            val_group: Optional validation query group sizes.
+            config: Training hyperparameters.
+            feature_names: Feature names.
+
+        Returns:
+            Trained native model handle; score with ``predict_raw_model_rs``.
+        """
+        ...
+
+
 class _ToJsonProto(Protocol):
     """Signature of ``cleargbm_rs.py_gbm_model_to_json_rs``."""
 
@@ -302,6 +336,9 @@ train_gradient_boosting_regression_rs: _TrainRegressionProto = (
 train_gradient_boosting_multiclass_rs: _TrainMulticlassProto = (
     _native_mod.train_gradient_boosting_multiclass_rs
 )
+train_gradient_boosting_ranking_rs: _TrainRankingProto = (
+    _native_mod.train_gradient_boosting_ranking_rs
+)
 predict_proba_model_rs: _PredictProbaProto = _native_mod.predict_proba_model_rs
 predict_raw_model_rs: _PredictRawProto = _native_mod.predict_raw_model_rs
 predict_raw_multiclass_model_rs: _PredictRawMulticlassProto = (
@@ -331,6 +368,7 @@ __all__ = [
     "py_gbm_model_n_trees_rs",
     "py_gbm_model_to_json_rs",
     "train_gradient_boosting_multiclass_rs",
+    "train_gradient_boosting_ranking_rs",
     "train_gradient_boosting_regression_rs",
     "train_gradient_boosting_rs",
 ]

@@ -19,8 +19,10 @@ Public API:
   the predictions — this is the regression inference function.
 
 The ``multiclass_softmax`` surface (its training entry and prediction trio)
-lives in :mod:`cleargbm.ensemble_multiclass` — a different contract, not a
-variant of this one.
+lives in :mod:`cleargbm.ensemble_multiclass`, and the ``lambdarank``
+training entry lives in :mod:`cleargbm.ensemble_ranking` — different
+contracts, not variants of this one. A ranking model IS scored here: its
+:func:`predict_raw` output is the ranking key.
 
 Strict typing only: no ``Any``, no ``cast``, no ``type: ignore``.
 """
@@ -130,6 +132,7 @@ def _config_to_rust_dict(
             else None
         ),
         "n_classes": config["n_classes"],
+        "lambdarank_truncation_level": config["lambdarank_truncation_level"],
     }
 
 
