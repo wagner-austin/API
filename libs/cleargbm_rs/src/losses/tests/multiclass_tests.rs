@@ -5,7 +5,7 @@ use crate::losses::multiclass::{fill_row_grad_hess, softmax_row_into, Multiclass
 use crate::losses::{multiclass_initial_predictions, multiclass_log_loss};
 
 #[test]
-fn test_softmax_row_gathers_class_major_and_normalizes() {
+fn test_softmax_row_gathers_class_major_and_normalizes() -> Result<(), ClearGbmError> {
     // Two rows, three classes, class-major: class k's block is contiguous.
     // Row 1 scores are [0, ln 2, ln 4]: softmax = [1/7, 2/7, 4/7].
     let scores = vec![
@@ -23,10 +23,11 @@ fn test_softmax_row_gathers_class_major_and_normalizes() {
     assert!((out[2] - 4.0_f64 / 7.0_f64).abs() < 1e-12_f64, "{out:?}");
     let sum: f64 = out.iter().sum();
     assert!((sum - 1.0_f64).abs() < 1e-12_f64);
+    Ok(())
 }
 
 #[test]
-fn test_softmax_is_shift_stable_at_large_scores() {
+fn test_softmax_is_shift_stable_at_large_scores() -> Result<(), ClearGbmError> {
     // Max subtraction keeps huge scores finite.
     let scores = vec![1000.0_f64, 1001.0_f64, 999.0_f64];
     let mut out = vec![0.0_f64; 3];
@@ -34,6 +35,7 @@ fn test_softmax_is_shift_stable_at_large_scores() {
     assert!(out.iter().all(|p| p.is_finite() && *p > 0.0_f64), "{out:?}");
     let sum: f64 = out.iter().sum();
     assert!((sum - 1.0_f64).abs() < 1e-12_f64);
+    Ok(())
 }
 
 #[test]
@@ -127,7 +129,7 @@ fn test_log_loss_rejects_bad_shapes() -> Result<(), ClearGbmError> {
 }
 
 #[test]
-fn test_grad_hess_formulas_per_class() {
+fn test_grad_hess_formulas_per_class() -> Result<(), ClearGbmError> {
     // One row, three classes, uniform probabilities p = 1/3. Label 1.
     // grad = p - onehot; hess = (K/(K-1)) * p * (1-p) = 1.5 * (1/3) * (2/3)
     // = 1/3. Weight 2 doubles both.
@@ -147,4 +149,5 @@ fn test_grad_hess_formulas_per_class() {
     for &h in &hessians {
         assert!((h - 2.0_f64 / 3.0_f64).abs() < 1e-12_f64, "{hessians:?}");
     }
+    Ok(())
 }

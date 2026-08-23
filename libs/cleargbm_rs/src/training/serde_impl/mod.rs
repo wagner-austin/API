@@ -97,7 +97,9 @@ impl<'de> Visitor<'de> for ObjectiveVisitor {
     type Value = Objective;
 
     fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        formatter.write_str("\"binary_log_loss\", \"squared_error\" or \"multiclass_softmax\"")
+        formatter.write_str(
+            "\"binary_log_loss\", \"squared_error\", \"multiclass_softmax\" or \"lambdarank\"",
+        )
     }
 
     fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>

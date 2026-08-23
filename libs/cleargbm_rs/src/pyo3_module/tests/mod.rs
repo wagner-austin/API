@@ -15,5 +15,6 @@ mod training_fns_tests;
 mod training_multiclass_entry_tests;
 mod training_objective_key_tests;
 mod training_options_tests;
+mod training_ranking_entry_tests;
 mod training_regression_entry_tests;
 mod training_weight_tests;

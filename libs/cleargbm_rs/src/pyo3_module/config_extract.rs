@@ -101,6 +101,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
     let colsample_bytree = propagate!(extract_colsample_bytree(dict));
     let categorical_features = propagate!(extract_categorical_features(dict));
     let n_classes = propagate!(extract_n_classes(dict));
+    let lambdarank_truncation_level = propagate!(extract_lambdarank_truncation_level(dict));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -123,6 +124,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
         colsample_bytree,
         categorical_features,
         n_classes,
+        lambdarank_truncation_level,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))
@@ -211,6 +213,37 @@ fn extract_n_classes(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
             return Err(ClearGbmError::InvalidParameter {
                 name: "n_classes".to_string(),
                 reason: "missing required key 'n_classes'".to_string(),
+            }
+            .into())
+        }
+    };
+
+    if item.is_none() {
+        return Ok(None);
+    }
+
+    let val: usize = propagate!(item.extract());
+    Ok(Some(val))
+}
+
+/// Extracts the optional NDCG truncation position from a config dict.
+///
+/// The key `"lambdarank_truncation_level"` is required to be present; its
+/// value may be `None` (every non-ranking objective) or an integer. Same
+/// presence contract as `n_classes`.
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing or the value is neither `None`
+/// nor an integer.
+fn extract_lambdarank_truncation_level(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
+    let opt = propagate!(dict.get_item("lambdarank_truncation_level"));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "lambdarank_truncation_level".to_string(),
+                reason: "missing required key 'lambdarank_truncation_level'".to_string(),
             }
             .into())
         }

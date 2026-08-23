@@ -32,6 +32,7 @@ const CONFIG_FIELDS: &[&str] = &[
     "colsample_bytree",
     "categorical_features",
     "n_classes",
+    "lambdarank_truncation_level",
 ];
 
 // =============================================================================
@@ -506,8 +507,9 @@ fn test_objective_visitor_expecting_names_both_spellings() -> Result<(), ClearGb
     use crate::testkit::test_expecting_write_success;
     use crate::training::serde_impl::ObjectiveVisitor;
 
-    // The message names both accepted spellings and is 37 bytes; 60 is ample.
-    match test_expecting_write_success(&ObjectiveVisitor, 60_usize) {
+    // The message names all four accepted spellings (~75 bytes); 120 is
+    // ample.
+    match test_expecting_write_success(&ObjectiveVisitor, 120_usize) {
         Ok(()) => Ok(()),
         Err(_) => Err(ClearGbmError::SerializationFailed {
             reason: "expecting() failed with a sufficient buffer".to_string(),

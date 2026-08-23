@@ -87,6 +87,10 @@ pub enum Objective {
     /// K-class classification under softmax cross-entropy: K trees per
     /// boosting round, one score column per class.
     MulticlassSoftmax,
+    /// Learning-to-rank under LambdaMART: per-query pair lambdas are the
+    /// gradient source, NDCG the evaluation metric, and the raw score the
+    /// ranking key. Training requires query group sizes as data.
+    LambdaRank,
 }
 
 impl Objective {
@@ -94,13 +98,15 @@ impl Objective {
     ///
     /// # Returns
     ///
-    /// `"binary_log_loss"`, `"squared_error"` or `"multiclass_softmax"`.
+    /// `"binary_log_loss"`, `"squared_error"`, `"multiclass_softmax"` or
+    /// `"lambdarank"`.
     #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::BinaryLogLoss => "binary_log_loss",
             Self::SquaredError => "squared_error",
             Self::MulticlassSoftmax => "multiclass_softmax",
+            Self::LambdaRank => "lambdarank",
         }
     }
 
@@ -108,8 +114,8 @@ impl Objective {
     ///
     /// # Args
     ///
-    /// * `value` - `"binary_log_loss"`, `"squared_error"` or
-    ///   `"multiclass_softmax"`.
+    /// * `value` - `"binary_log_loss"`, `"squared_error"`,
+    ///   `"multiclass_softmax"` or `"lambdarank"`.
     ///
     /// # Errors
     ///
@@ -119,11 +125,12 @@ impl Objective {
             "binary_log_loss" => Ok(Self::BinaryLogLoss),
             "squared_error" => Ok(Self::SquaredError),
             "multiclass_softmax" => Ok(Self::MulticlassSoftmax),
+            "lambdarank" => Ok(Self::LambdaRank),
             other => Err(ClearGbmError::InvalidParameter {
                 name: "objective".to_string(),
                 reason: format!(
-                    "expected \"binary_log_loss\", \"squared_error\" or \
-                     \"multiclass_softmax\", got {other:?}"
+                    "expected \"binary_log_loss\", \"squared_error\", \
+                     \"multiclass_softmax\" or \"lambdarank\", got {other:?}"
                 ),
             }),
         }

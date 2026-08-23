@@ -29,7 +29,7 @@ use crate::training::{Parallelism, TrainingRuntime};
 ///
 /// Returns `PyErr` if the array is non-contiguous or a value is negative
 /// or beyond `u32::MAX`.
-fn extract_class_labels(labels: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<u32>> {
+pub(super) fn extract_class_labels(labels: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<u32>> {
     let slice = propagate_into!(labels.as_slice());
     let mut result = Vec::with_capacity(slice.len());
     for &val in slice {

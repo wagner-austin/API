@@ -6,6 +6,7 @@
 //! (the LightGBM semantics).
 
 use super::super::feature_subsample::{select_split_features, FeatureSubsample};
+use crate::error::ClearGbmError;
 use crate::tree::{select_tree_features, tree_column_budget};
 
 // =============================================================================
@@ -13,7 +14,7 @@ use crate::tree::{select_tree_features, tree_column_budget};
 // =============================================================================
 
 #[test]
-fn test_tree_mask_enables_exactly_k_features() {
+fn test_tree_mask_enables_exactly_k_features() -> Result<(), ClearGbmError> {
     for k_tree in 1_usize..=10_usize {
         let mask = select_tree_features(42_u64, 0_usize, k_tree, 10_usize);
         assert_eq!(mask.len(), 10_usize);
@@ -23,17 +24,19 @@ fn test_tree_mask_enables_exactly_k_features() {
             "k_tree={k_tree} enabled {enabled} features"
         );
     }
+    Ok(())
 }
 
 #[test]
-fn test_tree_mask_is_a_pure_function_of_seed_and_round() {
+fn test_tree_mask_is_a_pure_function_of_seed_and_round() -> Result<(), ClearGbmError> {
     let first = select_tree_features(42_u64, 7_usize, 3_usize, 10_usize);
     let second = select_tree_features(42_u64, 7_usize, 3_usize, 10_usize);
     assert_eq!(first, second);
+    Ok(())
 }
 
 #[test]
-fn test_tree_mask_varies_across_rounds() {
+fn test_tree_mask_varies_across_rounds() -> Result<(), ClearGbmError> {
     // Each boosting round draws its own mask; a derivation that ignored the
     // round would give every tree the same columns, silently weakening the
     // regularizer to a one-time projection.
@@ -44,22 +47,25 @@ fn test_tree_mask_varies_across_rounds() {
         .iter()
         .any(|m| masks.first().is_some_and(|head| m != head));
     assert!(distinct, "eight rounds all drew the identical mask");
+    Ok(())
 }
 
 #[test]
-fn test_tree_mask_varies_across_seeds() {
+fn test_tree_mask_varies_across_seeds() -> Result<(), ClearGbmError> {
     let a = select_tree_features(42_u64, 0_usize, 4_usize, 12_usize);
     let b = select_tree_features(43_u64, 0_usize, 4_usize, 12_usize);
     assert_ne!(a, b, "different seeds drew the identical mask");
+    Ok(())
 }
 
 #[test]
-fn test_tree_mask_full_budget_enables_everything() {
+fn test_tree_mask_full_budget_enables_everything() -> Result<(), ClearGbmError> {
     // k_tree = n_features is reachable when floor(f * n) == n - 1 rounds up
     // through max(1, ..) on tiny feature counts; the mask must degrade to
     // all-true rather than dropping a column.
     let mask = select_tree_features(42_u64, 3_usize, 5_usize, 5_usize);
     assert!(mask.iter().all(|&b| b));
+    Ok(())
 }
 
 // =============================================================================
@@ -67,7 +73,7 @@ fn test_tree_mask_full_budget_enables_everything() {
 // =============================================================================
 
 #[test]
-fn test_split_draw_selects_within_the_tree_mask() {
+fn test_split_draw_selects_within_the_tree_mask() -> Result<(), ClearGbmError> {
     // With both axes active, every feature the node draws must come from the
     // tree's sampled set — the composition, not an independent draw.
     let tree_mask = select_tree_features(42_u64, 0_usize, 4_usize, 10_usize);
@@ -85,10 +91,11 @@ fn test_split_draw_selects_within_the_tree_mask() {
             );
         }
     }
+    Ok(())
 }
 
 #[test]
-fn test_split_budget_caps_at_the_tree_pool() {
+fn test_split_budget_caps_at_the_tree_pool() -> Result<(), ClearGbmError> {
     // max_features larger than the tree's sampled set cannot manufacture
     // columns: the draw keeps the whole pool and nothing more.
     let tree_mask = select_tree_features(42_u64, 0_usize, 3_usize, 10_usize);
@@ -98,10 +105,11 @@ fn test_split_budget_caps_at_the_tree_pool() {
     };
     let node_mask = select_split_features(subsample, 10_usize, 0_usize, Some(&tree_mask));
     assert_eq!(node_mask, tree_mask);
+    Ok(())
 }
 
 #[test]
-fn test_split_draw_without_tree_mask_uses_every_feature_as_pool() {
+fn test_split_draw_without_tree_mask_uses_every_feature_as_pool() -> Result<(), ClearGbmError> {
     // The colsample-off path: the candidate pool is all features, exactly
     // the pre-colsample derivation, so unrestricted training stays
     // bit-identical to the history before the axis existed.
@@ -112,6 +120,7 @@ fn test_split_draw_without_tree_mask_uses_every_feature_as_pool() {
     let mask = select_split_features(subsample, 10_usize, 5_usize, None);
     assert_eq!(mask.len(), 10_usize);
     assert_eq!(mask.iter().filter(|&&b| b).count(), 3_usize);
+    Ok(())
 }
 
 // =============================================================================
@@ -146,8 +155,7 @@ fn test_tree_column_budget_never_drops_below_one() -> Result<(), crate::error::C
 }
 
 #[test]
-fn test_tree_column_budget_rejects_feature_counts_beyond_u32(
-) -> Result<(), crate::error::ClearGbmError> {
+fn test_tree_column_budget_rejects_counts_beyond_u32() -> Result<(), crate::error::ClearGbmError> {
     // The same ceiling row subsampling imposes on n_samples: the mask math
     // runs in u32-derived f64 space, so a wider count must error, not wrap.
     match tree_column_budget(0.5_f64, usize::MAX) {

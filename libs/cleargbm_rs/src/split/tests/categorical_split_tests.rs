@@ -38,7 +38,7 @@ fn fill_bin(
 // =============================================================================
 
 #[test]
-fn test_bin_set_insert_contains_and_order() {
+fn test_bin_set_insert_contains_and_order() -> Result<(), ClearGbmError> {
     let mut set = CategoryBinSet::new();
     assert!(set.is_empty());
     set.insert(200_usize);
@@ -48,10 +48,11 @@ fn test_bin_set_insert_contains_and_order() {
     assert!(set.contains(3_usize) && set.contains(64_usize) && set.contains(200_usize));
     assert!(!set.contains(4_usize));
     assert_eq!(set.bins(), vec![3_usize, 64_usize, 200_usize]);
+    Ok(())
 }
 
 #[test]
-fn test_bin_set_ignores_out_of_range_bins() {
+fn test_bin_set_ignores_out_of_range_bins() -> Result<(), ClearGbmError> {
     // Bins at or above 256 are unrepresentable by the u8 invariant; insert
     // ignores them and contains reports false rather than indexing outside
     // the mask.
@@ -60,6 +61,7 @@ fn test_bin_set_ignores_out_of_range_bins() {
     set.insert(1_000_usize);
     assert!(set.is_empty());
     assert!(!set.contains(256_usize));
+    Ok(())
 }
 
 // =============================================================================

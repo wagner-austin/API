@@ -21,7 +21,7 @@ impl Serialize for GradientBoostingConfig {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 20) {
+        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 21) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -108,6 +108,13 @@ impl Serialize for GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match state.serialize_field(
+            "lambdarank_truncation_level",
+            &self.lambdarank_truncation_level(),
+        ) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
         state.end()
     }
 }
@@ -158,6 +165,8 @@ pub(crate) enum GradientBoostingConfigField {
     CategoricalFeatures,
     /// The class count (optional).
     NClasses,
+    /// The NDCG truncation position (optional).
+    LambdarankTruncationLevel,
 }
 
 /// Visitor for deserializing `GradientBoostingConfigField` from string.
@@ -198,6 +207,9 @@ impl<'de> Visitor<'de> for GradientBoostingConfigFieldVisitor {
             "colsample_bytree" => Ok(GradientBoostingConfigField::ColsampleBytree),
             "categorical_features" => Ok(GradientBoostingConfigField::CategoricalFeatures),
             "n_classes" => Ok(GradientBoostingConfigField::NClasses),
+            "lambdarank_truncation_level" => {
+                Ok(GradientBoostingConfigField::LambdarankTruncationLevel)
+            }
             _ => Err(E::unknown_field(value, GRADIENT_BOOSTING_CONFIG_FIELDS)),
         }
     }
@@ -234,6 +246,7 @@ const GRADIENT_BOOSTING_CONFIG_FIELDS: &[&str] = &[
     "colsample_bytree",
     "categorical_features",
     "n_classes",
+    "lambdarank_truncation_level",
 ];
 
 impl<'de> Deserialize<'de> for GradientBoostingConfig {
@@ -274,6 +287,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                 let mut colsample_bytree: Option<Option<f64>> = None;
                 let mut categorical_features: Option<Option<Vec<usize>>> = None;
                 let mut n_classes: Option<Option<usize>> = None;
+                let mut lambdarank_truncation_level: Option<Option<usize>> = None;
 
                 loop {
                     let key: Option<GradientBoostingConfigField> = match map.next_key() {
@@ -405,6 +419,12 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                                 Err(e) => return Err(e),
                             });
                         }
+                        GradientBoostingConfigField::LambdarankTruncationLevel => {
+                            lambdarank_truncation_level = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
                     }
                 }
 
@@ -488,6 +508,10 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("n_classes")),
                 };
+                let lambdarank_truncation_level = match lambdarank_truncation_level {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("lambdarank_truncation_level")),
+                };
 
                 let params = GradientBoostingConfigParams {
                     n_estimators,
@@ -510,6 +534,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     colsample_bytree,
                     categorical_features,
                     n_classes,
+                    lambdarank_truncation_level,
                 };
                 match GradientBoostingConfig::new(params) {
                     Ok(cfg) => Ok(cfg),

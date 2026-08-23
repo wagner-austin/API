@@ -7,7 +7,7 @@ use crate::split::CategoryBinSet;
 use crate::tree::CategoricalLayout;
 
 #[test]
-fn test_layout_reports_category_counts() {
+fn test_layout_reports_category_counts() -> Result<(), ClearGbmError> {
     let layout = CategoricalLayout::new(vec![
         None,
         Some(vec![0.0_f64, 3.0_f64, 9.0_f64]),
@@ -17,6 +17,7 @@ fn test_layout_reports_category_counts() {
     assert_eq!(layout.n_categories(1_usize), Some(3_usize));
     assert_eq!(layout.n_categories(2_usize), Some(1_usize));
     assert_eq!(layout.n_categories(9_usize), None);
+    Ok(())
 }
 
 #[test]

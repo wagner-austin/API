@@ -23,6 +23,7 @@ pub(crate) mod setup;
 pub(crate) mod subsampling;
 mod train;
 mod train_multiclass;
+mod train_ranking;
 pub(crate) mod validation;
 
 #[cfg(test)]
@@ -34,3 +35,6 @@ pub use labels::{TrainingLabels, ValidationData};
 pub use model::GradientBoostingModel;
 pub use parallelism::Parallelism;
 pub use train::{train_gradient_boosting, TrainingRuntime};
+pub use train_ranking::{
+    train_gradient_boosting_ranking, RankingTrainingData, RankingValidationData,
+};

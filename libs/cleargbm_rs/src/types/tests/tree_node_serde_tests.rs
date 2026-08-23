@@ -474,17 +474,18 @@ fn test_tree_node_serialize_fail_on_end() -> Result<(), ClearGbmError> {
 }
 
 #[test]
-fn test_tree_node_deserialize_wrong_categories_type() {
+fn test_tree_node_deserialize_wrong_categories_type() -> Result<(), ClearGbmError> {
     use crate::testkit::WrongValueDeserializer;
     use serde::Deserialize;
 
     let deser = WrongValueDeserializer::new("categories_goes_left");
     let result = TreeNode::deserialize(deser);
     assert!(result.is_err());
+    Ok(())
 }
 
 #[test]
-fn test_tree_node_deserialize_missing_categories_field() {
+fn test_tree_node_deserialize_missing_categories_field() -> Result<(), ClearGbmError> {
     // Nine complete fields but no categories_goes_left: pre-categorical
     // node payloads are rejected, not silently read as numeric.
     let json = r#"{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":100,"left_child":null,"right_child":null,"nan_goes_left":true}"#;
@@ -497,4 +498,5 @@ fn test_tree_node_deserialize_missing_categories_field() {
         err_text.contains("categories_goes_left"),
         "a payload without categories_goes_left must be rejected, got: {err_text:?}"
     );
+    Ok(())
 }

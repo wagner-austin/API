@@ -245,7 +245,7 @@ fn test_resolve_validates_continuous_val_label_content() -> Result<(), ClearGbmE
 }
 
 #[test]
-fn test_validation_data_debug_and_copy() {
+fn test_validation_data_debug_and_copy() -> Result<(), ClearGbmError> {
     let x_rows: Vec<Vec<f64>> = vec![vec![0.5_f64]];
     let x: Vec<&[f64]> = x_rows.iter().map(Vec::as_slice).collect();
     let y = [1_u8];
@@ -257,6 +257,7 @@ fn test_validation_data_debug_and_copy() {
     let copy = val;
     let debug = format!("{copy:?}");
     assert!(debug.contains("ValidationData"));
+    Ok(())
 }
 
 // =============================================================================
@@ -339,7 +340,7 @@ fn test_binary_objective_rejects_continuous_val_labels() -> Result<(), ClearGbmE
 }
 
 #[test]
-fn test_labels_len_and_is_empty() {
+fn test_labels_len_and_is_empty() -> Result<(), ClearGbmError> {
     let binary = TrainingLabels::Binary(&[0_u8, 1_u8]);
     assert_eq!(binary.len(), 2_usize);
     assert!(!binary.is_empty());
@@ -349,13 +350,15 @@ fn test_labels_len_and_is_empty() {
     let debug = format!("{binary:?} {continuous:?}");
     assert!(debug.contains("Binary"));
     assert!(debug.contains("Continuous"));
+    Ok(())
 }
 
 #[test]
-fn test_growth_strategy_debug_format() {
+fn test_growth_strategy_debug_format() -> Result<(), ClearGbmError> {
     // Keeps the derive covered without a dedicated serde path.
     let debug = format!("{:?}", GrowthStrategy::LeafWise);
     assert!(debug.contains("LeafWise"));
+    Ok(())
 }
 
 #[test]
@@ -453,8 +456,7 @@ fn test_resolve_multiclass_pairing_arms() -> Result<(), ClearGbmError> {
 }
 
 #[test]
-fn test_resolve_multiclass_ok_and_single_score_rejects_multiclass_labels(
-) -> Result<(), ClearGbmError> {
+fn test_resolve_multiclass_ok_and_single_score_rejects_mc_labels() -> Result<(), ClearGbmError> {
     // A clean multiclass resolution carries everything through.
     let y_mc = [0_u32, 2_u32, 1_u32];
     let resolved = propagate!(resolve_objective(

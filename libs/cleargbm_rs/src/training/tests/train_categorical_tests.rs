@@ -332,8 +332,7 @@ fn test_rejects_non_integer_values_in_a_categorical_column() -> Result<(), Clear
 }
 
 #[test]
-fn test_numeric_features_keep_their_constraints_beside_a_categorical_one(
-) -> Result<(), ClearGbmError> {
+fn test_numeric_features_keep_constraints_beside_a_categorical() -> Result<(), ClearGbmError> {
     // Constraints and the categorical axis coexist as long as no
     // categorical feature is itself constrained: the numeric feature's
     // constraint stands, the categorical feature trains unconstrained.

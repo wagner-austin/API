@@ -32,6 +32,7 @@ pub(super) fn default_params() -> GradientBoostingConfigParams {
         colsample_bytree: None,
         categorical_features: None,
         n_classes: None,
+        lambdarank_truncation_level: None,
     }
 }
 
@@ -198,6 +199,11 @@ fn test_objective_wire_spellings_round_trip() -> Result<(), ClearGbmError> {
         propagate!(Objective::from_wire("squared_error")),
         Objective::SquaredError
     );
+    assert_eq!(Objective::LambdaRank.as_str(), "lambdarank");
+    assert_eq!(
+        propagate!(Objective::from_wire("lambdarank")),
+        Objective::LambdaRank
+    );
     Ok(())
 }
 
@@ -334,4 +340,109 @@ fn test_config_scale_pos_weight_getter() -> Result<(), ClearGbmError> {
     };
     assert_eq!(config.scale_pos_weight(), Some(2.5_f64));
     Ok(())
+}
+// =============================================================================
+// The lambdarank_truncation_level pairing
+// =============================================================================
+
+/// Default valid lambdarank params for the pairing tests.
+fn ranking_params() -> GradientBoostingConfigParams {
+    let mut params = default_params();
+    params.objective = Objective::LambdaRank;
+    params.scale_pos_weight = None;
+    params.lambdarank_truncation_level = Some(10_usize);
+    params
+}
+
+#[test]
+fn test_config_lambdarank_pairing_accepts_and_reads_back() -> Result<(), ClearGbmError> {
+    let config = propagate!(GradientBoostingConfig::new(ranking_params()));
+    assert_eq!(config.objective(), Objective::LambdaRank);
+    assert_eq!(config.lambdarank_truncation_level(), Some(10_usize));
+    Ok(())
+}
+
+#[test]
+fn test_config_rejects_lambdarank_without_a_truncation_level() -> Result<(), ClearGbmError> {
+    let mut params = ranking_params();
+    params.lambdarank_truncation_level = None;
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected the missing-truncation refusal".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "lambdarank_truncation_level");
+            assert!(reason.contains("must be set"), "{reason}");
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_config_rejects_a_zero_truncation_level() -> Result<(), ClearGbmError> {
+    let mut params = ranking_params();
+    params.lambdarank_truncation_level = Some(0_usize);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected the zero-truncation refusal".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "lambdarank_truncation_level");
+            assert!(reason.contains(">= 1"), "{reason}");
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_config_rejects_a_truncation_level_under_other_objectives() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.lambdarank_truncation_level = Some(10_usize);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected the decorative-truncation refusal".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "lambdarank_truncation_level");
+            assert!(reason.contains("binary_log_loss"), "{reason}");
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_config_rejects_a_class_weight_under_lambdarank() -> Result<(), ClearGbmError> {
+    let mut params = ranking_params();
+    params.scale_pos_weight = Some(2.0_f64);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected the weight refusal".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "scale_pos_weight");
+            assert!(reason.contains("sample_weight"), "{reason}");
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_config_rejects_a_class_count_under_lambdarank() -> Result<(), ClearGbmError> {
+    let mut params = ranking_params();
+    params.n_classes = Some(3_usize);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected the class-count refusal".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "n_classes");
+            assert!(reason.contains("lambdarank"), "{reason}");
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
 }

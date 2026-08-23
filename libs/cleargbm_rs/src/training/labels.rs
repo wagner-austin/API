@@ -328,6 +328,16 @@ pub(crate) fn resolve_objective<'a>(
                 val,
             }))
         }
+        // Ranking cannot resolve here: lambdas are computed per query, and
+        // this entry carries no query groups. The ranking trainer owns its
+        // own resolution (`train_gradient_boosting_ranking`), so the generic
+        // entry names it instead of half-training a groupless ranking.
+        Objective::LambdaRank => Err(ClearGbmError::InvalidParameter {
+            name: "objective".to_string(),
+            reason: "\"lambdarank\" requires query groups; use \
+                     train_gradient_boosting_ranking, which takes them as data"
+                .to_string(),
+        }),
         Objective::SquaredError => {
             let yt = match y_train {
                 TrainingLabels::Continuous(y) => y,

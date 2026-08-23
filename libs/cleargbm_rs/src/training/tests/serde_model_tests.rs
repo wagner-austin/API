@@ -368,13 +368,14 @@ fn test_model_wire_rejects_base_score_mismatches() -> Result<(), ClearGbmError> 
 }
 
 #[test]
-fn test_model_deserialize_wrong_class_base_type() {
+fn test_model_deserialize_wrong_class_base_type() -> Result<(), ClearGbmError> {
     use crate::testkit::WrongValueDeserializer;
     use serde::Deserialize;
 
     let deser = WrongValueDeserializer::new("class_base_predictions");
     let result = GradientBoostingModel::deserialize(deser);
     assert!(result.is_err());
+    Ok(())
 }
 
 #[test]

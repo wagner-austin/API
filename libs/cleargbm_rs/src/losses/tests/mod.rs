@@ -8,6 +8,7 @@
 //! - `sigmoid_array_tests`: Tests for vectorized sigmoid
 
 mod initial_prediction_tests;
+mod lambdarank_tests;
 mod loss_tests;
 mod multiclass_tests;
 mod sigmoid_array_tests;

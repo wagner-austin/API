@@ -114,9 +114,11 @@ impl GradientBoostingModel {
                 }
                 BaseScore::PerClass(v)
             }
-            (Objective::BinaryLogLoss | Objective::SquaredError, Some(b), None) => {
-                BaseScore::Single(b)
-            }
+            (
+                Objective::BinaryLogLoss | Objective::SquaredError | Objective::LambdaRank,
+                Some(b),
+                None,
+            ) => BaseScore::Single(b),
             (objective, bp, cbp) => {
                 return Err(ClearGbmError::InvalidParameter {
                     name: "base_prediction".to_string(),
@@ -127,7 +129,9 @@ impl GradientBoostingModel {
                         match objective {
                             Objective::MulticlassSoftmax =>
                                 "null base_prediction plus per-class scores",
-                            Objective::BinaryLogLoss | Objective::SquaredError =>
+                            Objective::BinaryLogLoss
+                            | Objective::SquaredError
+                            | Objective::LambdaRank =>
                                 "a scalar base_prediction and null per-class scores",
                         },
                         match bp {
@@ -199,7 +203,8 @@ impl GradientBoostingModel {
     ///
     /// Under `binary_log_loss` the raw score is a log-odds; under
     /// `squared_error` it IS the prediction — regression inference is this
-    /// function.
+    /// function; under `lambdarank` it is the ranking key — documents sort
+    /// by it, descending.
     ///
     /// # Args
     ///
@@ -275,6 +280,15 @@ impl GradientBoostingModel {
                     name: "objective".to_string(),
                     reason: "predict_proba is binary; a \"multiclass_softmax\" model has one \
                              probability per class, so use predict_proba_multiclass"
+                        .to_string(),
+                })
+            }
+            Objective::LambdaRank => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "objective".to_string(),
+                    reason: "predict_proba requires objective \"binary_log_loss\"; a \
+                             \"lambdarank\" model's raw scores are ranking keys, not \
+                             log-odds, so use predict_raw"
                         .to_string(),
                 })
             }

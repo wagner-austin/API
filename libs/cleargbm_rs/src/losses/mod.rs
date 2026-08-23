@@ -27,6 +27,7 @@ pub(crate) mod validation;
 #[cfg(test)]
 mod tests;
 
+pub(crate) mod lambdarank;
 pub mod multiclass;
 
 pub use initial_prediction::binary_log_loss_initial_prediction;

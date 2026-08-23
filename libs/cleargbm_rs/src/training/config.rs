@@ -72,6 +72,11 @@ pub struct GradientBoostingConfigParams {
     /// `None` under every other objective, which has no class count to
     /// state.
     pub n_classes: Option<usize>,
+    /// NDCG truncation position, paired with the objective: must be
+    /// `Some(k)` with `k >= 1` under `LambdaRank` (it bounds the outer pair
+    /// loop and the max-DCG normalizer) and `None` under every other
+    /// objective, which has no ranking cutoff to state.
+    pub lambdarank_truncation_level: Option<usize>,
 }
 
 /// Configuration for gradient boosting training.
@@ -121,6 +126,9 @@ pub struct GradientBoostingConfig {
     categorical_features: Option<Vec<usize>>,
     /// Class count, present exactly when `objective` is `MulticlassSoftmax`.
     n_classes: Option<usize>,
+    /// NDCG truncation position, present exactly when `objective` is
+    /// `LambdaRank`.
+    lambdarank_truncation_level: Option<usize>,
 }
 
 impl GradientBoostingConfig {
@@ -155,6 +163,7 @@ impl GradientBoostingConfig {
             colsample_bytree,
             categorical_features,
             n_classes,
+            lambdarank_truncation_level,
         } = params;
 
         if n_estimators < 1_usize {
@@ -269,6 +278,16 @@ impl GradientBoostingConfig {
                 })
             }
             (Objective::MulticlassSoftmax, None) => {}
+            (Objective::LambdaRank, Some(w)) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "scale_pos_weight".to_string(),
+                    reason: format!(
+                        "must be unset when objective is \"lambdarank\" (got {w}); ranking \
+                         weighs rows via sample_weight, not a two-class ratio"
+                    ),
+                })
+            }
+            (Objective::LambdaRank, None) => {}
         }
         // `n_classes` is paired with the objective the same way: stated
         // exactly when softmax needs it, never carried decoratively.
@@ -287,7 +306,10 @@ impl GradientBoostingConfig {
                     });
                 }
             }
-            (Objective::BinaryLogLoss | Objective::SquaredError, Some(k)) => {
+            (
+                Objective::BinaryLogLoss | Objective::SquaredError | Objective::LambdaRank,
+                Some(k),
+            ) => {
                 return Err(ClearGbmError::InvalidParameter {
                     name: "n_classes".to_string(),
                     reason: format!(
@@ -297,7 +319,43 @@ impl GradientBoostingConfig {
                     ),
                 })
             }
-            (Objective::BinaryLogLoss | Objective::SquaredError, None) => {}
+            (Objective::BinaryLogLoss | Objective::SquaredError | Objective::LambdaRank, None) => {}
+        }
+        // `lambdarank_truncation_level` is paired with the objective the
+        // same way: it bounds the ranking pair loop and the max-DCG
+        // normalizer, so it exists exactly when there is a ranking to cut.
+        match (objective, lambdarank_truncation_level) {
+            (Objective::LambdaRank, None) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "lambdarank_truncation_level".to_string(),
+                    reason: "must be set when objective is \"lambdarank\"".to_string(),
+                })
+            }
+            (Objective::LambdaRank, Some(k)) => {
+                if k < 1_usize {
+                    return Err(ClearGbmError::InvalidParameter {
+                        name: "lambdarank_truncation_level".to_string(),
+                        reason: format!("must be >= 1, got {k}"),
+                    });
+                }
+            }
+            (
+                Objective::BinaryLogLoss | Objective::SquaredError | Objective::MulticlassSoftmax,
+                Some(k),
+            ) => {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "lambdarank_truncation_level".to_string(),
+                    reason: format!(
+                        "must be unset when objective is \"{}\" (got {k}); only \
+                         \"lambdarank\" states a truncation position",
+                        objective.as_str()
+                    ),
+                })
+            }
+            (
+                Objective::BinaryLogLoss | Objective::SquaredError | Objective::MulticlassSoftmax,
+                None,
+            ) => {}
         }
         if let Some(k) = max_features {
             if k < 1_usize {
@@ -394,6 +452,7 @@ impl GradientBoostingConfig {
             colsample_bytree,
             categorical_features,
             n_classes,
+            lambdarank_truncation_level,
         })
     }
 
@@ -509,6 +568,13 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn n_classes(&self) -> Option<usize> {
         self.n_classes
+    }
+
+    /// Returns the NDCG truncation position (present exactly under
+    /// `LambdaRank`).
+    #[must_use]
+    pub fn lambdarank_truncation_level(&self) -> Option<usize> {
+        self.lambdarank_truncation_level
     }
 
     /// Returns the leaf budget, set exactly under `LeafWise` growth.

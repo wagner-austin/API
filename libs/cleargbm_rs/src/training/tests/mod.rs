@@ -18,6 +18,7 @@ mod train_knob_tests;
 mod train_multiclass_edge_tests;
 mod train_multiclass_tests;
 mod train_nan_tests;
+mod train_ranking_tests;
 mod train_regression_tests;
 mod train_tests;
 mod train_weight_tests;

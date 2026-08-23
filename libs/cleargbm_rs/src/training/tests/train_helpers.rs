@@ -72,6 +72,7 @@ pub(super) fn default_params() -> GradientBoostingConfigParams {
         colsample_bytree: None,
         categorical_features: None,
         n_classes: None,
+        lambdarank_truncation_level: None,
     }
 }
 

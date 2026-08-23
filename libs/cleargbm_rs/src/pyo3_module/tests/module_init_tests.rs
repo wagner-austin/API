@@ -327,3 +327,85 @@ fn test_module_registers_the_multiclass_surface() -> Result<(), ClearGbmError> {
         Ok(())
     })
 }
+#[test]
+fn test_module_registers_the_ranking_surface() -> Result<(), ClearGbmError> {
+    // The ranking registration is callable through the module object
+    // itself: train on a two-query corpus, then score with predict_raw.
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let module = match init_module(py) {
+            Ok(m) => m,
+            Err(e) => return Err(e),
+        };
+        let x_rows = vec![
+            vec![0.0_f64, 0.0_f64],
+            vec![1.0_f64, 0.0_f64],
+            vec![2.0_f64, 0.0_f64],
+            vec![0.1_f64, 0.0_f64],
+            vec![1.1_f64, 0.0_f64],
+            vec![2.1_f64, 0.0_f64],
+        ];
+        let x_train = match numpy::PyArray2::from_vec2(py, &x_rows) {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("PyArray2 creation failed: {e}"))),
+        };
+        let y_train = numpy::PyArray1::from_vec(py, vec![0_i64, 1, 2, 0, 1, 2]);
+        let group = numpy::PyArray1::from_vec(py, vec![3_i64, 3_i64]);
+        let config = match make_config_dict(py) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        match set_config_str(&config, "objective", "lambdarank") {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        };
+        match config.set_item("scale_pos_weight", py.None()) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match config.set_item("lambdarank_truncation_level", 3_i64) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match config.set_item("max_bins", 16_i64) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let names = match pyo3::types::PyList::new(py, ["f0", "f1"]) {
+            Ok(l) => l,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+
+        let train_func = match module.getattr("train_gradient_boosting_ranking_rs") {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("getattr failed: {e}"))),
+        };
+        let features_again = match numpy::PyArray2::from_vec2(py, &x_rows) {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("PyArray2 creation failed: {e}"))),
+        };
+        let model = match train_func.call1((
+            x_train,
+            y_train,
+            group,
+            py.None(),
+            py.None(),
+            py.None(),
+            py.None(),
+            config,
+            names,
+        )) {
+            Ok(m) => m,
+            Err(e) => return Err(fail(format!("training call failed: {e}"))),
+        };
+
+        let score_func = match module.getattr("predict_raw_model_rs") {
+            Ok(f) => f,
+            Err(e) => return Err(fail(format!("getattr predict_raw failed: {e}"))),
+        };
+        match score_func.call1((model, features_again)) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(fail(format!("predict_raw call failed: {e}"))),
+        }
+    })
+}

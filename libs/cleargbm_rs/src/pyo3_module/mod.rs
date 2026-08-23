@@ -28,6 +28,7 @@
 //! - [`config_extract`] — Config-dict extraction for the training entries
 //! - [`training_fns`] — Training entries (binary + regression) and prediction
 //! - [`training_multiclass_fns`] — The multiclass entry and its predict trio
+//! - [`training_ranking_fns`] — The LambdaMART ranking entry
 //! - [`entry_args`] — Positional-argument unpacking for the registrations
 //! - [`model_fns`] — The [`PyGbmModel`] class + model serde + importances
 
@@ -38,6 +39,7 @@ mod error_conversion;
 pub(crate) mod model_fns;
 pub(crate) mod training_fns;
 pub(crate) mod training_multiclass_fns;
+pub(crate) mod training_ranking_fns;
 
 #[cfg(test)]
 mod tests;
@@ -205,6 +207,17 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"Predict class labels (argmax) using a trained multiclass model."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
                 entry_args::predict_class_model_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"train_gradient_boosting_ranking_rs"),
+            Some(c"Train a LambdaMART ranking model on query-grouped data."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                entry_args::train_gradient_boosting_ranking_from_args(args)
             },
         )
     })
