@@ -63,12 +63,13 @@ The primary operator of this library is an AI session. Therefore:
 
 ## The roadmap (phases, dependency-ordered)
 
-- **P1 — Objective abstraction + regression.** An `Objective` enum in the
-  core (binary log loss, squared error first; quantile/Huber next) behind
-  one seam: init, gradient/hessian, eval loss, prediction transform.
-  Unlocks weather, RustedWarfare value models, metabolomics/BVOC — most of
-  the operator's named domains are continuous targets. Everything later
-  (multiclass, ranking, custom-menu objectives) rides this seam.
+- **P1 — Objective abstraction + regression.** DONE 2026-08-22 — see
+  [[cleargbm-objective-seam]]. The `Objective` enum (binary log loss,
+  squared error) landed behind one seam; the binary path proved
+  byte-identical (56/56 manifest values), and ClearGBM's first regression
+  benchmark entry LEADS both opponents on financial_distress (RMSE 1.8023
+  vs xgboost 1.8291, lightgbm 1.8637) at the fastest wall clock.
+  Quantile/Huber remain future menu additions on the same seam.
 - **P2 — Per-row sample weights.** Generalizes `scale_pos_weight` (class
   weight becomes the special case it always was), and is the prerequisite
   for GOSS and ranking. Also the honest way to encode instrument/measurement
