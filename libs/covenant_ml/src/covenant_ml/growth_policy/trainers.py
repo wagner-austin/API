@@ -225,6 +225,7 @@ class ClearGbmAnchorTrainer:
             "min_samples_split": 2,
             "min_samples_leaf": self._config["min_leaf"],
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": self._config["max_bins"],
             "subsample": 1.0,
             "random_state": seed,

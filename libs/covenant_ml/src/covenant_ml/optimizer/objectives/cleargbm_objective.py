@@ -91,6 +91,7 @@ def _build_trial_config(
         min_samples_split=int_params.get("min_samples_split", 10),
         min_samples_leaf=int_params.get("min_samples_leaf", 5),
         max_features=None,
+        colsample_bytree=None,
         max_bins=int_params.get("max_bins", 64),
         subsample=float_params.get("subsample", 1.0),
         random_state=random_state,

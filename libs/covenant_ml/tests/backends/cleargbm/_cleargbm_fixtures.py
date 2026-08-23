@@ -66,6 +66,7 @@ def _make_cleargbm_config(
         "min_samples_split": 2,
         "min_samples_leaf": 1,
         "max_features": None,
+        "colsample_bytree": None,
         "max_bins": 64,
         "subsample": 1.0,
         "train_ratio": 0.6,

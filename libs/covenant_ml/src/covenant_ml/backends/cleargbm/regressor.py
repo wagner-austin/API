@@ -216,6 +216,7 @@ class ClearGBMRegressorBackend:
             min_samples_split=cfg["min_samples_split"],
             min_samples_leaf=cfg["min_samples_leaf"],
             max_features=_resolve_max_features(cfg["max_features"], n_feats),
+            colsample_bytree=cfg["colsample_bytree"],
             max_bins=cfg["max_bins"],
             subsample=cfg["subsample"],
             random_state=cfg["random_state"],

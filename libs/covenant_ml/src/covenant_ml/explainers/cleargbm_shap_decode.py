@@ -235,6 +235,7 @@ def _decode_rust_config(raw: JSONValue) -> GradientBoostingConfig:
         # Read from the payload: the serialized config records the budget
         # the model actually trained under.
         max_features=_optional_int(cfg.get("max_features")),
+        colsample_bytree=_optional_float(cfg.get("colsample_bytree")),
         max_bins=narrow_json_to_int(cfg["max_bins"]),
         subsample=narrow_json_to_float(cfg["subsample"]),
         random_state=narrow_json_to_int(cfg["random_state"]),

@@ -68,6 +68,7 @@ def _train_native_binary_model(
         "min_samples_split": 4,
         "min_samples_leaf": 2,
         "max_features": None,
+        "colsample_bytree": None,
         "max_bins": 8,
         "subsample": 1.0,
         "random_state": random_state,

@@ -467,3 +467,4 @@ class TestBuildTrialConfig:
         assert config["growth_strategy"] == "depth_wise"
         assert config["num_leaves"] is None
         assert config["max_features"] is None
+        assert config["colsample_bytree"] is None
