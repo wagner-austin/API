@@ -27,6 +27,8 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from hpc3.contracts.provenance import encode_provenance, require_provenance
+
 SHA256_HEX_LENGTH = 64
 
 _HEX_DIGITS = frozenset("0123456789abcdef")
@@ -59,10 +61,16 @@ class StageManifest(TypedDict):
         destination: Absolute directory on the cluster receiving the files.
         files: The files to place. Never empty -- a manifest describing no
             file describes no staging.
+        provenance: Where these bytes came from, as free-form key/value pairs.
+            Required and never empty. The digests below prove the bytes on the
+            cluster are the bytes named here; only this says what "here" is,
+            and a manifest that cannot answer that is the one worth refusing.
+            See :mod:`hpc3.contracts.provenance`.
     """
 
     destination: str
     files: list[StagedFile]
+    provenance: dict[str, str]
 
 
 def _require_object(value: JSONValue, what: str) -> dict[str, JSONValue]:
@@ -214,6 +222,7 @@ def encode_stage_manifest(manifest: StageManifest) -> dict[str, JSONValue]:
     return {
         "destination": manifest["destination"],
         "files": files,
+        "provenance": encode_provenance(manifest["provenance"]),
     }
 
 
@@ -244,6 +253,7 @@ def decode_stage_manifest(value: JSONValue) -> StageManifest:
     return StageManifest(
         destination=_require_absolute_posix_dir(obj, "destination"),
         files=files,
+        provenance=require_provenance(obj, "provenance"),
     )
 
 

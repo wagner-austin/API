@@ -42,7 +42,9 @@ from hpc3.contracts.cluster import (
     require_gpu_type,
     require_partition,
 )
+from hpc3.contracts.experiment import encode_experiment, require_experiment
 from hpc3.contracts.layout import require_project
+from hpc3.contracts.pins import encode_pinned_packages, require_pinned_packages
 
 PREEMPTION_PROTECTION_THRESHOLD_MINUTES = 60
 """Above this, a preemptible job must carry requeue and checkpointing.
@@ -78,6 +80,16 @@ class JobSpec(TypedDict):
             for any partition whose QOS charges.
         env_path: Absolute path on the cluster to a directory with a ``bin``
             holding the payload's interpreter or binary.
+        pinned_packages: Distribution versions that environment must actually
+            contain. Checked at preflight against the environment's own
+            report, because a path proves the directory exists and nothing
+            about what is in it. Empty means the project declared no pins.
+        experiment: What this run IS, as free-form key/value pairs -- the
+            corpus digest it trains on, its seed, the model it starts from.
+            Required and never empty, and carried into the ledger, because a
+            job id and a name say which row in ``squeue`` this was and nothing
+            about which result it produced. See
+            :mod:`hpc3.contracts.experiment`.
         command: Payload to run, executed with that ``bin`` already on PATH.
     """
 
@@ -93,6 +105,8 @@ class JobSpec(TypedDict):
     checkpoint_steps: int
     accept_billing: bool
     env_path: str
+    pinned_packages: dict[str, str]
+    experiment: dict[str, str]
     command: str
 
 
@@ -255,6 +269,8 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
         "checkpoint_steps": spec["checkpoint_steps"],
         "accept_billing": spec["accept_billing"],
         "env_path": spec["env_path"],
+        "pinned_packages": encode_pinned_packages(spec["pinned_packages"]),
+        "experiment": encode_experiment(spec["experiment"]),
         "command": spec["command"],
     }
 
@@ -312,6 +328,8 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
         checkpoint_steps=checkpoint_steps,
         accept_billing=accept_billing,
         env_path=_require_nonempty_str(value, "env_path"),
+        pinned_packages=require_pinned_packages(value, "pinned_packages"),
+        experiment=require_experiment(value, "experiment"),
         command=_require_nonempty_str(value, "command"),
     )
 

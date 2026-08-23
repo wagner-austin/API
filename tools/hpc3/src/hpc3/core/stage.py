@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import pathlib
 
+from hpc3.contracts.provenance import format_provenance
 from hpc3.contracts.stage import StagedFile, StageManifest
 from hpc3.core import audit, digest, remote
 
@@ -73,7 +74,12 @@ def stage_manifest(host: str, source_dir: pathlib.Path, manifest: StageManifest)
     ]
     # Logged only after every file verified on the cluster: an event emitted
     # per file would record a partial stage as a sequence of successes.
-    audit.files_staged(host=host, destination=manifest["destination"], count=len(placed))
+    audit.files_staged(
+        host=host,
+        destination=manifest["destination"],
+        count=len(placed),
+        provenance=format_provenance(manifest["provenance"]),
+    )
     return placed
 
 

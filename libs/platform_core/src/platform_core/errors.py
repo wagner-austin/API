@@ -191,6 +191,7 @@ class Hpc3ErrorCode(ErrorCodeBase):
     # Staging -- the bytes a run is entitled to read.
     DIGEST_MISMATCH = "DIGEST_MISMATCH"
     MANIFEST_FILE_MISSING = "MANIFEST_FILE_MISSING"
+    STAGED_DIGEST_UNEXPECTED = "STAGED_DIGEST_UNEXPECTED"
 
     # Budget -- our own share of a shared machine, capped before and during.
     BUDGET_PROJECTION_EXCEEDED = "BUDGET_PROJECTION_EXCEEDED"
@@ -200,6 +201,8 @@ class Hpc3ErrorCode(ErrorCodeBase):
     PREFLIGHT_REJECTED = "PREFLIGHT_REJECTED"
     PREFLIGHT_UNPARSABLE = "PREFLIGHT_UNPARSABLE"
     ENV_PATH_MISSING = "ENV_PATH_MISSING"
+    ENV_PACKAGE_MISMATCH = "ENV_PACKAGE_MISMATCH"
+    ENV_PROBE_UNREADABLE = "ENV_PROBE_UNREADABLE"
 
     # Workspace configuration -- the one document every command reads.
     WORKSPACE_PROJECT_UNKNOWN = "WORKSPACE_PROJECT_UNKNOWN"

@@ -41,6 +41,9 @@ def _record(name: str, payload: bytes) -> StagedFile:
     )
 
 
+_PROVENANCE = {"wiki_commit": "176bb8c", "emitter": "emit_corpus.py"}
+
+
 class TestStageOne:
     def test_a_good_file_is_written_and_verified(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
@@ -101,6 +104,7 @@ class TestStageManifest:
         manifest = StageManifest(
             destination=_DEST,
             files=[_record("armB.txt", _B), _record("armC.txt", _C)],
+            provenance=_PROVENANCE,
         )
         placed = stage_manifest("hpc3", tmp_path, manifest)
 
@@ -117,6 +121,7 @@ class TestStageManifest:
         manifest = StageManifest(
             destination=_DEST,
             files=[_record("armB.txt", _B), _record("armC.txt", _C)],
+            provenance=_PROVENANCE,
         )
         with pytest.raises(AppError) as excinfo:
             stage_manifest("hpc3", tmp_path, manifest)
@@ -135,12 +140,19 @@ class TestStageAudit:
         fake_run.add("sha256sum '/pub/wagnera3/corpora/armC.txt'", stdout=f"{_C_DIGEST}  x\n")
 
         manifest = StageManifest(
-            destination=_DEST, files=[_record("armB.txt", _B), _record("armC.txt", _C)]
+            destination=_DEST,
+            files=[_record("armB.txt", _B), _record("armC.txt", _C)],
+            provenance=_PROVENANCE,
         )
         stage_manifest("hpc3", tmp_path, manifest)
 
         assert [event.event for event in logged] == [audit.FILES_STAGED]
-        assert logged[0].fields == {"host": "hpc3", "destination": _DEST, "files": 2}
+        assert logged[0].fields == {
+            "host": "hpc3",
+            "destination": _DEST,
+            "files": 2,
+            "provenance": "emitter=emit_corpus.py wiki_commit=176bb8c",
+        }
 
     def test_a_partial_stage_records_nothing(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, logged: list[LoggedEvent]
@@ -150,7 +162,9 @@ class TestStageAudit:
         fake_run.add("sha256sum", stdout=f"{_B_DIGEST}  x\n")
 
         manifest = StageManifest(
-            destination=_DEST, files=[_record("armB.txt", _B), _record("armC.txt", _C)]
+            destination=_DEST,
+            files=[_record("armB.txt", _B), _record("armC.txt", _C)],
+            provenance=_PROVENANCE,
         )
         with pytest.raises(AppError):
             stage_manifest("hpc3", tmp_path, manifest)

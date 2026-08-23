@@ -26,6 +26,7 @@ hpc3-preflight --config runs/hpc3.json --run runs/arm-b.json   # would it start?
 hpc3-submit    --config runs/hpc3.json --run runs/arm-b.json   # start it
 hpc3-watch     --config runs/hpc3.json --job 55519937          # what is it doing, what did it cost
 hpc3-triage    --config runs/hpc3.json                         # is anything wrong that looks fine?
+hpc3-trace     --config runs/hpc3.json --match 07ab4976…       # which job trained this?
 hpc3-cancel    --config runs/hpc3.json --job 55519937          # stop it, and say what actually stopped
 ```
 
@@ -57,7 +58,8 @@ address, the ledger, the budget and each project's resources are written down.
       "requeue": true,
       "checkpoint_steps": 500,
       "accept_billing": false,
-      "env_path": "/pub/wagnera3/envs/abl-pinned"
+      "env_path": "/pub/wagnera3/envs/abl-pinned",
+      "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" }
     }
   }
 }
@@ -108,9 +110,17 @@ A run document says only what is specific to this run:
 {
   "project": "abl",
   "name": "armB-s42",
-  "command": "python -u train.py --arm B --seed 42"
+  "command": "python -u train.py --arm B --seed 42",
+  "experiment": { "arm": "B", "seed": "42", "base_model": "gpt2", "corpus": "armB.txt" }
 }
 ```
+
+`experiment` is required and free-form: it is what the run **is**, as opposed
+to which row in the queue it held. It lands in the ledger and in the job's
+`--comment`, and `hpc3-trace` searches it. Without it the only link between a
+job and the result it produced is a name somebody typed — and `arm-b-43`
+mistyped as `arm-b-42` gives two jobs claiming one identity with no error
+anywhere.
 
 Any project default may be restated to override it for this run alone:
 
@@ -146,6 +156,79 @@ default.
 goes. There is no rollback: a member that fails leaves the earlier ones running
 and findable, because a live job that is fine should not be cancelled for a
 later job's failure.
+
+---
+
+## Identity: the bytes are the right ones, not just intact
+
+Three checks in this package verify *transport* — that what arrived is what
+left. Three others verify *identity* — that what left was the right thing in
+the first place. The second kind exists because the first kind cannot catch a
+run that completes, reports plausible numbers, and is comparable to nothing.
+
+### The environment is the pinned one
+
+`env_path` proves a directory exists. `pinned_packages` proves what is in it:
+preflight runs that environment's own interpreter and holds it to the declared
+versions.
+
+This is not hypothetical. `/pub/wagnera3/envs/abl` and
+`/pub/wagnera3/envs/abl-pinned` both exist, both pass an existence check, and
+they differ by transformers 4.46.3 vs 5.15.1 and torch 2.6.0+cu124 vs
+2.11.0+cu128. Seven characters in a path, a major version underneath, and a
+McNemar comparison against published arms that silently means nothing.
+
+Declaring `{}` is allowed and deliberate — a project whose payload is a
+compiled binary has no Python packages to pin — but the field is required, so
+"no pins" is an answer rather than an omission.
+
+### The staged bytes are the published ones
+
+```bash
+hpc3-stage --config hpc3.json --manifest runs/stage.json \
+    --source-dir runs/corpora --expect-from runs/file_ids.txt
+```
+
+A manifest is self-consistent by construction: whoever emitted the files
+computed the digests from those same files, so they always agree. That proves
+the emitter was deterministic and nothing else.
+
+`--expect-from` is required and points at a record written by a *different act*
+— every digest in the manifest must appear in it. That is a real check
+precisely because re-emitting a corpus from the wrong source state produces new
+digests, and new digests are not in the record. Any text works: a `sha256sum`
+listing, a JSON manifest, a run log.
+
+Every manifest also carries a required, non-empty `provenance` block:
+
+```json
+{
+  "destination": "/pub/wagnera3/abl/corpora",
+  "files": [{ "name": "armB.txt", "sha256": "…", "size_bytes": 41943040 }],
+  "provenance": {
+    "wiki_commit": "176bb8c",
+    "emitter": "extraction-eval/emit_corpus.py",
+    "emitter_flags": "--seed 0 --dilution oscar_en.txt --dilution-ratio 7.0"
+  }
+}
+```
+
+Free-form because what identifies a source differs per project, and a fixed
+schema would mean writing `"none"` into fields that do not apply. It is the
+record; `--expect-from` is the enforcement.
+
+### The result can be traced back to the run
+
+```bash
+$ hpc3-trace --config hpc3.json --match 07ab4976…
+101 abl.armB-s42 submitted 2026-08-22T16:00:00+00:00
+  arm=B corpus=07ab4976… seed=42
+  logs /pub/wagnera3/abl/logs
+1 of 6 recorded run(s) match
+```
+
+Exits 1 when nothing matches — a question with no answer is not an error, but
+it must not read as "nothing was ever run".
 
 ---
 
@@ -225,6 +308,7 @@ scope rather than one module away.
 | `GPU_TYPE_UNPINNED` — the GPU model is named and the cluster carries it | a bare `--gres=gpu:1` on `free-gpu` is roughly a two-in-five chance of a V100, whose `sm_70` the pinned torch does not target; the failure reads as a bug in the training code |
 | `PARTITION_GPU_MISMATCH` — that partition carries that model | Slurm leaves the job pending forever rather than rejecting it |
 | `PARTITION_BILLS_WITHOUT_CONSENT` — a non-zero `UsageFactor` needs `accept_billing` | `free-gpu32` bills one service unit per core-hour despite its name |
+| `ENV_PACKAGE_MISMATCH` — the environment contains what the project pinned | `envs/abl` and `envs/abl-pinned` both exist and differ by a transformers major version |
 | `PREEMPTIBLE_RUN_UNPROTECTED` — long preemptible runs carry requeue **and** checkpointing | `PreemptMode=CANCEL` gives 60 seconds of grace; requeue without checkpoints restarts from step zero, which is not protection |
 | `TIME_LIMIT_EXCEEDS_PARTITION` — the wall clock fits | rejected at submission otherwise |
 
@@ -279,11 +363,24 @@ anything is found.
 | `hpc3-sweep --config C --run S` | the same, per member, recording each as it goes |
 | `hpc3-watch --config C --job ID[,ID…]` | state, elapsed, real cost, GPU-hours, state tally; one `sacct` call so a sweep's rows share one moment |
 | `hpc3-triage --config C` | the three conditions above; exit 1 if any |
+| `hpc3-trace --config C {--match V \| --job ID}` | which run produced a result, or what a job was; exit 1 if nothing matches |
 | `hpc3-cancel --config C --job ID[,ID…]` | stops jobs and reports which were actually running — `scancel` is silent about one that had already finished |
-| `hpc3-stage --config C --manifest M --source-dir D` | places files and verifies sha256 on both sides |
+| `hpc3-stage --config C --manifest M --source-dir D --expect-from R` | places files, verifies sha256 on both sides, and holds every digest against the published record |
 
 Start estimates are a snapshot of the queue, not a reservation. A measured
 3.4-hour estimate on this cluster started in 5 seconds.
+
+**`TIME_LIMIT_EXCEEDS_PARTITION` bounds a single attempt, not a total.**
+free-gpu's 72 hours is per attempt and a requeue restarts that clock, so
+nothing here caps cumulative wall time across requeues. The GPU-hour budget is
+the only thing that does, and it projects from *requested* minutes — so a
+requeued job can exceed its own projection. Watch it with `hpc3-watch`.
+
+**`checkpoint_steps` is a declaration, not a verification.** The contract
+requires a long preemptible run to carry it; nothing here can confirm the
+training script honours it or that resume works, because a submitter cannot
+know the trainer. Prove it with one real preempted arm — a synthetic test
+cannot schedule its own preemption.
 
 ---
 
@@ -296,12 +393,17 @@ contracts/     types + decode/encode + every validation rule
   cluster.py     what a cluster must declare; the one facts accessor
   workspace.py   the config document; project defaults
   run.py         merging a run onto its project's defaults
-  job.py         a fully specified job, and the five submission rules
+  job.py         a fully specified job, and the submission rules
   sweep.py       many jobs from one template, bounded by the QOS
   layout.py      project names, job labels, directory derivation
+  pins.py        what an environment must contain
+  provenance.py  where staged bytes came from
+  experiment.py  what a run IS, as opposed to which queue row it held
   ledger.py  status.py  pending.py  preflight.py  budget.py  stage.py
 core/          behaviour: rendering, ssh, parsing, submission, triage
-cli/           seven entry points; argument reading and reporting only
+  env_probe.py   asking an environment what is installed in it
+  expected.py    holding a manifest against a record written before it
+cli/           eight entry points; argument reading and reporting only
 ```
 
 ---

@@ -3,6 +3,10 @@
   "name": "rung-large",
   "minutes": 900,
   "checkpoint_steps": 250,
+  "experiment": {
+    "base_model": "gpt2-large",
+    "rung": "774M"
+  },
   "members": [
     {
       "suffix": "armB-s0",

@@ -25,7 +25,7 @@ from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.preflight import PreflightResult, decode_preflight_result
-from hpc3.core import remote, sbatch
+from hpc3.core import env_probe, remote, sbatch
 
 _START_ANCHOR = " to start at "
 _USING_ANCHOR = " using "
@@ -174,11 +174,16 @@ def preflight(
 
     Raises:
         AppError: With ``ENV_PATH_MISSING`` if the environment is absent,
-            ``PREFLIGHT_REJECTED`` if Slurm refuses the job -- carrying its
-            own reason, which is the diagnostic -- or ``PREFLIGHT_UNPARSABLE``
-            if the verdict cannot be read.
+            ``ENV_PACKAGE_MISMATCH`` if it exists but does not contain what
+            the project pinned, ``ENV_PROBE_UNREADABLE`` if it cannot say what
+            it contains, ``PREFLIGHT_REJECTED`` if Slurm refuses the job --
+            carrying its own reason, which is the diagnostic -- or
+            ``PREFLIGHT_UNPARSABLE`` if the verdict cannot be read.
     """
     check_env_path(host, spec)
+    # Existence, then identity. The path check catches a typo; this catches
+    # the more expensive mistake of a real environment that is the wrong one.
+    env_probe.verify_env_packages(host, spec["env_path"], spec["pinned_packages"])
 
     remote.make_directory(host, script_dir)
     remote.make_directory(host, log_dir)

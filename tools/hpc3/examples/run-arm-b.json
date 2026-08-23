@@ -1,5 +1,11 @@
 {
   "project": "abl",
   "name": "armB-s42",
-  "command": "python -u train.py --arm B --seed 42 --corpus /pub/wagnera3/abl/corpora/armB.txt"
+  "command": "python -u train.py --arm B --seed 42 --corpus /pub/wagnera3/abl/corpora/armB.txt",
+  "experiment": {
+    "arm": "B",
+    "seed": "42",
+    "base_model": "gpt2",
+    "corpus": "armB.txt"
+  }
 }

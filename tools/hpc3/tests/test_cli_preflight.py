@@ -30,6 +30,7 @@ def _run_payload(**overrides: JSONValue) -> dict[str, JSONValue]:
         "project": "abl",
         "name": "arm-b-42",
         "command": "python train.py",
+        "experiment": {"arm": "B"},
     }
     document.update(overrides)
     return document
@@ -103,7 +104,12 @@ class TestPreflightCli:
         ]
         _write(
             tmp_path / "doc.json",
-            {"project": "abl", "name": "rung", "members": members},
+            {
+                "project": "abl",
+                "name": "rung",
+                "members": members,
+                "experiment": {"rung": "774M"},
+            },
         )
         _ok(fake_run)
 
@@ -123,7 +129,12 @@ class TestPreflightCli:
         ]
         _write(
             tmp_path / "doc.json",
-            {"project": "abl", "name": "rung", "members": members},
+            {
+                "project": "abl",
+                "name": "rung",
+                "members": members,
+                "experiment": {"rung": "774M"},
+            },
         )
 
         with pytest.raises(AppError) as excinfo:

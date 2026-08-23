@@ -36,7 +36,12 @@ def _payload(count: int = 3, **overrides: JSONValue) -> dict[str, JSONValue]:
     members: list[JSONValue] = [
         {"suffix": f"s{i}", "command": f"python train.py --seed {i}"} for i in range(count)
     ]
-    document: dict[str, JSONValue] = {"project": "abl", "name": "rung", "members": members}
+    document: dict[str, JSONValue] = {
+        "project": "abl",
+        "name": "rung",
+        "members": members,
+        "experiment": {"rung": "774M"},
+    }
     document.update(overrides)
     return document
 
@@ -206,6 +211,7 @@ class TestTriageCli:
                     "partition": "free-gpu",
                     "submitted_at": "2026-08-22T16:00:00+00:00",
                     "log_dir": "/pub/logs",
+                    "experiment": {"arm": "B"},
                 }
             ).encode("utf-8")
             + b"\n",
@@ -224,7 +230,12 @@ class TestTriageCli:
         write_file(
             tmp_path / "run.json",
             dump_json_str(
-                {"project": "abl", "name": "arm-b-42", "command": "python train.py"}
+                {
+                    "project": "abl",
+                    "name": "arm-b-42",
+                    "command": "python train.py",
+                    "experiment": {"arm": "B"},
+                }
             ).encode("utf-8"),
         )
         config = write_workspace(tmp_path / "hpc3.json", workspace_document())

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 from typing import ClassVar
@@ -8,11 +9,44 @@ from monorepo_guards import Violation
 from monorepo_guards.util import read_lines
 
 
+def _bare_print_lines(source: str, path: Path) -> set[int]:
+    """Find the lines carrying a real call to the builtin ``print``.
+
+    Read from the parse tree rather than matched against the text, because a
+    regex cannot tell a call from a mention. The text form flagged ``print(``
+    wherever it appeared -- including inside a string literal, which is how a
+    command built here to be executed by a *remote* interpreter registered as
+    printing from this process.
+
+    Args:
+        source: The module's full text.
+        path: The file, used in the parse-failure message.
+
+    Returns:
+        Line numbers holding a call whose callee is the bare name ``print``.
+        Attribute calls such as ``console.print(...)`` are not included, which
+        is the same distinction the text form was reaching for.
+
+    Raises:
+        RuntimeError: If the module cannot be parsed. A guard that silently
+            skipped an unparsable file would report it as clean.
+    """
+    try:
+        tree = ast.parse(source, filename=str(path))
+    except SyntaxError as exc:
+        raise RuntimeError(f"failed to parse {path}: {exc}") from exc
+
+    return {
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "print"
+    }
+
+
 class LoggingRule:
     name = "logging"
-
-    # Matches bare print calls but NOT method calls like console.print
-    _pat_bare_print = re.compile(r"(?<![.\w])print\s*\(")
     _pat_import_logging = re.compile(r"^\s*import\s+logging(\s+as\s+(?P<alias>\w+))?\b")
     _pat_from_logging = re.compile(r"^\s*from\s+logging\s+import\s+(?P<imports>.+)$")
 
@@ -94,6 +128,7 @@ class LoggingRule:
         lines: list[str],
         module_aliases: set[str],
         func_aliases: set[str],
+        print_lines: set[int],
     ) -> list[Violation]:
         """Check violations for print, basicConfig, and getLogger (aliases included)."""
         violations: list[Violation] = []
@@ -102,7 +137,7 @@ class LoggingRule:
 
         for idx, raw in enumerate(lines, start=1):
             line = raw.rstrip("\n")
-            if self._pat_bare_print.search(line):
+            if idx in print_lines:
                 violations.append(Violation(file=path, line_no=idx, kind="print", line=line))
                 continue
 
@@ -159,7 +194,10 @@ class LoggingRule:
                 path, lines
             )
             out.extend(import_violations)
-            out.extend(self._check_line_violations(path, lines, module_aliases, func_aliases))
+            print_lines = _bare_print_lines("\n".join(lines), path)
+            out.extend(
+                self._check_line_violations(path, lines, module_aliases, func_aliases, print_lines)
+            )
 
         return out
 

@@ -43,6 +43,7 @@ from hpc3.clusters import require_cluster
 from hpc3.contracts.budget import Budget, decode_budget, encode_budget
 from hpc3.contracts.cluster import ClusterFacts, require_gpu_type, require_partition
 from hpc3.contracts.layout import require_project, require_root
+from hpc3.contracts.pins import encode_pinned_packages, require_pinned_packages
 
 DEFAULT_QUIET_SECONDS = 1800
 """How long a running job may write nothing before triage calls it silent.
@@ -75,6 +76,12 @@ class ProjectConfig(TypedDict):
             allowed to cost money is a property of the work, not of one run.
         env_path: Absolute path to this project's Python environment on the
             cluster.
+        pinned_packages: Distribution versions the environment must actually
+            contain, keyed by name. Required as a field, may be empty: a
+            project whose payload is a compiled binary has no Python packages
+            to pin, and declaring ``{}`` says so deliberately rather than
+            leaving the question unasked. When non-empty, preflight asks the
+            environment itself instead of trusting its path.
     """
 
     partition: str
@@ -87,6 +94,7 @@ class ProjectConfig(TypedDict):
     checkpoint_steps: int
     accept_billing: bool
     env_path: str
+    pinned_packages: dict[str, str]
 
 
 class Workspace(TypedDict):
@@ -129,6 +137,7 @@ PROJECT_FIELDS = (
     "checkpoint_steps",
     "accept_billing",
     "env_path",
+    "pinned_packages",
 )
 """The fields a project declares, and exactly the fields a run may override.
 
@@ -218,6 +227,7 @@ def decode_project_config(value: JSONValue, cluster: ClusterFacts) -> ProjectCon
         checkpoint_steps=checkpoint_steps,
         accept_billing=require_bool(value, "accept_billing"),
         env_path=_require_nonempty_str(value, "env_path"),
+        pinned_packages=require_pinned_packages(value, "pinned_packages"),
     )
 
 
@@ -241,6 +251,7 @@ def encode_project_config(config: ProjectConfig) -> dict[str, JSONValue]:
         "checkpoint_steps": config["checkpoint_steps"],
         "accept_billing": config["accept_billing"],
         "env_path": config["env_path"],
+        "pinned_packages": encode_pinned_packages(config["pinned_packages"]),
     }
 
 

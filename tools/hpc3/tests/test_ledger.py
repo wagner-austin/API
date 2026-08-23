@@ -36,6 +36,7 @@ def _entry(**overrides: str) -> LedgerEntry:
         "partition": "free-gpu",
         "submitted_at": "2026-08-22T16:00:00+00:00",
         "log_dir": "/pub/wagnera3/logs",
+        "experiment": {"arm": "B", "seed": "42"},
     }
     base.update(overrides)
     return decode_ledger_entry(base)
@@ -109,6 +110,7 @@ class TestLedgerEntryContract:
             "partition": "free-gpu",
             "submitted_at": "2026-08-22T16:00:00+00:00",
             "log_dir": "/pub/wagnera3/logs",
+            "experiment": {"arm": "B", "seed": "42"},
         }
         assert encode_ledger_entry(decode_ledger_entry(payload)) == payload
 
@@ -128,6 +130,7 @@ class TestLedgerEntryContract:
                     "partition": "turbo",
                     "submitted_at": "t",
                     "log_dir": "/l",
+                    "experiment": {"arm": "B"},
                 }
             )
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_UNKNOWN
@@ -144,6 +147,7 @@ class TestLedgerEntryContract:
                     "partition": "free-gpu",
                     "submitted_at": "t",
                     "log_dir": "/l",
+                    "experiment": {"arm": "B"},
                 }
             )
 
@@ -156,6 +160,7 @@ class TestLedgerEntryContract:
             "partition": "free-gpu",
             "submitted_at": "t",
             "log_dir": "/l",
+            "experiment": {"arm": "B"},
         }
         for key in ("job_id", "project", "name", "host", "submitted_at", "log_dir"):
             broken = dict(full)

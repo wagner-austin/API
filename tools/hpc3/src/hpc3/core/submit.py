@@ -126,6 +126,7 @@ def submit(
             partition=spec["partition"],
             submitted_at=submitted_at,
             log_dir=log_dir,
+            experiment=spec["experiment"],
         ),
     )
     audit.job_submitted(spec, host=host, job_id=job_id, cluster=cluster)

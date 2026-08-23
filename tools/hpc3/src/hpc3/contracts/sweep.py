@@ -81,6 +81,11 @@ def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
             checkpoint_steps=spec["base"]["checkpoint_steps"],
             accept_billing=spec["base"]["accept_billing"],
             env_path=spec["base"]["env_path"],
+            pinned_packages=spec["base"]["pinned_packages"],
+            # The template's identity plus the member's own suffix: six arms
+            # sharing one experiment record would be six rows the ledger
+            # cannot tell apart, which is the failure this field exists for.
+            experiment={**spec["base"]["experiment"], "member": member["suffix"]},
             command=member["command"],
         )
         for member in spec["members"]

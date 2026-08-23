@@ -46,6 +46,8 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "checkpoint_steps": 50,
         "accept_billing": False,
         "env_path": "/pub/envs/abl",
+        "pinned_packages": {},
+        "experiment": {"arm": "B"},
         "command": "python train.py",
     }
     base.update(overrides)

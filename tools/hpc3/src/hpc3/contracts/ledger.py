@@ -28,6 +28,7 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import ClusterFacts, require_partition
+from hpc3.contracts.experiment import encode_experiment, require_experiment
 from hpc3.contracts.layout import require_project
 
 
@@ -49,6 +50,11 @@ class LedgerEntry(TypedDict):
             reads the clock cannot be tested for what it records.
         log_dir: Absolute directory holding the job's output, so the logs are
             findable without reconstructing the submission.
+        experiment: What this run was -- corpus digest, seed, base model, or
+            whatever identifies a run in this project. The fields above find
+            the job; this one says which result it produced, which is the
+            question asked months later when an outcome file needs tracing
+            back to the run that made it.
     """
 
     job_id: str
@@ -58,6 +64,7 @@ class LedgerEntry(TypedDict):
     partition: str
     submitted_at: str
     log_dir: str
+    experiment: dict[str, str]
 
 
 def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
@@ -98,6 +105,7 @@ def encode_ledger_entry(entry: LedgerEntry) -> dict[str, JSONValue]:
         "partition": entry["partition"],
         "submitted_at": entry["submitted_at"],
         "log_dir": entry["log_dir"],
+        "experiment": encode_experiment(entry["experiment"]),
     }
 
 
@@ -130,6 +138,7 @@ def decode_ledger_entry(value: JSONValue, cluster: ClusterFacts) -> LedgerEntry:
         partition=require_partition(cluster, value, "partition"),
         submitted_at=_require_nonempty_str(value, "submitted_at"),
         log_dir=_require_nonempty_str(value, "log_dir"),
+        experiment=require_experiment(value, "experiment"),
     )
 
 

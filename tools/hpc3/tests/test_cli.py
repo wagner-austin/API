@@ -16,7 +16,7 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
-from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
 from hpc3.cli import stage as stage_cli
 from hpc3.cli import submit as submit_cli
@@ -65,6 +65,7 @@ def _run_payload(**overrides: JSONValue) -> dict[str, JSONValue]:
         "project": "abl",
         "name": "arm-b-42",
         "command": "python train.py",
+        "experiment": {"arm": "B", "seed": "42"},
     }
     document.update(overrides)
     return document
@@ -116,49 +117,110 @@ def _watch_args(tmp_path: pathlib.Path, jobs: str, *, gpu_hours: float = 100.0) 
     return ["--config", _config(tmp_path, budget=budget), "--job", jobs]
 
 
+def _stage_manifest(destination: str = "/pub/wagnera3/corpora") -> dict[str, JSONValue]:
+    """Build a manifest document naming the standard payload.
+
+    Args:
+        destination: Cluster directory to receive it.
+
+    Returns:
+        The document.
+    """
+    return {
+        "destination": destination,
+        "files": [{"name": "armB.txt", "sha256": _DIGEST, "size_bytes": len(_PAYLOAD)}],
+        "provenance": {"wiki_commit": "176bb8c", "emitter": "emit_corpus.py"},
+    }
+
+
+def _stage_args(tmp_path: pathlib.Path, *, expected: str | None = None) -> list[str]:
+    """Build a full stage argument list, writing the published-digest record.
+
+    Args:
+        tmp_path: Directory holding the documents.
+        expected: Digest the record vouches for; defaults to the real one.
+
+    Returns:
+        Arguments excluding the program name.
+    """
+    record = tmp_path / "file_ids.txt"
+    write_file(record, ((expected if expected is not None else _DIGEST) + "\n").encode())
+    return [
+        "--config",
+        _config(tmp_path),
+        "--manifest",
+        str(tmp_path / "m.json"),
+        "--source-dir",
+        str(tmp_path / "src"),
+        "--expect-from",
+        str(record),
+    ]
+
+
 class TestStageCli:
     def test_it_stages_and_reports_each_file(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
         write_file(tmp_path / "src" / "armB.txt", _PAYLOAD)
-        _write_json(
-            tmp_path / "m.json",
-            {
-                "destination": "/pub/wagnera3/corpora",
-                "files": [{"name": "armB.txt", "sha256": _DIGEST, "size_bytes": len(_PAYLOAD)}],
-            },
-        )
+        _write_json(tmp_path / "m.json", _stage_manifest())
         fake_run.add("sha256sum", stdout=f"{_DIGEST}  x\n")
 
-        code = stage_cli.main(
-            [
-                "--config",
-                _config(tmp_path),
-                "--manifest",
-                str(tmp_path / "m.json"),
-                "--source-dir",
-                str(tmp_path / "src"),
-            ]
-        )
-
-        assert code == 0
-        assert emitted == [
+        assert stage_cli.main(_stage_args(tmp_path)) == 0
+        assert emitted[-2:] == [
             "staged /pub/wagnera3/corpora/armB.txt",
             "verified 1 file(s) on hpc3:/pub/wagnera3/corpora",
         ]
+
+    def test_it_reports_the_provenance_it_staged_under(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        write_file(tmp_path / "src" / "armB.txt", _PAYLOAD)
+        _write_json(tmp_path / "m.json", _stage_manifest())
+        fake_run.add("sha256sum", stdout=f"{_DIGEST}  x\n")
+
+        stage_cli.main(_stage_args(tmp_path))
+        assert emitted[1] == "provenance emitter=emit_corpus.py wiki_commit=176bb8c"
+
+    def test_bytes_the_published_record_does_not_name_never_leave_the_machine(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """A corpus regenerated from the wrong source state stages clean
+        against itself; only the external record catches it."""
+        write_file(tmp_path / "src" / "armB.txt", _PAYLOAD)
+        _write_json(tmp_path / "m.json", _stage_manifest())
+
+        with pytest.raises(AppError) as excinfo:
+            stage_cli.main(_stage_args(tmp_path, expected="a" * 64))
+
+        assert excinfo.value.code is Hpc3ErrorCode.STAGED_DIGEST_UNEXPECTED
+        assert fake_run.calls == []
+        assert emitted == []
 
     def test_a_digest_mismatch_is_not_reported_as_success(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
         write_file(tmp_path / "src" / "armB.txt", b"a different corpus\n")
-        _write_json(
-            tmp_path / "m.json",
-            {
-                "destination": "/pub/x",
-                "files": [{"name": "armB.txt", "sha256": _DIGEST, "size_bytes": len(_PAYLOAD)}],
-            },
-        )
+        _write_json(tmp_path / "m.json", _stage_manifest(destination="/pub/x"))
+
         with pytest.raises(AppError) as excinfo:
+            stage_cli.main(_stage_args(tmp_path))
+        assert excinfo.value.code is Hpc3ErrorCode.DIGEST_MISMATCH
+
+    def test_a_manifest_without_provenance_is_refused(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        write_file(tmp_path / "src" / "armB.txt", _PAYLOAD)
+        document = _stage_manifest()
+        del document["provenance"]
+        _write_json(tmp_path / "m.json", document)
+
+        with pytest.raises(JSONTypeError):
+            stage_cli.main(_stage_args(tmp_path))
+        assert fake_run.calls == []
+
+    def test_the_expect_from_flag_is_not_optional(self, tmp_path: pathlib.Path) -> None:
+        """A check that runs only when remembered is not protection."""
+        with pytest.raises(ValueError, match="--expect-from is required"):
             stage_cli.main(
                 [
                     "--config",
@@ -169,8 +231,6 @@ class TestStageCli:
                     str(tmp_path / "src"),
                 ]
             )
-        assert excinfo.value.code is Hpc3ErrorCode.DIGEST_MISMATCH
-        assert emitted == []
 
     def test_a_missing_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--source-dir is required"):
@@ -393,23 +453,9 @@ class TestEntrypoints:
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], argv: list[str]
     ) -> None:
         write_file(tmp_path / "src" / "armB.txt", _PAYLOAD)
-        _write_json(
-            tmp_path / "m.json",
-            {
-                "destination": "/pub/x",
-                "files": [{"name": "armB.txt", "sha256": _DIGEST, "size_bytes": len(_PAYLOAD)}],
-            },
-        )
+        _write_json(tmp_path / "m.json", _stage_manifest(destination="/pub/x"))
         fake_run.add("sha256sum", stdout=f"{_DIGEST}  x\n")
-        argv[:] = [
-            "prog",
-            "--config",
-            _config(tmp_path),
-            "--manifest",
-            str(tmp_path / "m.json"),
-            "--source-dir",
-            str(tmp_path / "src"),
-        ]
+        argv[:] = ["prog", *_stage_args(tmp_path)]
 
         with pytest.raises(SystemExit) as excinfo:
             stage_cli.entrypoint()

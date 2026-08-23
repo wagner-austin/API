@@ -39,11 +39,20 @@ from hpc3.contracts.workspace import (
     workspace_cluster,
 )
 
-RUN_IDENTITY_FIELDS = ("project", "name", "command")
-"""What only a run can say. Never inherited, never optional."""
+RUN_IDENTITY_FIELDS = ("project", "name", "command", "experiment")
+"""What only a run can say. Never inherited, never optional.
 
-SWEEP_IDENTITY_FIELDS = ("project", "name", "members")
-"""The sweep equivalent; the command comes from each member instead."""
+``experiment`` is here rather than among the project defaults because what a
+run IS differs per run -- the corpus digest and the seed are the whole point of
+running it twice.
+"""
+
+SWEEP_IDENTITY_FIELDS = ("project", "name", "members", "experiment")
+"""The sweep equivalent; the command comes from each member instead.
+
+The sweep's ``experiment`` describes what the members share; expansion adds
+each member's suffix so the rows stay distinguishable in the ledger.
+"""
 
 
 def _check_known_fields(document: dict[str, JSONValue], identity: tuple[str, ...]) -> None:
@@ -135,6 +144,7 @@ def resolve_run(workspace: Workspace, value: JSONValue) -> JobSpec:
     merged = _merged(document, require_project_config(workspace, project), project)
     merged["name"] = document.get("name")
     merged["command"] = document.get("command")
+    merged["experiment"] = document.get("experiment")
     return decode_job_spec(merged, workspace_cluster(workspace))
 
 
@@ -168,6 +178,7 @@ def resolve_sweep(workspace: Workspace, value: JSONValue) -> SweepSpec:
     project = require_project(document, "project")
     base = _merged(document, require_project_config(workspace, project), project)
     base["name"] = document.get("name")
+    base["experiment"] = document.get("experiment")
 
     members = require_list(document, "members")
     if members == []:

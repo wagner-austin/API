@@ -15,7 +15,7 @@ from hpc3.contracts.job import JobSpec
 from hpc3.contracts.preflight import encode_preflight_result
 from hpc3.core.preflight import check_env_path, preflight
 from tests.against_hpc3 import decode_job_spec, decode_preflight_result, parse_test_only
-from tests.conftest import FakeRun, cluster
+from tests.conftest import ABL_PINNED_DISTRIBUTIONS, FakeRun, cluster
 
 _REAL_LINE = (
     "sbatch: Job 55516995 to start at 2026-08-22T03:23:00 a using 4 processors "
@@ -45,6 +45,8 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "checkpoint_steps": 0,
         "accept_billing": False,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
+        "pinned_packages": {},
+        "experiment": {"arm": "B"},
         "command": "python train.py",
     }
     base.update(overrides)
@@ -167,6 +169,46 @@ class TestPreflight:
             preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
         assert excinfo.value.code is Hpc3ErrorCode.PREFLIGHT_REJECTED
         assert "Invalid account" in excinfo.value.message
+
+
+class TestPreflightChecksEnvironmentIdentity:
+    """Existence, then identity, then the scheduler -- in that order.
+
+    The path check catches a typo. This catches the more expensive mistake:
+    a real environment that is the wrong one.
+    """
+
+    def test_a_pinned_environment_that_matches_is_admitted(self, fake_run: FakeRun) -> None:
+        fake_run.add("test -d", stdout="PRESENT\n")
+        fake_run.add("importlib.metadata", stdout=ABL_PINNED_DISTRIBUTIONS)
+        fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
+
+        spec = _spec(pinned_packages={"torch": "2.6.0+cu124", "transformers": "4.46.3"})
+        result = preflight(spec, host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+        assert result["partition"] == "free-gpu"
+
+    def test_the_wrong_environment_stops_before_the_scheduler_is_asked(
+        self, fake_run: FakeRun
+    ) -> None:
+        """envs/abl instead of envs/abl-pinned: transformers 5.15.1, torch 2.11.0."""
+        fake_run.add("test -d", stdout="PRESENT\n")
+        fake_run.add("importlib.metadata", stdout="torch==2.11.0+cu128\ntransformers==5.15.1\n")
+
+        spec = _spec(pinned_packages={"transformers": "4.46.3"})
+        with pytest.raises(AppError) as excinfo:
+            preflight(spec, host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+
+        assert excinfo.value.code is Hpc3ErrorCode.ENV_PACKAGE_MISMATCH
+        assert not any("--test-only" in c for c in fake_run.commands())
+        assert not any(c.startswith("cat >") for c in fake_run.commands())
+
+    def test_an_unpinned_project_never_asks_the_environment(self, fake_run: FakeRun) -> None:
+        """A compiled payload should not pay for a round trip it cannot use."""
+        fake_run.add("test -d", stdout="PRESENT\n")
+        fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
+
+        preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+        assert not any("importlib.metadata" in c for c in fake_run.commands())
 
 
 class TestPreflightResultContract:

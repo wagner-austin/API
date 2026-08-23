@@ -50,6 +50,7 @@ def _run(**overrides: JSONValue) -> dict[str, JSONValue]:
         "project": "abl",
         "name": "armB-s42",
         "command": "python train.py --arm B",
+        "experiment": {"arm": "B", "seed": "42"},
     }
     document.update(overrides)
     return document
@@ -68,13 +69,18 @@ def _sweep(count: int = 3, **overrides: JSONValue) -> dict[str, JSONValue]:
     members: list[JSONValue] = [
         {"suffix": f"s{i}", "command": f"python train.py --seed {i}"} for i in range(count)
     ]
-    document: dict[str, JSONValue] = {"project": "abl", "name": "rung", "members": members}
+    document: dict[str, JSONValue] = {
+        "project": "abl",
+        "name": "rung",
+        "members": members,
+        "experiment": {"rung": "774M"},
+    }
     document.update(overrides)
     return document
 
 
 class TestResolveRun:
-    def test_a_three_field_document_becomes_a_complete_spec(self) -> None:
+    def test_a_four_field_document_becomes_a_complete_spec(self) -> None:
         """The whole point: a run says what differs, not what it inherits."""
         spec = resolve_run(_workspace(), _run())
         assert spec == {
@@ -90,6 +96,8 @@ class TestResolveRun:
             "checkpoint_steps": 0,
             "accept_billing": False,
             "env_path": "/pub/envs/abl-pinned",
+            "pinned_packages": {},
+            "experiment": {"arm": "B", "seed": "42"},
             "command": "python train.py --arm B",
         }
 

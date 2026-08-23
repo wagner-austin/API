@@ -39,6 +39,8 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "checkpoint_steps": 0,
         "accept_billing": False,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
+        "pinned_packages": {},
+        "experiment": {"arm": "B", "seed": "42"},
         "command": "python train.py --seed 42",
     }
     base.update(overrides)
@@ -142,10 +144,15 @@ class TestJobIsSelfDescribing:
     def test_the_job_name_is_prefixed_by_its_project(self) -> None:
         assert "#SBATCH -J abl.arm-b-42" in render_sbatch(_spec(), log_dir=_LOG_DIR)
 
-    def test_the_comment_carries_project_hardware_and_environment(self) -> None:
+    def test_the_comment_carries_project_hardware_environment_and_experiment(self) -> None:
         assert job_comment(_spec()) == (
-            "project=abl;gpu=A100x1;cpus=8;env=/pub/wagnera3/envs/abl-pinned"
+            "project=abl;gpu=A100x1;cpus=8;env=/pub/wagnera3/envs/abl-pinned;exp=arm=B,seed=42"
         )
+
+    def test_a_queue_row_says_which_experiment_it_is(self) -> None:
+        """So a row found in squeue answers the question without a ledger."""
+        script = render_sbatch(_spec(experiment={"corpus": "07ab4976"}), log_dir=_LOG_DIR)
+        assert "exp=corpus=07ab4976" in script
 
     def test_the_comment_holds_no_space(self) -> None:
         """sbatch takes --comment as one token; a space truncates the rest."""

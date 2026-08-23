@@ -75,9 +75,14 @@ class TestExampleRun:
         assert spec["project"] == "abl"
         assert spec["gpu"] == "A100"
 
-    def test_the_documented_three_field_shape_is_enough(self) -> None:
-        """The README's central claim, checked against the real file."""
-        assert _fields("run-arm-b.json") == ["command", "name", "project"]
+    def test_a_run_states_only_what_is_specific_to_it(self) -> None:
+        """The README's central claim, checked against the real file.
+
+        Four fields: three saying what to run, and one saying what the run
+        IS so the result can be traced back to it. Everything else -- the
+        partition, the GPU, the cores, the environment -- is inherited.
+        """
+        assert _fields("run-arm-b.json") == ["command", "experiment", "name", "project"]
 
 
 class TestExampleSweep:

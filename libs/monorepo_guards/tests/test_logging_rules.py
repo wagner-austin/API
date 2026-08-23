@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from monorepo_guards.logging_rules import LoggingRule
 
 
@@ -20,6 +22,66 @@ def test_logging_rule_flags_print_and_basicconfig(tmp_path: Path) -> None:
     kinds = {v.kind for v in violations}
     assert "print" in kinds
     assert "logging-basicConfig" in kinds
+
+
+def test_logging_rule_ignores_print_inside_a_string_literal(tmp_path: Path) -> None:
+    """A mention is not a call.
+
+    A module may legitimately carry the text of a program meant for a
+    different interpreter -- a command sent over ssh, a generated script, a
+    docstring showing usage. The text form of this check flagged those as
+    printing from this process, which is how a remote-environment probe in
+    tools/hpc3 was reported for output it never produces here.
+    """
+    code = 'PROBE = "import sys;print(sys.version)"\nVALUE = 1\n'
+    path = tmp_path / "remote_probe.py"
+    _write(path, code)
+
+    rule = LoggingRule()
+    kinds = {v.kind for v in rule.run([path])}
+    assert "print" not in kinds
+
+
+def test_logging_rule_ignores_print_inside_a_docstring(tmp_path: Path) -> None:
+    code = '"""Usage: print(value) writes to stdout."""\nVALUE = 1\n'
+    path = tmp_path / "documented.py"
+    _write(path, code)
+
+    rule = LoggingRule()
+    kinds = {v.kind for v in rule.run([path])}
+    assert "print" not in kinds
+
+
+def test_logging_rule_still_flags_a_real_print_beside_a_mentioned_one(tmp_path: Path) -> None:
+    """The fix must not have turned the check off, only made it exact."""
+    code = 'PROBE = "print(1)"\npri' + "nt('actually printing')\n"
+    path = tmp_path / "mixed.py"
+    _write(path, code)
+
+    rule = LoggingRule()
+    prints = [v for v in rule.run([path]) if v.kind == "print"]
+    assert [v.line_no for v in prints] == [2]
+
+
+def test_logging_rule_does_not_flag_an_attribute_print(tmp_path: Path) -> None:
+    """console.print is the rich console, not the builtin."""
+    code = "console = get_console()\nconsole.print('x')\n"
+    path = tmp_path / "console_user.py"
+    _write(path, code)
+
+    rule = LoggingRule()
+    kinds = {v.kind for v in rule.run([path])}
+    assert "print" not in kinds
+
+
+def test_logging_rule_refuses_to_pass_an_unparsable_file(tmp_path: Path) -> None:
+    """Reporting a file it could not read as clean is the worse failure."""
+    path = tmp_path / "broken.py"
+    _write(path, "def (:\n")
+
+    rule = LoggingRule()
+    with pytest.raises(RuntimeError, match="failed to parse"):
+        rule.run([path])
 
 
 def test_logging_rule_skips_platform_core_logging_module(tmp_path: Path) -> None:
@@ -178,8 +240,17 @@ def test_logging_rule_flags_from_logging_import_with_alias(tmp_path: Path) -> No
 
 
 def test_logging_rule_handles_empty_import_segments(tmp_path: Path) -> None:
-    """Test that empty segments in from imports are handled correctly."""
-    code = "from logging import getLogger,  , Logger\nx = 1\n"
+    """Test that empty segments in from imports are handled correctly.
+
+    The malformed import is inside a string because the module has to parse:
+    the print check reads the parse tree now, and a file that cannot be parsed
+    is refused rather than reported clean. ``getLogger,  ,`` is not valid
+    Python anywhere it would actually execute, so text is the only place it
+    can appear -- and the import scan is still textual, so it reads it there.
+    That the scan sees into strings at all is the same blind spot the print
+    check just lost; it is left alone here rather than widened by accident.
+    """
+    code = 'DOC = """\nfrom logging import getLogger,  , Logger\n"""\nx = 1\n'
     path = tmp_path / "service.py"
     _write(path, code)
 

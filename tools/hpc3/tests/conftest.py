@@ -231,6 +231,17 @@ PREFLIGHT_LINE = (
     "on nodes hpc3-gpu-16-02 in partition free-gpu"
 )
 
+ABL_PINNED_DISTRIBUTIONS = (
+    "torch==2.6.0+cu124\ntransformers==4.46.3\nnumpy==2.1.3\ntyping_extensions==4.12.2\n"
+)
+"""What ``/pub/wagnera3/envs/abl-pinned`` reports, as measured on the cluster.
+
+The ablation's arms were produced against exactly these versions, so a probe
+answering anything else means the run would not be comparable to them. The
+``typing_extensions`` entry is here deliberately: it is the underscore spelling
+the distribution actually reports, and normalisation has to survive it.
+"""
+
 
 def script_healthy_cluster(fake: FakeRun, *, job_id: str = "55519937") -> None:
     """Script a cluster that admits and accepts everything.
@@ -245,6 +256,7 @@ def script_healthy_cluster(fake: FakeRun, *, job_id: str = "55519937") -> None:
         job_id: Id the real submission should report.
     """
     fake.add("test -d", stdout="PRESENT\n")
+    fake.add("importlib.metadata", stdout=ABL_PINNED_DISTRIBUTIONS)
     fake.add("--test-only", stdout=PREFLIGHT_LINE + "\nrc=0\n")
     fake.add("sbatch", stdout=f"Submitted batch job {job_id}\n")
 
@@ -282,6 +294,7 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
         "checkpoint_steps": 0,
         "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
+        "pinned_packages": {},
     }
     config.update(overrides)
     return config

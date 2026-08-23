@@ -15,6 +15,7 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONValue
 
 from hpc3.contracts.job import JobSpec
+from hpc3.contracts.ledger import LedgerEntry
 from hpc3.core import audit
 from hpc3.core.submit import parse_job_id, submit
 from tests.against_hpc3 import decode_job_spec, read_ledger
@@ -51,6 +52,8 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "checkpoint_steps": 0,
         "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
+        "pinned_packages": {},
+        "experiment": {"arm": "B", "seed": "42"},
         "command": "python train.py",
     }
     base.update(overrides)
@@ -173,17 +176,30 @@ class TestSubmitRecordsTheJob:
         script_healthy_cluster(fake_run)
         _submit(tmp_path)
 
-        assert read_ledger(tmp_path / "ledger.jsonl") == [
-            {
-                "job_id": "55519937",
-                "project": "abl",
-                "name": "abl.arm-b-42",
-                "host": "hpc3",
-                "partition": "free-gpu",
-                "submitted_at": _AT,
-                "log_dir": "/pub/wagnera3/logs",
-            }
+        recorded = read_ledger(tmp_path / "ledger.jsonl")
+        assert recorded == [
+            LedgerEntry(
+                job_id="55519937",
+                project="abl",
+                name="abl.arm-b-42",
+                host="hpc3",
+                partition="free-gpu",
+                submitted_at=_AT,
+                log_dir="/pub/wagnera3/logs",
+                experiment={"arm": "B", "seed": "42"},
+            )
         ]
+
+    def test_the_entry_carries_what_the_run_was_not_only_which_row_it_held(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """A job id finds the job; this is what says which result it produced."""
+        script_healthy_cluster(fake_run)
+        _submit(tmp_path)
+        assert read_ledger(tmp_path / "ledger.jsonl")[0]["experiment"] == {
+            "arm": "B",
+            "seed": "42",
+        }
 
     def test_a_failed_submission_records_nothing(
         self, tmp_path: pathlib.Path, fake_run: FakeRun

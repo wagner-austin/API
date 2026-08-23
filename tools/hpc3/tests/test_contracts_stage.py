@@ -47,6 +47,7 @@ def _manifest(**overrides: JSONValue) -> dict[str, JSONValue]:
     base: dict[str, JSONValue] = {
         "destination": "/pub/wagnera3/corpora",
         "files": [_file()],
+        "provenance": {"wiki_commit": "176bb8c"},
     }
     base.update(overrides)
     return base

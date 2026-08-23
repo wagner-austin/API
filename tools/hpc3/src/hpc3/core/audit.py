@@ -80,17 +80,21 @@ def sweep_submitted(*, host: str, project: str, base_name: str, job_ids: list[st
     )
 
 
-def files_staged(*, host: str, destination: str, count: int) -> None:
+def files_staged(*, host: str, destination: str, count: int, provenance: str) -> None:
     """Record a staging operation whose files all verified on the cluster.
 
     Args:
         host: SSH destination.
         destination: Directory the files were placed in.
         count: Number of files placed and verified.
+        provenance: The manifest's record of where the bytes came from,
+            already rendered. Carried into the event because "what was staged
+            here" is a question asked months later, when the manifest may have
+            been regenerated and the log is what is left.
     """
     _test_hooks.log_event(
         FILES_STAGED,
-        {"host": host, "destination": destination, "files": count},
+        {"host": host, "destination": destination, "files": count, "provenance": provenance},
     )
 
 

@@ -42,6 +42,8 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "checkpoint_steps": 0,
         "accept_billing": False,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
+        "pinned_packages": {},
+        "experiment": {"arm": "B", "seed": "42"},
         "command": "python train.py",
     }
     base.update(overrides)
@@ -61,12 +63,14 @@ class TestValidSpec:
             "command",
             "cpus",
             "env_path",
+            "experiment",
             "gpu",
             "gpu_count",
             "mem_gb",
             "minutes",
             "name",
             "partition",
+            "pinned_packages",
             "project",
             "requeue",
         ]

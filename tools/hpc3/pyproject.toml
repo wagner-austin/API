@@ -33,6 +33,7 @@ hpc3-preflight = "hpc3.cli.preflight:entrypoint"
 hpc3-stage = "hpc3.cli.stage:entrypoint"
 hpc3-submit = "hpc3.cli.submit:entrypoint"
 hpc3-sweep = "hpc3.cli.sweep:entrypoint"
+hpc3-trace = "hpc3.cli.trace:entrypoint"
 hpc3-triage = "hpc3.cli.triage:entrypoint"
 hpc3-watch = "hpc3.cli.watch:entrypoint"
 

@@ -82,6 +82,8 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "checkpoint_steps": 0,
         "accept_billing": True,
         "env_path": "/scratch/env",
+        "pinned_packages": {},
+        "experiment": {"arm": "B"},
         "command": "python train.py",
     }
     base.update(overrides)

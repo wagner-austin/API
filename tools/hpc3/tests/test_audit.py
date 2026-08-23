@@ -41,6 +41,8 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "checkpoint_steps": 0,
         "accept_billing": False,
         "env_path": "/pub/envs/abl-pinned",
+        "pinned_packages": {},
+        "experiment": {"arm": "B"},
         "command": "python train.py",
     }
     base.update(overrides)
@@ -104,12 +106,18 @@ class TestSweepSubmittedEvent:
 
 class TestFilesStagedEvent:
     def test_it_records_the_destination_and_count(self, logged: list[LoggedEvent]) -> None:
-        audit.files_staged(host="hpc3", destination="/pub/corpora", count=2)
+        audit.files_staged(
+            host="hpc3",
+            destination="/pub/corpora",
+            count=2,
+            provenance="wiki_commit=176bb8c",
+        )
         assert logged[0].event == audit.FILES_STAGED
         assert logged[0].fields == {
             "host": "hpc3",
             "destination": "/pub/corpora",
             "files": 2,
+            "provenance": "wiki_commit=176bb8c",
         }
 
 

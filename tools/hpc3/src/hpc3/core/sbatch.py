@@ -17,6 +17,7 @@ a successful job.
 
 from __future__ import annotations
 
+from hpc3.contracts.experiment import comment_fragment
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 
@@ -56,14 +57,18 @@ def job_comment(spec: JobSpec) -> str:
 
     Returns:
         A compact provenance string readable through ``scontrol show job`` and
-        ``sacct -o Comment``, naming the project, the hardware asked for, and
-        the environment the payload runs in.
+        ``sacct -o Comment``, naming the project, the hardware asked for, the
+        environment the payload runs in, and what the run is -- so a row found
+        in the queue answers "which experiment is this" without a ledger to
+        hand. The experiment fragment is truncated if long; the ledger holds
+        the full record.
     """
     return (
         f"project={spec['project']}"
         f";gpu={spec['gpu']}x{spec['gpu_count']}"
         f";cpus={spec['cpus']}"
         f";env={spec['env_path']}"
+        f";exp={comment_fragment(spec['experiment'])}"
     )
 
 
