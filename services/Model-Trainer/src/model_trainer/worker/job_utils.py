@@ -7,7 +7,7 @@ from pathlib import Path
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import default_events_channel
-from platform_core.logging import LogFormat, LogLevel, setup_logging
+from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.queues import TRAINER_QUEUE
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_core.trainer_metrics_events import (
@@ -16,7 +16,7 @@ from platform_core.trainer_metrics_events import (
     make_config_event,
     make_progress_metrics_event,
 )
-from platform_ml import RequestedDevice, ResolvedDevice
+from platform_ml import RequestedDevice, ResolvedDevice, encode_determinism_report
 from platform_workers.redis import RedisStrProto
 
 from model_trainer.core import _test_hooks
@@ -35,6 +35,8 @@ from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.infra.paths import models_dir
 from model_trainer.core.logging.types import LOGGING_EXTRA_FIELDS
 from model_trainer.core.services.tokenizer.loader import load_tokenizer_from_dir
+
+_log = get_logger(__name__)
 
 EVENTS_CHANNEL = default_events_channel("trainer")
 
@@ -111,13 +113,37 @@ def publish_metrics(r: RedisStrProto, message: str) -> None:
 
 
 def setup_env(settings: Settings) -> int:
-    """Setup environment for training job."""
+    """Setup environment for training job.
+
+    Also pins kernel-level numerical determinism, and does it HERE because
+    this is the last point in the job that is guaranteed to precede any CUDA
+    work: ``CUBLAS_WORKSPACE_CONFIG`` is read once when the cuBLAS handle is
+    created, so a later call is accepted in silence and has no effect.
+
+    Seeding is separate and already handled per-run. Seeds fix what the
+    sampler draws; they do not fix the order a GPU accumulates a reduction
+    in, and floating-point addition is not associative, so without this an
+    identical config on identical hardware still yields a different model on
+    every run. That variance was previously indistinguishable from seed
+    spread in any experiment reading small between-arm differences.
+
+    The applied settings are logged rather than assumed, because a run whose
+    determinism settings are unknown cannot be compared with one whose are.
+
+    Args:
+        settings: Application settings supplying the thread count.
+
+    Returns:
+        The resolved thread count.
+    """
     threads_cfg = settings["app"]["threads"]
     threads = threads_cfg if threads_cfg and threads_cfg > 0 else max(1, int(os.cpu_count() or 1))
     env = LocalCPUProvider(threads_count=threads).env()
     for k, v in env.items():
         __import__("os").putenv(k, v)
     __import__("os").putenv("TOKENIZERS_PARALLELISM", "1")
+    report = _test_hooks.apply_determinism_hook()
+    _log.info("determinism pinned", extra={"determinism": encode_determinism_report(report)})
     return threads
 
 

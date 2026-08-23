@@ -8,6 +8,7 @@ No conditionals needed - just call the hook directly.
 from __future__ import annotations
 
 from platform_core.logging import get_logger
+from platform_ml import DeterminismReport, apply_determinism
 from platform_workers.redis import (
     redis_for_kv,
     redis_raw_for_rq,
@@ -93,6 +94,7 @@ from model_trainer.core._hook_protocols import (
     TorchDeviceProto,
 )
 from model_trainer.core._hook_protocols_ml import (
+    ApplyDeterminismProto,
     CorpusCacheCleanupServiceFactoryProto,
     CorpusFetcherFactoryProto,
     CudaDeviceNameProto,
@@ -128,6 +130,29 @@ def _default_pkg_version(name: str) -> str:
     except PackageNotFoundError:
         _log.debug("Package %s not found, returning 'unknown'", name)
         return "unknown"
+
+
+def _default_apply_determinism() -> DeterminismReport:
+    """Production determinism pin - used as default hook.
+
+    Imported inside the function so that merely importing this module does
+    not pull torch into a process that only wanted a Redis handle.
+    """
+    import os
+
+    import torch
+    import torch.backends.cuda
+    import torch.backends.cudnn
+
+    # os.putenv rather than os.environ: it reaches the real process
+    # environment that cuBLAS's getenv reads, and it is a write rather than
+    # the config read the monorepo's env guard exists to stop.
+    return apply_determinism(
+        torch.backends.cudnn,
+        torch.backends.cuda.matmul,
+        torch.use_deterministic_algorithms,
+        os.putenv,
+    )
 
 
 def _default_gpu_max_memory_allocated() -> int:
@@ -166,6 +191,8 @@ corpus_fetcher_factory: CorpusFetcherFactoryProto = _default_corpus_fetcher_fact
 load_tokenizer_for_training: LoadTokenizerProto = _default_load_tokenizer_for_training
 
 httpx_client_factory: HttpxClientFactoryProto = _default_httpx_client_factory
+
+apply_determinism_hook: ApplyDeterminismProto = _default_apply_determinism
 
 cuda_is_available: CudaIsAvailableProto = _default_cuda_is_available
 

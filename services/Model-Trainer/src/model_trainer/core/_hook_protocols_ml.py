@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Protocol
 
 import torch
+from platform_ml import DeterminismReport
 from platform_ml.testing import (
     WandbModuleProtocol as WandbModuleLike,
 )
@@ -22,6 +23,19 @@ from model_trainer.core.contracts.dataset import CorpusSplit, DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.types import LMModelProto
+
+
+class ApplyDeterminismProto(Protocol):
+    """Protocol for the apply_determinism hook.
+
+    Behind a hook because it writes process-global torch state and the
+    environment, which a test must be able to observe without a real CUDA
+    stack and without leaking settings into the rest of the suite.
+    """
+
+    def __call__(self) -> DeterminismReport:
+        """Pin kernel determinism and report what was actually applied."""
+        ...
 
 
 class CudaIsAvailableProto(Protocol):

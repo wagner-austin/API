@@ -1,6 +1,18 @@
 from __future__ import annotations
 
 from .artifact_store import ArtifactStore, ArtifactStoreError
+from .determinism import (
+    CUBLAS_DETERMINISTIC_WORKSPACE,
+    CUBLAS_WORKSPACE_ENV_VAR,
+    CudnnBackendProtocol,
+    DeterminismReport,
+    MatmulBackendProtocol,
+    SetDeterministicAlgorithmsProtocol,
+    SetEnvProtocol,
+    apply_determinism,
+    encode_determinism_report,
+    set_cublas_workspace,
+)
 from .device_selector import (
     RequestedDevice,
     RequestedPrecision,
@@ -68,6 +80,8 @@ from .wandb_types import (
 )
 
 __all__ = [
+    "CUBLAS_DETERMINISTIC_WORKSPACE",
+    "CUBLAS_WORKSPACE_ENV_VAR",
     "GRADIENT_CAPABILITIES",
     "INTEGRATED_GRADIENTS_CAPABILITIES",
     "MANIFEST_SCHEMA_VERSION",
@@ -75,7 +89,9 @@ __all__ = [
     "ArtifactStore",
     "ArtifactStoreError",
     "ComputationalCost",
+    "CudnnBackendProtocol",
     "DTypeProtocol",
+    "DeterminismReport",
     "DeviceProtocol",
     "ExplainerCapabilities",
     "ExplainerName",
@@ -88,6 +104,7 @@ __all__ = [
     "IntegratedGradientsConfig",
     "IntegratedGradientsExplainer",
     "LocalExplanation",
+    "MatmulBackendProtocol",
     "ModelManifestV2",
     "PILImage",
     "PermutationConfig",
@@ -97,6 +114,8 @@ __all__ = [
     "RequestedPrecision",
     "ResolvedDevice",
     "ResolvedPrecision",
+    "SetDeterministicAlgorithmsProtocol",
+    "SetEnvProtocol",
     "ShapTreeWrapper",
     "TarballError",
     "TensorIterable",
@@ -115,11 +134,13 @@ __all__ = [
     "WandbStepMetrics",
     "WandbTableRow",
     "WandbUnavailableError",
+    "apply_determinism",
     "configure_torch_threads",
     "create_gradient_explainer",
     "create_integrated_gradients_explainer",
     "create_permutation_explainer",
     "create_tarball",
+    "encode_determinism_report",
     "extract_tarball",
     "from_json_manifest_v2",
     "from_path_manifest_v2",
@@ -127,5 +148,6 @@ __all__ = [
     "recommended_batch_size",
     "resolve_device",
     "resolve_precision",
+    "set_cublas_workspace",
     "set_manual_seed",
 ]
