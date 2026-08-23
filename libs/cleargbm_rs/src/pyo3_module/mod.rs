@@ -25,10 +25,12 @@
 //!
 //! - [`error_conversion`] — Maps [`ClearGbmError`](crate::error::ClearGbmError) to Python exceptions
 //! - [`array_helpers`] — Numpy ↔ Rust type conversions (no `as` casts)
+//! - [`config_extract`] — Config-dict extraction for the training entries
 //! - [`training_fns`] — Training entries (binary + regression) and prediction
 //! - [`model_fns`] — The [`PyGbmModel`] class + model serde + importances
 
 pub(crate) mod array_helpers;
+pub(crate) mod config_extract;
 mod error_conversion;
 pub(crate) mod model_fns;
 pub(crate) mod training_fns;

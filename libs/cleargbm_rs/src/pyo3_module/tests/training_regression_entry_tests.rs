@@ -95,7 +95,10 @@ fn test_regression_entry_registered_on_module() -> Result<(), ClearGbmError> {
             Ok(v) => v,
             Err(e) => return Err(fail(format!("is_instance failed: {e}"))),
         };
-        assert!(is_model, "regression trainer returned a non-PyGbmModel object");
+        assert!(
+            is_model,
+            "regression trainer returned a non-PyGbmModel object"
+        );
         Ok(())
     })
 }

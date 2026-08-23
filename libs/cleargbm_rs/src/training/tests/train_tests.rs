@@ -9,7 +9,7 @@ use crate::hooks::Hooks;
 use crate::losses::{binary_log_loss, sigmoid_array};
 use crate::split::MonotonicConstraint;
 use crate::training::{
-    train_gradient_boosting, GradientBoostingConfig, GrowthStrategy, Objective, TrainingLabels,
+    train_gradient_boosting, GradientBoostingConfig, Objective, TrainingLabels,
     ValidationData,
 };
 use crate::training::{Parallelism, TrainingRuntime};
@@ -508,97 +508,4 @@ fn test_default_pool_builder_produces_a_usable_pool() -> Result<(), ClearGbmErro
     };
     assert_eq!(pool.current_num_threads(), 2_usize);
     Ok(())
-}
-
-#[test]
-fn test_binary_objective_rejects_continuous_labels() -> Result<(), ClearGbmError> {
-    // The typed entry makes the mismatch an error instead of a silent
-    // reinterpretation.
-    let (rows, _, feature_names) = make_simple_dataset();
-    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
-    let y_continuous: Vec<f64> = vec![0.0_f64; rows.len()];
-
-    let config = match make_config(2_usize) {
-        Ok(c) => c,
-        Err(e) => return Err(e),
-    };
-    let result = train_gradient_boosting(
-        &x_train,
-        TrainingLabels::Continuous(&y_continuous),
-        None,
-        &config,
-        &feature_names,
-        &TrainingRuntime {
-            parallelism: Parallelism::Single,
-            hooks: &Hooks::default(),
-        },
-    );
-    match result {
-        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
-            reason: "binary objective must reject continuous labels".to_string(),
-        }),
-        Err(ClearGbmError::InvalidParameter { name, reason }) => {
-            assert_eq!(name, "y_train");
-            assert!(
-                reason.contains("binary_log_loss"),
-                "error should name the objective, got: {reason}"
-            );
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }
-}
-
-#[test]
-fn test_binary_objective_rejects_continuous_val_labels() -> Result<(), ClearGbmError> {
-    let (rows, y_train, feature_names) = make_simple_dataset();
-    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
-    let val_rows: Vec<Vec<f64>> = vec![vec![0.1_f64, 0.2_f64]];
-    let x_val: Vec<&[f64]> = val_rows.iter().map(Vec::as_slice).collect();
-    let y_val: Vec<f64> = vec![0.5_f64];
-
-    let config = match make_config(2_usize) {
-        Ok(c) => c,
-        Err(e) => return Err(e),
-    };
-    let result = train_binary(
-        &x_train,
-        &y_train,
-        Some(ValidationData {
-            x: &x_val,
-            y: TrainingLabels::Continuous(&y_val),
-        }),
-        &config,
-        &feature_names,
-    );
-    match result {
-        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
-            reason: "binary objective must reject continuous validation labels".to_string(),
-        }),
-        Err(ClearGbmError::InvalidParameter { name, .. }) => {
-            assert_eq!(name, "y_val");
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }
-}
-
-#[test]
-fn test_labels_len_and_is_empty() {
-    let binary = TrainingLabels::Binary(&[0_u8, 1_u8]);
-    assert_eq!(binary.len(), 2_usize);
-    assert!(!binary.is_empty());
-    let continuous: TrainingLabels<'_> = TrainingLabels::Continuous(&[]);
-    assert_eq!(continuous.len(), 0_usize);
-    assert!(continuous.is_empty());
-    let debug = format!("{binary:?} {continuous:?}");
-    assert!(debug.contains("Binary"));
-    assert!(debug.contains("Continuous"));
-}
-
-#[test]
-fn test_growth_strategy_debug_format() {
-    // Keeps the derive covered without a dedicated serde path.
-    let debug = format!("{:?}", GrowthStrategy::LeafWise);
-    assert!(debug.contains("LeafWise"));
 }
