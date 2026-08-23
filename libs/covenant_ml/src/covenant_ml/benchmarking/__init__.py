@@ -76,6 +76,15 @@ from .protocols import (
     TrainerProto,
 )
 from .quality import compute_quality
+from .ranking_quality import (
+    RankingArmResult,
+    RankingBenchConfig,
+    RankingManifest,
+    RankingQuality,
+    encode_ranking_manifest,
+    make_synthetic_ranking,
+    run_ranking_benchmark,
+)
 from .reporting import GapSummary, ModelSummary, render_report, summarize_gap
 from .runner import measure_trainer, run_benchmark
 from .splitting import company_disjoint_split
@@ -101,6 +110,10 @@ __all__ = [
     "PowerThrottlingOptOutProto",
     "ProcessInformationSetterProto",
     "QualityMetrics",
+    "RankingArmResult",
+    "RankingBenchConfig",
+    "RankingManifest",
+    "RankingQuality",
     "SeedResult",
     "SplitFactoryProto",
     "TimingSummary",
@@ -112,17 +125,20 @@ __all__ = [
     "disable_power_throttling",
     "encode_benchmark_manifest",
     "encode_multiclass_manifest",
+    "encode_ranking_manifest",
     "load_bankruptcy_dataset",
     "make_baseline_trainers",
     "make_benchmark_config",
     "make_split_factory",
     "make_synthetic_multiclass",
+    "make_synthetic_ranking",
     "make_trainers",
     "measure_trainer",
     "opt_out_of_power_throttling",
     "render_report",
     "run_benchmark",
     "run_multiclass_benchmark",
+    "run_ranking_benchmark",
     "summarize_gap",
     "summarize_timings",
 ]

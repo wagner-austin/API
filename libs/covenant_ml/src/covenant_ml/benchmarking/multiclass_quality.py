@@ -246,6 +246,7 @@ def _cleargbm_config(config: MulticlassBenchConfig, seed: int) -> GradientBoosti
         colsample_bytree=None,
         categorical_features=None,
         n_classes=config["n_classes"],
+        lambdarank_truncation_level=None,
         max_bins=config["max_bins"],
         subsample=1.0,
         random_state=seed,

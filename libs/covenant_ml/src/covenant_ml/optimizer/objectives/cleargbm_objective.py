@@ -94,6 +94,7 @@ def _build_trial_config(
         colsample_bytree=None,
         categorical_features=None,
         n_classes=None,
+        lambdarank_truncation_level=None,
         max_bins=int_params.get("max_bins", 64),
         subsample=float_params.get("subsample", 1.0),
         random_state=random_state,

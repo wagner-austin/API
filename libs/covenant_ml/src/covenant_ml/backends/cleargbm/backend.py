@@ -312,6 +312,7 @@ class ClearGBMBackend(ClassifierBackend):
                 cfg["categorical_features"], resolved_names
             ),
             n_classes=None,
+            lambdarank_truncation_level=None,
             max_bins=cfg["max_bins"],
             subsample=cfg["subsample"],
             random_state=cfg["random_state"],

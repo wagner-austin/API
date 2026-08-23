@@ -82,6 +82,61 @@ def compute_multiclass_log_loss(
     return -total / n_samples
 
 
+def compute_ndcg_at_k(
+    y_true: NDArray[np.int64],
+    scores: NDArray[np.float64],
+    k: int,
+) -> float:
+    """Compute NDCG@k for one query.
+
+    Gains are ``2^label - 1`` and the position discount is
+    ``1 / log2(rank + 2)`` for 0-based ranks — the LightGBM/Burges
+    convention, so the number is comparable across both benchmark arms.
+
+    Args:
+        y_true: Relevance grades (non-negative ints), shape (n_docs,)
+        scores: Ranking scores, shape (n_docs,); documents sort by them
+            descending, ties keeping row order
+        k: Truncation position (>= 1)
+
+    Returns:
+        DCG@k of the score ordering divided by the ideal DCG@k, or 1.0
+        when the ideal DCG is zero (every grade 0 — nothing to rank).
+
+    Raises:
+        ValueError: If lengths differ, ``k`` is below 1, or a grade is
+            negative.
+    """
+    n_docs = len(y_true)
+    if len(scores) != n_docs:
+        raise ValueError(
+            f"y_true and scores must have equal length, got {n_docs} and {len(scores)}"
+        )
+    if k < 1:
+        raise ValueError(f"k must be >= 1, got {k}")
+    grades: list[int] = []
+    for i in range(n_docs):
+        grade = int(y_true.flat[i].item())
+        if grade < 0:
+            raise ValueError(f"grade {grade} at index {i} must be >= 0")
+        grades.append(grade)
+    score_list: list[float] = [float(scores.flat[i].item()) for i in range(n_docs)]
+
+    def neg_score(i: int) -> float:
+        return -score_list[i]
+
+    order: list[int] = sorted(range(n_docs), key=neg_score)
+    dcg = 0.0
+    for position, doc in enumerate(order[:k]):
+        dcg += (2.0 ** grades[doc] - 1.0) / math.log2(float(position) + 2.0)
+    ideal = 0.0
+    for position, grade in enumerate(sorted(grades, reverse=True)[:k]):
+        ideal += (2.0**grade - 1.0) / math.log2(float(position) + 2.0)
+    if ideal <= 0.0:
+        return 1.0
+    return dcg / ideal
+
+
 def compute_auc(
     y_true: NDArray[np.int64],
     y_prob: NDArray[np.float64],
@@ -480,6 +535,7 @@ __all__ = [
     "compute_f1_score",
     "compute_log_loss",
     "compute_multiclass_log_loss",
+    "compute_ndcg_at_k",
     "compute_precision",
     "compute_recall",
     "format_metrics_str",
