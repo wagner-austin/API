@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cleargbm.types import GradientBoostingConfig, GrowthStrategy
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 
 
 def make_config(
@@ -20,6 +20,8 @@ def make_config(
     early_stopping_rounds: int | None = None,
     growth_strategy: GrowthStrategy = "depth_wise",
     num_leaves: int | None = None,
+    objective: Objective = "binary_log_loss",
+    scale_pos_weight: float | None = 1.0,
 ) -> GradientBoostingConfig:
     """Create a test config.
 
@@ -38,6 +40,9 @@ def make_config(
         early_stopping_rounds: Rounds without improvement before stopping (None = disabled).
         growth_strategy: Tree growth policy.
         num_leaves: Leaf budget, required under leaf-wise growth.
+        objective: Training objective.
+        scale_pos_weight: Positive-class weight; must be ``None`` under
+            ``"squared_error"``.
 
     Returns:
         Test configuration.
@@ -59,7 +64,32 @@ def make_config(
         early_stopping_rounds=early_stopping_rounds,
         growth_strategy=growth_strategy,
         num_leaves=num_leaves,
-        scale_pos_weight=1.0,
+        objective=objective,
+        scale_pos_weight=scale_pos_weight,
+    )
+
+
+def make_regression_config(
+    n_estimators: int = 10,
+    max_depth: int = 3,
+    early_stopping_rounds: int | None = None,
+) -> GradientBoostingConfig:
+    """Create a test squared-error regression config.
+
+    Args:
+        n_estimators: Number of boosting rounds.
+        max_depth: Maximum tree depth.
+        early_stopping_rounds: Rounds without improvement before stopping (None = disabled).
+
+    Returns:
+        Test configuration with the regression objective pairing.
+    """
+    return make_config(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        early_stopping_rounds=early_stopping_rounds,
+        objective="squared_error",
+        scale_pos_weight=None,
     )
 
 

@@ -178,6 +178,7 @@ class TestTuningReport:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "objective": "binary_log_loss",
             "scale_pos_weight": 1.0,
         }
         timing_result: TimingResult = {
@@ -229,6 +230,7 @@ class TestTuningReport:
             "n_jobs": 1,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "objective": "binary_log_loss",
             "scale_pos_weight": 1.0,
         }
         raw: JSONDict = {
@@ -262,6 +264,7 @@ class TestTuningReport:
             "n_jobs": 1,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "objective": "binary_log_loss",
             "scale_pos_weight": 1.0,
         }
         raw: JSONDict = {
@@ -295,6 +298,7 @@ class TestTuningReport:
             "n_jobs": 1,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "objective": "binary_log_loss",
             "scale_pos_weight": 1.0,
         }
         raw: JSONDict = {
@@ -328,6 +332,7 @@ class TestTuningReport:
             "n_jobs": 1,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "objective": "binary_log_loss",
             "scale_pos_weight": 1.0,
         }
         raw: JSONDict = {

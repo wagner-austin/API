@@ -18,8 +18,9 @@ from cleargbm.ensemble import (
     predict_proba,
     predict_raw,
     train_gradient_boosting,
+    train_gradient_boosting_regression,
 )
-from cleargbm.types import GradientBoostingConfig, GrowthStrategy
+from cleargbm.types import GradientBoostingConfig, GrowthStrategy, Objective
 
 
 def _make_config(
@@ -31,6 +32,8 @@ def _make_config(
     n_jobs: int = 1,
     growth_strategy: GrowthStrategy = "depth_wise",
     num_leaves: int | None = None,
+    objective: Objective = "binary_log_loss",
+    scale_pos_weight: float | None = 1.0,
 ) -> GradientBoostingConfig:
     """Return a minimal valid training config."""
     return GradientBoostingConfig(
@@ -50,7 +53,18 @@ def _make_config(
         early_stopping_rounds=early_stopping_rounds,
         growth_strategy=growth_strategy,
         num_leaves=num_leaves,
-        scale_pos_weight=1.0,
+        objective=objective,
+        scale_pos_weight=scale_pos_weight,
+    )
+
+
+def _make_regression_config(n_estimators: int = 30) -> GradientBoostingConfig:
+    """Return a minimal valid squared-error regression config."""
+    return _make_config(
+        n_estimators=n_estimators,
+        max_depth=3,
+        objective="squared_error",
+        scale_pos_weight=None,
     )
 
 
@@ -106,8 +120,8 @@ class TestValidateTrainingInputs:
 class TestConfigToRustDict:
     """Config translation: every field crosses; monotonic list is passed through."""
 
-    def test_carries_the_sixteen_hyperparameters_plus_n_jobs(self) -> None:
-        """The Rust-side dict has exactly the 17 keys the Rust trainer reads."""
+    def test_carries_every_hyperparameter_plus_n_jobs(self) -> None:
+        """The Rust-side dict has exactly the 18 keys the Rust trainer reads."""
         result = _config_to_rust_dict(_make_config())
         expected = {
             "n_estimators",
@@ -125,10 +139,24 @@ class TestConfigToRustDict:
             "n_jobs",
             "growth_strategy",
             "num_leaves",
+            "objective",
             "scale_pos_weight",
             "max_features",
         }
         assert set(result.keys()) == expected
+
+    def test_carries_the_objective_and_its_weight_pairing(self) -> None:
+        """Both halves of the objective axis must reach Rust.
+
+        The objective decides the loss; the weight is only meaningful under
+        the binary objective and crosses as None for regression.
+        """
+        binary = _config_to_rust_dict(_make_config())
+        assert binary["objective"] == "binary_log_loss"
+        assert binary["scale_pos_weight"] == 1.0
+        regression = _config_to_rust_dict(_make_regression_config())
+        assert regression["objective"] == "squared_error"
+        assert regression["scale_pos_weight"] is None
 
     def test_carries_the_growth_policy_and_its_budget(self) -> None:
         """Both halves of the growth axis must reach Rust.
@@ -267,6 +295,107 @@ class TestTrainAndPredict:
                 y_val=None,
                 config=_make_config(),
                 feature_names=("a", "b"),
+            )
+
+
+class TestTrainRegression:
+    """End-to-end regression path: continuous targets, raw-score predictions."""
+
+    @staticmethod
+    def _make_regression_dataset() -> tuple[
+        NDArray[np.float64], NDArray[np.float64], tuple[str, ...]
+    ]:
+        """Return a small noiseless regression dataset (y = 2*f0 + f1)."""
+        rng = np.random.default_rng(3)
+        x: NDArray[np.float64] = rng.random((40, 2), dtype=np.float64)
+        y: NDArray[np.float64] = (2.0 * x[:, 0] + x[:, 1]).astype(np.float64)
+        return x, y, ("f0", "f1")
+
+    def test_regression_fits_a_noiseless_target(self) -> None:
+        """Predictions track the target closely on noiseless data."""
+        x, y, names = self._make_regression_dataset()
+        model = train_gradient_boosting_regression(
+            x_train=x,
+            y_train=y,
+            x_val=None,
+            y_val=None,
+            config=_make_regression_config(),
+            feature_names=names,
+        )
+        preds = predict_raw(model, x)
+        n_rows: int = int(y.shape[0])
+        squared_error: NDArray[np.float64] = (preds - y) ** 2
+        mse = float(np.sum(squared_error)) / n_rows
+        assert mse < 0.05, f"regression fit too loose: MSE {mse}"
+
+    def test_regression_model_rejects_predict_proba(self) -> None:
+        """A squared-error model's raw scores are predictions, not log-odds."""
+        x, y, names = self._make_regression_dataset()
+        model = train_gradient_boosting_regression(
+            x_train=x,
+            y_train=y,
+            x_val=None,
+            y_val=None,
+            config=_make_regression_config(),
+            feature_names=names,
+        )
+        with pytest.raises(ValueError, match="predict_raw"):
+            predict_proba(model, x)
+
+    def test_regression_entry_rejects_a_binary_config(self) -> None:
+        """Entry and objective must agree; the Rust boundary enforces it."""
+        x, y, names = self._make_regression_dataset()
+        with pytest.raises(ValueError, match="binary_log_loss"):
+            train_gradient_boosting_regression(
+                x_train=x,
+                y_train=y,
+                x_val=None,
+                y_val=None,
+                config=_make_config(),
+                feature_names=names,
+            )
+
+    def test_binary_entry_rejects_a_regression_config(self) -> None:
+        """The mismatch is symmetric: the binary entry rejects squared_error."""
+        x, y, names = _make_binary_dataset()
+        with pytest.raises(ValueError, match="squared_error"):
+            train_gradient_boosting(
+                x_train=x,
+                y_train=y,
+                x_val=None,
+                y_val=None,
+                config=_make_regression_config(),
+                feature_names=names,
+            )
+
+    def test_regression_artifact_carries_the_objective(self) -> None:
+        """A saved regression model names the loss it was trained under."""
+        x, y, names = self._make_regression_dataset()
+        model = train_gradient_boosting_regression(
+            x_train=x,
+            y_train=y,
+            x_val=None,
+            y_val=None,
+            config=_make_regression_config(),
+            feature_names=names,
+        )
+        document = export_model_json(model)
+        assert '"objective":"squared_error"' in document
+        assert '"scale_pos_weight":null' in document
+
+    def test_regression_rejects_non_finite_targets(self) -> None:
+        """A NaN target fails loudly with its index, not as a NaN model."""
+        x, y, names = self._make_regression_dataset()
+        y = y.copy()
+        y[4] = np.nan
+        with pytest.raises(ValueError, match="index 4"):
+            train_gradient_boosting_regression(
+                x_train=x,
+                y_train=y,
+                x_val=None,
+                y_val=None,
+                config=_make_regression_config(),
+                feature_names=names,
             )
 
 

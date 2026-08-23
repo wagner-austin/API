@@ -41,7 +41,7 @@ class _TrainProto(Protocol):
         config: dict[str, int | float | bool | str | list[int] | None],
         feature_names: list[str],
     ) -> PyGbmModelProto:
-        """Train a native gradient boosting model.
+        """Train a native binary-classification gradient boosting model.
 
         Args:
             x_train: 2D training feature matrix.
@@ -49,7 +49,37 @@ class _TrainProto(Protocol):
             x_val: Optional 2D validation feature matrix.
             y_val: Optional 1D validation labels.
             config: Hyperparameter dict (Rust-side shape; produced by
-                ``cleargbm.ensemble._config_to_rust_dict``).
+                ``cleargbm.ensemble._config_to_rust_dict``); its
+                ``objective`` must be ``"binary_log_loss"``.
+            feature_names: Feature names list, length = ``x_train.shape[1]``.
+
+        Returns:
+            Opaque native model handle.
+        """
+        ...
+
+
+class _TrainRegressionProto(Protocol):
+    """Signature of ``cleargbm_rs.train_gradient_boosting_regression_rs``."""
+
+    def __call__(
+        self,
+        x_train: NDArray[np.float64],
+        y_train: NDArray[np.float64],
+        x_val: NDArray[np.float64] | None,
+        y_val: NDArray[np.float64] | None,
+        config: dict[str, int | float | bool | str | list[int] | None],
+        feature_names: list[str],
+    ) -> PyGbmModelProto:
+        """Train a native squared-error regression model.
+
+        Args:
+            x_train: 2D training feature matrix.
+            y_train: 1D continuous training targets.
+            x_val: Optional 2D validation feature matrix.
+            y_val: Optional 1D continuous validation targets.
+            config: Hyperparameter dict (Rust-side shape); its ``objective``
+                must be ``"squared_error"``.
             feature_names: Feature names list, length = ``x_train.shape[1]``.
 
         Returns:
@@ -159,24 +189,12 @@ class _NTreesProto(Protocol):
         ...
 
 
-class _NClassesProto(Protocol):
-    """Signature of ``cleargbm_rs.py_gbm_model_n_classes_rs``."""
-
-    def __call__(self, model: PyGbmModelProto) -> int:
-        """Return the class count.
-
-        Args:
-            model: Trained native model handle.
-
-        Returns:
-            Number of classes (2 for binary).
-        """
-        ...
-
-
 _native_mod: types.ModuleType = __import__("cleargbm_rs")
 
 train_gradient_boosting_rs: _TrainProto = _native_mod.train_gradient_boosting_rs
+train_gradient_boosting_regression_rs: _TrainRegressionProto = (
+    _native_mod.train_gradient_boosting_regression_rs
+)
 predict_proba_model_rs: _PredictProbaProto = _native_mod.predict_proba_model_rs
 predict_raw_model_rs: _PredictRawProto = _native_mod.predict_raw_model_rs
 py_gbm_model_to_json_rs: _ToJsonProto = _native_mod.py_gbm_model_to_json_rs
@@ -185,7 +203,6 @@ py_gbm_model_feature_importances_rs: _FeatureImportancesProto = (
     _native_mod.py_gbm_model_feature_importances_rs
 )
 py_gbm_model_n_trees_rs: _NTreesProto = _native_mod.py_gbm_model_n_trees_rs
-py_gbm_model_n_classes_rs: _NClassesProto = _native_mod.py_gbm_model_n_classes_rs
 
 
 __all__ = [
@@ -194,8 +211,8 @@ __all__ = [
     "predict_raw_model_rs",
     "py_gbm_model_feature_importances_rs",
     "py_gbm_model_from_json_rs",
-    "py_gbm_model_n_classes_rs",
     "py_gbm_model_n_trees_rs",
     "py_gbm_model_to_json_rs",
+    "train_gradient_boosting_regression_rs",
     "train_gradient_boosting_rs",
 ]

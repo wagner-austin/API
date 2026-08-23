@@ -166,7 +166,6 @@ class TestHelperErrorPaths:
                     "base_prediction": 0.0,
                     "learning_rate": 0.1,
                     "feature_names": ["x"],
-                    "n_classes": 2,
                     "config": {
                         "n_estimators": 1,
                         "max_depth": 1,
@@ -191,7 +190,6 @@ class TestHelperErrorPaths:
                     "base_prediction": 0.0,
                     "learning_rate": 0.1,
                     "feature_names": [123],  # int, not str
-                    "n_classes": 2,
                     "config": {
                         "n_estimators": 1,
                         "max_depth": 1,
@@ -216,7 +214,6 @@ class TestHelperErrorPaths:
                     "base_prediction": 0.0,
                     "learning_rate": 0.1,
                     "feature_names": "not a list",  # string, not list
-                    "n_classes": 2,
                     "config": {
                         "n_estimators": 1,
                         "max_depth": 1,

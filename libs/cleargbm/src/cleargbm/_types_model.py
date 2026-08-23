@@ -52,6 +52,21 @@ quietly training the default policy.
 GROWTH_STRATEGIES: tuple[GrowthStrategy, ...] = get_args(GrowthStrategy)
 """Every accepted :data:`GrowthStrategy` value, for validation and iteration."""
 
+Objective = Literal["binary_log_loss", "squared_error"]
+"""Training objective — the loss whose gradients the trees descend.
+
+``binary_log_loss`` is binary classification: 0/1 labels, a log-odds base
+score, sigmoid probabilities. ``squared_error`` is regression: continuous
+targets, a label-mean base score, raw scores that ARE the predictions.
+
+A closed literal for the same reason :data:`GrowthStrategy` is: a mistyped
+objective fails at the Rust boundary rather than quietly training the wrong
+loss.
+"""
+
+OBJECTIVES: tuple[Objective, ...] = get_args(Objective)
+"""Every accepted :data:`Objective` value, for validation and iteration."""
+
 
 class GradientBoostingConfig(TypedDict):
     """Configuration for gradient boosting training.
@@ -91,12 +106,17 @@ class GradientBoostingConfig(TypedDict):
             against ``growth_strategy`` is enforced once, at the Rust
             boundary, so the cross-field rule has a single owner rather than
             two copies that can drift.
+        objective: The loss to train under, ``"binary_log_loss"`` or
+            ``"squared_error"``. Required, with no implicit default: a run
+            must name the loss it descends.
         scale_pos_weight: Weight applied to positive samples in the loss,
-            its gradients and the base score. Must be a finite positive
-            number; ``1.0`` trains unweighted (and is bit-identical to the
-            pre-weighting behavior). Required, with no implicit default,
-            for the same reason ``growth_strategy`` is: the field exists
-            because a backend once reported a weight it never applied.
+            its gradients and the base score. Paired with the objective:
+            must be a finite positive float under ``"binary_log_loss"``
+            (``1.0`` trains unweighted, bit-identical to the pre-weighting
+            behavior) and ``None`` under ``"squared_error"``, which has no
+            positive class to weight. As with ``num_leaves``, this layer
+            checks the field's own type; the *pairing* is enforced once, at
+            the Rust boundary.
     """
 
     n_estimators: int
@@ -115,7 +135,8 @@ class GradientBoostingConfig(TypedDict):
     early_stopping_rounds: int | None
     growth_strategy: GrowthStrategy
     num_leaves: int | None
-    scale_pos_weight: float
+    objective: Objective
+    scale_pos_weight: float | None
 
 
 def require_leaf_budget(value: int, name: str) -> int:
@@ -157,6 +178,25 @@ def require_growth_strategy(value: str, name: str) -> GrowthStrategy:
     raise ValueError(f"{name} must be one of {list(GROWTH_STRATEGIES)}, got {value!r}")
 
 
+def require_objective(value: str, name: str) -> Objective:
+    """Narrow a string to an :data:`Objective`.
+
+    Args:
+        value: Candidate objective name.
+        name: Field name, used in the error message.
+
+    Returns:
+        The value, narrowed to the literal type.
+
+    Raises:
+        ValueError: If ``value`` is not one of :data:`OBJECTIVES`.
+    """
+    for objective in OBJECTIVES:
+        if value == objective:
+            return objective
+    raise ValueError(f"{name} must be one of {list(OBJECTIVES)}, got {value!r}")
+
+
 def encode_gradient_boosting_config(
     config: GradientBoostingConfig,
 ) -> JSONDict:
@@ -189,6 +229,7 @@ def encode_gradient_boosting_config(
         "early_stopping_rounds": config["early_stopping_rounds"],
         "growth_strategy": config["growth_strategy"],
         "num_leaves": config["num_leaves"],
+        "objective": config["objective"],
         "scale_pos_weight": config["scale_pos_weight"],
     }
 
@@ -260,9 +301,11 @@ def decode_gradient_boosting_config(
     if num_leaves is not None:
         num_leaves = require_leaf_budget(num_leaves, "num_leaves")
 
-    scale_pos_weight = require_positive_float(
-        _require_float(raw, "scale_pos_weight"), "scale_pos_weight"
-    )
+    objective = require_objective(_require_str(raw, "objective"), "objective")
+
+    scale_pos_weight = _get_optional_float(raw, "scale_pos_weight")
+    if scale_pos_weight is not None:
+        scale_pos_weight = require_positive_float(scale_pos_weight, "scale_pos_weight")
 
     return GradientBoostingConfig(
         n_estimators=n_estimators,
@@ -281,6 +324,7 @@ def decode_gradient_boosting_config(
         early_stopping_rounds=early_stopping_rounds,
         growth_strategy=growth_strategy,
         num_leaves=num_leaves,
+        objective=objective,
         scale_pos_weight=scale_pos_weight,
     )
 
@@ -291,13 +335,18 @@ def decode_gradient_boosting_config(
 
 
 class GradientBoostingModel(TypedDict):
-    """Trained gradient boosting model."""
+    """Trained gradient boosting model.
+
+    Everything objective-dependent — how a raw score reads, whether
+    probabilities exist — is answered by ``config["objective"]``. The
+    ``n_classes`` field was removed 2026-08-22: constant 2 for binary,
+    derivable from the objective, meaningless for regression.
+    """
 
     trees: tuple[DecisionTree, ...]
     base_prediction: float
     learning_rate: float
     feature_names: tuple[str, ...]
-    n_classes: int
     config: GradientBoostingConfig
 
 
@@ -317,7 +366,6 @@ def encode_gradient_boosting_model(
         "base_prediction": model["base_prediction"],
         "learning_rate": model["learning_rate"],
         "feature_names": list(model["feature_names"]),
-        "n_classes": model["n_classes"],
         "config": encode_gradient_boosting_config(model["config"]),
     }
 
@@ -348,7 +396,6 @@ def decode_gradient_boosting_model(
 
     base_prediction = _require_float(raw, "base_prediction")
     learning_rate = require_positive_float(_require_float(raw, "learning_rate"), "learning_rate")
-    n_classes = require_positive_int(_require_int(raw, "n_classes"), "n_classes")
 
     feature_names_raw = raw["feature_names"]
     if not isinstance(feature_names_raw, list):
@@ -367,7 +414,6 @@ def decode_gradient_boosting_model(
         base_prediction=base_prediction,
         learning_rate=learning_rate,
         feature_names=tuple(feature_names),
-        n_classes=n_classes,
         config=config,
     )
 
@@ -434,9 +480,11 @@ def decode_training_progress(raw: JSONDict) -> TrainingProgress:
 
 __all__ = [
     "GROWTH_STRATEGIES",
+    "OBJECTIVES",
     "GradientBoostingConfig",
     "GradientBoostingModel",
     "GrowthStrategy",
+    "Objective",
     "TrainingProgress",
     "decode_gradient_boosting_config",
     "decode_gradient_boosting_model",
@@ -446,4 +494,5 @@ __all__ = [
     "encode_training_progress",
     "require_growth_strategy",
     "require_leaf_budget",
+    "require_objective",
 ]
