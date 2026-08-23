@@ -1,0 +1,24 @@
+{
+  "project": "abl",
+  "name": "rung-large",
+  "minutes": 900,
+  "checkpoint_steps": 250,
+  "members": [
+    {
+      "suffix": "armB-s0",
+      "command": "python -u train.py --arm B --seed 0 --model gpt2-large"
+    },
+    {
+      "suffix": "armB-s1",
+      "command": "python -u train.py --arm B --seed 1 --model gpt2-large"
+    },
+    {
+      "suffix": "armC-s0",
+      "command": "python -u train.py --arm C --seed 0 --model gpt2-large"
+    },
+    {
+      "suffix": "armC-s1",
+      "command": "python -u train.py --arm C --seed 1 --model gpt2-large"
+    }
+  ]
+}

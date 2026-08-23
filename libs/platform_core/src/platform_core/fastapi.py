@@ -6,12 +6,15 @@ from typing import Protocol, runtime_checkable
 from starlette.requests import Request
 from starlette.responses import Response
 
-from platform_core.errors import (
-    ErrorCode,
-    ErrorCodeBase,
+from platform_core._asgi_protocols import (
     _ExceptionHandlerProto,
     _FastAPIAppProto,
     _JSONResponseProto,
+    _URLProto,
+)
+from platform_core.errors import (
+    ErrorCode,
+    ErrorCodeBase,
     install_exception_handlers,
 )
 from platform_core.request_context import request_id_var as _global_request_id_var
@@ -30,11 +33,6 @@ class StarletteRequestProto(Protocol):
 
     @property
     def method(self) -> str: ...
-
-
-class _URLProto(Protocol):
-    @property
-    def path(self) -> str: ...
 
 
 @runtime_checkable

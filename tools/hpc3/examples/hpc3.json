@@ -1,0 +1,25 @@
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "budget": {
+    "max_gpu_hours": 120.0,
+    "max_service_units": 0.0
+  },
+  "projects": {
+    "abl": {
+      "partition": "free-gpu",
+      "gpu": "A100",
+      "gpu_count": 1,
+      "cpus": 8,
+      "mem_gb": 96,
+      "minutes": 720,
+      "requeue": true,
+      "checkpoint_steps": 500,
+      "accept_billing": false,
+      "env_path": "/pub/wagnera3/envs/abl-pinned"
+    }
+  }
+}

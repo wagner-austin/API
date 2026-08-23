@@ -1,0 +1,149 @@
+"""Rendering a validated job spec into the batch script Slurm receives.
+
+This module is where the contract's rules stop being assertions and become
+the text that gets submitted. Two of them are visible in the output:
+
+* ``--gres`` always carries the GPU model. There is no code path that emits a
+  bare ``gpu:N``, because :class:`~hpc3.contracts.job.JobSpec` has no way to
+  express one.
+* ``--requeue`` appears exactly when the spec requested it, and the spec
+  cannot request a long preemptible run without it.
+
+The script body sets no error-handling policy of its own beyond ``set -u``.
+It deliberately does NOT ``set -e``: the payload's exit status is what Slurm
+records, and swallowing or transforming it here would hide a failed run behind
+a successful job.
+"""
+
+from __future__ import annotations
+
+from hpc3.contracts.job import JobSpec
+from hpc3.contracts.layout import qualified_name
+
+MINUTES_PER_HOUR = 60
+MINUTES_PER_DAY = 1440
+
+
+def format_walltime(minutes: int) -> str:
+    """Render a duration in the ``sbatch --time`` format.
+
+    Args:
+        minutes: Duration in minutes. Always positive: the job contract
+            rejects a non-positive wall clock before rendering.
+
+    Returns:
+        ``HH:MM:SS`` under a day, ``D-HH:MM:SS`` at a day or more. Slurm
+        accepts both; the day form is used above 24 hours because ``72:00:00``
+        and ``3-00:00:00`` are the same duration but only one is legible at a
+        glance in ``squeue``.
+    """
+    days, remainder = divmod(minutes, MINUTES_PER_DAY)
+    hours, mins = divmod(remainder, MINUTES_PER_HOUR)
+    if days > 0:
+        return f"{days}-{hours:02d}:{mins:02d}:00"
+    return f"{hours:02d}:{mins:02d}:00"
+
+
+def job_comment(spec: JobSpec) -> str:
+    """Build the provenance string Slurm carries alongside the job.
+
+    Kept to key=value pairs joined by semicolons, with no spaces: ``sbatch``
+    takes ``--comment`` as a single token, and a space would silently truncate
+    everything after it into a different argument.
+
+    Args:
+        spec: The spec being rendered.
+
+    Returns:
+        A compact provenance string readable through ``scontrol show job`` and
+        ``sacct -o Comment``, naming the project, the hardware asked for, and
+        the environment the payload runs in.
+    """
+    return (
+        f"project={spec['project']}"
+        f";gpu={spec['gpu']}x{spec['gpu_count']}"
+        f";cpus={spec['cpus']}"
+        f";env={spec['env_path']}"
+    )
+
+
+def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
+    """Render a validated job spec into a batch script.
+
+    Args:
+        spec: A spec that has already passed
+            :func:`~hpc3.contracts.job.decode_job_spec`. Every rule the
+            rendered script relies on was enforced there, so nothing is
+            re-checked here.
+        log_dir: Absolute directory on the cluster for stdout and stderr.
+
+    Returns:
+        The complete script text, LF-terminated. Written with LF regardless of
+        the authoring platform: a CRLF shebang makes the cluster's kernel
+        report the interpreter as missing, which reads as a broken image
+        rather than a line-ending problem.
+    """
+    label = qualified_name(spec["project"], spec["name"])
+    directives = [
+        "#!/bin/bash -l",
+        # The project prefix is what makes `squeue` legible on a cluster 102
+        # other people share, and what tells us which body of work a row
+        # belongs to when several are running at once.
+        f"#SBATCH -J {label}",
+        # Slurm surfaces this through `scontrol show job` and `sacct -o
+        # Comment`, so a job carries its own provenance rather than requiring
+        # whoever finds it to reconstruct what it was for.
+        f"#SBATCH --comment {job_comment(spec)}",
+        f"#SBATCH -p {spec['partition']}",
+        f"#SBATCH --gres=gpu:{spec['gpu']}:{spec['gpu_count']}",
+        f"#SBATCH -c {spec['cpus']}",
+        f"#SBATCH --mem={spec['mem_gb']}G",
+        f"#SBATCH -t {format_walltime(spec['minutes'])}",
+        f"#SBATCH -o {log_dir}/{label}-%j.out",
+        f"#SBATCH -e {log_dir}/{label}-%j.err",
+    ]
+    if spec["requeue"]:
+        directives.append("#SBATCH --requeue")
+
+    body = [
+        "",
+        "# Undefined variables are a bug, not a default. No `set -e`: the",
+        "# payload's exit status is what Slurm records, and this wrapper must",
+        "# not convert a failed run into a successful job.",
+        "set -u",
+        "",
+        f'export HPC3_PROJECT="{spec["project"]}"',
+        f'export HPC3_JOB_NAME="{label}"',
+        f'export HPC3_CHECKPOINT_STEPS="{spec["checkpoint_steps"]}"',
+        # Slurm increments SLURM_RESTART_COUNT each time it requeues a job,
+        # so a preempted run re-enters here with a non-zero value. This
+        # package cannot resume on the payload's behalf -- only the payload
+        # knows what its checkpoint means -- so it surfaces the count and
+        # leaves the decision where the knowledge is.
+        'export HPC3_RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"',
+        f'export PATH="{spec["env_path"]}/bin:$PATH"',
+        "",
+        'echo "host      $(hostname)"',
+        'echo "job       ${SLURM_JOB_ID:-none}"',
+        'echo "restart   ${HPC3_RESTART_COUNT}"',
+        'echo "gpu       ' + spec["gpu"] + '"',
+        "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader",
+        "date -Is",
+        "",
+        spec["command"],
+        "rc=$?",
+        "",
+        "date -Is",
+        'echo "exit      $rc"',
+        "exit $rc",
+    ]
+    return "\n".join([*directives, *body]) + "\n"
+
+
+__all__ = [
+    "MINUTES_PER_DAY",
+    "MINUTES_PER_HOUR",
+    "format_walltime",
+    "job_comment",
+    "render_sbatch",
+]

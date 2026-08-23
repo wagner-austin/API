@@ -1,0 +1,5 @@
+{
+  "project": "abl",
+  "name": "armB-s42",
+  "command": "python -u train.py --arm B --seed 42 --corpus /pub/wagnera3/abl/corpora/armB.txt"
+}

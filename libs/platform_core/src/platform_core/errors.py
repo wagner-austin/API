@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from enum import Enum
-from typing import Generic, Protocol, TypeVar, runtime_checkable
+from typing import Generic, TypeVar
 
 from fastapi.responses import JSONResponse as _FastAPIJSONResponse
 
+from platform_core._asgi_protocols import (
+    _ExceptionHandlerProto,
+    _FastAPIAppProto,
+    _JSONResponseProto,
+    _RequestProto,
+)
 from platform_core.logging import get_logger
 from platform_core.request_context import request_id_var as _global_request_id_var
 
@@ -159,6 +164,56 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     ARTIFACT_DOWNLOAD_FAILED = "ARTIFACT_DOWNLOAD_FAILED"
 
 
+class Hpc3ErrorCode(ErrorCodeBase):
+    """Slurm cluster submission and staging error codes.
+
+    Each names one invariant of submitting work to HPC3. There is
+    deliberately no generic member: a code that covers everything identifies
+    nothing, and the first thing a caller does with one is re-parse the
+    message string it was supposed to replace.
+
+    These carry no meaningful HTTP status. They surface through a CLI, and
+    ``_default_status_for`` returning 500 for them is correct in the sense
+    that nothing consults it.
+    """
+
+    # Submission rules -- each maps to one refusal in decode_job_spec.
+    GPU_TYPE_UNPINNED = "GPU_TYPE_UNPINNED"
+    PARTITION_BILLS_WITHOUT_CONSENT = "PARTITION_BILLS_WITHOUT_CONSENT"
+    PARTITION_GPU_MISMATCH = "PARTITION_GPU_MISMATCH"
+    PREEMPTIBLE_RUN_UNPROTECTED = "PREEMPTIBLE_RUN_UNPROTECTED"
+    TIME_LIMIT_EXCEEDS_PARTITION = "TIME_LIMIT_EXCEEDS_PARTITION"
+
+    # Sweeps -- many jobs from one template.
+    SWEEP_EXCEEDS_GPU_CEILING = "SWEEP_EXCEEDS_GPU_CEILING"
+    SWEEP_EXCEEDS_JOB_CEILING = "SWEEP_EXCEEDS_JOB_CEILING"
+
+    # Staging -- the bytes a run is entitled to read.
+    DIGEST_MISMATCH = "DIGEST_MISMATCH"
+    MANIFEST_FILE_MISSING = "MANIFEST_FILE_MISSING"
+
+    # Budget -- our own share of a shared machine, capped before and during.
+    BUDGET_PROJECTION_EXCEEDED = "BUDGET_PROJECTION_EXCEEDED"
+    BUDGET_CONSUMPTION_EXCEEDED = "BUDGET_CONSUMPTION_EXCEEDED"
+
+    # Preflight -- validating a job against the live scheduler before running it.
+    PREFLIGHT_REJECTED = "PREFLIGHT_REJECTED"
+    PREFLIGHT_UNPARSABLE = "PREFLIGHT_UNPARSABLE"
+    ENV_PATH_MISSING = "ENV_PATH_MISSING"
+
+    # Workspace configuration -- the one document every command reads.
+    WORKSPACE_PROJECT_UNKNOWN = "WORKSPACE_PROJECT_UNKNOWN"
+    RUN_FIELD_UNKNOWN = "RUN_FIELD_UNKNOWN"
+
+    # Cluster selection -- which measured machine the rules come from.
+    CLUSTER_UNKNOWN = "CLUSTER_UNKNOWN"
+    PARTITION_UNKNOWN = "PARTITION_UNKNOWN"
+
+    # Cluster interaction.
+    REMOTE_COMMAND_FAILED = "REMOTE_COMMAND_FAILED"
+    SACCT_FIELD_UNPARSABLE = "SACCT_FIELD_UNPARSABLE"
+
+
 class OAuthErrorCode(ErrorCodeBase):
     """OAuth 2.0 error codes for authentication flows.
 
@@ -307,56 +362,6 @@ def _code_value(code: ErrorCodeBase) -> str:
     # This gives us "INVALID_INPUT" not "ErrorCode.INVALID_INPUT"
     result: str = code
     return result
-
-
-@runtime_checkable
-class _RequestProto(Protocol):
-    """Minimal protocol for FastAPI Request."""
-
-    @property
-    def url(self) -> _URLProto: ...
-
-    @property
-    def method(self) -> str: ...
-
-
-@runtime_checkable
-class _URLProto(Protocol):
-    """Minimal protocol for Request.url."""
-
-    @property
-    def path(self) -> str: ...
-
-
-@runtime_checkable
-class _JSONResponseProto(Protocol):
-    """Minimal protocol for FastAPI JSONResponse."""
-
-    def __init__(self, content: dict[str, str], status_code: int) -> None: ...
-
-    @property
-    def body(self) -> bytes | memoryview[int]: ...
-
-    @property
-    def status_code(self) -> int: ...
-
-
-_ExceptionHandlerProto = Callable[[_RequestProto, Exception], Awaitable[_JSONResponseProto]]
-
-
-@runtime_checkable
-class _FastAPIAppProto(Protocol):
-    """Minimal protocol for FastAPI application adapter.
-
-    Services should create an adapter that wraps FastAPI and converts response types.
-    See qr-api/src/qr_api/app.py for reference implementation.
-    """
-
-    def add_exception_handler(
-        self,
-        exc_class_or_status_code: int | type[Exception],
-        handler: _ExceptionHandlerProto,
-    ) -> None: ...
 
 
 def install_exception_handlers(
@@ -574,6 +579,7 @@ __all__ = [
     "ErrorCode",
     "ErrorCodeBase",
     "HandwritingErrorCode",
+    "Hpc3ErrorCode",
     "ModelTrainerErrorCode",
     "OAuthErrorCode",
     "TranscriptErrorCode",

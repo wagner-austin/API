@@ -1,0 +1,137 @@
+"""The budget contract: our own share of a machine 102 other people use.
+
+HPC3's own QOS ceilings bound how much can run *at once*. They say nothing
+about how much is consumed *in total*, and on the free partitions nothing
+bills, so there is no external mechanism that ever says stop. A sweep of 24
+GPUs for three days is 1,728 GPU-hours, entirely within every limit the
+cluster enforces, and it is not a reasonable share of a shared machine.
+
+So the cap is ours to declare and ours to enforce. Two of them, because they
+answer different questions:
+
+* ``max_gpu_hours`` is the courtesy limit. It exists on the free partitions
+  where nothing else counts.
+* ``max_service_units`` is the spending limit, and it only binds on billing
+  partitions -- which is exactly where it matters, since the personal balance
+  is 1,000 SU and one three-day job on eleven cores would spend 792 of them.
+
+Both are checked twice: projected before submission, so a flood never starts,
+and observed while running, so a wrong projection is caught rather than
+discovered afterwards.
+"""
+
+from __future__ import annotations
+
+from platform_core.json_utils import JSONTypeError, JSONValue, require_float
+from typing_extensions import TypedDict
+
+
+class Budget(TypedDict):
+    """Self-imposed caps on what a run may consume.
+
+    Attributes:
+        max_gpu_hours: GPUs multiplied by wall-clock hours, summed over every
+            job. The measure of our share on partitions that bill nothing.
+        max_service_units: Service units, summed over every job. Zero on the
+            free partitions however long they run, so this binds only where
+            spending is real.
+    """
+
+    max_gpu_hours: float
+    max_service_units: float
+
+
+class Consumption(TypedDict):
+    """What a set of jobs actually holds or has held.
+
+    Attributes:
+        gpu_hours: Total GPU-hours across the jobs.
+        service_units: Total service units across the jobs.
+        jobs: How many jobs the totals cover.
+    """
+
+    gpu_hours: float
+    service_units: float
+    jobs: int
+
+
+def _require_nonnegative_float(obj: dict[str, JSONValue], key: str) -> float:
+    """Read a required float field that cannot be negative.
+
+    Args:
+        obj: Object being decoded.
+        key: Field name.
+
+    Returns:
+        The field's value.
+
+    Raises:
+        JSONTypeError: If the field is missing, not a number, or negative. A
+            negative cap would admit everything, which is the opposite of
+            what declaring a cap means.
+    """
+    value = require_float(obj, key)
+    if value < 0.0:
+        raise JSONTypeError(f"Field '{key}' must not be negative, got {value}")
+    return value
+
+
+def encode_budget(budget: Budget) -> dict[str, JSONValue]:
+    """Encode a budget to a JSON object.
+
+    Args:
+        budget: Budget to encode.
+
+    Returns:
+        JSON-serialisable mapping carrying every field.
+    """
+    return {
+        "max_gpu_hours": budget["max_gpu_hours"],
+        "max_service_units": budget["max_service_units"],
+    }
+
+
+def decode_budget(value: JSONValue) -> Budget:
+    """Decode and validate a JSON value into a budget.
+
+    Args:
+        value: Value produced by the JSON loader.
+
+    Returns:
+        Validated budget.
+
+    Raises:
+        JSONTypeError: If the value is not an object, a field is missing or
+            mistyped, or a cap is negative.
+    """
+    if not isinstance(value, dict):
+        raise JSONTypeError(f"budget must be a JSON object, got {type(value).__name__}")
+    return Budget(
+        max_gpu_hours=_require_nonnegative_float(value, "max_gpu_hours"),
+        max_service_units=_require_nonnegative_float(value, "max_service_units"),
+    )
+
+
+def encode_consumption(consumption: Consumption) -> dict[str, JSONValue]:
+    """Encode a consumption total to a JSON object.
+
+    Args:
+        consumption: Total to encode.
+
+    Returns:
+        JSON-serialisable mapping carrying every field.
+    """
+    return {
+        "gpu_hours": consumption["gpu_hours"],
+        "service_units": consumption["service_units"],
+        "jobs": consumption["jobs"],
+    }
+
+
+__all__ = [
+    "Budget",
+    "Consumption",
+    "decode_budget",
+    "encode_budget",
+    "encode_consumption",
+]
