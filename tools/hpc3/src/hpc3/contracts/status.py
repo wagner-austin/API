@@ -82,9 +82,14 @@ class JobStatus(TypedDict):
         billing_tres: The ``billing`` figure from ``AllocTRES``. A rate per
             hour, not a total, and not yet adjusted by the usage factor.
         gpu_count: GPUs the allocation holds, from ``AllocTRES``'s
-            ``gres/gpu``. Zero while pending. This is what GPU-hours are
-            computed from, and it is not derivable from ``billing``: the two
-            are separate TRES with unrelated weights.
+            ``gres/gpu``. Zero while pending, and zero for a CPU-only job.
+            This is what GPU-hours are computed from, and it is not derivable
+            from ``billing``: the two are separate TRES with unrelated
+            weights.
+        cpu_count: Cores the allocation holds, from ``AllocTRES``'s ``cpu``.
+            Zero while pending. Carried because ``gpu_count`` alone cannot
+            describe a CPU job -- a report saying "0 GPU(s)" about a job that
+            never asked for one reads as a broken allocation.
         node_list: Nodes assigned, or an empty string while pending.
     """
 
@@ -95,6 +100,7 @@ class JobStatus(TypedDict):
     elapsed_seconds: int
     billing_tres: int
     gpu_count: int
+    cpu_count: int
     node_list: str
 
 
@@ -229,6 +235,7 @@ def encode_job_status(status: JobStatus) -> dict[str, JSONValue]:
         "elapsed_seconds": status["elapsed_seconds"],
         "billing_tres": status["billing_tres"],
         "gpu_count": status["gpu_count"],
+        "cpu_count": status["cpu_count"],
         "node_list": status["node_list"],
     }
 
@@ -265,6 +272,7 @@ def decode_job_status(value: JSONValue, cluster: ClusterFacts) -> JobStatus:
         elapsed_seconds=_require_nonnegative(obj, "elapsed_seconds"),
         billing_tres=_require_nonnegative(obj, "billing_tres"),
         gpu_count=_require_nonnegative(obj, "gpu_count"),
+        cpu_count=_require_nonnegative(obj, "cpu_count"),
         node_list=require_str(obj, "node_list"),
     )
 

@@ -17,6 +17,7 @@ from tests.conftest import (
     PREFLIGHT_LINE,
     FakeRun,
     budget_document,
+    gpus,
     project_config,
     workspace_document,
     write_file,
@@ -151,7 +152,9 @@ class TestSweepCli:
             _args(
                 tmp_path,
                 projects={
-                    "abl": project_config(partition="free-gpu32", gpu="L40S", accept_billing=True)
+                    "abl": project_config(
+                        partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True
+                    )
                 },
             )
         )

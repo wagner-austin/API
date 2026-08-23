@@ -41,7 +41,13 @@ from typing_extensions import TypedDict
 
 from hpc3.clusters import require_cluster
 from hpc3.contracts.budget import Budget, decode_budget, encode_budget
-from hpc3.contracts.cluster import ClusterFacts, require_gpu_type, require_partition
+from hpc3.contracts.cluster import (
+    ClusterFacts,
+    GpuRequest,
+    decode_gpu_request,
+    encode_gpu_request,
+    require_partition,
+)
 from hpc3.contracts.layout import require_project, require_root
 from hpc3.contracts.pins import encode_pinned_packages, require_pinned_packages
 
@@ -63,9 +69,8 @@ class ProjectConfig(TypedDict):
 
     Attributes:
         partition: Partition this project's work goes to.
-        gpu: GPU model to pin. Never generic; see
-            :mod:`hpc3.contracts.job` rule 1.
-        gpu_count: GPUs per job.
+        gpu: GPUs to pin per job, or None for CPU-only work. Never generic
+            when present; see :mod:`hpc3.contracts.job` rule 1.
         cpus: CPU cores per job.
         mem_gb: Host memory per job, in GiB.
         minutes: Wall-clock limit per job.
@@ -95,8 +100,7 @@ class ProjectConfig(TypedDict):
     """
 
     partition: str
-    gpu: str
-    gpu_count: int
+    gpu: GpuRequest | None
     cpus: int
     mem_gb: int
     minutes: int
@@ -140,7 +144,6 @@ class Workspace(TypedDict):
 PROJECT_FIELDS = (
     "partition",
     "gpu",
-    "gpu_count",
     "cpus",
     "mem_gb",
     "minutes",
@@ -230,8 +233,7 @@ def decode_project_config(value: JSONValue, cluster: ClusterFacts) -> ProjectCon
 
     return ProjectConfig(
         partition=require_partition(cluster, value, "partition"),
-        gpu=require_gpu_type(cluster, value, "gpu"),
-        gpu_count=_require_positive(value, "gpu_count"),
+        gpu=decode_gpu_request(cluster, value.get("gpu"), "gpu"),
         cpus=_require_positive(value, "cpus"),
         mem_gb=_require_positive(value, "mem_gb"),
         minutes=_require_positive(value, "minutes"),
@@ -255,8 +257,7 @@ def encode_project_config(config: ProjectConfig) -> dict[str, JSONValue]:
     """
     return {
         "partition": config["partition"],
-        "gpu": config["gpu"],
-        "gpu_count": config["gpu_count"],
+        "gpu": encode_gpu_request(config["gpu"]),
         "cpus": config["cpus"],
         "mem_gb": config["mem_gb"],
         "minutes": config["minutes"],

@@ -50,8 +50,7 @@ address, the ledger, the budget and each project's resources are written down.
   "projects": {
     "abl": {
       "partition": "free-gpu",
-      "gpu": "A100",
-      "gpu_count": 1,
+      "gpu": { "model": "A100", "count": 1 },
       "cpus": 8,
       "mem_gb": 96,
       "minutes": 720,
@@ -61,6 +60,19 @@ address, the ledger, the budget and each project's resources are written down.
       "env_path": "/pub/wagnera3/envs/abl-pinned",
       "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" },
       "deterministic": true
+    },
+    "sirius": {
+      "partition": "free",
+      "gpu": null,
+      "cpus": 16,
+      "mem_gb": 64,
+      "minutes": 360,
+      "requeue": true,
+      "checkpoint_steps": 1,
+      "accept_billing": false,
+      "env_path": "/pub/wagnera3/envs/sirius",
+      "pinned_packages": {},
+      "deterministic": false
     }
   }
 }
@@ -85,13 +97,14 @@ looks wrong.
 
 ### Adding a project
 
-Add one entry to `projects`. For a **single-node GPU workload** that is the
-whole procedure — the LSTM work, covenant-radar's training and the transformer
-ablation differ only in their resource line and their environment path:
+Add one entry to `projects`. For a **single-node job**, GPU or CPU, that is the
+whole procedure — the LSTM work, covenant-radar, `cleargbm_rs`, SIRIUS, ZODIAC
+and the transformer ablation differ only in their resource line and their
+environment path:
 
 ```json
 "turkic-lstm": {
-  "partition": "free-gpu", "gpu": "V100", "gpu_count": 1,
+  "partition": "free-gpu", "gpu": { "model": "V100", "count": 1 },
   "cpus": 4, "mem_gb": 32, "minutes": 240,
   "requeue": true, "checkpoint_steps": 200,
   "accept_billing": false,
@@ -100,6 +113,12 @@ ablation differ only in their resource line and their environment path:
   "deterministic": false
 }
 ```
+
+`"gpu": null` is how a **CPU-only** job is stated, and it is the only way —
+there is no zero-count request, because two spellings of one state is how they
+drift apart. The partition must agree in both directions: a GPU on a CPU
+partition pends forever, and no GPU on a GPU partition *runs*, holding a card
+it never touches.
 
 **Not every workload is that shape.** See
 [What this cannot submit](#what-this-cannot-submit) before assuming a project
@@ -288,7 +307,7 @@ $ scontrol show job 55519937 | grep Comment
 | | |
 | --- | --- |
 | job name | `<project>.<name>` — self-describing among 102 users' rows |
-| `--comment` | project, hardware and environment, readable via `scontrol` and `sacct -o Comment` |
+| `--comment` | project, hardware and environment, readable via `scontrol show job <id>` or `squeue -o %k` **while the job is live** — see below |
 | scripts | `<root>/<project>/scripts/<project>.<name>.sbatch` |
 | logs | `<root>/<project>/logs/<project>.<name>-<jobid>.{out,err}` |
 
@@ -317,7 +336,42 @@ writing `999` would not raise the ceiling — it would only disable the check
 that predicts the pending job. Committing a cluster module is the act of
 saying "these numbers were read off the real thing."
 
-Currently measured: **`hpc3`** (UCI HPC3, 2026-08-22).
+Currently measured: **`hpc3`** (UCI HPC3 — GPU partitions 2026-08-22, CPU
+partitions 2026-08-23).
+
+| partition | GPUs | bills | preemptible | max hours | per-user ceiling |
+| --- | --- | --- | --- | --- | --- |
+| `free-gpu` | V100, A30, A100 | no | yes | 72 | 24 GPUs |
+| `free-gpu32` | L40S, RTX6000 | **yes** | yes | 72 | 4 GPUs |
+| `gpu` | V100, A30, A100 | yes | no | 336 | 40 GPUs |
+| `gpu32` | L40S, RTX6000 | yes | no | 336 | 12 GPUs |
+| `free` | — | no | yes | 72 | 3500 cores |
+| `standard` | — | **yes** | no | 336 | 2500 cores |
+
+**Two of those names lie, in opposite directions.** `free-gpu32` bills at
+`UsageFactor 1.0`. And `standard` is HPC3's *default* partition — the one
+marked `standard*` in `sinfo` — so a CPU job submitted without naming a
+partition bills. That is why the partition is required here and never defaulted.
+
+The billing figures are measured, not read off the QOS name, and the
+distinction is load-bearing: a QOS literally named `free-gpu` exists and
+carries `UsageFactor 1.000000`, but it is **not** what the `free-gpu` partition
+uses — that is `free-gpu-part`, at `0.000000`. Grepping the obvious name would
+have recorded the free partition as billing. Confirmed at the other end after
+a GPU run and a CPU run:
+
+```
+wagnera3 *         0 |    CJMAYER_LAB     9,396 |        96,921    87,525
+```
+
+`free` is the CPU twin of `free-gpu` — same `0.0`, same `PreemptMode=CANCEL`,
+same 72-hour cap — so the preemption-protection rule applies to it unchanged,
+with no new logic.
+
+Not carried, each for a measured reason: `standard-hbm` needs an explicit
+`--qos` this package does not emit; `gpu-hugemem` returns `Invalid account or
+account/partition combination`; `highmem`, `hugemem`, `maxmem` and `admin`
+appear in `sinfo -a` but not in `scontrol show partition`.
 
 ### Adding a cluster
 
@@ -340,24 +394,29 @@ scope rather than one module away.
 
 ## What this cannot submit
 
-`JobSpec` describes **one single-node job that holds at least one named GPU**.
-That shape is enforced, not defaulted: `gpu` is required and validated against
-the cluster's inventory, and `render_sbatch` always emits
-`--gres=gpu:<model>:<n>`. Everything below is therefore not a missing flag but
-a shape the contract cannot express.
+`JobSpec` describes **one single-node job**, with GPUs or without. Everything
+below is not a missing flag but a shape the contract cannot express.
 
 | shape | status | what it blocks |
 | --- | --- | --- |
-| **CPU-only job** | cannot be expressed — `gpu` is required | `cleargbm_rs` (Rust/LightGBM), SIRIUS and ZODIAC (JVM, CPU-parallel), any preprocessing or eval pass that needs no GPU |
 | **Multi-node / MPI** | no `--nodes`, `--ntasks`, `srun` or `mpirun` anywhere | anything that does not fit one node |
 | **Job array** | a sweep is N separate `sbatch` calls | a wide sweep is N ledger rows and N scheduler entries where `--array` would be one; correct, but heavier on the scheduler and on `squeue` |
 | **Job dependency** | no `--dependency` | a staged pipeline — train → eval, SIRIUS → ZODIAC — must be driven by hand, one stage submitted after watching the previous finish |
+| **Explicit `--qos`** | not emitted; the cluster auto-selects | `standard-hbm` on HPC3, which refuses the default QOS with `Invalid qos specification` |
 | **`--constraint` / `--exclusive`** | not emitted | node features cannot be selected beyond the GPU model |
 
 None of these are hard to add, and the cluster-facts layer already carries what
 the checks would need. They are absent because they were never built, not
 because they were judged wrong — recorded here so the gap is a decision rather
 than a discovery.
+
+**CPU-only was on this list and is not any more.** `"gpu": null` on a CPU
+partition submits, so `cleargbm_rs`, SIRIUS and ZODIAC are reachable. One
+caveat worth stating: `pinned_packages` verification runs the environment's
+own `bin/python`, and an empty pin map makes **no round trip at all**. A JVM
+project is therefore submittable while getting only `test -d` on its
+environment — the weakest guarantee here, and exactly the "both paths exist,
+both pass, the results aren't comparable" failure the pin check was built for.
 
 ---
 
@@ -368,18 +427,23 @@ than a discovery.
 | rule | why |
 | --- | --- |
 | `PARTITION_UNKNOWN` — the partition exists on this cluster | a workspace written for another machine, or a typo; either way the job would be refused at submission or land somewhere unintended |
-| `GPU_TYPE_UNPINNED` — the GPU model is named and the cluster carries it | a bare `--gres=gpu:1` on `free-gpu` is roughly a two-in-five chance of a V100, whose `sm_70` the pinned torch does not target; the failure reads as a bug in the training code |
-| `PARTITION_GPU_MISMATCH` — that partition carries that model | Slurm leaves the job pending forever rather than rejecting it |
-| `PARTITION_BILLS_WITHOUT_CONSENT` — a non-zero `UsageFactor` needs `accept_billing` | `free-gpu32` bills one service unit per core-hour despite its name |
+| `GPU_TYPE_UNPINNED` — a GPU request names its model and the cluster carries it | a bare `--gres=gpu:1` on `free-gpu` is roughly a two-in-five chance of a V100, whose `sm_70` the pinned torch does not target; the failure reads as a bug in the training code |
+| `PARTITION_GPU_MISMATCH` — the partition and the request agree, **both ways** | a GPU on a CPU partition pends forever; no GPU on a GPU partition *runs*, holding a card it never touches, so only this catches it |
+| `PARTITION_BILLS_WITHOUT_CONSENT` — a non-zero `UsageFactor` needs `accept_billing` | `free-gpu32` bills despite its name, and `standard` is the default partition and bills |
 | `ENV_PACKAGE_MISMATCH` — the environment contains what the project pinned | `envs/abl` and `envs/abl-pinned` both exist and differ by a transformers major version |
 | `PREEMPTIBLE_RUN_UNPROTECTED` — long preemptible runs carry requeue **and** checkpointing | `PreemptMode=CANCEL` gives 60 seconds of grace; requeue without checkpoints restarts from step zero, which is not protection |
 | `TIME_LIMIT_EXCEEDS_PARTITION` — the wall clock fits | rejected at submission otherwise |
 
 ### Sweeps — checked before anything is sent
 
-`SWEEP_EXCEEDS_GPU_CEILING` / `SWEEP_EXCEEDS_JOB_CEILING`. Slurm does not
-reject an oversized set; it queues the excess against `MaxTRESPU`, which reads
-as a busy cluster and is not.
+`SWEEP_EXCEEDS_GPU_CEILING` / `SWEEP_EXCEEDS_CPU_CEILING` /
+`SWEEP_EXCEEDS_JOB_CEILING`. Slurm does not reject an oversized set; it queues
+the excess against `MaxTRESPU`, which reads as a busy cluster and is not.
+
+Which ceiling binds follows from the partition: GPU work pends against
+`gres/gpu`, CPU work against `cpu`. A ceiling the QOS **does not declare** is
+not checked — `free-gpu-part` caps GPUs and says nothing about cores, and
+inventing a core limit for it would refuse sweeps the cluster would have run.
 
 ### Budget — ours, because nothing else says stop
 
@@ -414,6 +478,25 @@ anything is found.
 - **silent** — `RUNNING`, holding GPUs, and its log has stopped growing. Log
   age is measured against the cluster's own clock; a few minutes of skew would
   either invent staleness or hide it.
+
+### The comment is live-only, and that is why the ledger exists
+
+`--comment` is readable via `scontrol show job <id>` and `squeue -o %k` **while
+the job is live**. It does not reach accounting on HPC3:
+
+```
+AccountingStoreFlags    = (null)
+```
+
+Without `job_comment` in that list Slurm never stores it, so `sacct -o Comment`
+returns empty for every job — measured 2026-08-23 against both a finished CPU
+job and a GPU job from the day before. This README claimed `sacct -o Comment`
+worked until that measurement; it never did on this cluster.
+
+Nothing in the package reads provenance back from the cluster, so no behaviour
+depended on the wrong claim. That is the actual point: **the ledger is the
+durable record precisely because the comment is not.** The comment is a
+convenience for a human looking at a live queue.
 
 ### Closures: why `unaccounted` doesn't rot
 

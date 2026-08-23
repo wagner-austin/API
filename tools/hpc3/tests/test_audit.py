@@ -16,7 +16,7 @@ from platform_core.json_utils import JSONValue
 from hpc3.contracts.job import JobSpec
 from hpc3.core import _test_hooks, audit
 from tests.against_hpc3 import decode_job_spec
-from tests.conftest import LoggedEvent, cluster
+from tests.conftest import LoggedEvent, cluster, gpus
 
 
 def _spec(**overrides: JSONValue) -> JobSpec:
@@ -32,8 +32,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "project": "abl",
         "name": "arm-b-42",
         "partition": "free-gpu",
-        "gpu": "A100",
-        "gpu_count": 2,
+        "gpu": gpus("A100", 2),
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 30,
@@ -72,6 +71,14 @@ class TestJobSubmittedEvent:
             "checkpoint_steps": 0,
         }
 
+    def test_a_cpu_job_logs_readable_hardware_not_a_null(self, logged: list[LoggedEvent]) -> None:
+        """The audit trail stays flat -- a reader greps `gpu=` across every
+        event, and a null there reads as a field that failed to populate."""
+        spec = _spec(partition="free", gpu=None)
+        audit.job_submitted(spec, host="hpc3", job_id="1", cluster=cluster())
+        assert logged[0].fields["gpu"] == "cpu-only"
+        assert logged[0].fields["gpu_count"] == 0
+
     def test_the_recorded_name_is_the_one_the_cluster_shows(
         self, logged: list[LoggedEvent]
     ) -> None:
@@ -81,7 +88,7 @@ class TestJobSubmittedEvent:
 
     def test_a_billing_submission_is_marked_as_spending(self, logged: list[LoggedEvent]) -> None:
         """A billed submission is a spending decision; the record must say so."""
-        spec = _spec(partition="free-gpu32", gpu="L40S", accept_billing=True)
+        spec = _spec(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True)
         audit.job_submitted(spec, host="hpc3", job_id="1", cluster=cluster())
         assert logged[0].fields["bills"] is True
 

@@ -87,8 +87,7 @@ class TestResolveRun:
             "project": "abl",
             "name": "armB-s42",
             "partition": "free-gpu",
-            "gpu": "A100",
-            "gpu_count": 1,
+            "gpu": {"model": "A100", "count": 1},
             "cpus": 8,
             "mem_gb": 96,
             "minutes": 30,
@@ -151,8 +150,8 @@ class TestUnknownFieldsAreRefused:
 
     def test_the_message_names_what_is_accepted(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            resolve_run(_workspace(), _run(gpus=2))
-        assert "'gpu_count'" in excinfo.value.message
+            resolve_run(_workspace(), _run(gpu_count=2))
+        assert "'gpu'" in excinfo.value.message
 
     def test_every_unknown_field_is_named_at_once(self) -> None:
         with pytest.raises(AppError) as excinfo:
@@ -179,18 +178,36 @@ class TestOverridingCannotEvadeARule:
 
     def test_overriding_onto_a_billing_partition_still_needs_consent(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            resolve_run(_workspace(), _run(partition="free-gpu32", gpu="L40S"))
+            resolve_run(
+                _workspace(),
+                _run(partition="free-gpu32", gpu={"model": "L40S", "count": 1}),
+            )
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS_WITHOUT_CONSENT
 
     def test_a_project_consenting_to_billing_carries_that_consent(self) -> None:
         """Whether a body of work may cost money is a property of the work."""
-        workspace = _workspace(partition="free-gpu32", gpu="L40S", accept_billing=True)
+        workspace = _workspace(
+            partition="free-gpu32", gpu={"model": "L40S", "count": 1}, accept_billing=True
+        )
         assert resolve_run(workspace, _run())["accept_billing"] is True
 
     def test_an_override_onto_a_partition_without_that_gpu_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            resolve_run(_workspace(), _run(gpu="L40S"))
+            resolve_run(_workspace(), _run(gpu={"model": "L40S", "count": 1}))
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_GPU_MISMATCH
+
+    def test_overriding_a_gpu_project_to_cpu_only_is_refused(self) -> None:
+        """The merged result would hold a GPU node to do CPU work, and Slurm
+        would accept it -- so the refusal has to happen here."""
+        with pytest.raises(AppError) as excinfo:
+            resolve_run(_workspace(), _run(gpu=None))
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_GPU_MISMATCH
+
+    def test_overriding_both_partition_and_gpu_reaches_cpu_only(self) -> None:
+        """The pair that IS coherent: a run may move to CPU work outright."""
+        resolved = resolve_run(_workspace(), _run(partition="free", gpu=None))
+        assert resolved["gpu"] is None
+        assert resolved["partition"] == "free"
 
     def test_an_override_past_the_partition_ceiling_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
@@ -199,7 +216,7 @@ class TestOverridingCannotEvadeARule:
 
     def test_an_override_to_a_generic_gpu_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            resolve_run(_workspace(), _run(gpu="gpu"))
+            resolve_run(_workspace(), _run(gpu={"model": "gpu", "count": 1}))
         assert excinfo.value.code is Hpc3ErrorCode.GPU_TYPE_UNPINNED
 
 

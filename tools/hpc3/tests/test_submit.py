@@ -24,6 +24,7 @@ from tests.conftest import (
     FakeRun,
     LoggedEvent,
     cluster,
+    gpus,
     script_healthy_cluster,
 )
 
@@ -43,8 +44,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "project": "abl",
         "name": "arm-b-42",
         "partition": "free-gpu",
-        "gpu": "A100",
-        "gpu_count": 1,
+        "gpu": gpus("A100"),
         "cpus": 4,
         "mem_gb": 16,
         "minutes": 30,

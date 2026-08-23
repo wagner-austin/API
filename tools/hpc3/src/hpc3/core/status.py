@@ -172,6 +172,7 @@ def parse_sacct_row(line: str, cluster: ClusterFacts) -> JobStatus:
         "elapsed_seconds": parse_elapsed_seconds(elapsed),
         "billing_tres": parse_tres_int(alloc_tres, "billing"),
         "gpu_count": parse_tres_int(alloc_tres, "gres/gpu"),
+        "cpu_count": parse_tres_int(alloc_tres, "cpu"),
         "node_list": node_list.strip(),
     }
     return decode_job_status(record, cluster)

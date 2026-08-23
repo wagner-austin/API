@@ -15,7 +15,7 @@ scraping captured output.
 
 from __future__ import annotations
 
-from hpc3.contracts.cluster import ClusterFacts, partition_bills
+from hpc3.contracts.cluster import ClusterFacts, gpu_count, partition_bills
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.core import _test_hooks
@@ -48,8 +48,8 @@ def job_submitted(spec: JobSpec, *, host: str, job_id: str, cluster: ClusterFact
             "host": host,
             "cluster": cluster["slug"],
             "partition": spec["partition"],
-            "gpu": spec["gpu"],
-            "gpu_count": spec["gpu_count"],
+            "gpu": "cpu-only" if spec["gpu"] is None else spec["gpu"]["model"],
+            "gpu_count": gpu_count(spec["gpu"]),
             "cpus": spec["cpus"],
             "minutes": spec["minutes"],
             "bills": partition_bills(cluster, spec["partition"]),

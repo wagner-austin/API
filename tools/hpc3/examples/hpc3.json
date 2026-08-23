@@ -11,8 +11,7 @@
   "projects": {
     "abl": {
       "partition": "free-gpu",
-      "gpu": "A100",
-      "gpu_count": 1,
+      "gpu": { "model": "A100", "count": 1 },
       "cpus": 8,
       "mem_gb": 96,
       "minutes": 720,
@@ -25,6 +24,19 @@
         "transformers": "4.46.3"
       },
       "deterministic": true
+    },
+    "sirius": {
+      "partition": "free",
+      "gpu": null,
+      "cpus": 16,
+      "mem_gb": 64,
+      "minutes": 360,
+      "requeue": true,
+      "checkpoint_steps": 1,
+      "accept_billing": false,
+      "env_path": "/pub/wagnera3/envs/sirius",
+      "pinned_packages": {},
+      "deterministic": false
     }
   }
 }

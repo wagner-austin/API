@@ -32,6 +32,7 @@ from hpc3.contracts.cluster import (
 from hpc3.contracts.job import decode_job_spec
 from hpc3.contracts.status import decode_job_status, service_units
 from hpc3.contracts.sweep import decode_sweep_spec
+from tests.conftest import gpus
 
 OTHER: ClusterFacts = ClusterFacts(
     slug="other",
@@ -44,6 +45,7 @@ OTHER: ClusterFacts = ClusterFacts(
             max_hours=8,
             gpus=("H100",),
             max_gpus_per_user=2,
+            max_cpus_per_user=None,
             max_jobs_per_user=2,
         ),
         "scavenge": PartitionFacts(
@@ -52,7 +54,17 @@ OTHER: ClusterFacts = ClusterFacts(
             max_hours=4,
             gpus=("MI300X",),
             max_gpus_per_user=1,
+            max_cpus_per_user=None,
             max_jobs_per_user=1,
+        ),
+        "serial": PartitionFacts(
+            usage_factor=0.25,
+            preemptible=False,
+            max_hours=2,
+            gpus=(),
+            max_gpus_per_user=None,
+            max_cpus_per_user=12,
+            max_jobs_per_user=3,
         ),
     },
 )
@@ -73,8 +85,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "project": "abl",
         "name": "run",
         "partition": "batch",
-        "gpu": "H100",
-        "gpu_count": 1,
+        "gpu": gpus("H100"),
         "cpus": 4,
         "mem_gb": 16,
         "minutes": 30,
@@ -102,7 +113,14 @@ class TestHpc3Facts:
         assert partition_bills(HPC3, "free-gpu") is False
 
     def test_every_partition_is_listed(self) -> None:
-        assert partition_names(HPC3) == ("free-gpu", "free-gpu32", "gpu", "gpu32")
+        assert partition_names(HPC3) == (
+            "free",
+            "free-gpu",
+            "free-gpu32",
+            "gpu",
+            "gpu32",
+            "standard",
+        )
 
     def test_an_absent_partition_is_refused_by_name(self) -> None:
         with pytest.raises(AppError) as excinfo:
@@ -166,17 +184,42 @@ class TestRegistryShape:
                 reachable |= set(partition_facts(facts, name)["gpus"])
             assert reachable == set(facts["gpus"])
 
-    def test_every_partition_carries_at_least_one_gpu(self) -> None:
-        for facts in CLUSTERS.values():
-            for name in partition_names(facts):
-                assert partition_facts(facts, name)["gpus"] != ()
+    def test_every_partition_declares_the_ceiling_its_own_work_pends_against(self) -> None:
+        """This replaced "every partition carries a GPU", which stopped being
+        true the moment CPU partitions were measured -- and which was really
+        protecting this: a partition must bound the resource its jobs compete
+        for, or a sweep on it has nothing that can catch an overcommit.
 
-    def test_every_ceiling_admits_at_least_one_job(self) -> None:
-        """A zero ceiling would refuse every sweep on that partition."""
+        Which resource that is follows from the partition rather than being
+        declared twice: GPU work pends against ``gres/gpu``, CPU work against
+        ``cpu``. Asserting the RELATION rather than either literal is what
+        keeps this from expiring again the next time a machine is measured.
+        """
         for facts in CLUSTERS.values():
             for name in partition_names(facts):
                 measured = partition_facts(facts, name)
-                assert measured["max_gpus_per_user"] >= 1
+                bound = (
+                    measured["max_gpus_per_user"]
+                    if measured["gpus"] != ()
+                    else measured["max_cpus_per_user"]
+                )
+                if bound is None:
+                    raise AssertionError(f"{facts['slug']}.{name} bounds neither GPUs nor cores")
+                assert bound >= 1
+
+    def test_every_ceiling_that_is_declared_admits_at_least_one_job(self) -> None:
+        """A zero ceiling would refuse every sweep on that partition.
+
+        An undeclared ceiling is skipped rather than defaulted: the QOS says
+        nothing about that resource, and a number invented here would be
+        enforced against jobs the cluster would have run.
+        """
+        for facts in CLUSTERS.values():
+            for name in partition_names(facts):
+                measured = partition_facts(facts, name)
+                for ceiling in (measured["max_gpus_per_user"], measured["max_cpus_per_user"]):
+                    if ceiling is not None:
+                        assert ceiling >= 1
                 assert measured["max_jobs_per_user"] >= 1
                 assert measured["max_hours"] >= 1
 
@@ -196,12 +239,12 @@ class TestTheRulesFollowTheCluster:
 
     def test_an_hpc3_partition_is_unknown_on_the_other_cluster(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(partition="free-gpu", gpu="A100"), OTHER)
+            decode_job_spec(_spec(partition="free-gpu", gpu=gpus("A100")), OTHER)
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_UNKNOWN
 
     def test_an_hpc3_gpu_is_unknown_on_the_other_cluster(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(gpu="A100"), OTHER)
+            decode_job_spec(_spec(gpu=gpus("A100")), OTHER)
         assert excinfo.value.code is Hpc3ErrorCode.GPU_TYPE_UNPINNED
 
     def test_the_other_clusters_shorter_walltime_ceiling_binds(self) -> None:
@@ -213,7 +256,7 @@ class TestTheRulesFollowTheCluster:
     def test_its_preemptible_partition_still_demands_protection(self) -> None:
         with pytest.raises(AppError) as excinfo:
             decode_job_spec(
-                _spec(partition="scavenge", gpu="MI300X", minutes=200, accept_billing=False),
+                _spec(partition="scavenge", gpu=gpus("MI300X"), minutes=200, accept_billing=False),
                 OTHER,
             )
         assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
@@ -240,6 +283,7 @@ class TestTheRulesFollowTheCluster:
             "elapsed_seconds": 3600,
             "billing_tres": 4,
             "gpu_count": 1,
+            "cpu_count": 4,
             "node_list": "n1",
         }
         assert service_units(decode_job_status(row, OTHER), OTHER) == 2.0
@@ -253,6 +297,7 @@ class TestTheRulesFollowTheCluster:
             "elapsed_seconds": 36000,
             "billing_tres": 64,
             "gpu_count": 1,
+            "cpu_count": 4,
             "node_list": "n1",
         }
         assert service_units(decode_job_status(row, OTHER), OTHER) == 0.0

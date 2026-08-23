@@ -17,6 +17,7 @@ from platform_core.json_utils import JSONValue
 from hpc3.contracts.job import JobSpec
 from hpc3.core.sbatch import format_walltime, job_comment, render_sbatch
 from tests.against_hpc3 import decode_job_spec
+from tests.conftest import gpus
 
 _LOG_DIR = "/pub/wagnera3/logs"
 
@@ -34,8 +35,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "project": "abl",
         "name": "arm-b-42",
         "partition": "free-gpu",
-        "gpu": "A100",
-        "gpu_count": 1,
+        "gpu": gpus("A100"),
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 30,
@@ -176,7 +176,7 @@ class TestJobIsSelfDescribing:
         assert comment_lines == [f"#SBATCH --comment {job_comment(_spec())}"]
 
     def test_the_comment_tracks_a_multi_gpu_request(self) -> None:
-        assert "gpu=A100x4" in job_comment(_spec(gpu_count=4))
+        assert "gpu=A100x4" in job_comment(_spec(gpu=gpus("A100", 4)))
 
     def test_the_payload_can_read_its_own_project_and_label(self) -> None:
         """A training script writing checkpoints needs to name them something."""
@@ -229,6 +229,56 @@ class TestDeterminismIsDeclaredBeforeTheProcessStarts:
         exported = next(i for i, line in enumerate(lines) if CUBLAS_WORKSPACE_ENV_VAR in line)
         payload = next(i for i, line in enumerate(lines) if line == "python train.py --seed 42")
         assert exported < payload
+
+
+class TestCpuOnlyJobs:
+    """A job that holds no GPU, rendered as one.
+
+    The absences are the assertions here. A ``--gres`` line asking for zero
+    is not the same as no ``--gres`` line, and ``nvidia-smi`` on a CPU node
+    writes a command-not-found to stderr on every single run -- which teaches
+    whoever reads these logs to ignore the one stream a real failure arrives
+    by.
+    """
+
+    def _cpu(self) -> JobSpec:
+        """Build a CPU-only spec on the free CPU partition.
+
+        Returns:
+            A validated spec holding no GPU.
+        """
+        return _spec(partition="free", gpu=None, command="sirius --input /pub/data")
+
+    def test_no_gres_line_is_emitted_at_all(self) -> None:
+        script = render_sbatch(self._cpu(), log_dir=_LOG_DIR)
+        assert "--gres" not in script
+
+    def test_nvidia_smi_is_not_called_on_a_node_without_it(self) -> None:
+        script = render_sbatch(self._cpu(), log_dir=_LOG_DIR)
+        assert "nvidia-smi" not in script
+
+    def test_the_log_still_says_what_hardware_it_got(self) -> None:
+        """Silence would read as a truncated header, not as a CPU job."""
+        script = render_sbatch(self._cpu(), log_dir=_LOG_DIR)
+        assert 'echo "gpu       cpu-only"' in script
+
+    def test_the_comment_says_cpu_only_rather_than_going_blank(self) -> None:
+        assert job_comment(self._cpu()) == (
+            "project=abl;gpu=cpu-only;cpus=8;env=/pub/wagnera3/envs/abl-pinned"
+            ";det=off;exp=arm=B,seed=42"
+        )
+
+    def test_the_payload_and_exit_handling_are_unchanged(self) -> None:
+        """A CPU job is a normal job; only the hardware lines differ."""
+        script = render_sbatch(self._cpu(), log_dir=_LOG_DIR)
+        assert "sirius --input /pub/data" in script
+        assert "#SBATCH -p free" in script
+        assert "#SBATCH -c 8" in script
+        assert script.rstrip("\n").endswith("exit $rc")
+
+    def test_a_gpu_job_on_the_same_cluster_still_gets_its_gres(self) -> None:
+        """The CPU path must not be reachable by a job that asked for a GPU."""
+        assert "#SBATCH --gres=gpu:A100:1" in render_sbatch(_spec(), log_dir=_LOG_DIR)
 
 
 class TestResumeSurface:

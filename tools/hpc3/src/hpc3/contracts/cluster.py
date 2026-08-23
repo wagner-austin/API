@@ -27,8 +27,29 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from platform_core.errors import AppError, Hpc3ErrorCode
-from platform_core.json_utils import JSONValue, require_str
+from platform_core.json_utils import JSONTypeError, JSONValue, require_int, require_str
 from typing_extensions import TypedDict
+
+
+class GpuRequest(TypedDict):
+    """A job's demand for GPUs, when it has one.
+
+    Kept as one nullable object rather than a model field beside a count,
+    because the two must agree and a flat pair permits states that mean
+    nothing: a named model with a count of zero, or a count of three with no
+    model. Neither is expressible here -- a job either asks for GPUs, naming
+    which and how many, or it asks for none by writing null.
+
+    Attributes:
+        model: GPU model to pin, by Slurm GRES name. Never generic: a bare
+            request lands wherever the scheduler chooses, which is how a run
+            reaches a card the pinned torch cannot drive.
+        count: GPUs requested on the node. At least one -- a request for zero
+            is spelled by omitting the request.
+    """
+
+    model: str
+    count: int
 
 
 class PartitionFacts(TypedDict):
@@ -45,19 +66,31 @@ class PartitionFacts(TypedDict):
             a preemption destroys unsaved work outright.
         max_hours: Wall-clock ceiling the partition enforces.
         gpus: GPU models physically present, by Slurm GRES name. Must be a
-            subset of the cluster's own ``gpus``.
-        max_gpus_per_user: QOS ``MaxTRESPU`` for ``gres/gpu``. A sweep that
-            asks for more does not have the excess rejected -- those jobs sit
-            pending against a limit rather than a resource, which reads as
-            contention and is not.
+            subset of the cluster's own ``gpus``. **Empty means this is a CPU
+            partition**, and a job asking it for a GPU is refused.
+        max_gpus_per_user: QOS ``MaxTRESPU`` for ``gres/gpu``, or None where
+            the QOS declares no such cap. A sweep that asks for more does not
+            have the excess rejected -- those jobs sit pending against a limit
+            rather than a resource, which reads as contention and is not.
+        max_cpus_per_user: QOS ``MaxTRESPU`` for ``cpu``, or None where the
+            QOS declares no such cap. The twin of the field above for CPU
+            work: a wide CPU sweep pends against cores, and nothing else here
+            would predict it.
         max_jobs_per_user: QOS ``MaxJobsPU``: concurrently running jobs.
+
+    None on either ceiling means **measured absence, not unknown**. HPC3's
+    ``free-gpu-part`` caps ``gres/gpu`` and says nothing about cores;
+    ``free-part`` caps ``cpu`` and says nothing about GPUs. Writing a large
+    number instead of None would be inventing a limit the QOS does not
+    declare, and the check it fed would be fiction.
     """
 
     usage_factor: float
     preemptible: bool
     max_hours: int
     gpus: tuple[str, ...]
-    max_gpus_per_user: int
+    max_gpus_per_user: int | None
+    max_cpus_per_user: int | None
     max_jobs_per_user: int
 
 
@@ -189,9 +222,100 @@ def require_gpu_type(cluster: ClusterFacts, obj: dict[str, JSONValue], key: str)
     return raw
 
 
+def decode_gpu_request(cluster: ClusterFacts, value: JSONValue, key: str) -> GpuRequest | None:
+    """Decode a job's GPU request, which may be absent.
+
+    Args:
+        cluster: The selected cluster.
+        value: The field's value. ``None`` means the job wants no GPU.
+        key: Field name, used in error messages.
+
+    Returns:
+        The validated request, or None for a CPU-only job.
+
+    Raises:
+        JSONTypeError: If the value is neither null nor an object, or the
+            count is missing, mistyped, or below one. There is no zero-GPU
+            request: a job wanting no GPU writes null, and ``{"count": 0}``
+            would be a second spelling of the same state.
+        AppError: With ``GPU_TYPE_UNPINNED`` if the model names no GPU the
+            cluster carries.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise JSONTypeError(
+            f"Field {key!r} must be a GPU request object or null, got {type(value).__name__}"
+        )
+    count = require_int(value, "count")
+    if count < 1:
+        raise JSONTypeError(
+            f"Field {key!r} must ask for at least 1 GPU, got {count}. "
+            "A job wanting no GPU states null."
+        )
+    return GpuRequest(model=require_gpu_type(cluster, value, "model"), count=count)
+
+
+def encode_gpu_request(request: GpuRequest | None) -> JSONValue:
+    """Encode a GPU request back to JSON.
+
+    Args:
+        request: The request, or None for a CPU-only job.
+
+    Returns:
+        An object carrying the model and count, or null.
+    """
+    if request is None:
+        return None
+    return {"model": request["model"], "count": request["count"]}
+
+
+def describe_gpu_request(request: GpuRequest | None) -> str:
+    """Render a GPU request for a human reading a queue row or a console line.
+
+    One definition rather than three, because this string appears in the job
+    comment, in the submit confirmation and in the sweep summary, and an
+    operator comparing what they were told against what ``sacct`` shows should
+    not have to notice that two of them spell it differently.
+
+    Args:
+        request: The request, or None for a CPU-only job.
+
+    Returns:
+        ``"<model>x<count>"``, or ``"cpu-only"`` when no GPU was asked for --
+        never an empty string, because a blank in this position reads as
+        missing information rather than as a deliberate absence.
+    """
+    if request is None:
+        return "cpu-only"
+    return f"{request['model']}x{request['count']}"
+
+
+def gpu_count(request: GpuRequest | None) -> int:
+    """Report how many GPUs a request asks for, counting absence as zero.
+
+    Every ceiling and projection in this package multiplies by this number,
+    and a CPU job contributes nothing to any of them. Narrowing the optional
+    once here keeps that from becoming the same None-check written at six
+    call sites.
+
+    Args:
+        request: The request, or None for a CPU-only job.
+
+    Returns:
+        The requested count, or 0 when no GPU was asked for.
+    """
+    return 0 if request is None else request["count"]
+
+
 __all__ = [
     "ClusterFacts",
+    "GpuRequest",
     "PartitionFacts",
+    "decode_gpu_request",
+    "describe_gpu_request",
+    "encode_gpu_request",
+    "gpu_count",
     "partition_bills",
     "partition_facts",
     "partition_names",

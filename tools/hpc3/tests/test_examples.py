@@ -134,11 +134,19 @@ class TestTheReadmeIsAnExampleToo:
     def test_every_documented_project_entry_decodes(self) -> None:
         """Including the standalone fragment, which is what a reader pastes."""
         configs = _readme_project_configs()
-        assert len(configs) == 2
+        assert len(configs) == 3
         assert [decode_project_config(config)["partition"] for config in configs] == [
             "free-gpu",
+            "free",
             "free-gpu",
         ]
+
+    def test_the_documented_cpu_only_entry_really_is_cpu_only(self) -> None:
+        """The README claims `"gpu": null` is how CPU work is stated. This is
+        that claim run through the decoder rather than read."""
+        cpu = [c for c in _readme_project_configs() if decode_project_config(c)["gpu"] is None]
+        assert len(cpu) == 1
+        assert decode_project_config(cpu[0])["partition"] == "free"
 
     def test_the_documented_workspace_decodes_whole(self) -> None:
         document = load_json_str(_readme_json_blocks()[0])
@@ -153,15 +161,32 @@ class TestTheReadmeIsAnExampleToo:
         """
         text = _README.read_text(encoding="utf-8")
         assert "## What this cannot submit" in text
-        for shape in ("CPU-only job", "Multi-node / MPI", "Job array", "Job dependency"):
+        for shape in ("Multi-node / MPI", "Job array", "Job dependency", "Explicit `--qos`"):
             assert shape in text
+
+    def test_a_limit_that_was_lifted_is_not_still_listed_as_one(self) -> None:
+        """This assertion named "CPU-only job" until CPU-only shipped, and
+        failed the moment the row came out -- which is the behaviour wanted
+        from a list of limits. A stale entry there is worse than no list: it
+        sends a reader looking for a workaround to something that works."""
+        section = _README.read_text(encoding="utf-8").split("## What this cannot submit")[1]
+        table = section.split("None of these")[0]
+        assert "CPU-only" not in table
 
 
 class TestExampleWorkspace:
     def test_it_decodes(self) -> None:
         workspace = _workspace()
         assert workspace["host"] == "hpc3"
-        assert sorted(workspace["projects"]) == ["abl"]
+        assert sorted(workspace["projects"]) == ["abl", "sirius"]
+
+    def test_it_carries_a_gpu_project_and_a_cpu_project(self) -> None:
+        """Both shapes ship as examples, because a reader with a JVM tool and
+        a reader with a training script both open this file first."""
+        projects = _workspace()["projects"]
+        assert projects["abl"]["gpu"] == {"model": "A100", "count": 1}
+        assert projects["sirius"]["gpu"] is None
+        assert projects["sirius"]["partition"] == "free"
 
     def test_its_ledger_resolves_beside_it(self) -> None:
         assert pathlib.Path(_workspace()["ledger"]).parent == _EXAMPLES
@@ -171,7 +196,7 @@ class TestExampleRun:
     def test_it_resolves_against_the_example_workspace(self) -> None:
         spec = resolve_run(_workspace(), _load("run-arm-b.json"))
         assert spec["project"] == "abl"
-        assert spec["gpu"] == "A100"
+        assert spec["gpu"] == {"model": "A100", "count": 1}
 
     def test_a_run_states_only_what_is_specific_to_it(self) -> None:
         """The README's central claim, checked against the real file.

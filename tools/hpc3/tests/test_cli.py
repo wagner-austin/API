@@ -26,6 +26,7 @@ from tests.conftest import (
     FakeRun,
     budget_document,
     cluster,
+    gpus,
     project_config,
     script_healthy_cluster,
     workspace_document,
@@ -303,7 +304,9 @@ class TestSubmitCli:
             tmp_path / "hpc3.json",
             workspace_document(
                 projects={
-                    "abl": project_config(partition="free-gpu32", gpu="L40S", accept_billing=True)
+                    "abl": project_config(
+                        partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True
+                    )
                 }
             ),
         )
@@ -314,7 +317,7 @@ class TestSubmitCli:
     def test_an_invalid_resolution_never_reaches_the_cluster(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
-        _write_json(tmp_path / "run.json", _run_payload(gpu="gpu"))
+        _write_json(tmp_path / "run.json", _run_payload(gpu=gpus("gpu")))
         with pytest.raises(AppError) as excinfo:
             submit_cli.main(_submit_args(tmp_path))
         assert excinfo.value.code is Hpc3ErrorCode.GPU_TYPE_UNPINNED
@@ -422,6 +425,7 @@ class TestFormatStatus:
                 "elapsed_seconds": 1,
                 "billing_tres": 0,
                 "gpu_count": 1,
+                "cpu_count": 8,
                 "node_list": "n1",
             }
         )
@@ -437,6 +441,7 @@ class TestFormatStatus:
                 "elapsed_seconds": 1,
                 "billing_tres": 0,
                 "gpu_count": 1,
+                "cpu_count": 8,
                 "node_list": "n1",
             }
         )

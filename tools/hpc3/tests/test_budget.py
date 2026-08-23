@@ -22,6 +22,7 @@ from tests.against_hpc3 import (
     observe,
     project,
 )
+from tests.conftest import gpus
 
 
 def _spec(**overrides: JSONValue) -> JobSpec:
@@ -37,8 +38,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "project": "abl",
         "name": "arm",
         "partition": "free-gpu",
-        "gpu": "A100",
-        "gpu_count": 1,
+        "gpu": gpus("A100"),
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 600,
@@ -72,6 +72,7 @@ def _status(**overrides: JSONValue) -> JobStatus:
         "elapsed_seconds": 3600,
         "billing_tres": 8,
         "gpu_count": 1,
+        "cpu_count": 8,
         "node_list": "n1",
     }
     base.update(overrides)
@@ -105,11 +106,16 @@ class TestProjection:
         assert projected["service_units"] == 0.0
 
     def test_a_billing_partition_projects_cpu_hours_as_spend(self) -> None:
-        spec = _spec(partition="free-gpu32", gpu="L40S", accept_billing=True, cpus=11)
+        spec = _spec(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True, cpus=11)
         assert project([spec])["service_units"] == 110.0
 
     def test_multi_gpu_jobs_multiply(self) -> None:
-        assert project([_spec(gpu_count=4)])["gpu_hours"] == 40.0
+        assert project([_spec(gpu=gpus("A100", 4))])["gpu_hours"] == 40.0
+
+    def test_a_cpu_only_job_projects_no_gpu_hours(self) -> None:
+        """It still projects spend on a billing partition -- the two are
+        separate questions, and only one of them is about GPUs."""
+        assert project([_spec(partition="free", gpu=None)])["gpu_hours"] == 0.0
 
     def test_no_specs_project_nothing(self) -> None:
         assert project([]) == {"gpu_hours": 0.0, "service_units": 0.0, "jobs": 0}
@@ -134,7 +140,7 @@ class TestCheckProjection:
         assert "Nothing was submitted" in excinfo.value.message
 
     def test_over_the_service_unit_cap_is_refused(self) -> None:
-        spec = _spec(partition="free-gpu32", gpu="L40S", accept_billing=True, cpus=11)
+        spec = _spec(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True, cpus=11)
         with pytest.raises(AppError) as excinfo:
             check_projection(_budget(1000.0, 100.0), [spec])
         assert excinfo.value.code is Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED
@@ -142,7 +148,7 @@ class TestCheckProjection:
 
     def test_the_free_ceiling_would_admit_what_a_budget_refuses(self) -> None:
         """24 GPUs for 3 days is inside every cluster limit and is 1,728 GPU-hours."""
-        flood = [_spec(gpu_count=1, minutes=4320) for _ in range(24)]
+        flood = [_spec(minutes=4320) for _ in range(24)]
         assert project(flood)["gpu_hours"] == 1728.0
         with pytest.raises(AppError):
             check_projection(_budget(100.0, 0.0), flood)

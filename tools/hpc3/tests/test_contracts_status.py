@@ -39,6 +39,7 @@ def _status(**overrides: JSONValue) -> dict[str, JSONValue]:
         "elapsed_seconds": 48,
         "billing_tres": 11,
         "gpu_count": 1,
+        "cpu_count": 11,
         "node_list": "hpc3-gpu-n54-00",
     }
     base.update(overrides)

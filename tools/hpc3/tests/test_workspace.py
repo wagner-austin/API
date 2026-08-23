@@ -23,7 +23,7 @@ from hpc3.contracts.workspace import (
     require_project_config,
 )
 from tests.against_hpc3 import decode_project_config
-from tests.conftest import project_config, workspace_document
+from tests.conftest import gpus, project_config, workspace_document
 
 _DIR = pathlib.Path("/tmp/ws")
 
@@ -119,7 +119,7 @@ class TestDecodeWorkspace:
             projects={
                 "abl": project_config(),
                 "sirius": project_config(cpus=4),
-                "turkic-lstm": project_config(gpu="V100"),
+                "turkic-lstm": project_config(gpu=gpus("V100")),
             }
         )
         assert sorted(workspace["projects"]) == ["abl", "sirius", "turkic-lstm"]
@@ -142,8 +142,13 @@ class TestDecodeProjectConfig:
 
     def test_a_generic_gpu_is_refused_with_the_pinning_code(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_project_config(project_config(gpu="gpu"))
+            decode_project_config(project_config(gpu=gpus("gpu")))
         assert excinfo.value.code is Hpc3ErrorCode.GPU_TYPE_UNPINNED
+
+    def test_a_cpu_only_project_states_null_and_is_admitted(self) -> None:
+        config = decode_project_config(project_config(partition="free", gpu=None))
+        assert config["gpu"] is None
+        assert config["partition"] == "free"
 
     def test_a_negative_checkpoint_interval_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must not be negative"):
@@ -153,9 +158,13 @@ class TestDecodeProjectConfig:
         assert decode_project_config(project_config(checkpoint_steps=0))["checkpoint_steps"] == 0
 
     def test_a_non_positive_resource_is_refused(self) -> None:
-        for field in ("gpu_count", "cpus", "mem_gb", "minutes"):
+        for field in ("cpus", "mem_gb", "minutes"):
             with pytest.raises(JSONTypeError, match="at least 1"):
                 decode_project_config(project_config(**{field: 0}))
+
+    def test_a_zero_gpu_count_is_refused_rather_than_meaning_cpu_only(self) -> None:
+        with pytest.raises(JSONTypeError, match="at least 1"):
+            decode_project_config(project_config(gpu=gpus("A100", 0)))
 
     def test_an_empty_env_path_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
@@ -165,7 +174,7 @@ class TestDecodeProjectConfig:
         """A run may override any of these, so rejecting here refuses a
         legitimate shape: the cross-field rules belong at resolution."""
         config = decode_project_config(
-            project_config(partition="free-gpu32", gpu="L40S", accept_billing=False)
+            project_config(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=False)
         )
         assert config["partition"] == "free-gpu32"
 
@@ -189,7 +198,7 @@ class TestRoundTrip:
 class TestRequireProjectConfig:
     def test_a_declared_project_is_returned(self) -> None:
         workspace = decode_workspace(workspace_document(), config_dir=_DIR)
-        assert require_project_config(workspace, "abl")["gpu"] == "A100"
+        assert require_project_config(workspace, "abl")["gpu"] == {"model": "A100", "count": 1}
 
     def test_an_undeclared_project_is_refused(self) -> None:
         workspace = decode_workspace(workspace_document(), config_dir=_DIR)

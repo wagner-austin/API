@@ -143,6 +143,23 @@ def unaccounted_jobs(
     ]
 
 
+def _allocation_phrase(status: JobStatus) -> str:
+    """Describe what a running job is holding, in its own terms.
+
+    Args:
+        status: The job's accounting row.
+
+    Returns:
+        The GPU count for a job that holds GPUs, and the core count for one
+        that does not. A CPU job described as holding "0 GPU(s)" reads as a
+        broken allocation rather than as the allocation it asked for.
+    """
+    gpus = status["gpu_count"]
+    if gpus > 0:
+        return f"{gpus} GPU(s)"
+    return f"{status['cpu_count']} core(s)"
+
+
 def silent_jobs(
     statuses: Sequence[JobStatus], log_ages: dict[str, int], *, quiet_seconds: int
 ) -> list[Finding]:
@@ -174,7 +191,10 @@ def silent_jobs(
                 status["job_id"],
                 status["name"],
                 "silent",
-                f"RUNNING on {status['gpu_count']} GPU(s) but its log has not "
+                # Reported from AllocTRES, so a CPU job says cores rather than
+                # "0 GPU(s)" -- which reads as a broken allocation on a job
+                # that never asked for one.
+                f"RUNNING on {_allocation_phrase(status)} but its log has not "
                 f"been written for {age}s",
             )
         )

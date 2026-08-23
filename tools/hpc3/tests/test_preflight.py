@@ -15,7 +15,7 @@ from hpc3.contracts.job import JobSpec
 from hpc3.contracts.preflight import encode_preflight_result
 from hpc3.core.preflight import check_env_path, preflight
 from tests.against_hpc3 import decode_job_spec, decode_preflight_result, parse_test_only
-from tests.conftest import ABL_PINNED_DISTRIBUTIONS, FakeRun, cluster
+from tests.conftest import ABL_PINNED_DISTRIBUTIONS, FakeRun, cluster, gpus
 
 _REAL_LINE = (
     "sbatch: Job 55516995 to start at 2026-08-22T03:23:00 a using 4 processors "
@@ -36,8 +36,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "project": "abl",
         "name": "arm-b-42",
         "partition": "free-gpu",
-        "gpu": "A100",
-        "gpu_count": 1,
+        "gpu": gpus("A100"),
         "cpus": 4,
         "mem_gb": 16,
         "minutes": 30,

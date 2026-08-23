@@ -25,7 +25,7 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from hpc3.contracts.cluster import ClusterFacts, partition_facts
+from hpc3.contracts.cluster import ClusterFacts, gpu_count, partition_facts
 from hpc3.contracts.job import JobSpec, decode_job_spec, encode_job_spec
 
 
@@ -73,7 +73,6 @@ def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
             name=f"{spec['base']['name']}-{member['suffix']}",
             partition=spec["base"]["partition"],
             gpu=spec["base"]["gpu"],
-            gpu_count=spec["base"]["gpu_count"],
             cpus=spec["base"]["cpus"],
             mem_gb=spec["base"]["mem_gb"],
             minutes=spec["base"]["minutes"],
@@ -146,22 +145,39 @@ def _check_ceilings(cluster: ClusterFacts, base: JobSpec, count: int) -> None:
         AppError: With
             :attr:`~platform_core.errors.Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING`
             if the members together ask for more GPUs than one user may hold,
-            or
+            :attr:`~platform_core.errors.Hpc3ErrorCode.SWEEP_EXCEEDS_CPU_CEILING`
+            if they ask for more cores, or
             :attr:`~platform_core.errors.Hpc3ErrorCode.SWEEP_EXCEEDS_JOB_CEILING`
             if there are more members than concurrently-runnable jobs. Slurm
             queues the excess rather than refusing it, so the operator would
             otherwise wait on a limit that looks like contention.
+
+            A ceiling the QOS does not declare is not checked -- there is
+            nothing to check against, and inventing a number would be
+            enforcing a limit the cluster does not have.
     """
     facts = partition_facts(cluster, base["partition"])
 
-    gpus = count * base["gpu_count"]
+    per_job_gpus = gpu_count(base["gpu"])
+    gpus = count * per_job_gpus
     gpu_ceiling = facts["max_gpus_per_user"]
-    if gpus > gpu_ceiling:
+    if gpu_ceiling is not None and gpus > gpu_ceiling:
         raise AppError(
             Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING,
-            f"{count} members x {base['gpu_count']} GPU(s) = {gpus}, but "
+            f"{count} members x {per_job_gpus} GPU(s) = {gpus}, but "
             f"{base['partition']!r} on {cluster['slug']!r} allows one user "
             f"{gpu_ceiling} at once. "
+            "The excess would pend against the QOS, not against the cluster.",
+        )
+
+    cpus = count * base["cpus"]
+    cpu_ceiling = facts["max_cpus_per_user"]
+    if cpu_ceiling is not None and cpus > cpu_ceiling:
+        raise AppError(
+            Hpc3ErrorCode.SWEEP_EXCEEDS_CPU_CEILING,
+            f"{count} members x {base['cpus']} core(s) = {cpus}, but "
+            f"{base['partition']!r} on {cluster['slug']!r} allows one user "
+            f"{cpu_ceiling} at once. "
             "The excess would pend against the QOS, not against the cluster.",
         )
 

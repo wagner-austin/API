@@ -12,7 +12,7 @@ from hpc3.contracts.sweep import SweepSpec
 from hpc3.core import audit
 from hpc3.core.sweep import submit_sweep
 from tests.against_hpc3 import decode_sweep_spec, read_ledger
-from tests.conftest import PREFLIGHT_LINE, FakeRun, LoggedEvent, cluster
+from tests.conftest import PREFLIGHT_LINE, FakeRun, LoggedEvent, cluster, gpus
 
 _AT = "2026-08-22T16:00:00+00:00"
 
@@ -31,8 +31,7 @@ def _sweep(count: int = 3, **overrides: JSONValue) -> SweepSpec:
         "project": "abl",
         "name": "rung",
         "partition": "free-gpu",
-        "gpu": "A100",
-        "gpu_count": 1,
+        "gpu": gpus("A100"),
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 30,
@@ -217,7 +216,7 @@ class TestSweepAuditEvents:
         _healthy(fake_run)
         fake_run.add("sbatch", stdout="Submitted batch job 1\n")
         _run(
-            _sweep(count=2, partition="free-gpu32", gpu="L40S", accept_billing=True),
+            _sweep(count=2, partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True),
             tmp_path,
         )
         jobs = [e for e in logged if e.event == audit.JOB_SUBMITTED]

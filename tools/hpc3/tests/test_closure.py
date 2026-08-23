@@ -68,6 +68,7 @@ def _status(job_id: str, state: str) -> JobStatus:
         "elapsed_seconds": 60,
         "billing_tres": 8,
         "gpu_count": 1,
+        "cpu_count": 8,
         "node_list": "n1",
     }
     return decode_job_status(base)

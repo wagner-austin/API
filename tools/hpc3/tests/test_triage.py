@@ -63,6 +63,7 @@ def _status(job_id: str, state: str, **overrides: JSONValue) -> JobStatus:
         "elapsed_seconds": 60,
         "billing_tres": 8,
         "gpu_count": 1,
+        "cpu_count": 8,
         "node_list": "n1",
     }
     base.update(overrides)
@@ -173,6 +174,16 @@ class TestSilentJobs:
             [_status("101", "RUNNING", gpu_count=4)], {"101": 4000}, quiet_seconds=1800
         )
         assert "4 GPU(s)" in findings[0].detail
+
+    def test_the_detail_names_cores_for_a_job_holding_no_gpu(self) -> None:
+        """ "0 GPU(s)" would read as a broken allocation on a CPU job."""
+        findings = silent_jobs(
+            [_status("101", "RUNNING", gpu_count=0, cpu_count=16)],
+            {"101": 4000},
+            quiet_seconds=1800,
+        )
+        assert "16 core(s)" in findings[0].detail
+        assert "GPU" not in findings[0].detail
 
 
 class TestLiveEntries:

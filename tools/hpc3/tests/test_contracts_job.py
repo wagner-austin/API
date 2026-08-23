@@ -18,6 +18,7 @@ from hpc3.contracts.job import (
     encode_job_spec,
 )
 from tests.against_hpc3 import decode_job_spec
+from tests.conftest import gpus
 
 
 def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -33,8 +34,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "project": "abl",
         "name": "arm-b-42",
         "partition": "free-gpu",
-        "gpu": "A100",
-        "gpu_count": 1,
+        "gpu": gpus("A100"),
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 30,
@@ -67,7 +67,6 @@ class TestValidSpec:
             "env_path",
             "experiment",
             "gpu",
-            "gpu_count",
             "mem_gb",
             "minutes",
             "name",
@@ -81,37 +80,87 @@ class TestValidSpec:
 class TestRuleGpuMustBeNamed:
     def test_a_generic_gpu_request_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(gpu="gpu"))
+            decode_job_spec(_spec(gpu=gpus("gpu")))
         assert excinfo.value.code is Hpc3ErrorCode.GPU_TYPE_UNPINNED
 
     def test_an_empty_gpu_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(gpu=""))
+            decode_job_spec(_spec(gpu=gpus("")))
         assert excinfo.value.code is Hpc3ErrorCode.GPU_TYPE_UNPINNED
 
     def test_a_named_model_is_admitted(self) -> None:
-        assert decode_job_spec(_spec(gpu="A30"))["gpu"] == "A30"
+        assert decode_job_spec(_spec(gpu=gpus("A30")))["gpu"] == {"model": "A30", "count": 1}
+
+
+class TestRuleGpuRequestOrNoneButNothingBetween:
+    """Absence is spelled one way, and a zero-GPU request is not it.
+
+    The nullable object exists so that a model with no count, or a count with
+    no model, cannot be written down. These are the states the old flat pair
+    permitted and this shape refuses.
+    """
+
+    def test_a_cpu_only_job_states_null(self) -> None:
+        assert decode_job_spec(_spec(partition="free", gpu=None))["gpu"] is None
+
+    def test_a_zero_gpu_request_is_refused_rather_than_read_as_cpu_only(self) -> None:
+        """Two spellings of one state is how they drift apart."""
+        with pytest.raises(JSONTypeError):
+            decode_job_spec(_spec(gpu=gpus("A100", 0)))
+
+    def test_a_request_missing_its_count_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError):
+            decode_job_spec(_spec(gpu={"model": "A100"}))
+
+    def test_a_request_missing_its_model_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError):
+            decode_job_spec(_spec(gpu={"count": 1}))
+
+    def test_a_bare_string_is_no_longer_a_gpu_request(self) -> None:
+        with pytest.raises(JSONTypeError):
+            decode_job_spec(_spec(gpu="A100"))
 
 
 class TestRulePartitionMustCarryTheGpu:
     def test_asking_free_gpu_for_a_blackwell_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(gpu="RTX6000"))
+            decode_job_spec(_spec(gpu=gpus("RTX6000")))
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_GPU_MISMATCH
 
     def test_the_same_gpu_on_its_own_partition_is_admitted(self) -> None:
-        decoded = decode_job_spec(_spec(gpu="RTX6000", partition="free-gpu32", accept_billing=True))
+        decoded = decode_job_spec(
+            _spec(gpu=gpus("RTX6000"), partition="free-gpu32", accept_billing=True)
+        )
         assert decoded["partition"] == "free-gpu32"
+
+    def test_asking_a_cpu_partition_for_a_gpu_is_refused(self) -> None:
+        """Slurm would leave it pending forever rather than reject it."""
+        with pytest.raises(AppError) as excinfo:
+            decode_job_spec(_spec(partition="free", gpu=gpus("A100")))
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_GPU_MISMATCH
+
+    def test_asking_a_gpu_partition_for_no_gpu_is_refused(self) -> None:
+        """This one RUNS. Slurm accepts it and hands over a GPU node to do
+        CPU work, so nothing surfaces it except this check."""
+        with pytest.raises(AppError) as excinfo:
+            decode_job_spec(_spec(partition="free-gpu", gpu=None))
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_GPU_MISMATCH
+
+    def test_a_cpu_job_on_a_cpu_partition_is_admitted(self) -> None:
+        decoded = decode_job_spec(_spec(partition="free", gpu=None))
+        assert decoded["partition"] == "free"
 
 
 class TestRuleBillingNeedsConsent:
     def test_a_billing_partition_without_consent_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(partition="free-gpu32", gpu="L40S"))
+            decode_job_spec(_spec(partition="free-gpu32", gpu=gpus("L40S")))
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS_WITHOUT_CONSENT
 
     def test_consent_admits_it(self) -> None:
-        decoded = decode_job_spec(_spec(partition="free-gpu32", gpu="L40S", accept_billing=True))
+        decoded = decode_job_spec(
+            _spec(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True)
+        )
         assert decoded["accept_billing"] is True
 
     def test_the_free_partition_needs_no_consent(self) -> None:
@@ -184,10 +233,6 @@ class TestFieldValidation:
         with pytest.raises(JSONTypeError):
             decode_job_spec(_spec(cpus=0))
 
-    def test_zero_gpus_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError):
-            decode_job_spec(_spec(gpu_count=0))
-
     def test_zero_memory_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
             decode_job_spec(_spec(mem_gb=0))
@@ -201,9 +246,21 @@ class TestFieldValidation:
             decode_job_spec(_spec(checkpoint_steps=-1))
 
 
+class TestEncodeCpuOnly:
+    def test_a_cpu_only_spec_round_trips_through_null(self) -> None:
+        """The ledger and the audit trail both re-encode a spec, so a CPU job
+        that could not survive the round trip would be unrecordable."""
+        payload = _spec(partition="free", gpu=None)
+        assert encode_job_spec(decode_job_spec(payload)) == payload
+
+    def test_the_encoded_gpu_field_is_null_not_an_empty_object(self) -> None:
+        encoded = encode_job_spec(decode_job_spec(_spec(partition="free", gpu=None)))
+        assert encoded["gpu"] is None
+
+
 class TestEncode:
     def test_encode_preserves_a_billing_spec(self) -> None:
-        payload = _spec(partition="gpu32", gpu="RTX6000", accept_billing=True)
+        payload = _spec(partition="gpu32", gpu=gpus("RTX6000"), accept_billing=True)
         spec: JobSpec = decode_job_spec(payload)
         assert encode_job_spec(spec)["partition"] == "gpu32"
         assert encode_job_spec(spec)["accept_billing"] is True

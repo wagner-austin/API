@@ -286,6 +286,21 @@ def cluster() -> ClusterFacts:
     return HPC3
 
 
+def gpus(model: str, count: int = 1) -> dict[str, JSONValue]:
+    """Build a GPU request payload.
+
+    Args:
+        model: GPU model to pin.
+        count: GPUs requested. Defaults to one, which is what nearly every
+            test wants and what keeps the interesting cases visible.
+
+    Returns:
+        The request, ready to place in a spec or project payload. A test
+        wanting a CPU-only job writes ``None`` instead of calling this.
+    """
+    return {"model": model, "count": count}
+
+
 def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
     """Build one project's resource defaults.
 
@@ -297,8 +312,7 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
     """
     config: dict[str, JSONValue] = {
         "partition": "free-gpu",
-        "gpu": "A100",
-        "gpu_count": 1,
+        "gpu": gpus("A100"),
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 30,

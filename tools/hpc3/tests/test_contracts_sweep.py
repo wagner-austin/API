@@ -17,6 +17,7 @@ from hpc3.contracts.sweep import (
     expand_sweep,
 )
 from tests.against_hpc3 import decode_sweep_spec
+from tests.conftest import gpus
 
 
 def _base(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -32,8 +33,7 @@ def _base(**overrides: JSONValue) -> dict[str, JSONValue]:
         "project": "abl",
         "name": "rung",
         "partition": "free-gpu",
-        "gpu": "A100",
-        "gpu_count": 1,
+        "gpu": gpus("A100"),
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 30,
@@ -95,7 +95,7 @@ class TestValidSweep:
     def test_expansion_shares_every_resource_setting(self) -> None:
         specs = expand_sweep(decode_sweep_spec(_sweep()))
         assert {spec["partition"] for spec in specs} == {"free-gpu"}
-        assert {spec["gpu"] for spec in specs} == {"A100"}
+        assert [spec["gpu"] for spec in specs] == [{"model": "A100", "count": 1}] * len(specs)
         assert {spec["cpus"] for spec in specs} == {8}
         assert {spec["minutes"] for spec in specs} == {30}
         assert {spec["env_path"] for spec in specs} == {"/pub/envs/abl-pinned"}
@@ -119,12 +119,38 @@ class TestGpuCeiling:
     def test_multi_gpu_members_count_against_the_ceiling(self) -> None:
         """Three members at 2 GPUs each is six GPUs, not three."""
         with pytest.raises(AppError) as excinfo:
-            decode_sweep_spec(_sweep(base=_base(gpu_count=3), members=_members(9)))
+            decode_sweep_spec(_sweep(base=_base(gpu=gpus("A100", 3)), members=_members(9)))
         assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING
+
+    def test_a_cpu_sweep_is_bounded_by_cores_not_gpus(self) -> None:
+        """`free` caps one user at 3500 cores and declares no GPU ceiling, so
+        a wide CPU sweep has exactly one limit that can catch it."""
+        payload = _sweep(
+            base=_base(partition="free", gpu=None, cpus=64),
+            members=_members(60),
+        )
+        with pytest.raises(AppError) as excinfo:
+            decode_sweep_spec(payload)
+        assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_CPU_CEILING
+
+    def test_a_cpu_sweep_inside_the_core_ceiling_is_admitted(self) -> None:
+        specs = expand_sweep(
+            decode_sweep_spec(
+                _sweep(base=_base(partition="free", gpu=None, cpus=8), members=_members(10))
+            )
+        )
+        assert len(specs) == 10
+        assert [spec["gpu"] for spec in specs] == [None] * 10
+
+    def test_a_gpu_sweep_is_not_checked_against_an_undeclared_core_ceiling(self) -> None:
+        """`free-gpu-part` caps GPUs and says nothing about cores. Inventing a
+        core limit for it would refuse sweeps the cluster would have run."""
+        specs = expand_sweep(decode_sweep_spec(_sweep(base=_base(cpus=40), members=_members(20))))
+        assert len(specs) == 20
 
     def test_free_gpu32_has_a_much_lower_ceiling(self) -> None:
         payload = _sweep(
-            base=_base(partition="free-gpu32", gpu="L40S", accept_billing=True),
+            base=_base(partition="free-gpu32", gpu=gpus("L40S"), accept_billing=True),
             members=_members(5),
         )
         with pytest.raises(AppError) as excinfo:
@@ -191,7 +217,7 @@ class TestSweepValidation:
 
     def test_an_invalid_base_propagates_its_own_code(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_sweep_spec(_sweep(base=_base(gpu="gpu")))
+            decode_sweep_spec(_sweep(base=_base(gpu=gpus("gpu"))))
         assert excinfo.value.code is Hpc3ErrorCode.GPU_TYPE_UNPINNED
 
     def test_an_empty_member_list_is_refused(self) -> None:

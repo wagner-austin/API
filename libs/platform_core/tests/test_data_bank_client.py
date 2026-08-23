@@ -165,11 +165,14 @@ class _MockServer:
             body = {"code": "INVALID_RANGE", "message": "invalid range", "request_id": None}
             return httpx.Response(416, text=dump_json_str(body))
         start_s = rng[len("bytes=") :].split("-")[0]
-        try:
-            start = int(start_s) if start_s != "" else 0
-        except ValueError:
+        # Asked as a question rather than caught as a ValueError: a byte-range
+        # offset is either digits or it is not, and int() raising is not the
+        # cheapest way to find that out. Also keeps the arm from being a catch
+        # that neither logs nor re-raises.
+        if start_s != "" and not start_s.isdigit():
             body = {"code": "INVALID_RANGE", "message": "invalid range", "request_id": None}
             return httpx.Response(416, text=dump_json_str(body))
+        start = int(start_s) if start_s != "" else 0
         if start >= len(data):
             headers = {"Content-Range": f"bytes */{len(data)}"}
             body = {"code": "RANGE_NOT_SATISFIABLE", "message": "unsat", "request_id": None}

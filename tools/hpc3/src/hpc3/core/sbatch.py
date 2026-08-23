@@ -22,6 +22,7 @@ from platform_core.determinism_env import (
     CUBLAS_WORKSPACE_ENV_VAR,
 )
 
+from hpc3.contracts.cluster import describe_gpu_request
 from hpc3.contracts.experiment import comment_fragment
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
@@ -61,16 +62,22 @@ def job_comment(spec: JobSpec) -> str:
         spec: The spec being rendered.
 
     Returns:
-        A compact provenance string readable through ``scontrol show job`` and
-        ``sacct -o Comment``, naming the project, the hardware asked for, the
-        environment the payload runs in, and what the run is -- so a row found
-        in the queue answers "which experiment is this" without a ledger to
-        hand. The experiment fragment is truncated if long; the ledger holds
-        the full record.
+        A compact provenance string naming the project, the hardware asked
+        for, the environment the payload runs in, and what the run is -- so a
+        row found in the queue answers "which experiment is this" without a
+        ledger to hand. The experiment fragment is truncated if long.
+
+        Readable through ``scontrol show job <id>`` and ``squeue -o %k``,
+        and **only while the job is live**. It does NOT survive into
+        accounting on HPC3: ``AccountingStoreFlags`` is unset there, so
+        ``sacct -o Comment`` returns empty for every job, finished or not.
+        Measured 2026-08-23, after this docstring had claimed otherwise.
+        That is precisely why the ledger exists and why nothing in this
+        package reads provenance back from the cluster.
     """
     return (
         f"project={spec['project']}"
-        f";gpu={spec['gpu']}x{spec['gpu_count']}"
+        f";gpu={describe_gpu_request(spec['gpu'])}"
         f";cpus={spec['cpus']}"
         f";env={spec['env_path']}"
         f";det={'on' if spec['deterministic'] else 'off'}"
@@ -117,18 +124,24 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
         rather than a line-ending problem.
     """
     label = qualified_name(spec["project"], spec["name"])
+    gpu = spec["gpu"]
     directives = [
         "#!/bin/bash -l",
         # The project prefix is what makes `squeue` legible on a cluster 102
         # other people share, and what tells us which body of work a row
         # belongs to when several are running at once.
         f"#SBATCH -J {label}",
-        # Slurm surfaces this through `scontrol show job` and `sacct -o
-        # Comment`, so a job carries its own provenance rather than requiring
-        # whoever finds it to reconstruct what it was for.
+        # Slurm surfaces this through `scontrol show job` and `squeue -o %k`
+        # while the job is live, so a job carries its own provenance rather
+        # than requiring whoever finds it to reconstruct what it was for. It
+        # does not reach accounting -- see `job_comment` -- which is what the
+        # ledger is for.
         f"#SBATCH --comment {job_comment(spec)}",
         f"#SBATCH -p {spec['partition']}",
-        f"#SBATCH --gres=gpu:{spec['gpu']}:{spec['gpu_count']}",
+        # No --gres line at all for a CPU-only job. An empty or zero-valued
+        # one is not the same thing: `--gres=gpu:0` is a GPU request for none,
+        # which Slurm may still route to a GPU partition's accounting.
+        *([] if gpu is None else [f"#SBATCH --gres=gpu:{gpu['model']}:{gpu['count']}"]),
         f"#SBATCH -c {spec['cpus']}",
         f"#SBATCH --mem={spec['mem_gb']}G",
         f"#SBATCH -t {format_walltime(spec['minutes'])}",
@@ -169,8 +182,18 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
         'echo "host      $(hostname)"',
         'echo "job       ${SLURM_JOB_ID:-none}"',
         'echo "restart   ${HPC3_RESTART_COUNT}"',
-        'echo "gpu       ' + spec["gpu"] + '"',
-        "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader",
+        # A CPU node has no nvidia-smi, and calling it there writes a
+        # command-not-found to stderr on every run -- which trains whoever
+        # reads these logs to ignore stderr, on the one stream a real failure
+        # arrives by.
+        *(
+            ['echo "gpu       cpu-only"']
+            if gpu is None
+            else [
+                'echo "gpu       ' + gpu["model"] + '"',
+                "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader",
+            ]
+        ),
         "date -Is",
         "",
         spec["command"],

@@ -186,6 +186,7 @@ class Hpc3ErrorCode(ErrorCodeBase):
 
     # Sweeps -- many jobs from one template.
     SWEEP_EXCEEDS_GPU_CEILING = "SWEEP_EXCEEDS_GPU_CEILING"
+    SWEEP_EXCEEDS_CPU_CEILING = "SWEEP_EXCEEDS_CPU_CEILING"
     SWEEP_EXCEEDS_JOB_CEILING = "SWEEP_EXCEEDS_JOB_CEILING"
 
     # Staging -- the bytes a run is entitled to read.

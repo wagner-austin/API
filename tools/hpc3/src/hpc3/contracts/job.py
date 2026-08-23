@@ -6,10 +6,14 @@ violates one cannot be constructed from JSON at all, which means an invalid
 job is caught at author time instead of an hour into the queue or ten hours
 into a run.
 
-1. The GPU model is named, and the cluster carries it. A bare ``--gres=gpu:1``
-   on a mixed partition is a coin flip over generations; where the pinned torch
-   does not target the card that comes up, the failure reads like a bug in the
-   training code.
+1. A GPU request, where there is one, names its model, and the cluster
+   carries it. A bare ``--gres=gpu:1`` on a mixed partition is a coin flip
+   over generations; where the pinned torch does not target the card that
+   comes up, the failure reads like a bug in the training code. A job may
+   also ask for no GPU at all -- that is how CPU-only work is expressed --
+   and the partition must agree in BOTH directions: a GPU on a CPU partition
+   pends forever, and no GPU on a GPU partition runs happily while occupying
+   a card it never touches.
 2. A billing partition requires explicit consent. A partition's name is not
    evidence about its cost -- HPC3's ``free-gpu32`` bills at ``UsageFactor``
    1.0 -- so silence must mean no.
@@ -37,9 +41,11 @@ from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import (
     ClusterFacts,
+    GpuRequest,
+    decode_gpu_request,
+    encode_gpu_request,
     partition_bills,
     partition_facts,
-    require_gpu_type,
     require_partition,
 )
 from hpc3.contracts.experiment import encode_experiment, require_experiment
@@ -68,8 +74,8 @@ class JobSpec(TypedDict):
         name: The job's own name within its project.
         partition: Partition to submit to. Validated against the selected
             cluster, not against a fixed list.
-        gpu: GPU model to pin. Never generic -- see rule 1.
-        gpu_count: GPUs requested on the node.
+        gpu: GPUs to pin, or None for a CPU-only job. Never generic when
+            present -- see rule 1.
         cpus: CPU cores requested. Where a partition bills, this is usually
             the whole charge: billing tracks cores, not GPUs or memory.
         mem_gb: Host memory requested, in GiB.
@@ -101,8 +107,7 @@ class JobSpec(TypedDict):
     project: str
     name: str
     partition: str
-    gpu: str
-    gpu_count: int
+    gpu: GpuRequest | None
     cpus: int
     mem_gb: int
     minutes: int
@@ -155,24 +160,52 @@ def _require_positive(obj: dict[str, JSONValue], key: str) -> int:
     return value
 
 
-def _check_partition_carries_gpu(cluster: ClusterFacts, partition: str, gpu: str) -> None:
-    """Reject a job asking a partition for a GPU it does not hold.
+def _check_partition_carries_gpu(
+    cluster: ClusterFacts, partition: str, gpu: GpuRequest | None
+) -> None:
+    """Reject a job whose GPU request does not match its partition.
+
+    Both directions are refused, and the second is the reason this is not
+    simply a membership test. Asking a CPU partition for a GPU leaves the job
+    pending forever. Asking a GPU partition for no GPU is *accepted* by Slurm
+    and runs -- occupying a GPU node to do CPU work, which is why it has to be
+    caught here rather than left to the scheduler.
 
     Args:
         cluster: The selected cluster.
         partition: Target partition.
-        gpu: Requested GPU model.
+        gpu: The job's GPU request, or None for a CPU-only job.
 
     Raises:
-        AppError: With ``PARTITION_GPU_MISMATCH`` if the partition's nodes do
-            not carry the model. Slurm would leave the job pending forever
-            rather than reject it.
+        AppError: With ``PARTITION_GPU_MISMATCH`` when the partition carries
+            no GPUs but one was asked for, when it carries GPUs but none was
+            asked for, or when it does not hold the model requested.
     """
-    if gpu not in partition_facts(cluster, partition)["gpus"]:
+    available = partition_facts(cluster, partition)["gpus"]
+
+    if gpu is None:
+        if available != ():
+            raise AppError(
+                Hpc3ErrorCode.PARTITION_GPU_MISMATCH,
+                f"Partition {partition!r} on {cluster['slug']!r} is a GPU partition "
+                f"({list(available)}) and this job asks for no GPU. It would run, "
+                "holding a GPU node to do CPU work. Use a CPU partition.",
+            )
+        return
+
+    if available == ():
         raise AppError(
             Hpc3ErrorCode.PARTITION_GPU_MISMATCH,
-            f"Partition {partition!r} on {cluster['slug']!r} carries no {gpu} GPUs; "
+            f"Partition {partition!r} on {cluster['slug']!r} is a CPU partition and "
+            f"carries no GPUs, but this job asks for {gpu['count']}x {gpu['model']}; "
             "the job would pend forever.",
+        )
+
+    if gpu["model"] not in available:
+        raise AppError(
+            Hpc3ErrorCode.PARTITION_GPU_MISMATCH,
+            f"Partition {partition!r} on {cluster['slug']!r} carries no "
+            f"{gpu['model']} GPUs ({list(available)}); the job would pend forever.",
         )
 
 
@@ -266,8 +299,7 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
         "project": spec["project"],
         "name": spec["name"],
         "partition": spec["partition"],
-        "gpu": spec["gpu"],
-        "gpu_count": spec["gpu_count"],
+        "gpu": encode_gpu_request(spec["gpu"]),
         "cpus": spec["cpus"],
         "mem_gb": spec["mem_gb"],
         "minutes": spec["minutes"],
@@ -306,7 +338,7 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
         raise JSONTypeError(f"job spec must be a JSON object, got {type(value).__name__}")
 
     partition = require_partition(cluster, value, "partition")
-    gpu = require_gpu_type(cluster, value, "gpu")
+    gpu = decode_gpu_request(cluster, value.get("gpu"), "gpu")
     minutes = _require_positive(value, "minutes")
     requeue = require_bool(value, "requeue")
     accept_billing = require_bool(value, "accept_billing")
@@ -327,7 +359,6 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
         name=_require_nonempty_str(value, "name"),
         partition=partition,
         gpu=gpu,
-        gpu_count=_require_positive(value, "gpu_count"),
         cpus=_require_positive(value, "cpus"),
         mem_gb=_require_positive(value, "mem_gb"),
         minutes=minutes,
