@@ -217,6 +217,13 @@ def _default_shutil_rmtree(path: Path | str) -> None:
     shutil.rmtree(path)
 
 
+def _default_os_utime(path: Path | str) -> None:
+    """Production os.utime, stamping the path with the current time."""
+    import os
+
+    os.utime(path, None)
+
+
 def _default_load_wandb_module() -> WandbModuleLike:
     """Production wandb module loader."""
     from platform_ml.wandb_publisher import _load_wandb_module as _load

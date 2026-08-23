@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Final
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import default_events_channel
@@ -35,6 +36,7 @@ from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.infra.paths import models_dir
 from model_trainer.core.logging.types import LOGGING_EXTRA_FIELDS
 from model_trainer.core.services.tokenizer.loader import load_tokenizer_from_dir
+from model_trainer.worker.trainer_job_store import TrainerJobStore
 
 _log = get_logger(__name__)
 
@@ -44,6 +46,98 @@ EVENTS_CHANNEL = default_events_channel("trainer")
 def redis_client(settings: Settings) -> RedisStrProto:
     """Create Redis client from settings."""
     return _test_hooks.kv_store_factory(settings["redis"]["url"])
+
+
+#: Materialized run directories the models root keeps. A run dir is ~1.4 GB,
+#: so four is ~6 GB. Five job types re-materialize completed runs through
+#: ``materialize_run_artifacts`` and nothing used to delete them, which is how
+#: the models root reached 49 GB.
+MATERIALIZED_RUN_KEEP: Final = 4
+
+
+def _last_used(run_dir: Path) -> float:
+    """Recency key for a materialized run directory.
+
+    Args:
+        run_dir: Directory to read.
+
+    Returns:
+        Its modification time, which ``materialize_run_artifacts`` stamps on
+        every use so that recency tracks use rather than download age.
+    """
+    return run_dir.stat().st_mtime
+
+
+def _materialized_run_dirs(models_root: Path) -> list[Path]:
+    """List materialized run directories, most recently used first.
+
+    Args:
+        models_root: Directory holding one subdirectory per materialized run.
+
+    Returns:
+        The run directories, newest mtime first.
+    """
+    if not models_root.is_dir():
+        return []
+    dirs = [child for child in models_root.iterdir() if child.is_dir()]
+    return sorted(dirs, key=_last_used, reverse=True)
+
+
+def evict_materialized_runs(
+    settings: Settings,
+    redis: RedisStrProto,
+    *,
+    keep: int = MATERIALIZED_RUN_KEEP,
+) -> tuple[str, ...]:
+    """Evict the least recently used materialized run directories.
+
+    ``materialize_run_artifacts`` is deliberately cache-semantic: five job
+    types, including interactive chat and generate, re-materialize a completed
+    run and expect it to still be there next call. Deleting after each use
+    would force a 1.4 GB re-download per chat message. So the cache is bounded
+    instead of emptied.
+
+    A directory whose run is NOT terminal is never evicted, because the
+    actively-training run writes into this same models root and evicting it
+    would delete a run out from under itself. That makes eviction conservative
+    when a run is stuck in a non-terminal state, which is the safe direction.
+
+    Args:
+        settings: Service settings carrying the models root.
+        redis: Client holding the run statuses.
+        keep: How many of the most recently used directories to retain.
+
+    Returns:
+        The run ids evicted, most recently used first.
+    """
+    store = TrainerJobStore(redis)
+    evicted: list[str] = []
+    for candidate in _materialized_run_dirs(models_dir(settings))[keep:]:
+        run_id = candidate.name
+        status_record = store.load(run_id)
+        status = None if status_record is None else status_record["status"]
+        if status not in ("completed", "failed"):
+            _log.info(
+                "Materialized-run eviction skipped: run not terminal",
+                extra={
+                    "event": "materialized_evict_skipped",
+                    "run_id": run_id,
+                    "reason": "run_not_terminal",
+                    "status": status,
+                },
+            )
+            continue
+        _test_hooks.shutil_rmtree(candidate)
+        evicted.append(run_id)
+        _log.info(
+            "Materialized-run evicted",
+            extra={
+                "event": "materialized_evicted",
+                "run_id": run_id,
+                "path": str(candidate),
+            },
+        )
+    return tuple(evicted)
 
 
 def materialize_run_artifacts(
@@ -84,6 +178,12 @@ def materialize_run_artifacts(
         # Already on disk, so the pointer is irrelevant -- requiring it here
         # would fail a run whose artifacts are present but whose upload
         # pointer was never written.
+        #
+        # Touched so that recency reflects USE and not the download that first
+        # created the directory. Without this the cache evicts by age and the
+        # run being chatted with every minute is the one thrown away.
+        _test_hooks.os_utime(normalized)
+        evict_materialized_runs(settings, redis)
         return normalized
 
     file_id = redis.get(artifact_file_id_key(run_id))
@@ -104,6 +204,9 @@ def materialize_run_artifacts(
         expected_root=f"model-{run_id}",
     )
     out_root.rename(normalized)
+    # Evicted AFTER the rename so the run just fetched is the newest entry and
+    # is never itself a candidate.
+    evict_materialized_runs(settings, redis)
     return normalized
 
 

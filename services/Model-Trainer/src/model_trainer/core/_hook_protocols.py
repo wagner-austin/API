@@ -185,6 +185,16 @@ class ShutilRmtreeProto(Protocol):
     def __call__(self, path: Path | str) -> None: ...
 
 
+class OsUtimeProto(Protocol):
+    """Protocol for the os.utime hook.
+
+    Used to mark a materialized run directory as recently USED, so the cache
+    evicts by recency of use rather than by age of download.
+    """
+
+    def __call__(self, path: Path | str) -> None: ...
+
+
 class OsScandirProto(Protocol):
     """Protocol for os.scandir hook."""
 

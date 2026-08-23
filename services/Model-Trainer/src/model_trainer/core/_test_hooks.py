@@ -34,6 +34,7 @@ from model_trainer.core._hook_defaults import (
     _default_load_wandb_module,
     _default_model_dir,
     _default_os_scandir,
+    _default_os_utime,
     _default_path_iterdir,
     _default_path_unlink,
     _default_random_factory,
@@ -75,6 +76,7 @@ from model_trainer.core._hook_protocols import (
     KVStoreFactoryProto,
     LoadSettingsProto,
     OsScandirProto,
+    OsUtimeProto,
     PathIterdirProto,
     PathUnlinkProto,
     PkgVersionProto,
@@ -219,6 +221,8 @@ spm_encode_ids: SpmEncodeIdsProto = _default_spm_encode_ids
 random_factory: RandomFactoryProto = _default_random_factory
 
 shutil_rmtree: ShutilRmtreeProto = _default_shutil_rmtree
+
+os_utime: OsUtimeProto = _default_os_utime
 
 load_wandb_module: LoadWandbModuleProto = _default_load_wandb_module
 
