@@ -17,10 +17,16 @@ class ExceptionsRule:
     _log_call_named = re.compile(
         r"\b(logging|log|logger)\.(debug|info|warning|error|exception|critical)\("
     )
-    # ``write_line`` is the sanctioned output channel of the stdlib-only
-    # clients (RustedWarfareBot's ``_test_hooks.write_line``): calling it
-    # in an except body surfaces the failure exactly as a log call does.
-    _log_call_any = re.compile(r"\.(debug|info|warning|error|exception|critical|write_line)\(")
+    # ``write_line`` and ``emit_error`` are the sanctioned output channels of
+    # the stdlib-only clients and CLIs (RustedWarfareBot's
+    # ``_test_hooks.write_line``; hpc3's ``cli/_test_hooks.emit_error``, which
+    # writes a refusal to stderr at the process boundary). Calling either in an
+    # except body surfaces the failure exactly as a log call does -- for a
+    # command-line tool it surfaces it more directly, since the operator reads
+    # stderr and not the log.
+    _log_call_any = re.compile(
+        r"\.(debug|info|warning|error|exception|critical|write_line|emit_error)\("
+    )
     _raise_re = re.compile(r"\braise\b")
 
     def run(self, files: list[Path]) -> list[Violation]:

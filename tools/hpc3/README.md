@@ -384,6 +384,34 @@ cannot schedule its own preemption.
 
 ---
 
+## Exit statuses
+
+| | |
+| --- | --- |
+| `0` | the command did what it was asked |
+| `1` | it ran and the answer is negative — triage found something, `hpc3-trace` matched nothing |
+| `2` | it **refused**; nothing was submitted, staged or run |
+
+A refusal prints one line to stderr carrying its error code:
+
+```
+$ hpc3-preflight --config hpc3.json --run runs/arm-b.json
+ENV_PACKAGE_MISMATCH: /pub/wagnera3/envs/abl has torch==2.11.0+cu128, but this
+project pins torch==2.6.0+cu124. A version difference under a published
+comparison is a confound, not a detail.
+$ echo $?
+2
+```
+
+Exactly one place translates — `cli/_fatal.py`, at the process boundary — and
+it is **typed**, not an `except Exception`. Three exception types become
+messages, because each names something the operator did that the tool declined
+to do. Anything else propagates with its traceback intact, because anything
+else is a defect in this package rather than a refusal by it, and a defect that
+prints one tidy line is a defect nobody debugs.
+
+---
+
 ## Architecture
 
 ```

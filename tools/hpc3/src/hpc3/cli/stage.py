@@ -25,7 +25,7 @@ from collections.abc import Sequence
 
 from platform_core.json_utils import load_json_str
 
-from hpc3.cli import _argv, _config, _test_hooks
+from hpc3.cli import _argv, _config, _fatal, _test_hooks
 from hpc3.contracts.provenance import format_provenance
 from hpc3.contracts.stage import decode_stage_manifest
 from hpc3.core import _test_hooks as core_hooks
@@ -85,7 +85,7 @@ def entrypoint() -> None:
     Raises:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
-    raise SystemExit(main(None))
+    raise SystemExit(_fatal.run(main))
 
 
 __all__ = ["entrypoint", "main"]

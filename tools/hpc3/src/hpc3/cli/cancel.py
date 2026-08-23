@@ -14,7 +14,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 
-from hpc3.cli import _argv, _config, _test_hooks
+from hpc3.cli import _argv, _config, _fatal, _test_hooks
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core.cancel import cancel, summarise
 
@@ -65,7 +65,7 @@ def entrypoint() -> None:
     Raises:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
-    raise SystemExit(main(None))
+    raise SystemExit(_fatal.run(main))
 
 
 __all__ = ["entrypoint", "main"]

@@ -117,3 +117,35 @@ def test_exceptions_rule_accepts_write_line_as_surfacing(tmp_path: Path) -> None
     # write_line is the stdlib-only clients' output channel; calling it
     # in a narrow except body surfaces the failure like a log call.
     assert violations == []
+
+
+def test_exceptions_rule_accepts_emit_error_as_surfacing(tmp_path: Path) -> None:
+    """A CLI's top-level translator writes the refusal to stderr and exits.
+
+    That is the loudest surfacing available to a command-line tool -- the
+    operator reads stderr, not the log -- so it satisfies the rule for the
+    same reason write_line does.
+    """
+    code = (
+        "try:\n"
+        "    return main(None)\n"
+        "except ValueError as usage:\n"
+        "    _test_hooks.emit_error(f'usage: {usage}')\n"
+        "    return EXIT_REFUSED\n"
+    )
+    path = tmp_path / "emit_error_ok.py"
+    _write(path, code)
+
+    rule = ExceptionsRule()
+    assert rule.run([path]) == []
+
+
+def test_exceptions_rule_still_flags_a_body_that_surfaces_nothing(tmp_path: Path) -> None:
+    """The rule has to stay able to fail, or the two acceptances above are
+    indistinguishable from a rule that accepts everything."""
+    code = "try:\n    return main(None)\nexcept ValueError as usage:\n    return EXIT_REFUSED\n"
+    path = tmp_path / "silent.py"
+    _write(path, code)
+
+    rule = ExceptionsRule()
+    assert [v.kind for v in rule.run([path])] == ["except-without-log-or-raise"]

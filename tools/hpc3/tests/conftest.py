@@ -169,6 +169,18 @@ class LoggedEvent:
         self.fields = dict(fields)
 
 
+def _make_errors() -> Generator[list[str], None, None]:
+    """Capture CLI refusal lines instead of writing them to stderr.
+
+    Yields:
+        The list the CLI's ``emit_error`` hook appends to, in order.
+    """
+    lines: list[str] = []
+    cli_hooks.emit_error = lines.append
+    yield lines
+    cli_hooks.reset_hooks()
+
+
 def _make_logged() -> Generator[list[LoggedEvent], None, None]:
     """Capture audit events instead of writing them to the platform logger.
 
@@ -370,6 +382,7 @@ def write_file(path: pathlib.Path, payload: bytes) -> None:
 # the bare @pytest.fixture expression carries Any under disallow_any_expr.
 argv = pytest.fixture(_make_argv)
 emitted = pytest.fixture(_make_emitted)
+errors = pytest.fixture(_make_errors)
 fake_run = pytest.fixture(_make_fake_run)
 frozen_clock = pytest.fixture(_make_frozen_clock)
 logged = pytest.fixture(_make_logged)

@@ -1,9 +1,10 @@
 """Dependency-injection seam for the CLI layer.
 
-The CLI's only impure act beyond what the core already routes through hooks
-is writing its report to stdout. It goes through a hook so a test asserts what
-a command reported rather than what pytest managed to capture, which keeps the
-assertions about content instead of about capture behaviour.
+The CLI's only impure acts beyond what the core already routes through hooks
+are writing its report to stdout and its refusals to stderr. Both go through
+hooks so a test asserts what a command reported rather than what pytest
+managed to capture, which keeps the assertions about content instead of about
+capture behaviour.
 """
 
 from __future__ import annotations
@@ -22,6 +23,19 @@ def _default_emit(line: str) -> None:
     sys.stdout.write(line + "\n")
 
 
+def _default_emit_error(line: str) -> None:
+    """Write one refusal line to stderr.
+
+    Separate stream from :func:`_default_emit` so a command's report can be
+    piped or redirected while its refusals still reach the operator, and so
+    a refusal never lands in a file something else will parse as output.
+
+    Args:
+        line: Line to write, without a trailing newline.
+    """
+    sys.stderr.write(line + "\n")
+
+
 def _default_now_iso() -> str:
     """Read the wall clock for the ledger's timestamp.
 
@@ -35,14 +49,16 @@ def _default_now_iso() -> str:
 
 
 emit: Callable[[str], None] = _default_emit
+emit_error: Callable[[str], None] = _default_emit_error
 now_iso: Callable[[], str] = _default_now_iso
 
 
 def reset_hooks() -> None:
     """Rebind every hook to its production implementation."""
-    global emit, now_iso
+    global emit, emit_error, now_iso
     emit = _default_emit
+    emit_error = _default_emit_error
     now_iso = _default_now_iso
 
 
-__all__ = ["emit", "now_iso", "reset_hooks"]
+__all__ = ["emit", "emit_error", "now_iso", "reset_hooks"]
