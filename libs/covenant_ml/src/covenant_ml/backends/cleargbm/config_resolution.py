@@ -18,6 +18,7 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from ...types import ClassifierTrainConfig, ClearGBMConfig
+from ...types_regression import RegressorTrainConfig
 
 _log = get_logger(__name__)
 
@@ -36,6 +37,22 @@ def _is_cleargbm_config(cfg: ClassifierTrainConfig) -> TypeGuard[ClearGBMConfig]
         and "min_samples_split" in cfg
         and "min_samples_leaf" in cfg  # LightGBM has min_child_samples instead
     )
+
+
+def _is_cleargbm_regressor_config(cfg: RegressorTrainConfig) -> TypeGuard[ClearGBMConfig]:
+    """Check if a regressor config is ClearGBMConfig by its distinctive keys.
+
+    The same discriminator as :func:`_is_cleargbm_config` on the regressor
+    config union — `min_samples_split`/`min_samples_leaf` appear in no other
+    member (LightGBM has `min_child_samples`).
+
+    Args:
+        cfg: Regressor training configuration to check.
+
+    Returns:
+        True if config is ClearGBMConfig.
+    """
+    return isinstance(cfg, dict) and "min_samples_split" in cfg and "min_samples_leaf" in cfg
 
 
 def _resolve_monotonic_constraints(

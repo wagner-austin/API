@@ -101,6 +101,7 @@ def _build_trial_config(
         early_stopping_rounds=early_stopping_rounds,
         growth_strategy="depth_wise",
         num_leaves=None,
+        objective="binary_log_loss",
         scale_pos_weight=_compute_class_weight(y_train),
     )
 

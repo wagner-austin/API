@@ -73,6 +73,7 @@ def _make_config() -> GradientBoostingConfig:
         early_stopping_rounds=10,
         growth_strategy="depth_wise",
         num_leaves=None,
+        objective="binary_log_loss",
         scale_pos_weight=1.0,
     )
     return config
@@ -198,6 +199,5 @@ def _make_model(trees: list[DecisionTree]) -> GradientBoostingModel:
         base_prediction=0.0,
         learning_rate=0.1,
         feature_names=("feature_0", "feature_1"),
-        n_classes=2,
         config=_make_config(),
     )

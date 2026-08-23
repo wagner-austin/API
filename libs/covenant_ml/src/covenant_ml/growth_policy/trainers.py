@@ -235,6 +235,7 @@ class ClearGbmAnchorTrainer:
             "early_stopping_rounds": None,
             "growth_strategy": "depth_wise",
             "num_leaves": None,
+            "objective": "binary_log_loss",
             "scale_pos_weight": 1.0,
         }
         feature_count = int(split.x_train.shape[1])

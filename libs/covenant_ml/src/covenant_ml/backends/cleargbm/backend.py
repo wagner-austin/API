@@ -318,6 +318,7 @@ class ClearGBMBackend(ClassifierBackend):
             early_stopping_rounds=cfg["early_stopping_rounds"],
             growth_strategy=cfg["growth_strategy"],
             num_leaves=cfg["num_leaves"],
+            objective="binary_log_loss",
             # The auto-computed class weight, actually applied. Until
             # 2026-08-22 this value was computed, logged and reported in the
             # outcome while the core had no weighting mechanism at all —

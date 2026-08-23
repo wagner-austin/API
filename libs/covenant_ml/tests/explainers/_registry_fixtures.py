@@ -158,6 +158,7 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         early_stopping_rounds=10,
         growth_strategy="depth_wise",
         num_leaves=None,
+        objective="binary_log_loss",
         scale_pos_weight=1.0,
     )
 

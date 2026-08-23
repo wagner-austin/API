@@ -11,6 +11,7 @@ from cleargbm.types import (
     GradientBoostingModel,
     TreeNode,
     require_growth_strategy,
+    require_objective,
 )
 from platform_core.json_utils import (
     JSONValue,
@@ -250,9 +251,10 @@ def _decode_rust_config(raw: JSONValue) -> GradientBoostingConfig:
         ),
         num_leaves=_optional_int(cfg.get("num_leaves")),
         # Read from the payload for the same reason as growth_strategy: the
-        # serialized config records the weight the model actually trained
-        # under.
-        scale_pos_weight=narrow_json_to_float(cfg["scale_pos_weight"]),
+        # serialized config records the loss and weight the model actually
+        # trained under. The weight is None exactly under squared_error.
+        objective=require_objective(narrow_json_to_str(cfg["objective"]), "objective"),
+        scale_pos_weight=_optional_float(cfg.get("scale_pos_weight")),
     )
 
 
@@ -287,6 +289,5 @@ def _decode_rust_json_to_python_model(json_str: str) -> GradientBoostingModel:
         base_prediction=narrow_json_to_float(raw["base_prediction"]),
         learning_rate=narrow_json_to_float(raw["learning_rate"]),
         feature_names=feature_names,
-        n_classes=narrow_json_to_int(raw["n_classes"]),
         config=_decode_rust_config(raw["config"]),
     )

@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.types import (
+    ClearGBMConfig,
     FeatureImportance,
     LightGBMConfig,
     LSTMConfig,
@@ -124,7 +125,7 @@ class XGBRegressorFactory(Protocol):
         ...
 
 
-RegressorBackendName = Literal["xgboost_reg", "lightgbm_reg", "mlp_reg", "lstm_reg"]
+RegressorBackendName = Literal["xgboost_reg", "lightgbm_reg", "cleargbm_reg", "mlp_reg", "lstm_reg"]
 
 
 class RegressionMetrics(TypedDict, total=True):
@@ -164,7 +165,7 @@ class RegressionTrainProgress(TypedDict, total=True):
     val_rmse: float | None
 
 
-RegressorTrainConfig = TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig
+RegressorTrainConfig = TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig | ClearGBMConfig
 
 
 class RegressionTrainOutcome(TypedDict, total=True):

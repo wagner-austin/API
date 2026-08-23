@@ -115,6 +115,7 @@ def default_regressor_registry() -> RegressorRegistry:
     Returns:
         A RegressorRegistry with all available regressor backends.
     """
+    from .cleargbm.regressor import create_cleargbm_regressor_backend
     from .lightgbm.regressor import create_lightgbm_regressor_backend
     from .xgboost.regressor import create_xgboost_regressor_backend
 
@@ -126,6 +127,10 @@ def default_regressor_registry() -> RegressorRegistry:
     reg.register(
         "lightgbm_reg",
         RegressorBackendRegistration(create_lightgbm_regressor_backend),
+    )
+    reg.register(
+        "cleargbm_reg",
+        RegressorBackendRegistration(create_cleargbm_regressor_backend),
     )
     return reg
 

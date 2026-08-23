@@ -313,7 +313,6 @@ class TestConvertClearGBMToShapFormat:
             base_prediction=0.0,
             learning_rate=0.1,
             feature_names=("f0",),
-            n_classes=2,
             config=_make_config(),
         )
 
@@ -357,7 +356,6 @@ class TestConvertClearGBMToShapFormat:
             base_prediction=-0.5,
             learning_rate=0.1,
             feature_names=("f0", "f1"),
-            n_classes=2,
             config=_make_config(),
         )
 
