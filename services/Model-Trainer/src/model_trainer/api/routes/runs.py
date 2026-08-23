@@ -18,6 +18,7 @@ from model_trainer.api.routes.runs_files import (
 from ...core.infra.paths import model_logs_path
 from ...core.logging.types import LoggingExtra
 from ...core.services.container import ServiceContainer
+from ...core.services.data.corpus import open_corpus
 from ..middleware import api_key_dependency
 from ..schemas.runs import (
     ArtifactPointerResponse,
@@ -182,7 +183,7 @@ class _RunsRoutes:
                 model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
             )
         try:
-            with open(path, encoding="utf-8", errors="ignore") as f:
+            with open_corpus(path) as f:
                 lines = f.readlines()
             tail_n = max(1, int(tail))
             content = "".join(lines[-tail_n:])

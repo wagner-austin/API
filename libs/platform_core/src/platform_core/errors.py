@@ -138,6 +138,7 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     CORPUS_EMPTY = "CORPUS_EMPTY"
     CORPUS_TOO_LARGE = "CORPUS_TOO_LARGE"
     CORPUS_HOLDOUT_UNSATISFIABLE = "CORPUS_HOLDOUT_UNSATISFIABLE"
+    CORPUS_NOT_DECODABLE = "CORPUS_NOT_DECODABLE"
 
     # Run/Job errors
     RUN_NOT_FOUND = "RUN_NOT_FOUND"
@@ -548,6 +549,7 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     ModelTrainerErrorCode.CORPUS_EMPTY: 400,
     ModelTrainerErrorCode.CORPUS_TOO_LARGE: 413,
     ModelTrainerErrorCode.CORPUS_HOLDOUT_UNSATISFIABLE: 400,
+    ModelTrainerErrorCode.CORPUS_NOT_DECODABLE: 400,
     # Run/Job errors
     ModelTrainerErrorCode.RUN_NOT_FOUND: 404,
     ModelTrainerErrorCode.EVAL_NOT_FOUND: 404,

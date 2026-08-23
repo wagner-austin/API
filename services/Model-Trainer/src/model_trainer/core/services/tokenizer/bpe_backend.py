@@ -20,7 +20,7 @@ from ...contracts.tokenizer import (
 from ...contracts.tokenizer import (
     TokenizerTrainStats as _TokenizerTrainStats,
 )
-from ..data.corpus import count_lines, list_text_files, sample_lines
+from ..data.corpus import count_lines, list_text_files, open_corpus, sample_lines
 
 DEFAULT_SPECIALS: tuple[str, ...] = ("[PAD]", "[UNK]", "[BOS]", "[EOS]")
 
@@ -172,7 +172,7 @@ def _read_corpus_lines(files: list[str]) -> list[str]:
     """Read all lines from corpus files."""
     lines: list[str] = []
     for fp in files:
-        with open(fp, encoding="utf-8", errors="ignore") as f:
+        with open_corpus(fp) as f:
             for line in f:
                 stripped = line.strip()
                 if stripped:

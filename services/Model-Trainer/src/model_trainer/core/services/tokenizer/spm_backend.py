@@ -23,7 +23,7 @@ from ...contracts.tokenizer import (
 from ...contracts.tokenizer import (
     TokenizerTrainStats as _TokenizerTrainStats,
 )
-from ..data.corpus import count_lines, list_text_files, sample_lines
+from ..data.corpus import count_lines, list_text_files, open_corpus, sample_lines
 
 
 def _spm_train(files: list[str], *, model_prefix: str, vocab_size: int) -> None:
@@ -124,7 +124,7 @@ class _SPMAdapter:
         vocab_path = str(Path(model_path).with_suffix(".vocab"))
         table: dict[str, int] = {}
         try:
-            with open(vocab_path, encoding="utf-8", errors="ignore") as f:
+            with open_corpus(vocab_path) as f:
                 for i, line in enumerate(f):
                     piece = line.split("\t", 1)[0].strip()
                     if piece:

@@ -9,7 +9,7 @@ from platform_core.logging import get_logger
 
 from ...contracts.dataset import CorpusSplit, DatasetConfig
 from ...encoding import Encoded, Encoder
-from ..data.corpus import list_text_files
+from ..data.corpus import list_text_files, open_corpus
 
 _logger: Final = get_logger(__name__)
 
@@ -28,7 +28,7 @@ def read_corpus_lines(files: Sequence[str]) -> tuple[str, ...]:
     """
     lines: list[str] = []
     for path in files:
-        with open(path, encoding="utf-8", errors="ignore") as handle:
+        with open_corpus(path) as handle:
             for raw in handle:
                 stripped = raw.strip()
                 if stripped:
