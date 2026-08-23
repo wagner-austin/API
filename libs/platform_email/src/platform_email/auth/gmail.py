@@ -17,6 +17,7 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.logging import get_logger
 
 from platform_email.auth.common import (
     generate_code_challenge,
@@ -271,8 +272,15 @@ def gmail_load_or_authorize() -> OAuthTokens:
                 new_tokens = refresh_gmail_access_token(credentials, cached_tokens["refresh_token"])
                 hooks.save_gmail_tokens(new_tokens)
                 return new_tokens
-            except AppError:
-                pass
+            except AppError as refresh_failed:
+                # Falling through to a full authorization is the recovery, but a
+                # refresh that keeps failing means the stored refresh token is
+                # dead, and silently re-prompting hides that from whoever has to
+                # explain why this account reauthorizes every run.
+                get_logger(__name__).warning(
+                    "Gmail token refresh failed, falling back to full authorization: %s",
+                    refresh_failed,
+                )
         else:
             return cached_tokens
 

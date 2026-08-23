@@ -215,12 +215,13 @@ class Storage:
         path = self._path_for(file_id)
         meta_path = self._meta_path_for(file_id)
         existed = False
-        try:
-            path.unlink()
+        # An already-missing blob is an ordinary outcome of delete, not an
+        # error to catch and drop. Asked directly, in the same shape as the
+        # sidecar cleanup below; missing_ok covers the file vanishing between
+        # the question and the unlink.
+        if path.exists():
+            path.unlink(missing_ok=True)
             existed = True
-        except FileNotFoundError:
-            # Blob already missing; proceed to sidecar cleanup below.
-            pass
 
         if meta_path.exists():
             meta_path.unlink()

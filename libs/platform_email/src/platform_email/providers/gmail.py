@@ -20,6 +20,7 @@ from platform_core.json_utils import (
     optional_str,
     require_str,
 )
+from platform_core.logging import get_logger
 
 from platform_email.config import GMAIL_API_BASE
 from platform_email.providers.gmail_decode import (
@@ -552,7 +553,12 @@ class _GmailEmailClient:
             try:
                 decoded = base64.urlsafe_b64decode(content_data + "==")
                 content_bytes = base64.b64encode(decoded).decode("utf-8")
-            except (ValueError, UnicodeDecodeError):
+            except (ValueError, UnicodeDecodeError) as decode_failed:
+                # Not base64url after all: pass the raw payload through rather
+                # than dropping the attachment. Logged because a systematic
+                # decode failure would otherwise be indistinguishable from
+                # attachments that legitimately arrive undecodable.
+                get_logger(__name__).debug("attachment base64url decode failed: %s", decode_failed)
                 content_bytes = content_data
 
         size = data.get("size")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from scripts import guard as guard_script
 
 from music_wrapped_api import _test_hooks
@@ -23,13 +24,8 @@ def test_find_monorepo_root_failure(tmp_path: Path) -> None:
     start.mkdir(parents=True)
 
     # Use the default hook implementation directly
-    raised = False
-    try:
+    with pytest.raises(RuntimeError):
         _test_hooks._default_guard_find_monorepo_root(start)
-    except RuntimeError:
-        raised = True
-    if not raised:
-        raise AssertionError("expected RuntimeError when libs dir not found")
 
 
 def test_load_orchestrator_from_tmp(tmp_path: Path) -> None:

@@ -19,6 +19,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
 )
+from platform_core.logging import get_logger
 from platform_core.oauth import (
     generate_code_challenge,
     generate_code_verifier,
@@ -336,9 +337,15 @@ def load_or_authorize() -> OAuthTokens:
                 new_tokens = refresh_access_token(credentials, cached_tokens["refresh_token"])
                 hooks.save_tokens(new_tokens)
                 return new_tokens
-            except AppError:
-                # Refresh failed, need to re-authorize
-                pass
+            except AppError as refresh_failed:
+                # Falling through to a full authorization is the recovery, but a
+                # refresh that keeps failing means the stored refresh token is
+                # dead, and silently re-prompting hides that from whoever has to
+                # explain why this account reauthorizes every run.
+                get_logger(__name__).warning(
+                    "Calendar token refresh failed, falling back to full authorization: %s",
+                    refresh_failed,
+                )
         else:
             return cached_tokens
 

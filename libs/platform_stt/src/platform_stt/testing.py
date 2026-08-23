@@ -135,11 +135,10 @@ class FakeAudioChunker:
         """Return configured chunks or single pass-through chunk."""
         if self._chunks is not None:
             return self._chunks
-        # Default: return single chunk pointing to source file
-        try:
-            size = os.path.getsize(audio_path)
-        except OSError:
-            size = 0
+        # Default: return single chunk pointing to source file. A fake is
+        # routinely handed a path that was never written, so absence is the
+        # expected case and is asked about directly rather than caught.
+        size = os.path.getsize(audio_path) if os.path.exists(audio_path) else 0
         return [
             AudioChunk(
                 path=audio_path,
