@@ -266,6 +266,74 @@ class _TrainRankingProto(Protocol):
         ...
 
 
+class _ContinueProto(Protocol):
+    """Protocol for the native binary continuation entry."""
+
+    def __call__(
+        self,
+        model: PyGbmModelProto,
+        x_train: NDArray[np.float64],
+        y_train: NDArray[np.int64],
+        sample_weight: NDArray[np.float64] | None,
+        x_val: NDArray[np.float64] | None,
+        y_val: NDArray[np.int64] | None,
+        val_sample_weight: NDArray[np.float64] | None,
+        additional_rounds: int,
+        n_jobs: int,
+    ) -> PyGbmModelProto:
+        """Continue a binary model with more boosting rounds.
+
+        Args:
+            model: Existing trained model handle (not modified).
+            x_train: Continuation feature matrix.
+            y_train: Continuation labels.
+            sample_weight: Optional per-row training weights.
+            x_val: Optional validation features.
+            y_val: Optional validation labels.
+            val_sample_weight: Optional per-row evaluation weights.
+            additional_rounds: New boosting rounds (>= 1).
+            n_jobs: Worker-thread policy.
+
+        Returns:
+            A new combined native model handle.
+        """
+        ...
+
+
+class _ContinueRegressionProto(Protocol):
+    """Protocol for the native regression continuation entry."""
+
+    def __call__(
+        self,
+        model: PyGbmModelProto,
+        x_train: NDArray[np.float64],
+        y_train: NDArray[np.float64],
+        sample_weight: NDArray[np.float64] | None,
+        x_val: NDArray[np.float64] | None,
+        y_val: NDArray[np.float64] | None,
+        val_sample_weight: NDArray[np.float64] | None,
+        additional_rounds: int,
+        n_jobs: int,
+    ) -> PyGbmModelProto:
+        """Continue a regression model with more boosting rounds.
+
+        Args:
+            model: Existing trained model handle (not modified).
+            x_train: Continuation feature matrix.
+            y_train: Continuous continuation targets.
+            sample_weight: Optional per-row training weights.
+            x_val: Optional validation features.
+            y_val: Optional validation targets.
+            val_sample_weight: Optional per-row evaluation weights.
+            additional_rounds: New boosting rounds (>= 1).
+            n_jobs: Worker-thread policy.
+
+        Returns:
+            A new combined native model handle.
+        """
+        ...
+
+
 class _ToJsonProto(Protocol):
     """Signature of ``cleargbm_rs.py_gbm_model_to_json_rs``."""
 
@@ -333,6 +401,10 @@ train_gradient_boosting_rs: _TrainProto = _native_mod.train_gradient_boosting_rs
 train_gradient_boosting_regression_rs: _TrainRegressionProto = (
     _native_mod.train_gradient_boosting_regression_rs
 )
+continue_gradient_boosting_rs: _ContinueProto = _native_mod.continue_gradient_boosting_rs
+continue_gradient_boosting_regression_rs: _ContinueRegressionProto = (
+    _native_mod.continue_gradient_boosting_regression_rs
+)
 train_gradient_boosting_multiclass_rs: _TrainMulticlassProto = (
     _native_mod.train_gradient_boosting_multiclass_rs
 )
@@ -358,6 +430,8 @@ py_gbm_model_n_trees_rs: _NTreesProto = _native_mod.py_gbm_model_n_trees_rs
 
 __all__ = [
     "PyGbmModelProto",
+    "continue_gradient_boosting_regression_rs",
+    "continue_gradient_boosting_rs",
     "predict_class_model_rs",
     "predict_proba_model_rs",
     "predict_proba_multiclass_model_rs",
