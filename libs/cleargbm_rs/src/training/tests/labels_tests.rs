@@ -23,13 +23,16 @@ fn test_resolve_binary_ok() -> Result<(), ClearGbmError> {
         Some(2.0_f64),
         TrainingLabels::Binary(&y),
         None,
+        None,
     ));
     match resolved {
         ResolvedObjective::Binary {
             y_train,
+            weights,
             val,
             scale_pos_weight,
         } => {
+            assert!(weights.is_none());
             assert_eq!(y_train, &y);
             assert!(val.is_none());
             assert!((scale_pos_weight - 2.0_f64).abs() < 1e-15_f64);
@@ -51,25 +54,33 @@ fn test_resolve_squared_error_ok_with_val() -> Result<(), ClearGbmError> {
         Objective::SquaredError,
         None,
         TrainingLabels::Continuous(&y),
+        None,
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Continuous(&y_val),
+            weight: None,
         }),
     ));
-    match resolved {
-        ResolvedObjective::SquaredError { y_train, val } => {
-            assert_eq!(y_train, &y);
-            let (xv, yv) = match val {
-                Some(pair) => pair,
+    assert!(resolved_has_val_features(&resolved));
+    match &resolved {
+        ResolvedObjective::SquaredError {
+            y_train,
+            weights,
+            val,
+        } => {
+            assert_eq!(*y_train, &y);
+            assert!(weights.is_none());
+            let v = match val {
+                Some(v) => v,
                 None => {
                     return Err(ClearGbmError::TreeConstructionFailed {
                         reason: "expected validation data".to_string(),
                     })
                 }
             };
-            assert_eq!(xv.len(), 1_usize);
-            assert_eq!(yv, &y_val);
-            assert!(resolved_has_val_features(&resolved));
+            assert_eq!(v.x.len(), 1_usize);
+            assert_eq!(v.y, &y_val);
+            assert!(v.weight.is_none());
             Ok(())
         }
         ResolvedObjective::Binary { .. } => Err(ClearGbmError::TreeConstructionFailed {
@@ -93,6 +104,7 @@ fn test_resolve_binary_missing_weight_is_error() -> Result<(), ClearGbmError> {
         None,
         TrainingLabels::Binary(&y),
         None,
+        None,
     );
     match result {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
@@ -113,6 +125,7 @@ fn test_resolve_squared_error_with_weight_is_error() -> Result<(), ClearGbmError
         Objective::SquaredError,
         Some(3.0_f64),
         TrainingLabels::Continuous(&y),
+        None,
         None,
     );
     match result {
@@ -139,6 +152,7 @@ fn test_resolve_validates_binary_train_label_content() -> Result<(), ClearGbmErr
         Some(1.0_f64),
         TrainingLabels::Binary(&y),
         None,
+        None,
     );
     match result {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
@@ -163,9 +177,11 @@ fn test_resolve_validates_binary_val_label_content() -> Result<(), ClearGbmError
         Objective::BinaryLogLoss,
         Some(1.0_f64),
         TrainingLabels::Binary(&y),
+        None,
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Binary(&y_val),
+            weight: None,
         }),
     );
     match result {
@@ -190,9 +206,11 @@ fn test_resolve_validates_continuous_val_label_content() -> Result<(), ClearGbmE
         Objective::SquaredError,
         None,
         TrainingLabels::Continuous(&y),
+        None,
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Continuous(&y_val),
+            weight: None,
         }),
     );
     match result {
@@ -215,6 +233,7 @@ fn test_validation_data_debug_and_copy() {
     let val = ValidationData {
         x: &x,
         y: TrainingLabels::Binary(&y),
+        weight: None,
     };
     let copy = val;
     let debug = format!("{copy:?}");
@@ -240,6 +259,7 @@ fn test_binary_objective_rejects_continuous_labels() -> Result<(), ClearGbmError
     let result = train_gradient_boosting(
         &x_train,
         TrainingLabels::Continuous(&y_continuous),
+        None,
         None,
         &config,
         &feature_names,
@@ -282,6 +302,7 @@ fn test_binary_objective_rejects_continuous_val_labels() -> Result<(), ClearGbmE
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Continuous(&y_val),
+            weight: None,
         }),
         &config,
         &feature_names,

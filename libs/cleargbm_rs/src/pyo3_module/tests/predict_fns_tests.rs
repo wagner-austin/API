@@ -7,9 +7,7 @@ use pyo3::types::PyTuple;
 
 use super::helpers::{train_model, wrap_py_err};
 use crate::error::ClearGbmError;
-use crate::pyo3_module::training_fns::{
-    predict_proba_model_from_args, predict_raw_model_from_args,
-};
+use crate::pyo3_module::entry_args::{predict_proba_model_from_args, predict_raw_model_from_args};
 
 // =============================================================================
 // predict_proba_model_from_args

@@ -8,7 +8,9 @@
 //! the reverse) is unrepresentable past this point.
 
 use crate::error::ClearGbmError;
-use crate::losses::validation::{validate_continuous_labels, validate_labels};
+use crate::losses::validation::{
+    validate_continuous_labels, validate_labels, validate_weight_pairing,
+};
 
 use super::config::Objective;
 
@@ -53,9 +55,9 @@ impl TrainingLabels<'_> {
     }
 }
 
-/// Validation features paired with their labels.
+/// Validation features paired with their labels and optional weights.
 ///
-/// The pair travels as one value so "features without labels" (or the
+/// The group travels as one value so "features without labels" (or the
 /// reverse) is unrepresentable in the core — the both-or-neither check lives
 /// at the boundary that receives them as separate arguments.
 #[derive(Debug, Clone, Copy)]
@@ -64,6 +66,20 @@ pub struct ValidationData<'a> {
     pub x: &'a [&'a [f64]],
     /// Validation labels, same kind as the training labels.
     pub y: TrainingLabels<'a>,
+    /// Optional per-row weights for the evaluation loss; `None` weighs
+    /// every row 1.
+    pub weight: Option<&'a [f64]>,
+}
+
+/// A resolved validation split: features, labels of the objective's kind,
+/// and optional per-row evaluation weights.
+pub(crate) struct ResolvedValidation<'a, Y> {
+    /// Validation feature matrix `[n_val_samples][n_features]`.
+    pub x: &'a [&'a [f64]],
+    /// Validation labels, already narrowed to the objective's kind.
+    pub y: &'a [Y],
+    /// Optional per-row evaluation weights; `None` weighs every row 1.
+    pub weight: Option<&'a [f64]>,
 }
 
 /// The objective with its labels and objective-specific parameters, resolved
@@ -78,8 +94,10 @@ pub(crate) enum ResolvedObjective<'a> {
     Binary {
         /// Training labels, each 0 or 1.
         y_train: &'a [u8],
-        /// Validation features and labels, when provided.
-        val: Option<(&'a [&'a [f64]], &'a [u8])>,
+        /// Optional per-row training weights; `None` weighs every row 1.
+        weights: Option<&'a [f64]>,
+        /// The validation split, when provided.
+        val: Option<ResolvedValidation<'a, u8>>,
         /// Positive-class weight (1.0 = unweighted).
         scale_pos_weight: f64,
     },
@@ -87,8 +105,10 @@ pub(crate) enum ResolvedObjective<'a> {
     SquaredError {
         /// Training targets, each finite.
         y_train: &'a [f64],
-        /// Validation features and targets, when provided.
-        val: Option<(&'a [&'a [f64]], &'a [f64])>,
+        /// Optional per-row training weights; `None` weighs every row 1.
+        weights: Option<&'a [f64]>,
+        /// The validation split, when provided.
+        val: Option<ResolvedValidation<'a, f64>>,
     },
 }
 
@@ -98,8 +118,8 @@ impl<'a> ResolvedObjective<'a> {
     /// the boosting loop starts.
     pub(crate) fn val_features(&self) -> Option<&'a [&'a [f64]]> {
         match self {
-            Self::Binary { val, .. } => val.map(|(x, _)| x),
-            Self::SquaredError { val, .. } => val.map(|(x, _)| x),
+            Self::Binary { val, .. } => val.as_ref().map(|v| v.x),
+            Self::SquaredError { val, .. } => val.as_ref().map(|v| v.x),
         }
     }
 }
@@ -121,35 +141,52 @@ fn pairing_error(
     }
 }
 
-/// Resolves the configured objective against typed labels.
+/// Resolves the configured objective against typed labels and weights.
 ///
 /// Checks that the label kind matches the objective for both training and
 /// validation labels, that the objective-paired `scale_pos_weight` is
 /// present exactly under `BinaryLogLoss` (the config constructor enforces
 /// the same rule; this function is total over its inputs rather than
-/// trusting the caller), and that label contents are valid for their kind
-/// (0/1 for binary, finite for continuous).
+/// trusting the caller), that label contents are valid for their kind
+/// (0/1 for binary, finite for continuous), and that any per-row weights
+/// pair with their labels (matching length; finite, strictly positive
+/// values).
 ///
 /// # Args
 ///
 /// * `objective` - The configured training objective.
 /// * `scale_pos_weight` - The configured positive-class weight.
 /// * `y_train` - Typed training labels.
-/// * `validation` - Validation features paired with typed labels, when
-///   provided.
+/// * `sample_weight` - Optional per-row training weights.
+/// * `validation` - Validation features paired with typed labels and
+///   optional weights, when provided.
 ///
 /// # Errors
 ///
 /// * `ClearGbmError::InvalidParameter` on any objective/label-kind mismatch,
-///   on a weight/objective pairing violation, or on a non-finite continuous
-///   label.
+///   on a weight/objective pairing violation, on a non-finite continuous
+///   label, or on an invalid sample weight.
+/// * `ClearGbmError::ShapeMismatch` if a weight slice's length differs from
+///   its labels'.
 /// * `ClearGbmError::InvalidLabel` if a binary label is not 0 or 1.
 pub(crate) fn resolve_objective<'a>(
     objective: Objective,
     scale_pos_weight: Option<f64>,
     y_train: TrainingLabels<'a>,
+    sample_weight: Option<&'a [f64]>,
     validation: Option<ValidationData<'a>>,
 ) -> Result<ResolvedObjective<'a>, ClearGbmError> {
+    // Weight pairing is objective-independent: lengths against the labels
+    // they accompany, values finite and strictly positive.
+    if let Some(w) = sample_weight {
+        propagate!(validate_weight_pairing(y_train.len(), w, "sample_weight"));
+    }
+    if let Some(v) = validation {
+        if let Some(w) = v.weight {
+            propagate!(validate_weight_pairing(v.y.len(), w, "val_sample_weight"));
+        }
+    }
+
     match objective {
         Objective::BinaryLogLoss => {
             let yt = match y_train {
@@ -168,7 +205,8 @@ pub(crate) fn resolve_objective<'a>(
                 Some(ValidationData {
                     x,
                     y: TrainingLabels::Binary(y),
-                }) => Some((x, y)),
+                    weight,
+                }) => Some(ResolvedValidation { x, y, weight }),
                 Some(ValidationData {
                     y: labels @ TrainingLabels::Continuous(_),
                     ..
@@ -191,11 +229,12 @@ pub(crate) fn resolve_objective<'a>(
                 }
             };
             propagate!(validate_labels(yt));
-            if let Some((_, y)) = val {
-                propagate!(validate_labels(y));
+            if let Some(v) = &val {
+                propagate!(validate_labels(v.y));
             }
             Ok(ResolvedObjective::Binary {
                 y_train: yt,
+                weights: sample_weight,
                 val,
                 scale_pos_weight: w,
             })
@@ -217,7 +256,8 @@ pub(crate) fn resolve_objective<'a>(
                 Some(ValidationData {
                     x,
                     y: TrainingLabels::Continuous(y),
-                }) => Some((x, y)),
+                    weight,
+                }) => Some(ResolvedValidation { x, y, weight }),
                 Some(ValidationData {
                     y: labels @ TrainingLabels::Binary(_),
                     ..
@@ -237,10 +277,14 @@ pub(crate) fn resolve_objective<'a>(
                 });
             }
             propagate!(validate_continuous_labels(yt, "y_train"));
-            if let Some((_, y)) = val {
-                propagate!(validate_continuous_labels(y, "y_val"));
+            if let Some(v) = &val {
+                propagate!(validate_continuous_labels(v.y, "y_val"));
             }
-            Ok(ResolvedObjective::SquaredError { y_train: yt, val })
+            Ok(ResolvedObjective::SquaredError {
+                y_train: yt,
+                weights: sample_weight,
+                val,
+            })
         }
     }
 }

@@ -10,7 +10,7 @@ use pyo3::types::PyDict;
 
 use super::helpers::{fail, make_training_args, wrap_py_err};
 use crate::error::ClearGbmError;
-use crate::pyo3_module::training_fns::train_gradient_boosting_from_args;
+use crate::pyo3_module::entry_args::train_gradient_boosting_from_args;
 
 // =============================================================================
 // growth_strategy extraction
@@ -40,7 +40,7 @@ fn train_error_with_growth_strategy(
         Ok(a) => a,
         Err(e) => return Err(e),
     };
-    let item = match args.get_item(4_usize) {
+    let item = match args.get_item(6_usize) {
         Ok(v) => v,
         Err(e) => return Err(wrap_py_err(&e)),
     };
@@ -126,7 +126,7 @@ fn test_train_accepts_leaf_wise_with_a_budget() -> Result<(), ClearGbmError> {
             Ok(a) => a,
             Err(e) => return Err(e),
         };
-        let item = match args.get_item(4_usize) {
+        let item = match args.get_item(6_usize) {
             Ok(v) => v,
             Err(e) => return Err(wrap_py_err(&e)),
         };
@@ -158,7 +158,7 @@ fn test_train_rejects_missing_num_leaves_key() -> Result<(), ClearGbmError> {
             Ok(a) => a,
             Err(e) => return Err(e),
         };
-        let item = match args.get_item(4_usize) {
+        let item = match args.get_item(6_usize) {
             Ok(v) => v,
             Err(e) => return Err(wrap_py_err(&e)),
         };
@@ -195,7 +195,7 @@ fn test_train_rejects_non_integer_num_leaves() -> Result<(), ClearGbmError> {
             Ok(a) => a,
             Err(e) => return Err(e),
         };
-        let item = match args.get_item(4_usize) {
+        let item = match args.get_item(6_usize) {
             Ok(v) => v,
             Err(e) => return Err(wrap_py_err(&e)),
         };
@@ -232,7 +232,7 @@ fn test_train_rejects_non_string_growth_strategy() -> Result<(), ClearGbmError> 
             Ok(a) => a,
             Err(e) => return Err(e),
         };
-        let item = match args.get_item(4_usize) {
+        let item = match args.get_item(6_usize) {
             Ok(v) => v,
             Err(e) => return Err(wrap_py_err(&e)),
         };
@@ -269,7 +269,7 @@ fn test_train_accepts_depth_wise_growth_strategy() -> Result<(), ClearGbmError> 
             Ok(a) => a,
             Err(e) => return Err(e),
         };
-        let item = match args.get_item(4_usize) {
+        let item = match args.get_item(6_usize) {
             Ok(v) => v,
             Err(e) => return Err(wrap_py_err(&e)),
         };
@@ -297,7 +297,7 @@ fn test_train_accepts_max_features_count() -> Result<(), ClearGbmError> {
             Ok(a) => a,
             Err(e) => return Err(e),
         };
-        let item = match args.get_item(4_usize) {
+        let item = match args.get_item(6_usize) {
             Ok(v) => v,
             Err(e) => return Err(wrap_py_err(&e)),
         };
@@ -325,7 +325,7 @@ fn test_train_rejects_missing_max_features_key() -> Result<(), ClearGbmError> {
             Ok(a) => a,
             Err(e) => return Err(e),
         };
-        let item = match args.get_item(4_usize) {
+        let item = match args.get_item(6_usize) {
             Ok(v) => v,
             Err(e) => return Err(wrap_py_err(&e)),
         };
@@ -362,7 +362,7 @@ fn test_train_rejects_non_integer_max_features() -> Result<(), ClearGbmError> {
             Ok(a) => a,
             Err(e) => return Err(e),
         };
-        let item = match args.get_item(4_usize) {
+        let item = match args.get_item(6_usize) {
             Ok(v) => v,
             Err(e) => return Err(wrap_py_err(&e)),
         };
@@ -419,7 +419,7 @@ fn train_error_with_key(
         Ok(a) => a,
         Err(e) => return Err(e),
     };
-    let item = match args.get_item(4_usize) {
+    let item = match args.get_item(6_usize) {
         Ok(v) => v,
         Err(e) => return Err(wrap_py_err(&e)),
     };

@@ -122,6 +122,8 @@ fn test_module_call_train_gradient_boosting() -> Result<(), ClearGbmError> {
             parts.y_train,
             py.None(),
             py.None(),
+            py.None(),
+            py.None(),
             parts.config,
             parts.names,
         )) {
@@ -163,6 +165,8 @@ fn test_module_call_predict_proba_and_raw() -> Result<(), ClearGbmError> {
         let model = match train_func.call1((
             parts.x_train,
             parts.y_train,
+            py.None(),
+            py.None(),
             py.None(),
             py.None(),
             parts.config,

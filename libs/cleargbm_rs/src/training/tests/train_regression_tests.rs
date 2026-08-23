@@ -99,8 +99,8 @@ fn test_regression_training_mse_decreases() -> Result<(), ClearGbmError> {
         Ok(p) => p,
         Err(e) => return Err(e),
     };
-    let mse_1 = propagate!(squared_error_loss(&y_train, &preds_1));
-    let mse_20 = propagate!(squared_error_loss(&y_train, &preds_20));
+    let mse_1 = propagate!(squared_error_loss(&y_train, &preds_1, None));
+    let mse_20 = propagate!(squared_error_loss(&y_train, &preds_20, None));
     assert!(
         mse_20 < mse_1,
         "20 trees must fit the target better than 1: {mse_20} vs {mse_1}"
@@ -245,6 +245,7 @@ fn test_regression_early_stopping_triggers() -> Result<(), ClearGbmError> {
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Continuous(&y_val),
+            weight: None,
         }),
         &config,
         &feature_names,
@@ -275,6 +276,7 @@ fn test_regression_validation_without_early_stopping() -> Result<(), ClearGbmErr
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Continuous(&y_val),
+            weight: None,
         }),
         &config,
         &feature_names,
@@ -331,6 +333,7 @@ fn test_regression_rejects_binary_val_labels() -> Result<(), ClearGbmError> {
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Binary(&y_val),
+            weight: None,
         }),
         &config,
         &feature_names,

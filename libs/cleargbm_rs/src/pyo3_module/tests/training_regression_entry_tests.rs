@@ -11,7 +11,7 @@ use super::helpers::{
     training_rows, wrap_py_err,
 };
 use crate::error::ClearGbmError;
-use crate::pyo3_module::training_fns::{
+use crate::pyo3_module::entry_args::{
     predict_proba_model_from_args, train_gradient_boosting_regression_from_args,
 };
 
@@ -83,7 +83,16 @@ fn test_regression_entry_registered_on_module() -> Result<(), ClearGbmError> {
             Ok(l) => l,
             Err(e) => return Err(wrap_py_err(&e)),
         };
-        let model = match train_fn.call1((x, y, py.None(), py.None(), config, names)) {
+        let model = match train_fn.call1((
+            x,
+            y,
+            py.None(),
+            py.None(),
+            py.None(),
+            py.None(),
+            config,
+            names,
+        )) {
             Ok(m) => m,
             Err(e) => return Err(fail(format!("registered regression trainer failed: {e}"))),
         };
@@ -162,6 +171,8 @@ fn test_binary_entry_rejects_squared_error_config() -> Result<(), ClearGbmError>
                 y.into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -169,7 +180,7 @@ fn test_binary_entry_rejects_squared_error_config() -> Result<(), ClearGbmError>
             Ok(t) => t,
             Err(e) => return Err(wrap_py_err(&e)),
         };
-        match crate::pyo3_module::training_fns::train_gradient_boosting_from_args(&tuple) {
+        match crate::pyo3_module::entry_args::train_gradient_boosting_from_args(&tuple) {
             Ok(_) => Err(fail(
                 "the binary entry must reject a squared_error config".to_string(),
             )),
@@ -208,6 +219,8 @@ fn test_regression_entry_rejects_binary_config() -> Result<(), ClearGbmError> {
             [
                 x.into_any(),
                 y.into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 config.into_any(),
@@ -258,6 +271,8 @@ fn test_regression_entry_rejects_integer_targets() -> Result<(), ClearGbmError> 
                 y.into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -303,8 +318,10 @@ fn test_regression_entry_with_validation_and_nan_rejection() -> Result<(), Clear
             [
                 x.into_any(),
                 y.into_any(),
+                py.None().into_bound(py).into_any(),
                 x_val.into_any(),
                 y_val.into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -392,7 +409,9 @@ fn test_regression_entry_rejects_x_val_without_y_val() -> Result<(), ClearGbmErr
             [
                 x.into_any(),
                 y.into_any(),
+                py.None().into_bound(py).into_any(),
                 x_val.into_any(),
+                py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
@@ -440,7 +459,9 @@ fn test_regression_entry_rejects_y_val_without_x_val() -> Result<(), ClearGbmErr
                 x.into_any(),
                 y.into_any(),
                 py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 y_val.into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],

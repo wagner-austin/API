@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::error::ClearGbmError;
-use crate::pyo3_module::training_fns::{
+use crate::pyo3_module::entry_args::{
     train_gradient_boosting_from_args, train_gradient_boosting_regression_from_args,
 };
 
@@ -298,6 +298,8 @@ pub(super) fn make_training_args<'py>(
             y_train.into_any(),
             py.None().into_bound(py).into_any(),
             py.None().into_bound(py).into_any(),
+            py.None().into_bound(py).into_any(),
+            py.None().into_bound(py).into_any(),
             config.into_any(),
             names.into_any(),
         ],
@@ -383,6 +385,8 @@ pub(super) fn make_regression_training_args<'py>(
         [
             x_train.into_any(),
             y_train.into_any(),
+            py.None().into_bound(py).into_any(),
+            py.None().into_bound(py).into_any(),
             py.None().into_bound(py).into_any(),
             py.None().into_bound(py).into_any(),
             config.into_any(),

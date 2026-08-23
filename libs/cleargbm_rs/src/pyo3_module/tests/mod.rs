@@ -13,3 +13,4 @@ mod training_config_key_tests;
 mod training_fns_tests;
 mod training_options_tests;
 mod training_regression_entry_tests;
+mod training_weight_tests;

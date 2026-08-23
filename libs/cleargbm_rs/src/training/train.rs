@@ -60,8 +60,10 @@ pub struct TrainingRuntime<'a> {
 ///
 /// * `x_train` - Training feature matrix `[n_samples][n_features]`.
 /// * `y_train` - Training labels, typed by kind ([`TrainingLabels`]).
-/// * `validation` - Validation features paired with labels of the same kind,
-///   or `None`.
+/// * `sample_weight` - Optional per-row training weights (finite, > 0);
+///   `None` weighs every row 1 and is bit-identical to weightless history.
+/// * `validation` - Validation features paired with labels of the same kind
+///   and optional evaluation weights, or `None`.
 /// * `config` - Training hyperparameters.
 /// * `feature_names` - Feature names (one per feature).
 /// * `runtime` - Worker-thread policy and injection hooks. Does not affect the
@@ -82,6 +84,7 @@ pub struct TrainingRuntime<'a> {
 pub fn train_gradient_boosting(
     x_train: &[&[f64]],
     y_train: TrainingLabels<'_>,
+    sample_weight: Option<&[f64]>,
     validation: Option<ValidationData<'_>>,
     config: &GradientBoostingConfig,
     feature_names: &[String],
@@ -109,6 +112,7 @@ pub fn train_gradient_boosting(
         config.objective(),
         config.scale_pos_weight(),
         y_train,
+        sample_weight,
         validation,
     ));
 
@@ -116,11 +120,20 @@ pub fn train_gradient_boosting(
     let base_prediction = match &resolved {
         ResolvedObjective::Binary {
             y_train: yt,
+            weights,
             scale_pos_weight,
             ..
-        } => propagate!(binary_log_loss_initial_prediction(yt, *scale_pos_weight)),
-        ResolvedObjective::SquaredError { y_train: yt, .. } => {
-            propagate!(squared_error_initial_prediction(yt))
+        } => propagate!(binary_log_loss_initial_prediction(
+            yt,
+            *scale_pos_weight,
+            *weights
+        )),
+        ResolvedObjective::SquaredError {
+            y_train: yt,
+            weights,
+            ..
+        } => {
+            propagate!(squared_error_initial_prediction(yt, *weights))
         }
     };
 
@@ -225,52 +238,108 @@ pub fn train_gradient_boosting(
             let (gradients, hessians): (Vec<f64>, Vec<f64>) = match &resolved {
                 ResolvedObjective::Binary {
                     y_train: yt,
+                    weights,
                     scale_pos_weight,
                     ..
                 } => {
                     // Probabilities come from the sigmoid of the running raw
-                    // scores. Positive samples carry `scale_pos_weight`: the
-                    // objective is the weighted log loss, so its first and
-                    // second derivatives scale together. At weight 1.0 the
-                    // multiply is by exactly `1.0`, which IEEE 754 makes an
-                    // identity — the unweighted history is the weighted
-                    // path's special case, bit for bit.
+                    // scores. The effective row weight is the product of the
+                    // class term (`scale_pos_weight` for positives, 1 for
+                    // negatives) and the optional per-row sample weight; the
+                    // weighted log loss's first and second derivatives scale
+                    // by it together. The weightless arm keeps the exact
+                    // historical expressions - no synthesized `* 1.0` - so
+                    // every recorded manifest stays bit-valid, and at weight
+                    // 1.0 the class multiply is an IEEE identity: each
+                    // specialization is the general path's special case,
+                    // bit for bit.
                     let scale_pos_weight = *scale_pos_weight;
                     let probas = sigmoid_array(&raw_preds_train);
-                    let gradients: Vec<f64> = probas
-                        .iter()
-                        .zip(yt.iter())
-                        .map(|(&p, &y)| {
-                            if y == 1_u8 {
-                                scale_pos_weight * (p - 1.0_f64)
-                            } else {
-                                p
-                            }
-                        })
-                        .collect();
-                    let hessians: Vec<f64> = probas
-                        .iter()
-                        .zip(yt.iter())
-                        .map(|(&p, &y)| {
-                            if y == 1_u8 {
-                                scale_pos_weight * (p * (1.0_f64 - p))
-                            } else {
-                                p * (1.0_f64 - p)
-                            }
-                        })
-                        .collect();
-                    (gradients, hessians)
+                    match weights {
+                        Some(ws) => {
+                            let gradients: Vec<f64> = probas
+                                .iter()
+                                .zip(yt.iter())
+                                .zip(ws.iter())
+                                .map(|((&p, &y), &w)| {
+                                    if y == 1_u8 {
+                                        (scale_pos_weight * w) * (p - 1.0_f64)
+                                    } else {
+                                        w * p
+                                    }
+                                })
+                                .collect();
+                            let hessians: Vec<f64> = probas
+                                .iter()
+                                .zip(yt.iter())
+                                .zip(ws.iter())
+                                .map(|((&p, &y), &w)| {
+                                    if y == 1_u8 {
+                                        (scale_pos_weight * w) * (p * (1.0_f64 - p))
+                                    } else {
+                                        w * (p * (1.0_f64 - p))
+                                    }
+                                })
+                                .collect();
+                            (gradients, hessians)
+                        }
+                        None => {
+                            let gradients: Vec<f64> = probas
+                                .iter()
+                                .zip(yt.iter())
+                                .map(|(&p, &y)| {
+                                    if y == 1_u8 {
+                                        scale_pos_weight * (p - 1.0_f64)
+                                    } else {
+                                        p
+                                    }
+                                })
+                                .collect();
+                            let hessians: Vec<f64> = probas
+                                .iter()
+                                .zip(yt.iter())
+                                .map(|(&p, &y)| {
+                                    if y == 1_u8 {
+                                        scale_pos_weight * (p * (1.0_f64 - p))
+                                    } else {
+                                        p * (1.0_f64 - p)
+                                    }
+                                })
+                                .collect();
+                            (gradients, hessians)
+                        }
+                    }
                 }
-                ResolvedObjective::SquaredError { y_train: yt, .. } => {
+                ResolvedObjective::SquaredError {
+                    y_train: yt,
+                    weights,
+                    ..
+                } => {
                     // Squared error differentiates in raw-score space
-                    // directly: gradient = prediction - y, hessian = 1.
-                    let gradients: Vec<f64> = raw_preds_train
-                        .iter()
-                        .zip(yt.iter())
-                        .map(|(&pred, &y)| pred - y)
-                        .collect();
-                    let hessians: Vec<f64> = vec![1.0_f64; n_train];
-                    (gradients, hessians)
+                    // directly: gradient = w * (prediction - y), hessian = w,
+                    // with the weightless arm keeping the bare historical
+                    // expressions (gradient = pred - y, hessian = 1).
+                    match weights {
+                        Some(ws) => {
+                            let gradients: Vec<f64> = raw_preds_train
+                                .iter()
+                                .zip(yt.iter())
+                                .zip(ws.iter())
+                                .map(|((&pred, &y), &w)| w * (pred - y))
+                                .collect();
+                            let hessians: Vec<f64> = ws.to_vec();
+                            (gradients, hessians)
+                        }
+                        None => {
+                            let gradients: Vec<f64> = raw_preds_train
+                                .iter()
+                                .zip(yt.iter())
+                                .map(|(&pred, &y)| pred - y)
+                                .collect();
+                            let hessians: Vec<f64> = vec![1.0_f64; n_train];
+                            (gradients, hessians)
+                        }
+                    }
                 }
             };
 
@@ -348,30 +417,32 @@ pub fn train_gradient_boosting(
             // (before push, so we can borrow tree)
             let val_loss: Option<f64> = match &resolved {
                 ResolvedObjective::Binary {
-                    val: Some((xv, yv)),
+                    val: Some(v),
                     scale_pos_weight,
                     ..
                 } => {
-                    let val_preds = propagate!(predict_tree(&tree, xv));
+                    let val_preds = propagate!(predict_tree(&tree, v.x));
                     for i in 0_usize..raw_preds_val.len() {
                         raw_preds_val[i] += config.learning_rate() * val_preds[i];
                     }
                     let val_probas = sigmoid_array(&raw_preds_val);
                     Some(propagate!(binary_log_loss(
-                        yv,
+                        v.y,
                         &val_probas,
-                        *scale_pos_weight
+                        *scale_pos_weight,
+                        v.weight
                     )))
                 }
-                ResolvedObjective::SquaredError {
-                    val: Some((xv, yv)),
-                    ..
-                } => {
-                    let val_preds = propagate!(predict_tree(&tree, xv));
+                ResolvedObjective::SquaredError { val: Some(v), .. } => {
+                    let val_preds = propagate!(predict_tree(&tree, v.x));
                     for i in 0_usize..raw_preds_val.len() {
                         raw_preds_val[i] += config.learning_rate() * val_preds[i];
                     }
-                    Some(propagate!(squared_error_loss(yv, &raw_preds_val)))
+                    Some(propagate!(squared_error_loss(
+                        v.y,
+                        &raw_preds_val,
+                        v.weight
+                    )))
                 }
                 ResolvedObjective::Binary { val: None, .. }
                 | ResolvedObjective::SquaredError { val: None, .. } => None,

@@ -116,9 +116,22 @@ pub(super) fn train_binary(
     config: &GradientBoostingConfig,
     feature_names: &[String],
 ) -> Result<GradientBoostingModel, ClearGbmError> {
+    train_binary_weighted(x_train, y_train, None, validation, config, feature_names)
+}
+
+/// Trains with binary labels and optional per-row weights.
+pub(super) fn train_binary_weighted(
+    x_train: &[&[f64]],
+    y_train: &[u8],
+    sample_weight: Option<&[f64]>,
+    validation: Option<ValidationData<'_>>,
+    config: &GradientBoostingConfig,
+    feature_names: &[String],
+) -> Result<GradientBoostingModel, ClearGbmError> {
     train_gradient_boosting(
         x_train,
         TrainingLabels::Binary(y_train),
+        sample_weight,
         validation,
         config,
         feature_names,
@@ -137,9 +150,22 @@ pub(super) fn train_regression(
     config: &GradientBoostingConfig,
     feature_names: &[String],
 ) -> Result<GradientBoostingModel, ClearGbmError> {
+    train_regression_weighted(x_train, y_train, None, validation, config, feature_names)
+}
+
+/// Trains with continuous targets and optional per-row weights.
+pub(super) fn train_regression_weighted(
+    x_train: &[&[f64]],
+    y_train: &[f64],
+    sample_weight: Option<&[f64]>,
+    validation: Option<ValidationData<'_>>,
+    config: &GradientBoostingConfig,
+    feature_names: &[String],
+) -> Result<GradientBoostingModel, ClearGbmError> {
     train_gradient_boosting(
         x_train,
         TrainingLabels::Continuous(y_train),
+        sample_weight,
         validation,
         config,
         feature_names,

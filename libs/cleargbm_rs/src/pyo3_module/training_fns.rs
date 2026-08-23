@@ -9,7 +9,7 @@
 
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::types::{PyDict, PyList};
 
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
@@ -57,6 +57,30 @@ fn extract_rows(features: &PyReadonlyArray2<'_, f64>) -> Result<Vec<Vec<f64>>, C
     Ok(rows)
 }
 
+/// The training-side numpy arrays for one entry call, generic over the
+/// label dtype (`i64` for binary, `f64` for regression).
+pub(crate) struct TrainingArrays<'a, 'py, T: numpy::Element> {
+    /// 2D feature matrix.
+    pub x: &'a PyReadonlyArray2<'py, f64>,
+    /// 1D labels of the entry's dtype.
+    pub y: &'a PyReadonlyArray1<'py, T>,
+    /// Optional 1D per-row training weights.
+    pub weight: Option<&'a PyReadonlyArray1<'py, f64>>,
+}
+
+/// The optional validation-side numpy arrays for one entry call.
+///
+/// Presence pairing (features with labels, weights with a split) is checked
+/// by the wrapper, which sees the arguments individually.
+pub(crate) struct ValidationArrays<'a, 'py, T: numpy::Element> {
+    /// Optional 2D validation feature matrix.
+    pub x: Option<&'a PyReadonlyArray2<'py, f64>>,
+    /// Optional 1D validation labels of the entry's dtype.
+    pub y: Option<&'a PyReadonlyArray1<'py, T>>,
+    /// Optional 1D per-row evaluation weights.
+    pub weight: Option<&'a PyReadonlyArray1<'py, f64>>,
+}
+
 // =============================================================================
 // Core wrappers
 // =============================================================================
@@ -66,10 +90,10 @@ fn extract_rows(features: &PyReadonlyArray2<'_, f64>) -> Result<Vec<Vec<f64>>, C
 /// # Args
 ///
 /// * `py` - Python GIL token.
-/// * `x_train` - 2D numpy array (f64) of training features.
-/// * `y_train` - 1D numpy array (i64) of binary labels (0/1).
-/// * `x_val` - Optional 2D numpy array (f64) of validation features.
-/// * `y_val` - Optional 1D numpy array (i64) of validation labels.
+/// * `train` - Training arrays: features, i64 binary labels (0/1), and
+///   optional per-row weights (`None` weighs every row 1).
+/// * `val` - Optional validation arrays: features, labels, and optional
+///   evaluation weights.
 /// * `config_dict` - Python dict with training hyperparameters; its
 ///   `objective` must be `"binary_log_loss"`.
 /// * `feature_names` - Python list of feature name strings.
@@ -83,23 +107,32 @@ fn extract_rows(features: &PyReadonlyArray2<'_, f64>) -> Result<Vec<Vec<f64>>, C
 /// Returns `PyErr` on argument extraction, validation, or training errors.
 pub(crate) fn train_gradient_boosting_rs(
     py: Python<'_>,
-    x_train: &PyReadonlyArray2<'_, f64>,
-    y_train: &PyReadonlyArray1<'_, i64>,
-    x_val: Option<&PyReadonlyArray2<'_, f64>>,
-    y_val: Option<&PyReadonlyArray1<'_, i64>>,
+    train: &TrainingArrays<'_, '_, i64>,
+    val: &ValidationArrays<'_, '_, i64>,
     config_dict: &Bound<'_, PyDict>,
     feature_names: &Bound<'_, PyList>,
 ) -> PyResult<Py<PyGbmModel>> {
+    let x_train = train.x;
+    let y_train = train.y;
+    let sample_weight = train.weight;
+    let x_val = val.x;
+    let y_val = val.y;
+    let val_sample_weight = val.weight;
     // Extract training features
     let train_rows = propagate_into!(extract_rows(x_train));
     let train_slices: Vec<&[f64]> = train_rows.iter().map(Vec::as_slice).collect();
 
-    // Extract training labels
+    // Extract training labels and optional per-row weights
     let y_train_u8 = propagate!(extract_labels(y_train));
+    let weights: Option<Vec<f64>> = match sample_weight {
+        Some(w) => Some(propagate!(extract_targets(w))),
+        None => None,
+    };
 
     // Extract optional validation data (both-or-neither: the typed core
     // takes features and labels as one value, so the pairing is checked
-    // here, where they arrive as separate arguments).
+    // here, where they arrive as separate arguments). A validation weight
+    // without a validation split is likewise rejected.
     let val_rows: Option<Vec<Vec<f64>>> = match x_val {
         Some(xv) => Some(propagate_into!(extract_rows(xv))),
         None => None,
@@ -112,13 +145,23 @@ pub(crate) fn train_gradient_boosting_rs(
         Some(yv) => Some(propagate!(extract_labels(yv))),
         None => None,
     };
+    let val_weights: Option<Vec<f64>> = match val_sample_weight {
+        Some(w) => Some(propagate!(extract_targets(w))),
+        None => None,
+    };
 
     let validation: Option<ValidationData<'_>> = match (&val_slices, &y_val_u8) {
         (Some(xv), Some(yv)) => Some(ValidationData {
             x: xv,
             y: TrainingLabels::Binary(yv),
+            weight: val_weights.as_deref(),
         }),
-        (None, None) => None,
+        (None, None) => {
+            if val_weights.is_some() {
+                return Err(missing_val_pair("y_val", "val_sample_weight"));
+            }
+            None
+        }
         (Some(_), None) => return Err(missing_val_pair("y_val", "x_val")),
         (None, Some(_)) => return Err(missing_val_pair("x_val", "y_val")),
     };
@@ -141,6 +184,7 @@ pub(crate) fn train_gradient_boosting_rs(
     let model = propagate_into!(train_gradient_boosting(
         &train_slices,
         TrainingLabels::Binary(&y_train_u8),
+        weights.as_deref(),
         validation,
         &config,
         &names,
@@ -158,10 +202,10 @@ pub(crate) fn train_gradient_boosting_rs(
 /// # Args
 ///
 /// * `py` - Python GIL token.
-/// * `x_train` - 2D numpy array (f64) of training features.
-/// * `y_train` - 1D numpy array (f64) of continuous targets.
-/// * `x_val` - Optional 2D numpy array (f64) of validation features.
-/// * `y_val` - Optional 1D numpy array (f64) of validation targets.
+/// * `train` - Training arrays: features, f64 continuous targets, and
+///   optional per-row weights (`None` weighs every row 1).
+/// * `val` - Optional validation arrays: features, targets, and optional
+///   evaluation weights.
 /// * `config_dict` - Python dict with training hyperparameters; its
 ///   `objective` must be `"squared_error"`.
 /// * `feature_names` - Python list of feature name strings.
@@ -175,22 +219,30 @@ pub(crate) fn train_gradient_boosting_rs(
 /// Returns `PyErr` on argument extraction, validation, or training errors.
 pub(crate) fn train_gradient_boosting_regression_rs(
     py: Python<'_>,
-    x_train: &PyReadonlyArray2<'_, f64>,
-    y_train: &PyReadonlyArray1<'_, f64>,
-    x_val: Option<&PyReadonlyArray2<'_, f64>>,
-    y_val: Option<&PyReadonlyArray1<'_, f64>>,
+    train: &TrainingArrays<'_, '_, f64>,
+    val: &ValidationArrays<'_, '_, f64>,
     config_dict: &Bound<'_, PyDict>,
     feature_names: &Bound<'_, PyList>,
 ) -> PyResult<Py<PyGbmModel>> {
+    let x_train = train.x;
+    let y_train = train.y;
+    let sample_weight = train.weight;
+    let x_val = val.x;
+    let y_val = val.y;
+    let val_sample_weight = val.weight;
     // Extract training features
     let train_rows = propagate_into!(extract_rows(x_train));
     let train_slices: Vec<&[f64]> = train_rows.iter().map(Vec::as_slice).collect();
 
-    // Extract training targets
+    // Extract training targets and optional per-row weights
     let y_train_f64 = propagate!(extract_targets(y_train));
+    let weights: Option<Vec<f64>> = match sample_weight {
+        Some(w) => Some(propagate!(extract_targets(w))),
+        None => None,
+    };
 
     // Extract optional validation data (both-or-neither, as in the binary
-    // entry).
+    // entry; a validation weight without a validation split is rejected).
     let val_rows: Option<Vec<Vec<f64>>> = match x_val {
         Some(xv) => Some(propagate_into!(extract_rows(xv))),
         None => None,
@@ -203,13 +255,23 @@ pub(crate) fn train_gradient_boosting_regression_rs(
         Some(yv) => Some(propagate!(extract_targets(yv))),
         None => None,
     };
+    let val_weights: Option<Vec<f64>> = match val_sample_weight {
+        Some(w) => Some(propagate!(extract_targets(w))),
+        None => None,
+    };
 
     let validation: Option<ValidationData<'_>> = match (&val_slices, &y_val_f64) {
         (Some(xv), Some(yv)) => Some(ValidationData {
             x: xv,
             y: TrainingLabels::Continuous(yv),
+            weight: val_weights.as_deref(),
         }),
-        (None, None) => None,
+        (None, None) => {
+            if val_weights.is_some() {
+                return Err(missing_val_pair("y_val", "val_sample_weight"));
+            }
+            None
+        }
         (Some(_), None) => return Err(missing_val_pair("y_val", "x_val")),
         (None, Some(_)) => return Err(missing_val_pair("x_val", "y_val")),
     };
@@ -230,6 +292,7 @@ pub(crate) fn train_gradient_boosting_regression_rs(
     let model = propagate_into!(train_gradient_boosting(
         &train_slices,
         TrainingLabels::Continuous(&y_train_f64),
+        weights.as_deref(),
         validation,
         &config,
         &names,
@@ -365,163 +428,4 @@ fn extract_feature_names(names: &Bound<'_, PyList>) -> PyResult<Vec<String>> {
         result.push(name);
     }
     Ok(result)
-}
-
-// =============================================================================
-// Argument extraction wrappers for PyCFunction::new_closure registration
-// =============================================================================
-
-/// Extracts arguments and delegates to [`train_gradient_boosting_rs`].
-///
-/// # Args (positional)
-///
-/// 0. `x_train` (numpy f64 2D array) - Training features.
-/// 1. `y_train` (numpy i64 1D array) - Training labels.
-/// 2. `x_val` (numpy f64 2D array or None) - Optional validation features.
-/// 3. `y_val` (numpy i64 1D array or None) - Optional validation labels.
-/// 4. `config` (dict) - Training hyperparameters.
-/// 5. `feature_names` (list of str) - Feature names.
-///
-/// # Errors
-///
-/// Returns `PyErr` if argument extraction or training fails.
-pub(crate) fn train_gradient_boosting_from_args(args: &Bound<'_, PyTuple>) -> PyResult<Py<PyAny>> {
-    let py = args.py();
-
-    let x_train: PyReadonlyArray2<'_, f64> =
-        propagate_into!(propagate!(args.get_item(0_usize)).extract());
-    let y_train: PyReadonlyArray1<'_, i64> =
-        propagate_into!(propagate!(args.get_item(1_usize)).extract());
-
-    let arg2 = propagate!(args.get_item(2_usize));
-    let x_val: Option<PyReadonlyArray2<'_, f64>> = if arg2.is_none() {
-        None
-    } else {
-        Some(propagate_into!(arg2.extract()))
-    };
-
-    let arg3 = propagate!(args.get_item(3_usize));
-    let y_val: Option<PyReadonlyArray1<'_, i64>> = if arg3.is_none() {
-        None
-    } else {
-        Some(propagate_into!(arg3.extract()))
-    };
-
-    let config_dict: Bound<'_, PyDict> =
-        propagate_into!(propagate!(args.get_item(4_usize)).extract());
-    let feature_names: Bound<'_, PyList> =
-        propagate_into!(propagate!(args.get_item(5_usize)).extract());
-
-    let model = propagate!(train_gradient_boosting_rs(
-        py,
-        &x_train,
-        &y_train,
-        x_val.as_ref(),
-        y_val.as_ref(),
-        &config_dict,
-        &feature_names,
-    ));
-
-    Ok(model.into_any())
-}
-
-/// Extracts arguments and delegates to
-/// [`train_gradient_boosting_regression_rs`].
-///
-/// # Args (positional)
-///
-/// 0. `x_train` (numpy f64 2D array) - Training features.
-/// 1. `y_train` (numpy f64 1D array) - Continuous training targets.
-/// 2. `x_val` (numpy f64 2D array or None) - Optional validation features.
-/// 3. `y_val` (numpy f64 1D array or None) - Optional validation targets.
-/// 4. `config` (dict) - Training hyperparameters.
-/// 5. `feature_names` (list of str) - Feature names.
-///
-/// # Errors
-///
-/// Returns `PyErr` if argument extraction or training fails.
-pub(crate) fn train_gradient_boosting_regression_from_args(
-    args: &Bound<'_, PyTuple>,
-) -> PyResult<Py<PyAny>> {
-    let py = args.py();
-
-    let x_train: PyReadonlyArray2<'_, f64> =
-        propagate_into!(propagate!(args.get_item(0_usize)).extract());
-    let y_train: PyReadonlyArray1<'_, f64> =
-        propagate_into!(propagate!(args.get_item(1_usize)).extract());
-
-    let arg2 = propagate!(args.get_item(2_usize));
-    let x_val: Option<PyReadonlyArray2<'_, f64>> = if arg2.is_none() {
-        None
-    } else {
-        Some(propagate_into!(arg2.extract()))
-    };
-
-    let arg3 = propagate!(args.get_item(3_usize));
-    let y_val: Option<PyReadonlyArray1<'_, f64>> = if arg3.is_none() {
-        None
-    } else {
-        Some(propagate_into!(arg3.extract()))
-    };
-
-    let config_dict: Bound<'_, PyDict> =
-        propagate_into!(propagate!(args.get_item(4_usize)).extract());
-    let feature_names: Bound<'_, PyList> =
-        propagate_into!(propagate!(args.get_item(5_usize)).extract());
-
-    let model = propagate!(train_gradient_boosting_regression_rs(
-        py,
-        &x_train,
-        &y_train,
-        x_val.as_ref(),
-        y_val.as_ref(),
-        &config_dict,
-        &feature_names,
-    ));
-
-    Ok(model.into_any())
-}
-
-/// Extracts arguments and delegates to [`predict_proba_model_rs`].
-///
-/// # Args (positional)
-///
-/// 0. `model` (PyGbmModel) - Trained model.
-/// 1. `features` (numpy f64 2D array) - Feature matrix.
-///
-/// # Errors
-///
-/// Returns `PyErr` if argument extraction or prediction fails.
-pub(crate) fn predict_proba_model_from_args(args: &Bound<'_, PyTuple>) -> PyResult<Py<PyAny>> {
-    let py = args.py();
-
-    let model: PyRef<'_, PyGbmModel> =
-        propagate_into!(propagate!(args.get_item(0_usize)).extract());
-    let features: PyReadonlyArray2<'_, f64> =
-        propagate_into!(propagate!(args.get_item(1_usize)).extract());
-
-    let result = propagate!(predict_proba_model_rs(py, &model, &features));
-    Ok(result.unbind().into_any())
-}
-
-/// Extracts arguments and delegates to [`predict_raw_model_rs`].
-///
-/// # Args (positional)
-///
-/// 0. `model` (PyGbmModel) - Trained model.
-/// 1. `features` (numpy f64 2D array) - Feature matrix.
-///
-/// # Errors
-///
-/// Returns `PyErr` if argument extraction or prediction fails.
-pub(crate) fn predict_raw_model_from_args(args: &Bound<'_, PyTuple>) -> PyResult<Py<PyAny>> {
-    let py = args.py();
-
-    let model: PyRef<'_, PyGbmModel> =
-        propagate_into!(propagate!(args.get_item(0_usize)).extract());
-    let features: PyReadonlyArray2<'_, f64> =
-        propagate_into!(propagate!(args.get_item(1_usize)).extract());
-
-    let result = propagate!(predict_raw_model_rs(py, &model, &features));
-    Ok(result.unbind().into_any())
 }

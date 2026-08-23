@@ -12,7 +12,7 @@ use pyo3::types::{PyDict, PyList, PyTuple};
 
 use super::helpers::{make_config_dict, set_config_i64, train_model, wrap_py_err};
 use crate::error::ClearGbmError;
-use crate::pyo3_module::training_fns::train_gradient_boosting_from_args;
+use crate::pyo3_module::entry_args::train_gradient_boosting_from_args;
 
 // =============================================================================
 // train_gradient_boosting_from_args
@@ -77,6 +77,8 @@ fn test_train_wrong_x_type() -> Result<(), ClearGbmError> {
                 y_train.into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -122,6 +124,8 @@ fn test_train_wrong_y_type() -> Result<(), ClearGbmError> {
             [
                 x_train.into_any(),
                 y_train.into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 config.into_any(),
@@ -174,6 +178,8 @@ fn test_train_missing_config_key() -> Result<(), ClearGbmError> {
             [
                 x_train.into_any(),
                 y_train.into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 config.into_any(),
@@ -237,6 +243,8 @@ fn test_train_invalid_config_value() -> Result<(), ClearGbmError> {
             [
                 x_train.into_any(),
                 y_train.into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 config.into_any(),
@@ -316,6 +324,8 @@ fn test_train_invalid_label_value() -> Result<(), ClearGbmError> {
                 y_train.into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -374,6 +384,8 @@ fn test_train_missing_f64_config_key() -> Result<(), ClearGbmError> {
             [
                 x_train.into_any(),
                 y_train.into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 config.into_any(),

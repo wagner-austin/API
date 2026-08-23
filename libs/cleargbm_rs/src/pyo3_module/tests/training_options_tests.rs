@@ -7,7 +7,7 @@ use pyo3::types::{PyList, PyTuple};
 
 use super::helpers::{make_config_dict, set_config_i64, wrap_py_err};
 use crate::error::ClearGbmError;
-use crate::pyo3_module::training_fns::train_gradient_boosting_from_args;
+use crate::pyo3_module::entry_args::train_gradient_boosting_from_args;
 
 /// Training with validation data.
 #[test]
@@ -56,8 +56,10 @@ fn test_train_with_validation_data() -> Result<(), ClearGbmError> {
             [
                 x_train.into_any(),
                 y_train.into_any(),
+                py.None().into_bound(py).into_any(),
                 x_val.into_any(),
                 y_val.into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -130,8 +132,10 @@ fn test_train_with_early_stopping() -> Result<(), ClearGbmError> {
             [
                 x_train.into_any(),
                 y_train.into_any(),
+                py.None().into_bound(py).into_any(),
                 x_val.into_any(),
                 y_val.into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -192,6 +196,8 @@ fn test_train_with_decreasing_constraints() -> Result<(), ClearGbmError> {
                 y_train.into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -247,6 +253,8 @@ fn test_train_with_none_constraints() -> Result<(), ClearGbmError> {
                 y_train.into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -299,6 +307,8 @@ fn test_train_with_none_early_stopping() -> Result<(), ClearGbmError> {
             [
                 x_train.into_any(),
                 y_train.into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
                 config.into_any(),
@@ -364,6 +374,8 @@ fn test_train_with_monotonic_constraints() -> Result<(), ClearGbmError> {
                 y_train.into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -425,6 +437,8 @@ fn test_train_invalid_monotonic_constraint_value() -> Result<(), ClearGbmError> 
                 y_train.into_any(),
                 py.None().into_bound(py).into_any(),
                 py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
+                py.None().into_bound(py).into_any(),
                 config.into_any(),
                 names.into_any(),
             ],
@@ -482,8 +496,10 @@ fn args_with_val<'py>(
         [
             x_train.into_any(),
             y_train.into_any(),
+            py.None().into_bound(py).into_any(),
             x_val,
             y_val,
+            py.None().into_bound(py).into_any(),
             config.into_any(),
             names.into_any(),
         ],

@@ -27,10 +27,12 @@
 //! - [`array_helpers`] — Numpy ↔ Rust type conversions (no `as` casts)
 //! - [`config_extract`] — Config-dict extraction for the training entries
 //! - [`training_fns`] — Training entries (binary + regression) and prediction
+//! - [`entry_args`] — Positional-argument unpacking for the registrations
 //! - [`model_fns`] — The [`PyGbmModel`] class + model serde + importances
 
 pub(crate) mod array_helpers;
 pub(crate) mod config_extract;
+pub(crate) mod entry_args;
 mod error_conversion;
 pub(crate) mod model_fns;
 pub(crate) mod training_fns;
@@ -80,7 +82,7 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         Some(c"train_gradient_boosting_rs"),
         Some(c"Train a gradient boosting model on binary classification data."),
         |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
-            training_fns::train_gradient_boosting_from_args(args)
+            entry_args::train_gradient_boosting_from_args(args)
         },
     )
     .and_then(|f| m.add_function(f))
@@ -90,7 +92,7 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"train_gradient_boosting_regression_rs"),
             Some(c"Train a gradient boosting model on regression data (squared error)."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
-                training_fns::train_gradient_boosting_regression_from_args(args)
+                entry_args::train_gradient_boosting_regression_from_args(args)
             },
         )
     })
@@ -101,7 +103,7 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"predict_proba_model_rs"),
             Some(c"Predict class probabilities using a trained model."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
-                training_fns::predict_proba_model_from_args(args)
+                entry_args::predict_proba_model_from_args(args)
             },
         )
     })
@@ -112,7 +114,7 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
             Some(c"predict_raw_model_rs"),
             Some(c"Predict raw log-odds using a trained model."),
             |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
-                training_fns::predict_raw_model_from_args(args)
+                entry_args::predict_raw_model_from_args(args)
             },
         )
     })

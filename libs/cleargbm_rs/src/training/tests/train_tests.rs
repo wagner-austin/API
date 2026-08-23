@@ -9,8 +9,7 @@ use crate::hooks::Hooks;
 use crate::losses::{binary_log_loss, sigmoid_array};
 use crate::split::MonotonicConstraint;
 use crate::training::{
-    train_gradient_boosting, GradientBoostingConfig, Objective, TrainingLabels,
-    ValidationData,
+    train_gradient_boosting, GradientBoostingConfig, Objective, TrainingLabels, ValidationData,
 };
 use crate::training::{Parallelism, TrainingRuntime};
 
@@ -80,7 +79,7 @@ fn test_training_loss_decreases() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     let probas_1 = sigmoid_array(&raw_1);
-    let loss_1 = match binary_log_loss(&y_train, &probas_1, 1.0_f64) {
+    let loss_1 = match binary_log_loss(&y_train, &probas_1, 1.0_f64, None) {
         Ok(l) => l,
         Err(e) => return Err(e),
     };
@@ -90,7 +89,7 @@ fn test_training_loss_decreases() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     let probas_10 = sigmoid_array(&raw_10);
-    let loss_10 = match binary_log_loss(&y_train, &probas_10, 1.0_f64) {
+    let loss_10 = match binary_log_loss(&y_train, &probas_10, 1.0_f64, None) {
         Ok(l) => l,
         Err(e) => return Err(e),
     };
@@ -162,6 +161,7 @@ fn test_with_validation_set() -> Result<(), ClearGbmError> {
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Binary(&y_val),
+            weight: None,
         }),
         &config,
         &feature_names,
@@ -197,6 +197,7 @@ fn test_early_stopping_triggers() -> Result<(), ClearGbmError> {
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Binary(&y_val),
+            weight: None,
         }),
         &config,
         &feature_names,
@@ -383,6 +384,7 @@ fn test_validation_set_wrong_features() -> Result<(), ClearGbmError> {
         Some(ValidationData {
             x: &x_val,
             y: TrainingLabels::Binary(&y_val),
+            weight: None,
         }),
         &config,
         &feature_names,
@@ -460,6 +462,7 @@ fn test_training_reports_a_worker_pool_that_cannot_be_built() -> Result<(), Clea
     match train_gradient_boosting(
         &x_train,
         TrainingLabels::Binary(&y_train),
+        None,
         None,
         &config,
         &feature_names,
