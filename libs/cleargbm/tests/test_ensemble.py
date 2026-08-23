@@ -43,6 +43,7 @@ def _make_config(
         min_samples_split=4,
         min_samples_leaf=2,
         max_features=None,
+        colsample_bytree=None,
         max_bins=8,
         subsample=1.0,
         random_state=42,
@@ -142,6 +143,7 @@ class TestConfigToRustDict:
             "objective",
             "scale_pos_weight",
             "max_features",
+            "colsample_bytree",
         }
         assert set(result.keys()) == expected
 
@@ -187,6 +189,15 @@ class TestConfigToRustDict:
         """
         result = _config_to_rust_dict(_make_config())
         assert result["max_features"] is None
+
+    def test_forwards_colsample_bytree_to_the_rust_core(self) -> None:
+        """colsample_bytree must reach Rust, where it masks each tree's columns.
+
+        Same defect class as max_features: a dropped key here would read as
+        "all features" on the other side of the wire.
+        """
+        result = _config_to_rust_dict(_make_config())
+        assert result["colsample_bytree"] is None
 
     def test_monotonic_constraints_none_stays_none(self) -> None:
         """None constraint stays None in the dict."""

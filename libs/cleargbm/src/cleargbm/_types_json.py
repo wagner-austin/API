@@ -94,6 +94,27 @@ def require_unit_float(value: float, name: str) -> float:
     return value
 
 
+def require_open_unit_float(value: float, name: str) -> float:
+    """Validate that value is in (0, 1) exclusive.
+
+    Args:
+        value: The value to validate.
+        name: Parameter name for error messages.
+
+    Returns:
+        The validated value.
+
+    Raises:
+        ValueError: If value is not strictly between 0 and 1. Used for
+            fractions whose "1.0" spelling is reserved: ``colsample_bytree``
+            expresses "all features" as ``None``, so a second spelling of
+            the same meaning is rejected rather than silently equivalent.
+    """
+    if value <= 0.0 or value >= 1.0:
+        raise ValueError(f"{name} must be in (0, 1) exclusive, got {value}")
+    return value
+
+
 def require_non_negative_float(value: float, name: str) -> float:
     """Validate that value is a non-negative float.
 

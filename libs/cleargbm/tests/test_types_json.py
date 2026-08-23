@@ -9,6 +9,7 @@ from cleargbm.types import (
     decode_gradient_boosting_model,
     decode_split_condition,
     decode_tree_node,
+    require_open_unit_float,
 )
 
 # =============================================================================
@@ -173,6 +174,7 @@ class TestHelperErrorPaths:
                         "min_samples_split": 2,
                         "min_samples_leaf": 1,
                         "max_features": None,
+                        "colsample_bytree": None,
                         "max_bins": 64,
                         "subsample": 1.0,
                         "random_state": 0,
@@ -197,6 +199,7 @@ class TestHelperErrorPaths:
                         "min_samples_split": 2,
                         "min_samples_leaf": 1,
                         "max_features": None,
+                        "colsample_bytree": None,
                         "max_bins": 64,
                         "subsample": 1.0,
                         "random_state": 0,
@@ -221,6 +224,7 @@ class TestHelperErrorPaths:
                         "min_samples_split": 2,
                         "min_samples_leaf": 1,
                         "max_features": None,
+                        "colsample_bytree": None,
                         "max_bins": 64,
                         "subsample": 1.0,
                         "random_state": 0,
@@ -312,3 +316,36 @@ class TestHelperErrorPaths:
         # The int 5 should be coerced to float 5.0
         # This test covers line 256: return float(value)
         assert result["threshold"] == 5.0
+
+
+# =============================================================================
+# require_open_unit_float
+# =============================================================================
+
+
+class TestRequireOpenUnitFloat:
+    """Tests for the exclusive-unit-interval validator.
+
+    ``colsample_bytree`` reserves ``None`` as the only spelling of "all
+    features", so both endpoints are rejected — 1.0 would be a second
+    spelling of the same meaning and 0.0 selects nothing.
+    """
+
+    def test_accepts_an_interior_fraction(self) -> None:
+        """A value strictly inside (0, 1) passes through unchanged."""
+        assert require_open_unit_float(0.5, "colsample_bytree") == 0.5
+
+    def test_rejects_one(self) -> None:
+        """1.0 is rejected: null owns the all-features spelling."""
+        with pytest.raises(ValueError, match=r"colsample_bytree must be in \(0, 1\) exclusive"):
+            require_open_unit_float(1.0, "colsample_bytree")
+
+    def test_rejects_zero(self) -> None:
+        """0.0 selects nothing and is rejected."""
+        with pytest.raises(ValueError, match=r"colsample_bytree must be in \(0, 1\) exclusive"):
+            require_open_unit_float(0.0, "colsample_bytree")
+
+    def test_rejects_a_negative_value(self) -> None:
+        """Negative fractions are rejected with the offending value named."""
+        with pytest.raises(ValueError, match=r"got \-0\.5"):
+            require_open_unit_float(-0.5, "colsample_bytree")

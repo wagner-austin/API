@@ -11,6 +11,7 @@ def make_config(
     min_samples_split: int = 2,
     min_samples_leaf: int = 1,
     max_features: int | None = None,
+    colsample_bytree: float | None = None,
     max_bins: int = 64,
     subsample: float = 1.0,
     random_state: int = 42,
@@ -31,6 +32,7 @@ def make_config(
         min_samples_split: Minimum samples to split a node.
         min_samples_leaf: Minimum samples in a leaf.
         max_features: Max features per split (None = all).
+        colsample_bytree: Fraction of features per tree (None = all).
         max_bins: Number of histogram bins.
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -54,6 +56,7 @@ def make_config(
         min_samples_split=min_samples_split,
         min_samples_leaf=min_samples_leaf,
         max_features=max_features,
+        colsample_bytree=colsample_bytree,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,

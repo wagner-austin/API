@@ -39,6 +39,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 10,
             "min_samples_leaf": 5,
             "max_features": 3,
+            "colsample_bytree": 0.7,
             "max_bins": 64,
             "subsample": 0.8,
             "random_state": 42,
@@ -61,6 +62,7 @@ class TestGradientBoostingConfig:
         assert decoded["min_samples_split"] == 10
         assert decoded["min_samples_leaf"] == 5
         assert decoded["max_features"] == 3
+        assert decoded["colsample_bytree"] == 0.7
         assert decoded["max_bins"] == 64
         assert decoded["subsample"] == 0.8
         assert decoded["random_state"] == 42
@@ -81,6 +83,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -98,6 +101,7 @@ class TestGradientBoostingConfig:
         decoded = decode_gradient_boosting_config(encoded)
 
         assert decoded["max_features"] is None
+        assert decoded["colsample_bytree"] is None
         assert decoded["monotonic_constraints"] is None
         assert decoded["reg_alpha"] == 0.0
         assert decoded["reg_lambda"] == 0.0
@@ -113,6 +117,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -138,6 +143,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -163,6 +169,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -188,6 +195,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -213,6 +221,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -240,6 +249,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -307,6 +317,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -333,6 +344,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -358,6 +370,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -383,6 +396,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -408,6 +422,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -438,6 +453,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -464,6 +480,7 @@ class TestGradientBoostingConfig:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -514,6 +531,7 @@ class TestGradientBoostingModel:
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
+            "colsample_bytree": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,

@@ -119,6 +119,7 @@ def _config_to_rust_dict(
         "objective": config["objective"],
         "scale_pos_weight": config["scale_pos_weight"],
         "max_features": config["max_features"],
+        "colsample_bytree": config["colsample_bytree"],
     }
 
 

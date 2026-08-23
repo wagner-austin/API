@@ -22,6 +22,7 @@ from cleargbm._types_json import (
     require_n_jobs,
     require_non_negative_float,
     require_non_negative_int,
+    require_open_unit_float,
     require_positive_float,
     require_positive_int,
     require_unit_float,
@@ -81,6 +82,12 @@ class GradientBoostingConfig(TypedDict):
         max_features: Features each split may consider (None = all). A real
             per-split budget as of 2026-08-22; earlier configs carried the
             field but the trainer ignored it.
+        colsample_bytree: Fraction of features each TREE may use (None =
+            all), drawn once per boosting round; the per-split
+            ``max_features`` draw then selects within the tree's set. Must
+            lie strictly between 0 and 1 when set — ``None`` is the only
+            spelling of "all features", so ``1.0`` is rejected rather than
+            silently equivalent.
         max_bins: Number of histogram bins for split finding (64-256 typical).
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -125,6 +132,7 @@ class GradientBoostingConfig(TypedDict):
     min_samples_split: int
     min_samples_leaf: int
     max_features: int | None
+    colsample_bytree: float | None
     max_bins: int
     subsample: float
     random_state: int
@@ -215,6 +223,7 @@ def encode_gradient_boosting_config(
         "min_samples_split": config["min_samples_split"],
         "min_samples_leaf": config["min_samples_leaf"],
         "max_features": config["max_features"],
+        "colsample_bytree": config["colsample_bytree"],
         "max_bins": config["max_bins"],
         "subsample": config["subsample"],
         "random_state": config["random_state"],
@@ -232,6 +241,36 @@ def encode_gradient_boosting_config(
         "objective": config["objective"],
         "scale_pos_weight": config["scale_pos_weight"],
     }
+
+
+def _decode_monotonic_constraints(raw: JSONDict) -> tuple[int, ...] | None:
+    """Decode the optional per-feature monotonic constraint list.
+
+    Args:
+        raw: Raw dictionary from JSON.
+
+    Returns:
+        The constraints as a tuple, or None when absent or null.
+
+    Raises:
+        JSONTypeError: If the value is not a list of ints.
+        ValueError: If any constraint is outside {-1, 0, 1}.
+    """
+    if "monotonic_constraints" not in raw or raw["monotonic_constraints"] is None:
+        return None
+    mc_raw = raw["monotonic_constraints"]
+    if not isinstance(mc_raw, list):
+        raise JSONTypeError(
+            f"monotonic_constraints must be list or None, got {type(mc_raw).__name__}"
+        )
+    mc_list: list[int] = []
+    for i, val in enumerate(mc_raw):
+        if not isinstance(val, int) or isinstance(val, bool):
+            raise JSONTypeError(f"monotonic_constraints[{i}] must be int, got {type(val).__name__}")
+        if val not in (-1, 0, 1):
+            raise ValueError(f"monotonic_constraints[{i}] must be -1, 0, or 1, got {val}")
+        mc_list.append(val)
+    return tuple(mc_list)
 
 
 def decode_gradient_boosting_config(
@@ -262,27 +301,14 @@ def decode_gradient_boosting_config(
     max_features = _get_optional_int(raw, "max_features")
     if max_features is not None:
         max_features = require_positive_int(max_features, "max_features")
+    colsample_bytree = _get_optional_float(raw, "colsample_bytree")
+    if colsample_bytree is not None:
+        colsample_bytree = require_open_unit_float(colsample_bytree, "colsample_bytree")
     max_bins = require_positive_int(_require_int(raw, "max_bins"), "max_bins")
     subsample = require_unit_float(_require_float(raw, "subsample"), "subsample")
     random_state = _require_int(raw, "random_state")
 
-    monotonic_constraints: tuple[int, ...] | None = None
-    if "monotonic_constraints" in raw and raw["monotonic_constraints"] is not None:
-        mc_raw = raw["monotonic_constraints"]
-        if not isinstance(mc_raw, list):
-            raise JSONTypeError(
-                f"monotonic_constraints must be list or None, got {type(mc_raw).__name__}"
-            )
-        mc_list: list[int] = []
-        for i, val in enumerate(mc_raw):
-            if not isinstance(val, int) or isinstance(val, bool):
-                raise JSONTypeError(
-                    f"monotonic_constraints[{i}] must be int, got {type(val).__name__}"
-                )
-            if val not in (-1, 0, 1):
-                raise ValueError(f"monotonic_constraints[{i}] must be -1, 0, or 1, got {val}")
-            mc_list.append(val)
-        monotonic_constraints = tuple(mc_list)
+    monotonic_constraints = _decode_monotonic_constraints(raw)
 
     reg_alpha = require_non_negative_float(_require_float(raw, "reg_alpha"), "reg_alpha")
     reg_lambda = require_non_negative_float(_require_float(raw, "reg_lambda"), "reg_lambda")
@@ -314,6 +340,7 @@ def decode_gradient_boosting_config(
         min_samples_split=min_samples_split,
         min_samples_leaf=min_samples_leaf,
         max_features=max_features,
+        colsample_bytree=colsample_bytree,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,
