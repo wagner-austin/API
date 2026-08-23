@@ -169,6 +169,11 @@ pub struct GradientBoostingConfigParams {
     /// The k <= n_features bound is checked at train time where the
     /// feature count is known.
     pub max_features: Option<usize>,
+    /// Fraction of features each TREE may consider (None = all; Some(f)
+    /// with 0 < f < 1). Some(1.0) is rejected: it would be a second
+    /// spelling of "all features". The per-split `max_features` budget
+    /// applies within the tree's sampled set.
+    pub colsample_bytree: Option<f64>,
 }
 
 /// Configuration for gradient boosting training.
@@ -212,6 +217,8 @@ pub struct GradientBoostingConfig {
     scale_pos_weight: Option<f64>,
     /// Features each split may consider (None = all).
     max_features: Option<usize>,
+    /// Fraction of features each tree may consider (None = all).
+    colsample_bytree: Option<f64>,
 }
 
 impl GradientBoostingConfig {
@@ -243,6 +250,7 @@ impl GradientBoostingConfig {
             objective,
             scale_pos_weight,
             max_features,
+            colsample_bytree,
         } = params;
 
         if n_estimators < 1_usize {
@@ -356,6 +364,19 @@ impl GradientBoostingConfig {
                 });
             }
         }
+        // A fraction of exactly 1.0 is every feature, which already has a
+        // spelling: null. Two spellings of one behavior is how a config
+        // stops being self-describing, so the boundary is exclusive.
+        if let Some(f) = colsample_bytree {
+            if !f.is_finite() || f <= 0.0_f64 || f >= 1.0_f64 {
+                return Err(ClearGbmError::InvalidParameter {
+                    name: "colsample_bytree".to_string(),
+                    reason: format!(
+                        "must be in (0.0, 1.0) exclusive when set (null = all features), got {f}"
+                    ),
+                });
+            }
+        }
         // `num_leaves` is paired with the policy rather than merely ignored
         // under the wrong one. A leaf budget silently doing nothing under
         // depth-wise growth is the same class of defect as a missing
@@ -408,6 +429,7 @@ impl GradientBoostingConfig {
             objective,
             scale_pos_weight,
             max_features,
+            colsample_bytree,
         })
     }
 
@@ -505,6 +527,12 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn max_features(&self) -> Option<usize> {
         self.max_features
+    }
+
+    /// Returns the per-tree feature fraction (None = all features).
+    #[must_use]
+    pub fn colsample_bytree(&self) -> Option<f64> {
+        self.colsample_bytree
     }
 
     /// Returns the leaf budget, set exactly under `LeafWise` growth.

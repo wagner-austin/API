@@ -209,9 +209,15 @@ fn evaluate_candidate(
         return Ok(None);
     }
 
-    let feature_mask = context.input.feature_subsample.map(|fs| {
-        super::feature_subsample::select_split_features(fs, context.input.n_features, node_id)
-    });
+    let feature_mask = match context.input.feature_subsample {
+        Some(fs) => Some(super::feature_subsample::select_split_features(
+            fs,
+            context.input.n_features,
+            node_id,
+            context.input.tree_feature_mask,
+        )),
+        None => context.input.tree_feature_mask.map(<[bool]>::to_vec),
+    };
     let best_split = match find_best_split_across_features_internal(
         &histograms,
         split_config,

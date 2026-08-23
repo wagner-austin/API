@@ -194,6 +194,12 @@ pub(super) fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict
         Ok(()) => {}
         Err(e) => return Err(wrap_py_err(&e)),
     };
+    // Present and null, like max_features: absence must be an error, not a
+    // silent "all features".
+    match config.set_item("colsample_bytree", py.None()) {
+        Ok(()) => {}
+        Err(e) => return Err(wrap_py_err(&e)),
+    };
     Ok(config)
 }
 
@@ -474,5 +480,55 @@ pub(super) fn module_fn<'py>(
     match module.getattr(name) {
         Ok(f) => Ok(f),
         Err(e) => Err(wrap_py_err(&e)),
+    }
+}
+
+/// Builds the standard training args and rewrites one config key, returning
+/// the rejection text the training call produces.
+///
+/// # Args
+///
+/// * `py` - Python GIL token.
+/// * `key` - The config key to rewrite.
+/// * `value` - `Some(object)` to overwrite the key, `None` to delete it.
+///
+/// # Returns
+///
+/// The `PyErr` text produced by the training call.
+///
+/// # Errors
+///
+/// Returns [`ClearGbmError::TreeConstructionFailed`] if the args cannot be
+/// built or if training unexpectedly succeeds.
+pub(super) fn train_error_with_key(
+    py: Python<'_>,
+    key: &str,
+    value: Option<Bound<'_, PyAny>>,
+) -> Result<String, ClearGbmError> {
+    let args = match make_training_args(py) {
+        Ok(a) => a,
+        Err(e) => return Err(e),
+    };
+    let item = match args.get_item(6_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(wrap_py_err(&e)),
+    };
+    let config: Bound<'_, PyDict> = match item.extract() {
+        Ok(d) => d,
+        Err(e) => return Err(fail(format!("config arg is not a dict: {e}"))),
+    };
+    match value {
+        Some(obj) => match config.set_item(key, obj) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        },
+        None => match config.del_item(key) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        },
+    };
+    match train_gradient_boosting_from_args(&args) {
+        Ok(_) => Err(fail(format!("a defect in '{key}' must be rejected"))),
+        Err(e) => Ok(e.to_string()),
     }
 }

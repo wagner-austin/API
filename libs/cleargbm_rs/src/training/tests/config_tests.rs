@@ -402,3 +402,91 @@ fn test_config_max_features_getter() -> Result<(), ClearGbmError> {
     assert_eq!(config.max_features(), Some(3_usize));
     Ok(())
 }
+
+#[test]
+fn test_config_rejects_colsample_bytree_of_one() -> Result<(), ClearGbmError> {
+    // Some(1.0) would be a second spelling of "all features"; the null case
+    // owns that meaning, so 1.0 is rejected rather than silently equivalent.
+    let mut params = default_params();
+    params.colsample_bytree = Some(1.0_f64);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected error for colsample_bytree = 1.0".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "colsample_bytree");
+            assert!(reason.contains("(0.0, 1.0) exclusive"));
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_config_rejects_zero_colsample_bytree() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.colsample_bytree = Some(0.0_f64);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected error for colsample_bytree = 0.0".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "colsample_bytree");
+            assert!(reason.contains("got 0"));
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_config_rejects_negative_colsample_bytree() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.colsample_bytree = Some(-0.5_f64);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected error for negative colsample_bytree".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, .. }) => {
+            assert_eq!(name, "colsample_bytree");
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_config_rejects_nan_colsample_bytree() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.colsample_bytree = Some(f64::NAN);
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "expected error for NaN colsample_bytree".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, .. }) => {
+            assert_eq!(name, "colsample_bytree");
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[test]
+fn test_config_colsample_bytree_getter() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.colsample_bytree = Some(0.5_f64);
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let fraction = match config.colsample_bytree() {
+        Some(f) => f,
+        None => {
+            return Err(ClearGbmError::TreeConstructionFailed {
+                reason: "colsample_bytree getter dropped the value".to_string(),
+            })
+        }
+    };
+    assert!((fraction - 0.5_f64).abs() < 1e-15_f64);
+    Ok(())
+}

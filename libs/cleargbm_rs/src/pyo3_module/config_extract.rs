@@ -98,6 +98,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
     let objective = propagate!(extract_objective(dict));
     let scale_pos_weight = propagate!(extract_scale_pos_weight(dict));
     let max_features = propagate!(extract_max_features(dict));
+    let colsample_bytree = propagate!(extract_colsample_bytree(dict));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -117,6 +118,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
         objective,
         scale_pos_weight,
         max_features,
+        colsample_bytree,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))
@@ -184,6 +186,37 @@ fn extract_max_features(dict: &Bound<'_, PyDict>) -> PyResult<Option<usize>> {
 
     let val: i64 = propagate!(item.extract());
     Ok(Some(propagate_into!(i64_to_usize(val, "max_features"))))
+}
+
+/// Extracts the optional per-tree feature fraction from a config dict.
+///
+/// The key `"colsample_bytree"` is required to be present; its value may be
+/// `None` (all features). Same presence contract as `max_features`: an
+/// absent key would silently read as "all features".
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing or the value is neither `None`
+/// nor a float.
+fn extract_colsample_bytree(dict: &Bound<'_, PyDict>) -> PyResult<Option<f64>> {
+    let opt = propagate!(dict.get_item("colsample_bytree"));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "colsample_bytree".to_string(),
+                reason: "missing required key 'colsample_bytree'".to_string(),
+            }
+            .into())
+        }
+    };
+
+    if item.is_none() {
+        return Ok(None);
+    }
+
+    let val: f64 = propagate!(item.extract());
+    Ok(Some(val))
 }
 
 /// Extracts the optional positive-class weight from a config dict.

@@ -281,3 +281,180 @@ fn test_max_features_applies_under_leaf_wise_growth() -> Result<(), ClearGbmErro
     );
     Ok(())
 }
+
+#[test]
+fn test_colsample_bytree_changes_the_trained_model() -> Result<(), ClearGbmError> {
+    // Knob-sensitivity: at 0.5 on two features each tree keeps a single
+    // column (k_tree = max(1, floor(0.5 * 2)) = 1), so across five rounds
+    // some tree must lose the column the unrestricted run would have split.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+
+    let unrestricted = match make_config(5_usize) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let mut restricted_params = default_params();
+    restricted_params.n_estimators = 5_usize;
+    restricted_params.colsample_bytree = Some(0.5_f64);
+    let restricted = match GradientBoostingConfig::new(restricted_params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let model_all = match train_binary(&x_train, &y_train, None, &unrestricted, &feature_names) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let model_half = match train_binary(&x_train, &y_train, None, &restricted, &feature_names) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+
+    let preds_all = match model_all.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    let preds_half = match model_half.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    assert!(
+        preds_all != preds_half,
+        "colsample_bytree=0.5 produced the same predictions as all-features"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_colsample_bytree_deterministic_across_runs() -> Result<(), ClearGbmError> {
+    // The tree mask is a pure function of (random_state, round), so two
+    // identical runs must agree bit for bit.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+
+    let mut params = default_params();
+    params.n_estimators = 4_usize;
+    params.colsample_bytree = Some(0.5_f64);
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let first = match train_binary(&x_train, &y_train, None, &config, &feature_names) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let second = match train_binary(&x_train, &y_train, None, &config, &feature_names) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+
+    let preds_first = match first.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    let preds_second = match second.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(preds_first, preds_second);
+    Ok(())
+}
+
+#[test]
+fn test_colsample_bytree_composes_with_max_features() -> Result<(), ClearGbmError> {
+    // When both axes are set, the per-node draw selects within the tree's
+    // sampled set — so adding the tree mask on top of max_features=1 must
+    // change which single feature some node ends up considering.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+
+    let mut split_only_params = default_params();
+    split_only_params.n_estimators = 5_usize;
+    split_only_params.max_features = Some(1_usize);
+    let split_only = match GradientBoostingConfig::new(split_only_params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let mut both_params = default_params();
+    both_params.n_estimators = 5_usize;
+    both_params.max_features = Some(1_usize);
+    both_params.colsample_bytree = Some(0.5_f64);
+    let both = match GradientBoostingConfig::new(both_params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let model_split_only = match train_binary(&x_train, &y_train, None, &split_only, &feature_names)
+    {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let model_both = match train_binary(&x_train, &y_train, None, &both, &feature_names) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+
+    let preds_split_only = match model_split_only.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    let preds_both = match model_both.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    assert!(
+        preds_split_only != preds_both,
+        "adding colsample_bytree=0.5 atop max_features=1 changed nothing"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_colsample_bytree_applies_under_leaf_wise_growth() -> Result<(), ClearGbmError> {
+    // Both growers receive the same per-tree mask through BuildTreeInput;
+    // this drives the leaf-wise path's composition.
+    let (rows, y_train, feature_names) = make_nested_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+
+    let mut restricted_params = default_params();
+    restricted_params.n_estimators = 5_usize;
+    restricted_params.growth_strategy = crate::training::GrowthStrategy::LeafWise;
+    restricted_params.num_leaves = Some(3_usize);
+    restricted_params.colsample_bytree = Some(0.5_f64);
+    let restricted = match GradientBoostingConfig::new(restricted_params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let unrestricted = match make_leaf_wise_config(5_usize, 3_usize) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let model_restricted = match train_binary(&x_train, &y_train, None, &restricted, &feature_names)
+    {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let model_unrestricted =
+        match train_binary(&x_train, &y_train, None, &unrestricted, &feature_names) {
+            Ok(m) => m,
+            Err(e) => return Err(e),
+        };
+
+    let preds_restricted = match model_restricted.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    let preds_unrestricted = match model_unrestricted.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    assert!(
+        preds_restricted != preds_unrestricted,
+        "leaf-wise colsample_bytree=0.5 produced the same predictions as all-features"
+    );
+    Ok(())
+}

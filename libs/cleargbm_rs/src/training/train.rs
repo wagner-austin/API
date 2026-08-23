@@ -13,8 +13,8 @@ use crate::losses::{
 };
 use crate::predict::predict_tree;
 use crate::tree::{
-    build_tree_leaf_wise_with_leaf_assignment, build_tree_with_leaf_assignment, BuildTreeInput,
-    FeatureSubsample, Tree, TreeBuildConfig,
+    build_tree_leaf_wise_with_leaf_assignment, build_tree_with_leaf_assignment,
+    select_tree_features, BuildTreeInput, FeatureSubsample, Tree, TreeBuildConfig,
 };
 use crate::types::SplitConfig;
 
@@ -212,6 +212,17 @@ pub fn train_gradient_boosting(
         }
     }
 
+    // 9c. Resolve the per-tree column budget: k_tree = max(1,
+    // floor(colsample_bytree * n_features)), the row-subsampling convention.
+    // The count lives on [1, n_features] by construction (the fraction is
+    // validated in (0, 1) exclusive), so no further pairing check is needed.
+    let tree_column_budget: Option<usize> = match config.colsample_bytree() {
+        Some(fraction) => Some(propagate!(crate::tree::tree_column_budget(
+            fraction, n_features
+        ))),
+        None => None,
+    };
+
     // 10. Boosting loop, run inside the run-scoped pool so the caller's
     // `n_jobs` actually bounds the worker count. Tree building owns every
     // rayon dispatch in the crate (per-feature histogram construction), so
@@ -359,6 +370,12 @@ pub fn train_gradient_boosting(
                     .random_state()
                     .wrapping_add(round_u64.wrapping_mul(0x9E37_79B9_7F4A_7C15_u64)),
             });
+            // The per-tree column mask, when `colsample_bytree` is set: a
+            // pure function of (random_state, round) on its own stream (see
+            // TREE_MIX), so the other RNG consumers are untouched and the
+            // colsample-off path stays bit-identical.
+            let tree_mask: Option<Vec<bool>> = tree_column_budget
+                .map(|k| select_tree_features(config.random_state(), round, k, n_features));
             let input = BuildTreeInput {
                 sample_indices: &sample_indices,
                 gradients: &gradients,
@@ -371,6 +388,7 @@ pub fn train_gradient_boosting(
                 config: &tree_build_config,
                 monotonic_constraints: config.monotonic_constraints(),
                 feature_subsample,
+                tree_feature_mask: tree_mask.as_deref(),
             };
 
             // e. Build tree (and capture per-sample leaf assignments as a

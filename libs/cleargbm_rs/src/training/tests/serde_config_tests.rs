@@ -29,6 +29,7 @@ const CONFIG_FIELDS: &[&str] = &[
     "objective",
     "scale_pos_weight",
     "max_features",
+    "colsample_bytree",
 ];
 
 // =============================================================================
@@ -524,4 +525,29 @@ fn test_config_field_visitor_expecting_describes_a_field_identifier() -> Result<
             reason: "expecting() failed with a sufficient buffer".to_string(),
         }),
     }
+}
+
+#[test]
+fn test_config_roundtrips_a_colsample_payload() -> Result<(), ClearGbmError> {
+    // The per-tree fraction must survive the wire in both spellings: a real
+    // value round-trips exactly, and the reference config (colsample unset)
+    // serializes an explicit null rather than omitting the key.
+    let mut p = default_params();
+    p.colsample_bytree = Some(0.5_f64);
+    let original = match GradientBoostingConfig::new(p) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let json = propagate!(to_json(&original));
+    assert!(json.contains(r#""colsample_bytree":0.5"#));
+    let decoded: GradientBoostingConfig = propagate!(from_json(&json));
+    assert_eq!(decoded, original);
+
+    let unset = match reference_config() {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let unset_json = propagate!(to_json(&unset));
+    assert!(unset_json.contains(r#""colsample_bytree":null"#));
+    Ok(())
 }

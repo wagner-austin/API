@@ -69,6 +69,7 @@ pub(super) fn default_params() -> GradientBoostingConfigParams {
         objective: Objective::BinaryLogLoss,
         scale_pos_weight: Some(1.0_f64),
         max_features: None,
+        colsample_bytree: None,
     }
 }
 

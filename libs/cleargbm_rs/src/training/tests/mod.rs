@@ -14,6 +14,7 @@ mod serde_model_tests;
 mod subsampling_tests;
 mod train_helpers;
 mod train_knob_tests;
+mod train_nan_tests;
 mod train_regression_tests;
 mod train_tests;
 mod train_weight_tests;

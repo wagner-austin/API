@@ -77,6 +77,11 @@ pub struct BuildTreeInput<'a> {
     /// considers every feature at every split, bit-identical to the
     /// history before this axis existed.
     pub feature_subsample: Option<super::feature_subsample::FeatureSubsample>,
+
+    /// Optional per-TREE feature mask (`colsample_bytree`), derived once
+    /// per boosting round. `None` lets the tree use every feature. When
+    /// both axes are set, the per-split draw selects within this mask.
+    pub tree_feature_mask: Option<&'a [bool]>,
 }
 
 /// Records a leaf's value against every sample that reached it.
@@ -361,10 +366,18 @@ pub fn build_tree_with_leaf_assignment(
             }
         };
 
-        // Find best split across the features this node may consider
-        let feature_mask = input
-            .feature_subsample
-            .map(|fs| super::feature_subsample::select_split_features(fs, n_features, node_id));
+        // Find best split across the features this node may consider:
+        // the per-node draw (within the tree mask when one is active), or
+        // the tree mask alone, or everything.
+        let feature_mask = match input.feature_subsample {
+            Some(fs) => Some(super::feature_subsample::select_split_features(
+                fs,
+                n_features,
+                node_id,
+                input.tree_feature_mask,
+            )),
+            None => input.tree_feature_mask.map(<[bool]>::to_vec),
+        };
         let best_split = match find_best_split_across_features_internal(
             &histograms,
             split_config,
