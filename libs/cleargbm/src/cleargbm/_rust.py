@@ -36,8 +36,10 @@ class _TrainProto(Protocol):
         self,
         x_train: NDArray[np.float64],
         y_train: NDArray[np.int64],
+        sample_weight: NDArray[np.float64] | None,
         x_val: NDArray[np.float64] | None,
         y_val: NDArray[np.int64] | None,
+        val_sample_weight: NDArray[np.float64] | None,
         config: dict[str, int | float | bool | str | list[int] | None],
         feature_names: list[str],
     ) -> PyGbmModelProto:
@@ -46,8 +48,12 @@ class _TrainProto(Protocol):
         Args:
             x_train: 2D training feature matrix.
             y_train: 1D binary training labels.
+            sample_weight: Optional 1D per-row training weights (finite,
+                > 0); ``None`` weighs every row 1, bit-identically.
             x_val: Optional 2D validation feature matrix.
             y_val: Optional 1D validation labels.
+            val_sample_weight: Optional 1D per-row evaluation weights for
+                the validation split.
             config: Hyperparameter dict (Rust-side shape; produced by
                 ``cleargbm.ensemble._config_to_rust_dict``); its
                 ``objective`` must be ``"binary_log_loss"``.
@@ -66,8 +72,10 @@ class _TrainRegressionProto(Protocol):
         self,
         x_train: NDArray[np.float64],
         y_train: NDArray[np.float64],
+        sample_weight: NDArray[np.float64] | None,
         x_val: NDArray[np.float64] | None,
         y_val: NDArray[np.float64] | None,
+        val_sample_weight: NDArray[np.float64] | None,
         config: dict[str, int | float | bool | str | list[int] | None],
         feature_names: list[str],
     ) -> PyGbmModelProto:
@@ -76,8 +84,12 @@ class _TrainRegressionProto(Protocol):
         Args:
             x_train: 2D training feature matrix.
             y_train: 1D continuous training targets.
+            sample_weight: Optional 1D per-row training weights (finite,
+                > 0); ``None`` weighs every row 1, bit-identically.
             x_val: Optional 2D validation feature matrix.
             y_val: Optional 1D continuous validation targets.
+            val_sample_weight: Optional 1D per-row evaluation weights for
+                the validation split.
             config: Hyperparameter dict (Rust-side shape); its ``objective``
                 must be ``"squared_error"``.
             feature_names: Feature names list, length = ``x_train.shape[1]``.

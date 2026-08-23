@@ -399,6 +399,86 @@ class TestTrainRegression:
             )
 
 
+class TestSampleWeights:
+    """Per-row sample weights through the public surface."""
+
+    def test_binary_weights_change_the_model(self) -> None:
+        """Knob sensitivity: a non-uniform weight vector changes the model."""
+        x, y, names = _make_binary_dataset()
+        weights: NDArray[np.float64] = np.ones(int(y.shape[0]), dtype=np.float64)
+        weights[::2] = 4.0
+        weights[1::2] = 0.5
+        weighted = train_gradient_boosting(
+            x_train=x,
+            y_train=y,
+            x_val=None,
+            y_val=None,
+            config=_make_config(),
+            feature_names=names,
+            sample_weight=weights,
+        )
+        unweighted = train_gradient_boosting(
+            x_train=x, y_train=y, x_val=None, y_val=None, config=_make_config(), feature_names=names
+        )
+        assert export_model_json(weighted) != export_model_json(unweighted)
+
+    def test_all_ones_weights_are_identical_to_none(self) -> None:
+        """The all-ones weight vector reproduces weightless training exactly."""
+        x, y, names = _make_binary_dataset()
+        ones = np.ones(int(y.shape[0]), dtype=np.float64)
+        with_ones = train_gradient_boosting(
+            x_train=x,
+            y_train=y,
+            x_val=None,
+            y_val=None,
+            config=_make_config(),
+            feature_names=names,
+            sample_weight=ones,
+        )
+        without = train_gradient_boosting(
+            x_train=x, y_train=y, x_val=None, y_val=None, config=_make_config(), feature_names=names
+        )
+        assert export_model_json(with_ones) == export_model_json(without)
+
+    def test_regression_weights_with_validation_weights(self) -> None:
+        """Weighted regression with weighted validation trains end to end."""
+        rng = np.random.default_rng(5)
+        x: NDArray[np.float64] = rng.random((40, 2), dtype=np.float64)
+        y: NDArray[np.float64] = (2.0 * x[:, 0] + x[:, 1]).astype(np.float64)
+        weights: NDArray[np.float64] = (1.0 + x[:, 0]).astype(np.float64)
+        x_val: NDArray[np.float64] = rng.random((10, 2), dtype=np.float64)
+        y_val: NDArray[np.float64] = (2.0 * x_val[:, 0] + x_val[:, 1]).astype(np.float64)
+        val_weights = np.ones(10, dtype=np.float64)
+        model = train_gradient_boosting_regression(
+            x_train=x,
+            y_train=y,
+            x_val=x_val,
+            y_val=y_val,
+            config=_make_regression_config(),
+            feature_names=("f0", "f1"),
+            sample_weight=weights,
+            val_sample_weight=val_weights,
+        )
+        preds = predict_raw(model, x)
+        assert preds.shape == (40,)
+
+    def test_zero_weight_is_rejected_with_its_index(self) -> None:
+        """A zero weight fails loudly at the Rust boundary, naming the row."""
+        x, y, names = _make_binary_dataset()
+        weights = np.ones(int(y.shape[0]), dtype=np.float64)
+        weights[7] = 0.0
+        with pytest.raises(ValueError, match="index 7"):
+            train_gradient_boosting(
+                x_train=x,
+                y_train=y,
+                x_val=None,
+                y_val=None,
+                config=_make_config(),
+                feature_names=names,
+                sample_weight=weights,
+            )
+
+
 class TestExportModelJson:
     """Model introspection through the public JSON surface."""
 

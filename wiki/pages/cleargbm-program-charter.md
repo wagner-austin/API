@@ -70,10 +70,11 @@ The primary operator of this library is an AI session. Therefore:
   benchmark entry LEADS both opponents on financial_distress (RMSE 1.8023
   vs xgboost 1.8291, lightgbm 1.8637) at the fastest wall clock.
   Quantile/Huber remain future menu additions on the same seam.
-- **P2 — Per-row sample weights.** Generalizes `scale_pos_weight` (class
-  weight becomes the special case it always was), and is the prerequisite
-  for GOSS and ranking. Also the honest way to encode instrument/measurement
-  confidence in scientific data.
+- **P2 — Per-row sample weights.** DONE 2026-08-23 — see
+  [[cleargbm-sample-weights]]. Both objectives take optional per-row
+  weights (data, not config; no artifact break); `scale_pos_weight` is
+  now provably the derived special case, bit for bit; four-arm identity
+  reproduced 56/56. GOSS (P5) and ranking (P4) are unblocked.
 - **P3 — Data realism.** Learned missing-value direction per split
   (weather and lab data are full of missingness); per-tree column sampling
   (trivial atop the per-split machinery); native categorical splits.

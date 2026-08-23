@@ -129,6 +129,9 @@ def train_gradient_boosting(
     y_val: NDArray[np.int64] | None,
     config: GradientBoostingConfig,
     feature_names: tuple[str, ...],
+    *,
+    sample_weight: NDArray[np.float64] | None = None,
+    val_sample_weight: NDArray[np.float64] | None = None,
 ) -> PyGbmModelProto:
     """Train a binary-classification gradient boosting ensemble.
 
@@ -136,6 +139,11 @@ def train_gradient_boosting(
     The returned handle is opaque to Python; pass it to :func:`predict_proba`,
     :func:`predict_raw`, or the module-level ``cleargbm_rs.py_gbm_model_*_rs``
     functions for JSON persistence and feature-importance extraction.
+
+    Weights are data, not configuration: ``sample_weight=None`` weighs
+    every row 1 and is bit-identical to weightless history, so the keyword
+    default cannot silently change semantics the way a config default
+    could. The Rust boundary validates weight length and positivity.
 
     Args:
         x_train: Training feature matrix ``(n_samples, n_features)``.
@@ -147,12 +155,17 @@ def train_gradient_boosting(
             between entry and objective).
         feature_names: Feature name tuple; length must match
             ``x_train.shape[1]``.
+        sample_weight: Optional per-row training weights (finite, > 0),
+            shape ``(n_samples,)``.
+        val_sample_weight: Optional per-row evaluation weights for the
+            validation split; requires ``x_val``/``y_val``.
 
     Returns:
         Trained ``PyGbmModel`` handle.
 
     Raises:
-        ValueError: On any input shape or feature-name mismatch.
+        ValueError: On any input shape or feature-name mismatch, or an
+            invalid weight.
         RuntimeError: Propagated from the native trainer on Rust-side error.
     """
     _validate_training_inputs(x_train, y_train, feature_names)
@@ -161,8 +174,10 @@ def train_gradient_boosting(
     return train_gradient_boosting_rs(
         x_train,
         y_train,
+        sample_weight,
         x_val,
         y_val,
+        val_sample_weight,
         rust_config,
         names_list,
     )
@@ -175,6 +190,9 @@ def train_gradient_boosting_regression(
     y_val: NDArray[np.float64] | None,
     config: GradientBoostingConfig,
     feature_names: tuple[str, ...],
+    *,
+    sample_weight: NDArray[np.float64] | None = None,
+    val_sample_weight: NDArray[np.float64] | None = None,
 ) -> PyGbmModelProto:
     """Train a squared-error regression gradient boosting ensemble.
 
@@ -182,6 +200,10 @@ def train_gradient_boosting_regression(
     come from :func:`predict_raw` — under ``squared_error`` the raw score IS
     the prediction, and :func:`predict_proba` is rejected for the returned
     model.
+
+    Weights are data, not configuration: ``sample_weight=None`` weighs
+    every row 1 and is bit-identical to weightless history — the honest
+    encoding of instrument or measurement confidence in scientific corpora.
 
     Args:
         x_train: Training feature matrix ``(n_samples, n_features)``.
@@ -193,12 +215,17 @@ def train_gradient_boosting_regression(
             between entry and objective).
         feature_names: Feature name tuple; length must match
             ``x_train.shape[1]``.
+        sample_weight: Optional per-row training weights (finite, > 0),
+            shape ``(n_samples,)``.
+        val_sample_weight: Optional per-row evaluation weights for the
+            validation split; requires ``x_val``/``y_val``.
 
     Returns:
         Trained ``PyGbmModel`` handle.
 
     Raises:
-        ValueError: On any input shape or feature-name mismatch.
+        ValueError: On any input shape or feature-name mismatch, or an
+            invalid weight.
         RuntimeError: Propagated from the native trainer on Rust-side error,
             including non-finite targets and objective/entry mismatches.
     """
@@ -208,8 +235,10 @@ def train_gradient_boosting_regression(
     return train_gradient_boosting_regression_rs(
         x_train,
         y_train,
+        sample_weight,
         x_val,
         y_val,
+        val_sample_weight,
         rust_config,
         names_list,
     )
