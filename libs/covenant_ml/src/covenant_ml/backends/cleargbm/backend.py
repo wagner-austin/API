@@ -313,6 +313,8 @@ class ClearGBMBackend(ClassifierBackend):
             ),
             n_classes=None,
             lambdarank_truncation_level=None,
+            goss_top_rate=None,
+            goss_other_rate=None,
             max_bins=cfg["max_bins"],
             subsample=cfg["subsample"],
             random_state=cfg["random_state"],

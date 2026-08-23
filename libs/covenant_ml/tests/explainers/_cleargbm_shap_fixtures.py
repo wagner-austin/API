@@ -67,6 +67,8 @@ def _make_config() -> GradientBoostingConfig:
         categorical_features=None,
         n_classes=None,
         lambdarank_truncation_level=None,
+        goss_top_rate=None,
+        goss_other_rate=None,
         max_bins=64,
         subsample=1.0,
         random_state=42,

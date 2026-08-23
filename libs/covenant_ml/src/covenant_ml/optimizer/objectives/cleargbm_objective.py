@@ -95,6 +95,8 @@ def _build_trial_config(
         categorical_features=None,
         n_classes=None,
         lambdarank_truncation_level=None,
+        goss_top_rate=None,
+        goss_other_rate=None,
         max_bins=int_params.get("max_bins", 64),
         subsample=float_params.get("subsample", 1.0),
         random_state=random_state,
