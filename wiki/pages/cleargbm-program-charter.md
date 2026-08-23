@@ -86,8 +86,13 @@ The primary operator of this library is an AI session. Therefore:
   splits by gradient-sorted prefix scan, set-membership nodes, SHAP
   refusal. Both landings: identity 112/112, all five artifacts retrained
   with exactly reproduced numbers.
-- **P4 — More objectives.** Multiclass (softmax, K trees per round) on the
-  P1 seam; ranking (LambdaMART) on P1+P2.
+- **P4 — More objectives.** Landing A (multiclass softmax) DONE
+  2026-08-23 — see [[cleargbm-multiclass-softmax]]: K trees per round on
+  the P1 seam, class-major buffers, `n_classes` required-with-null
+  (config field 20) + per-class base scores (model field 6), identity
+  112/112, log loss below LightGBM on all four quality seeds. Landing B
+  — ranking (LambdaMART) on P1+P2 — is in flight; the lambda math is
+  pinned in the tech-wiki (Burges 2010 + LightGBM rank pages).
 - **P5 — Accelerators through the quality gate.** Quantized training (the
   measured 2x lever, integer histograms per Shi 2022 — tech-wiki has the
   full primary-source map), GOSS, EFB, continued training on an existing
