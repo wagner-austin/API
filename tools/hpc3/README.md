@@ -59,7 +59,8 @@ address, the ledger, the budget and each project's resources are written down.
       "checkpoint_steps": 500,
       "accept_billing": false,
       "env_path": "/pub/wagnera3/envs/abl-pinned",
-      "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" }
+      "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" },
+      "deterministic": true
     }
   }
 }
@@ -84,9 +85,9 @@ looks wrong.
 
 ### Adding a project
 
-Add one entry to `projects`. That is the whole procedure — LSTM work,
-`cleargbm_rs`, covenant-radar, SIRIUS, ZODIAC and the transformer ablation
-differ only in their resource line and their environment path:
+Add one entry to `projects`. For a **single-node GPU workload** that is the
+whole procedure — the LSTM work, covenant-radar's training and the transformer
+ablation differ only in their resource line and their environment path:
 
 ```json
 "turkic-lstm": {
@@ -94,9 +95,15 @@ differ only in their resource line and their environment path:
   "cpus": 4, "mem_gb": 32, "minutes": 240,
   "requeue": true, "checkpoint_steps": 200,
   "accept_billing": false,
-  "env_path": "/pub/wagnera3/envs/turkic"
+  "env_path": "/pub/wagnera3/envs/turkic",
+  "pinned_packages": {},
+  "deterministic": false
 }
 ```
+
+**Not every workload is that shape.** See
+[What this cannot submit](#what-this-cannot-submit) before assuming a project
+entry is all that stands between a workload and the cluster.
 
 Project names are lowercase letters, digits and hyphens, at most 24 characters.
 
@@ -328,6 +335,29 @@ to one machine under another machine's ceilings is worse than refusing.
 This is a Slurm tool. `sbatch`, `sbatch --test-only`, `sacct`, `squeue` and
 `scancel` are wired into `core/`, so PBS/Torque, LSF and Kubernetes are out of
 scope rather than one module away.
+
+---
+
+## What this cannot submit
+
+`JobSpec` describes **one single-node job that holds at least one named GPU**.
+That shape is enforced, not defaulted: `gpu` is required and validated against
+the cluster's inventory, and `render_sbatch` always emits
+`--gres=gpu:<model>:<n>`. Everything below is therefore not a missing flag but
+a shape the contract cannot express.
+
+| shape | status | what it blocks |
+| --- | --- | --- |
+| **CPU-only job** | cannot be expressed — `gpu` is required | `cleargbm_rs` (Rust/LightGBM), SIRIUS and ZODIAC (JVM, CPU-parallel), any preprocessing or eval pass that needs no GPU |
+| **Multi-node / MPI** | no `--nodes`, `--ntasks`, `srun` or `mpirun` anywhere | anything that does not fit one node |
+| **Job array** | a sweep is N separate `sbatch` calls | a wide sweep is N ledger rows and N scheduler entries where `--array` would be one; correct, but heavier on the scheduler and on `squeue` |
+| **Job dependency** | no `--dependency` | a staged pipeline — train → eval, SIRIUS → ZODIAC — must be driven by hand, one stage submitted after watching the previous finish |
+| **`--constraint` / `--exclusive`** | not emitted | node features cannot be selected beyond the GPU model |
+
+None of these are hard to add, and the cluster-facts layer already carries what
+the checks would need. They are absent because they were never built, not
+because they were judged wrong — recorded here so the gap is a decision rather
+than a discovery.
 
 ---
 
