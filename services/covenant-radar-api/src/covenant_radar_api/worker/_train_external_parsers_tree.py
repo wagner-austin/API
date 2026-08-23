@@ -194,6 +194,35 @@ def _parse_colsample_bytree_nullable(
     raise JSONTypeError("colsample_bytree must be a float or null")
 
 
+def _parse_categorical_features_nullable(
+    raw: JSONObject,
+) -> list[str] | None:
+    """Parse categorical_features field accepting a list of names or null.
+
+    Args:
+        raw: JSON object containing the field.
+
+    Returns:
+        The categorical column names, or None for all-numeric. Name
+        resolution against the dataset's features is owned by the
+        covenant_ml backend.
+
+    Raises:
+        JSONTypeError: If value is not a list of strings or null.
+    """
+    val = raw.get("categorical_features")
+    if val is None:
+        return None
+    if not isinstance(val, list):
+        raise JSONTypeError("categorical_features must be a list of strings or null")
+    names: list[str] = []
+    for item in val:
+        if not isinstance(item, str):
+            raise JSONTypeError("categorical_features entries must be strings")
+        names.append(item)
+    return names
+
+
 def _parse_monotonic_constraints(
     raw: JSONObject,
 ) -> dict[str, int] | None:
@@ -255,6 +284,7 @@ def _parse_cleargbm_config(
         "min_samples_leaf": require_int(raw, "min_samples_leaf"),
         "max_features": _parse_max_features_nullable(raw),
         "colsample_bytree": _parse_colsample_bytree_nullable(raw),
+        "categorical_features": _parse_categorical_features_nullable(raw),
         "max_bins": _optional_int(raw, "max_bins", 64),
         "subsample": require_float(raw, "subsample"),
         "random_state": require_int(raw, "random_state"),

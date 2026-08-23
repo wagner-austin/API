@@ -165,6 +165,7 @@ def _build_cleargbm_config(
         min_samples_leaf=int_params["min_samples_leaf"],
         max_features=None,
         colsample_bytree=None,
+        categorical_features=None,
         max_bins=int_params["max_bins"],
         subsample=float_params["subsample"],
         random_state=42,

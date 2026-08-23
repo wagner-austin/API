@@ -403,6 +403,49 @@ class TestClearGBMConfig:
         with pytest.raises(JSONTypeError, match="colsample_bytree must be"):
             _parse_external_train_config(config_json)
 
+    def test_with_categorical_features_names(self) -> None:
+        """Parse ClearGBM config with categorical column names."""
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 50,
+                "max_depth": 4,
+                "learning_rate": 0.05,
+                "min_samples_split": 5,
+                "min_samples_leaf": 3,
+                "max_features": None,
+                "categorical_features": ["industry", "region"],
+                "subsample": 0.9,
+                "random_state": 7,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        if result["backend"] != "cleargbm":
+            raise AssertionError("Expected cleargbm backend")
+        assert result["config"]["categorical_features"] == ["industry", "region"]
+
+    def test_invalid_categorical_features_type_raises(self) -> None:
+        """Non-list and non-string entries raise JSONTypeError."""
+        base = {
+            "backend": "cleargbm",
+            "dataset": "taiwan",
+            "n_estimators": 50,
+            "max_depth": 4,
+            "learning_rate": 0.05,
+            "min_samples_split": 5,
+            "min_samples_leaf": 3,
+            "max_features": None,
+            "subsample": 0.9,
+            "random_state": 7,
+        }
+        with pytest.raises(JSONTypeError, match="categorical_features must be"):
+            _parse_external_train_config(
+                dump_json_str({**base, "categorical_features": "industry"})
+            )
+        with pytest.raises(JSONTypeError, match="entries must be strings"):
+            _parse_external_train_config(dump_json_str({**base, "categorical_features": [3]}))
+
     def test_invalid_max_features_type_raises(self) -> None:
         """Invalid max_features type raises JSONTypeError."""
         config_json = dump_json_str(
