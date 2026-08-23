@@ -150,6 +150,7 @@ def make_config(
         min_samples_leaf=1,
         max_features=None,
         colsample_bytree=None,
+        categorical_features=None,
         max_bins=max_bins,
         subsample=1.0,
         random_state=random_state,

@@ -88,6 +88,12 @@ class GradientBoostingConfig(TypedDict):
             lie strictly between 0 and 1 when set — ``None`` is the only
             spelling of "all features", so ``1.0`` is rejected rather than
             silently equivalent.
+        categorical_features: Feature indices treated as categorical
+            (None = every feature numeric). Strictly ascending when set —
+            the one canonical spelling of a set. Values in those columns
+            must be non-negative integer codes; splits partition categories
+            by set membership (LightGBM's many-vs-many mechanism) rather
+            than by threshold.
         max_bins: Number of histogram bins for split finding (64-256 typical).
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -133,6 +139,7 @@ class GradientBoostingConfig(TypedDict):
     min_samples_leaf: int
     max_features: int | None
     colsample_bytree: float | None
+    categorical_features: tuple[int, ...] | None
     max_bins: int
     subsample: float
     random_state: int
@@ -224,6 +231,11 @@ def encode_gradient_boosting_config(
         "min_samples_leaf": config["min_samples_leaf"],
         "max_features": config["max_features"],
         "colsample_bytree": config["colsample_bytree"],
+        "categorical_features": (
+            list(config["categorical_features"])
+            if config["categorical_features"] is not None
+            else None
+        ),
         "max_bins": config["max_bins"],
         "subsample": config["subsample"],
         "random_state": config["random_state"],
@@ -241,6 +253,43 @@ def encode_gradient_boosting_config(
         "objective": config["objective"],
         "scale_pos_weight": config["scale_pos_weight"],
     }
+
+
+def _decode_categorical_features(raw: JSONDict) -> tuple[int, ...] | None:
+    """Decode the optional categorical feature index list.
+
+    Args:
+        raw: Raw dictionary from JSON.
+
+    Returns:
+        The indices as a tuple, or None when absent or null.
+
+    Raises:
+        JSONTypeError: If the value is not a list of ints.
+        ValueError: If the list is empty, holds a negative index, or is not
+            strictly ascending — a set has one canonical spelling.
+    """
+    if "categorical_features" not in raw or raw["categorical_features"] is None:
+        return None
+    cf_raw = raw["categorical_features"]
+    if not isinstance(cf_raw, list):
+        raise JSONTypeError(
+            f"categorical_features must be list or None, got {type(cf_raw).__name__}"
+        )
+    if not cf_raw:
+        raise ValueError("categorical_features must be non-empty when set (null = all numeric)")
+    indices: list[int] = []
+    for i, val in enumerate(cf_raw):
+        if not isinstance(val, int) or isinstance(val, bool):
+            raise JSONTypeError(f"categorical_features[{i}] must be int, got {type(val).__name__}")
+        if val < 0:
+            raise ValueError(f"categorical_features[{i}] must be >= 0, got {val}")
+        if indices and val <= indices[-1]:
+            raise ValueError(
+                f"categorical_features must be strictly ascending, got {val} after {indices[-1]}"
+            )
+        indices.append(val)
+    return tuple(indices)
 
 
 def _decode_monotonic_constraints(raw: JSONDict) -> tuple[int, ...] | None:
@@ -304,6 +353,7 @@ def decode_gradient_boosting_config(
     colsample_bytree = _get_optional_float(raw, "colsample_bytree")
     if colsample_bytree is not None:
         colsample_bytree = require_open_unit_float(colsample_bytree, "colsample_bytree")
+    categorical_features = _decode_categorical_features(raw)
     max_bins = require_positive_int(_require_int(raw, "max_bins"), "max_bins")
     subsample = require_unit_float(_require_float(raw, "subsample"), "subsample")
     random_state = _require_int(raw, "random_state")
@@ -341,6 +391,7 @@ def decode_gradient_boosting_config(
         min_samples_leaf=min_samples_leaf,
         max_features=max_features,
         colsample_bytree=colsample_bytree,
+        categorical_features=categorical_features,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,

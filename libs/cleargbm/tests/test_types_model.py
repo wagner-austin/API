@@ -7,16 +7,12 @@ import pytest
 from cleargbm.types import (
     GROWTH_STRATEGIES,
     OBJECTIVES,
-    DecisionTree,
     GradientBoostingConfig,
-    GradientBoostingModel,
     JSONDict,
     JSONTypeError,
-    TreeNode,
+    JSONValue,
     decode_gradient_boosting_config,
-    decode_gradient_boosting_model,
     encode_gradient_boosting_config,
-    encode_gradient_boosting_model,
     require_growth_strategy,
     require_leaf_budget,
     require_objective,
@@ -40,6 +36,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 5,
             "max_features": 3,
             "colsample_bytree": 0.7,
+            "categorical_features": (1, 3),
             "max_bins": 64,
             "subsample": 0.8,
             "random_state": 42,
@@ -63,6 +60,7 @@ class TestGradientBoostingConfig:
         assert decoded["min_samples_leaf"] == 5
         assert decoded["max_features"] == 3
         assert decoded["colsample_bytree"] == 0.7
+        assert decoded["categorical_features"] == (1, 3)
         assert decoded["max_bins"] == 64
         assert decoded["subsample"] == 0.8
         assert decoded["random_state"] == 42
@@ -84,6 +82,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -118,6 +117,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -144,6 +144,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -170,6 +171,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -196,6 +198,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -222,6 +225,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -250,6 +254,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -318,6 +323,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -345,6 +351,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -371,6 +378,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -397,6 +405,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -423,6 +432,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -454,6 +464,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -481,6 +492,7 @@ class TestGradientBoostingConfig:
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -501,37 +513,20 @@ class TestGradientBoostingConfig:
 # =============================================================================
 
 
-class TestGradientBoostingModel:
-    """Tests for GradientBoostingModel encode/decode."""
+class TestCategoricalFeaturesDecode:
+    """Validation of the categorical_features index list."""
 
-    def test_encode_decode_roundtrip(self) -> None:
-        """Encode then decode should preserve data."""
-        node: TreeNode = {
-            "node_id": 0,
-            "is_leaf": True,
-            "feature_index": None,
-            "feature_name": None,
-            "threshold": None,
-            "value": 0.5,
-            "n_samples": 100,
-            "left_child": None,
-            "right_child": None,
-            "nan_direction": None,
-        }
-        tree: DecisionTree = {
-            "nodes": (node,),
-            "max_depth": 0,
-            "n_leaves": 1,
-            "feature_names": ("x",),
-        }
-        config: GradientBoostingConfig = {
-            "n_estimators": 1,
-            "max_depth": 1,
-            "learning_rate": 0.1,
+    @staticmethod
+    def _raw(value: JSONValue) -> JSONDict:
+        return {
+            "n_estimators": 10,
+            "max_depth": 2,
+            "learning_rate": 0.5,
             "min_samples_split": 2,
             "min_samples_leaf": 1,
             "max_features": None,
             "colsample_bytree": None,
+            "categorical_features": value,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -545,41 +540,32 @@ class TestGradientBoostingModel:
             "objective": "binary_log_loss",
             "scale_pos_weight": 1.0,
         }
-        original: GradientBoostingModel = {
-            "trees": (tree,),
-            "base_prediction": -0.5,
-            "learning_rate": 0.1,
-            "feature_names": ("x",),
-            "config": config,
-        }
-        encoded = encode_gradient_boosting_model(original)
-        decoded = decode_gradient_boosting_model(encoded)
 
-        assert len(decoded["trees"]) == 1
-        assert decoded["base_prediction"] == -0.5
-        assert decoded["learning_rate"] == 0.1
-        assert decoded["feature_names"] == ("x",)
+    def test_rejects_a_non_list(self) -> None:
+        """A dict is neither a list nor null."""
+        with pytest.raises(JSONTypeError, match="categorical_features must be list or None"):
+            decode_gradient_boosting_config(self._raw({"a": 1}))
 
-    def test_decode_trees_not_list(self) -> None:
-        """trees not a list should raise TypeError."""
-        raw: JSONDict = {
-            "trees": "not a list",
-            "base_prediction": 0.0,
-            "learning_rate": 0.1,
-            "feature_names": ["x"],
-            "config": {},
-        }
-        with pytest.raises(JSONTypeError, match="trees must be list"):
-            decode_gradient_boosting_model(raw)
+    def test_rejects_an_empty_list(self) -> None:
+        """Null is the only spelling of all-numeric."""
+        with pytest.raises(ValueError, match="non-empty"):
+            decode_gradient_boosting_config(self._raw([]))
 
-    def test_decode_config_not_dict(self) -> None:
-        """config not a dict should raise TypeError."""
-        raw: JSONDict = {
-            "trees": [],
-            "base_prediction": 0.0,
-            "learning_rate": 0.1,
-            "feature_names": ["x"],
-            "config": "not a dict",
-        }
-        with pytest.raises(JSONTypeError, match="config must be dict"):
-            decode_gradient_boosting_model(raw)
+    def test_rejects_a_non_int_element(self) -> None:
+        """Strings and bools are not feature indices."""
+        with pytest.raises(JSONTypeError, match=r"categorical_features\[1\] must be int"):
+            decode_gradient_boosting_config(self._raw([0, "one"]))
+        with pytest.raises(JSONTypeError, match=r"categorical_features\[0\] must be int"):
+            decode_gradient_boosting_config(self._raw([True]))
+
+    def test_rejects_a_negative_index(self) -> None:
+        """Feature indices are non-negative."""
+        with pytest.raises(ValueError, match=r"must be >= 0, got -1"):
+            decode_gradient_boosting_config(self._raw([-1]))
+
+    def test_rejects_an_unsorted_list(self) -> None:
+        """Strictly ascending is the one canonical spelling of a set."""
+        with pytest.raises(ValueError, match="strictly ascending"):
+            decode_gradient_boosting_config(self._raw([2, 1]))
+        with pytest.raises(ValueError, match="strictly ascending"):
+            decode_gradient_boosting_config(self._raw([1, 1]))

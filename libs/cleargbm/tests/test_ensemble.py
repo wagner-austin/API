@@ -44,6 +44,7 @@ def _make_config(
         min_samples_leaf=2,
         max_features=None,
         colsample_bytree=None,
+        categorical_features=None,
         max_bins=8,
         subsample=1.0,
         random_state=42,
@@ -144,6 +145,7 @@ class TestConfigToRustDict:
             "scale_pos_weight",
             "max_features",
             "colsample_bytree",
+            "categorical_features",
         }
         assert set(result.keys()) == expected
 
@@ -198,6 +200,16 @@ class TestConfigToRustDict:
         """
         result = _config_to_rust_dict(_make_config())
         assert result["colsample_bytree"] is None
+
+    def test_forwards_categorical_features_to_the_rust_core(self) -> None:
+        """categorical_features must reach Rust as a list-or-None.
+
+        Same defect class as max_features: a dropped key here would read as
+        "all numeric" on the other side of the wire, silently training
+        threshold splits over category codes.
+        """
+        result = _config_to_rust_dict(_make_config())
+        assert result["categorical_features"] is None
 
     def test_monotonic_constraints_none_stays_none(self) -> None:
         """None constraint stays None in the dict."""

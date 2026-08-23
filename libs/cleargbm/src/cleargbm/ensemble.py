@@ -120,6 +120,11 @@ def _config_to_rust_dict(
         "scale_pos_weight": config["scale_pos_weight"],
         "max_features": config["max_features"],
         "colsample_bytree": config["colsample_bytree"],
+        "categorical_features": (
+            list(config["categorical_features"])
+            if config["categorical_features"] is not None
+            else None
+        ),
     }
 
 

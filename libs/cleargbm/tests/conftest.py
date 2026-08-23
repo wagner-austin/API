@@ -12,6 +12,7 @@ def make_config(
     min_samples_leaf: int = 1,
     max_features: int | None = None,
     colsample_bytree: float | None = None,
+    categorical_features: tuple[int, ...] | None = None,
     max_bins: int = 64,
     subsample: float = 1.0,
     random_state: int = 42,
@@ -33,6 +34,7 @@ def make_config(
         min_samples_leaf: Minimum samples in a leaf.
         max_features: Max features per split (None = all).
         colsample_bytree: Fraction of features per tree (None = all).
+        categorical_features: Feature indices treated as categorical (None = all numeric).
         max_bins: Number of histogram bins.
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -57,6 +59,7 @@ def make_config(
         min_samples_leaf=min_samples_leaf,
         max_features=max_features,
         colsample_bytree=colsample_bytree,
+        categorical_features=categorical_features,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,
