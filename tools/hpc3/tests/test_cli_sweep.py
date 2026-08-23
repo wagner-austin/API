@@ -11,6 +11,7 @@ from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 from hpc3.cli import submit as submit_cli
 from hpc3.cli import sweep as sweep_cli
 from hpc3.cli import triage as triage_cli
+from hpc3.core import _test_hooks as core_hooks
 from tests.against_hpc3 import read_ledger
 from tests.conftest import (
     PREFLIGHT_LINE,
@@ -249,7 +250,7 @@ class TestTriageCli:
         fake_run.add("date +%s", stdout="now 1000\n55519937 990\n")
 
         assert triage_cli.main(["--config", config]) == 0
-        assert emitted[-1] == "1 recorded, 1 not finished, 0 finding(s)"
+        assert emitted[-1] == "1 recorded, 1 open, 1 not finished, 0 finding(s), 0 newly closed"
 
     def test_a_healthy_finished_job_reports_nothing_wrong(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -259,7 +260,31 @@ class TestTriageCli:
         fake_run.add("squeue", stdout="")
 
         assert triage_cli.main(self._config(tmp_path)) == 0
-        assert emitted[-1] == "1 recorded, 0 not finished, 0 finding(s)"
+        assert emitted[-1] == "1 recorded, 1 open, 0 not finished, 0 finding(s), 1 newly closed"
+
+    def test_a_finished_job_is_closed_and_then_never_re_reported(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The retention bug end to end: the second run does not ask about it.
+
+        A completed job whose accounting row has aged out is, to a query,
+        indistinguishable from a job that never existed. The first run records
+        that it ended; the second never asks, so it cannot be reported.
+        """
+        self._ledger(tmp_path)
+        fake_run.add("sacct", stdout="101|abl.arm|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n")
+        fake_run.add("squeue", stdout="")
+        assert triage_cli.main(self._config(tmp_path)) == 0
+
+        # Accounting has now forgotten it -- the state after retention expires.
+        second = FakeRun()
+        core_hooks.run = second
+        second.add("sacct", stdout="")
+        second.add("squeue", stdout="")
+
+        assert triage_cli.main(self._config(tmp_path)) == 0
+        assert emitted[-1] == "1 recorded, all closed; nothing left to reconcile"
+        assert second.calls == []
 
     def test_a_blocked_job_is_found_and_exits_non_zero(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]

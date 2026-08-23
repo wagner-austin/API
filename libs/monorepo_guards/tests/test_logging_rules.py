@@ -239,22 +239,58 @@ def test_logging_rule_flags_from_logging_import_with_alias(tmp_path: Path) -> No
     assert "logging-getLogger" in kinds
 
 
-def test_logging_rule_handles_empty_import_segments(tmp_path: Path) -> None:
-    """Test that empty segments in from imports are handled correctly.
+def test_logging_rule_ignores_an_import_line_inside_a_string(tmp_path: Path) -> None:
+    """Text that looks like an import is not an import.
 
-    The malformed import is inside a string because the module has to parse:
-    the print check reads the parse tree now, and a file that cannot be parsed
-    is refused rather than reported clean. ``getLogger,  ,`` is not valid
-    Python anywhere it would actually execute, so text is the only place it
-    can appear -- and the import scan is still textual, so it reads it there.
-    That the scan sees into strings at all is the same blind spot the print
-    check just lost; it is left alone here rather than widened by accident.
+    This is the same blind spot the print check lost, closed for the import
+    scan too. A module documenting the rule it is subject to -- or building a
+    command for another interpreter -- registered as importing stdlib logging.
+    The malformed segment is what the old text scanner had a defensive branch
+    for; nothing that parses can produce it, so both are gone.
     """
-    code = 'DOC = """\nfrom logging import getLogger,  , Logger\n"""\nx = 1\n'
+    code = 'DOC = """\nfrom logging import getLogger,  , Logger\nimport logging\n"""\nx = 1\n'
     path = tmp_path / "service.py"
     _write(path, code)
 
     rule = LoggingRule()
-    violations = rule.run([path])
-    kinds = {v.kind for v in violations}
-    assert "from-logging-import" in kinds
+    assert rule.run([path]) == []
+
+
+def test_logging_rule_ignores_a_logging_call_inside_a_string(tmp_path: Path) -> None:
+    code = 'import logging\nDOC = "logging.getLogger(__name__)"\n'
+    path = tmp_path / "mentioned.py"
+    _write(path, code)
+
+    rule = LoggingRule()
+    # The import is real and still flagged; the call is only mentioned.
+    assert [v.kind for v in rule.run([path])] == ["direct-logging-import"]
+
+
+def test_logging_rule_finds_an_aliased_module_call(tmp_path: Path) -> None:
+    code = "import logging as lg\nlogger = lg.getLogger(__name__)\n"
+    path = tmp_path / "aliased.py"
+    _write(path, code)
+
+    rule = LoggingRule()
+    kinds = {v.kind for v in rule.run([path])}
+    assert kinds == {"direct-logging-import", "logging-getLogger"}
+
+
+def test_logging_rule_finds_an_aliased_function_call(tmp_path: Path) -> None:
+    code = "from logging import getLogger as gl\nlogger = gl(__name__)\n"
+    path = tmp_path / "aliased_func.py"
+    _write(path, code)
+
+    rule = LoggingRule()
+    kinds = {v.kind for v in rule.run([path])}
+    assert kinds == {"from-logging-import", "logging-getLogger"}
+
+
+def test_logging_rule_ignores_a_relative_logging_import(tmp_path: Path) -> None:
+    """``from .logging import x`` is a local module, not the stdlib one."""
+    code = "from .logging import get_logger\nlogger = get_logger(__name__)\n"
+    path = tmp_path / "relative.py"
+    _write(path, code)
+
+    rule = LoggingRule()
+    assert rule.run([path]) == []

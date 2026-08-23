@@ -166,8 +166,13 @@ def _require_object(value: JSONValue, what: str) -> dict[str, JSONValue]:
     return value
 
 
-def _require_state(obj: dict[str, JSONValue], key: str) -> JobState:
+def require_state(obj: dict[str, JSONValue], key: str) -> JobState:
     """Read and narrow a required job-state field.
+
+    Shared with :mod:`hpc3.contracts.closure`, which records the terminal
+    state a job ended in and must narrow it the same way -- a closure holding
+    a state this package does not recognise would be a job it can neither
+    report on nor stop reporting on.
 
     Args:
         obj: Object being decoded.
@@ -256,7 +261,7 @@ def decode_job_status(value: JSONValue, cluster: ClusterFacts) -> JobStatus:
         job_id=job_id,
         name=name,
         partition=require_partition(cluster, obj, "partition"),
-        state=_require_state(obj, "state"),
+        state=require_state(obj, "state"),
         elapsed_seconds=_require_nonnegative(obj, "elapsed_seconds"),
         billing_tres=_require_nonnegative(obj, "billing_tres"),
         gpu_count=_require_nonnegative(obj, "gpu_count"),
@@ -274,5 +279,6 @@ __all__ = [
     "encode_job_status",
     "gpu_hours",
     "is_terminal",
+    "require_state",
     "service_units",
 ]

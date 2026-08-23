@@ -34,7 +34,15 @@ from hpc3.core import ledger, logs
 from hpc3.core.remote import run_remote
 from hpc3.core.squeue import parse_squeue_output, squeue_command
 from hpc3.core.status import parse_sacct_output, sacct_command
-from hpc3.core.triage import Finding, blocked_jobs, live_entries, silent_jobs, unaccounted_jobs
+from hpc3.core.triage import (
+    Finding,
+    blocked_jobs,
+    closures_for,
+    live_entries,
+    open_entries,
+    silent_jobs,
+    unaccounted_jobs,
+)
 
 _FLAGS = (_config.CONFIG_FLAG,)
 
@@ -65,9 +73,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     host = workspace["host"]
     quiet_seconds = workspace["quiet_seconds"]
 
-    entries = ledger.read(pathlib.Path(workspace["ledger"]), cluster)
-    if entries == []:
+    ledger_path = pathlib.Path(workspace["ledger"])
+    closures_path = ledger.closure_path(ledger_path)
+
+    recorded = ledger.read(ledger_path, cluster)
+    if recorded == []:
         _test_hooks.emit("ledger is empty; nothing has been submitted from this machine")
+        return 0
+
+    # Jobs already observed to have ended are not asked about again. Without
+    # this, every job older than the cluster's sacct retention window becomes
+    # a permanent 'unaccounted' finding, and a board that is always red is the
+    # same as no board.
+    closed = ledger.read_closures(closures_path)
+    entries = open_entries(recorded, closed)
+    if entries == []:
+        _test_hooks.emit(f"{len(recorded)} recorded, all closed; nothing left to reconcile")
         return 0
 
     job_ids = [entry["job_id"] for entry in entries]
@@ -88,8 +109,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{finding.kind.upper()} {finding.job_id} {finding.name}: {finding.detail}"
         )
 
+    # Written AFTER the findings are built, so this run still reports on a job
+    # it is closing, and only then stops asking. Recorded whatever the verdict
+    # was: a job that ended is a job accounting will eventually forget.
+    newly_closed = closures_for(statuses, closed_at=_test_hooks.now_iso())
+    for closure in newly_closed:
+        ledger.append_closure(closures_path, closure)
+
     _test_hooks.emit(
-        f"{len(entries)} recorded, {len(still_live)} not finished, {len(findings)} finding(s)"
+        f"{len(recorded)} recorded, {len(entries)} open, {len(still_live)} not finished, "
+        f"{len(findings)} finding(s), {len(newly_closed)} newly closed"
     )
     return 1 if findings != [] else 0
 

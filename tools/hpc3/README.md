@@ -352,6 +352,25 @@ anything is found.
   age is measured against the cluster's own clock; a few minutes of skew would
   either invent staleness or hide it.
 
+### Closures: why `unaccounted` doesn't rot
+
+`sacct` retention is finite. A job that ran perfectly a month ago eventually
+has no accounting row — which is character-for-character the same observation
+as a job that never existed. Left alone, every old job becomes a permanent
+`unaccounted` finding, the count climbs without bound, and triage exits
+non-zero forever. A board that is always red is the same as no board.
+
+So the moment accounting reports a terminal state, triage writes it to
+`<ledger>.closed` and never asks about that job again. The closure is written
+*after* the findings are built, so the run that closes a job still reports on
+it. Failures close exactly as successes do — accounting forgets both on the
+same schedule.
+
+A job that vanished before triage ever saw it end has no closure and stays
+reportable forever, which is correct: that is the case the finding exists for.
+The corollary is that triage has to run at least once inside the retention
+window for a job to close cleanly.
+
 ---
 
 ## Commands

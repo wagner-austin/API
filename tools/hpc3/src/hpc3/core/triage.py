@@ -20,8 +20,9 @@ which by construction excludes the ones that went missing.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
+from hpc3.contracts.closure import Closure
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.pending import PendingJob, is_blocked
 from hpc3.contracts.status import JobStatus, is_terminal
@@ -71,17 +72,61 @@ def blocked_jobs(pending: Sequence[PendingJob]) -> list[Finding]:
     ]
 
 
+def open_entries(
+    entries: Sequence[LedgerEntry], closures: Mapping[str, Closure]
+) -> list[LedgerEntry]:
+    """Narrow the ledger to jobs not already known to have ended.
+
+    Args:
+        entries: Everything the local ledger holds.
+        closures: Jobs previously observed in a terminal state.
+
+    Returns:
+        Only the entries still worth asking the cluster about. This is what
+        keeps ``unaccounted`` honest as a ledger ages: ``sacct`` retention is
+        finite, so a job that ran perfectly a month ago eventually has no
+        accounting row, which is indistinguishable from a job that never
+        existed. Once a closure is recorded the question is never asked again,
+        so the finding cannot come back and the query does not grow without
+        bound either.
+    """
+    return [entry for entry in entries if entry["job_id"] not in closures]
+
+
+def closures_for(statuses: Sequence[JobStatus], *, closed_at: str) -> list[Closure]:
+    """Build a closure for every job accounting now reports as finished.
+
+    Args:
+        statuses: Accounting rows just read.
+        closed_at: ISO-8601 timestamp of this observation, supplied by the
+            caller so this function reads no clock.
+
+    Returns:
+        One closure per terminal row, in the order reported. ``REQUEUED`` is
+        not terminal and produces none: the job is going back to the queue,
+        which is protection working rather than the run ending.
+    """
+    return [
+        Closure(job_id=status["job_id"], state=status["state"], closed_at=closed_at)
+        for status in statuses
+        if is_terminal(status["state"])
+    ]
+
+
 def unaccounted_jobs(
     entries: Sequence[LedgerEntry], statuses: Sequence[JobStatus]
 ) -> list[Finding]:
     """Find submitted jobs the cluster has never reported on.
 
     Args:
-        entries: Everything the local ledger holds.
+        entries: Ledger entries still open -- see :func:`open_entries`. Passing
+            the whole ledger would report every job older than the cluster's
+            ``sacct`` retention window, which is the same observation as a job
+            that never existed and is not the same event.
         statuses: Accounting rows the cluster returned for those ids.
 
     Returns:
-        One finding per ledger entry with no accounting row. This is the
+        One finding per open ledger entry with no accounting row. This is the
         condition no cluster-side query can detect, because the evidence is
         precisely the absence of a cluster-side record.
     """
@@ -157,7 +202,9 @@ def live_entries(
 __all__ = [
     "Finding",
     "blocked_jobs",
+    "closures_for",
     "live_entries",
+    "open_entries",
     "silent_jobs",
     "unaccounted_jobs",
 ]

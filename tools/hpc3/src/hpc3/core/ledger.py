@@ -18,6 +18,7 @@ from collections.abc import Sequence
 
 from platform_core.json_utils import dump_json_str, load_json_str
 
+from hpc3.contracts.closure import Closure, decode_closure, encode_closure
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.ledger import LedgerEntry, decode_ledger_entry, encode_ledger_entry
 from hpc3.core import _test_hooks
@@ -66,6 +67,61 @@ def read(path: pathlib.Path, cluster: ClusterFacts) -> list[LedgerEntry]:
     ]
 
 
+def closure_path(ledger: pathlib.Path) -> pathlib.Path:
+    """Locate the closure record belonging to a ledger.
+
+    Derived rather than configured, for the same reason the ledger itself is
+    not a flag: two files that must describe the same set of jobs should not
+    be separately addressable.
+
+    Args:
+        ledger: The ledger file.
+
+    Returns:
+        A sibling file named after it.
+    """
+    return ledger.with_name(ledger.name + ".closed")
+
+
+def append_closure(path: pathlib.Path, closure: Closure) -> None:
+    """Record that a job was observed to have ended.
+
+    Args:
+        path: Closure file. Created, with its parent directories, if absent.
+        closure: What ended, how, and when it was noticed.
+    """
+    line = dump_json_str(encode_closure(closure)) + "\n"
+    _test_hooks.append_text(path, line)
+
+
+def read_closures(path: pathlib.Path) -> dict[str, Closure]:
+    """Read every closure, keyed by job id.
+
+    Args:
+        path: Closure file.
+
+    Returns:
+        The most recent closure per job. Later records win, so a file that
+        somehow holds a job twice resolves rather than raising -- unlike the
+        ledger, a duplicate here is harmless: both records say the job ended.
+
+    Raises:
+        JSONTypeError: If a line is not a valid closure. Skipping it would
+            silently resurrect a finished job as an unaccounted finding.
+        InvalidJsonError: If a line is not valid JSON.
+    """
+    if not _test_hooks.file_exists(path):
+        return {}
+    text = _test_hooks.read_bytes(path).decode("utf-8")
+    closures: dict[str, Closure] = {}
+    for line in text.splitlines():
+        if line.strip() == "":
+            continue
+        closure = decode_closure(load_json_str(line))
+        closures[closure["job_id"]] = closure
+    return closures
+
+
 def unfinished(entries: Sequence[LedgerEntry], finished_ids: Sequence[str]) -> list[LedgerEntry]:
     """List recorded jobs that accounting has not reported as finished.
 
@@ -82,4 +138,11 @@ def unfinished(entries: Sequence[LedgerEntry], finished_ids: Sequence[str]) -> l
     return [entry for entry in entries if entry["job_id"] not in done]
 
 
-__all__ = ["append", "read", "unfinished"]
+__all__ = [
+    "append",
+    "append_closure",
+    "closure_path",
+    "read",
+    "read_closures",
+    "unfinished",
+]
