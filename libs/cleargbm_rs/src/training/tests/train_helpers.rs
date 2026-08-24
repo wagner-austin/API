@@ -75,6 +75,7 @@ pub(super) fn default_params() -> GradientBoostingConfigParams {
         lambdarank_truncation_level: None,
         goss_top_rate: None,
         goss_other_rate: None,
+        quantized_gradient_bins: None,
     }
 }
 

@@ -15,13 +15,15 @@ use super::super::config::{
     GradientBoostingConfig, GradientBoostingConfigParams, GrowthStrategy, Objective,
 };
 
+use super::config_fields::{GradientBoostingConfigField, GRADIENT_BOOSTING_CONFIG_FIELDS};
+
 impl Serialize for GradientBoostingConfig {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 23) {
+        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 24) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -123,147 +125,13 @@ impl Serialize for GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match state.serialize_field("quantized_gradient_bins", &self.quantized_gradient_bins()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
         state.end()
     }
 }
-
-/// Field identifiers for `GradientBoostingConfig` deserialization.
-///
-/// `pub(crate)` because it is the `Value` type of the `pub(crate)`
-/// [`GradientBoostingConfigFieldVisitor`].
-pub(crate) enum GradientBoostingConfigField {
-    /// The number of boosting iterations.
-    NEstimators,
-    /// The maximum tree depth.
-    MaxDepth,
-    /// The learning rate.
-    LearningRate,
-    /// The minimum samples required to split a node.
-    MinSamplesSplit,
-    /// The minimum samples per leaf.
-    MinSamplesLeaf,
-    /// The maximum number of histogram bins per feature.
-    MaxBins,
-    /// The row-subsampling fraction.
-    Subsample,
-    /// The random seed.
-    RandomState,
-    /// The per-feature monotonic constraints (optional).
-    MonotonicConstraints,
-    /// The L1 regularization term.
-    RegAlpha,
-    /// The L2 regularization term.
-    RegLambda,
-    /// The early stopping patience (optional).
-    EarlyStoppingRounds,
-    /// The tree growth policy.
-    GrowthStrategy,
-    /// The leaf budget (optional; set exactly under leaf-wise growth).
-    NumLeaves,
-    /// The training objective.
-    Objective,
-    /// The positive-class weight (optional; set exactly under binary log
-    /// loss).
-    ScalePosWeight,
-    /// The per-split feature budget (optional).
-    MaxFeatures,
-    /// The per-tree feature fraction (optional).
-    ColsampleBytree,
-    /// The categorical feature indices (optional).
-    CategoricalFeatures,
-    /// The class count (optional).
-    NClasses,
-    /// The NDCG truncation position (optional).
-    LambdarankTruncationLevel,
-    /// The GOSS top rate (optional).
-    GossTopRate,
-    /// The GOSS other rate (optional).
-    GossOtherRate,
-}
-
-/// Visitor for deserializing `GradientBoostingConfigField` from string.
-///
-/// `pub(crate)` so [`crate::training::tests`] can drive its `expecting`
-/// formatter directly, matching the convention in [`crate::types::serde_impl`].
-pub(crate) struct GradientBoostingConfigFieldVisitor;
-
-impl<'de> Visitor<'de> for GradientBoostingConfigFieldVisitor {
-    type Value = GradientBoostingConfigField;
-
-    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        formatter.write_str("field identifier")
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        match value {
-            "n_estimators" => Ok(GradientBoostingConfigField::NEstimators),
-            "max_depth" => Ok(GradientBoostingConfigField::MaxDepth),
-            "learning_rate" => Ok(GradientBoostingConfigField::LearningRate),
-            "min_samples_split" => Ok(GradientBoostingConfigField::MinSamplesSplit),
-            "min_samples_leaf" => Ok(GradientBoostingConfigField::MinSamplesLeaf),
-            "max_bins" => Ok(GradientBoostingConfigField::MaxBins),
-            "subsample" => Ok(GradientBoostingConfigField::Subsample),
-            "random_state" => Ok(GradientBoostingConfigField::RandomState),
-            "monotonic_constraints" => Ok(GradientBoostingConfigField::MonotonicConstraints),
-            "reg_alpha" => Ok(GradientBoostingConfigField::RegAlpha),
-            "reg_lambda" => Ok(GradientBoostingConfigField::RegLambda),
-            "early_stopping_rounds" => Ok(GradientBoostingConfigField::EarlyStoppingRounds),
-            "growth_strategy" => Ok(GradientBoostingConfigField::GrowthStrategy),
-            "num_leaves" => Ok(GradientBoostingConfigField::NumLeaves),
-            "objective" => Ok(GradientBoostingConfigField::Objective),
-            "scale_pos_weight" => Ok(GradientBoostingConfigField::ScalePosWeight),
-            "max_features" => Ok(GradientBoostingConfigField::MaxFeatures),
-            "colsample_bytree" => Ok(GradientBoostingConfigField::ColsampleBytree),
-            "categorical_features" => Ok(GradientBoostingConfigField::CategoricalFeatures),
-            "n_classes" => Ok(GradientBoostingConfigField::NClasses),
-            "lambdarank_truncation_level" => {
-                Ok(GradientBoostingConfigField::LambdarankTruncationLevel)
-            }
-            "goss_top_rate" => Ok(GradientBoostingConfigField::GossTopRate),
-            "goss_other_rate" => Ok(GradientBoostingConfigField::GossOtherRate),
-            _ => Err(E::unknown_field(value, GRADIENT_BOOSTING_CONFIG_FIELDS)),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for GradientBoostingConfigField {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_identifier(GradientBoostingConfigFieldVisitor)
-    }
-}
-
-/// Field names for `GradientBoostingConfig` serialization.
-const GRADIENT_BOOSTING_CONFIG_FIELDS: &[&str] = &[
-    "n_estimators",
-    "max_depth",
-    "learning_rate",
-    "min_samples_split",
-    "min_samples_leaf",
-    "max_bins",
-    "subsample",
-    "random_state",
-    "monotonic_constraints",
-    "reg_alpha",
-    "reg_lambda",
-    "early_stopping_rounds",
-    "growth_strategy",
-    "num_leaves",
-    "objective",
-    "scale_pos_weight",
-    "max_features",
-    "colsample_bytree",
-    "categorical_features",
-    "n_classes",
-    "lambdarank_truncation_level",
-    "goss_top_rate",
-    "goss_other_rate",
-];
 
 impl<'de> Deserialize<'de> for GradientBoostingConfig {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -306,6 +174,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                 let mut lambdarank_truncation_level: Option<Option<usize>> = None;
                 let mut goss_top_rate: Option<Option<f64>> = None;
                 let mut goss_other_rate: Option<Option<f64>> = None;
+                let mut quantized_gradient_bins: Option<Option<usize>> = None;
 
                 loop {
                     let key: Option<GradientBoostingConfigField> = match map.next_key() {
@@ -455,6 +324,12 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                                 Err(e) => return Err(e),
                             });
                         }
+                        GradientBoostingConfigField::QuantizedGradientBins => {
+                            quantized_gradient_bins = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
                     }
                 }
 
@@ -550,6 +425,10 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("goss_other_rate")),
                 };
+                let quantized_gradient_bins = match quantized_gradient_bins {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("quantized_gradient_bins")),
+                };
 
                 let params = GradientBoostingConfigParams {
                     n_estimators,
@@ -575,6 +454,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     lambdarank_truncation_level,
                     goss_top_rate,
                     goss_other_rate,
+                    quantized_gradient_bins,
                 };
                 match GradientBoostingConfig::new(params) {
                     Ok(cfg) => Ok(cfg),

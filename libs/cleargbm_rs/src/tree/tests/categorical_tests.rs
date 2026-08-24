@@ -71,7 +71,8 @@ fn test_dispatcher_propagates_a_categorical_search_error() -> Result<(), ClearGb
     // the categorical finder error; the dispatcher must surface it intact.
     use crate::types::{HistogramBuffer, SplitConfig};
 
-    let histograms = vec![HistogramBuffer::new(3_usize)];
+    let histograms =
+        super::super::histograms::NodeHistograms::Float(vec![HistogramBuffer::new(3_usize)]);
     let config = propagate!(SplitConfig::new(
         2_usize, 1_usize, 8_usize, 0.0_f64, 0.0_f64
     ));

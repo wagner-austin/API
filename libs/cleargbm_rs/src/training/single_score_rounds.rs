@@ -16,16 +16,30 @@ use crate::losses::{binary_log_loss, sigmoid_array, squared_error_loss};
 use crate::predict::predict_tree;
 use crate::tree::{
     build_tree_leaf_wise_with_leaf_assignment, build_tree_with_leaf_assignment,
-    select_tree_features, BuildTreeInput, FeatureSubsample, Tree,
+    select_tree_features, BuildTreeInput, FeatureSubsample, QuantizedTreeData, Tree,
 };
 
 use super::config::{GradientBoostingConfig, GrowthStrategy};
 use super::early_stopping::EarlyStoppingState;
 use super::goss::{goss_sample_indices, GossRates};
 use super::labels::ResolvedObjective;
+use super::quantize::{
+    discretize_gradients, generate_rounding_randoms, rotation_offset, DiscretizeRequest,
+    QuantRoundingRandoms,
+};
 use super::rng::SimpleRng;
 use super::setup::PreparedTraining;
 use super::subsampling::get_sample_indices;
+
+/// The run-scoped quantization state: the knob's bin count and the
+/// pre-generated rounding randoms, both pure functions of the config
+/// (and the row count), created once before the rounds.
+struct QuantRunState {
+    /// The `quantized_gradient_bins` value.
+    n_quant_bins: usize,
+    /// The pre-generated per-row rounding randoms.
+    randoms: QuantRoundingRandoms,
+}
 
 /// Everything one single-score boosting run needs, borrowed from its
 /// caller: the data, the resolved objective, the running score buffers,
@@ -85,6 +99,17 @@ pub(super) fn run_single_score_rounds(
     let tree_column_budget = run.prepared.tree_column_budget;
 
     let mut trees: Vec<Tree> = Vec::with_capacity(run.n_rounds);
+
+    // Quantized training's run state: generated once, before any round.
+    // The randoms are a pure function of (random_state, n_train), so a
+    // continuation regenerates exactly the vectors the fresh run had —
+    // one of the two properties (with the pure per-round rotation
+    // offset) that keep split training exact under quantization.
+    let quant_state: Option<QuantRunState> =
+        config.quantized_gradient_bins().map(|bins| QuantRunState {
+            n_quant_bins: bins,
+            randoms: generate_rounding_randoms(config.random_state(), n_train),
+        });
 
     for round in 0_usize..run.n_rounds {
         // a/b. Compute gradients and hessians under the objective
@@ -234,6 +259,42 @@ pub(super) fn run_single_score_rounds(
             }
         };
 
+        // c2. Quantized training: discretize this round's (post-GOSS)
+        // gradients and hessians into the interleaved int8 stream. The
+        // rotation offset is a pure function of (random_state, global
+        // round), so continuation rounds discretize exactly as the
+        // fresh run's same-numbered rounds do. The scan and the stream
+        // cover ALL rows (LightGBM's shape); the tree reads only the
+        // sampled ones.
+        let quantized_round = match quant_state.as_ref() {
+            Some(qs) => {
+                let round_for_offset = u64::try_from(round + run.round_offset).unwrap_or(u64::MAX);
+                let offset = propagate!(rotation_offset(
+                    config.random_state(),
+                    round_for_offset,
+                    n_train,
+                ));
+                Some(discretize_gradients(DiscretizeRequest {
+                    gradients: &gradients,
+                    hessians: &hessians,
+                    n_quant_bins: qs.n_quant_bins,
+                    randoms: &qs.randoms,
+                    offset,
+                }))
+            }
+            None => None,
+        };
+        let quantized_data: Option<QuantizedTreeData<'_>> =
+            match (quantized_round.as_ref(), quant_state.as_ref()) {
+                (Some(q), Some(qs)) => Some(QuantizedTreeData {
+                    packed_int8: &q.packed_int8,
+                    grad_scale: q.scales.grad_scale,
+                    hess_scale: q.scales.hess_scale,
+                    n_quant_bins: qs.n_quant_bins,
+                }),
+                _ => None,
+            };
+
         // d. Build tree input. The feature-subsample seed mixes the
         // GLOBAL tree index (the boosting round plus the continuation
         // offset) into the run seed so the same node id draws a different
@@ -269,6 +330,7 @@ pub(super) fn run_single_score_rounds(
             feature_subsample,
             tree_feature_mask: tree_mask.as_deref(),
             categorical: categorical_layout,
+            quantized: quantized_data,
         };
 
         // e. Build tree (and capture per-sample leaf assignments as a

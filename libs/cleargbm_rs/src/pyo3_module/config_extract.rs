@@ -104,6 +104,10 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
     let lambdarank_truncation_level = propagate!(extract_lambdarank_truncation_level(dict));
     let goss_top_rate = propagate!(extract_optional_f64_required_key(dict, "goss_top_rate"));
     let goss_other_rate = propagate!(extract_optional_f64_required_key(dict, "goss_other_rate"));
+    let quantized_gradient_bins = propagate!(extract_optional_usize_required_key(
+        dict,
+        "quantized_gradient_bins"
+    ));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -129,6 +133,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
         lambdarank_truncation_level,
         goss_top_rate,
         goss_other_rate,
+        quantized_gradient_bins,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))
@@ -289,6 +294,40 @@ fn extract_optional_f64_required_key(dict: &Bound<'_, PyDict>, key: &str) -> PyR
     }
 
     let val: f64 = propagate!(item.extract());
+    Ok(Some(val))
+}
+
+/// Extracts an optional non-negative integer under a required key.
+///
+/// The key must be present; its value may be `None` or a non-negative
+/// integer. Same presence contract as `n_classes`: an absent key would
+/// silently read as "off". Used by `quantized_gradient_bins`.
+///
+/// # Errors
+///
+/// Returns `PyErr` if the key is missing or the value is neither `None`
+/// nor a non-negative integer.
+fn extract_optional_usize_required_key(
+    dict: &Bound<'_, PyDict>,
+    key: &str,
+) -> PyResult<Option<usize>> {
+    let opt = propagate!(dict.get_item(key));
+    let item = match opt {
+        Some(v) => v,
+        None => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: key.to_string(),
+                reason: format!("missing required key '{key}'"),
+            }
+            .into())
+        }
+    };
+
+    if item.is_none() {
+        return Ok(None);
+    }
+
+    let val: usize = propagate!(item.extract());
     Ok(Some(val))
 }
 

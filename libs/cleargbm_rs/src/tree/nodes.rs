@@ -9,9 +9,10 @@
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::split::SplitDecision;
-use crate::types::{CategoricalNodeConfig, HistogramBuffer, TreeNode, TreeNodeConfig};
+use crate::types::{CategoricalNodeConfig, TreeNode, TreeNodeConfig};
 
 use super::categorical::CategoricalLayout;
+use super::histograms::NodeHistograms;
 
 /// Epsilon for floating-point comparisons.
 pub(crate) const EPSILON: f64 = 1e-10_f64;
@@ -34,7 +35,7 @@ pub(super) struct PendingNode {
     pub(super) is_left_child: bool,
 
     /// Cached histograms from parent's sibling subtraction (for 2x speedup).
-    pub(super) cached_histograms: Option<Vec<HistogramBuffer>>,
+    pub(super) cached_histograms: Option<NodeHistograms>,
 }
 
 /// Internal struct for building tree nodes before finalization.

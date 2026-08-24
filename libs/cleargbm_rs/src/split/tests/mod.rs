@@ -8,6 +8,7 @@ mod helpers;
 mod histogram_split_tests;
 mod monotonic_tests;
 mod nan_direction_tests;
+mod quantized_split_tests;
 mod serde_result_deser_tests;
 mod serde_result_tests;
 mod serde_tests;

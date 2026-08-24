@@ -33,6 +33,7 @@
 //! ```
 
 use crate::error::ClearGbmError;
+use crate::histogram::quantized::{QuantizedNodeHistogramRequest, QuantizedNodeHistograms};
 use crate::histogram::NodeHistogramRequest;
 use crate::types::HistogramBuffer;
 
@@ -58,6 +59,14 @@ pub struct Hooks {
     /// wrapped in `Ok(...)`.
     pub build_node_histograms:
         fn(NodeHistogramRequest<'_>) -> Result<Vec<HistogramBuffer>, ClearGbmError>,
+
+    /// Hook for building one node's packed integer histograms under
+    /// quantized training.
+    ///
+    /// Default: [`crate::histogram::quantized::build_quantized_node_histograms`]
+    /// wrapped in `Ok(...)`.
+    pub build_node_histograms_quantized:
+        fn(QuantizedNodeHistogramRequest<'_>) -> Result<QuantizedNodeHistograms, ClearGbmError>,
 
     /// Optional error to inject in finalize_nodes.
     ///
@@ -90,6 +99,9 @@ impl Default for Hooks {
             build_node_histograms: |request| {
                 Ok(crate::histogram::build_node_histograms_single_pass(request))
             },
+            build_node_histograms_quantized: |request| {
+                Ok(crate::histogram::quantized::build_quantized_node_histograms(request))
+            },
             finalize_nodes_error: None,
             build_pool: |threads| {
                 rayon::ThreadPoolBuilder::new()
@@ -114,6 +126,32 @@ impl Hooks {
     ) -> Self {
         Self {
             build_node_histograms,
+            ..Self::default()
+        }
+    }
+
+    /// Creates hooks with a custom quantized histogram builder.
+    ///
+    /// The quantized sibling of [`Self::with_histogram_builder`], used by
+    /// error-injection tests to force the quantized tree paths'
+    /// error-propagation arms.
+    ///
+    /// # Args
+    ///
+    /// * `build_node_histograms_quantized` - Replacement quantized builder.
+    ///
+    /// # Returns
+    ///
+    /// Hooks with the default float builder and the supplied quantized one.
+    #[must_use]
+    pub fn with_quantized_histogram_builder(
+        build_node_histograms_quantized: fn(
+            QuantizedNodeHistogramRequest<'_>,
+        )
+            -> Result<QuantizedNodeHistograms, ClearGbmError>,
+    ) -> Self {
+        Self {
+            build_node_histograms_quantized,
             ..Self::default()
         }
     }

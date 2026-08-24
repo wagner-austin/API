@@ -46,6 +46,7 @@ fn test_leaf_wise_rejects_empty_sample_indices() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     match build_tree_leaf_wise(&input, &Hooks::default()) {
@@ -90,6 +91,7 @@ fn grow_with_hooks(
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     build_tree_leaf_wise_with_leaf_assignment(&input, hooks)
@@ -233,6 +235,7 @@ fn test_leaf_wise_handles_an_unsplittable_root() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let (tree, _assignment) =
@@ -273,6 +276,7 @@ fn test_build_tree_leaf_wise_discards_the_assignment() -> Result<(), ClearGbmErr
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let tree = match build_tree_leaf_wise(&input, &Hooks::default()) {

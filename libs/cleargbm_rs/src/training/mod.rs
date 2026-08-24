@@ -11,6 +11,7 @@
 //! - [`GradientBoostingModel`] wraps the trained ensemble for prediction
 
 pub(crate) mod config;
+mod config_rules;
 mod continue_training;
 pub(crate) mod early_stopping;
 mod goss;
@@ -19,6 +20,7 @@ pub(crate) mod labels;
 pub(crate) mod model;
 pub(crate) mod objective_enums;
 pub(crate) mod parallelism;
+mod quantize;
 pub(crate) mod rng;
 pub(crate) mod serde_impl;
 pub(crate) mod setup;

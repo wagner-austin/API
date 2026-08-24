@@ -22,6 +22,9 @@
 use crate::error::ClearGbmError;
 use crate::types::HistogramBuffer;
 
+/// Packed integer histograms for quantized training.
+pub mod quantized;
+
 /// The inputs one single-pass all-features node build needs.
 ///
 /// The row-major sibling of [`HistogramRequest`]: instead of one feature's

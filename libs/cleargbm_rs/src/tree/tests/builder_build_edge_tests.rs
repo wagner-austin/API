@@ -42,6 +42,7 @@ fn test_build_tree_no_features() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -88,6 +89,7 @@ fn test_build_tree_bins_shape_mismatch() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -132,6 +134,7 @@ fn test_build_tree_with_monotonic_constraints() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     // Should succeed (constraint may or may not affect the split)
@@ -175,6 +178,7 @@ fn test_build_tree_with_l1_regularization() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let _ = match build_tree(&input, &Hooks::default()) {
@@ -220,6 +224,7 @@ fn test_build_tree_left_larger_than_right() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -273,6 +278,7 @@ fn test_build_tree_deep_tree() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -353,6 +359,7 @@ fn test_build_tree_child_histogram_error() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     // Inject hook that fails on child histogram building
@@ -423,6 +430,7 @@ fn test_build_tree_subtract_histogram_error() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     // Inject hook that returns wrong-sized histogram

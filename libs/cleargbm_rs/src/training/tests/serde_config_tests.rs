@@ -35,6 +35,7 @@ const CONFIG_FIELDS: &[&str] = &[
     "lambdarank_truncation_level",
     "goss_top_rate",
     "goss_other_rate",
+    "quantized_gradient_bins",
 ];
 
 // =============================================================================

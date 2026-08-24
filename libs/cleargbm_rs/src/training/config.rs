@@ -1,9 +1,13 @@
 //! Training configuration for gradient boosting.
 //!
 //! Validated configuration struct with accessors for all hyperparameters.
+//! The validation rulebook lives in [`super::config_rules`]; construction
+//! here runs every rule before a config can exist.
 
 use crate::error::ClearGbmError;
 use crate::split::MonotonicConstraint;
+
+use super::config_rules;
 
 pub use super::objective_enums::{GrowthStrategy, Objective};
 
@@ -47,8 +51,8 @@ pub struct GradientBoostingConfigParams {
     pub objective: Objective,
     /// Weight applied to positive samples in the loss, its gradients and
     /// the base score. Must be `Some(w)` with `w` finite and positive under
-    /// `BinaryLogLoss` (`1.0` = unweighted) and `None` under `SquaredError`,
-    /// which has no positive class to weight.
+    /// `BinaryLogLoss` (`1.0` = unweighted) and `None` under every other
+    /// objective, which has no positive class to weight.
     pub scale_pos_weight: Option<f64>,
     /// Features each split may consider (None = all; Some(k) with k >= 1).
     /// The k <= n_features bound is checked at train time where the
@@ -85,6 +89,13 @@ pub struct GradientBoostingConfigParams {
     /// GOSS other rate: the fraction of the remaining rows sampled and
     /// reweighted by `(1 - top) / other`. See `goss_top_rate`.
     pub goss_other_rate: Option<f64>,
+    /// Quantized-training bin count (None = float histograms; Some(b)
+    /// with b even, in [2, 126]). When set, per-round gradients and
+    /// hessians are stochastically rounded into `b` integer levels and
+    /// histograms accumulate packed integers; leaf values always come
+    /// from the original floats. Single-score objectives only, and
+    /// exclusive with `categorical_features`.
+    pub quantized_gradient_bins: Option<usize>,
 }
 
 /// Configuration for gradient boosting training.
@@ -141,6 +152,8 @@ pub struct GradientBoostingConfig {
     goss_top_rate: Option<f64>,
     /// GOSS other rate, paired with `goss_top_rate` (both-or-neither).
     goss_other_rate: Option<f64>,
+    /// Quantized-training bin count (None = float histograms).
+    quantized_gradient_bins: Option<usize>,
 }
 
 impl GradientBoostingConfig {
@@ -152,8 +165,34 @@ impl GradientBoostingConfig {
     ///
     /// # Errors
     ///
-    /// Returns `ClearGbmError::InvalidParameter` if any field is out of range.
+    /// Returns `ClearGbmError::InvalidParameter` if any field is out of
+    /// range or violates a pairing rule (see [`super::config_rules`]).
     pub fn new(params: GradientBoostingConfigParams) -> Result<Self, ClearGbmError> {
+        match config_rules::validate_scalar_ranges(&params) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match config_rules::validate_objective_pairings(&params) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match config_rules::validate_goss(&params) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match config_rules::validate_feature_axes(&params) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match config_rules::validate_growth(&params) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match config_rules::validate_quantized(&params) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+
         let GradientBoostingConfigParams {
             n_estimators,
             max_depth,
@@ -178,327 +217,8 @@ impl GradientBoostingConfig {
             lambdarank_truncation_level,
             goss_top_rate,
             goss_other_rate,
+            quantized_gradient_bins,
         } = params;
-
-        if n_estimators < 1_usize {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "n_estimators".to_string(),
-                reason: "must be >= 1".to_string(),
-            });
-        }
-        if max_depth < 1_usize {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "max_depth".to_string(),
-                reason: "must be >= 1".to_string(),
-            });
-        }
-        if learning_rate <= 0.0_f64 || learning_rate > 1.0_f64 {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "learning_rate".to_string(),
-                reason: format!("must be in (0.0, 1.0], got {learning_rate}"),
-            });
-        }
-        if min_samples_split < 2_usize {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "min_samples_split".to_string(),
-                reason: "must be >= 2".to_string(),
-            });
-        }
-        if min_samples_leaf < 1_usize {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "min_samples_leaf".to_string(),
-                reason: "must be >= 1".to_string(),
-            });
-        }
-        if max_bins < 2_usize {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "max_bins".to_string(),
-                reason: "must be >= 2".to_string(),
-            });
-        }
-        // Bin indices are packed into u8 for cache-line density
-        // (see FeatureBins storage layout). Enforce the u8 upper bound
-        // here so downstream code can rely on it without another check.
-        if max_bins > 255_usize {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "max_bins".to_string(),
-                reason: format!("must be <= 255 (u8 bin index), got {max_bins}"),
-            });
-        }
-        if subsample <= 0.0_f64 || subsample > 1.0_f64 {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "subsample".to_string(),
-                reason: format!("must be in (0.0, 1.0], got {subsample}"),
-            });
-        }
-        if reg_alpha < 0.0_f64 {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "reg_alpha".to_string(),
-                reason: format!("must be >= 0.0, got {reg_alpha}"),
-            });
-        }
-        if reg_lambda < 0.0_f64 {
-            return Err(ClearGbmError::InvalidParameter {
-                name: "reg_lambda".to_string(),
-                reason: format!("must be >= 0.0, got {reg_lambda}"),
-            });
-        }
-        if let Some(rounds) = early_stopping_rounds {
-            if rounds < 1_usize {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "early_stopping_rounds".to_string(),
-                    reason: "must be >= 1 when set".to_string(),
-                });
-            }
-        }
-        // `scale_pos_weight` is paired with the objective rather than merely
-        // ignored under the wrong one — same rule as `num_leaves` below. A
-        // class weight silently doing nothing under squared error would be a
-        // config field training does not honour.
-        match (objective, scale_pos_weight) {
-            (Objective::BinaryLogLoss, None) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "scale_pos_weight".to_string(),
-                    reason: "must be set when objective is \"binary_log_loss\"; state 1.0 \
-                             explicitly for unweighted training"
-                        .to_string(),
-                })
-            }
-            (Objective::BinaryLogLoss, Some(w)) => {
-                if !w.is_finite() || w <= 0.0_f64 {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "scale_pos_weight".to_string(),
-                        reason: format!("must be a finite positive number, got {w}"),
-                    });
-                }
-            }
-            (Objective::SquaredError, Some(w)) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "scale_pos_weight".to_string(),
-                    reason: format!(
-                        "must be unset when objective is \"squared_error\" (got {w}); squared \
-                         error has no positive class to weight"
-                    ),
-                })
-            }
-            (Objective::SquaredError, None) => {}
-            (Objective::MulticlassSoftmax, Some(w)) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "scale_pos_weight".to_string(),
-                    reason: format!(
-                        "must be unset when objective is \"multiclass_softmax\" (got {w}); \
-                         softmax has no single positive class to weight"
-                    ),
-                })
-            }
-            (Objective::MulticlassSoftmax, None) => {}
-            (Objective::LambdaRank, Some(w)) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "scale_pos_weight".to_string(),
-                    reason: format!(
-                        "must be unset when objective is \"lambdarank\" (got {w}); ranking \
-                         weighs rows via sample_weight, not a two-class ratio"
-                    ),
-                })
-            }
-            (Objective::LambdaRank, None) => {}
-        }
-        // `n_classes` is paired with the objective the same way: stated
-        // exactly when softmax needs it, never carried decoratively.
-        match (objective, n_classes) {
-            (Objective::MulticlassSoftmax, None) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "n_classes".to_string(),
-                    reason: "must be set when objective is \"multiclass_softmax\"".to_string(),
-                })
-            }
-            (Objective::MulticlassSoftmax, Some(k)) => {
-                if k < 2_usize {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "n_classes".to_string(),
-                        reason: format!("must be >= 2, got {k}"),
-                    });
-                }
-            }
-            (
-                Objective::BinaryLogLoss | Objective::SquaredError | Objective::LambdaRank,
-                Some(k),
-            ) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "n_classes".to_string(),
-                    reason: format!(
-                        "must be unset when objective is \"{}\" (got {k}); only \
-                         \"multiclass_softmax\" states a class count",
-                        objective.as_str()
-                    ),
-                })
-            }
-            (Objective::BinaryLogLoss | Objective::SquaredError | Objective::LambdaRank, None) => {}
-        }
-        // `lambdarank_truncation_level` is paired with the objective the
-        // same way: it bounds the ranking pair loop and the max-DCG
-        // normalizer, so it exists exactly when there is a ranking to cut.
-        match (objective, lambdarank_truncation_level) {
-            (Objective::LambdaRank, None) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "lambdarank_truncation_level".to_string(),
-                    reason: "must be set when objective is \"lambdarank\"".to_string(),
-                })
-            }
-            (Objective::LambdaRank, Some(k)) => {
-                if k < 1_usize {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "lambdarank_truncation_level".to_string(),
-                        reason: format!("must be >= 1, got {k}"),
-                    });
-                }
-            }
-            (
-                Objective::BinaryLogLoss | Objective::SquaredError | Objective::MulticlassSoftmax,
-                Some(k),
-            ) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "lambdarank_truncation_level".to_string(),
-                    reason: format!(
-                        "must be unset when objective is \"{}\" (got {k}); only \
-                         \"lambdarank\" states a truncation position",
-                        objective.as_str()
-                    ),
-                })
-            }
-            (
-                Objective::BinaryLogLoss | Objective::SquaredError | Objective::MulticlassSoftmax,
-                None,
-            ) => {}
-        }
-        // GOSS: both rates travel together, each in (0, 1), summing to
-        // at most 1, and GOSS replaces row subsampling outright — a run
-        // that stated both `subsample < 1` and GOSS would be sampling
-        // rows twice under two different laws.
-        match (goss_top_rate, goss_other_rate) {
-            (None, None) => {}
-            (Some(_), None) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "goss_other_rate".to_string(),
-                    reason: "must be set when goss_top_rate is set (the GOSS rates travel \
-                             together)"
-                        .to_string(),
-                })
-            }
-            (None, Some(_)) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "goss_top_rate".to_string(),
-                    reason: "must be set when goss_other_rate is set (the GOSS rates travel \
-                             together)"
-                        .to_string(),
-                })
-            }
-            (Some(top), Some(other)) => {
-                if !top.is_finite() || top <= 0.0_f64 || top >= 1.0_f64 {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "goss_top_rate".to_string(),
-                        reason: format!("must be in (0.0, 1.0) exclusive, got {top}"),
-                    });
-                }
-                if !other.is_finite() || other <= 0.0_f64 || other >= 1.0_f64 {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "goss_other_rate".to_string(),
-                        reason: format!("must be in (0.0, 1.0) exclusive, got {other}"),
-                    });
-                }
-                if top + other > 1.0_f64 {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "goss_top_rate".to_string(),
-                        reason: format!(
-                            "goss_top_rate + goss_other_rate must be <= 1.0, got {}",
-                            top + other
-                        ),
-                    });
-                }
-                if subsample < 1.0_f64 {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "subsample".to_string(),
-                        reason: format!(
-                            "must be 1.0 when GOSS is enabled (got {subsample}); GOSS \
-                             replaces row subsampling"
-                        ),
-                    });
-                }
-            }
-        }
-        if let Some(k) = max_features {
-            if k < 1_usize {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "max_features".to_string(),
-                    reason: "must be >= 1 when set".to_string(),
-                });
-            }
-        }
-        // A fraction of exactly 1.0 is every feature, which already has a
-        // spelling: null. Two spellings of one behavior is how a config
-        // stops being self-describing, so the boundary is exclusive.
-        if let Some(ref indices) = categorical_features {
-            if indices.is_empty() {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "categorical_features".to_string(),
-                    reason: "must be non-empty when set (null = every feature numeric)".to_string(),
-                });
-            }
-            for pair in indices.windows(2_usize) {
-                if pair[1] <= pair[0] {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "categorical_features".to_string(),
-                        reason: format!(
-                            "must be strictly ascending, got {} after {}",
-                            pair[1], pair[0]
-                        ),
-                    });
-                }
-            }
-        }
-        if let Some(f) = colsample_bytree {
-            if !f.is_finite() || f <= 0.0_f64 || f >= 1.0_f64 {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "colsample_bytree".to_string(),
-                    reason: format!(
-                        "must be in (0.0, 1.0) exclusive when set (null = all features), got {f}"
-                    ),
-                });
-            }
-        }
-        // `num_leaves` is paired with the policy rather than merely ignored
-        // under the wrong one. A leaf budget silently doing nothing under
-        // depth-wise growth is the same class of defect as a missing
-        // growth_strategy: the run reports a knob it did not honour.
-        match (growth_strategy, num_leaves) {
-            (GrowthStrategy::LeafWise, None) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "num_leaves".to_string(),
-                    reason: "must be set when growth_strategy is \"leaf_wise\"; best-first \
-                             growth has no depth to bound it, so the leaf budget is its only \
-                             capacity limit"
-                        .to_string(),
-                })
-            }
-            (GrowthStrategy::LeafWise, Some(budget)) => {
-                if budget < 2_usize {
-                    return Err(ClearGbmError::InvalidParameter {
-                        name: "num_leaves".to_string(),
-                        reason: format!("must be >= 2, got {budget}"),
-                    });
-                }
-            }
-            (GrowthStrategy::DepthWise, Some(budget)) => {
-                return Err(ClearGbmError::InvalidParameter {
-                    name: "num_leaves".to_string(),
-                    reason: format!(
-                        "must be unset when growth_strategy is \"depth_wise\" (got {budget}); \
-                         depth-wise growth is bounded by max_depth and would ignore it"
-                    ),
-                })
-            }
-            (GrowthStrategy::DepthWise, None) => {}
-        }
 
         Ok(Self {
             n_estimators,
@@ -524,6 +244,7 @@ impl GradientBoostingConfig {
             lambdarank_truncation_level,
             goss_top_rate,
             goss_other_rate,
+            quantized_gradient_bins,
         })
     }
 
@@ -671,6 +392,13 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn goss_other_rate(&self) -> Option<f64> {
         self.goss_other_rate
+    }
+
+    /// Returns the quantized-training bin count (None = float
+    /// histograms).
+    #[must_use]
+    pub fn quantized_gradient_bins(&self) -> Option<usize> {
+        self.quantized_gradient_bins
     }
 
     /// Returns the leaf budget, set exactly under `LeafWise` growth.

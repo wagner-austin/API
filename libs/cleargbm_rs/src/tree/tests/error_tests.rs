@@ -6,7 +6,7 @@ use crate::split::MonotonicConstraint;
 use crate::split::SplitDecision;
 use crate::tree::histograms::{
     build_feature_histograms, compute_child_histograms, find_best_split_across_features_internal,
-    BuildHistogramConfig, ChildHistogramConfig, OrderedScratch,
+    BuildHistogramConfig, ChildHistogramConfig, NodeHistograms, OrderedScratch,
 };
 use crate::tree::nodes::{finalize_nodes, BuildNode};
 use crate::tree::{build_tree, BuildTreeInput, TreeBuildConfig};
@@ -185,6 +185,7 @@ fn test_build_feature_histograms_empty_features() -> Result<(), ClearGbmError> {
         bins_rows: &bins_rows,
         n_features: 0_usize,
         n_bins: 3_usize,
+        quantized: None,
         hooks: &hooks,
     };
     let result = build_feature_histograms(
@@ -193,7 +194,7 @@ fn test_build_feature_histograms_empty_features() -> Result<(), ClearGbmError> {
     );
 
     // Should return Ok with empty vec (no error, but no histograms)
-    assert!(matches!(result, Ok(ref h) if h.is_empty()));
+    assert!(matches!(result, Ok(NodeHistograms::Float(ref h)) if h.is_empty()));
     Ok(())
 }
 
@@ -202,7 +203,7 @@ fn test_find_best_split_across_features_internal_error() -> Result<(), ClearGbmE
     // Create a histogram and config that will trigger an error
     // n_regular_bins > n_bins should cause an error
     let histogram = HistogramBuffer::new(3_usize);
-    let histograms = vec![histogram];
+    let histograms = NodeHistograms::Float(vec![histogram]);
     let config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -252,7 +253,7 @@ fn test_find_best_split_across_features_internal_multiple_features() -> Result<(
         }
     }
 
-    let histograms = vec![hist0, hist1];
+    let histograms = NodeHistograms::Float(vec![hist0, hist1]);
     let config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -287,7 +288,7 @@ fn test_compute_child_histograms_parent_histograms_too_short() -> Result<(), Cle
     let bins: Vec<u8> = vec![0_u8, 1_u8, 0_u8, 1_u8, 0_u8, 1_u8, 0_u8, 1_u8];
 
     // Only 1 parent histogram, but n_features = 2
-    let parent_histograms = vec![HistogramBuffer::new(3_usize)];
+    let parent_histograms = NodeHistograms::Float(vec![HistogramBuffer::new(3_usize)]);
 
     let hooks = Hooks::default();
     let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 2_usize);
@@ -299,6 +300,7 @@ fn test_compute_child_histograms_parent_histograms_too_short() -> Result<(), Cle
         bins_rows: &bins_rows,
         n_features: 2_usize, // 2 features, but only 1 parent histogram
         n_bins: 3_usize,
+        quantized: None,
         parent_histograms: &parent_histograms,
         hooks: &hooks,
     };
@@ -335,7 +337,7 @@ fn test_compute_child_histograms_success() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     }
 
-    let parent_histograms = vec![parent_hist];
+    let parent_histograms = NodeHistograms::Float(vec![parent_hist]);
 
     let hooks = Hooks::default();
     let bins_rows = crate::testkit::binning::transpose_cols_to_rows(&bins, 4_usize, 1_usize);
@@ -347,6 +349,7 @@ fn test_compute_child_histograms_success() -> Result<(), ClearGbmError> {
         bins_rows: &bins_rows,
         n_features: 1_usize,
         n_bins: 3_usize,
+        quantized: None,
         parent_histograms: &parent_histograms,
         hooks: &hooks,
     };
@@ -358,8 +361,8 @@ fn test_compute_child_histograms_success() -> Result<(), ClearGbmError> {
         Ok(h) => h,
         Err(e) => return Err(e),
     };
-    assert_eq!(left_hists.len(), 1_usize);
-    assert_eq!(right_hists.len(), 1_usize);
+    assert!(matches!(left_hists, NodeHistograms::Float(ref h) if h.len() == 1_usize));
+    assert!(matches!(right_hists, NodeHistograms::Float(ref h) if h.len() == 1_usize));
     Ok(())
 }
 
@@ -397,6 +400,7 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     // This succeeds because histogram.n_bins() = n_regular_bins + 1 = 101 > 100

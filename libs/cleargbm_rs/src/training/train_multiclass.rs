@@ -193,6 +193,7 @@ pub(super) fn train_multiclass(
                     feature_subsample,
                     tree_feature_mask: tree_mask.as_deref(),
                     categorical: categorical_layout,
+                    quantized: None,
                 };
 
                 let (tree, leaf_value_per_sample) = match config.growth_strategy() {

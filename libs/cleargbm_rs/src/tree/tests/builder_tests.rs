@@ -357,6 +357,7 @@ fn test_build_tree_rejects_out_of_range_sample_index() -> Result<(), ClearGbmErr
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     match build_tree(&input, &Hooks::default()) {

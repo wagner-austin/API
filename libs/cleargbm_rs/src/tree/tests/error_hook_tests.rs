@@ -5,7 +5,9 @@
 use crate::error::ClearGbmError;
 use crate::histogram::NodeHistogramRequest;
 use crate::hooks::Hooks;
-use crate::tree::histograms::{compute_child_histograms, ChildHistogramConfig, OrderedScratch};
+use crate::tree::histograms::{
+    compute_child_histograms, ChildHistogramConfig, NodeHistograms, OrderedScratch,
+};
 use crate::tree::{build_tree, BuildTreeInput, TreeBuildConfig};
 use crate::types::{HistogramBuffer, SplitConfig};
 
@@ -53,6 +55,7 @@ fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmErr
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     // Inject error via hook
@@ -85,7 +88,7 @@ fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
         Ok(_) => {}
         Err(e) => return Err(e),
     }
-    let parent_histograms = vec![parent_hist];
+    let parent_histograms = NodeHistograms::Float(vec![parent_hist]);
 
     // Inject error via hook
     let error_hooks = Hooks::with_histogram_builder(error_histogram);
@@ -98,6 +101,7 @@ fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
         bins_rows: &bins_rows,
         n_features: 1_usize,
         n_bins: 3_usize,
+        quantized: None,
         parent_histograms: &parent_histograms,
         hooks: &error_hooks,
     };
@@ -156,6 +160,7 @@ fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     // Inject undersized histogram via hook - this causes split finding error
@@ -200,6 +205,7 @@ fn test_build_tree_finalize_nodes_error_via_hook() -> Result<(), ClearGbmError> 
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     // Inject error via finalize_nodes hook

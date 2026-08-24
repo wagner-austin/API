@@ -39,12 +39,12 @@
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::split::SplitResult;
-use crate::types::{HistogramBuffer, TreeNode};
+use crate::types::TreeNode;
 
 use super::builder::{record_leaf_values, validate_build_input, BuildTreeInput};
 use super::histograms::{
     build_feature_histograms, compute_child_histograms, find_best_split_across_features_internal,
-    BuildHistogramConfig, ChildHistogramConfig, OrderedScratch,
+    BuildHistogramConfig, ChildHistogramConfig, NodeHistograms, OrderedScratch,
 };
 use super::nodes::{
     compute_leaf_value, compute_sums, finalize_nodes, should_stop, split_samples, BuildNode,
@@ -67,7 +67,7 @@ struct Candidate {
     depth: usize,
     /// Histograms this node's split was found from, reused to derive its
     /// children's by sibling subtraction.
-    histograms: Vec<HistogramBuffer>,
+    histograms: NodeHistograms,
     /// The best split available at this node.
     split: SplitResult,
 }
@@ -187,7 +187,7 @@ fn evaluate_candidate(
     node_id: usize,
     sample_indices: Vec<u32>,
     depth: usize,
-    histograms: Vec<HistogramBuffer>,
+    histograms: NodeHistograms,
 ) -> Result<Option<Candidate>, ClearGbmError> {
     let config: &TreeBuildConfig = context.input.config;
     let split_config = config.split_config();
@@ -314,6 +314,7 @@ pub fn build_tree_leaf_wise_with_leaf_assignment(
         bins_rows: input.bins_rows,
         n_features: input.n_features,
         n_bins: context.n_bins,
+        quantized: input.quantized,
         hooks,
     };
     let root_histograms = match build_feature_histograms(&root_hist_config, &mut scratch) {
@@ -324,7 +325,7 @@ pub fn build_tree_leaf_wise_with_leaf_assignment(
     // Nodes awaiting a split search. The root and both children of every
     // split go through this one queue, so evaluation — and its error
     // handling — exists in exactly one place.
-    let mut to_evaluate: Vec<(usize, Vec<u32>, usize, Vec<HistogramBuffer>)> =
+    let mut to_evaluate: Vec<(usize, Vec<u32>, usize, NodeHistograms)> =
         vec![(root_id, root_indices, 0_usize, root_histograms)];
     let mut n_leaves = 1_usize;
 
@@ -374,6 +375,7 @@ pub fn build_tree_leaf_wise_with_leaf_assignment(
             bins_rows: input.bins_rows,
             n_features: input.n_features,
             n_bins: context.n_bins,
+            quantized: input.quantized,
             parent_histograms: &candidate.histograms,
             hooks,
         };

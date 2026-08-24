@@ -15,10 +15,11 @@
 //! - [`model`] — `GradientBoostingModel` (de)serialization
 
 mod config;
+mod config_fields;
 mod model;
 
 #[cfg(test)]
-pub(crate) use config::GradientBoostingConfigFieldVisitor;
+pub(crate) use config_fields::GradientBoostingConfigFieldVisitor;
 #[cfg(test)]
 pub(crate) use model::GradientBoostingModelFieldVisitor;
 

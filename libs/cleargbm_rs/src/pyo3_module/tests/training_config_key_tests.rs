@@ -351,3 +351,64 @@ fn test_train_accepts_goss_rates_and_rejects_a_missing_goss_key() -> Result<(), 
         }
     })
 }
+
+#[test]
+fn test_train_accepts_quantized_bins_and_rejects_a_missing_key() -> Result<(), ClearGbmError> {
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        // A run with quantized_gradient_bins set trains (the int crosses
+        // the boundary and validates).
+        let args = match make_training_args(py) {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+        let item = match args.get_item(6_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let config: Bound<'_, PyDict> = match item.extract() {
+            Ok(d) => d,
+            Err(e) => return Err(fail(format!("config arg is not a dict: {e}"))),
+        };
+        match config.set_item("quantized_gradient_bins", 4_i64) {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match train_gradient_boosting_from_args(&args) {
+            Ok(_) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        }
+
+        // A missing quantized_gradient_bins key is an error, not a
+        // silent "off".
+        let args = match make_training_args(py) {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+        let item = match args.get_item(6_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        let config: Bound<'_, PyDict> = match item.extract() {
+            Ok(d) => d,
+            Err(e) => return Err(fail(format!("config arg is not a dict: {e}"))),
+        };
+        match config.del_item("quantized_gradient_bins") {
+            Ok(()) => {}
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+        match train_gradient_boosting_from_args(&args) {
+            Ok(_) => Err(fail(
+                "a missing quantized_gradient_bins key must be rejected".to_string(),
+            )),
+            Err(e) => {
+                let text = e.to_string();
+                assert!(
+                    text.contains("missing required key 'quantized_gradient_bins'"),
+                    "got: {text}"
+                );
+                Ok(())
+            }
+        }
+    })
+}

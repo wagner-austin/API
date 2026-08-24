@@ -24,12 +24,15 @@ use crate::error::ClearGbmError;
 mod categorical;
 /// The threshold (numeric) prefix-sum search.
 mod threshold;
+/// The threshold search over packed integer histograms.
+mod threshold_quantized;
 
 #[cfg(test)]
 mod tests;
 
 pub use categorical::{find_best_categorical_split_from_histogram, CategoryBinSet};
 pub use threshold::{find_best_split_across_features, find_best_split_from_histogram};
+pub use threshold_quantized::{find_best_split_from_quantized_histogram, QuantizedScanScales};
 
 /// Direction for NaN values during tree traversal.
 ///

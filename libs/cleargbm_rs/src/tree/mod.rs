@@ -24,6 +24,7 @@ mod serde_impl;
 
 pub use builder::{
     build_tree, build_tree_with_leaf_assignment, compute_leaf_value, BuildTreeInput,
+    QuantizedTreeData,
 };
 pub use categorical::CategoricalLayout;
 pub use feature_subsample::{select_tree_features, tree_column_budget, FeatureSubsample};

@@ -89,6 +89,32 @@ pub struct BuildTreeInput<'a> {
     /// search partitions its bins by set membership and finalization
     /// translates the winning bins into raw codes.
     pub categorical: Option<&'a super::categorical::CategoricalLayout>,
+
+    /// Optional quantized-training data for this round. `None` runs the
+    /// float histogram path, bit-identical to the history before the
+    /// quantized axis existed. `Some` switches histogram construction,
+    /// sibling subtraction, and the threshold scan to packed integers;
+    /// leaf values are computed from the original float gradients either
+    /// way, so quantization only ever affects which splits are chosen.
+    pub quantized: Option<QuantizedTreeData<'a>>,
+}
+
+/// One round's quantized streams and decode scales, as the tree consumes
+/// them.
+///
+/// Produced by the training loop's per-round discretization (see
+/// `training::quantize`); the tree never re-derives scales or re-rounds.
+#[derive(Debug, Clone, Copy)]
+pub struct QuantizedTreeData<'a> {
+    /// Interleaved `int8` stream: hessian at `2i`, gradient at `2i + 1`,
+    /// length `2 * n_samples`.
+    pub packed_int8: &'a [i8],
+    /// Integer gradient sums multiply by this to recover gradient space.
+    pub grad_scale: f64,
+    /// Integer hessian sums multiply by this to recover hessian space.
+    pub hess_scale: f64,
+    /// The quantization bin count (`quantized_gradient_bins`).
+    pub n_quant_bins: usize,
 }
 
 /// Records a leaf's value against every sample that reached it.
@@ -144,6 +170,33 @@ pub(super) fn validate_build_input(input: &BuildTreeInput<'_>) -> Result<(), Cle
         return Err(ClearGbmError::EmptyInput {
             context: "sample_indices".to_string(),
         });
+    }
+
+    // Quantized invariants, checked before any length math that would
+    // require materializing the bin matrix: the 32-bit packed halves
+    // hold per-bin sums bounded by `n_samples * n_quant_bins`, so that
+    // product must fit the hessian half (u32); and the interleaved
+    // stream must cover every row's pair.
+    if let Some(quantized) = input.quantized {
+        let n_u64 = u64::try_from(input.n_samples).unwrap_or(u64::MAX);
+        let bins_u64 = u64::try_from(quantized.n_quant_bins).unwrap_or(u64::MAX);
+        let max_stat = n_u64.saturating_mul(bins_u64);
+        if max_stat > u64::from(u32::MAX) {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "quantized_gradient_bins".to_string(),
+                reason: format!(
+                    "n_samples ({}) x quantized_gradient_bins ({}) must not exceed u32::MAX \
+                     (the packed 32-bit histogram half's capacity)",
+                    input.n_samples, quantized.n_quant_bins
+                ),
+            });
+        }
+        if quantized.packed_int8.len() != 2_usize * input.n_samples {
+            return Err(ClearGbmError::ShapeMismatch {
+                expected: format!("packed_int8 length {}", 2_usize * input.n_samples),
+                got: format!("packed_int8 length {}", quantized.packed_int8.len()),
+            });
+        }
     }
 
     // Validate input lengths
@@ -364,6 +417,7 @@ pub fn build_tree_with_leaf_assignment(
                     bins_rows: input.bins_rows,
                     n_features,
                     n_bins,
+                    quantized: input.quantized,
                     hooks,
                 };
                 match build_feature_histograms(&hist_config, &mut scratch) {
@@ -457,6 +511,7 @@ pub fn build_tree_with_leaf_assignment(
             bins_rows: input.bins_rows,
             n_features,
             n_bins,
+            quantized: input.quantized,
             parent_histograms: &histograms,
             hooks,
         };

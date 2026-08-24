@@ -29,6 +29,7 @@ mod leafwise_error_tests;
 mod leafwise_helpers;
 mod leafwise_tests;
 mod proptest_tests;
+mod quantized_tree_tests;
 mod serde_error_tests;
 mod serde_fail_deser_tests;
 mod serde_fail_ser_tests;

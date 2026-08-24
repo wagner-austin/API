@@ -35,6 +35,7 @@ pub(super) fn default_params() -> GradientBoostingConfigParams {
         lambdarank_truncation_level: None,
         goss_top_rate: None,
         goss_other_rate: None,
+        quantized_gradient_bins: None,
     }
 }
 
@@ -447,4 +448,90 @@ fn test_config_rejects_a_class_count_under_lambdarank() -> Result<(), ClearGbmEr
         }
         Err(other) => Err(other),
     }
+}
+
+// =============================================================================
+// Quantized training (`quantized_gradient_bins`)
+// =============================================================================
+
+/// Asserts construction fails naming `quantized_gradient_bins` with a
+/// reason containing `needle`.
+fn expect_quantized_refusal(
+    params: GradientBoostingConfigParams,
+    needle: &str,
+) -> Result<(), ClearGbmError> {
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: format!("expected a quantized_gradient_bins refusal ({needle})"),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "quantized_gradient_bins");
+            assert!(reason.contains(needle), "{reason}");
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_quantized_bins_accepts_even_values_in_range() -> Result<(), ClearGbmError> {
+    for bins in [2_usize, 4_usize, 64_usize, 126_usize] {
+        let mut params = default_params();
+        params.quantized_gradient_bins = Some(bins);
+        let config = propagate!(GradientBoostingConfig::new(params));
+        assert_eq!(config.quantized_gradient_bins(), Some(bins));
+    }
+    let mut regression = default_regression_params();
+    regression.quantized_gradient_bins = Some(4_usize);
+    let config = propagate!(GradientBoostingConfig::new(regression));
+    assert_eq!(config.quantized_gradient_bins(), Some(4_usize));
+    Ok(())
+}
+
+#[test]
+fn test_quantized_bins_rejects_out_of_range_values() -> Result<(), ClearGbmError> {
+    for bins in [0_usize, 1_usize, 128_usize, 1000_usize] {
+        let mut params = default_params();
+        params.quantized_gradient_bins = Some(bins);
+        propagate!(expect_quantized_refusal(params, "[2, 126]"));
+    }
+    Ok(())
+}
+
+#[test]
+fn test_quantized_bins_rejects_odd_values() -> Result<(), ClearGbmError> {
+    // An odd count would silently train under bins - 1 (gradients get
+    // bins/2 per side) — the config would state a knob training does
+    // not honour.
+    for bins in [3_usize, 5_usize, 125_usize] {
+        let mut params = default_params();
+        params.quantized_gradient_bins = Some(bins);
+        propagate!(expect_quantized_refusal(params, "must be even"));
+    }
+    Ok(())
+}
+
+#[test]
+fn test_quantized_bins_rejects_multiclass() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.objective = Objective::MulticlassSoftmax;
+    params.scale_pos_weight = None;
+    params.n_classes = Some(3_usize);
+    params.quantized_gradient_bins = Some(4_usize);
+    expect_quantized_refusal(params, "multiclass_softmax")
+}
+
+#[test]
+fn test_quantized_bins_rejects_lambdarank() -> Result<(), ClearGbmError> {
+    let mut params = ranking_params();
+    params.quantized_gradient_bins = Some(4_usize);
+    expect_quantized_refusal(params, "lambdarank")
+}
+
+#[test]
+fn test_quantized_bins_rejects_categorical_features() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.categorical_features = Some(vec![0_usize]);
+    params.quantized_gradient_bins = Some(4_usize);
+    expect_quantized_refusal(params, "categorical_features")
 }

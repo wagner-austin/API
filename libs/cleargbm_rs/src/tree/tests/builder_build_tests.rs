@@ -44,6 +44,7 @@ fn test_build_tree_single_leaf() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -96,6 +97,7 @@ fn test_build_tree_with_split() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -148,6 +150,7 @@ fn test_build_tree_empty_input() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -192,6 +195,7 @@ fn test_build_tree_max_depth_constraint() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -238,6 +242,7 @@ fn test_build_tree_max_leaves_constraint() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let tree = match build_tree(&input, &Hooks::default()) {
@@ -280,6 +285,7 @@ fn test_build_tree_gradients_too_short() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
@@ -323,6 +329,7 @@ fn test_build_tree_hessians_too_short() -> Result<(), ClearGbmError> {
         feature_subsample: None,
         tree_feature_mask: None,
         categorical: None,
+        quantized: None,
     };
 
     let result = build_tree(&input, &Hooks::default());
