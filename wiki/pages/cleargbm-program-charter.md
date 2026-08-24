@@ -98,19 +98,24 @@ The primary operator of this library is an AI session. Therefore:
   identity 112/112, all three artifacts retrained with exactly reproduced
   numbers. The lambda math is pinned in the tech-wiki (Burges 2010 +
   LightGBM rank/DCG pages @ 3ec5b99b).
-- **P5 — Accelerators through the quality gate.** IN PROGRESS 2026-08-23
-  — see [[cleargbm-continuation-and-goss]]. Landing A (continued
-  training) DONE: trees append to a self-contained artifact (inverting
-  LightGBM's delta-model init_model shape), split training exact to the
-  bit. Landing B (GOSS) DONE: goss_top_rate/goss_other_rate as one
-  honest knob pair (config fields 22-23), shipped-code semantics
-  (|g x h| ranking, 1/lr warmup), quality cost matching LightGBM's own
-  GOSS (-0.0072 vs -0.0073 mean AUC gap). Remaining: quantized training
-  (the measured 2x lever, integer histograms per Shi 2022 — the
-  code-level map is in the tech-wiki since 2026-08-23). EFB is
-  recommended EXCLUDED: its habitat is sparse one-hot data the registry
-  lacks, and its hardcoded 1/10000 conflict budget would need a knob no
-  corpus yet names.
+- **P5 — Accelerators through the quality gate.** DONE 2026-08-23, in
+  three landings. Landing A (continued training) — see
+  [[cleargbm-continuation-and-goss]]: trees append to a self-contained
+  artifact (inverting LightGBM's delta-model init_model shape), split
+  training exact to the bit. Landing B (GOSS): the honest rate pair
+  (config fields 22-23), shipped-code semantics, quality cost matching
+  LightGBM's own (-0.0072 vs -0.0073 mean AUC gap). Landing C
+  (quantized training) — see [[cleargbm-quantized-training]]:
+  `quantized_gradient_bins` (config field 24), packed 16/32-bit integer
+  histograms per Shi 2022's shipped form, split training exact under
+  quantization via pure-function rounding randoms. The measurement
+  refuted the marketing: at our single-threaded 20k-200k scales the
+  knob IMPROVES quality (+0.0029 mean AUC, stochastic-rounding
+  regularization) but costs ~1.1-1.5x wall clock — and LightGBM's own
+  quantized arm only breaks even there too; the 2x lives at
+  many-million-row, many-thread scale. EFB is EXCLUDED: its habitat is
+  sparse one-hot data the registry lacks, and its hardcoded 1/10000
+  conflict budget would need a knob no corpus yet names.
 - **P6 — Scale.** HPC3 first as an experiment farm (parallel sweeps and
   evaluations over the dataset registry via Slurm — infrastructure another
   session is already building), because a thousand honest experiments beat
