@@ -1,6 +1,6 @@
 ---
-title: ClearGBM on HPC3 — the farm runs; rw_value, weather_tmax and metab_confidence join the board
-tags: [ml, cleargbm, hpc3, slurm, rw-value, metabolomics, roadmap-p6]
+title: ClearGBM on HPC3 — the farm runs; four new-domain corpora join the board
+tags: [ml, cleargbm, hpc3, slurm, rw-value, metabolomics, voc, roadmap-p6]
 related:
   - "[[cleargbm-program-charter]]"
   - "[[cleargbm-quantized-training]]"
@@ -9,6 +9,8 @@ source_paths:
   - tools/hpc3/runs/sweep-cleargbm-p6-rung1.json
   - libs/covenant_ml/scripts/derive_rw_value.py
   - libs/covenant_ml/scripts/build_metab_corpus.py
+  - libs/covenant_ml/scripts/build_voc_corpus.py
+  - libs/covenant_ml/src/covenant_ml/datasets/xlsx_reader.py
   - libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md
 fact_checked: "2026-08-24"
@@ -16,10 +18,11 @@ confidence: high
 hubs: [libs]
 ---
 
-# ClearGBM on HPC3 — the farm runs; rw_value, weather_tmax and metab_confidence join the board
+# ClearGBM on HPC3 — the farm runs; four new-domain corpora join the board
 
-P6 Landings A, B1, B2 and B3 of the [[cleargbm-program-charter]] (board
-task `1ad15eb6`).
+P6 Landings A and B1-B4 of the [[cleargbm-program-charter]] (board task
+`1ad15eb6`): the experiment farm plus rw_value, weather_tmax,
+metab_confidence and voc_match_quality.
 
 ## The farm (Landing A)
 
@@ -117,11 +120,37 @@ structure confidence is barely predictable from how well a feature was
 measured; it is dominated by what the compound is. A weak-signal
 benchmark entry, recorded exactly as measured.
 
+## voc_match_quality (Landing B4)
+
+The BVOC corpus, from the Faiola Lab's aggregated GC-MS peak table
+(ten California reserve site sheets; tree-bot's sha256-pinned lab
+snapshot, and the builder's manifest pin reproduces the snapshot's own
+pin). The GC-MS twin of metab_confidence's question: one row per
+chromatogram peak, target = the top NIST library match's quality
+(`Match1.Quality`, 1-99, verbatim), predictors PRE-ANNOTATION
+measurables only — species (41 codes including `blk` blanks), RT, and
+chromatogram-context statistics (run peak count, RT rank fraction, gap
+to previous peak, ±0.1/±1-min crowding, run RT span; a no-hit peak
+still crowds its neighbours). `MatchScore` was verified equal to the
+target on all 6,238 source rows and is excluded with the rest of the
+library/curation outputs; `site` is the group column. Drops counted:
+350 misfiled no-species rows (provenance-flagged), 35 no-quality, 1
+no-RT, 2 impossible qualities (944/994). Result: **5,850 rows across
+10 sites** (228 chromatograms), built byte-deterministically through a
+new stdlib XLSX reader (`covenant_ml.datasets.xlsx_reader` — no new
+dependency).
+
+The scoreboard entry has REAL signal (R² 0.37-0.48, against
+metab_confidence's 0.004-0.025) and is honestly adverse: **LightGBM
+leads** (mean test RMSE 18.3170 vs cleargbm 18.4423, cleargbm@leaf_wise
+18.4806, xgboost 18.5646; per-seed wins lightgbm 3 / cleargbm 1 /
+xgboost 1). ClearGBM is second at a 0.7% gap — the second corpus on
+the named-target list beside weather_tmax.
+
 ## Remaining P6 scope
 
-BVOC data is real and located (ten VOC field sites, ~6.2k observations
-in corvis `research_*`) but joins the registry only behind an honest
-target design with the operator's science. The Emily/ProGenesis table
-(23,134 x 58) remains a candidate for a separate blank-vs-real peak
-corpus. Later landings under the open board task, alongside larger farm
-rungs and closing the weather gap.
+The Emily/ProGenesis table (23,134 x 58) remains a candidate for a
+separate blank-vs-real peak corpus (never joined to metab_confidence,
+by provenance rule). Later landings under the open board task: larger
+farm rungs, and closing the weather_tmax + voc_match_quality gaps to
+LightGBM.

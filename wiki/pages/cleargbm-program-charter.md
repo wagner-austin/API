@@ -135,10 +135,15 @@ The primary operator of this library is an AI session. Therefore:
   co-elution windows, target COSMIC ConfidenceScoreExact, predictors
   pre-annotation measurables only; the four arms tie (spread 0.12% of
   RMSE) and the honest finding is scientific: R² 0.004-0.025 — a
-  weak-signal entry where learner differences are noise. Remaining:
-  the BVOC target design with the operator's science, larger farm
-  rungs, and closing the weather gap. Distributed/GPU training only
-  when single-node ceilings measurably bind.
+  weak-signal entry where learner differences are noise. Landing B4
+  (voc_match_quality) DONE: the BVOC corpus from the Faiola Lab's
+  ten-site GC-MS peak table — 5,850 rows grouped by site, target NIST
+  Match1.Quality, pre-annotation predictors (species, RT, chromatogram
+  context) through a new stdlib XLSX reader; real signal (R²
+  0.37-0.48) and honestly adverse: LightGBM leads, ClearGBM second at
+  0.7%. Remaining: larger farm rungs, and closing the weather_tmax +
+  voc_match_quality gaps. Distributed/GPU training only when
+  single-node ceilings measurably bind.
 
 Out of scope until a real need names them: sparse-matrix input, external
 memory, DART, in-library CV (covenant_ml owns CV).
