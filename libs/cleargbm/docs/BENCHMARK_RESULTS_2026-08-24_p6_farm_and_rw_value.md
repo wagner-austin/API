@@ -1,4 +1,4 @@
-# P6 Landings A + B1 + B2 — the farm, rw_value, and weather_tmax (2026-08-24)
+# P6 Landings A + B1 + B2 + B3 — the farm, rw_value, weather_tmax, and metab_confidence (2026-08-24)
 
 ## Landing A — HPC3 as the experiment farm, demonstrated
 
@@ -160,20 +160,84 @@ Manifest: `BENCHMARK_MANIFEST_2026-08-24_p6_weather_tmax_quality.json`;
 the derived `data.csv` is committed, so the benchmark reproduces without
 a network.
 
+## Landing B3 — metab_confidence: the metabolomics corpus, from the artcal campaign
+
+The metabolomics corpus comes from the operator's own artcal campaign
+(corvis dataset 15's provenance chain: Waters MS-E raws -> ProteoWizard
+-> mzMine 4.9.14 -> DIA pseudo-MS2 -> SIRIUS 6.3.12), NOT the separate
+Emily/ProGenesis table — the provenance record says "Do not join them"
+and this corpus honors that by living entirely on the mzMine/SIRIUS
+side. The SIRIUS merged summaries ARE the target source; ZODIAC was
+deliberately not run in that campaign (the `ZodiacScore` column is
+empty), so there is no ZODIAC data to include.
+
+The question the corpus asks is deployable: given only what the
+instrument measured, how confident will CSI:FingerID be in its best
+structure call? `covenant_ml/scripts/build_metab_corpus.py` joins three
+sha256-pinned sources — the 372 MB DIA export MGF (22,906 features,
+MS1+MS2 block pairs), the MetaboAnalyst quant table (114,814 aligned
+features x 24 samples), and SIRIUS `structure_identifications.tsv`
+(18,406 rank-1 structure calls) — into one row per rank-1 feature.
+Target: COSMIC `ConfidenceScoreExact`, verbatim. Predictors:
+pre-annotation measurables ONLY (precursor m/z, RT, log MS1 height,
+correlated-MS1 peak count, MS2 peak count and log total/max intensity,
+top-3 intensity fraction, and detection count / log mean / log max
+across the 23 BIOLOGICAL samples — the pooled `combine.mzML` injection
+is excluded). Annotation outputs (adduct, formula, ionMass, any SIRIUS
+score) never become features: they are downstream of the answer.
+
+Drops are counted, never imputed: 795 features whose confidence is
+SIRIUS's `-Infinity` ("no exact confidence computable") are dropped by
+rule; zero features were undetected in all biological samples. The
+corpus: **17,611 rows across 138 retention-time bins** (0.1-minute
+co-elution windows — adducts and in-source fragments of one molecule
+co-elute, so `rt_bin` is the GROUP column and whole windows land in one
+split). Target mean 0.1198. The rebuild is byte-deterministic (one
+sha256 twice).
+
+Four arms, matched P1 protocol, grouped by rt window, seeds 42-46,
+mean test RMSE:
+
+| arm | mean test RMSE |
+|---|---|
+| **xgboost** | **0.129348** |
+| lightgbm | 0.129391 |
+| cleargbm@leaf_wise | 0.129428 |
+| cleargbm | 0.129497 |
+
+Per-seed wins: xgboost 3, lightgbm 1, cleargbm@leaf_wise 1. Two honest
+readings:
+
+- **The arms are effectively tied.** The full spread is 0.12% of RMSE,
+  far smaller than the seed-to-seed spread (0.1261-0.1342); no arm
+  separates from the pack on this corpus.
+- **The corpus's real finding is scientific: structure confidence is
+  barely predictable from pre-annotation measurables.** R² is
+  0.004-0.025 for every arm — spectrum quality, intensity and detection
+  breadth explain ~2% of COSMIC confidence variance under grouped
+  splits. That is worth knowing (it says confidence is dominated by
+  what the compound IS, not how well it was measured), and it makes
+  this a weak-signal benchmark entry: differences between learners here
+  are noise until an arm moves R² materially.
+
+Manifest: `BENCHMARK_MANIFEST_2026-08-24_p6_metab_confidence_quality.json`;
+the derived `data.csv` (1.5 MB) is committed, so the benchmark
+reproduces without the 372 MB sources.
+
 ## Remaining P6 scope (recorded, not hidden)
 
-- **Metabolomics/BVOC**: real data located (Emily project: 23,134 x 58
-  drought/watered/ambient abundance matrix; 10 VOC field sites, ~6.2k
-  observations, in corvis `research_*`). Both need an honest supervised
-  target designed WITH the operator's science — the leading candidate
-  for Emily is blank-vs-real peak classification, per the
-  metabolomics-dashboard's own analyses. Deferred to a written design
-  rather than invented unilaterally.
+- **BVOC**: 10 VOC field sites (~6.2k observations, in corvis
+  `research_*`) still need an honest supervised target designed WITH
+  the operator's science. The Emily/ProGenesis table (23,134 x 58)
+  remains available for a blank-vs-real peak classification corpus —
+  separate from metab_confidence by provenance rule ("Do not join
+  them").
 
 ## Gates at landing
 
-- covenant_ml: 2510 tests, 100.00% (group support + harness + deriver +
-  the weather_tmax registry entry).
+- covenant_ml: 2533 tests, 100.00% (group support + harness + deriver +
+  the weather_tmax registry entry; Landing B3 adds the
+  metab_confidence builder and registry entry).
 - covenant-radar-api: 2608 tests, 100.00% at close (the race fix was
   additionally held to three consecutive green full runs with the live
   broker up, at 2590 tests before the farm-filename and corpus-builder
@@ -181,3 +245,6 @@ a network.
 - cleargbm / cleargbm_rs: untouched this landing.
 - weather_tmax determinism: a full rebuild from the pinned raw files
   reproduces `data.csv` byte-for-byte (one sha256 for both).
+- metab_confidence determinism: two builds from the pinned sources
+  produce identical `data.csv` and `MANIFEST.json`; the MGF's sha256
+  matches the corvis provenance pin exactly.

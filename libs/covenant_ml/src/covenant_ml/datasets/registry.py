@@ -549,6 +549,30 @@ _VERIFIED_REGRESSION_CONFIGS: tuple[RegressionDatasetConfig, ...] = (
         target_mean_expected=0.091,
         group_column="station",
     ),
+    # Metabolomics structure-confidence (SIRIUS/CSI:FingerID, artcal)
+    # Built by covenant_ml's scripts/build_metab_corpus.py from the
+    # sha256-pinned artcal campaign sources (mzMine DIA MGF, MetaboAnalyst
+    # quant table, SIRIUS structure_identifications.tsv): one row per
+    # feature with a rank-1 structure call, predictors are pre-annotation
+    # measurables ONLY (precursor mass, RT, MS1/MS2 spectral shape,
+    # per-sample detection statistics), target = COSMIC
+    # ConfidenceScoreExact. Co-eluting adducts/fragments of one molecule
+    # must never straddle splits, so the 0.1-minute retention window
+    # (rt_bin) is the GROUP column and the split must be by window.
+    RegressionDatasetConfig(
+        name="metab_confidence",
+        display_name="Metabolomics Structure Confidence (SIRIUS artcal)",
+        folder="metab_confidence",
+        file_name="data.csv",
+        file_format="csv",
+        encoding="utf-8",
+        target=RegressionTargetSpec(column_name="confidence_exact"),
+        exclude_columns=(),
+        n_samples_expected=17611,
+        n_features_expected=11,
+        target_mean_expected=0.12,
+        group_column="rt_bin",
+    ),
 )
 
 

@@ -1,0 +1,23 @@
+{
+  "sources": {
+    "mgf": {
+      "file_name": "artcal_metab_dia_sirius.mgf",
+      "sha256": "3b10effd8a449971c88408ce8d4ee49efe17c2e66141c65e8cd7287611957172"
+    },
+    "quant": {
+      "file_name": "artcal_metab_dia_metaboanalyst.csv",
+      "sha256": "b955d5883039161ac479aa8ec638a27b99b91bef39ae4d30fec5237843e8ded8"
+    },
+    "structures": {
+      "file_name": "structure_identifications.tsv",
+      "sha256": "0bdcfe26198f751371f2c3593882ad5e2e3928f6d13acbdc93907fc02280e9fc"
+    }
+  },
+  "corpus": {
+    "rows": 17611,
+    "rt_bins": 138,
+    "dropped_infinite_confidence": 795,
+    "dropped_undetected": 0,
+    "target_mean": 0.119798
+  }
+}
