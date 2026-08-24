@@ -33,6 +33,7 @@ from platform_workers.local_kv import LocalKV
 from platform_workers.redis import RedisStrProto
 
 from model_trainer.cluster import _test_hooks as cluster_hooks
+from model_trainer.cluster import preflight
 from model_trainer.cluster.stores import LocalArtifacts, StagedCorpus
 from model_trainer.core import _test_hooks
 from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
@@ -48,11 +49,17 @@ _FLAGS = (PAYLOAD_FLAG, CORPUS_FLAG, ARTIFACTS_FLAG)
 def _publish_to_log(channel: str, message: str) -> None:
     """Put a published event where a cluster operator will actually find it.
 
+    The body is carried as ``event_body``, NOT as ``message``: ``message`` is
+    a reserved ``LogRecord`` attribute, and ``logging`` raises ``KeyError`` on
+    any ``extra`` that would overwrite one. That raise happened on the first
+    ``publish_started()`` of the first real cluster run -- so the failure
+    surfaced as a training job dying before step one, from a logging call.
+
     Args:
         channel: Channel the event was published to.
         message: The event body.
     """
-    _log.info("event", extra={"channel": channel, "message": message})
+    _log.info("event", extra={"channel": channel, "event_body": message})
 
 
 def install_cluster_hooks(*, corpus_dir: Path, artifacts_dir: Path) -> None:
@@ -171,6 +178,26 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     install_cluster_hooks(corpus_dir=corpus_dir, artifacts_dir=artifacts_dir)
 
+    # Before a single training step. Everything below is checkable in under a
+    # second and, unchecked, is only discovered after the expensive part has
+    # already been spent -- which is exactly how 49 minutes of A100 time was
+    # lost to an empty configuration string.
+    settings = _test_hooks.load_settings()
+    preflight.check_writable(
+        {
+            "APP__ARTIFACTS_ROOT": Path(settings["app"]["artifacts_root"]),
+            "APP__RUNS_ROOT": Path(settings["app"]["runs_root"]),
+            "APP__LOGS_ROOT": Path(settings["app"]["logs_root"]),
+            "--artifacts-dir": artifacts_dir,
+        }
+    )
+    preflight.check_artifact_round_trip(
+        _test_hooks.artifact_store_factory(
+            settings["app"]["data_bank_api_url"], settings["app"]["data_bank_api_key"]
+        ),
+        artifacts_dir / ".preflight",
+    )
+
     raw = load_json_str(payload_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"{payload_path} must hold a JSON object")
@@ -201,3 +228,13 @@ __all__ = [
     "install_cluster_hooks",
     "main",
 ]
+
+
+# Without this, `python -m model_trainer.cluster.entry` imports the module,
+# defines these functions, and exits 0 -- having trained nothing while
+# reporting success. That cost a real cluster job: 30 seconds, exit 0, no
+# artifacts, no output. A batch script is exactly where nobody is watching a
+# terminal, so the one invocation that must never silently succeed is this
+# one. `worker_entry` carries the same guard.
+if __name__ == "__main__":
+    entrypoint()

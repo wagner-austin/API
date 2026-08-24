@@ -8,6 +8,7 @@ from pathlib import Path
 
 import httpx
 import torch
+from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import _JSONInputValue as JSONInputValue
 from platform_ml.testing import (
     WandbModuleProtocol as WandbModuleLike,
@@ -65,10 +66,28 @@ def _default_artifact_store(
     *,
     timeout_seconds: float = 600.0,
 ) -> ArtifactStoreProto:
-    """Production ArtifactStore - used as default hook."""
+    """Production ArtifactStore - used as default hook.
+
+    Validates its OWN credentials here rather than leaving that to callers.
+    The check used to live in ``_upload_and_persist_pointer``, which meant a
+    precondition belonging to this HTTP-backed store gated every store: a
+    filesystem-backed implementation that needs no credentials was refused
+    before the factory was ever reached. That cost a completed 20-epoch run,
+    which trained for 49 minutes and then failed to save.
+
+    Raises:
+        AppError: With ``ARTIFACT_UPLOAD_FAILED`` when either credential is
+            absent, since this store cannot reach the data bank without both.
+    """
     from platform_core.data_bank_client import DataBankClient
     from platform_ml import ArtifactStore
 
+    if base_url.strip() == "" or api_key.strip() == "":
+        raise AppError(
+            ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED,
+            "data-bank-api configuration missing for artifact upload",
+            model_trainer_status_for(ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED),
+        )
     client = DataBankClient(base_url, api_key, timeout_seconds=timeout_seconds)
     return ArtifactStore(client)
 

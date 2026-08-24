@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_ml.wandb_publisher import WandbPublisher, WandbUnavailableError
@@ -97,15 +96,13 @@ def _upload_and_persist_pointer(
         },
     )
 
-    api_url = settings["app"]["data_bank_api_url"]
-    api_key = settings["app"]["data_bank_api_key"]
-    if api_url.strip() == "" or api_key.strip() == "":
-        raise AppError(
-            ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED,
-            "data-bank-api configuration missing for artifact upload",
-            model_trainer_status_for(ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED),
-        )
-    store = _test_hooks.artifact_store_factory(api_url, api_key)
+    # No credential check here. Whether these are required is a property of
+    # the store the factory returns, not of this call site: the HTTP-backed
+    # store validates them itself, and a filesystem-backed one needs neither.
+    # Checking here refused an implementation that would have worked.
+    store = _test_hooks.artifact_store_factory(
+        settings["app"]["data_bank_api_url"], settings["app"]["data_bank_api_key"]
+    )
     base = _Path(out_dir)
     fid_resp = store.upload_artifact(base, artifact_name=f"model-{run_id}", request_id=run_id)
     r.set(artifact_file_id_key(run_id), fid_resp["file_id"])

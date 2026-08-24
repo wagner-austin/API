@@ -10,7 +10,9 @@ required rather than guessed.
 from __future__ import annotations
 
 import hashlib
+import logging
 import pathlib
+import runpy
 import sys
 from collections.abc import Generator
 
@@ -145,6 +147,90 @@ class TestInstalledHooks:
         assert list(tmp_path.rglob("*")) == []
 
 
+def _rendered(record: logging.LogRecord, fmt: str) -> str:
+    """Render a record through a real formatter and return the result.
+
+    Reading the extras as attributes would mean touching ``LogRecord.__dict__``,
+    which is untyped. Formatting is both fully typed and a stronger check: it
+    proves the fields can actually be RENDERED, which is what the service's
+    JSON formatter does to them and where the original defect surfaced.
+
+    Args:
+        record: The captured record.
+        fmt: A ``%``-style format naming the fields to render.
+
+    Returns:
+        The formatted line.
+    """
+    return logging.Formatter(fmt).format(record)
+
+
+class TestPublishingGoesThroughRealLogging:
+    """Driven against the actual ``logging`` module, not a fake sink.
+
+    The fake-sink tests above passed while this path was broken. ``logging``
+    refuses any ``extra`` key that would overwrite a reserved ``LogRecord``
+    attribute, and ``message`` is one -- so ``extra={"message": ...}`` raises
+    ``KeyError`` the first time anything is published. Nothing that stopped
+    short of the real logger could see it, and the first real cluster run
+    died on ``publish_started()`` before step one.
+    """
+
+    def test_publishing_does_not_collide_with_a_reserved_record_field(self) -> None:
+        records: list[logging.LogRecord] = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                records.append(record)
+
+        handler = _Capture()
+        logger = logging.getLogger("model_trainer.cluster.entry")
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        try:
+            cluster_entry._publish_to_log("trainer:events", "step 1 of 26912")
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)
+
+        assert len(records) == 1
+        assert _rendered(records[0], "%(message)s|%(channel)s|%(event_body)s") == (
+            "event|trainer:events|step 1 of 26912"
+        )
+
+    def test_the_store_publishes_through_that_same_path(self, tmp_path: pathlib.Path) -> None:
+        """The wiring, not just the function: LocalKV.publish must reach the
+        real logger without raising, which is what actually failed."""
+        records: list[logging.LogRecord] = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                records.append(record)
+
+        handler = _Capture()
+        logger = logging.getLogger("model_trainer.cluster.entry")
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        try:
+            cluster_entry.install_cluster_hooks(
+                corpus_dir=tmp_path / "c", artifacts_dir=tmp_path / "a"
+            )
+            store = _test_hooks.kv_store_factory("redis://ignored")
+            store.publish("trainer:events", "started")
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)
+
+        # install_cluster_hooks logs to this same logger, so select the
+        # published events rather than assuming they are the only records.
+        published = [r for r in records if r.getMessage() == "event"]
+        assert [_rendered(r, "%(channel)s|%(event_body)s") for r in published] == [
+            "trainer:events|started"
+        ]
+
+
 class TestMain:
     def test_it_hands_the_payload_to_the_training_entry_point(self, tmp_path: pathlib.Path) -> None:
         """Unchanged, so a cluster run and a queued run are the same job."""
@@ -192,6 +278,52 @@ class TestArguments:
     def test_a_flag_without_a_value_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="needs a value"):
             cluster_entry.main([*_args(tmp_path), cluster_entry.CORPUS_FLAG])
+
+
+class TestTheModuleGuardActuallyRuns:
+    """`python -m model_trainer.cluster.entry` must not silently succeed.
+
+    Without the guard the module imports, defines its functions, and exits 0
+    having trained nothing. That is not hypothetical -- it cost a real cluster
+    job: 30 seconds, exit code 0, no artifacts, no output whatsoever. A batch
+    script is precisely where nobody is watching a terminal, so this is the
+    one invocation that must never quietly do nothing.
+
+    Executed with runpy rather than asserted about, matching how the sibling
+    worker_entry guard is covered.
+    """
+
+    def test_running_as_main_reaches_the_training_entry_point(self, tmp_path: pathlib.Path) -> None:
+        recorder = _Recorder()
+        cluster_hooks.run_job = recorder
+        sys.argv[:] = ["prog", *_args(tmp_path)]
+
+        module_name = "model_trainer.cluster.entry"
+        saved = sys.modules.pop(module_name, None)
+        try:
+            with pytest.raises(SystemExit) as excinfo:
+                runpy.run_module(module_name, run_name="__main__", alter_sys=False)
+        finally:
+            if saved is not None:
+                sys.modules[module_name] = saved
+
+        assert excinfo.value.code == 0
+        assert recorder.payloads == [_PAYLOAD]
+
+    def test_running_as_main_with_no_arguments_refuses(self, tmp_path: pathlib.Path) -> None:
+        """The exact shape of the original failure: invoked with nothing, it
+        exited 0. It must raise instead."""
+        cluster_hooks.run_job = _Recorder()
+        sys.argv[:] = ["prog"]
+
+        module_name = "model_trainer.cluster.entry"
+        saved = sys.modules.pop(module_name, None)
+        try:
+            with pytest.raises(ValueError, match=cluster_entry.PAYLOAD_FLAG):
+                runpy.run_module(module_name, run_name="__main__", alter_sys=False)
+        finally:
+            if saved is not None:
+                sys.modules[module_name] = saved
 
 
 class TestEntrypoint:
