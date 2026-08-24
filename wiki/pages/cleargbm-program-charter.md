@@ -116,11 +116,19 @@ The primary operator of this library is an AI session. Therefore:
   many-million-row, many-thread scale. EFB is EXCLUDED: its habitat is
   sparse one-hot data the registry lacks, and its hardcoded 1/10000
   conflict budget would need a knob no corpus yet names.
-- **P6 — Scale.** HPC3 first as an experiment farm (parallel sweeps and
-  evaluations over the dataset registry via Slurm — infrastructure another
-  session is already building), because a thousand honest experiments beat
-  one GPU port. Distributed/GPU training only when single-node ceilings
-  measurably bind.
+- **P6 — Scale.** IN PROGRESS 2026-08-24 — see
+  [[cleargbm-hpc3-farm-and-rw-value]]. Landing A (the farm) DONE: ClearGBM
+  runs on HPC3's free CPU partition through tools/hpc3; the first rung put
+  320 Optuna trials (16 members, 4 datasets x 4 presets) through compute
+  nodes with zero failures and zero triage findings, and the fan-out's two
+  shared-writer hazards were fixed at the root (per-job filenames under
+  HPC3_JOB_NAME). Landing B1 (rw_value) DONE: the time-to-verdict
+  regression corpus (569,561 rows, 99 match groups) joined the registry
+  with grouped splitting, and ClearGBM leads its mean test RMSE. Remaining:
+  the weather corpus (GHCN-D fetch + McKinnon-style construction), the
+  metabolomics/BVOC target design with the operator's science, and
+  registry-wide farm rungs at larger trial budgets. Distributed/GPU
+  training only when single-node ceilings measurably bind.
 
 Out of scope until a real need names them: sparse-matrix input, external
 memory, DART, in-library CV (covenant_ml owns CV).
