@@ -1,0 +1,29 @@
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "budget": {
+    "max_gpu_hours": 0.5,
+    "max_service_units": 0.0
+  },
+  "projects": {
+    "cleargbm": {
+      "partition": "free",
+      "gpu": null,
+      "cpus": 4,
+      "mem_gb": 16,
+      "minutes": 60,
+      "requeue": false,
+      "checkpoint_steps": 0,
+      "env_path": "/pub/wagnera3/envs/cleargbm",
+      "pinned_packages": {
+        "numpy": "2.3.5",
+        "lightgbm": "4.6.0",
+        "xgboost": "3.1.2"
+      },
+      "deterministic": true
+    }
+  }
+}
