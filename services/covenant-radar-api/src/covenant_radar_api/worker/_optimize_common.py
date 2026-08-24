@@ -400,11 +400,20 @@ def save_optimization_results(
     Returns:
         Tuple of (result_path, config_path).
     """
+    from platform_core.config import _test_hooks as config_env
     from platform_core.json_utils import dump_json_str
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    result_path = output_dir / f"{dataset_name}_{backend_name}_optuna_result.json"
-    config_path = output_dir / f"{dataset_name}_{backend_name}_optimal_config.json"
+    # Under the HPC3 farm (HPC3_JOB_NAME exported by the batch script),
+    # the filenames embed the job name: sweep members for one dataset
+    # differ only by feature preset, and without the suffix four
+    # concurrent jobs would overwrite one file last-writer-wins — a
+    # result whose identity is whichever member happened to finish
+    # last. Locally the names are unchanged.
+    job_name = config_env.get_env("HPC3_JOB_NAME")
+    job_suffix = f"-{job_name}" if job_name is not None and job_name != "" else ""
+    result_path = output_dir / f"{dataset_name}_{backend_name}_optuna_result{job_suffix}.json"
+    config_path = output_dir / f"{dataset_name}_{backend_name}_optimal_config{job_suffix}.json"
 
     with open(result_path, "w") as f:
         f.write(dump_json_str(result_dict))

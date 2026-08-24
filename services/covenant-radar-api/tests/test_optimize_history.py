@@ -492,3 +492,49 @@ class TestOptimizationHistoryGetProgression:
         preset: FeaturePreset = "full"
         history.get_progression(backend, dataset, preset)
         assert history._loaded is True
+
+
+class TestForOutputDirUnderTheFarm:
+    """The history file is per-job when HPC3_JOB_NAME is exported."""
+
+    def test_job_name_suffixes_the_history_file(self, tmp_path: Path) -> None:
+        """Concurrent sweep members must never share a history writer.
+
+        BeeGFS does not guarantee cross-node append atomicity, so the
+        farm's batch script exports HPC3_JOB_NAME and the history file
+        embeds it — one writer per file.
+        """
+        from platform_core.config import _test_hooks as config_env
+
+        saved = config_env.get_env
+
+        def fake_get_env(key: str) -> str | None:
+            if key == "HPC3_JOB_NAME":
+                return "cleargbm.p6-rung1-taiwan-full"
+            return saved(key)
+
+        config_env.get_env = fake_get_env
+        try:
+            history = OptimizationHistory.for_output_dir(tmp_path)
+            expected = tmp_path / "optimization_history-cleargbm.p6-rung1-taiwan-full.jsonl"
+            assert history._path == expected
+        finally:
+            config_env.get_env = saved
+
+    def test_empty_job_name_keeps_the_shared_file(self, tmp_path: Path) -> None:
+        """An empty export behaves like no export: the local layout."""
+        from platform_core.config import _test_hooks as config_env
+
+        saved = config_env.get_env
+
+        def fake_get_env(key: str) -> str | None:
+            if key == "HPC3_JOB_NAME":
+                return ""
+            return saved(key)
+
+        config_env.get_env = fake_get_env
+        try:
+            history = OptimizationHistory.for_output_dir(tmp_path)
+            assert history._path == tmp_path / "optimization_history.jsonl"
+        finally:
+            config_env.get_env = saved

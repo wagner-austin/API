@@ -57,7 +57,7 @@ def _make_fake_regression_dataset(name: str = "financial_distress") -> Regressio
         "target_max": 1.0,
         "categorical_encodings": (),
     }
-    return {"meta": meta, "x": x, "y": y}
+    return {"meta": meta, "x": x, "y": y, "groups": None}
 
 
 def _make_fake_regression_config(name: str) -> RegressionDatasetConfig:

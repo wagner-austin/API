@@ -80,8 +80,15 @@ class TestRealKafkaProducer:
             confluent_config=_make_confluent_config(),
             producer_config=_make_producer_config(),
         )
-        # Verify producer can perform operations (stronger than is not None)
-        assert producer.poll(0.0) == 0
+        # Verify producer can perform operations (stronger than is not
+        # None). flush() returns the number of MESSAGES still queued —
+        # exactly 0 here, deterministically, because nothing was
+        # produced. poll()'s return counts EVENTS, and rdkafka's
+        # background threads deliver connection events asynchronously
+        # (a live broker on localhost:9092 surfaces them within
+        # milliseconds), so an exact-count assertion on poll() races
+        # the network by construction.
+        assert producer.flush(0.0) == 0
 
     def test_produce(self) -> None:
         """Produce buffers message (no broker connection needed)."""
@@ -102,13 +109,23 @@ class TestRealKafkaProducer:
         producer.produce("test-topic", b"test-value", None)
 
     def test_poll(self) -> None:
-        """Poll returns 0 when no callbacks pending."""
+        """Poll serves pending events and reports their count.
+
+        The exact count is NOT deterministic: connection events from
+        rdkafka's background threads arrive on their own schedule, and
+        whatever answers localhost:9092 (a live broker, or nothing)
+        changes what is pending at the instant of the call. The
+        deterministic anchors are that poll returns a non-negative
+        event count and that the MESSAGE queue stays empty — flush's
+        return value — because nothing was produced.
+        """
         producer = RealKafkaProducer(
             confluent_config=_make_confluent_config(),
             producer_config=_make_producer_config(),
         )
         result = producer.poll(0.0)
-        assert result == 0
+        assert result >= 0
+        assert producer.flush(0.0) == 0
 
     def test_flush(self) -> None:
         """Flush returns 0 when no messages pending."""
@@ -326,8 +343,10 @@ class TestRealFactoryFunctions:
             confluent_config=_make_confluent_config(),
             producer_config=_make_producer_config(),
         )
-        # Verify producer works
-        assert producer.poll(0.0) == 0
+        # Verify producer works: an empty MESSAGE queue is the
+        # deterministic post-construction fact; poll()'s event count
+        # races asynchronous connection events (see test_poll).
+        assert producer.flush(0.0) == 0
 
     def test_real_consumer_factory(self) -> None:
         """Create consumer via factory function."""

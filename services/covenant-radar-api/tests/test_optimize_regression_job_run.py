@@ -348,3 +348,57 @@ class TestRunRegressionOptimization:
         saved_files = sorted(output_dir.rglob("*.json"))
         assert saved_files[0].name.endswith(".json")
         assert len(saved_files) == 2
+
+
+class TestSaveOptimizationResultsUnderTheFarm:
+    """Result filenames are per-job when HPC3_JOB_NAME is exported."""
+
+    def test_job_name_suffixes_both_files(self, tmp_path: Path) -> None:
+        """Sweep members for one dataset differ only by preset; without
+        the suffix, four concurrent jobs would overwrite one file
+        last-writer-wins and the survivor's identity would be whichever
+        member finished last."""
+        from platform_core.config import _test_hooks as config_env
+
+        from covenant_radar_api.worker._optimize_common import save_optimization_results
+
+        saved = config_env.get_env
+
+        def fake_get_env(key: str) -> str | None:
+            if key == "HPC3_JOB_NAME":
+                return "cleargbm.p6-rung1-taiwan-full"
+            return saved(key)
+
+        config_env.get_env = fake_get_env
+        try:
+            result_path, config_path = save_optimization_results(
+                tmp_path,
+                "taiwan",
+                "cleargbm",
+                {"best_value": 0.9},
+                {"n_estimators": 100},
+            )
+            assert result_path.name == (
+                "taiwan_cleargbm_optuna_result-cleargbm.p6-rung1-taiwan-full.json"
+            )
+            assert config_path.name == (
+                "taiwan_cleargbm_optimal_config-cleargbm.p6-rung1-taiwan-full.json"
+            )
+            assert result_path.exists()
+            assert config_path.exists()
+        finally:
+            config_env.get_env = saved
+
+    def test_no_job_name_keeps_the_local_names(self, tmp_path: Path) -> None:
+        """Locally the filenames are unchanged."""
+        from covenant_radar_api.worker._optimize_common import save_optimization_results
+
+        result_path, config_path = save_optimization_results(
+            tmp_path,
+            "taiwan",
+            "cleargbm",
+            {"best_value": 0.9},
+            {"n_estimators": 100},
+        )
+        assert result_path.name == "taiwan_cleargbm_optuna_result.json"
+        assert config_path.name == "taiwan_cleargbm_optimal_config.json"

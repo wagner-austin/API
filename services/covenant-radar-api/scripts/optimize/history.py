@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from covenant_ml.types import BackendName
+from platform_core.config import _test_hooks as config_env
 from platform_core.json_utils import (
     JSONObject,
     dump_json_str,
@@ -175,12 +176,26 @@ class OptimizationHistory:
     def for_output_dir(cls, output_dir: Path) -> OptimizationHistory:
         """Create history manager for an output directory.
 
+        Under the HPC3 farm (``HPC3_JOB_NAME`` exported by the batch
+        script), the history file is suffixed with the job name so that
+        concurrent sweep members — running on different nodes against
+        one shared checkout — never append to the same file. BeeGFS
+        does not guarantee cross-node append atomicity, so a shared
+        JSONL under concurrent writers can interleave into corrupt
+        lines. Locally the name is unchanged and history accumulates
+        across runs as before.
+
         Args:
             output_dir: Directory where models and history are stored.
 
         Returns:
             New history manager instance.
         """
+        job_name = config_env.get_env("HPC3_JOB_NAME")
+        if job_name is not None and job_name != "":
+            stem = Path(HISTORY_FILENAME).stem
+            suffix = Path(HISTORY_FILENAME).suffix
+            return cls(output_dir / f"{stem}-{job_name}{suffix}")
         return cls(output_dir / HISTORY_FILENAME)
 
     def load(self) -> None:
