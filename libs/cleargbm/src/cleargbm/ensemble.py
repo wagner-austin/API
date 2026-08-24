@@ -135,6 +135,7 @@ def _config_to_rust_dict(
         "lambdarank_truncation_level": config["lambdarank_truncation_level"],
         "goss_top_rate": config["goss_top_rate"],
         "goss_other_rate": config["goss_other_rate"],
+        "quantized_gradient_bins": config["quantized_gradient_bins"],
     }
 
 

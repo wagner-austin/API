@@ -32,6 +32,7 @@ def _make_raw_config(n_classes: int | None, objective: str) -> JSONDict:
         "lambdarank_truncation_level": None,
         "goss_top_rate": None,
         "goss_other_rate": None,
+        "quantized_gradient_bins": None,
         "max_bins": 64,
         "subsample": 1.0,
         "random_state": 0,
@@ -100,6 +101,7 @@ class TestGradientBoostingModel:
             "lambdarank_truncation_level": None,
             "goss_top_rate": None,
             "goss_other_rate": None,
+            "quantized_gradient_bins": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -202,6 +204,33 @@ class TestConfigNClasses:
         raw["goss_top_rate"] = 0.2
         raw["goss_other_rate"] = 0.0
         with pytest.raises(ValueError, match="goss_other_rate"):
+            decode_gradient_boosting_config(raw)
+
+    def test_decode_carries_a_valid_quantized_bin_count(self) -> None:
+        """An even count in [2, 126] passes through the decode unchanged."""
+        raw = _make_raw_config(None, "binary_log_loss")
+        raw["scale_pos_weight"] = 1.0
+        raw["quantized_gradient_bins"] = 4
+        decoded = decode_gradient_boosting_config(raw)
+        assert decoded["quantized_gradient_bins"] == 4
+
+    def test_decode_rejects_quantized_bins_out_of_range(self) -> None:
+        """Counts outside [2, 126] cannot pack into int8."""
+        raw = _make_raw_config(None, "binary_log_loss")
+        raw["scale_pos_weight"] = 1.0
+        raw["quantized_gradient_bins"] = 128
+        with pytest.raises(ValueError, match=r"quantized_gradient_bins must be in \[2, 126\]"):
+            decode_gradient_boosting_config(raw)
+        raw["quantized_gradient_bins"] = 0
+        with pytest.raises(ValueError, match=r"quantized_gradient_bins must be in \[2, 126\]"):
+            decode_gradient_boosting_config(raw)
+
+    def test_decode_rejects_an_odd_quantized_bin_count(self) -> None:
+        """An odd count would silently train under bins - 1."""
+        raw = _make_raw_config(None, "binary_log_loss")
+        raw["scale_pos_weight"] = 1.0
+        raw["quantized_gradient_bins"] = 5
+        with pytest.raises(ValueError, match="quantized_gradient_bins must be even"):
             decode_gradient_boosting_config(raw)
 
 

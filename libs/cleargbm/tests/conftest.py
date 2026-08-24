@@ -17,6 +17,7 @@ def make_config(
     lambdarank_truncation_level: int | None = None,
     goss_top_rate: float | None = None,
     goss_other_rate: float | None = None,
+    quantized_gradient_bins: int | None = None,
     max_bins: int = 64,
     subsample: float = 1.0,
     random_state: int = 42,
@@ -45,6 +46,8 @@ def make_config(
             (>= 1) under ``"lambdarank"``, ``None`` otherwise.
         goss_top_rate: GOSS top rate, paired with goss_other_rate.
         goss_other_rate: GOSS other rate, paired with goss_top_rate.
+        quantized_gradient_bins: Quantized-training bin count (None = float
+            histograms); even, in [2, 126].
         max_bins: Number of histogram bins.
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -74,6 +77,7 @@ def make_config(
         lambdarank_truncation_level=lambdarank_truncation_level,
         goss_top_rate=goss_top_rate,
         goss_other_rate=goss_other_rate,
+        quantized_gradient_bins=quantized_gradient_bins,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,
