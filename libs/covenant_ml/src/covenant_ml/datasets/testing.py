@@ -203,7 +203,7 @@ class FakeRegressionDatasetLoader:
             categorical_encodings=(),
         )
 
-        return RegressionLoadedDataset(meta=meta, x=x_array, y=y_array)
+        return RegressionLoadedDataset(meta=meta, x=x_array, y=y_array, groups=None)
 
 
 def create_fake_regression_dataset_loader(

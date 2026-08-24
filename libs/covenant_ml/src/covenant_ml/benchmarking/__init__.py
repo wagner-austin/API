@@ -102,6 +102,14 @@ from .ranking_quality import (
     make_synthetic_ranking,
     run_ranking_benchmark,
 )
+from .regression_quality import (
+    RegressionArmResult,
+    RegressionBenchConfig,
+    RegressionManifest,
+    RegressionQuality,
+    encode_regression_manifest,
+    run_regression_benchmark,
+)
 from .reporting import GapSummary, ModelSummary, render_report, summarize_gap
 from .runner import measure_trainer, run_benchmark
 from .splitting import company_disjoint_split
@@ -139,6 +147,10 @@ __all__ = [
     "RankingBenchConfig",
     "RankingManifest",
     "RankingQuality",
+    "RegressionArmResult",
+    "RegressionBenchConfig",
+    "RegressionManifest",
+    "RegressionQuality",
     "SeedResult",
     "SplitFactoryProto",
     "TimingSummary",
@@ -153,6 +165,7 @@ __all__ = [
     "encode_multiclass_manifest",
     "encode_quantized_manifest",
     "encode_ranking_manifest",
+    "encode_regression_manifest",
     "load_bankruptcy_dataset",
     "make_baseline_trainers",
     "make_benchmark_config",
@@ -169,6 +182,7 @@ __all__ = [
     "run_multiclass_benchmark",
     "run_quantized_benchmark",
     "run_ranking_benchmark",
+    "run_regression_benchmark",
     "summarize_gap",
     "summarize_timings",
 ]

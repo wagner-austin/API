@@ -132,6 +132,10 @@ class RegressionDatasetConfig(TypedDict, total=True):
         n_samples_expected: Expected sample count for validation.
         n_features_expected: Expected feature count for validation.
         target_mean_expected: Expected target mean for validation.
+        group_column: Column identifying which rows belong to one entity
+            (e.g., all snapshots of one match). Never a feature; rows
+            sharing a value must land in the same split. Absent for
+            row-independent datasets.
     """
 
     name: str
@@ -145,6 +149,7 @@ class RegressionDatasetConfig(TypedDict, total=True):
     n_samples_expected: int
     n_features_expected: int
     target_mean_expected: float
+    group_column: NotRequired[str]
 
 
 class DatasetConfig(TypedDict, total=True):
@@ -315,11 +320,16 @@ class RegressionLoadedDataset(TypedDict, total=True):
         meta: Regression dataset metadata with target statistics.
         x: Feature matrix of shape (n_samples, n_features).
         y: Continuous target values of shape (n_samples,).
+        groups: Integer group codes of shape (n_samples,) when the
+            dataset's config names a group_column — rows sharing a code
+            are one entity and must never straddle a split; None for
+            row-independent datasets.
     """
 
     meta: RegressionDatasetMeta
     x: NDArray[np.float64]
     y: NDArray[np.float64]
+    groups: NDArray[np.int64] | None
 
 
 class DatasetValidationResult(TypedDict, total=True):

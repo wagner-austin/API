@@ -256,3 +256,50 @@ class TestCreateRegressionCSVLoader:
 
         result = loader.load(config, fixtures_dir)
         assert result["meta"]["n_samples"] == 5
+
+
+class TestGroupColumn:
+    """Group-column extraction on regression datasets."""
+
+    def _grouped_config(self) -> RegressionDatasetConfig:
+        """Return a config naming ``match`` as the group column."""
+        return RegressionDatasetConfig(
+            name="test_grouped_regression",
+            display_name="Test Grouped Regression",
+            folder="regression_grouped",
+            file_name="data.csv",
+            file_format="csv",
+            encoding="utf-8",
+            target=RegressionTargetSpec(column_name="target_value"),
+            exclude_columns=(),
+            n_samples_expected=8,
+            n_features_expected=2,
+            target_mean_expected=0.0,
+            group_column="match",
+        )
+
+    def test_groups_factorize_in_first_appearance_order(self) -> None:
+        """Rows of one match share a code; codes count up from zero."""
+        loader = RegressionCSVLoader()
+        result = loader.load(self._grouped_config(), _get_fixtures_dir())
+        groups = result["groups"]
+        if groups is None:
+            raise AssertionError("grouped config must produce group codes")
+        codes: list[int] = []
+        for i in range(len(groups)):
+            value: np.int64 = groups[i]
+            codes.append(int(value))
+        assert codes == [0, 0, 0, 1, 1, 2, 2, 2]
+
+    def test_group_column_is_never_a_feature(self) -> None:
+        """The group column is excluded from the feature matrix."""
+        loader = RegressionCSVLoader()
+        result = loader.load(self._grouped_config(), _get_fixtures_dir())
+        assert result["meta"]["feature_names"] == ("frame", "army")
+        assert result["meta"]["n_features"] == 2
+
+    def test_no_group_column_yields_none(self) -> None:
+        """Row-independent datasets carry groups=None."""
+        loader = RegressionCSVLoader()
+        result = loader.load(_make_regression_config(), _get_fixtures_dir())
+        assert result["groups"] is None

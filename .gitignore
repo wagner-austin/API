@@ -91,6 +91,9 @@ Thumbs.db
 # match fleet writes it -- but data.csv is 64MB, over the same threshold, and
 # it is reproducible by re-running matches. Same rule, different source.
 services/covenant-radar-api/data/external/rw_matches/
+# rw_value derives deterministically from rw_matches (covenant_ml's
+# scripts/derive_rw_value.py) and is the same size class. Same rule.
+services/covenant-radar-api/data/external/rw_value/
 services/covenant-radar-api/data/external/kaggle_amex_default/
 services/covenant-radar-api/data/external/kaggle_lending_club/
 services/covenant-radar-api/data/external/kaggle_home_credit/

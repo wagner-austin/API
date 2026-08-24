@@ -88,6 +88,15 @@ class RegressionCSVLoader:
         exclude_set = set(config["exclude_columns"])
         exclude_set.add(target_spec["column_name"])  # Target is not a feature
 
+        # The group column identifies which rows are one correlated entity;
+        # it is never a feature (a model reading it would memorize entities)
+        # and its values are factorized to integer codes for the splitter.
+        group_column = config.get("group_column")
+        group_idx: int | None = None
+        if group_column is not None:
+            group_idx = find_column_index(headers, group_column)
+            exclude_set.add(group_column)
+
         # Build feature column indices
         feature_indices: list[int] = []
         feature_names: list[str] = []
@@ -123,26 +132,13 @@ class RegressionCSVLoader:
                 )
             )
 
-        x_array: NDArray[np.float64] = np.zeros((n_samples, n_features), dtype=np.float64)
-        y_array: NDArray[np.float64] = np.zeros(n_samples, dtype=np.float64)
-
-        for row_idx, row in enumerate(rows):
-            # Extract features
-            for feat_idx, col_idx in enumerate(feature_indices):
-                value = row[col_idx] if col_idx < len(row) else ""
-
-                if feat_idx in encoding_lookup:
-                    # Categorical column — apply label encoding
-                    x_array[row_idx, feat_idx] = encode_categorical_value(
-                        value, encoding_lookup[feat_idx]
-                    )
-                else:
-                    # Numeric column — parse as float
-                    x_array[row_idx, feat_idx] = parse_numeric_value(value)
-
-            # Extract target as continuous float (no label encoding)
-            target_value = row[target_idx] if target_idx < len(row) else ""
-            y_array[row_idx] = parse_numeric_value(target_value)
+        x_array, y_array, groups_array = _encode_regression_rows(
+            rows,
+            feature_indices,
+            encoding_lookup,
+            target_idx,
+            group_idx,
+        )
 
         # Report encoding phase complete
         if progress_callback is not None:
@@ -181,7 +177,66 @@ class RegressionCSVLoader:
             categorical_encodings=tuple(encodings),
         )
 
-        return RegressionLoadedDataset(meta=meta, x=x_array, y=y_array)
+        return RegressionLoadedDataset(meta=meta, x=x_array, y=y_array, groups=groups_array)
+
+
+def _encode_regression_rows(
+    rows: list[list[str]],
+    feature_indices: list[int],
+    encoding_lookup: dict[int, dict[str, int]],
+    target_idx: int,
+    group_idx: int | None,
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.int64] | None]:
+    """Encode parsed CSV rows into feature, target and group arrays.
+
+    Args:
+        rows: Parsed CSV rows.
+        feature_indices: Column indices of the feature columns, in order.
+        encoding_lookup: Categorical encodings keyed by feature position.
+        target_idx: Column index of the continuous target.
+        group_idx: Column index of the group column, or None when the
+            dataset is row-independent.
+
+    Returns:
+        Feature matrix, continuous targets, and group codes (None without
+        a group column). Group values factorize in first-appearance
+        order, so codes are deterministic for a given file.
+    """
+    n_samples = len(rows)
+    x_array: NDArray[np.float64] = np.zeros((n_samples, len(feature_indices)), dtype=np.float64)
+    y_array: NDArray[np.float64] = np.zeros(n_samples, dtype=np.float64)
+    groups_array: NDArray[np.int64] | None = None
+    group_codes: dict[str, int] = {}
+    if group_idx is not None:
+        groups_array = np.zeros(n_samples, dtype=np.int64)
+
+    for row_idx, row in enumerate(rows):
+        # Extract features
+        for feat_idx, col_idx in enumerate(feature_indices):
+            value = row[col_idx] if col_idx < len(row) else ""
+
+            if feat_idx in encoding_lookup:
+                # Categorical column — apply label encoding
+                x_array[row_idx, feat_idx] = encode_categorical_value(
+                    value, encoding_lookup[feat_idx]
+                )
+            else:
+                # Numeric column — parse as float
+                x_array[row_idx, feat_idx] = parse_numeric_value(value)
+
+        # Extract target as continuous float (no label encoding)
+        target_value = row[target_idx] if target_idx < len(row) else ""
+        y_array[row_idx] = parse_numeric_value(target_value)
+
+        # Factorize the group value in first-appearance order, so codes
+        # are deterministic for a given file.
+        if groups_array is not None and group_idx is not None:
+            group_value = row[group_idx] if group_idx < len(row) else ""
+            if group_value not in group_codes:
+                group_codes[group_value] = len(group_codes)
+            groups_array[row_idx] = group_codes[group_value]
+
+    return x_array, y_array, groups_array
 
 
 def create_regression_csv_loader() -> RegressionCSVLoader:

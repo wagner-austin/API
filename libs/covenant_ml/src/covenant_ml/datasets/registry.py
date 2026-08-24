@@ -504,6 +504,29 @@ _VERIFIED_REGRESSION_CONFIGS: tuple[RegressionDatasetConfig, ...] = (
         n_features_expected=83,
         target_mean_expected=0.0,
     ),
+    # RustedWarfare match VALUE (time-to-verdict regression)
+    # Derived from rw_matches by scripts/derive_rw_value.py (covenant_ml):
+    # the target is frames_remaining — this sample's distance from its
+    # match's last recorded frame. The outcome restatements (won, verdict)
+    # and run identity (arm, seed, difficulty) never reach the file. Like
+    # rw_matches, the file grows with every exported batch, so the
+    # expected counts are the shape contract (16 feature columns), not a
+    # sample census; the match id is the GROUP column and the split must
+    # be by match, never by row.
+    RegressionDatasetConfig(
+        name="rw_value",
+        display_name="RustedWarfare Match Value (time-to-verdict)",
+        folder="rw_value",
+        file_name="data.csv",
+        file_format="csv",
+        encoding="utf-8",
+        target=RegressionTargetSpec(column_name="frames_remaining"),
+        exclude_columns=(),
+        n_samples_expected=0,
+        n_features_expected=16,
+        target_mean_expected=0.0,
+        group_column="match",
+    ),
 )
 
 
