@@ -1,5 +1,5 @@
 ---
-title: ClearGBM on HPC3 — the experiment farm runs, and rw_value joins the board
+title: ClearGBM on HPC3 — the farm runs, rw_value and weather_tmax join the board
 tags: [ml, cleargbm, hpc3, slurm, rw-value, roadmap-p6]
 related:
   - "[[cleargbm-program-charter]]"
@@ -15,9 +15,9 @@ confidence: high
 hubs: [libs]
 ---
 
-# ClearGBM on HPC3 — the experiment farm runs, and rw_value joins the board
+# ClearGBM on HPC3 — the farm runs, rw_value and weather_tmax join the board
 
-P6 Landings A and B1 of the [[cleargbm-program-charter]] (board task
+P6 Landings A, B1 and B2 of the [[cleargbm-program-charter]] (board task
 `1ad15eb6`).
 
 ## The farm (Landing A)
@@ -70,11 +70,28 @@ XGBoost 177,091) on a genuinely hard corpus (R² ~0.2; seed 44's fold is
 negative for every arm — grouped splits are unforgiving, which is the
 point).
 
+## weather_tmax (Landing B2)
+
+The weather corpus exists, built THROUGH the deployed feature path:
+`fetch_ghcnd_weather.py` vendors 24 GHCN-Daily stations under a
+mechanical inventory rule (sha256-pinned manifest), and radar's
+`scripts/build_weather_corpus.py` fits per-station Fourier/threshold
+state on 1950-1989 ONLY, then emits 1990-2024 summer rows whose features
+come from the radar `WeatherFeatureExtractor` itself (plus day-of-year
+and three lagged anomalies); target = next day's anomaly. A data-driven
+completeness gate refused 9 of 24 stations by name (the inventory's
+year-span says nothing about continuity). Result: 43,132 rows across 15
+stations, target mean +0.091 C — the warming signal where physics puts
+it. The scoreboard entry is honest and adverse: **LightGBM leads**
+(mean test RMSE 2.0695 vs xgboost 2.0704, cleargbm@leaf_wise 2.0735,
+cleargbm 2.0751; grouped by station, seeds 42-46, R² ~0.44-0.50).
+ClearGBM's first losing corpus is a named target now, and it is what
+makes the wins elsewhere credible.
+
 ## Remaining P6 scope
 
-Weather needs a GHCN-D fetch and McKinnon-style construction (the radar
-weather domain is inference-side only). Metabolomics/BVOC data is real
-and located (Emily 23,134 x 58; ten VOC field sites in corvis
-`research_*`) but joins the registry only behind an honest target
-design with the operator's science — blank-vs-real peak classification
-leads for Emily. Both are later landings under the open board task.
+Metabolomics/BVOC data is real and located (Emily 23,134 x 58; ten VOC
+field sites in corvis `research_*`) but joins the registry only behind
+an honest target design with the operator's science — blank-vs-real
+peak classification leads for Emily. A later landing under the open
+board task, alongside larger farm rungs and closing the weather gap.

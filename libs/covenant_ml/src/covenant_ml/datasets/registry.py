@@ -527,6 +527,28 @@ _VERIFIED_REGRESSION_CONFIGS: tuple[RegressionDatasetConfig, ...] = (
         target_mean_expected=0.0,
         group_column="match",
     ),
+    # Weather day-ahead anomaly (GHCN-D summer TMAX)
+    # Built by covenant-radar-api's scripts/build_weather_corpus.py from
+    # sha256-pinned GHCN-Daily station files (fetch_ghcnd_weather.py's
+    # mechanical selection + the builder's completeness gate): per-station
+    # Fourier/threshold state fitted on 1950-1989 ONLY, rows from
+    # 1990-2024 summers, features via the deployed WeatherFeatureExtractor
+    # plus three lagged anomalies, target = next day's anomaly. The
+    # station is the GROUP column and the split must be by station.
+    RegressionDatasetConfig(
+        name="weather_tmax",
+        display_name="Weather Day-Ahead TMAX Anomaly (GHCN-D)",
+        folder="weather_tmax",
+        file_name="data.csv",
+        file_format="csv",
+        encoding="utf-8",
+        target=RegressionTargetSpec(column_name="next_day_anomaly"),
+        exclude_columns=(),
+        n_samples_expected=43132,
+        n_features_expected=9,
+        target_mean_expected=0.091,
+        group_column="station",
+    ),
 )
 
 

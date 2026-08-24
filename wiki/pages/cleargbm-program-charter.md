@@ -124,11 +124,15 @@ The primary operator of this library is an AI session. Therefore:
   shared-writer hazards were fixed at the root (per-job filenames under
   HPC3_JOB_NAME). Landing B1 (rw_value) DONE: the time-to-verdict
   regression corpus (569,561 rows, 99 match groups) joined the registry
-  with grouped splitting, and ClearGBM leads its mean test RMSE. Remaining:
-  the weather corpus (GHCN-D fetch + McKinnon-style construction), the
-  metabolomics/BVOC target design with the operator's science, and
-  registry-wide farm rungs at larger trial budgets. Distributed/GPU
-  training only when single-node ceilings measurably bind.
+  with grouped splitting, and ClearGBM leads its mean test RMSE. Landing B2
+  (weather_tmax) DONE: 43,132 GHCN-D summer rows across 15 stations,
+  state fitted on 1950-1989 only, features through the deployed radar
+  extractor, day-ahead anomaly target — and the entry is honestly
+  adverse: LightGBM leads it (2.0695 vs ClearGBM 2.0735/2.0751 mean
+  RMSE), ClearGBM's first losing corpus and now a named target.
+  Remaining: the metabolomics/BVOC target design with the operator's
+  science, larger farm rungs, and closing the weather gap. Distributed/
+  GPU training only when single-node ceilings measurably bind.
 
 Out of scope until a real need names them: sparse-matrix input, external
 memory, DART, in-library CV (covenant_ml owns CV).
