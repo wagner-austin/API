@@ -44,22 +44,22 @@ class TestSyntheticBinaryCorpus:
     def test_same_seed_reproduces_the_corpus_exactly(self) -> None:
         """Two generations under one seed are byte-identical."""
         config = _small_config()
-        x1, y1 = make_synthetic_binary(config, 42)
-        x2, y2 = make_synthetic_binary(config, 42)
+        x1, y1 = make_synthetic_binary(config["n_samples"], config["n_features"], 42)
+        x2, y2 = make_synthetic_binary(config["n_samples"], config["n_features"], 42)
         assert np.array_equal(x1, x2)
         assert np.array_equal(y1, y2)
 
     def test_different_seeds_differ(self) -> None:
         """Distinct seeds produce distinct feature matrices."""
         config = _small_config()
-        x1, _ = make_synthetic_binary(config, 42)
-        x2, _ = make_synthetic_binary(config, 43)
+        x1, _ = make_synthetic_binary(config["n_samples"], config["n_features"], 42)
+        x2, _ = make_synthetic_binary(config["n_samples"], config["n_features"], 43)
         assert not np.array_equal(x1, x2)
 
     def test_labels_are_binary_and_mixed(self) -> None:
         """Both classes appear, in stochastic-but-deterministic mixture."""
         config = _small_config()
-        _, y = make_synthetic_binary(config, 42)
+        _, y = make_synthetic_binary(config["n_samples"], config["n_features"], 42)
         positives = int(np.sum(y))
         assert 0 < positives < len(y)
 

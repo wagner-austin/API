@@ -85,6 +85,14 @@ from .protocols import (
     TrainerProto,
 )
 from .quality import compute_quality
+from .quantized_quality import (
+    QuantizedArmResult,
+    QuantizedBenchConfig,
+    QuantizedManifest,
+    QuantizedQuality,
+    encode_quantized_manifest,
+    run_quantized_benchmark,
+)
 from .ranking_quality import (
     RankingArmResult,
     RankingBenchConfig,
@@ -123,6 +131,10 @@ __all__ = [
     "PowerThrottlingOptOutProto",
     "ProcessInformationSetterProto",
     "QualityMetrics",
+    "QuantizedArmResult",
+    "QuantizedBenchConfig",
+    "QuantizedManifest",
+    "QuantizedQuality",
     "RankingArmResult",
     "RankingBenchConfig",
     "RankingManifest",
@@ -139,6 +151,7 @@ __all__ = [
     "encode_benchmark_manifest",
     "encode_goss_manifest",
     "encode_multiclass_manifest",
+    "encode_quantized_manifest",
     "encode_ranking_manifest",
     "load_bankruptcy_dataset",
     "make_baseline_trainers",
@@ -154,6 +167,7 @@ __all__ = [
     "run_benchmark",
     "run_goss_benchmark",
     "run_multiclass_benchmark",
+    "run_quantized_benchmark",
     "run_ranking_benchmark",
     "summarize_gap",
     "summarize_timings",

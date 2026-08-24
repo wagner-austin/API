@@ -1,20 +1,23 @@
-"""GOSS quality benchmark: sampled versus full training, both libraries.
+"""Quantized-training benchmark: packed integer versus float histograms.
 
-Measures what gradient-based one-side sampling costs on a deterministic
-synthetic binary corpus: four arms per seed — ClearGBM and LightGBM, each
-trained full and trained under GOSS with the SAME rates — scored on the
-same held-out quarter by AUC and log loss. The interesting number is the
-within-library gap (GOSS minus full), and whether ClearGBM's gap matches
-LightGBM's.
+Measures what gradient quantization (Shi 2022, as both libraries ship it)
+buys and costs on a deterministic synthetic binary corpus: four arms per
+seed — ClearGBM and LightGBM, each trained with float histograms and with
+quantized gradients at the SAME bin count — scored on the same held-out
+quarter by AUC and log loss, with each arm's fit wall clock recorded.
+The interesting numbers are the within-library quality gap (quantized
+minus full) and the within-library speed ratio, because quantization is a
+speed lever whose price is quality.
 
-The corpus is synthetic because GOSS's quality effect is what is being
-measured, not a service dataset's idiosyncrasies; determinism (a seeded
-generator, no wall-clock anywhere) keeps every rerun comparable.
+Quality values are deterministic per config; ``fit_seconds`` is a wall
+clock and varies with the machine — the manifest records it as a
+measurement of THIS run's environment, exactly like the timing columns of
+the identity manifests.
 """
 
 from __future__ import annotations
 
-import math
+import time
 from typing import Protocol, TypedDict
 
 import numpy as np
@@ -24,10 +27,11 @@ from numpy.typing import NDArray
 from platform_core.json_utils import JSONValue
 
 from ..metrics import compute_auc, compute_log_loss
+from .goss_quality import make_synthetic_binary
 
 
-class GossBenchConfig(TypedDict):
-    """Shared hyperparameters for every arm of the GOSS benchmark.
+class QuantizedBenchConfig(TypedDict):
+    """Shared hyperparameters for every arm of the quantized benchmark.
 
     Args:
         n_samples: Corpus rows per seed.
@@ -37,8 +41,8 @@ class GossBenchConfig(TypedDict):
         learning_rate: Shrinkage for every arm.
         max_bins: Histogram bin count for every arm.
         min_samples_leaf: Minimum rows per leaf for every arm.
-        top_rate: GOSS top rate for the sampled arms.
-        other_rate: GOSS other rate for the sampled arms.
+        quant_bins: Gradient quantization bin count for the quantized
+            arms (both libraries receive the same count).
     """
 
     n_samples: int
@@ -48,11 +52,10 @@ class GossBenchConfig(TypedDict):
     learning_rate: float
     max_bins: int
     min_samples_leaf: int
-    top_rate: float
-    other_rate: float
+    quant_bins: int
 
 
-class GossQuality(TypedDict):
+class QuantizedQuality(TypedDict):
     """Held-out quality for one arm at one seed.
 
     Args:
@@ -64,24 +67,26 @@ class GossQuality(TypedDict):
     log_loss: float
 
 
-class GossArmResult(TypedDict):
+class QuantizedArmResult(TypedDict):
     """One arm's measurement at one seed.
 
     Args:
         model: Arm name (``"cleargbm"`` or ``"lightgbm"``).
-        sampling: ``"full"`` or ``"goss"``.
+        histogram: ``"float"`` or ``"quantized"``.
         seed: Corpus seed.
         quality: Held-out quality record.
+        fit_seconds: Wall-clock training time for this arm.
     """
 
     model: str
-    sampling: str
+    histogram: str
     seed: int
-    quality: GossQuality
+    quality: QuantizedQuality
+    fit_seconds: float
 
 
-class GossManifest(TypedDict):
-    """Complete GOSS benchmark manifest.
+class QuantizedManifest(TypedDict):
+    """Complete quantized benchmark manifest.
 
     Args:
         config: The shared hyperparameters.
@@ -89,12 +94,12 @@ class GossManifest(TypedDict):
         results: One record per arm per seed.
     """
 
-    config: GossBenchConfig
+    config: QuantizedBenchConfig
     seeds: list[int]
-    results: list[GossArmResult]
+    results: list[QuantizedArmResult]
 
 
-class _LGBMGossProto(Protocol):
+class _LGBMQuantProto(Protocol):
     """Protocol for the LightGBM classifier members this module uses."""
 
     def fit(self, x: NDArray[np.float64], y: NDArray[np.int64]) -> None:
@@ -118,16 +123,21 @@ class _LGBMGossProto(Protocol):
         ...
 
 
-class _LGBMGossCtor(Protocol):
-    """Protocol for the LightGBM classifier constructor, GOSS shape."""
+class _LGBMQuantCtor(Protocol):
+    """Protocol for the LightGBM classifier constructor, quantized shape.
+
+    ``quant_train_renew_leaf`` is passed True on the quantized arm so
+    LightGBM recomputes leaf values from the original float gradients —
+    matching ClearGBM, whose leaf values ALWAYS come from the floats.
+    """
 
     def __call__(
         self,
         *,
         objective: str,
-        data_sample_strategy: str,
-        top_rate: float,
-        other_rate: float,
+        use_quantized_grad: bool,
+        num_grad_quant_bins: int,
+        quant_train_renew_leaf: bool,
         n_estimators: int,
         max_depth: int,
         num_leaves: int,
@@ -139,60 +149,62 @@ class _LGBMGossCtor(Protocol):
         n_jobs: int,
         random_state: int,
         verbose: int,
-    ) -> _LGBMGossProto: ...
+    ) -> _LGBMQuantProto: ...
 
 
-def _load_lightgbm_goss_ctor() -> _LGBMGossCtor:
+def _load_lightgbm_quant_ctor() -> _LGBMQuantCtor:
     """Resolve LightGBM's classifier constructor as a Protocol-typed callable.
 
     Returns:
         The ``LGBMClassifier`` constructor.
     """
     module = __import__("lightgbm", fromlist=["LGBMClassifier"])
-    constructor: _LGBMGossCtor = module.LGBMClassifier
+    constructor: _LGBMQuantCtor = module.LGBMClassifier
     return constructor
 
 
-def make_synthetic_binary(
-    n_samples: int,
-    n_features: int,
+def _cleargbm_config(
+    config: QuantizedBenchConfig,
     seed: int,
-) -> tuple[NDArray[np.float64], NDArray[np.int64]]:
-    """Generate a deterministic noisy-logistic binary corpus.
-
-    Each row's log-odds is a linear signal over the first three features
-    plus uniform noise; the label thresholds the resulting probability at
-    a uniform draw, so labels are stochastic-but-deterministic and neither
-    library can reach zero loss. Shared by the GOSS and quantized-training
-    benchmarks, which is why the shape arrives as plain ints rather than
-    either harness's config record.
+    quantized: bool,
+) -> GradientBoostingConfig:
+    """Build the ClearGBM training config for one arm run.
 
     Args:
-        n_samples: Corpus rows.
-        n_features: Corpus feature count.
-        seed: Generator seed.
+        config: Shared hyperparameters.
+        seed: Random seed for the run.
+        quantized: Whether the arm trains on packed integer histograms.
 
     Returns:
-        Tuple of ``(features, labels)``.
+        The full ClearGBM config.
     """
-    rng = np.random.default_rng(seed)
-    n = n_samples
-    d = n_features
-    noise: NDArray[np.float64] = rng.random((n, d + 1), dtype=np.float64)
-    x_rows: list[list[float]] = []
-    labels: list[int] = []
-    for i in range(n):
-        row: list[float] = []
-        for j in range(d):
-            row.append(float(noise.flat[i * (d + 1) + j].item()))
-        x_rows.append(row)
-        signal = 4.0 * (row[0] - 0.5) + 2.0 * (row[1] - 0.5) + 1.0 * (row[2] - 0.5)
-        prob = 1.0 / (1.0 + math.exp(-signal))
-        draw = float(noise.flat[i * (d + 1) + d].item())
-        labels.append(1 if draw < prob else 0)
-    x: NDArray[np.float64] = np.asarray(x_rows, dtype=np.float64)
-    y: NDArray[np.int64] = np.asarray(labels, dtype=np.int64)
-    return x, y
+    return GradientBoostingConfig(
+        n_estimators=config["n_estimators"],
+        max_depth=config["max_depth"],
+        learning_rate=config["learning_rate"],
+        min_samples_split=2 * config["min_samples_leaf"],
+        min_samples_leaf=config["min_samples_leaf"],
+        max_features=None,
+        colsample_bytree=None,
+        categorical_features=None,
+        n_classes=None,
+        lambdarank_truncation_level=None,
+        goss_top_rate=None,
+        goss_other_rate=None,
+        quantized_gradient_bins=config["quant_bins"] if quantized else None,
+        max_bins=config["max_bins"],
+        subsample=1.0,
+        random_state=seed,
+        monotonic_constraints=None,
+        reg_alpha=0.0,
+        reg_lambda=0.0,
+        n_jobs=1,
+        early_stopping_rounds=None,
+        growth_strategy="depth_wise",
+        num_leaves=None,
+        objective="binary_log_loss",
+        scale_pos_weight=1.0,
+    )
 
 
 def _split(
@@ -218,50 +230,6 @@ def _split(
     return x[:n_train], y[:n_train], x[n_train:], y[n_train:]
 
 
-def _cleargbm_config(
-    config: GossBenchConfig,
-    seed: int,
-    goss: bool,
-) -> GradientBoostingConfig:
-    """Build the ClearGBM training config for one arm run.
-
-    Args:
-        config: Shared hyperparameters.
-        seed: Random seed for the run.
-        goss: Whether the arm trains under GOSS.
-
-    Returns:
-        The full ClearGBM config.
-    """
-    return GradientBoostingConfig(
-        n_estimators=config["n_estimators"],
-        max_depth=config["max_depth"],
-        learning_rate=config["learning_rate"],
-        min_samples_split=2 * config["min_samples_leaf"],
-        min_samples_leaf=config["min_samples_leaf"],
-        max_features=None,
-        colsample_bytree=None,
-        categorical_features=None,
-        n_classes=None,
-        lambdarank_truncation_level=None,
-        goss_top_rate=config["top_rate"] if goss else None,
-        goss_other_rate=config["other_rate"] if goss else None,
-        quantized_gradient_bins=None,
-        max_bins=config["max_bins"],
-        subsample=1.0,
-        random_state=seed,
-        monotonic_constraints=None,
-        reg_alpha=0.0,
-        reg_lambda=0.0,
-        n_jobs=1,
-        early_stopping_rounds=None,
-        growth_strategy="depth_wise",
-        num_leaves=None,
-        objective="binary_log_loss",
-        scale_pos_weight=1.0,
-    )
-
-
 def _positive_probas(pairs: tuple[tuple[float, float], ...]) -> NDArray[np.float64]:
     """Extract the positive-class column from probability pairs.
 
@@ -275,7 +243,7 @@ def _positive_probas(pairs: tuple[tuple[float, float], ...]) -> NDArray[np.float
     return np.asarray(positives, dtype=np.float64)
 
 
-def _quality(y_test: NDArray[np.int64], probas: NDArray[np.float64]) -> GossQuality:
+def _quality(y_test: NDArray[np.int64], probas: NDArray[np.float64]) -> QuantizedQuality:
     """Score one arm's held-out probabilities.
 
     Args:
@@ -285,17 +253,17 @@ def _quality(y_test: NDArray[np.int64], probas: NDArray[np.float64]) -> GossQual
     Returns:
         The arm's quality record.
     """
-    return GossQuality(
+    return QuantizedQuality(
         auc=compute_auc(y_test, probas),
         log_loss=compute_log_loss(y_test, probas),
     )
 
 
-def run_goss_benchmark(
-    config: GossBenchConfig,
+def run_quantized_benchmark(
+    config: QuantizedBenchConfig,
     seeds: list[int],
-) -> GossManifest:
-    """Run all four arms across every seed.
+) -> QuantizedManifest:
+    """Run all four arms across every seed, timing each fit.
 
     Args:
         config: Shared hyperparameters.
@@ -304,37 +272,40 @@ def run_goss_benchmark(
     Returns:
         The complete manifest.
     """
-    results: list[GossArmResult] = []
+    results: list[QuantizedArmResult] = []
     names = tuple(f"f{i}" for i in range(config["n_features"]))
     for seed in seeds:
         x, y = make_synthetic_binary(config["n_samples"], config["n_features"], seed)
         x_train, y_train, x_test, y_test = _split(x, y)
 
-        for goss in [False, True]:
+        for quantized in [False, True]:
+            started = time.perf_counter()
             model = train_gradient_boosting(
                 x_train,
                 y_train,
                 None,
                 None,
-                _cleargbm_config(config, seed, goss),
+                _cleargbm_config(config, seed, quantized),
                 names,
             )
+            fit_seconds = time.perf_counter() - started
             probas = _positive_probas(predict_proba(model, x_test))
             results.append(
-                GossArmResult(
+                QuantizedArmResult(
                     model="cleargbm",
-                    sampling="goss" if goss else "full",
+                    histogram="quantized" if quantized else "float",
                     seed=seed,
                     quality=_quality(y_test, probas),
+                    fit_seconds=fit_seconds,
                 )
             )
 
-        for goss in [False, True]:
-            classifier = _load_lightgbm_goss_ctor()(
+        for quantized in [False, True]:
+            classifier = _load_lightgbm_quant_ctor()(
                 objective="binary",
-                data_sample_strategy="goss" if goss else "bagging",
-                top_rate=config["top_rate"],
-                other_rate=config["other_rate"],
+                use_quantized_grad=quantized,
+                num_grad_quant_bins=config["quant_bins"],
+                quant_train_renew_leaf=quantized,
                 n_estimators=config["n_estimators"],
                 max_depth=config["max_depth"],
                 num_leaves=1 << config["max_depth"],
@@ -347,23 +318,26 @@ def run_goss_benchmark(
                 random_state=seed,
                 verbose=-1,
             )
+            started = time.perf_counter()
             classifier.fit(x_train, y_train)
+            fit_seconds = time.perf_counter() - started
             raw: NDArray[np.float64] = np.asarray(
                 classifier.predict_proba(x_test), dtype=np.float64
             )
             positives: NDArray[np.float64] = raw[:, 1]
             results.append(
-                GossArmResult(
+                QuantizedArmResult(
                     model="lightgbm",
-                    sampling="goss" if goss else "full",
+                    histogram="quantized" if quantized else "float",
                     seed=seed,
                     quality=_quality(y_test, positives),
+                    fit_seconds=fit_seconds,
                 )
             )
-    return GossManifest(config=config, seeds=list(seeds), results=results)
+    return QuantizedManifest(config=config, seeds=list(seeds), results=results)
 
 
-def encode_goss_manifest(manifest: GossManifest) -> JSONValue:
+def encode_quantized_manifest(manifest: QuantizedManifest) -> JSONValue:
     """Encode the manifest to a JSON-serializable value.
 
     Args:
@@ -382,19 +356,19 @@ def encode_goss_manifest(manifest: GossManifest) -> JSONValue:
             "learning_rate": cfg["learning_rate"],
             "max_bins": cfg["max_bins"],
             "min_samples_leaf": cfg["min_samples_leaf"],
-            "top_rate": cfg["top_rate"],
-            "other_rate": cfg["other_rate"],
+            "quant_bins": cfg["quant_bins"],
         },
         "seeds": list(manifest["seeds"]),
         "results": [
             {
                 "model": r["model"],
-                "sampling": r["sampling"],
+                "histogram": r["histogram"],
                 "seed": r["seed"],
                 "quality": {
                     "auc": r["quality"]["auc"],
                     "log_loss": r["quality"]["log_loss"],
                 },
+                "fit_seconds": r["fit_seconds"],
             }
             for r in manifest["results"]
         ],
@@ -402,11 +376,10 @@ def encode_goss_manifest(manifest: GossManifest) -> JSONValue:
 
 
 __all__ = [
-    "GossArmResult",
-    "GossBenchConfig",
-    "GossManifest",
-    "GossQuality",
-    "encode_goss_manifest",
-    "make_synthetic_binary",
-    "run_goss_benchmark",
+    "QuantizedArmResult",
+    "QuantizedBenchConfig",
+    "QuantizedManifest",
+    "QuantizedQuality",
+    "encode_quantized_manifest",
+    "run_quantized_benchmark",
 ]

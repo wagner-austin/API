@@ -362,6 +362,7 @@ class ClearGbmTrainer:
             "lambdarank_truncation_level": None,
             "goss_top_rate": None,
             "goss_other_rate": None,
+            "quantized_gradient_bins": None,
             "max_bins": self._config["max_bins"],
             "subsample": 1.0,
             "random_state": seed,

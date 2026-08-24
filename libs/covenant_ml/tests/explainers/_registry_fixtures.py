@@ -154,6 +154,7 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         lambdarank_truncation_level=None,
         goss_top_rate=None,
         goss_other_rate=None,
+        quantized_gradient_bins=None,
         max_bins=64,
         subsample=1.0,
         random_state=42,
