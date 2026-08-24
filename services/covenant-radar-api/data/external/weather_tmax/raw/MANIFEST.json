@@ -1,0 +1,152 @@
+{
+  "fetched_at": "2026-08-24T09:14:17.197731+00:00",
+  "selection_rule": "ghcnd-inventory.txt TMAX rows with firstyear<=1950, lastyear>=2024, id prefix 'USW', sorted by id, first 24",
+  "inventory_url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/ghcnd-inventory.txt",
+  "value_units": "TMAX tenths of degrees C",
+  "files": [
+    {
+      "station": "USW00003103",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003103.csv.gz",
+      "sha256": "74effb56cb5ab5e9845d5bc12a1b6910c48925b2bbca280a271770fd804cdf86",
+      "bytes": 1467648
+    },
+    {
+      "station": "USW00003104",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003104.csv.gz",
+      "sha256": "c287207cc347bc638850c55bfa8431362c9e07e716fb34185a689d4883de8475",
+      "bytes": 679146
+    },
+    {
+      "station": "USW00003122",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003122.csv.gz",
+      "sha256": "3330389d81eeff6a3e241e820c8ea1f7fd564a2fe4b8ed7c97a6bf47202769d5",
+      "bytes": 617009
+    },
+    {
+      "station": "USW00003124",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003124.csv.gz",
+      "sha256": "4c6aebb4a5b666c972de85dfb905e40976d91c260ff5e4bdc47faf2d5d5a16cc",
+      "bytes": 556825
+    },
+    {
+      "station": "USW00003802",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003802.csv.gz",
+      "sha256": "09d62e9cb9acb8964bd63451c23296ca359f441f320266765f7473abfa65680d",
+      "bytes": 481847
+    },
+    {
+      "station": "USW00003804",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003804.csv.gz",
+      "sha256": "f033cf85c71421cf5ba33437e377c5ba7fde632ac42f690a55a602189c16c38c",
+      "bytes": 1037150
+    },
+    {
+      "station": "USW00003809",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003809.csv.gz",
+      "sha256": "a48df4a23a32c4c6c584a2997a1350d1c35c5dbb747ad740dfb42190a20e9b60",
+      "bytes": 564626
+    },
+    {
+      "station": "USW00003810",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003810.csv.gz",
+      "sha256": "9b80cb21b119c2fbf73e3afb910b3573db66e1b2144808ad95ab8561a770d0ab",
+      "bytes": 1041389
+    },
+    {
+      "station": "USW00003811",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003811.csv.gz",
+      "sha256": "be49659b210625d39ba8c2b3633257ade994f9062f90f0a6054ed85cfddecdd7",
+      "bytes": 1052501
+    },
+    {
+      "station": "USW00003812",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003812.csv.gz",
+      "sha256": "6ceaf141eee2cbe93d0e7f21c32f2217aa03e288cc3731233b16a69a28fb567f",
+      "bytes": 1508437
+    },
+    {
+      "station": "USW00003813",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003813.csv.gz",
+      "sha256": "8d8edebddcd64fd461c951bfaf242ab0119165da79733c877046931e1a5bb8fb",
+      "bytes": 1558683
+    },
+    {
+      "station": "USW00003816",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003816.csv.gz",
+      "sha256": "0e13c8e6953a2661d480eac2780fcf3ae30a535555fcdffd3658a8eda8b6fcfa",
+      "bytes": 1398704
+    },
+    {
+      "station": "USW00003817",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003817.csv.gz",
+      "sha256": "5653c31bf0a21b0a5726e105497d80459d127f2b4da66c47f9d8f7ef1967ed0c",
+      "bytes": 90885
+    },
+    {
+      "station": "USW00003818",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003818.csv.gz",
+      "sha256": "a24dfb63bd79ecccd694952f138d72835896a958c12f2a91fa13e109df6826cf",
+      "bytes": 490356
+    },
+    {
+      "station": "USW00003820",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003820.csv.gz",
+      "sha256": "b732fb4e3dab34099a01df56297bc680891df32090232d1434355e45d30d9b1c",
+      "bytes": 1520564
+    },
+    {
+      "station": "USW00003822",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003822.csv.gz",
+      "sha256": "b803fbbf3549b778ff06945d46f434f1bf8b1cf16c4aa0fddb51ccd2d890eabe",
+      "bytes": 1875435
+    },
+    {
+      "station": "USW00003841",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003841.csv.gz",
+      "sha256": "16670e09ff29298570cfd45e15a776c748e8a4d6030dcdb7a797a27f4395c523",
+      "bytes": 571112
+    },
+    {
+      "station": "USW00003855",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003855.csv.gz",
+      "sha256": "0e91072863f4640830d224bccaadd9cc1d6288377d02f87727320c1f35973dc4",
+      "bytes": 913106
+    },
+    {
+      "station": "USW00003902",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003902.csv.gz",
+      "sha256": "991f9c9d81e06de3a82962b0bae2ab1ea4e9ecb0180ab4b623a9dc862943a817",
+      "bytes": 273445
+    },
+    {
+      "station": "USW00003959",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003959.csv.gz",
+      "sha256": "ccca293e35f34676dee586ae59b0e2e8176c5c0d1364d6668fcdb3598d400137",
+      "bytes": 925497
+    },
+    {
+      "station": "USW00003969",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00003969.csv.gz",
+      "sha256": "257915f93c3c9227c362e4766506e8d044e6325fd5b0b0d1ee64564f0af4fb0a",
+      "bytes": 847451
+    },
+    {
+      "station": "USW00012810",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00012810.csv.gz",
+      "sha256": "8b2356933cad9393651211ebc99ac8274c0b9cfb09d4487fbe9876311dab1930",
+      "bytes": 268979
+    },
+    {
+      "station": "USW00012833",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00012833.csv.gz",
+      "sha256": "44d71fd3857858c3f09500a9f942267981c43da048259aae2ddf9269b42260a7",
+      "bytes": 422301
+    },
+    {
+      "station": "USW00012834",
+      "url": "https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_station/USW00012834.csv.gz",
+      "sha256": "9b78b172ba0a22961906ff88617490efb078415bbe0b9ccd47423e5eaa78a4d4",
+      "bytes": 1458157
+    }
+  ]
+}

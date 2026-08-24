@@ -94,6 +94,10 @@ services/covenant-radar-api/data/external/rw_matches/
 # rw_value derives deterministically from rw_matches (covenant_ml's
 # scripts/derive_rw_value.py) and is the same size class. Same rule.
 services/covenant-radar-api/data/external/rw_value/
+# weather_tmax raw GHCN-D station files (~50MB total) are pinned by
+# sha256 in raw/MANIFEST.json (committed) and refetchable by
+# fetch_ghcnd_weather.py; the derived data.csv IS committed.
+services/covenant-radar-api/data/external/weather_tmax/raw/*.csv.gz
 services/covenant-radar-api/data/external/kaggle_amex_default/
 services/covenant-radar-api/data/external/kaggle_lending_club/
 services/covenant-radar-api/data/external/kaggle_home_credit/
