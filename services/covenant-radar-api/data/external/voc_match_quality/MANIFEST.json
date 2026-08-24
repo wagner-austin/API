@@ -1,0 +1,18 @@
+{
+  "sources": {
+    "workbook": {
+      "file_name": "Aggregated_Summarized_Output.xlsx",
+      "sha256": "27ce4c56bf2ffd4a3986a93d78110268e2952b880ec8bdba10716607c2b7d5f8"
+    }
+  },
+  "corpus": {
+    "rows": 5850,
+    "sites": 10,
+    "runs": 228,
+    "dropped_no_rt": 1,
+    "dropped_no_species": 350,
+    "dropped_no_quality": 35,
+    "dropped_quality_out_of_range": 2,
+    "target_mean": 75.721197
+  }
+}

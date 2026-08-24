@@ -1,4 +1,4 @@
-# P6 Landings A + B1 + B2 + B3 — the farm, rw_value, weather_tmax, and metab_confidence (2026-08-24)
+# P6 Landings A + B1-B4 — the farm, rw_value, weather_tmax, metab_confidence, and voc_match_quality (2026-08-24)
 
 ## Landing A — HPC3 as the experiment farm, demonstrated
 
@@ -224,20 +224,76 @@ Manifest: `BENCHMARK_MANIFEST_2026-08-24_p6_metab_confidence_quality.json`;
 the derived `data.csv` (1.5 MB) is committed, so the benchmark
 reproduces without the 372 MB sources.
 
+## Landing B4 — voc_match_quality: the BVOC corpus, from the field-site peak table
+
+The VOC corpus comes from the Faiola Lab's aggregated GC-MS peak table
+(`Aggregated_Summarized_Output.xlsx`, tree-bot's sha256-pinned
+2026-07-25 lab snapshot — the builder's manifest pin reproduces the
+snapshot's own pin exactly): ten California reserve sites, one sheet
+each, one row per chromatogram peak with its top-3 NIST library matches.
+The corpus asks the GC-MS twin of metab_confidence's question: given
+only what the instrument measured, how well will the NIST library
+identify this peak?
+
+`covenant_ml/scripts/build_voc_corpus.py` reads the workbook through a
+new stdlib XLSX reader (`covenant_ml.datasets.xlsx_reader` — zipfile +
+XML, verbatim cell strings, no third-party dependency, every cell shape
+and refusal tested) and emits one row per peak. Target:
+`Match1.Quality` (1-99), verbatim. Predictors: pre-annotation
+measurables ONLY — the plant species (known at sampling; 41 codes
+including `blk` blank cartridges), the retention time, and
+chromatogram-context statistics computed from peak positions alone
+(run peak count, RT rank fraction, gap to the previous peak, co-elution
+counts within ±0.1/±1 min, run RT span; a peak with no library hit
+still crowds its neighbours). Library outputs (match names, Match2/3
+qualities), curation outputs (Compound, Class, Comments), `MatchScore`
+(verified equal to `Match1.Quality` on all 6,238 rows) and run identity
+never become features. `site` is the GROUP column: peaks from one
+reserve share plants, weather and instrument sessions.
+
+Drops counted, never imputed: 1 peak with no retention time, 350 rows
+of the provenance-flagged misfiled cartridges (no species), 35 with no
+match quality, and 2 whose recorded quality (944, 994) is outside
+NIST's 1-99 scale — data defects dropped, not guessed at. The corpus:
+**5,850 rows across 10 sites (228 chromatograms)**, target mean 75.72,
+byte-deterministic rebuild (one sha256 twice).
+
+Four arms, matched P1 protocol, grouped by site, seeds 42-46, mean
+test RMSE (quality points):
+
+| arm | mean test RMSE |
+|---|---|
+| **lightgbm** | **18.3170** |
+| cleargbm | 18.4423 |
+| cleargbm@leaf_wise | 18.4806 |
+| xgboost | 18.5646 |
+
+Per-seed wins: lightgbm 3, cleargbm 1, xgboost 1. Unlike
+metab_confidence this corpus has REAL signal — R² 0.37-0.48 for every
+arm: where a peak elutes, what plant it came from, and how crowded its
+neighbourhood is explain nearly half the variance in library match
+quality. The entry is honestly adverse: LightGBM leads it, ClearGBM is
+second at a 0.7% gap — the second corpus on the named-target list
+beside weather_tmax. Manifest:
+`BENCHMARK_MANIFEST_2026-08-24_p6_voc_match_quality_quality.json`; the
+derived `data.csv` (416 KB) is committed.
+
 ## Remaining P6 scope (recorded, not hidden)
 
-- **BVOC**: 10 VOC field sites (~6.2k observations, in corvis
-  `research_*`) still need an honest supervised target designed WITH
-  the operator's science. The Emily/ProGenesis table (23,134 x 58)
-  remains available for a blank-vs-real peak classification corpus —
-  separate from metab_confidence by provenance rule ("Do not join
-  them").
+- The Emily/ProGenesis table (23,134 x 58) remains available for a
+  blank-vs-real peak classification corpus — separate from
+  metab_confidence by provenance rule ("Do not join them").
+- Larger farm rungs; closing the weather_tmax and voc_match_quality
+  gaps to LightGBM.
 
 ## Gates at landing
 
-- covenant_ml: 2533 tests, 100.00% (group support + harness + deriver +
-  the weather_tmax registry entry; Landing B3 adds the
-  metab_confidence builder and registry entry).
+- covenant_ml: 2554 tests, 100.00% (group support + harness + deriver +
+  the weather_tmax registry entry; Landing B3 adds the metab_confidence
+  builder and registry entry; Landing B4 adds the voc builder, the
+  stdlib XLSX reader, and the registry split — registry.py crossed the
+  600-line ceiling and its verified config tuples moved to
+  registry_configs.py).
 - covenant-radar-api: 2608 tests, 100.00% at close (the race fix was
   additionally held to three consecutive green full runs with the live
   broker up, at 2590 tests before the farm-filename and corpus-builder
@@ -248,3 +304,6 @@ reproduces without the 372 MB sources.
 - metab_confidence determinism: two builds from the pinned sources
   produce identical `data.csv` and `MANIFEST.json`; the MGF's sha256
   matches the corvis provenance pin exactly.
+- voc_match_quality determinism: two builds from the pinned workbook
+  produce identical `data.csv` and `MANIFEST.json`; the workbook's
+  sha256 matches tree-bot's lab-snapshot pin exactly.
