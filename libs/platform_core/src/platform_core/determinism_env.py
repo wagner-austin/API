@@ -35,4 +35,67 @@ enforcement is the reason this pairing is safe to rely on.
 """
 
 
-__all__ = ["CUBLAS_DETERMINISTIC_WORKSPACE", "CUBLAS_WORKSPACE_ENV_VAR"]
+DETERMINISM_ENV_VAR = "TRAIN_DETERMINISTIC"
+"""Name of the variable a launcher sets to state a run's determinism posture.
+
+Deliberately not named for any cluster. A trainer honours whichever launcher
+started it, and a worker running locally in Docker reading a variable called
+``HPC3_DETERMINISTIC`` would be plainly wrong -- and would be set wrong.
+The submitter imports this name rather than spelling it, exactly as it does
+for :data:`CUBLAS_WORKSPACE_ENV_VAR`.
+"""
+
+DETERMINISM_ON = "1"
+"""Value requesting kernel-level determinism."""
+
+DETERMINISM_OFF = "0"
+"""Value explicitly declining it, in exchange for speed."""
+
+
+def determinism_requested(raw: str | None) -> bool:
+    """Interpret the determinism posture a launcher asked for.
+
+    Takes the value rather than reading the environment, for two reasons: the
+    monorepo routes every environment read through the sanctioned config
+    accessors, and a pure function needs no hook to be testable.
+
+    Args:
+        raw: The variable's value, or None when it is unset. Callers obtain
+            it with ``_optional_env_str(DETERMINISM_ENV_VAR)``.
+
+    Returns:
+        Whether determinism should be applied. An ABSENT variable means True:
+        determinism is this platform's default, and the local worker that
+        predates any launcher must keep behaving as it did. Absence is the
+        only thing treated as a default -- a value that is present says what
+        it says.
+
+    Raises:
+        ValueError: If the variable is present but is neither
+            :data:`DETERMINISM_ON` nor :data:`DETERMINISM_OFF`. A typo must
+            not resolve to either posture: guessing "on" wastes wall clock
+            on a run the operator wanted fast, and guessing "off" produces a
+            run recorded as deterministic that is not, which is the failure
+            this whole variable exists to prevent.
+    """
+    if raw is None:
+        return True
+    if raw == DETERMINISM_ON:
+        return True
+    if raw == DETERMINISM_OFF:
+        return False
+    raise ValueError(
+        f"{DETERMINISM_ENV_VAR}={raw!r} is neither {DETERMINISM_ON!r} nor "
+        f"{DETERMINISM_OFF!r}. Refusing to guess: a run whose determinism "
+        "posture is unknown cannot be compared with one whose is."
+    )
+
+
+__all__ = [
+    "CUBLAS_DETERMINISTIC_WORKSPACE",
+    "CUBLAS_WORKSPACE_ENV_VAR",
+    "DETERMINISM_ENV_VAR",
+    "DETERMINISM_OFF",
+    "DETERMINISM_ON",
+    "determinism_requested",
+]

@@ -20,6 +20,9 @@ from __future__ import annotations
 from platform_core.determinism_env import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
+    DETERMINISM_ENV_VAR,
+    DETERMINISM_OFF,
+    DETERMINISM_ON,
 )
 
 from hpc3.contracts.cluster import describe_gpu_request
@@ -93,17 +96,19 @@ def _determinism_exports(spec: JobSpec) -> list[str]:
         spec: The spec being rendered.
 
     Returns:
-        Export lines when the project declared determinism, and an empty list
-        otherwise. ``HPC3_DETERMINISTIC`` is exported either way so the
-        payload can read what was asked of it rather than inferring it from
-        the presence of the cuBLAS variable -- absent is a state, not a
-        message, and a payload that guessed would silently train the other
-        record.
+        The export lines. The posture variable is written either way, so the
+        payload reads what was asked of it rather than inferring it from the
+        presence of the cuBLAS variable -- absent is a state, not a message,
+        and a payload that guessed would silently train the other record.
+
+        Its name comes from :mod:`platform_core.determinism_env`, which is
+        also where the trainer reads it. One definition, so the two cannot
+        drift into a launcher that exports a variable nothing reads.
     """
     if not spec["deterministic"]:
-        return ['export HPC3_DETERMINISTIC="0"']
+        return [f'export {DETERMINISM_ENV_VAR}="{DETERMINISM_OFF}"']
     return [
-        'export HPC3_DETERMINISTIC="1"',
+        f'export {DETERMINISM_ENV_VAR}="{DETERMINISM_ON}"',
         f'export {CUBLAS_WORKSPACE_ENV_VAR}="{CUBLAS_DETERMINISTIC_WORKSPACE}"',
     ]
 

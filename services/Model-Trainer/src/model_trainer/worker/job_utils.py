@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Final
 
+from platform_core.config import _optional_env_str
+from platform_core.determinism_env import DETERMINISM_ENV_VAR, determinism_requested
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import default_events_channel
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
@@ -232,12 +234,27 @@ def setup_env(settings: Settings) -> int:
 
     The applied settings are logged rather than assumed, because a run whose
     determinism settings are unknown cannot be compared with one whose are.
+    That logging is also the ONLY truthful record of the posture: a launcher
+    can declare determinism, but only the process that makes the torch calls
+    knows whether they happened. A run that skips them logs that it skipped
+    them, in the same field, so the two are never distinguished by absence.
+
+    The posture comes from the environment via
+    :func:`~platform_core.determinism_env.determinism_requested`, which
+    defaults to ON when nothing asked. A launcher that wants speed instead
+    sets the variable explicitly; an unreadable value raises rather than
+    resolving to either posture.
 
     Args:
         settings: Application settings supplying the thread count.
 
     Returns:
         The resolved thread count.
+
+    Raises:
+        ValueError: If the determinism variable is present and unreadable.
+            Raised before any CUDA work, so the job fails rather than running
+            under a posture nobody can name.
     """
     threads_cfg = settings["app"]["threads"]
     threads = threads_cfg if threads_cfg and threads_cfg > 0 else max(1, int(os.cpu_count() or 1))
@@ -245,6 +262,11 @@ def setup_env(settings: Settings) -> int:
     for k, v in env.items():
         __import__("os").putenv(k, v)
     __import__("os").putenv("TOKENIZERS_PARALLELISM", "1")
+
+    if not determinism_requested(_optional_env_str(DETERMINISM_ENV_VAR)):
+        _log.info("determinism declined", extra={"determinism": "off"})
+        return threads
+
     report = _test_hooks.apply_determinism_hook()
     _log.info("determinism pinned", extra={"determinism": encode_determinism_report(report)})
     return threads

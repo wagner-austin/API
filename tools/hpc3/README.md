@@ -261,9 +261,19 @@ The work itself is split, because only one half is a submitter's to do:
 | `CUBLAS_WORKSPACE_CONFIG` | **this tool**, in the batch script | cuBLAS reads it once when its handle is created; setting it after CUDA has started is accepted in silence and does nothing. Exported from the script it cannot be too late, and cannot be forgotten. |
 | `torch.use_deterministic_algorithms(True)`, cuDNN and TF32 flags | **the payload** | they are torch calls in the payload's own process. This tool has no torch and does not pretend to make them. |
 
-The payload reads `HPC3_DETERMINISTIC` (`0` or `1`, always exported) and applies
-its half — `platform_ml.apply_determinism` does exactly this, and Model-Trainer
-already calls it in `setup_env`. The two halves are safe to split because
+The payload reads `TRAIN_DETERMINISTIC` (`0` or `1`, always exported) and
+applies its half. **Model-Trainer's `setup_env` now honours it**: absent means
+on, since determinism is the platform default and the local worker predates any
+launcher; `0` declines it and logs `determinism declined`; anything else raises
+rather than resolving to either posture. The name carries no cluster prefix
+because a worker running locally should not be reading `HPC3_*`.
+
+The record of what happened comes from the payload, not from here. This tool
+*declares* a posture; only the process making the torch calls knows whether
+they happened, and it logs the applied report either way — so "deterministic"
+and "not" are never distinguished by a missing log line.
+
+The two halves are safe to split because
 PyTorch *enforces* the pairing: deterministic mode raises a `RuntimeError`
 naming the missing variable, so a payload that does its half without the
 launcher's half fails loudly rather than training quietly non-reproducible

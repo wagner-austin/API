@@ -11,6 +11,8 @@ from __future__ import annotations
 from platform_core.determinism_env import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
+    DETERMINISM_ENV_VAR,
+    determinism_requested,
 )
 from platform_core.json_utils import JSONValue
 
@@ -216,10 +218,29 @@ class TestDeterminismIsDeclaredBeforeTheProcessStarts:
     def test_the_posture_is_exported_either_way(self) -> None:
         """Absent is a state, not a message. A payload inferring determinism
         from a missing variable would silently train the other record."""
-        assert 'export HPC3_DETERMINISTIC="0"' in render_sbatch(_spec(), log_dir=_LOG_DIR)
-        assert 'export HPC3_DETERMINISTIC="1"' in render_sbatch(
+        assert f'export {DETERMINISM_ENV_VAR}="0"' in render_sbatch(_spec(), log_dir=_LOG_DIR)
+        assert f'export {DETERMINISM_ENV_VAR}="1"' in render_sbatch(
             _spec(deterministic=True), log_dir=_LOG_DIR
         )
+
+    def test_what_the_script_exports_is_what_the_trainer_reads_back(self) -> None:
+        """The two halves joined, against the trainer's own reader rather than
+        against a string this file also wrote.
+
+        The launcher writing a variable the trainer does not read is the exact
+        failure the shared definition exists to prevent, and it would look
+        like success from both sides: the export line is present, the trainer
+        pins determinism by default, and a run declared OFF would silently be
+        deterministic anyway.
+        """
+        for deterministic, expected in ((True, True), (False, False)):
+            script = render_sbatch(_spec(deterministic=deterministic), log_dir=_LOG_DIR)
+            exported = {
+                line.removeprefix("export ").split("=", 1)[0]: line.split("=", 1)[1].strip('"')
+                for line in script.splitlines()
+                if line.startswith("export ")
+            }
+            assert determinism_requested(exported.get(DETERMINISM_ENV_VAR)) is expected
 
     def test_it_is_exported_before_the_payload_runs(self) -> None:
         """After CUDA starts the variable is accepted and ignored."""
