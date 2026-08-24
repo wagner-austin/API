@@ -1,6 +1,6 @@
 ---
-title: ClearGBM on HPC3 — the farm runs, rw_value and weather_tmax join the board
-tags: [ml, cleargbm, hpc3, slurm, rw-value, roadmap-p6]
+title: ClearGBM on HPC3 — the farm runs; rw_value, weather_tmax and metab_confidence join the board
+tags: [ml, cleargbm, hpc3, slurm, rw-value, metabolomics, roadmap-p6]
 related:
   - "[[cleargbm-program-charter]]"
   - "[[cleargbm-quantized-training]]"
@@ -8,6 +8,7 @@ source_paths:
   - tools/hpc3/runs/hpc3.json
   - tools/hpc3/runs/sweep-cleargbm-p6-rung1.json
   - libs/covenant_ml/scripts/derive_rw_value.py
+  - libs/covenant_ml/scripts/build_metab_corpus.py
   - libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md
 fact_checked: "2026-08-24"
@@ -15,10 +16,10 @@ confidence: high
 hubs: [libs]
 ---
 
-# ClearGBM on HPC3 — the farm runs, rw_value and weather_tmax join the board
+# ClearGBM on HPC3 — the farm runs; rw_value, weather_tmax and metab_confidence join the board
 
-P6 Landings A, B1 and B2 of the [[cleargbm-program-charter]] (board task
-`1ad15eb6`).
+P6 Landings A, B1, B2 and B3 of the [[cleargbm-program-charter]] (board
+task `1ad15eb6`).
 
 ## The farm (Landing A)
 
@@ -88,10 +89,39 @@ cleargbm 2.0751; grouped by station, seeds 42-46, R² ~0.44-0.50).
 ClearGBM's first losing corpus is a named target now, and it is what
 makes the wins elsewhere credible.
 
+## metab_confidence (Landing B3)
+
+The metabolomics corpus, from the operator's artcal campaign (corvis
+dataset 15's provenance chain, mzMine -> DIA MGF -> SIRIUS 6.3.12) —
+NOT the Emily/ProGenesis table, which provenance says never to join.
+The SIRIUS merged summaries are the target source; ZODIAC was
+deliberately not run in the campaign (empty `ZodiacScore` column), so
+no ZODIAC data exists to include. One row per rank-1 CSI:FingerID
+structure call; target = COSMIC `ConfidenceScoreExact`; predictors are
+PRE-ANNOTATION measurables only (precursor m/z, RT, MS1 height and
+correlated-peak count, MS2 spectral shape, detection statistics over
+the 23 biological samples — the pooled `combine.mzML` column is
+excluded, and annotation outputs never become features). 795
+`-Infinity`-confidence rows dropped by counted rule; result **17,611
+rows across 138 rt bins** (0.1-minute co-elution windows are the group
+column — adducts/fragments of one molecule co-elute). Built
+byte-deterministically by `covenant_ml/scripts/build_metab_corpus.py`
+against three sha256-pinned sources (the MGF pin matches the corvis
+provenance pin exactly); `data.csv` is committed.
+
+The scoreboard entry: four arms are effectively TIED — mean test RMSE
+xgboost 0.129348, lightgbm 0.129391, cleargbm@leaf_wise 0.129428,
+cleargbm 0.129497 (spread 0.12%, far under the seed-to-seed spread).
+The real finding is scientific: R² is 0.004-0.025 for every arm —
+structure confidence is barely predictable from how well a feature was
+measured; it is dominated by what the compound is. A weak-signal
+benchmark entry, recorded exactly as measured.
+
 ## Remaining P6 scope
 
-Metabolomics/BVOC data is real and located (Emily 23,134 x 58; ten VOC
-field sites in corvis `research_*`) but joins the registry only behind
-an honest target design with the operator's science — blank-vs-real
-peak classification leads for Emily. A later landing under the open
-board task, alongside larger farm rungs and closing the weather gap.
+BVOC data is real and located (ten VOC field sites, ~6.2k observations
+in corvis `research_*`) but joins the registry only behind an honest
+target design with the operator's science. The Emily/ProGenesis table
+(23,134 x 58) remains a candidate for a separate blank-vs-real peak
+corpus. Later landings under the open board task, alongside larger farm
+rungs and closing the weather gap.

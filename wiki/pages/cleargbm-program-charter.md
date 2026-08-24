@@ -130,9 +130,15 @@ The primary operator of this library is an AI session. Therefore:
   extractor, day-ahead anomaly target — and the entry is honestly
   adverse: LightGBM leads it (2.0695 vs ClearGBM 2.0735/2.0751 mean
   RMSE), ClearGBM's first losing corpus and now a named target.
-  Remaining: the metabolomics/BVOC target design with the operator's
-  science, larger farm rungs, and closing the weather gap. Distributed/
-  GPU training only when single-node ceilings measurably bind.
+  Landing B3 (metab_confidence) DONE: the artcal campaign's SIRIUS
+  rank-1 structure calls as a corpus — 17,611 rows across 138
+  co-elution windows, target COSMIC ConfidenceScoreExact, predictors
+  pre-annotation measurables only; the four arms tie (spread 0.12% of
+  RMSE) and the honest finding is scientific: R² 0.004-0.025 — a
+  weak-signal entry where learner differences are noise. Remaining:
+  the BVOC target design with the operator's science, larger farm
+  rungs, and closing the weather gap. Distributed/GPU training only
+  when single-node ceilings measurably bind.
 
 Out of scope until a real need names them: sparse-matrix input, external
 memory, DART, in-library CV (covenant_ml owns CV).
