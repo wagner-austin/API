@@ -1,9 +1,10 @@
 """Teleport-based harvest steps of the COLLECT cascade.
 
 The larder family (cascade step 5: known-stock hops before any
-discovery) plus the marooned-ladder rungs (desperation hop and
-walk-for-fuel last resort). In-viewport pickups live in
-:mod:`collect_pickups`; lock continuation in :mod:`collect_locks`.
+discovery) plus the marooned desperation hop. The marooned
+walk-and-pan last resort lives in :mod:`maroon_walk`; in-viewport
+pickups in :mod:`collect_pickups`; lock continuation in
+:mod:`collect_locks`.
 """
 
 from __future__ import annotations
@@ -16,13 +17,11 @@ from tankpit_bot.bot.ai.collect_common import (
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision, set_resource_target
 from tankpit_bot.bot.ai.equipment_search import find_all_tracked_equipment
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
-from tankpit_bot.bot.ai.intent import release_collect_plan
 from tankpit_bot.bot.ai.larder import WALK_DOMINANT_RANGE, select_fuel_larder_hop
 from tankpit_bot.bot.ai.mode_gates import (
     hunt_entry_permitted,
     weapon_reserves_below_break,
 )
-from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -36,7 +35,6 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
 )
 from tankpit_bot.state.types import ContainerStateDict
-from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 
 def _equipment_hop_landing(
@@ -483,104 +481,8 @@ def desperation_fuel_hop(
     )
 
 
-WALK_FOR_FUEL_MAX_TILES = 48
-"""Farthest known fuel a marooned tank will walk toward (~96 s of
-2 s-per-tile walking). Beyond this the out_of_fuel exit stands -- the
-2026-07-25 exposure rule caps how long a broke tank crawls in the
-open, even in the practice room where bots never initiate."""
-
-
-def walk_for_fuel_last_resort(
-    ctx: DecideCtx,
-    base_state: AIStateDict,
-) -> TickDecisionDict | None:
-    """Walk toward the nearest known fuel instead of exiting broke.
-
-    The final rung before the ``out_of_fuel`` exit, reached only when
-    every pickup, larder hop, forage step, and dot hop has declined at
-    critical fuel. Walking is free at any fuel level (the density
-    probe's marooned-recovery law, [[walk-mechanics]]), so a tank with
-    known fuel in walking range is NOT actually stuck: runs
-    bot-20260728-090813/-091209 exited at fuel 98/88 in a shore corner
-    with the whole dot atlas 15+ unaffordable-teleport tiles away.
-    Each tick walks one in-viewport leg toward the nearest candidate
-    (map dot or believed container); arrival is handled by the normal
-    cascade -- fresh ground re-enables forage, scans, and pickups.
-
-    Args:
-        ctx: Decision context.
-        base_state: Base AI state to rewrite for the produced command.
-
-    Returns:
-        A one-leg walk decision, or ``None`` when no known fuel is
-        inside the walk cap or no leg is walkable (the exit stands).
-        The caller guarantees critical fuel -- the healthy-fuel tick
-        resolved via the hunt handoff before this rung.
-    """
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    candidates: list[tuple[int, int, int]] = []
-    for dot_x, dot_y in ctx.map_fuel_dots:
-        candidates.append((abs(dot_x - sx) + abs(dot_y - sy), dot_x, dot_y))
-    for container in ctx.world["containers"].values():
-        if not container["is_fuel"] or container["volume"] <= 0:
-            continue
-        if container["failed_pickups"] > 0:
-            continue
-        candidates.append(
-            (abs(container["x"] - sx) + abs(container["y"] - sy), container["x"], container["y"])
-        )
-    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-    # Nearest-first over EVERY candidate inside the cap: in a shore
-    # corner the closest entries are water-locked containers whose leg
-    # resolves to a teleport fallback, not a walk (run
-    # bot-20260728-092357 gave up after trying only the nearest and
-    # exited with dots in walking range further down the list).
-    for _, target_x, target_y in sorted(
-        c for c in candidates if 0 < c[0] <= WALK_FOR_FUEL_MAX_TILES
-    ):
-        terrain = ctx.terrain
-        if terrain is not None and not terrain.is_passable(target_x, target_y):
-            continue
-        leg_x = min(max(target_x, left), right)
-        leg_y = min(max(target_y, top), bottom)
-        if (leg_x, leg_y) == (sx, sy):
-            continue
-        command = walk_or_teleport(ctx, leg_x, leg_y, pickup_kind=None)
-        if command is None or command["cmd_type"] != "move":
-            continue
-        emit_ai(
-            "marooned at fuel %d: walking leg (%d,%d) toward known fuel at (%d,%d)",
-            ctx.fuel,
-            leg_x,
-            leg_y,
-            target_x,
-            target_y,
-        )
-        emit_diagnostic(
-            diagnostic_kind="walk_for_fuel",
-            target_x=target_x,
-            target_y=target_y,
-            leg_x=leg_x,
-            leg_y=leg_y,
-            fuel=ctx.fuel,
-        )
-        return make_decision(
-            command,
-            "COLLECT",
-            COLLECT_SCORE,
-            leg_x,
-            leg_y,
-            "walk_for_fuel",
-            release_collect_plan(base_state, reason="walk_for_fuel_override"),
-            ctx.equip,
-        )
-    return None
-
-
 __all__ = [
-    "WALK_FOR_FUEL_MAX_TILES",
     "desperation_fuel_hop",
     "hop_toward_equipment",
     "larder_harvest",
-    "walk_for_fuel_last_resort",
 ]

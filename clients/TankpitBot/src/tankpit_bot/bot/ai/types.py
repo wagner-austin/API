@@ -254,6 +254,15 @@ class AIStateDict(TypedDict):
             the block-freshness gate governs the next start.
         sweep_anchor_y: Y of the quad sweep's anchor tile (-1 when no
             sweep is latched).
+        maroon_pan_x: X of the tank's position at the last marooned-walk
+            viewport pan dispatch (-1 before any). The movement law: a
+            pan must pay for itself in movement before the next one, so
+            the walk-for-fuel rung refuses a second pan from the exact
+            latched tile. Without it two stuck candidates on opposite
+            sides would ping-pong the free window forever (run
+            bot-20260825-133452 oscillated 331 s between clamp tiles;
+            the pan gait must not inherit the loop).
+        maroon_pan_y: Y of that latched position (-1 before any).
     """
 
     config: AIConfigDict
@@ -294,6 +303,8 @@ class AIStateDict(TypedDict):
     last_scope_scout_ms: int
     sweep_anchor_x: int
     sweep_anchor_y: int
+    maroon_pan_x: int
+    maroon_pan_y: int
 
 
 def make_respawn_ai_state(previous: AIStateDict) -> AIStateDict:
@@ -389,6 +400,8 @@ def make_initial_ai_state(
         last_scope_scout_ms=0,
         sweep_anchor_x=-1,
         sweep_anchor_y=-1,
+        maroon_pan_x=-1,
+        maroon_pan_y=-1,
     )
 
 

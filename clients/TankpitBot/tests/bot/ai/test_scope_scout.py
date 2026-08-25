@@ -11,6 +11,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.scope_scout import (
     SCOPE_SCOUT_COOLDOWN_MS,
+    pan_plan_toward,
     scope_direction_toward,
     scope_scout_for_ferry,
 )
@@ -72,6 +73,31 @@ def test_direction_declines_a_pan_that_changes_nothing() -> None:
     """An east goal after an east pan re-derives the same window."""
     panned_east = (100, 92, 115, 107)
     assert scope_direction_toward(panned_east, 100, 100, 110, 100) is None
+
+
+def test_pan_plan_serves_goals_beyond_one_pan() -> None:
+    """The uncapped core pans at fuel a whole window away.
+
+    The marooned walk-for-fuel gait's case: the goal itself stays out
+    of reach, but the direction reveals the next 15 tiles of route.
+    """
+    assert pan_plan_toward(_REST_WINDOW, 100, 100, 130, 100) == (SCOPE_EAST, 100, 92)
+
+
+def test_pan_plan_names_the_anchored_origin_on_both_axes() -> None:
+    """A diagonal plan reports the anchor law's origin for each axis."""
+    assert pan_plan_toward(_REST_WINDOW, 100, 100, 90, 130) == (SCOPE_SOUTHWEST, 85, 100)
+
+
+def test_pan_plan_declines_the_tanks_own_tile() -> None:
+    """No compass sign, no plan — the same law as the capped scout."""
+    assert pan_plan_toward(_REST_WINDOW, 100, 100, 100, 100) is None
+
+
+def test_pan_plan_declines_a_pan_that_changes_nothing() -> None:
+    """An east goal after an east pan re-derives the same window."""
+    panned_east = (100, 92, 115, 107)
+    assert pan_plan_toward(panned_east, 100, 100, 130, 100) is None
 
 
 def _water_blob(cx: int, cy: int, radius: int = 2) -> dict[tuple[int, int], str]:

@@ -6,8 +6,10 @@ import pytest
 
 from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.maroon_walk import _maroon_pan_toward
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.protocol.commands import SCOPE_EAST
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import make_container_state, make_viewport_state
 from tests.bot.ai._support import (
@@ -135,13 +137,18 @@ def test_marooned_exit_ignores_blacklisted_containers() -> None:
         decide_collect_mode(_marooned_ctx(with_blacklisted_sliver=True))
 
 
-def test_marooned_walk_declines_when_the_leg_is_the_current_tile() -> None:
-    """A target clamping onto the tank's own tile produces no walk.
+def _edge_ctx(
+    *,
+    maroon_pan: tuple[int, int] | None = None,
+    terrain: InMemoryTerrainMap | None = None,
+    terrain_blind: bool = False,
+) -> DecideCtx:
+    """A broke tank ON the viewport's right edge, the only dot beyond it.
 
-    The tank sits on the viewport's right edge (the frame recenters
-    only at edges, so self-on-edge is a real geometry): the eastward
-    dot clamps onto the tank's own tile, no leg exists, and the exit
-    stands.
+    The bot-20260825-133452 geometry: self at (100,100) on the window's
+    east edge (85,92)-(100,107), the fuel dot at (130,100) outside it.
+    Every walking leg clamps onto the tank's own tile, so the window is
+    exhausted and only a free pan can make progress.
     """
     ws = WorldService()
     world, self_state = make_world(self_x=100, self_y=100, fuel=88, scanned=True)
@@ -156,20 +163,106 @@ def test_marooned_walk_declines_when_the_leg_is_the_current_tile() -> None:
             "last_map_open_ms": 99000,
         }
     )
-    ctx = DecideCtx(
+    if maroon_pan is not None:
+        ai_state = AIStateDict(
+            **{**ai_state, "maroon_pan_x": maroon_pan[0], "maroon_pan_y": maroon_pan[1]}
+        )
+    return DecideCtx(
         world,
         self_state,
         ai_state,
         make_inventory(),
         100000,
-        InMemoryTerrainMap(),
+        None if terrain_blind else (terrain if terrain is not None else InMemoryTerrainMap()),
         "",
         ((130, 100),),
         ws=ws,
     )
 
+
+def test_marooned_edge_clamp_pans_the_window_toward_the_fuel() -> None:
+    """A target clamping onto the tank's own tile buys a free pan.
+
+    The run bot-20260825-133452 root: with autoscroll pinned OFF the
+    window never moves on its own, and the pre-pan walker skipped any
+    candidate whose leg clamped onto the tank — shuttling between clamp
+    tiles for 331 s while fuel sat three tiles past the edge. The
+    exhausted window now spends the free Rb pan instead: the anchor law
+    reveals 15 fresh tiles toward the dot and the next leg walks them.
+    """
+    decision = decide_collect_mode(_edge_ctx())
+
+    if decision is None:
+        raise AssertionError("expected walk-for-fuel pan decision")
+    assert decision["behavior"]["reason_kind"] == "walk_for_fuel_pan"
+    assert decision["command"]["cmd_type"] == "scope_shift"
+    assert decision["command"]["direction"] == SCOPE_EAST
+    updated = decision["updated_ai_state"]
+    assert updated["maroon_pan_x"] == 100
+    assert updated["maroon_pan_y"] == 100
+
+
+def test_maroon_pan_obeys_the_movement_law() -> None:
+    """No second pan from the latched tile: the exit stands.
+
+    A pan must pay for itself in movement — with the latch already at
+    the tank's tile, the rung refuses to ping-pong the free window and
+    the out_of_fuel exit takes over.
+    """
+    ctx = _edge_ctx(maroon_pan=(100, 100))
+
     with pytest.raises(SessionExitError, match="out_of_fuel"):
         decide_collect_mode(ctx)
+
+
+def test_maroon_pan_allowed_after_movement_releases_the_latch() -> None:
+    """A latch at a DIFFERENT tile does not bar the pan."""
+    ctx = _edge_ctx(maroon_pan=(99, 100))
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected walk-for-fuel pan decision")
+    assert decision["behavior"]["reason_kind"] == "walk_for_fuel_pan"
+
+
+def test_maroon_pan_refuses_a_known_impassable_post_pan_leg() -> None:
+    """Post-pan clamp tile known impassable: no free action is wasted.
+
+    The east pan would clamp the dot to (115,100); with that tile
+    water, the terrain veto refuses the pan up front and the exit
+    stands instead of proving on the wire what the map already knows.
+    """
+    ctx = _edge_ctx(terrain=InMemoryTerrainMap({(115, 100): "W"}))
+
+    with pytest.raises(SessionExitError, match="out_of_fuel"):
+        decide_collect_mode(ctx)
+
+
+def test_maroon_pan_serves_a_terrain_blind_context() -> None:
+    """Without a terrain map the veto cannot judge; the pan proceeds.
+
+    The terrain veto is an optimization over KNOWN ground, never a
+    requirement — a terrain-blind session still gets its recovery
+    gait and lets the wire answer for the revealed tiles.
+    """
+    ctx = _edge_ctx(terrain_blind=True)
+    decision = _maroon_pan_toward(ctx, ctx.ai_state, 130, 100)
+    if decision is None:
+        raise AssertionError("expected a pan decision")
+    assert decision["command"]["cmd_type"] == "scope_shift"
+    assert decision["command"]["direction"] == SCOPE_EAST
+
+
+def test_maroon_pan_helper_declines_the_tanks_own_tile_target() -> None:
+    """The helper guards its own contract: target on self pans nowhere.
+
+    The walker's distance filter never passes a zero-distance
+    candidate, but the helper's refusal must not depend on caller
+    filtering.
+    """
+    ctx = _edge_ctx()
+    decision = _maroon_pan_toward(ctx, ctx.ai_state, 100, 100)
+    assert decision is None
 
 
 def test_desperation_hop_beats_a_long_walk_to_a_far_dot() -> None:

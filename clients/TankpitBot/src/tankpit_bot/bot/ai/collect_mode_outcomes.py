@@ -10,10 +10,8 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.collect_hops import (
-    WALK_FOR_FUEL_MAX_TILES,
     desperation_fuel_hop,
     larder_harvest,
-    walk_for_fuel_last_resort,
 )
 from tankpit_bot.bot.ai.collect_locks import continue_or_release_lock
 from tankpit_bot.bot.ai.collect_pickups import (
@@ -29,6 +27,10 @@ from tankpit_bot.bot.ai.intent import (
     current_collect_plan,
     plan_completes_here,
     release_collect_plan,
+)
+from tankpit_bot.bot.ai.maroon_walk import (
+    WALK_FOR_FUEL_MAX_TILES,
+    walk_for_fuel_last_resort,
 )
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 from tankpit_bot.bot.ai.resource_search import (

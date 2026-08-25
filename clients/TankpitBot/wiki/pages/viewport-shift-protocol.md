@@ -115,6 +115,29 @@ Every "Extend view" game-log line is followed by a `0x5A` 0–2 s later — prov
 
 **The bot now sends `Rb`** — the scope-shift capability landed end to end: `make_scope_shift_command` → executor → `bot_dispatch.scope_shift` (`build_scope_command`, fire-and-forget like chat; the sniffer's 0x5A ingestion updates the origin when the confirm lands). First doctrine consumer is the **ferry scope scout** (`bot/ai/scope_scout.py`): when the larder declines a water-locked container `no_landing` and no fresh ferry belief exists, one FREE pan at the goal's water runs before any discovery teleport — a revealed ferry arrives as a 0x5A terrain-5 patch and the next larder tick hops `ferry_served` ([[ferry-mechanics]]). One pan per 30 s cooldown (`SCOPE_SCOUT_COOLDOWN_MS` — a no-ferry pan leaves no negative belief, so the latch is what stops a re-fire loop); never during a held combat lock. `Ia` is sent only by the session-start OFF dance; `Sb` remains unsent. The sim enforces the anchor law (`sim/viewport_window.py::apply_scope_shift`, all 8 measured rows pinned in `tests/sim/test_scope.py`)  and answers every client `Rb` with the shifted 0x5A.[^7]
 
+**Second doctrine consumer (2026-08-25): the marooned pan-walk gait**
+(`bot/ai/maroon_walk.py`). Run bot-20260825-133452 (Artax, entry fuel
+0) proved the walk-for-fuel last resort could not cross a window
+boundary: its legs clamp to the stored window, autoscroll is OFF, and
+once the tank stood ON a candidate's clamp tile the walker skipped it
+— the session shuttled 331 s between the clamp tiles of two fuel
+destinations, with fuel three tiles past the west edge never reached.
+The fix: an exhausted window (leg == self) now spends a free pan
+toward the fuel via `pan_plan_toward` (the ferry scout's compass/anchor
+core, reach cap removed — a far goal still names the direction that
+reveals the next 15 tiles of route), so a broke tank traverses at
+walk-window granularity: pan, walk the revealed stretch, pan again.
+Two guards bound the free pans: the **movement law** (the dispatch
+position is latched in `maroon_pan_x/y`; no second pan fires from the
+same tile, so two stuck candidates on opposite sides cannot ping-pong
+the window) and the **terrain veto** (a known-impassable post-pan
+clamp tile refuses the pan up front). Deterministic cell:
+`tests/sim/test_maroon_recovery_seam.py` — a fuel-0 tank reaches a
+container 30 tiles out through two confirmed pans and refuels. This
+does NOT reopen the walking-as-travel question: the gait exists only
+on the marooned rung, under the 48-tile walk cap, where teleporting
+is arithmetically impossible.
+
 **The scope-pending radar drop (2026-08-20, FIXED same day):** a `radar`
 dispatched while an `Rb` awaits its 0x5A is **silently dropped by the
 server — no charge, no response** (the fuel receipt around the drop

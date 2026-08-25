@@ -402,6 +402,8 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "last_scope_scout_ms": state["last_scope_scout_ms"],
         "sweep_anchor_x": state["sweep_anchor_x"],
         "sweep_anchor_y": state["sweep_anchor_y"],
+        "maroon_pan_x": state["maroon_pan_x"],
+        "maroon_pan_y": state["maroon_pan_y"],
     }
 
 
@@ -531,6 +533,8 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         last_scope_scout_ms=require_int(data, "last_scope_scout_ms"),
         sweep_anchor_x=require_int(data, "sweep_anchor_x"),
         sweep_anchor_y=require_int(data, "sweep_anchor_y"),
+        maroon_pan_x=require_int(data, "maroon_pan_x"),
+        maroon_pan_y=require_int(data, "maroon_pan_y"),
         visited_tank_ids=_require_str_int_mapping(data, "visited_tank_ids"),
     )
 

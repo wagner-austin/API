@@ -121,6 +121,19 @@ class TestAIStateDetail:
         assert decoded["greeted_tank_ids"] == {"1229": 100000, "31": 105000}
         assert decoded["visited_tank_ids"] == {"1229": 101000}
 
+    def test_encode_decode_roundtrip_with_maroon_pan_latch(self) -> None:
+        """Encode/decode preserves the marooned-pan movement-law latch."""
+        from tankpit_bot.bot.ai.types import AIStateDict
+
+        original = make_initial_ai_state()
+        assert original["maroon_pan_x"] == -1
+        assert original["maroon_pan_y"] == -1
+        state = AIStateDict(**{**original, "maroon_pan_x": 113, "maroon_pan_y": 221})
+        encoded = encode_ai_state(state)
+        decoded = decode_ai_state(encoded)
+        assert decoded["maroon_pan_x"] == 113
+        assert decoded["maroon_pan_y"] == 221
+
     def test_decode_missing_greeted_tank_ids_raises(self) -> None:
         """Missing ``greeted_tank_ids`` raises — no back-compat default."""
         original = make_initial_ai_state()

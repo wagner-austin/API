@@ -65,6 +65,66 @@ window extends exactly 15 tiles from the tank in the requested
 direction (wire-measured 2026-08-01, [[viewport-shift-protocol]])."""
 
 
+def pan_plan_toward(
+    window: tuple[int, int, int, int],
+    sx: int,
+    sy: int,
+    goal_x: int,
+    goal_y: int,
+) -> tuple[int, int, int] | None:
+    """Compass byte plus anchored origin for a pan toward a goal.
+
+    The direction is the tank→goal compass sign; the anchored origin
+    is where the window's (left, top) lands under the measured anchor
+    law ([[viewport-shift-protocol]]): the server pins the tank to the
+    trailing edge, so the shifted window extends
+    :data:`SCOPE_REACH_TILES` from the tank in the requested
+    direction. No reach cap here — a goal beyond one pan still names
+    the direction that reveals the next window of route toward it
+    (the marooned walk-for-fuel gait's case; the ferry scout adds its
+    own cap in :func:`scope_direction_toward`).
+
+    Args:
+        window: Inclusive current window bounds (left, top, right,
+            bottom) — the stored 0x5A window.
+        sx: Self X.
+        sy: Self Y.
+        goal_x: Goal tile X.
+        goal_y: Goal tile Y.
+
+    Returns:
+        ``(direction, anchored_left, anchored_top)``, or ``None`` when
+        the goal IS the tank's own tile (no axis to pan) or the
+        anchored window IS the current window (the pan would reveal
+        nothing — e.g. right after a previous pan the same way).
+    """
+    east = goal_x > sx
+    west = goal_x < sx
+    south = goal_y > sy
+    north = goal_y < sy
+    if not (east or west or south or north):
+        return None
+    if north:
+        direction = SCOPE_NORTHEAST if east else SCOPE_NORTHWEST if west else SCOPE_NORTH
+    elif south:
+        direction = SCOPE_SOUTHEAST if east else SCOPE_SOUTHWEST if west else SCOPE_SOUTH
+    else:
+        direction = SCOPE_EAST if east else SCOPE_WEST
+    left, top = window[0], window[1]
+    shifted_left, shifted_top = left, top
+    if east:
+        shifted_left = sx
+    elif west:
+        shifted_left = sx - SCOPE_REACH_TILES
+    if south:
+        shifted_top = sy
+    elif north:
+        shifted_top = sy - SCOPE_REACH_TILES
+    if (shifted_left, shifted_top) == (left, top):
+        return None
+    return direction, shifted_left, shifted_top
+
+
 def scope_direction_toward(
     window: tuple[int, int, int, int],
     sx: int,
@@ -98,29 +158,10 @@ def scope_direction_toward(
     """
     if max(abs(goal_x - sx), abs(goal_y - sy)) > SCOPE_REACH_TILES:
         return None
-    east = goal_x > sx
-    west = goal_x < sx
-    south = goal_y > sy
-    north = goal_y < sy
-    if north:
-        direction = SCOPE_NORTHEAST if east else SCOPE_NORTHWEST if west else SCOPE_NORTH
-    elif south:
-        direction = SCOPE_SOUTHEAST if east else SCOPE_SOUTHWEST if west else SCOPE_SOUTH
-    else:
-        direction = SCOPE_EAST if east else SCOPE_WEST
-    left, top = window[0], window[1]
-    shifted_left, shifted_top = left, top
-    if east:
-        shifted_left = sx
-    elif west:
-        shifted_left = sx - SCOPE_REACH_TILES
-    if south:
-        shifted_top = sy
-    elif north:
-        shifted_top = sy - SCOPE_REACH_TILES
-    if (shifted_left, shifted_top) == (left, top):
+    plan = pan_plan_toward(window, sx, sy, goal_x, goal_y)
+    if plan is None:
         return None
-    return direction
+    return plan[0]
 
 
 def _water_locked_goals(ctx: DecideCtx) -> list[tuple[int, int]]:
@@ -229,6 +270,7 @@ def scope_scout_for_ferry(
 __all__ = [
     "SCOPE_REACH_TILES",
     "SCOPE_SCOUT_COOLDOWN_MS",
+    "pan_plan_toward",
     "scope_direction_toward",
     "scope_scout_for_ferry",
 ]
