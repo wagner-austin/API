@@ -1,0 +1,110 @@
+host      hpc3-21-11
+job       55571932
+restart   0
+gpu       cpu-only
+2026-08-25T03:05:55-07:00
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Hyperparameter Optimization                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+                               Run Configuration                                
+┌────────────────┬────────────┬────────────────────────────────────────────────┐
+│ Backend        │ LightGBM   │ ML model backend                               │
+│ Dataset        │ US         │ External bankruptcy dataset                    │
+│ Trials         │ 40         │ Optuna TPE Bayesian optimization trials        │
+│ Feature Preset │ full       │ Original + log + ratios + products (max ~800   │
+│                │            │ features)                                      │
+│ Device         │ CPU        │ GPU (CUDA) or CPU                              │
+│ Optimizer      │ Optuna TPE │ Tree-structured Parzen Estimator               │
+│ Metric         │ AUC-ROC    │ Area under ROC curve (validation set)          │
+└────────────────┴────────────┴────────────────────────────────────────────────┘
+
+INFO     Starting Optuna TPE optimization                                       
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Optuna TPE optimization complete                                       
+  18m 48s Saving results... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OPTIMIZATION COMPLETE                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+                Optimization Results                
+┌────────────────┬─────────────────────────────────┐
+│ Backend        │ LightGBM                        │
+│ Dataset        │ US                              │
+│ Feature Preset │ full                            │
+│ Samples        │ 78,682                          │
+│ Features       │ 495                             │
+│ Best AUC       │  0.8911                         │
+│ Best Trial     │ #21                             │
+│ Trials         │ 40 complete, 0 pruned, 0 failed │
+│ Time           │ 1128.1s                         │
+└────────────────┴─────────────────────────────────┘
+
+Best Hyperparameters (LightGBM) 
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┓
+┃ Parameter        ┃     Value ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━┩
+│ n_estimators     │       500 │
+│ num_leaves       │        72 │
+│ learning_rate    │  0.092938 │
+│ reg_alpha        │  0.016395 │
+│ reg_lambda       │ 49.762357 │
+│ subsample        │  0.766147 │
+│ colsample_bytree │  0.811264 │
+│ boosting_type    │      gbdt │
+└──────────────────┴───────────┘
+
+                Run Comparison                
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━┓
+┃ Metric          ┃    AUC ┃     Delta ┃ Run ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━┩
+│ Current Run     │ 0.8911 │           │ now │
+│ Previous Best   │    N/A │ first run │     │
+│ All-Time Best ★ │ 0.8911 │       NEW │ now │
+└─────────────────┴────────┴───────────┴─────┘
+
+ ★ NEW BEST AUC: 0.8911 ★ 
+
+2026-08-25T03:24:46-07:00
+exit      0

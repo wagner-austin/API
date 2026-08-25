@@ -169,7 +169,15 @@ finding — contamination is physicochemically distinguishable at AUC
 ~0.87 with no intensity information, so a blank-filter prior exists
 even where blanks are missing or disputed.
 
-## Remaining P6 scope
+## Rung 5 — tuned vs tuned, the capstone
 
-Larger-budget farm rungs (100+ trials with the coarseness dial in the
-space) whenever the standing numbers warrant another push.
+Each dataset's best preset, both engines tuned over their OWN Optuna
+spaces at matched budgets (100 trials; 40 on us-full): ClearGBM takes
+taiwan 0.9640 vs 0.9581 and kaggle 0.8708 vs 0.8699; LightGBM takes
+polish by 0.0012 and us by four points — measured to be a
+tuning-surface asymmetry (ClearGBM's space pins
+max_features/colsample/reg_lambda, knobs the engine has), the named
+successor: search-space parity. Three of four ClearGBM winners tuned a
+coarseness floor; taiwan's winner chose none — a dial, not a default.
+P6 closed with this rung
+(`BENCHMARK_RESULTS_2026-08-25_p6_rung5_tuned_vs_tuned.md`).

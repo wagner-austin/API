@@ -116,7 +116,7 @@ The primary operator of this library is an AI session. Therefore:
   many-million-row, many-thread scale. EFB is EXCLUDED: its habitat is
   sparse one-hot data the registry lacks, and its hardcoded 1/10000
   conflict budget would need a knob no corpus yet names.
-- **P6 — Scale.** IN PROGRESS 2026-08-24 — see
+- **P6 — Scale.** DONE 2026-08-25 — see
   [[cleargbm-hpc3-farm-and-rw-value]]. Landing A (the farm) DONE: ClearGBM
   runs on HPC3's free CPU partition through tools/hpc3; the first rung put
   320 Optuna trials (16 members, 4 datasets x 4 presets) through compute
@@ -158,8 +158,16 @@ The primary operator of this library is an AI session. Therefore:
   measurably recovers the retired regularization — inert at
   conventional floors on this corpus, 0.7460 at floor 32768 vs
   LightGBM's 0.7299 on the identical protocol, with a real optimum.
-  Distributed/GPU training only when single-node ceilings measurably
-  bind.
+  Landing B5 (metab_blank) completed the named corpus scope —
+  blank-vs-real peaks predictable at AUC ~0.87 from physicochemical
+  features alone, a three-way engine tie. Rung 5 capped the phase
+  with tuned-vs-tuned at 100-trial budgets: ClearGBM takes taiwan
+  (0.9640 vs 0.9581) and kaggle (0.8708 vs 0.8699), LightGBM takes
+  polish by 0.0012 and us by 4 points — the us gap measured to be a
+  TUNING-SURFACE asymmetry (ClearGBM's space never samples
+  max_features/colsample/reg_lambda, knobs the engine has), the named
+  successor: search-space parity. Distributed/GPU training only when
+  single-node ceilings measurably bind.
 
 Out of scope until a real need names them: sparse-matrix input, external
 memory, DART, in-library CV (covenant_ml owns CV).

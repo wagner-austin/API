@@ -1,0 +1,270 @@
+host      hpc3-14-20
+job       55571926
+restart   0
+gpu       cpu-only
+2026-08-25T03:05:26-07:00
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Hyperparameter Optimization                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+                              Run Configuration                              
+┌────────────────┬─────────────┬────────────────────────────────────────────┐
+│ Backend        │ ClearGBM    │ ML model backend                           │
+│ Dataset        │ TAIWAN      │ External bankruptcy dataset                │
+│ Trials         │ 100         │ Optuna TPE Bayesian optimization trials    │
+│ Feature Preset │ ratios_only │ Original + pairwise ratios (capped at 500) │
+│ Device         │ CPU         │ GPU (CUDA) or CPU                          │
+│ Optimizer      │ Optuna TPE  │ Tree-structured Parzen Estimator           │
+│ Metric         │ AUC-ROC     │ Area under ROC curve (validation set)      │
+└────────────────┴─────────────┴────────────────────────────────────────────┘
+
+INFO     Applied feature engineering for ClearGBM                               
+INFO     Starting Optuna TPE optimization                                       
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Optuna TPE optimization complete                                       
+  11m 51s Saving results... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OPTIMIZATION COMPLETE                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+                Optimization Results                 
+┌────────────────┬──────────────────────────────────┐
+│ Backend        │ ClearGBM                         │
+│ Dataset        │ TAIWAN                           │
+│ Feature Preset │ ratios_only                      │
+│ Samples        │ 6,819                            │
+│ Features       │ 595                              │
+│ Best AUC       │  0.9640                          │
+│ Best Trial     │ #72                              │
+│ Trials         │ 100 complete, 0 pruned, 0 failed │
+│ Time           │ 711.3s                           │
+└────────────────┴──────────────────────────────────┘
+
+  Best Hyperparameters (ClearGBM)   
+┏━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Parameter             ┃    Value ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ max_depth             │       10 │
+│ n_estimators          │      193 │
+│ min_samples_split     │       46 │
+│ min_samples_leaf      │       18 │
+│ min_data_in_bin_denom │        1 │
+│ max_bins              │       64 │
+│ learning_rate         │ 0.046850 │
+│ subsample             │ 0.878938 │
+└───────────────────────┴──────────┘
+
+                Run Comparison                
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━┓
+┃ Metric          ┃    AUC ┃     Delta ┃ Run ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━┩
+│ Current Run     │ 0.9640 │           │ now │
+│ Previous Best   │    N/A │ first run │     │
+│ All-Time Best ★ │ 0.9640 │       NEW │ now │
+└─────────────────┴────────┴───────────┴─────┘
+
+ ★ NEW BEST AUC: 0.9640 ★ 
+
+2026-08-25T03:17:20-07:00
+exit      0

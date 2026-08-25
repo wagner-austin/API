@@ -1,0 +1,172 @@
+host      hpc3-15-28
+job       55571928
+restart   0
+gpu       cpu-only
+2026-08-25T03:05:35-07:00
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Hyperparameter Optimization                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+                              Run Configuration                              
+┌────────────────┬─────────────┬────────────────────────────────────────────┐
+│ Backend        │ LightGBM    │ ML model backend                           │
+│ Dataset        │ TAIWAN      │ External bankruptcy dataset                │
+│ Trials         │ 100         │ Optuna TPE Bayesian optimization trials    │
+│ Feature Preset │ ratios_only │ Original + pairwise ratios (capped at 500) │
+│ Device         │ CPU         │ GPU (CUDA) or CPU                          │
+│ Optimizer      │ Optuna TPE  │ Tree-structured Parzen Estimator           │
+│ Metric         │ AUC-ROC     │ Area under ROC curve (validation set)      │
+└────────────────┴─────────────┴────────────────────────────────────────────┘
+
+INFO     Starting Optuna TPE optimization                                       
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Trial complete                                                         
+INFO     Optuna TPE optimization complete                                       
+  4m 08s Saving results... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OPTIMIZATION COMPLETE                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+                Optimization Results                 
+┌────────────────┬──────────────────────────────────┐
+│ Backend        │ LightGBM                         │
+│ Dataset        │ TAIWAN                           │
+│ Feature Preset │ ratios_only                      │
+│ Samples        │ 6,819                            │
+│ Features       │ 595                              │
+│ Best AUC       │  0.9581                          │
+│ Best Trial     │ #88                              │
+│ Trials         │ 100 complete, 0 pruned, 0 failed │
+│ Time           │ 248.9s                           │
+└────────────────┴──────────────────────────────────┘
+
+Best Hyperparameters (LightGBM)
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Parameter        ┃    Value ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ n_estimators     │      265 │
+│ num_leaves       │       50 │
+│ learning_rate    │ 0.096888 │
+│ reg_alpha        │ 6.196310 │
+│ reg_lambda       │ 1.720207 │
+│ subsample        │ 0.687237 │
+│ colsample_bytree │ 0.650139 │
+│ drop_rate        │ 0.096922 │
+│ skip_drop        │ 0.268176 │
+│ feature_fraction │ 0.097429 │
+│ boosting_type    │     dart │
+└──────────────────┴──────────┘
+
+                Run Comparison                
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━┓
+┃ Metric          ┃    AUC ┃     Delta ┃ Run ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━┩
+│ Current Run     │ 0.9581 │           │ now │
+│ Previous Best   │    N/A │ first run │     │
+│ All-Time Best ★ │ 0.9581 │       NEW │ now │
+└─────────────────┴────────┴───────────┴─────┘
+
+ ★ NEW BEST AUC: 0.9581 ★ 
+
+2026-08-25T03:09:47-07:00
+exit      0
