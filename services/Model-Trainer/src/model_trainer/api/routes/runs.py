@@ -340,6 +340,7 @@ class _RunsRoutes:
             "accuracy": out["accuracy"],
             "chance": out["chance"],
             "outcomes": out["outcomes"],
+            "fingerprint": out["fingerprint"],
         }
 
     async def enqueue_baseline_cloze(self: _RunsRoutes, request: Request) -> BaselineClozeResponse:
@@ -393,6 +394,7 @@ class _RunsRoutes:
             "accuracy": out["accuracy"],
             "chance": out["chance"],
             "outcomes": out["outcomes"],
+            "fingerprint": out["fingerprint"],
         }
 
     async def enqueue_score(self: _RunsRoutes, run_id: str, request: Request) -> ScoreResponse:

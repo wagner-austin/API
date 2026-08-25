@@ -10,9 +10,10 @@ enabling strict mypy compliance without Any, cast, or type: ignore.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Final, Literal, TypedDict
+from typing import Final, Literal
 
 from platform_core.json_utils import JSONValue
+from typing_extensions import TypedDict
 
 from .testing import WandbModuleProtocol, hooks
 from .wandb_types import WandbInitResult

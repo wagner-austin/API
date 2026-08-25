@@ -9,13 +9,9 @@ from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import Response
 
-from platform_core.errors import (
-    AppError,
-    ErrorCode,
-    _JSONResponseProto,
-    _RequestProto,
-    install_exception_handlers,
-)
+from platform_core._asgi_protocols import _JSONResponseProto, _RequestProto
+from platform_core.errors import AppError, ErrorCode
+from platform_core.fastapi import install_exception_handlers
 from platform_core.json_utils import (
     InvalidJsonError,
     JSONObject,

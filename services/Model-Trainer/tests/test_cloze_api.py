@@ -35,6 +35,24 @@ from model_trainer.orchestrators.inference_orchestrator import InferenceOrchestr
 from model_trainer.orchestrators.tokenizer_orchestrator import TokenizerOrchestrator
 from model_trainer.orchestrators.training_orchestrator import TrainingOrchestrator
 
+# What a completed cloze record must carry beside the number: the
+# configuration it was produced under. An accuracy without one cannot be
+# compared with any other measurement, because a disagreement is
+# indistinguishable from a working image scored on a different card.
+_FINGERPRINT: JSONValue = {
+    "image_digest": "sha256:abc",
+    "gpu_model": "NVIDIA GeForce RTX 3090 Ti",
+    "driver_version": "591.86",
+    "determinism": {
+        "deterministic_algorithms": True,
+        "cublas_workspace_config": ":4096:8",
+        "matmul_tf32": False,
+        "cudnn_tf32": False,
+        "cudnn_deterministic": True,
+        "cudnn_benchmark": False,
+    },
+}
+
 
 def _install_fakes() -> FakeQueue:
     fake_queue = FakeQueue()
@@ -117,6 +135,7 @@ class TestClozeOrchestrator:
             "correct": 6,
             "accuracy": 0.75,
             "chance": 0.25,
+            "fingerprint": _FINGERPRINT,
         }
         redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
         out = orch.get_cloze("run123", "req123")
@@ -139,6 +158,7 @@ class TestClozeOrchestrator:
                 {"item_id": "a", "correct": True, "scores": [1.0, 2.0]},
                 {"item_id": "b", "correct": False, "scores": [2.0, 1.0]},
             ],
+            "fingerprint": _FINGERPRINT,
         }
         redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
         out = orch.get_cloze("run123", "req123")
@@ -148,6 +168,64 @@ class TestClozeOrchestrator:
         assert [o["item_id"] for o in outcomes] == ["a", "b"]
         assert [o["correct"] for o in outcomes] == [True, False]
         assert outcomes[0]["scores"] == [1.0, 2.0]
+
+    def test_get_refuses_a_completed_record_that_cannot_say_what_it_ran_on(self) -> None:
+        """The invariant this whole field exists for.
+
+        A number without its configuration is not comparable: a later
+        measurement that disagrees cannot be told apart from a working image
+        scored on a different card. Serving it anyway is worse than refusing,
+        because it looks comparable. The published 52.3030% floor is exactly
+        such a record, which is why this is not softened for old entries.
+        """
+        orch, redis, _ = self._make_orchestrator()
+        cache: dict[str, JSONValue] = {
+            "status": "completed",
+            "total": 2627,
+            "correct": 1374,
+            "accuracy": 0.523030072325847,
+            "chance": 0.25,
+        }
+        redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
+
+        with pytest.raises(AppError) as excinfo:
+            orch.get_cloze("run123", "req123")
+
+        err: AppError[ModelTrainerErrorCode] = excinfo.value
+        assert err.code == ModelTrainerErrorCode.CLOZE_FINGERPRINT_MISSING
+        assert "re-score it" in err.message
+
+    def test_an_unfinished_record_needs_no_fingerprint(self) -> None:
+        """A queued job computed no number, so nothing needs qualifying."""
+        orch, redis, _ = self._make_orchestrator()
+        cache: dict[str, JSONValue] = {"status": "running"}
+        redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
+
+        out = orch.get_cloze("run123", "req123")
+
+        assert out["status"] == "running"
+        assert out["fingerprint"] is None
+
+    def test_a_completed_record_returns_its_decoded_fingerprint(self) -> None:
+        orch, redis, _ = self._make_orchestrator()
+        cache: dict[str, JSONValue] = {
+            "status": "completed",
+            "total": 8,
+            "correct": 6,
+            "accuracy": 0.75,
+            "chance": 0.25,
+            "fingerprint": _FINGERPRINT,
+        }
+        redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
+
+        out = orch.get_cloze("run123", "req123")
+        fingerprint = out["fingerprint"]
+
+        if fingerprint is None:
+            raise AssertionError("expected a fingerprint on a completed record")
+        assert fingerprint["gpu_model"] == "NVIDIA GeForce RTX 3090 Ti"
+        assert fingerprint["driver_version"] == "591.86"
+        assert fingerprint["determinism"]["cublas_workspace_config"] == ":4096:8"
 
     def test_get_rejects_outcomes_that_are_not_a_list(self) -> None:
         orch, redis, _ = self._make_orchestrator()
@@ -252,6 +330,7 @@ class TestClozeRoutes:
             "correct": 3,
             "accuracy": 0.75,
             "chance": 0.25,
+            "fingerprint": _FINGERPRINT,
         }
         redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
         res = client.get("/runs/run123/cloze/req123", headers={"X-API-Key": "test-key"})
@@ -273,6 +352,7 @@ class TestClozeRoutes:
             "accuracy": 1.0,
             "chance": 0.25,
             "outcomes": [{"item_id": "page::1", "correct": True, "scores": [1.0, 3.0]}],
+            "fingerprint": _FINGERPRINT,
         }
         redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
         res = client.get("/runs/run123/cloze/req123", headers={"X-API-Key": "test-key"})
@@ -408,6 +488,7 @@ class TestBaselineClozeOrchestrator:
             "correct": 1374,
             "accuracy": 0.523,
             "chance": 0.25,
+            "fingerprint": _FINGERPRINT,
         }
         redis.set(baseline_cloze_key("gpt2", "file-1"), dump_json_str(cache))
 
@@ -493,6 +574,7 @@ class TestBaselineClozeRoutes:
             "accuracy": 0.523,
             "chance": 0.25,
             "outcomes": [{"item_id": "page::1", "correct": True, "scores": [1.0, 3.0]}],
+            "fingerprint": _FINGERPRINT,
         }
         redis.set(baseline_cloze_key("gpt2", "file-1"), dump_json_str(cache))
 

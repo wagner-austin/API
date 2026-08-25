@@ -42,7 +42,7 @@ What this module deliberately does NOT do:
 
 from __future__ import annotations
 
-from typing import Protocol, TypedDict
+from typing import Protocol
 
 # PyTorch's documented setting for deterministic cuBLAS reductions. It is read
 # by the CUDA runtime when the cuBLAS handle is created, which happens on
@@ -64,6 +64,7 @@ from platform_core.json_utils import (
     require_bool,
     require_str,
 )
+from typing_extensions import TypedDict
 
 
 class DeterminismReport(TypedDict):

@@ -32,7 +32,7 @@ a deviation belongs to whatever owns submission, which is not this layer.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal
 
 from platform_core.json_utils import (
     JSONObject,
@@ -43,6 +43,7 @@ from platform_core.json_utils import (
     require_float,
     require_str,
 )
+from typing_extensions import TypedDict
 
 from platform_ml.comparability import (
     AxisDifference,

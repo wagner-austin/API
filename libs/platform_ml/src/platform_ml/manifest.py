@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Final, Literal, NotRequired, TypedDict
+from typing import Final, Literal, NotRequired
 
 from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
+from typing_extensions import TypedDict
 
 
 def _require_nonempty_str(d: dict[str, JSONValue], key: str) -> str:

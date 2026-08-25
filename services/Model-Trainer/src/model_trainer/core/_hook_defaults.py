@@ -142,6 +142,38 @@ def _default_cuda_device_name() -> str:
     return torch.cuda.get_device_name(0)
 
 
+def _default_cuda_driver_version() -> str:
+    """Production cuda_driver_version - used as default hook.
+
+    Read from ``nvidia-smi`` rather than from torch. ``torch.version.cuda``
+    is the CUDA runtime the wheel was BUILT against (12.4 here) and is not
+    the driver; reporting it as one would put a wrong value in a field whose
+    whole purpose is telling two otherwise-identical configurations apart.
+    torch 2.6 exposes no public driver accessor -- everything NVML-side under
+    ``torch.cuda`` is underscore-private.
+
+    Callers gate on the run's device being "cuda", which means CUDA
+    initialised, which means the driver answered. A failure here is therefore
+    a real fault and propagates: a fingerprint that quietly records "unknown"
+    for a run that HAD a driver would make two different configurations
+    compare equal, which is the one outcome this field exists to prevent.
+
+    Returns:
+        The NVIDIA driver version, e.g. ``"591.86"``.
+
+    Raises:
+        CalledProcessError: When nvidia-smi exits non-zero.
+        FileNotFoundError: When nvidia-smi is not present.
+    """
+    import subprocess as _sp
+
+    out = _sp.check_output(
+        ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+        stderr=_sp.DEVNULL,
+    )
+    return out.decode("utf-8").strip().splitlines()[0].strip()
+
+
 def _default_env_git_commit() -> str | None:
     """Production env_git_commit - used as default hook.
 

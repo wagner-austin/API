@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Protocol, runtime_checkable
 
-from platform_core.errors import _JSONResponseProto, _RequestProto
+from platform_core._asgi_protocols import _JSONResponseProto, _RequestProto
 from platform_core.json_utils import load_json_bytes
 
 

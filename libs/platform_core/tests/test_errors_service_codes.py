@@ -4,12 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from platform_core.errors import (
-    AppError,
-    ErrorCodeBase,
-    _JSONResponseProto,
-    install_exception_handlers,
-)
+from platform_core._asgi_protocols import _JSONResponseProto
+from platform_core.errors import AppError, ErrorCodeBase
+from platform_core.fastapi import install_exception_handlers
 from platform_core.logging import stdlib_logging
 from platform_core.request_context import request_id_var
 from tests._error_helpers import (

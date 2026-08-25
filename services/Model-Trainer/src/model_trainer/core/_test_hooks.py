@@ -20,6 +20,7 @@ from model_trainer.core._hook_defaults import (
     _default_corpus_fetcher_factory,
     _default_count_model_parameters,
     _default_cuda_device_name,
+    _default_cuda_driver_version,
     _default_cuda_is_available,
     _default_datetime_utcnow_iso,
     _default_dump_json_str,
@@ -100,6 +101,7 @@ from model_trainer.core._hook_protocols_ml import (
     CorpusCacheCleanupServiceFactoryProto,
     CorpusFetcherFactoryProto,
     CudaDeviceNameProto,
+    CudaDriverVersionProto,
     CudaIsAvailableProto,
     FreezeEmbeddingsProto,
     LoadGpt2ModelProto,
@@ -199,6 +201,8 @@ apply_determinism_hook: ApplyDeterminismProto = _default_apply_determinism
 cuda_is_available: CudaIsAvailableProto = _default_cuda_is_available
 
 cuda_device_name: CudaDeviceNameProto = _default_cuda_device_name
+
+cuda_driver_version: CudaDriverVersionProto = _default_cuda_driver_version
 
 env_git_commit: EnvGitCommitProto = _default_env_git_commit
 

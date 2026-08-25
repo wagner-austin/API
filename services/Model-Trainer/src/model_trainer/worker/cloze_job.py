@@ -21,6 +21,7 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import cloze_key
+from platform_ml import encode_run_fingerprint
 from typing_extensions import TypedDict
 
 from model_trainer.core import _test_hooks
@@ -30,6 +31,7 @@ from model_trainer.core.contracts.cloze import (
     encode_cloze_item_outcome,
 )
 from model_trainer.core.contracts.queue import ClozeJobPayload
+from model_trainer.core.run_fingerprint import capture_run_fingerprint
 from model_trainer.core.services.model.cloze import score_cloze_items
 from model_trainer.worker.job_utils import (
     materialize_run_artifacts,
@@ -45,6 +47,13 @@ class ClozeCacheModel(TypedDict, total=False):
     ``outcomes`` carries the per-item records encoded by
     :func:`encode_cloze_item_outcome`, so a reader can pair two runs scored on
     the same item set instead of comparing two aggregate counts.
+
+    ``fingerprint`` carries what the scoring ran on, encoded by
+    :func:`platform_ml.encode_run_fingerprint`. Without it an accuracy cannot
+    be checked against a previous one: a disagreement is indistinguishable
+    from a working image scored on a different card. It sits on the completed
+    record only -- a queued or failed job computed no number, so there is
+    nothing for a configuration to qualify.
     """
 
     status: str
@@ -53,6 +62,7 @@ class ClozeCacheModel(TypedDict, total=False):
     accuracy: float | None
     chance: float | None
     outcomes: list[JSONValue] | None
+    fingerprint: JSONValue | None
 
 
 def parse_items(raw: str) -> list[ClozeItem]:
@@ -103,6 +113,13 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
     settings = _test_hooks.load_settings()
     setup_job_logging(settings)
 
+    # Before any CUDA work, for the same reason setup_env does it there:
+    # CUBLAS_WORKSPACE_CONFIG is read once when the cuBLAS handle is created,
+    # so a later call is accepted in silence and has no effect. Scoring was
+    # previously left unpinned entirely, which made a cloze accuracy
+    # irreproducible in its last bits and its ties order-dependent.
+    determinism = _test_hooks.apply_determinism_hook()
+
     log = get_logger(__name__)
     r = redis_client(settings)
     run_id = payload["run_id"]
@@ -142,11 +159,14 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
         backend = container.model_registry.get(as_model_family(manifest["model_family"]))
         prepared = backend.load(str(normalized), settings, tokenizer=tok_handle)
 
+        device = as_device(manifest["device"])
+        fingerprint = capture_run_fingerprint(device, determinism)
+
         result = score_cloze_items(
             items=items,
             model=prepared.model,
             encoder=prepared.tok_for_dataset,
-            device=as_device(manifest["device"]),
+            device=device,
             max_seq_len=payload["max_seq_len"],
         )
 
@@ -160,6 +180,7 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
             "accuracy": result["accuracy"],
             "chance": result["chance"],
             "outcomes": encoded_outcomes,
+            "fingerprint": encode_run_fingerprint(fingerprint),
         }
     except Exception as e:
         out_failed: ClozeCacheModel = {"status": "failed"}

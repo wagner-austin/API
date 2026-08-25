@@ -17,6 +17,7 @@ from platform_core.trainer_keys import (
     generate_key,
     score_key,
 )
+from platform_ml import RunFingerprint, decode_run_fingerprint
 from platform_workers.redis import RedisStrProto
 from typing_extensions import TypedDict
 
@@ -81,6 +82,7 @@ class _ScoredCloze(TypedDict):
     accuracy: float | None
     chance: float | None
     outcomes: list[ClozeItemOutcome] | None
+    fingerprint: RunFingerprint | None
 
 
 def _decode_cloze_cache(raw: str) -> _ScoredCloze:
@@ -128,13 +130,34 @@ def _decode_cloze_cache(raw: str) -> _ScoredCloze:
             )
         outcomes = [decode_cloze_item_outcome(narrow_json_to_dict(entry)) for entry in outcomes_v]
 
+    status = _narrow_status(obj.get("status"))
+
+    # A completed record MUST say what it ran on. An accuracy without its
+    # configuration cannot be checked against a previous one -- a
+    # disagreement is indistinguishable from a working image scored on a
+    # different card -- so the record is refused rather than served as a
+    # number that looks comparable and is not. Unfinished states carry no
+    # number, so there is nothing for a configuration to qualify.
+    fingerprint: RunFingerprint | None = None
+    if status == "completed":
+        fingerprint_v = obj.get("fingerprint")
+        if fingerprint_v is None:
+            raise AppError(
+                ModelTrainerErrorCode.CLOZE_FINGERPRINT_MISSING,
+                "cloze record is completed but records no run fingerprint, so its "
+                "accuracy cannot be compared with any other measurement; re-score it",
+                model_trainer_status_for(ModelTrainerErrorCode.CLOZE_FINGERPRINT_MISSING),
+            )
+        fingerprint = decode_run_fingerprint(fingerprint_v)
+
     return {
-        "status": _narrow_status(obj.get("status")),
+        "status": status,
         "total": total_v if isinstance(total_v, int) else None,
         "correct": correct_v if isinstance(correct_v, int) else None,
         "accuracy": float(accuracy_v) if isinstance(accuracy_v, int | float) else None,
         "chance": float(chance_v) if isinstance(chance_v, int | float) else None,
         "outcomes": outcomes,
+        "fingerprint": fingerprint,
     }
 
 
@@ -249,6 +272,9 @@ class InferenceOrchestrator:
             "accuracy": None,
             "chance": None,
             "outcomes": None,
+            # A queued job has computed nothing, so there is no configuration
+            # to qualify. The worker records one when it produces the number.
+            "fingerprint": None,
         }
 
     def get_cloze(self: InferenceOrchestrator, run_id: str, request_id: str) -> ClozeResponse:
@@ -282,6 +308,7 @@ class InferenceOrchestrator:
             "accuracy": scored["accuracy"],
             "chance": scored["chance"],
             "outcomes": scored["outcomes"],
+            "fingerprint": scored["fingerprint"],
         }
 
     def enqueue_baseline_cloze(
@@ -338,6 +365,9 @@ class InferenceOrchestrator:
             "accuracy": None,
             "chance": None,
             "outcomes": None,
+            # A queued job has computed nothing, so there is no configuration
+            # to qualify. The worker records one when it produces the number.
+            "fingerprint": None,
         }
 
     def get_baseline_cloze(
@@ -377,6 +407,7 @@ class InferenceOrchestrator:
             "accuracy": scored["accuracy"],
             "chance": scored["chance"],
             "outcomes": scored["outcomes"],
+            "fingerprint": scored["fingerprint"],
         }
 
     def get_score(self: InferenceOrchestrator, run_id: str, request_id: str) -> ScoreResponse:

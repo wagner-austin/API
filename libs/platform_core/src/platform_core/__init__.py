@@ -22,10 +22,10 @@ from platform_core.errors import (
     error_body,
     handwriting_error_body,
     handwriting_status_for,
-    install_exception_handlers,
 )
 from platform_core.fastapi import (
     FastAPIAppAdapter,
+    install_exception_handlers,
     install_exception_handlers_fastapi,
 )
 from platform_core.health import (

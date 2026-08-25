@@ -39,7 +39,7 @@ WHAT IT DELIBERATELY DOES NOT DO:
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Literal, TypedDict
+from typing import Literal
 
 from platform_core.json_utils import (
     JSONObject,
@@ -50,6 +50,7 @@ from platform_core.json_utils import (
     require_float,
     require_str,
 )
+from typing_extensions import TypedDict
 
 from platform_ml.determinism import (
     DeterminismReport,

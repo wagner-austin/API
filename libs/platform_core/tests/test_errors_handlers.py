@@ -6,12 +6,9 @@ from contextvars import ContextVar
 
 import pytest
 
-from platform_core.errors import (
-    AppError,
-    ErrorCode,
-    _JSONResponseProto,
-    install_exception_handlers,
-)
+from platform_core._asgi_protocols import _JSONResponseProto
+from platform_core.errors import AppError, ErrorCode
+from platform_core.fastapi import install_exception_handlers
 from platform_core.logging import stdlib_logging
 from tests._error_helpers import (
     FakeFastAPIApp,

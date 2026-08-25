@@ -22,10 +22,12 @@ from pathlib import Path
 from platform_core.json_utils import JSONValue, dump_json_str
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import baseline_cloze_key
+from platform_ml import encode_run_fingerprint
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.cloze import encode_cloze_item_outcome
 from model_trainer.core.contracts.queue import BaselineClozeJobPayload
+from model_trainer.core.run_fingerprint import capture_run_fingerprint, describe_run_fingerprint
 from model_trainer.core.services.model.backends.hf_lm.io import load_prepared_hf_lm_from_hub
 from model_trainer.core.services.model.cloze import score_cloze_items
 from model_trainer.worker.cloze_job import ClozeCacheModel, parse_items
@@ -44,6 +46,12 @@ def process_baseline_cloze_job(payload: BaselineClozeJobPayload) -> None:
     """
     settings = _test_hooks.load_settings()
     setup_job_logging(settings)
+
+    # Before any CUDA work: CUBLAS_WORKSPACE_CONFIG is read once when the
+    # cuBLAS handle is created, so a later call is accepted in silence and has
+    # no effect. This floor is the number every arm accuracy is reported as
+    # lift over, and it was measured unpinned.
+    determinism = _test_hooks.apply_determinism_hook()
 
     log = get_logger(__name__)
     r = redis_client(settings)
@@ -65,6 +73,8 @@ def process_baseline_cloze_job(payload: BaselineClozeJobPayload) -> None:
 
         prepared = load_prepared_hf_lm_from_hub(hub_model_id)
 
+        fingerprint = capture_run_fingerprint(payload["device"], determinism)
+
         result = score_cloze_items(
             items=items,
             model=prepared.model,
@@ -83,6 +93,7 @@ def process_baseline_cloze_job(payload: BaselineClozeJobPayload) -> None:
             "accuracy": result["accuracy"],
             "chance": result["chance"],
             "outcomes": encoded_outcomes,
+            "fingerprint": encode_run_fingerprint(fingerprint),
         }
     except Exception as e:
         out_failed: ClozeCacheModel = {"status": "failed"}
@@ -97,11 +108,13 @@ def process_baseline_cloze_job(payload: BaselineClozeJobPayload) -> None:
     else:
         r.set(key, dump_json_str(out))
         log.info(
-            "Baseline cloze completed hub_model_id=%s items_file_id=%s accuracy=%.4f chance=%.4f",
+            "Baseline cloze completed hub_model_id=%s items_file_id=%s "
+            "accuracy=%.4f chance=%.4f %s",
             hub_model_id,
             items_file_id,
             result["accuracy"],
             result["chance"],
+            describe_run_fingerprint(fingerprint),
         )
 
 

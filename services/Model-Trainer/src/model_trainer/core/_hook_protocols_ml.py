@@ -54,6 +54,19 @@ class CudaDeviceNameProto(Protocol):
         ...
 
 
+class CudaDriverVersionProto(Protocol):
+    """Protocol for the cuda_driver_version hook.
+
+    Named separately from the card because the same card under two drivers
+    can select different kernels, so a number reproduced on one and not the
+    other is a driver difference rather than a broken image.
+    """
+
+    def __call__(self) -> str:
+        """Get the NVIDIA driver version. Callers gate on cuda_is_available."""
+        ...
+
+
 class ModelDirProto(Protocol):
     """Protocol for model_dir hook."""
 

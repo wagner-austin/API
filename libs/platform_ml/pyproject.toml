@@ -26,6 +26,7 @@ sentencepiece = "^0.2.1"
 shap = "^0.50"
 torch = {version = "^2.5", source = "pytorch-cuda"}
 wandb = { version = "^0.18", optional = true }
+typing-extensions = "^4.12.0"
 
 [tool.poetry.extras]
 wandb = ["wandb"]

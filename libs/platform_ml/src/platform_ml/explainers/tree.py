@@ -6,10 +6,11 @@ untyped 'shap' library while maintaining strict typing in the rest of the codeba
 
 from __future__ import annotations
 
-from typing import Protocol, TypedDict, TypeGuard
+from typing import Protocol, TypeGuard
 
 import numpy as np
 from numpy.typing import NDArray
+from typing_extensions import TypedDict
 
 # -----------------------------------------------------------------------------
 # Internal Protocols (The "Anti-Corruption" Interface)

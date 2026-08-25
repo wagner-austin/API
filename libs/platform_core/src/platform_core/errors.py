@@ -1,19 +1,16 @@
+"""Error-code vocabulary and the exception that carries one.
+
+Deliberately free of any web framework. The ASGI exception handlers that turn
+an :class:`AppError` into a response live in :mod:`platform_core.fastapi`,
+which is the module that already owns the FastAPI boundary -- this one is
+imported by 304 files across the monorepo, most of which never serve HTTP,
+and it has no business pulling in ``fastapi.responses`` to define an enum.
+"""
+
 from __future__ import annotations
 
-from contextvars import ContextVar
 from enum import Enum
 from typing import Generic, TypeVar
-
-from fastapi.responses import JSONResponse as _FastAPIJSONResponse
-
-from platform_core._asgi_protocols import (
-    _ExceptionHandlerProto,
-    _FastAPIAppProto,
-    _JSONResponseProto,
-    _RequestProto,
-)
-from platform_core.logging import get_logger
-from platform_core.request_context import request_id_var as _global_request_id_var
 
 
 class ErrorCodeBase(str, Enum):
@@ -149,6 +146,7 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     # Cloze evaluation errors
     CLOZE_ITEMS_EMPTY = "CLOZE_ITEMS_EMPTY"
     CLOZE_ITEM_UNSCOREABLE = "CLOZE_ITEM_UNSCOREABLE"
+    CLOZE_FINGERPRINT_MISSING = "CLOZE_FINGERPRINT_MISSING"
 
     # Checkpoint / resume errors
     CHECKPOINT_NOT_FOUND = "CHECKPOINT_NOT_FOUND"
@@ -369,127 +367,6 @@ def _code_value(code: ErrorCodeBase) -> str:
     return result
 
 
-def install_exception_handlers(
-    app: _FastAPIAppProto,
-    *,
-    request_id_var: ContextVar[str] | None = _global_request_id_var,
-    logger_name: str = "app",
-    log_user_errors: bool = True,
-    internal_error_code: ErrorCodeBase = ErrorCode.INTERNAL_ERROR,
-) -> None:
-    """Install centralized exception handlers with platform_core logging integration.
-
-    Registers handlers for:
-    - AppError: Structured application errors
-    - Exception: All unhandled exceptions
-
-    Logging behavior:
-    - User errors (4xx): Logged at INFO level without traceback
-    - System errors (5xx): Logged at ERROR level with full traceback (exc_info=True)
-    - Unhandled exceptions: Logged at ERROR level with full traceback
-
-    Args:
-        app: FastAPI application instance
-        request_id_var: Optional ContextVar for request ID tracking
-        logger_name: Logger name for error logging (default: "app")
-        log_user_errors: Whether to log user errors at INFO level (default: True)
-
-    Example:
-        >>> from fastapi import FastAPI
-        >>> from platform_core.errors import install_exception_handlers
-        >>> from platform_core.request_context import request_id_var
-        >>>
-        >>> app = FastAPI()
-        >>> install_exception_handlers(
-        ...     app,
-        ...     request_id_var=request_id_var,
-        ...     logger_name="my-api"
-        ... )
-    """
-    logger = get_logger(logger_name)
-
-    def _json_response(*, content: dict[str, str], status_code: int) -> _JSONResponseProto:
-        return _FastAPIJSONResponse(content=content, status_code=status_code)
-
-    async def _app_error_handler(request: _RequestProto, exc: Exception) -> _JSONResponseProto:
-        """Handle AppError exceptions with structured logging and response."""
-        if not isinstance(exc, AppError):
-            # Should not happen, but handle gracefully by delegating
-            return await _unhandled_handler(request, exc)
-
-        # Extract request ID from context if available
-        rid = request_id_var.get() if request_id_var is not None else ""
-
-        # Determine if this is a user error (4xx) or system error (5xx)
-        is_user_error = exc.http_status < 500
-
-        code_value = _code_value(exc.code)
-        if is_user_error and log_user_errors:
-            # Log user errors at INFO level without traceback
-            logger.info(
-                "user_error",
-                extra={
-                    "error_code": code_value,
-                    "request_id": rid,
-                    "error_message": exc.message,
-                    "path": request.url.path,
-                    "method": request.method,
-                },
-            )
-        elif not is_user_error:
-            # Log system errors at ERROR level with full traceback
-            logger.error(
-                "system_error",
-                extra={
-                    "error_code": code_value,
-                    "request_id": rid,
-                    "error_message": exc.message,
-                    "path": request.url.path,
-                    "method": request.method,
-                },
-                exc_info=True,
-            )
-
-        # Return structured JSON error response
-        response_body: dict[str, str] = {
-            "code": code_value,
-            "message": exc.message,
-            "request_id": rid,
-        }
-        return _json_response(content=response_body, status_code=exc.http_status)
-
-    async def _unhandled_handler(request: _RequestProto, exc: Exception) -> _JSONResponseProto:
-        """Handle all unhandled exceptions with full logging."""
-        # Extract request ID from context if available
-        rid = request_id_var.get() if request_id_var is not None else ""
-
-        # Log all unhandled exceptions at ERROR level with full traceback
-        logger.error(
-            "unhandled_exception",
-            extra={
-                "error_type": type(exc).__name__,
-                "request_id": rid,
-                "path": request.url.path,
-                "method": request.method,
-                "error_message": str(exc),
-            },
-            exc_info=True,
-        )
-
-        # Return generic error response (don't expose internal details)
-        code_value_internal = _code_value(internal_error_code)
-        response_body: dict[str, str] = {
-            "code": code_value_internal,
-            "message": "Internal server error",
-            "request_id": rid,
-        }
-        return _json_response(content=response_body, status_code=500)
-
-    # Register handlers with FastAPI
-    app.add_exception_handler(AppError, _app_error_handler)
-    app.add_exception_handler(Exception, _unhandled_handler)
-
-
 def error_body(code: str, message: str, request_id: str | None) -> dict[str, str | None]:
     """Standard error payload for platform services."""
     return {"code": code, "message": message, "request_id": request_id}
@@ -558,6 +435,10 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     # Cloze evaluation errors
     ModelTrainerErrorCode.CLOZE_ITEMS_EMPTY: 400,
     ModelTrainerErrorCode.CLOZE_ITEM_UNSCOREABLE: 400,
+    # 500, not 404: the record exists and claims to be completed, so the
+    # server stored a number it cannot say the configuration of. That is a
+    # fault in what was written, not a thing the caller asked for wrongly.
+    ModelTrainerErrorCode.CLOZE_FINGERPRINT_MISSING: 500,
     # Checkpoint / resume errors
     ModelTrainerErrorCode.CHECKPOINT_NOT_FOUND: 404,
     ModelTrainerErrorCode.CHECKPOINT_CORRUPT: 500,
@@ -589,12 +470,8 @@ __all__ = [
     "ModelTrainerErrorCode",
     "OAuthErrorCode",
     "TranscriptErrorCode",
-    "_ExceptionHandlerProto",
-    "_JSONResponseProto",
-    "_RequestProto",
     "error_body",
     "handwriting_error_body",
     "handwriting_status_for",
-    "install_exception_handlers",
     "model_trainer_status_for",
 ]

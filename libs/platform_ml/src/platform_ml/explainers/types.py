@@ -6,7 +6,9 @@ No Any, cast, or type: ignore allowed.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal
+
+from typing_extensions import TypedDict
 
 ExplainerName = Literal["permutation", "gradient", "integrated_gradients", "shap_tree"]
 """Supported explainer names."""

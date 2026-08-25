@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired
 
+from platform_ml import RunFingerprint
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.cloze import ClozeItemOutcome
@@ -199,6 +200,7 @@ class ClozeResponse(TypedDict, total=True):
     accuracy: float | None
     chance: float | None
     outcomes: list[ClozeItemOutcome] | None
+    fingerprint: RunFingerprint | None
 
 
 class BaselineClozeRequest(TypedDict, total=True):
@@ -231,6 +233,7 @@ class BaselineClozeResponse(TypedDict, total=True):
     accuracy: float | None
     chance: float | None
     outcomes: list[ClozeItemOutcome] | None
+    fingerprint: RunFingerprint | None
 
 
 class GenerateRequest(TypedDict, total=True):

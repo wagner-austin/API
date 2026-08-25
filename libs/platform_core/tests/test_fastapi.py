@@ -6,7 +6,8 @@ from collections.abc import Awaitable, Callable
 from starlette.requests import Request
 from starlette.responses import Response
 
-from platform_core.errors import AppError, ErrorCode, _JSONResponseProto, _RequestProto
+from platform_core._asgi_protocols import _JSONResponseProto, _RequestProto
+from platform_core.errors import AppError, ErrorCode
 from platform_core.fastapi import (
     FastAPIAppAdapter,
     install_exception_handlers_fastapi,
