@@ -46,6 +46,41 @@ from tankpit_bot.sniffer.world_state_containers import (
     increment_container_failed_pickups,
 )
 
+FUEL_ZERO_MOVE_STALL_TIMEOUT_MS = 20_000
+"""Move stall budget while the tank's believed fuel is exactly 0.
+
+Fuel-0 moves are served SLOW: across the two marooned-paralysis
+artifacts (bot-20260821-013519 artax + bot-20260825-133452, n=578
+paired dispatch→self-0x47 echoes) the latency ran median 3.8 s,
+p90 ~13 s, max 15.75 s — while scans and map opens in the same
+sessions stayed at normal tick speed. Every one of those runs'
+combined 114 move "stalls" was this tail crossing the standard 10 s
+budget: a FALSE stall whose replan then wrote a false failed-move
+mark (30 s TTL) steering the planner away from legitimate legs.
+20 s clears the measured maximum with margin while still bounding a
+truly dead move; fueled moves keep the standard budget (archive max
+healthy confirm ~8 s). Whether the slowness is the fuel-0 regime
+itself or the dense repeat-tile cadence those sessions share is not
+isolated; the budget keys on fuel 0, which covers the measured
+population either way."""
+
+
+def _fuel_zero_move(bot: Bot, kind: ActionKind) -> bool:
+    """Return True when a stall check concerns a move at believed fuel 0.
+
+    Args:
+        bot: Bot instance.
+        kind: In-flight action kind under the stall check.
+
+    Returns:
+        True when the action is a ``move`` and the tank's believed
+        fuel is exactly 0 (the measured slow-service regime).
+    """
+    if kind != "move":
+        return False
+    self_state = bot.get_world_state()["self_state"]
+    return self_state is not None and self_state["fuel"] == 0
+
 
 def has_in_flight_action(bot: Bot) -> bool:
     """Return True when a previously issued action is still resolving.
@@ -237,6 +272,8 @@ def _clear_stalled_action(
         return False
     elapsed_ms = get_current_time_ms() - started_ms
     timeout_ms = bot._ai_state["config"]["action_stall_timeout_ms"]
+    if _fuel_zero_move(bot, action["kind"]):
+        timeout_ms = max(timeout_ms, FUEL_ZERO_MOVE_STALL_TIMEOUT_MS)
     if elapsed_ms < timeout_ms:
         return False
     tx, ty = action["target_x"], action["target_y"]

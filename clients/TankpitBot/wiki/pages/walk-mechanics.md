@@ -99,6 +99,28 @@ blocks the simulator.[^3]
 - **Simulator**: model movement as instant relocation at the processing tick
   with per-tile billing; no walk-speed constant exists server-side.
 
+## Fuel-0 service latency (measured 2026-08-25)
+
+Walking at fuel 0 executes and bills **+0** (the marooned-recovery
+law stands), but the dispatch→self-0x47 latency in the fuel-0 regime
+is far above the healthy tick: across the two marooned-paralysis
+artifacts (`bot-20260821-013519` artax + `bot-20260825-133452`,
+**n=578** paired echoes) the distribution ran **median 3.8 s, p90
+~13 s, max 15.75 s** — while scans and map opens in the same sessions
+completed at normal ~2 s tick speed. The over-10 s tail counts (102
+and 11) match those runs' `move:stall_timeout` counts exactly: every
+"stall" in the paralysis sessions was a FALSE stall — the wire
+answered, late — and each false stall wrote a false failed-move mark
+(30 s TTL) that steered the planner off legitimate legs. Bot
+consequence: the move stall budget is 20 s while believed fuel is
+exactly 0 (`FUEL_ZERO_MOVE_STALL_TIMEOUT_MS`,
+`bot/tick_loop_actions.py`); fueled moves keep the standard 10 s.
+Whether the slowness is the fuel-0 regime itself or the dense
+repeat-tile cadence those sessions share is not isolated — the
+budget keys on fuel 0, which covers the measured population either
+way. Miner: `mine_lat.py` (session scratchpad, method in wiki log
+2026-08-25).
+
 ## The cant_go partial-walk law (measured 2026-08-04)
 
 Code 1 ("You can't go there!") is NOT a refusal — it is the receipt
