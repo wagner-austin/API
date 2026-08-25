@@ -245,6 +245,128 @@ Lifecycle events carry `job_id` (run_id), `user_id`, `queue`, progress, and opti
 
 ---
 
+## Running on a Slurm cluster
+
+`modeltrainer-cluster-train` runs one training job on a compute node that has
+no Redis, no data-bank API and no Docker. It is a **second composition root,
+not a second trainer**: it hands the same payload to the same
+`process_train_job` as the RQ worker, so the training code cannot drift
+between the two and does not know which one started it.
+
+```
+┌──────────────────┐                    ┌──────────────────────┐
+│  worker_entry    │                    │  cluster.entry       │
+│  Redis · RQ      │                    │  LocalKV · staged    │
+│  data-bank API   │                    │  corpus · local dir  │
+└────────┬─────────┘                    └──────────┬───────────┘
+         │                                         │
+         └────────► process_train_job(payload) ◄───┘
+                        (identical)
+```
+
+It works because the three service dependencies are already Protocols behind
+factory hooks — `kv_store_factory`, `corpus_fetcher_factory`,
+`artifact_store_factory`. The cluster root installs filesystem- and
+memory-backed implementations through the same hooks the service installs
+HTTP-backed ones through. Neither is a fake.
+
+### What differs on a compute node
+
+| | service | cluster |
+| --- | --- | --- |
+| job state | Redis, read by the API | in-process dict — **there is no reader** |
+| progress signal | Redis + events channel | the job's stdout, which Slurm captures |
+| cancellation | `runs:<id>:cancelled=1` | **`scancel`** — the key is never written, so the poll always answers False |
+| corpus | fetched from data-bank by file id | **pre-staged**, SHA-256 verified on both sides |
+| artifacts | uploaded to data-bank | tarball in a local directory |
+
+Cancellation being Slurm's is correct rather than a gap: a second cancellation
+mechanism the scheduler did not know about would be the bug.
+
+### Preflight — the run proves it can finish before it starts
+
+Before a single training step, the entry point writes and reads a probe in
+every output root, and pushes a real directory **through the artifact store
+and back**, comparing bytes. Both are real operations, not configuration
+checks — the two failures this exists for both had valid configuration and an
+unreachable path:
+
+- a checkpoint directory that could not be written, found at the first epoch
+  boundary of a 20-epoch run;
+- a credential guard belonging to the HTTP store, which refused the
+  filesystem store after 49 minutes of A100 time.
+
+A failed preflight refuses in under a second and names the setting to change.
+
+### Required environment
+
+Every variable below must be set. There are no defaults worth guessing: the
+service defaults point at `/data`, which on a cluster is not yours.
+
+| variable | why |
+| --- | --- |
+| `APP__ARTIFACTS_ROOT` | checkpoints and the final model |
+| `APP__RUNS_ROOT` | run scratch |
+| `APP__LOGS_ROOT` | job logs |
+| `APP__DATA_ROOT` | parent for the above |
+| `HF_HOME` | model cache; must already hold the base model **and its tokenizer** |
+| `TRANSFORMERS_OFFLINE=1`, `HF_HUB_OFFLINE=1` | keeps a run from reaching the network mid-training |
+| `TRAIN_DETERMINISTIC` | `1` or `0`; absent means on. Anything else raises |
+| `CUBLAS_WORKSPACE_CONFIG` | required by deterministic mode; must be set **before the process starts** |
+
+A cache holding weights but no tokenizer fails at tokenizer load, not at
+startup — warm it once with the offline flags unset.
+
+### The corpus must be staged under its own digest
+
+`StagedCorpus.fetch(file_id)` resolves `<corpus-dir>/<file_id>`. The staged
+filename is therefore the **bare digest, with no extension**, even though the
+service's local cache names the same bytes `<digest>.txt`. Staging it under
+the cache's name puts the file one character away from being found, and a
+compute node has nothing to fall back to.
+
+```bash
+hpc3-stage --config runs/hpc3.json --manifest runs/stage-corpus.json \
+    --source-dir runs/corpora --expect-from runs/expected.txt
+```
+
+`hpc3-stage` verifies the SHA-256 locally, transfers, then verifies again on
+the cluster — a stronger guarantee than the HTTP fetch it replaces.
+
+### Invoking it
+
+```bash
+modeltrainer-cluster-train \
+    --payload      /pub/<user>/abl/payloads/arm-a.json \
+    --corpus-dir   /pub/<user>/abl/corpora \
+    --artifacts-dir /pub/<user>/abl/artifacts
+```
+
+All three are required. None has a safe default — guessing where a corpus
+lives finds the wrong one as readily as none.
+
+The payload is the same shape the queue carries:
+`{"run_id": ..., "user_id": ..., "request": {...}, "resume": false}`.
+
+### Installing into a cluster environment
+
+Build wheels locally and install them with `--no-deps`, rather than copying
+source. Poetry's `packages` list makes a source install demand directories a
+training job never needs, and `--no-deps` is what keeps the resolver from
+replacing a pinned torch:
+
+```bash
+poetry build -f wheel            # in each of platform_core, platform_workers,
+                                 # platform_ml, Model-Trainer
+python -m pip install --no-deps --force-reinstall <wheels>/*.whl
+```
+
+Verify the pins did not move — `torch.__version__` and
+`transformers.__version__` — before and after. `pinned_packages` in the hpc3
+workspace document turns that into a preflight check on every submission.
+
+---
+
 ## Artifacts
 
 ### Directory Layout
