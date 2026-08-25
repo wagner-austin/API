@@ -22,7 +22,13 @@ from platform_core.determinism_env import (
     DETERMINISM_OFF,
     DETERMINISM_ON,
 )
-from platform_ml import FALSE, TORCH_STACK, TRUE, DeterminismRecord, determinism_record
+from platform_core.determinism_record import (
+    FALSE,
+    TRUE,
+    DeterminismRecord,
+    determinism_record,
+)
+from platform_ml import TORCH_STACK
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings

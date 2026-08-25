@@ -11,26 +11,30 @@ from __future__ import annotations
 
 import pytest
 
-from platform_ml.comparability import (
+from platform_core.comparability import (
     COMPARABILITY_AXES,
     AxisDifference,
     Calibration,
     RunFingerprint,
-    compare_runs,
+    compare_configurations,
     describe_verdict,
     find_differences,
 )
-from platform_ml.determinism import (
+from platform_core.determinism_record import (
     FALSE,
-    TORCH_STACK,
     TRUE,
     UNPINNED_STACK,
     DeterminismRecord,
     determinism_record,
 )
 
+# Spelled as a literal rather than imported: platform_core knows nothing
+# about torch, and a test here reaching into platform_ml for a constant
+# would invert the dependency this move exists to establish.
+_TORCH = "torch"
+
 DETERMINISTIC = determinism_record(
-    TORCH_STACK,
+    _TORCH,
     {
         "deterministic_algorithms": TRUE,
         "cublas_workspace_config": ":4096:8",
@@ -61,7 +65,7 @@ def fingerprint(
 
 
 def test_identical_configurations_subtract() -> None:
-    verdict = compare_runs(fingerprint(), fingerprint(), ())
+    verdict = compare_configurations(fingerprint(), fingerprint(), ())
 
     assert verdict == {"kind": "identical"}
     assert describe_verdict(verdict) == "comparable: configurations identical"
@@ -70,7 +74,7 @@ def test_identical_configurations_subtract() -> None:
 def test_a_torch_swap_shows_up_as_an_image_digest_difference() -> None:
     # The real failure: published arms ran one torch, a rebuilt image ran
     # another, everything else matched, and nothing objected.
-    verdict = compare_runs(fingerprint(), fingerprint(image="sha256:bbbb"), ())
+    verdict = compare_configurations(fingerprint(), fingerprint(image="sha256:bbbb"), ())
 
     assert verdict["kind"] == "uncalibrated"
     assert verdict["differences"] == (
@@ -80,7 +84,7 @@ def test_a_torch_swap_shows_up_as_an_image_digest_difference() -> None:
 
 
 def test_an_uncalibrated_card_change_names_the_axis_rather_than_refusing_silently() -> None:
-    verdict = compare_runs(fingerprint(), fingerprint(gpu="NVIDIA A100 80GB PCIe"), ())
+    verdict = compare_configurations(fingerprint(), fingerprint(gpu="NVIDIA A100 80GB PCIe"), ())
 
     assert verdict["kind"] == "uncalibrated"
     assert [d["axis"] for d in verdict["uncalibrated"]] == ["gpu_model"]
@@ -98,7 +102,9 @@ def test_a_measured_card_offset_makes_the_numbers_subtract() -> None:
         measured_by="armC-s42 on both cards",
     )
 
-    verdict = compare_runs(fingerprint(), fingerprint(gpu="NVIDIA A100 80GB PCIe"), (calibration,))
+    verdict = compare_configurations(
+        fingerprint(), fingerprint(gpu="NVIDIA A100 80GB PCIe"), (calibration,)
+    )
 
     assert verdict["kind"] == "offset"
     assert verdict["offset"] == pytest.approx(0.31)
@@ -117,7 +123,9 @@ def test_a_calibration_answers_in_the_reverse_direction_with_the_sign_flipped() 
         measured_by="armC-s42 on both cards",
     )
 
-    verdict = compare_runs(fingerprint(gpu="NVIDIA A100 80GB PCIe"), fingerprint(), (calibration,))
+    verdict = compare_configurations(
+        fingerprint(gpu="NVIDIA A100 80GB PCIe"), fingerprint(), (calibration,)
+    )
 
     assert verdict["kind"] == "offset"
     assert verdict["offset"] == pytest.approx(-0.31)
@@ -142,7 +150,7 @@ def test_offsets_across_several_axes_sum() -> None:
         ),
     )
 
-    verdict = compare_runs(
+    verdict = compare_configurations(
         fingerprint(),
         fingerprint(gpu="NVIDIA A100 80GB PCIe", driver="560.1.2"),
         calibrations,
@@ -166,7 +174,7 @@ def test_one_uncovered_axis_makes_the_whole_comparison_uncalibrated() -> None:
         ),
     )
 
-    verdict = compare_runs(
+    verdict = compare_configurations(
         fingerprint(),
         fingerprint(gpu="NVIDIA A100 80GB PCIe", image="sha256:bbbb"),
         calibrations,
@@ -181,11 +189,11 @@ def test_determinism_settings_are_an_axis() -> None:
     # Same card, same image, one run pinned and one not. This is the second
     # failure: same-seed GPT-2 diverges without the controls, so two such runs
     # are not comparable however identical everything else is.
-    verdict = compare_runs(fingerprint(), fingerprint(determinism=NONDETERMINISTIC), ())
+    verdict = compare_configurations(fingerprint(), fingerprint(determinism=NONDETERMINISTIC), ())
 
     assert verdict["kind"] == "uncalibrated"
     assert [d["axis"] for d in verdict["uncalibrated"]] == ["determinism"]
-    assert verdict["differences"][0]["left"].startswith(f"{TORCH_STACK}[")
+    assert verdict["differences"][0]["left"].startswith(f"{_TORCH}[")
     assert verdict["differences"][0]["right"] == f"{UNPINNED_STACK}[]"
 
 
@@ -193,7 +201,7 @@ def test_a_single_flipped_determinism_flag_is_still_a_difference() -> None:
     # TF32 alone changes the numbers, so a report differing only there must
     # not compare equal to one that pinned it.
     tf32_on = determinism_record(
-        TORCH_STACK,
+        _TORCH,
         {
             "deterministic_algorithms": TRUE,
             "cublas_workspace_config": ":4096:8",
@@ -210,7 +218,7 @@ def test_a_single_flipped_determinism_flag_is_still_a_difference() -> None:
 def test_an_absent_digest_differs_from_a_known_one_rather_than_matching_anything() -> None:
     # Empty means unknown. Treating unknown as a wildcard would report a run
     # with no recorded image comparable to every run that has one.
-    verdict = compare_runs(fingerprint(image=""), fingerprint(), ())
+    verdict = compare_configurations(fingerprint(image=""), fingerprint(), ())
 
     assert verdict["kind"] == "uncalibrated"
     assert verdict["uncalibrated"][0]["left"] == ""
@@ -219,7 +227,7 @@ def test_an_absent_digest_differs_from_a_known_one_rather_than_matching_anything
 def test_differences_are_reported_in_the_declared_axis_order() -> None:
     # Two verdicts over the same pair must render identically, so the order
     # is the constant's order rather than dict iteration order.
-    verdict = compare_runs(
+    verdict = compare_configurations(
         fingerprint(),
         fingerprint(
             image="sha256:bbbb",
@@ -243,7 +251,9 @@ def test_a_calibration_on_a_different_axis_does_not_cover_the_difference() -> No
         measured_by="mislabelled",
     )
 
-    verdict = compare_runs(fingerprint(), fingerprint(gpu="NVIDIA A100 80GB PCIe"), (wrong_axis,))
+    verdict = compare_configurations(
+        fingerprint(), fingerprint(gpu="NVIDIA A100 80GB PCIe"), (wrong_axis,)
+    )
 
     assert verdict["kind"] == "uncalibrated"
 
@@ -257,6 +267,8 @@ def test_a_calibration_between_other_values_does_not_cover_this_pair() -> None:
         measured_by="other cards",
     )
 
-    verdict = compare_runs(fingerprint(), fingerprint(gpu="NVIDIA A100 80GB PCIe"), (unrelated,))
+    verdict = compare_configurations(
+        fingerprint(), fingerprint(gpu="NVIDIA A100 80GB PCIe"), (unrelated,)
+    )
 
     assert verdict["kind"] == "uncalibrated"

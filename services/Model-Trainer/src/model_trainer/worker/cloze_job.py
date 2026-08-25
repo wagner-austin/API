@@ -21,7 +21,7 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import cloze_key
-from platform_ml import encode_run_fingerprint
+from platform_core.comparability import encode_run_fingerprint
 from typing_extensions import TypedDict
 
 from model_trainer.core import _test_hooks

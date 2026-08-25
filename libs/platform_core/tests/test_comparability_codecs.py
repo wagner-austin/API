@@ -8,22 +8,25 @@ perfectly and validates nothing.
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONTypeError
 
-from platform_ml.comparability import (
+from platform_core.comparability import (
     Calibration,
     RunFingerprint,
-    compare_runs,
+    compare_configurations,
     decode_calibration,
     decode_run_fingerprint,
     encode_calibration,
     encode_comparability_verdict,
     encode_run_fingerprint,
 )
-from platform_ml.determinism import FALSE, TORCH_STACK, TRUE, determinism_record
+from platform_core.determinism_record import FALSE, TRUE, determinism_record
+from platform_core.json_utils import JSONTypeError
+
+# See test_comparability: a literal, because platform_core knows no torch.
+_TORCH = "torch"
 
 REPORT = determinism_record(
-    TORCH_STACK,
+    _TORCH,
     {
         "deterministic_algorithms": TRUE,
         "cublas_workspace_config": ":4096:8",
@@ -120,7 +123,7 @@ def test_calibration_decode_rejects_a_non_object() -> None:
 
 
 def test_identical_verdict_encodes_to_its_discriminant_alone() -> None:
-    verdict = compare_runs(FINGERPRINT, FINGERPRINT, ())
+    verdict = compare_configurations(FINGERPRINT, FINGERPRINT, ())
 
     assert encode_comparability_verdict(verdict) == {"kind": "identical"}
 
@@ -133,7 +136,8 @@ def test_offset_verdict_encodes_its_offset_and_the_measurements_applied() -> Non
         determinism=REPORT,
     )
 
-    encoded = encode_comparability_verdict(compare_runs(FINGERPRINT, other, (CALIBRATION,)))
+    verdict = compare_configurations(FINGERPRINT, other, (CALIBRATION,))
+    encoded = encode_comparability_verdict(verdict)
 
     assert encoded["kind"] == "offset"
     assert encoded["offset"] == pytest.approx(0.31)
@@ -155,7 +159,7 @@ def test_uncalibrated_verdict_encodes_which_axes_lack_a_measurement() -> None:
         determinism=REPORT,
     )
 
-    encoded = encode_comparability_verdict(compare_runs(FINGERPRINT, other, ()))
+    encoded = encode_comparability_verdict(compare_configurations(FINGERPRINT, other, ()))
 
     assert encoded["kind"] == "uncalibrated"
     assert encoded["uncalibrated"] == [

@@ -25,7 +25,8 @@ this module does not restate them.
 
 from __future__ import annotations
 
-from platform_ml import DeterminismRecord, RunFingerprint
+from platform_core.comparability import RunFingerprint
+from platform_core.determinism_record import DeterminismRecord
 
 from model_trainer.core import _test_hooks
 

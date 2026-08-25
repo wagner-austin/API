@@ -10,22 +10,19 @@ pass on a version that set it last.
 
 from __future__ import annotations
 
-import pytest
-from platform_core.json_utils import JSONTypeError
+from platform_core.determinism_record import (
+    FALSE,
+    TRUE,
+    DeterminismRecord,
+    decode_determinism_record,
+    encode_determinism_record,
+)
 
 from platform_ml.determinism import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
-    FALSE,
     TORCH_STACK,
-    TRUE,
-    UNPINNED_STACK,
-    DeterminismRecord,
     apply_determinism,
-    decode_determinism_record,
-    determinism_record,
-    encode_determinism_record,
-    render_determinism_record,
     set_cublas_workspace,
 )
 
@@ -225,73 +222,7 @@ def test_a_torch_record_round_trips() -> None:
     assert decode_determinism_record(encode_determinism_record(record)) == record
 
 
-# ---------------------------------------------------------------------------
-# The stack-agnostic surface. These exist because most of this monorepo's
-# research is NOT torch, and a determinism axis only one stack can fill makes
-# every other stack's runs compare as though the question did not apply.
-# ---------------------------------------------------------------------------
-
-
-def test_a_non_torch_stack_can_describe_its_own_posture() -> None:
-    # A gradient-boosting or BLAS-bound run pins different things entirely.
-    record = determinism_record("numpy", {"threads": "1", "seed": "0"})
-
-    assert record == {"stack": "numpy", "settings": (("seed", "0"), ("threads", "1"))}
-
-
-def test_a_run_that_pinned_nothing_is_recordable() -> None:
-    # "Nothing was pinned" is a fact about a run, and it must differ from a
-    # pinned run rather than be absent.
-    record = determinism_record(UNPINNED_STACK, {})
-
-    assert record == DeterminismRecord(stack=UNPINNED_STACK, settings=())
-    assert record != RecordingTorch([]).apply(RecordingEnv([]))
-
-
-def test_settings_are_canonically_ordered_whatever_the_producer_did() -> None:
-    # Two records of the same posture must be equal and render identically,
-    # or a re-ordered producer would read as a configuration change.
-    forwards = determinism_record("numpy", {"a": "1", "b": "2"})
-    backwards = determinism_record("numpy", {"b": "2", "a": "1"})
-
-    assert forwards == backwards
-    assert render_determinism_record(forwards) == render_determinism_record(backwards)
-
-
-def test_render_names_the_stack_and_its_settings() -> None:
-    rendered = render_determinism_record(determinism_record("numpy", {"threads": "1"}))
-
-    assert rendered == "numpy[threads=1]"
-
-
-def test_two_stacks_pinning_the_same_setting_name_do_not_compare_equal() -> None:
-    # The stack is part of the record precisely because a name like "threads"
-    # can mean different things to different stacks.
-    assert determinism_record("numpy", {"threads": "1"}) != determinism_record(
-        "openblas", {"threads": "1"}
-    )
-
-
-def test_a_record_that_cannot_say_what_pinned_it_is_rejected() -> None:
-    with pytest.raises(ValueError, match="UNPINNED_STACK"):
-        determinism_record("", {"threads": "1"})
-
-
-def test_decode_rejects_an_unnamed_stack() -> None:
-    with pytest.raises(JSONTypeError, match="stack"):
-        decode_determinism_record({"stack": "", "settings": {}})
-
-
-def test_decode_rejects_a_setting_whose_value_is_not_a_string() -> None:
-    # A bool here would decode into a record that renders "True" on one
-    # producer and "true" on another, so two identical postures would compare
-    # as different configurations.
-    with pytest.raises(JSONTypeError, match="cudnn_benchmark"):
-        decode_determinism_record({"stack": TORCH_STACK, "settings": {"cudnn_benchmark": False}})
-
-
-def test_decode_rejects_a_non_object_and_a_missing_settings_block() -> None:
-    with pytest.raises(JSONTypeError):
-        decode_determinism_record("torch")
-    with pytest.raises(JSONTypeError):
-        decode_determinism_record({"stack": TORCH_STACK})
+# The stack-agnostic surface of the record -- construction, ordering,
+# rendering and the decode rejections -- is tested in platform_core, beside
+# the type itself. What stays here is the TORCH PRODUCER: that the pinning
+# happens, in the right order, and that what it reports matches what it did.

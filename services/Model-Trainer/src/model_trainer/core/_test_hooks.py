@@ -8,7 +8,8 @@ No conditionals needed - just call the hook directly.
 from __future__ import annotations
 
 from platform_core.logging import get_logger
-from platform_ml import DeterminismRecord, apply_determinism
+from platform_core.determinism_record import DeterminismRecord
+from platform_ml import apply_determinism
 from platform_workers.redis import (
     redis_for_kv,
     redis_raw_for_rq,

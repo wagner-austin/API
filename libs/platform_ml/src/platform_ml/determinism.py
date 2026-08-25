@@ -42,7 +42,6 @@ What this module deliberately does NOT do:
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Protocol
 
 # PyTorch's documented setting for deterministic cuBLAS reductions. It is read
@@ -58,84 +57,17 @@ from platform_core.determinism_env import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
 )
-from platform_core.json_utils import (
-    JSONObject,
-    JSONTypeError,
-    JSONValue,
-    narrow_json_to_dict,
-    require_dict,
-    require_str,
+from platform_core.determinism_record import (
+    FALSE,
+    TRUE,
+    DeterminismRecord,
+    determinism_record,
 )
-from typing_extensions import TypedDict
 
 #: The stack this module pins. Named here rather than spelled at the call
 #: site so a reader comparing two records knows the string is a constant and
 #: not one producer's spelling.
 TORCH_STACK = "torch"
-
-
-#: Value spelling for a pinned boolean setting. Settings are strings because
-#: the record must hold any stack's vocabulary -- a torch run pins
-#: ``cudnn_benchmark``, a BLAS-bound one pins a thread count, an
-#: arbitrary-precision one pins a mantissa width -- and a union of every
-#: stack's value types would grow forever while comparing no better.
-TRUE = "true"
-FALSE = "false"
-
-#: The stack name for a run that pinned nothing. Distinct from a pinned
-#: record with no settings, which cannot occur: a stack that pins states what
-#: it pinned. "Nothing was pinned" is a fact about a run and must be
-#: recordable, because a run whose determinism is unknown and a run that was
-#: deliberately left free are the same thing to a later comparison and both
-#: differ from a pinned one.
-UNPINNED_STACK = "none"
-
-
-class DeterminismRecord(TypedDict):
-    """What determinism was in force, and which stack put it there.
-
-    Deliberately NOT a torch shape. Most of this monorepo's research is not
-    torch -- gradient boosting, transliteration, metabolomics -- and a record
-    with ``cudnn_benchmark`` in it cannot be filled by a numpy run, a Rust
-    booster, or a future job with no GPU at all. Those runs still have a
-    determinism posture worth recording, and a fingerprint whose determinism
-    axis only one stack can populate makes every other stack's runs compare
-    as though the question did not apply.
-
-    Attributes:
-        stack: What pinned these settings, e.g. ``"torch"``, or
-            :const:`UNPINNED_STACK` when nothing did. Part of the record
-            rather than inferred from the setting names, because two stacks
-            may pin settings that share a name and mean different things.
-        settings: The pinned settings as ``(name, value)`` pairs, sorted by
-            name. Sorted at construction so two records describing the same
-            posture are equal and render identically regardless of the order
-            a producer emitted them in.
-    """
-
-    stack: str
-    settings: tuple[tuple[str, str], ...]
-
-
-def determinism_record(stack: str, settings: Mapping[str, str]) -> DeterminismRecord:
-    """Build a record, putting the settings in canonical order.
-
-    Args:
-        stack: What pinned the settings.
-        settings: The pinned settings by name.
-
-    Returns:
-        The record, with settings sorted by name.
-
-    Raises:
-        ValueError: When ``stack`` is empty. A record that cannot say what
-            pinned it is not comparable with one that can -- and
-            :const:`UNPINNED_STACK` is how "nothing did" is spelled, so an
-            empty string carries no meaning the vocabulary lacks.
-    """
-    if stack == "":
-        raise ValueError("stack must name what pinned these settings, or be UNPINNED_STACK")
-    return DeterminismRecord(stack=stack, settings=tuple(sorted(settings.items())))
 
 
 class CudnnBackendProtocol(Protocol):
@@ -251,83 +183,14 @@ def apply_determinism(
     )
 
 
-def encode_determinism_record(record: DeterminismRecord) -> JSONObject:
-    """Encode a record for a run record or a structured log field.
-
-    Args:
-        record: The record to encode.
-
-    Returns:
-        A JSON object carrying the stack and the settings as a nested
-        object. Nested rather than flattened so a setting can never collide
-        with the ``stack`` key, whatever a future stack decides to name one.
-    """
-    return {
-        "stack": record["stack"],
-        "settings": dict(record["settings"]),
-    }
-
-
-def decode_determinism_record(value: JSONValue) -> DeterminismRecord:
-    """Validate a JSON value as a determinism record.
-
-    Args:
-        value: The value to validate, typically from a stored run record.
-
-    Returns:
-        The validated record, with settings in canonical order.
-
-    Raises:
-        JSONTypeError: When ``value`` is not an object, the stack is absent
-            or empty, ``settings`` is absent or not an object, or any
-            setting value is not a string. A record that cannot say what
-            pinned it, or that carries a setting whose value has to be
-            guessed at, is not comparable with one that can.
-    """
-    obj = narrow_json_to_dict(value)
-    stack = require_str(obj, "stack")
-    if stack == "":
-        raise JSONTypeError("Field 'stack' must name what pinned these settings")
-    raw = require_dict(obj, "settings")
-    settings: dict[str, str] = {}
-    for name, setting in raw.items():
-        if not isinstance(setting, str):
-            raise JSONTypeError(f"Setting {name!r} must be a string, got {type(setting).__name__}")
-        settings[name] = setting
-    return determinism_record(stack, settings)
-
-
-def render_determinism_record(record: DeterminismRecord) -> str:
-    """Render a record as one stable comparison key.
-
-    Args:
-        record: The record to render.
-
-    Returns:
-        The stack and its settings in canonical order, so two runs with the
-        same posture render byte-identically and a difference is legible
-        without reading two nested objects side by side.
-    """
-    body = ",".join(f"{name}={value}" for name, value in record["settings"])
-    return f"{record['stack']}[{body}]"
-
-
 __all__ = [
     "CUBLAS_DETERMINISTIC_WORKSPACE",
     "CUBLAS_WORKSPACE_ENV_VAR",
-    "FALSE",
     "TORCH_STACK",
-    "TRUE",
-    "UNPINNED_STACK",
     "CudnnBackendProtocol",
-    "DeterminismRecord",
     "MatmulBackendProtocol",
     "SetDeterministicAlgorithmsProtocol",
     "SetEnvProtocol",
     "apply_determinism",
-    "decode_determinism_record",
-    "determinism_record",
-    "encode_determinism_record",
-    "render_determinism_record",
     "set_cublas_workspace",
 ]

@@ -41,6 +41,14 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Literal
 
+from typing_extensions import TypedDict
+
+from platform_core.determinism_record import (
+    DeterminismRecord,
+    decode_determinism_record,
+    encode_determinism_record,
+    render_determinism_record,
+)
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -49,14 +57,6 @@ from platform_core.json_utils import (
     require_dict,
     require_float,
     require_str,
-)
-from typing_extensions import TypedDict
-
-from platform_ml.determinism import (
-    DeterminismRecord,
-    decode_determinism_record,
-    encode_determinism_record,
-    render_determinism_record,
 )
 
 
@@ -76,7 +76,8 @@ class RunFingerprint(TypedDict):
             because the same card under two drivers can select different
             kernels.
         determinism: What numerical determinism was actually in force, from
-            :func:`platform_ml.determinism.apply_determinism`.
+            whatever pinner the run's stack uses, e.g.
+            :func:`platform_ml.determinism.apply_determinism` for torch.
     """
 
     image_digest: str
@@ -242,12 +243,20 @@ def _covering(
     return None
 
 
-def compare_runs(
+def compare_configurations(
     left: RunFingerprint,
     right: RunFingerprint,
     calibrations: tuple[Calibration, ...],
 ) -> IdenticalVerdict | OffsetVerdict | UncalibratedVerdict:
     """Decide whether two runs' numbers may be subtracted.
+
+    Named for CONFIGURATIONS rather than runs because it compares the
+    fingerprints, not the results: it answers whether a comparison is
+    licensed, never whether two runs agreed. ``navprobe.comparison`` already
+    owns ``compare_runs`` for the other question -- do two runs of the SAME
+    configuration produce the same numbers, and where did they first diverge
+    -- and two functions of that name meaning opposite things is the drift
+    this rename exists to prevent.
 
     Args:
         left: One run's resolved configuration.
@@ -448,7 +457,7 @@ __all__ = [
     "OffsetVerdict",
     "RunFingerprint",
     "UncalibratedVerdict",
-    "compare_runs",
+    "compare_configurations",
     "decode_calibration",
     "decode_run_fingerprint",
     "describe_verdict",

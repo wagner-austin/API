@@ -10,11 +10,11 @@ NOT reported as a broken image.
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONTypeError
 
-from platform_ml.comparability import RunFingerprint
-from platform_ml.determinism import FALSE, TORCH_STACK, TRUE, determinism_record
-from platform_ml.known_answer import (
+from platform_core.comparability import RunFingerprint
+from platform_core.determinism_record import FALSE, TRUE, determinism_record
+from platform_core.json_utils import JSONTypeError
+from platform_core.known_answer import (
     KnownAnswer,
     check_known_answer,
     decode_known_answer,
@@ -23,7 +23,7 @@ from platform_ml.known_answer import (
 )
 
 PINNED = determinism_record(
-    TORCH_STACK,
+    "torch",
     {
         "deterministic_algorithms": TRUE,
         "cublas_workspace_config": ":4096:8",

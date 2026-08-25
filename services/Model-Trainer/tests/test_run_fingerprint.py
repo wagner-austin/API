@@ -14,14 +14,9 @@ import re
 from collections.abc import Generator
 
 import pytest
-from platform_ml import (
-    FALSE,
-    TORCH_STACK,
-    TRUE,
-    decode_run_fingerprint,
-    determinism_record,
-    encode_run_fingerprint,
-)
+from platform_core.comparability import decode_run_fingerprint, encode_run_fingerprint
+from platform_core.determinism_record import FALSE, TRUE, determinism_record
+from platform_ml import TORCH_STACK
 
 from model_trainer.core import _test_hooks
 from model_trainer.core._hook_defaults import _default_cuda_driver_version

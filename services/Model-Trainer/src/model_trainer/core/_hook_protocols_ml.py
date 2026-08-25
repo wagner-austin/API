@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Protocol
 
 import torch
-from platform_ml import DeterminismRecord
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.testing import (
     WandbModuleProtocol as WandbModuleLike,
 )

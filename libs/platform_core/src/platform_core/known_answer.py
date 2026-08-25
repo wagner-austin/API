@@ -34,6 +34,15 @@ from __future__ import annotations
 
 from typing import Literal
 
+from typing_extensions import TypedDict
+
+from platform_core.comparability import (
+    AxisDifference,
+    RunFingerprint,
+    decode_run_fingerprint,
+    encode_run_fingerprint,
+    find_differences,
+)
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -42,15 +51,6 @@ from platform_core.json_utils import (
     require_dict,
     require_float,
     require_str,
-)
-from typing_extensions import TypedDict
-
-from platform_ml.comparability import (
-    AxisDifference,
-    RunFingerprint,
-    decode_run_fingerprint,
-    encode_run_fingerprint,
-    find_differences,
 )
 
 

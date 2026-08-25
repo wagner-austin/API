@@ -17,7 +17,7 @@ from platform_core.trainer_keys import (
     generate_key,
     score_key,
 )
-from platform_ml import RunFingerprint, decode_run_fingerprint
+from platform_core.comparability import RunFingerprint, decode_run_fingerprint
 from platform_workers.redis import RedisStrProto
 from typing_extensions import TypedDict
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired
 
-from platform_ml import RunFingerprint
+from platform_core.comparability import RunFingerprint
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.cloze import ClozeItemOutcome

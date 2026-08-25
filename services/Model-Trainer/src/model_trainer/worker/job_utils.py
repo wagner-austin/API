@@ -19,7 +19,8 @@ from platform_core.trainer_metrics_events import (
     make_config_event,
     make_progress_metrics_event,
 )
-from platform_ml import RequestedDevice, ResolvedDevice, encode_determinism_record
+from platform_core.determinism_record import encode_determinism_record
+from platform_ml import RequestedDevice, ResolvedDevice
 from platform_workers.redis import RedisStrProto
 
 from model_trainer.core import _test_hooks
