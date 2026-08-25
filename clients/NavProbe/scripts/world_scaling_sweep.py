@@ -230,6 +230,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 device=device_label,
                 device_request=invocation.device,
                 max_records=invocation.max_records,
+                linesearch_block_dim=None,
                 capacity=invocation.capacity,
                 scene=SCENE,
                 spec=TRIAL,

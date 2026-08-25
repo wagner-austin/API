@@ -15,14 +15,21 @@ from __future__ import annotations
 
 from navprobe.records import DeviceRunConditions
 from navprobe.wireformat import (
+    encode_optional_int,
     header_line,
     require_non_negative_field,
+    require_optional_non_negative_field,
     require_text_field,
     split_header_line,
 )
 
 #: Header lines a :class:`navprobe.records.DeviceRunConditions` occupies.
-DEVICE_CONDITIONS_FIELD_COUNT = 4
+#: Went from four to five on 2026-08-25 when the line-search block size was
+#: found to decide a determinism verdict. Every banner that carries these
+#: conditions was bumped in the same change, because a reader handed a
+#: four-field header and a five-field decoder would misread every field after
+#: the third rather than fail.
+DEVICE_CONDITIONS_FIELD_COUNT = 5
 
 
 def encode_device_conditions(conditions: DeviceRunConditions) -> tuple[str, ...]:
@@ -40,6 +47,9 @@ def encode_device_conditions(conditions: DeviceRunConditions) -> tuple[str, ...]
         header_line("device", conditions["device"]),
         header_line("device_request", conditions["device_request"]),
         header_line("max_records", str(conditions["max_records"])),
+        header_line(
+            "linesearch_block_dim", encode_optional_int(conditions["linesearch_block_dim"])
+        ),
     )
 
 
@@ -66,6 +76,9 @@ def decode_device_conditions(lines: tuple[str, ...]) -> DeviceRunConditions:
         ),
         max_records=require_non_negative_field(
             split_header_line(lines[3], "max_records"), "max_records"
+        ),
+        linesearch_block_dim=require_optional_non_negative_field(
+            split_header_line(lines[4], "linesearch_block_dim"), "linesearch_block_dim"
         ),
     )
 

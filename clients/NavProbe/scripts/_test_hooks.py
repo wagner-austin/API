@@ -246,7 +246,12 @@ class StateFactoryConstructorProtocol(Protocol):
     """Construct a MuJoCo-Warp state simulator factory for one scene."""
 
     def __call__(
-        self, model_xml: str, world_count: int, perturbation: float, constraint_capacity: int
+        self,
+        model_xml: str,
+        world_count: int,
+        perturbation: float,
+        constraint_capacity: int,
+        linesearch_block_dim: int | None = None,
     ) -> SimulatorFactoryProtocol:
         """Build the factory.
 
@@ -256,6 +261,12 @@ class StateFactoryConstructorProtocol(Protocol):
             perturbation: Half-width of the seed-driven initial offset range.
             constraint_capacity: Upper bound on constraints, contacts and
                 Jacobian non-zeros the allocation reserves.
+            linesearch_block_dim: CUDA block size to pin the iterative
+                line-search kernel to, or ``None`` for the vendor default.
+                Optional so the sweeps that predate the block-size finding call
+                this unchanged; declared because leaving it out would mean a
+                script could not pin the one setting that decides whether a
+                coupled-body scene reproduces.
 
         Returns:
             A factory producing freshly constructed simulators for that scene.

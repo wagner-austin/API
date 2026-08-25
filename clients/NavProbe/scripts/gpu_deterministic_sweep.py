@@ -43,7 +43,12 @@ from navprobe.records import SceneSpec, SweepEntry, SweepRunRecord, TrialSpec
 from navprobe.scenes import row_scene
 from navprobe.sweep import run_scene_sweep
 from scripts import _test_hooks
-from scripts.arguments import ScriptArgumentError, require_count, split_device
+from scripts.arguments import (
+    ScriptArgumentError,
+    require_count,
+    split_device,
+    split_linesearch_block_dim,
+)
 
 #: Half-width of the seed-driven initial offset range.
 PERTURBATION = 0.01
@@ -67,7 +72,10 @@ SCENES: tuple[SceneSpec, ...] = tuple(
 #: Positional arguments accepted, with and without the record bound.
 POSITIONAL_ARITIES = (2, 3)
 
-USAGE = "usage: gpu_deterministic_sweep <MODE> <CACHE_DIR> [MAX_RECORDS] [--device DEV]"
+USAGE = (
+    "usage: gpu_deterministic_sweep <MODE> <CACHE_DIR> [MAX_RECORDS] [--device DEV] "
+    "[--linesearch-block-dim N]"
+)
 
 
 class Invocation:
@@ -78,13 +86,23 @@ class Invocation:
         cache_dir: Kernel-cache directory for this run.
         max_records: Deterministic record bound, zero for Warp's own.
         device: Warp device identifier to sweep.
+        linesearch_block_dim: Block size to pin the line-search kernel to, or
+            ``None`` for the vendor default.
     """
 
-    def __init__(self, mode_name: str, cache_dir: str, max_records: int, device: str) -> None:
+    def __init__(
+        self,
+        mode_name: str,
+        cache_dir: str,
+        max_records: int,
+        device: str,
+        linesearch_block_dim: int | None,
+    ) -> None:
         self.mode_name = mode_name
         self.cache_dir = cache_dir
         self.max_records = max_records
         self.device = device
+        self.linesearch_block_dim = linesearch_block_dim
 
 
 def parse_invocation(args: Sequence[str]) -> Invocation:
@@ -102,7 +120,8 @@ def parse_invocation(args: Sequence[str]) -> Invocation:
             so a mistyped sweep stops before it compiles anything, and says
             which argument was wrong.
     """
-    device, positional = split_device(args)
+    device, without_device = split_device(args)
+    linesearch_block_dim, positional = split_linesearch_block_dim(without_device)
     if len(positional) not in POSITIONAL_ARITIES:
         raise ScriptArgumentError(
             "NP-ARGS-001",
@@ -112,7 +131,7 @@ def parse_invocation(args: Sequence[str]) -> Invocation:
     max_records = 0
     if len(positional) == POSITIONAL_ARITIES[1]:
         max_records = require_count(positional[2], "MAX_RECORDS")
-    return Invocation(positional[0], positional[1], max_records, device)
+    return Invocation(positional[0], positional[1], max_records, device, linesearch_block_dim)
 
 
 def progress_line(scene: SceneSpec, entry: SweepEntry, wall_seconds: float) -> str:
@@ -170,7 +189,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         Returns:
             The factory for that scene.
         """
-        return construct(model_xml, world_count, PERTURBATION, CONSTRAINT_CAPACITY)
+        return construct(
+            model_xml,
+            world_count,
+            PERTURBATION,
+            CONSTRAINT_CAPACITY,
+            invocation.linesearch_block_dim,
+        )
 
     entries: list[SweepEntry] = []
     with warp.ScopedDevice(invocation.device):
@@ -187,6 +212,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 device=device_label,
                 device_request=invocation.device,
                 max_records=invocation.max_records,
+                linesearch_block_dim=invocation.linesearch_block_dim,
                 world_count=WORLD_COUNT,
                 perturbation=PERTURBATION,
                 constraint_capacity=CONSTRAINT_CAPACITY,

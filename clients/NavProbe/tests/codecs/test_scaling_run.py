@@ -52,6 +52,7 @@ def _record() -> ScalingRunRecord:
         device="NVIDIA GeForce RTX 3090 Ti",
         device_request="cuda:0",
         max_records=64,
+        linesearch_block_dim=64,
         capacity=256,
         scene=SceneSpec(body_count=8, lattice_width=8, spacing=0.055, radius=0.03, timestep=0.005),
         spec=TrialSpec(seed=7, step_count=150, repetitions=12),
@@ -151,7 +152,7 @@ class TestScalingRunRejections:
     def test_rejects_a_zero_capacity(self) -> None:
         """A zero constraint allocation cannot hold a contact."""
         lines = encode_scaling_run(_record()).strip("\n").split("\n")
-        lines[5] = f"capacity{SEPARATOR}0"
+        lines[6] = f"capacity{SEPARATOR}0"
         with pytest.raises(WireFormatError) as caught:
             decode_scaling_run("\n".join(lines) + "\n")
         assert caught.value.code == "NP-WIRE-003"
@@ -167,6 +168,7 @@ class TestScalingRunRejections:
             device=_record()["device"],
             device_request=_record()["device_request"],
             max_records=_record()["max_records"],
+            linesearch_block_dim=_record()["linesearch_block_dim"],
             capacity=_record()["capacity"],
             scene=_record()["scene"],
             spec=_record()["spec"],

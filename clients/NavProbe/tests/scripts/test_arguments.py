@@ -9,6 +9,7 @@ from scripts.arguments import (
     require_count,
     require_positive_count,
     split_device,
+    split_linesearch_block_dim,
 )
 
 
@@ -46,6 +47,43 @@ class TestSplitDevice:
         args = ["a", "--device", "cuda:1", "b"]
         split_device(args)
         assert args == ["a", "--device", "cuda:1", "b"]
+
+
+class TestSplitLinesearchBlockDim:
+    """Tests for :func:`split_linesearch_block_dim`."""
+
+    def test_absent_means_the_vendor_default(self) -> None:
+        """No flag is not the same statement as any number.
+
+        ``None`` rather than 32, so a report can distinguish a run that pinned
+        the block size from one that inherited whatever the vendor shipped.
+        """
+        assert split_linesearch_block_dim(["RUN_TO_RUN", "cache"]) == (
+            None,
+            ["RUN_TO_RUN", "cache"],
+        )
+
+    def test_takes_the_value_and_removes_the_flag(self) -> None:
+        """The flag and its value leave the positional list intact."""
+        assert split_linesearch_block_dim(["a", "--linesearch-block-dim", "64", "b"]) == (
+            64,
+            ["a", "b"],
+        )
+
+    def test_rejects_a_dangling_flag(self) -> None:
+        """A flag with nothing after it must stop the run.
+
+        Falling back to the default would sweep under conditions the report
+        then misstates, which is the whole failure this field exists to close.
+        """
+        with pytest.raises(ScriptArgumentError) as caught:
+            split_linesearch_block_dim(["a", "--linesearch-block-dim"])
+        assert caught.value.code == "NP-ARGS-004"
+
+    def test_rejects_a_non_positive_block_size(self) -> None:
+        """A block of no threads is refused before anything compiles."""
+        with pytest.raises(ScriptArgumentError):
+            split_linesearch_block_dim(["--linesearch-block-dim", "0"])
 
 
 class TestRequireCount:

@@ -25,6 +25,7 @@ def _conditions() -> DeviceRunConditions:
         device="NVIDIA GeForce RTX 3090 Ti",
         device_request="cuda:0",
         max_records=64,
+        linesearch_block_dim=64,
     )
 
 
@@ -42,6 +43,7 @@ class TestEncodeDeviceConditions:
             "device",
             "device_request",
             "max_records",
+            "linesearch_block_dim",
         ]
 
 
@@ -60,7 +62,11 @@ class TestDeviceConditionsRoundTrip:
     def test_round_trips_a_zero_record_bound(self) -> None:
         """Zero means Warp's own bound and is not an absent value."""
         conditions = DeviceRunConditions(
-            mode="NOT_GUARANTEED", device="cpu", device_request="cpu", max_records=0
+            mode="NOT_GUARANTEED",
+            device="cpu",
+            device_request="cpu",
+            max_records=0,
+            linesearch_block_dim=None,
         )
         assert decode_device_conditions(encode_device_conditions(conditions)) == conditions
 

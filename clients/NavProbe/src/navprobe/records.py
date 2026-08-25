@@ -242,11 +242,12 @@ class DeviceRunConditions(TypedDict):
     """The conditions any device-scoped measurement run was taken under.
 
     Declared once and inherited, because a determinism figure is meaningless
-    without these four: the same scene family reproduces or does not depending
-    on the Warp mode, on the record bound, and on the card. Separating the
-    resolved device from the requested one is deliberate — a report that stored
-    only ``cuda:1`` could not distinguish the card that ran from the name that
-    was typed.
+    without these five: the same scene family reproduces or does not depending
+    on the Warp mode, on the record bound, on the card, and — measured
+    2026-08-25 — on one kernel's CUDA block size. Separating the resolved
+    device from the requested one is deliberate — a report that stored only
+    ``cuda:1`` could not distinguish the card that ran from the name that was
+    typed.
 
     Attributes:
         mode: The Warp determinism mode, one of ``NOT_GUARANTEED``,
@@ -255,12 +256,20 @@ class DeviceRunConditions(TypedDict):
         device_request: The device identifier asked for on the command line.
         max_records: ``wp.config.deterministic_max_records`` in force. Zero
             means Warp's own code-generated lower bound.
+        linesearch_block_dim: Block size pinned on the iterative line-search
+            kernel, or ``None`` for whatever the vendor shipped. It earns a
+            place beside the other four because it decides the verdict: at the
+            vendor's default of 32 a five-body touching row never reproduces,
+            and at 64 it usually does. A report that omitted it could not be
+            compared against another card's — which is exactly what the
+            cross-architecture question needs to do.
     """
 
     mode: str
     device: str
     device_request: str
     max_records: int
+    linesearch_block_dim: int | None
 
 
 class SweepRunRecord(DeviceRunConditions):

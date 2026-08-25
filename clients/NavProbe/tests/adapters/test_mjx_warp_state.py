@@ -35,6 +35,11 @@ CAPACITY = 4096
 #: A row whose spheres never touch each other, so every contact is to the floor.
 SEPARATED_ROW = row_scene(4, 0.070, 0.03, 0.005)
 
+#: What ``mujoco-warp 3.11.0`` ships as the iterative line-search block size.
+#: Pinned as a literal so a vendor bump that moves it fails this test loudly
+#: rather than silently re-baselining every determinism figure measured under it.
+VENDOR_DEFAULT_LINESEARCH_BLOCK_DIM = 32
+
 
 def _factory(
     body_count: int = 4, spacing: float = 0.070, world_count: int = WORLD_COUNT
@@ -104,6 +109,49 @@ class TestFactory:
         with pytest.raises(MjWarpStateAdapterError) as caught:
             factory()
         assert caught.value.code == "NP-WSTATE-003"
+
+    def test_pins_the_linesearch_block_size_when_given_one(self) -> None:
+        """The pin reaches the device model, which is where codegen reads it.
+
+        Asserted against the real vendor object rather than a stand-in: the
+        point of pinning is that MuJoCo-Warp sees the value, and a fake would
+        agree with the adapter while telling us nothing about the vendor.
+        """
+        factory = MjWarpStateSimulatorFactory(
+            model_xml=build_scene(SEPARATED_ROW),
+            world_count=WORLD_COUNT,
+            perturbation=PERTURBATION,
+            constraint_capacity=CAPACITY,
+            linesearch_block_dim=64,
+        )
+        assert factory._model.block_dim.linesearch_iterative == 64
+
+    def test_leaves_the_vendor_default_alone_when_not_given_one(self) -> None:
+        """Omitting the pin must not silently impose a value.
+
+        The default is the condition every published measurement before
+        2026-08-25 was taken under, so a factory that quietly moved it would
+        invalidate the comparison rather than extend it.
+        """
+        factory = MjWarpStateSimulatorFactory(
+            model_xml=build_scene(SEPARATED_ROW),
+            world_count=WORLD_COUNT,
+            perturbation=PERTURBATION,
+            constraint_capacity=CAPACITY,
+        )
+        assert factory._model.block_dim.linesearch_iterative == VENDOR_DEFAULT_LINESEARCH_BLOCK_DIM
+
+    def test_rejects_a_linesearch_block_size_below_one(self) -> None:
+        """A block of no threads is rejected here, not during codegen."""
+        with pytest.raises(MjWarpStateAdapterError) as caught:
+            MjWarpStateSimulatorFactory(
+                model_xml=build_scene(SEPARATED_ROW),
+                world_count=WORLD_COUNT,
+                perturbation=PERTURBATION,
+                constraint_capacity=CAPACITY,
+                linesearch_block_dim=0,
+            )
+        assert caught.value.code == "NP-WSTATE-004"
 
 
 class TestObservation:

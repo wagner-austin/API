@@ -29,8 +29,11 @@ from navprobe.wireformat import (
     split_header_line,
 )
 
-#: Banner identifying an encoded sweep run.
-SWEEP_RUN_BANNER = "navprobe-sweep-run/1"
+#: Banner identifying an encoded sweep run. Bumped to ``/2`` on 2026-08-25 when
+#: the line-search block size joined :class:`DeviceRunConditions`. A ``/1``
+#: document has one fewer header line, so a ``/2`` decoder must refuse it rather
+#: than read the body's first row as a condition.
+SWEEP_RUN_BANNER = "navprobe-sweep-run/2"
 
 #: Header lines an encoded sweep run occupies.
 SWEEP_RUN_HEADER_FIELD_COUNT = DEVICE_CONDITIONS_FIELD_COUNT + 3
@@ -78,6 +81,7 @@ def decode_sweep_run(text: str) -> SweepRunRecord:
         device=conditions["device"],
         device_request=conditions["device_request"],
         max_records=conditions["max_records"],
+        linesearch_block_dim=conditions["linesearch_block_dim"],
         world_count=require_positive_field(
             split_header_line(header[DEVICE_CONDITIONS_FIELD_COUNT], "world_count"), "world_count"
         ),

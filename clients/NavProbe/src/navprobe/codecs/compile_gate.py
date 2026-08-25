@@ -36,7 +36,7 @@ from navprobe.wireformat import (
 )
 
 #: Banner identifying an encoded compile-gate result.
-COMPILE_GATE_BANNER = "navprobe-compile-gate/1"
+COMPILE_GATE_BANNER = "navprobe-compile-gate/2"
 
 #: Header lines an encoded compile-gate result occupies.
 COMPILE_GATE_HEADER_FIELD_COUNT = DEVICE_CONDITIONS_FIELD_COUNT + 2 + SCENE_FIELD_COUNT
@@ -86,6 +86,7 @@ def decode_compile_gate(text: str) -> CompileGateRecord:
         device=conditions["device"],
         device_request=conditions["device_request"],
         max_records=conditions["max_records"],
+        linesearch_block_dim=conditions["linesearch_block_dim"],
         wall_seconds=require_non_negative_float_field(
             split_header_line(header[wall_at], "wall_seconds"), "wall_seconds"
         ),

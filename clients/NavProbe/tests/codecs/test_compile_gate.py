@@ -25,6 +25,7 @@ def _record() -> CompileGateRecord:
         device="cpu",
         device_request="cpu",
         max_records=0,
+        linesearch_block_dim=None,
         wall_seconds=19.1,
         world_count=2,
         scene=SceneSpec(body_count=6, lattice_width=6, spacing=0.055, radius=0.03, timestep=0.005),
@@ -73,7 +74,7 @@ class TestCompileGateRejections:
     def test_rejects_a_negative_wall_time(self) -> None:
         """A gate cannot have taken less than no time."""
         lines = encode_compile_gate(_record()).strip("\n").split("\n")
-        lines[5] = f"wall_seconds{SEPARATOR}{(-1.0).hex()}"
+        lines[6] = f"wall_seconds{SEPARATOR}{(-1.0).hex()}"
         with pytest.raises(WireFormatError) as caught:
             decode_compile_gate("\n".join(lines) + "\n")
         assert caught.value.code == "NP-WIRE-016"
@@ -81,7 +82,7 @@ class TestCompileGateRejections:
     def test_rejects_a_zero_world_count(self) -> None:
         """A gate that allocated no worlds compiled nothing."""
         lines = encode_compile_gate(_record()).strip("\n").split("\n")
-        lines[6] = f"world_count{SEPARATOR}0"
+        lines[7] = f"world_count{SEPARATOR}0"
         with pytest.raises(WireFormatError) as caught:
             decode_compile_gate("\n".join(lines) + "\n")
         assert caught.value.code == "NP-WIRE-003"

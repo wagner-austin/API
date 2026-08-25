@@ -24,6 +24,9 @@ DEVICE_FLAG = "--device"
 #: Device used when :data:`DEVICE_FLAG` is absent.
 DEFAULT_DEVICE = "cuda:0"
 
+#: The flag pinning the iterative line-search kernel's CUDA block size.
+LINESEARCH_BLOCK_DIM_FLAG = "--linesearch-block-dim"
+
 
 class ScriptArgumentError(NavProbeError):
     """A measurement script's command line could not be parsed.
@@ -105,11 +108,47 @@ def require_positive_count(raw: str, name: str) -> int:
     return value
 
 
+def split_linesearch_block_dim(args: Sequence[str]) -> tuple[int | None, list[str]]:
+    """Split a ``--linesearch-block-dim`` flag out of an argument list.
+
+    Absent means "leave the vendor's default in place", which is a different
+    statement from any number and is why the return is optional rather than
+    defaulted to 32. A report that recorded 32 when nobody asked for it would
+    claim the run pinned a value it merely inherited, and the pin is the thing
+    a cross-architecture comparison has to hold fixed.
+
+    Args:
+        args: Arguments excluding the program name.
+
+    Returns:
+        The requested block size or ``None``, and the remaining arguments.
+
+    Raises:
+        ScriptArgumentError: When the flag is present with no value after it,
+            or with a value that is not a positive integer. A dangling flag is
+            refused for the same reason ``--device`` refuses one: silently
+            falling back would run the sweep under conditions the report then
+            misstates.
+    """
+    remaining = list(args)
+    if LINESEARCH_BLOCK_DIM_FLAG not in remaining:
+        return None, remaining
+    index = remaining.index(LINESEARCH_BLOCK_DIM_FLAG)
+    if index + 1 >= len(remaining):
+        raise ScriptArgumentError(
+            "NP-ARGS-004", f"{LINESEARCH_BLOCK_DIM_FLAG} needs a block size after it"
+        )
+    value = require_positive_count(remaining[index + 1], LINESEARCH_BLOCK_DIM_FLAG)
+    return value, remaining[:index] + remaining[index + 2 :]
+
+
 __all__ = [
     "DEFAULT_DEVICE",
     "DEVICE_FLAG",
+    "LINESEARCH_BLOCK_DIM_FLAG",
     "ScriptArgumentError",
     "require_count",
     "require_positive_count",
     "split_device",
+    "split_linesearch_block_dim",
 ]

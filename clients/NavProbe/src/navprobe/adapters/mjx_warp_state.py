@@ -172,6 +172,19 @@ class MjWarpStateSimulatorFactory:
         world_count: Number of parallel worlds each simulator steps.
         perturbation: Half-width of the seed-driven initial offset range.
         constraint_capacity: Upper bound the allocation reserves.
+        linesearch_block_dim: CUDA block size to pin the iterative line-search
+            kernel to, or ``None`` to leave the vendor's default in place. It
+            is a constructor argument rather than something a caller reaches in
+            and sets, because it must be applied between ``put_model`` and the
+            first step, and because it changes a determinism verdict: at the
+            vendor default of 32 a five-body touching row never reproduces, and
+            at 64 it usually does.
+
+    Raises:
+        MjWarpStateAdapterError: When ``linesearch_block_dim`` is below one.
+            Rejected here rather than passed through, because the vendor would
+            take a nonsensical block size and fail during codegen, long after
+            the value that caused it left the call site.
     """
 
     def __init__(
@@ -180,11 +193,19 @@ class MjWarpStateSimulatorFactory:
         world_count: int,
         perturbation: float,
         constraint_capacity: int,
+        linesearch_block_dim: int | None = None,
     ) -> None:
+        if linesearch_block_dim is not None and linesearch_block_dim < 1:
+            raise MjWarpStateAdapterError(
+                "NP-WSTATE-004",
+                f"linesearch_block_dim must be one or greater, got {linesearch_block_dim}",
+            )
         self._mjwarp = load_mjwarp()
         self._numpy = load_numpy()
         self._mjm: MjModelProtocol = load_mujoco().MjModel.from_xml_string(model_xml)
         self._model = self._mjwarp.put_model(mjm=self._mjm)
+        if linesearch_block_dim is not None:
+            self._model.block_dim.linesearch_iterative = linesearch_block_dim
         self._world_count = world_count
         self._perturbation = perturbation
         self._constraint_capacity = constraint_capacity

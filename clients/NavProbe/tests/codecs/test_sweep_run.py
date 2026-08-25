@@ -61,6 +61,7 @@ def _record() -> SweepRunRecord:
         device="NVIDIA GeForce RTX 3090 Ti",
         device_request="cuda:0",
         max_records=64,
+        linesearch_block_dim=64,
         world_count=2,
         perturbation=0.01,
         constraint_capacity=8192,
@@ -86,7 +87,7 @@ class TestEncodeSweepRun:
         a change to the row that forgot this record would fail here.
         """
         embedded = encode_sweep(_record()["entries"]).split("\n")[1:]
-        assert encode_sweep_run(_record()).split("\n")[8:] == embedded
+        assert encode_sweep_run(_record()).split("\n")[9:] == embedded
 
 
 class TestSweepRunRoundTrip:
@@ -107,6 +108,7 @@ class TestSweepRunRoundTrip:
             device="cpu",
             device_request="cpu",
             max_records=0,
+            linesearch_block_dim=None,
             world_count=1,
             perturbation=0.0,
             constraint_capacity=1,
@@ -146,7 +148,7 @@ class TestSweepRunRejections:
     def test_rejects_a_zero_world_count(self) -> None:
         """A sweep over no worlds cannot have happened."""
         lines = encode_sweep_run(_record()).strip("\n").split("\n")
-        lines[5] = f"world_count{SEPARATOR}0"
+        lines[6] = f"world_count{SEPARATOR}0"
         with pytest.raises(WireFormatError) as caught:
             decode_sweep_run("\n".join(lines) + "\n")
         assert caught.value.code == "NP-WIRE-003"
@@ -154,7 +156,7 @@ class TestSweepRunRejections:
     def test_rejects_a_malformed_entry_row(self) -> None:
         """A short row would otherwise decode into the wrong fields."""
         lines = encode_sweep_run(_record()).strip("\n").split("\n")
-        lines[8] = f"entry{SEPARATOR}2"
+        lines[9] = f"entry{SEPARATOR}2"
         with pytest.raises(WireFormatError) as caught:
             decode_sweep_run("\n".join(lines) + "\n")
         assert caught.value.code == "NP-WIRE-017"

@@ -26,6 +26,13 @@ from tests.adapters.models import (
     RENDERABLE_BALL_XML,
 )
 
+#: What ``mujoco-warp 3.11.0`` ships as the iterative line-search block size.
+VENDOR_DEFAULT_LINESEARCH_BLOCK_DIM = 32
+
+#: A block size the adapter can pin it to. 64 rather than an arbitrary number
+#: because it is the one value that changes a determinism verdict.
+PINNED_LINESEARCH_BLOCK_DIM = 64
+
 #: Worlds the drift checks allocate.
 WORLD_COUNT = 2
 
@@ -51,6 +58,21 @@ class TestDeclaredKeywordNames:
         """
         placed = load_mjwarp().put_model(mjm=_compiled_model())
         assert placed.nq == FREE_JOINT_COORDINATE_COUNT
+
+    def test_the_placed_model_carries_a_writable_linesearch_block_size(self) -> None:
+        """``block_dim.linesearch_iterative`` exists and takes a write.
+
+        Declared on :class:`MjWarpBlockDimProtocol` and therefore asserted here,
+        like every other declared name. Both halves matter: reading proves the
+        vendor still spells it this way, and writing proves it is a settable
+        field rather than a computed property — the adapter pins it between
+        ``put_model`` and the first step, and a read-only attribute would make
+        that pin a silent no-op rather than an error.
+        """
+        placed = load_mjwarp().put_model(mjm=_compiled_model())
+        assert placed.block_dim.linesearch_iterative == VENDOR_DEFAULT_LINESEARCH_BLOCK_DIM
+        placed.block_dim.linesearch_iterative = PINNED_LINESEARCH_BLOCK_DIM
+        assert placed.block_dim.linesearch_iterative == PINNED_LINESEARCH_BLOCK_DIM
 
     def test_make_data_takes_mjm_and_nworld(self) -> None:
         """``mujoco_warp.make_data(mjm=..., nworld=...)`` allocates per world."""

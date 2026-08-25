@@ -82,6 +82,27 @@ class NumpyModuleProtocol(Protocol):
         ...
 
 
+class MjWarpBlockDimProtocol(Protocol):
+    """Per-kernel CUDA block sizes on a device-resident model.
+
+    The vendor's struct carries twenty-three of these. Only the one this
+    instrument varies is declared, for the same reason every other Protocol
+    here declares only what is used: a field nobody sets is a claim about the
+    vendor that nothing would notice going stale.
+
+    ``linesearch_iterative`` is the one, and it is not arbitrary. At its default
+    of 32 a five-body touching row never reproduces; at 64 it reproduces most of
+    the time, on a bit-identical trajectory. A determinism measurement that left
+    it unpinned would be reporting a verdict for whichever value the vendor
+    happened to ship.
+
+    Attributes:
+        linesearch_iterative: Block size for the iterative line-search kernel.
+    """
+
+    linesearch_iterative: int
+
+
 class MjWarpModelProtocol(Protocol):
     """A device-resident MuJoCo-Warp model.
 
@@ -93,9 +114,14 @@ class MjWarpModelProtocol(Protocol):
 
     Attributes:
         nq: Number of generalised position coordinates.
+        block_dim: Per-kernel CUDA block sizes. Declared because one of them
+            decides whether a coupled-body scene reproduces at all, so a probe
+            that could not pin it would be reporting a determinism verdict for
+            a scheduling configuration it did not control.
     """
 
     nq: int
+    block_dim: MjWarpBlockDimProtocol
 
 
 class MjWarpDataProtocol(Protocol):
@@ -283,6 +309,7 @@ __all__ = [
     "DeviceArrayProtocol",
     "HostArrayProtocol",
     "MakeDataProtocol",
+    "MjWarpBlockDimProtocol",
     "MjWarpDataProtocol",
     "MjWarpModelProtocol",
     "MjWarpModuleProtocol",

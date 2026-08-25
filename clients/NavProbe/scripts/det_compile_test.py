@@ -146,6 +146,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 device=device_label,
                 device_request=invocation.device,
                 max_records=0,
+                linesearch_block_dim=None,
                 wall_seconds=elapsed,
                 world_count=WORLD_COUNT,
                 scene=SCENE,

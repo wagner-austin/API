@@ -127,9 +127,20 @@ class RecordingFactoryConstructor:
         self._runtime = runtime
         self._deterministic = deterministic
         self.calls: list[tuple[str, int, float, int]] = []
+        #: The block-size pin each call carried, in call order. Kept beside
+        #: ``calls`` rather than widened into it so that adding a settable
+        #: condition did not rewrite every existing assertion on the tuple --
+        #: and so a test can assert a script passed ``None`` rather than
+        #: silently imposing a value, which is the failure that matters here.
+        self.linesearch_block_dims: list[int | None] = []
 
     def __call__(
-        self, model_xml: str, world_count: int, perturbation: float, constraint_capacity: int
+        self,
+        model_xml: str,
+        world_count: int,
+        perturbation: float,
+        constraint_capacity: int,
+        linesearch_block_dim: int | None = None,
     ) -> SimulatorFactoryProtocol:
         """Build a factory for one compiled scene.
 
@@ -138,11 +149,14 @@ class RecordingFactoryConstructor:
             world_count: Parallel worlds each simulator carries.
             perturbation: Half-width of the seed-driven offset range.
             constraint_capacity: Constraint allocation bound.
+            linesearch_block_dim: Block size pinned on the line-search kernel,
+                or ``None`` for the vendor default.
 
         Returns:
             A factory producing real simulators.
         """
         self.calls.append((model_xml, world_count, perturbation, constraint_capacity))
+        self.linesearch_block_dims.append(linesearch_block_dim)
         self._runtime.work_inside_scope.append(f"construct:{self._runtime.scope_depth}")
         if self._deterministic:
             return LinearSimulatorFactory(world_count=world_count)

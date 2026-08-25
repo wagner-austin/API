@@ -48,7 +48,7 @@ from navprobe.wireformat import (
 )
 
 #: Banner identifying an encoded scaling run.
-SCALING_RUN_BANNER = "navprobe-scaling-run/1"
+SCALING_RUN_BANNER = "navprobe-scaling-run/2"
 
 #: Leading token marking one rung.
 RUNG_TAG = "rung"
@@ -166,6 +166,7 @@ def decode_scaling_run(text: str) -> ScalingRunRecord:
         device=conditions["device"],
         device_request=conditions["device_request"],
         max_records=conditions["max_records"],
+        linesearch_block_dim=conditions["linesearch_block_dim"],
         capacity=require_positive_field(
             split_header_line(header[capacity_at], "capacity"), "capacity"
         ),
