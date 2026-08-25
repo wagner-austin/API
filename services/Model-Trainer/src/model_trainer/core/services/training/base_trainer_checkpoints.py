@@ -53,6 +53,43 @@ class _TrainerCheckpoints(_TrainerObservability):
             },
         )
 
+    def _restore_best_checkpoint(self) -> None:
+        """Load the shipped weights back into the live model before scoring.
+
+        ``_save_best_checkpoint`` overwrites the run's output directory on
+        every validation improvement, and ``train`` skips the final save
+        while such a checkpoint exists. So a run WITH a holdout finishes
+        with the best epoch on disk and the LAST epoch in memory, and a
+        test evaluation against the live model reports a score for weights
+        nobody receives. That is not hypothetical: mi-kk-armB-realsplit-seed42
+        uploaded epoch 17 and reported a test loss measured on epoch 20,
+        with its manifest carrying both numbers and no way to tell.
+
+        Reloading from disk rather than from an in-memory snapshot is
+        deliberate -- it scores the exact bytes that will be uploaded, so a
+        partial or corrupt save surfaces here rather than in whatever
+        consumes the artifact later.
+
+        A run without a holdout saved no best checkpoint, so the live model
+        already IS the artifact and this is a no-op.
+        """
+        path = self._best_checkpoint_path
+        if path is None:
+            return
+        reloaded = self._prepared.model.from_pretrained(str(path))
+        _ = self._prepared.model.load_state_dict(reloaded.state_dict())
+        _ = self._prepared.model.to(str(self._device))
+        _logger.info(
+            "Restored best checkpoint for evaluation",
+            extra={
+                "category": "training",
+                "event": "best_checkpoint_restored",
+                "path": str(path),
+                "run_id": self._run_id,
+                "best_val_loss": self._es_state["best_val_loss"],
+            },
+        )
+
     def _require_matching_config(self, meta: TrainingCheckpointMeta) -> None:
         """Refuse to resume under a config that differs from the checkpoint's.
 

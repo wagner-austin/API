@@ -24,6 +24,7 @@ class LoggingExtra(TypedDict, total=False):
     status: str
     loss: float
     perplexity: float
+    best_val_loss: float
     steps: int
     tail: int
     method: str
@@ -38,6 +39,11 @@ class LoggingExtra(TypedDict, total=False):
     size: int
     resume_from: int
     elapsed_seconds: float
+    # Cluster event sink. A key absent from LOGGING_EXTRA_FIELDS below is
+    # dropped by JsonFormatter without complaint, which is how every event
+    # published by a cluster run rendered as a bare {"message": "event"}.
+    channel: str
+    event_body: str
 
 
 # Strict list of keys to include when rendering JSON logs.
@@ -59,6 +65,7 @@ LOGGING_EXTRA_FIELDS: tuple[str, ...] = (
     "status",
     "loss",
     "perplexity",
+    "best_val_loss",
     "steps",
     "tail",
     "method",
@@ -72,6 +79,8 @@ LOGGING_EXTRA_FIELDS: tuple[str, ...] = (
     "size",
     "resume_from",
     "elapsed_seconds",
+    "channel",
+    "event_body",
 )
 
 __all__ = ["LOGGING_EXTRA_FIELDS", "LoggingExtra"]

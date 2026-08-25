@@ -129,6 +129,11 @@ class BaseTrainer(_TrainerLoop):
                 },
             )
 
+        # 6b. Score what ships, not what happens to be resident. With a
+        # holdout, out_dir holds the best epoch while the live model holds
+        # the last; without one, this is a no-op.
+        self._restore_best_checkpoint()
+
         # 7. Run test evaluation (NEW)
         test_loss: float | None = None
         test_ppl: float | None = None

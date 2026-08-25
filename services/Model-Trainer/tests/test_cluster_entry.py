@@ -210,8 +210,19 @@ class TestPublishingGoesThroughRealLogging:
             logger.setLevel(previous)
 
         assert len(records) == 1
-        assert _rendered(records[0], "%(message)s|%(channel)s|%(event_body)s") == (
-            "event|trainer:events|step 1 of 26912"
+        # The body must reach the RENDERED MESSAGE. `JsonFormatter` emits only
+        # `message`, its static fields, a caller-supplied `extra_field_names`
+        # defaulting to empty, and a fixed tuple naming neither key here -- so
+        # a body carried solely in `extra` is discarded. Runs 55570386 and
+        # 55570784 produced 36 MB and 28 MB of bare `{"message": "event"}`
+        # that way, and the metrics survived only because the evaluation
+        # service logs its own lines by a separate route.
+        assert records[0].getMessage() == "event channel=trainer:events body=step 1 of 26912"
+        # And the structured keys still ride along, still without colliding
+        # with the reserved `message` attribute -- the KeyError that killed
+        # the first real cluster run before step one.
+        assert _rendered(records[0], "%(channel)s|%(event_body)s") == (
+            "trainer:events|step 1 of 26912"
         )
 
     def test_the_store_publishes_through_that_same_path(self, tmp_path: pathlib.Path) -> None:
@@ -240,7 +251,7 @@ class TestPublishingGoesThroughRealLogging:
 
         # install_cluster_hooks logs to this same logger, so select the
         # published events rather than assuming they are the only records.
-        published = [r for r in records if r.getMessage() == "event"]
+        published = [r for r in records if r.getMessage().startswith("event channel=")]
         assert [_rendered(r, "%(channel)s|%(event_body)s") for r in published] == [
             "trainer:events|started"
         ]

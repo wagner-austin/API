@@ -50,17 +50,38 @@ _FLAGS = (PAYLOAD_FLAG, CORPUS_FLAG, ARTIFACTS_FLAG)
 def _publish_to_log(channel: str, message: str) -> None:
     """Put a published event where a cluster operator will actually find it.
 
-    The body is carried as ``event_body``, NOT as ``message``: ``message`` is
-    a reserved ``LogRecord`` attribute, and ``logging`` raises ``KeyError`` on
+    The body is FORMATTED INTO the log message rather than passed only
+    through ``extra``. Both halves of that are load-bearing:
+
+    ``extra`` alone does not reach the log. ``JsonFormatter`` emits the
+    static fields, a caller-supplied ``extra_field_names`` that defaults to
+    empty, and a fixed tuple naming neither ``channel`` nor ``event_body``
+    -- so every event logged that way rendered as a bare
+    ``{"message": "event"}``. Runs 55570386 and 55570784 produced 36 MB and
+    28 MB of those, carrying nothing. The metrics survived only because the
+    evaluation service logs its own lines by a separate route.
+
+    ``extra={"message": ...}`` is not the alternative: ``message`` is a
+    reserved ``LogRecord`` attribute and ``logging`` raises ``KeyError`` on
     any ``extra`` that would overwrite one. That raise happened on the first
-    ``publish_started()`` of the first real cluster run -- so the failure
+    ``publish_started()`` of the first real cluster run, so the failure
     surfaced as a training job dying before step one, from a logging call.
+
+    Formatting into the message body avoids both: ``record.getMessage()``
+    renders it with no formatter configuration and no reserved-name
+    collision. The structured keys stay on the record for any consumer that
+    is configured to read them.
 
     Args:
         channel: Channel the event was published to.
         message: The event body.
     """
-    _log.info("event", extra={"channel": channel, "event_body": message})
+    _log.info(
+        "event channel=%s body=%s",
+        channel,
+        message,
+        extra={"channel": channel, "event_body": message},
+    )
 
 
 def install_cluster_hooks(*, corpus_dir: Path, artifacts_dir: Path) -> None:
