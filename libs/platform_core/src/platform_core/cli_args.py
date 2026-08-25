@@ -1,9 +1,15 @@
-"""Argument reading shared by the three entry points.
+"""Argument reading shared by this monorepo's command-line entry points.
 
 Arguments are parsed by hand rather than with argparse because argparse's
-namespace is untyped attribute access and this package holds every expression
-to a known type. The surface is small enough that the hand parser is the
-simpler artifact.
+namespace is untyped attribute access and these packages hold every
+expression to a known type. The surface is small enough that the hand parser
+is the simpler artifact.
+
+In ``platform_core`` rather than beside any one command because more than one
+package now has entry points -- the hpc3 submitter and the Model-Trainer
+scorer -- and forty lines of flag parsing copied into the second is a fork
+that drifts on exactly the question it exists to settle: whether a mistyped
+flag is refused or ignored.
 
 An unknown or malformed flag raises rather than being ignored. A job
 submitted under a mistyped flag is a different job, and a staging run under

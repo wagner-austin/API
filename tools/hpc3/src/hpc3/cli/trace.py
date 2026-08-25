@@ -21,7 +21,9 @@ import pathlib
 import sys
 from collections.abc import Sequence
 
-from hpc3.cli import _argv, _config, _fatal, _test_hooks
+from platform_core import cli_args
+
+from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.experiment import format_experiment, matches
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.workspace import workspace_cluster
@@ -78,7 +80,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AppError: If a record names a partition this cluster does not have.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    parsed = _argv.parse_single_flags(tokens, _FLAGS)
+    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     workspace = _config.load_workspace(parsed)
 
     entries = ledger.read(pathlib.Path(workspace["ledger"]), workspace_cluster(workspace))

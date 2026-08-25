@@ -23,9 +23,10 @@ import pathlib
 import sys
 from collections.abc import Sequence
 
+from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
-from hpc3.cli import _argv, _config, _fatal, _test_hooks
+from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.provenance import format_provenance
 from hpc3.contracts.stage import decode_stage_manifest
 from hpc3.core import _test_hooks as core_hooks
@@ -57,11 +58,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             as one.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    parsed = _argv.parse_single_flags(tokens, _FLAGS)
+    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     host = _config.load_workspace(parsed)["host"]
-    manifest_path = pathlib.Path(_argv.require_flag(parsed, "--manifest"))
-    source_dir = pathlib.Path(_argv.require_flag(parsed, "--source-dir"))
-    expect_path = pathlib.Path(_argv.require_flag(parsed, "--expect-from"))
+    manifest_path = pathlib.Path(cli_args.require_flag(parsed, "--manifest"))
+    source_dir = pathlib.Path(cli_args.require_flag(parsed, "--source-dir"))
+    expect_path = pathlib.Path(cli_args.require_flag(parsed, "--expect-from"))
 
     raw = core_hooks.read_bytes(manifest_path).decode("utf-8")
     manifest = decode_stage_manifest(load_json_str(raw))

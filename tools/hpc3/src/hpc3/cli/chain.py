@@ -15,9 +15,10 @@ import pathlib
 import sys
 from collections.abc import Sequence
 
+from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
-from hpc3.cli import _argv, _config, _fatal, _test_hooks
+from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.cluster import describe_gpu_request
 from hpc3.contracts.layout import log_dir, script_dir
 from hpc3.contracts.run import resolve_chain
@@ -48,10 +49,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             a failure stay queued and are recorded in the ledger.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    parsed = _argv.parse_single_flags(tokens, _FLAGS)
+    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     workspace = _config.load_workspace(parsed)
     cluster = workspace_cluster(workspace)
-    run_path = pathlib.Path(_argv.require_flag(parsed, "--run"))
+    run_path = pathlib.Path(cli_args.require_flag(parsed, "--run"))
 
     raw = core_hooks.read_bytes(run_path).decode("utf-8")
     spec = resolve_chain(workspace, load_json_str(raw))

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from hpc3.cli._argv import parse_single_flags, require_flag, take_value
+from platform_core.cli_args import parse_single_flags, require_flag, take_value
 
 _FLAGS = ("--host", "--spec")
 

@@ -18,7 +18,9 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 
-from hpc3.cli import _argv, _config, _fatal, _test_hooks
+from platform_core import cli_args
+
+from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.status import JobState, JobStatus, gpu_hours, is_terminal, service_units
 from hpc3.contracts.workspace import workspace_cluster
@@ -70,11 +72,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             specific job and silence would read as "not running yet".
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    parsed = _argv.parse_single_flags(tokens, _FLAGS)
+    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     workspace = _config.load_workspace(parsed)
     cluster = workspace_cluster(workspace)
     host = workspace["host"]
-    requested = [part for part in _argv.require_flag(parsed, "--job").split(",") if part != ""]
+    requested = [part for part in cli_args.require_flag(parsed, "--job").split(",") if part != ""]
     if requested == []:
         raise ValueError("--job must name at least one job id")
 

@@ -20,9 +20,10 @@ import pathlib
 import sys
 from collections.abc import Sequence
 
+from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
-from hpc3.cli import _argv, _config, _fatal, _test_hooks
+from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import log_dir, qualified_name, script_dir
 from hpc3.contracts.run import resolve_run, resolve_sweep
@@ -83,7 +84,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             that would not run must not preflight clean.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    parsed = _argv.parse_single_flags(tokens, _FLAGS)
+    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     workspace = _config.load_workspace(parsed)
     cluster = workspace_cluster(workspace)
     root = workspace["root"]

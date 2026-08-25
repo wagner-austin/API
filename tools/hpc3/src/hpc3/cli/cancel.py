@@ -14,7 +14,9 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 
-from hpc3.cli import _argv, _config, _fatal, _test_hooks
+from platform_core import cli_args
+
+from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core.cancel import cancel, summarise
 
@@ -39,10 +41,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             malformed.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    parsed = _argv.parse_single_flags(tokens, _FLAGS)
+    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     workspace = _config.load_workspace(parsed)
     host = workspace["host"]
-    requested = [part for part in _argv.require_flag(parsed, "--job").split(",") if part != ""]
+    requested = [part for part in cli_args.require_flag(parsed, "--job").split(",") if part != ""]
     if requested == []:
         raise ValueError("--job must name at least one job id")
 

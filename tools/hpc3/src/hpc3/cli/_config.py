@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import pathlib
 
+from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
-from hpc3.cli import _argv
 from hpc3.contracts.workspace import Workspace, decode_workspace
 from hpc3.core import _test_hooks as core_hooks
 
@@ -39,7 +39,7 @@ def load_workspace(parsed: dict[str, str]) -> Workspace:
         JSONTypeError: If the document is not a valid workspace.
         AppError: If a project declares a GPU this cluster does not carry.
     """
-    path = pathlib.Path(_argv.require_flag(parsed, CONFIG_FLAG)).resolve()
+    path = pathlib.Path(cli_args.require_flag(parsed, CONFIG_FLAG)).resolve()
     raw = core_hooks.read_bytes(path).decode("utf-8")
     return decode_workspace(load_json_str(raw), config_dir=path.parent)
 
