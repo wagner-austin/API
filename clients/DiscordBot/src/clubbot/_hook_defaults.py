@@ -9,7 +9,6 @@ module reads a hook, which is what keeps that rebinding effective.
 from __future__ import annotations
 
 import urllib.parse as _url
-from pathlib import Path
 
 from discord.abc import Snowflake as DiscordSnowflake
 from discord.app_commands import AppCommand
@@ -36,7 +35,6 @@ from clubbot._hook_protocols_platform import (
     BotOrchestratorProtocol,
     DigitsEnqueuerLike,
     FetchedUserLike,
-    GuardRunForProjectProtocol,
     HttpxModuleProtocol,
     ServiceContainerProtocol,
     TranscriptResultLike,
@@ -146,30 +144,6 @@ def _default_rq_queue(name: str, *, connection: _RedisBytesClient) -> RQClientQu
 def _default_rq_retry(*, max_retries: int, intervals: list[int]) -> RQRetryLike:
     """Production implementation - creates real RQ retry."""
     return _real_rq_retry(max_retries=max_retries, intervals=intervals)
-
-
-def _default_guard_find_monorepo_root(start: Path) -> Path:
-    """Production implementation - finds monorepo root by climbing directories."""
-    current = start
-    while True:
-        if (current / "libs").is_dir():
-            return current
-        if current.parent == current:
-            raise RuntimeError("monorepo root with 'libs' directory not found")
-        current = current.parent
-
-
-def _default_guard_load_orchestrator(monorepo_root: Path) -> GuardRunForProjectProtocol:
-    """Production implementation - loads the orchestrator module."""
-    import sys
-
-    libs_path = monorepo_root / "libs"
-    guards_src = libs_path / "monorepo_guards" / "src"
-    sys.path.insert(0, str(guards_src))
-    sys.path.insert(0, str(libs_path))
-    mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
-    run_for_project: GuardRunForProjectProtocol = mod.run_for_project
-    return run_for_project
 
 
 def _default_build_digits_enqueuer(redis_url: str) -> DigitsEnqueuerLike | None:

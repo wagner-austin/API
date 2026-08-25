@@ -13,7 +13,6 @@ from PIL.Image import Image as PILImage
 from torch.nn import Module as TorchModule
 from torch.optim.optimizer import Optimizer as TorchOptimizer
 
-from handwriting_ai._hook_protocols import GuardRunForProjectProtocol
 from handwriting_ai._hook_protocols_ml import (
     InferenceTorchModelProtocol,
     PreprocessDatasetProtocol,
@@ -33,14 +32,6 @@ from handwriting_ai.training.progress import (
     EpochEmitter,
 )
 from handwriting_ai.training.train_config import TrainConfig, TrainingResult
-
-
-class GuardLoadOrchestratorProtocol(Protocol):
-    """Protocol for _load_orchestrator function."""
-
-    def __call__(self, monorepo_root: Path) -> GuardRunForProjectProtocol:
-        """Load the orchestrator module and return run_for_project."""
-        ...
 
 
 class CgroupMemoryUsageDict(TypedDict):

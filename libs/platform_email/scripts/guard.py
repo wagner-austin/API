@@ -1,11 +1,19 @@
-"""Guard script for platform_email.
+"""Run this package's guard checks.
 
-Invokes the monorepo_guards orchestrator for this project. Every non-pure
-operation is reached through ``scripts._test_hooks``, which binds each symbol
-to its real implementation at import time. The hooks are called directly, so
-there is no conditional dispatch and no separate production code path.
+A bootstrap, not an implementation. Every guard rule -- and the argument
+handling around it -- lives in ``libs/monorepo_guards``. This file exists
+only because that package is a dependency of four of the forty-one packages
+here and so cannot simply be imported by the other thirty-seven. It puts
+``monorepo_guards`` on the path and hands over.
 
-Strict typing only: no Any, no casts, no type: ignore, no stubs.
+Invoked as ``python -m scripts.guard`` from the package directory, which is
+the single form every Makefile uses. Running this file BY PATH instead puts
+``scripts/`` on ``sys.path[0]`` rather than the package root, which is a
+different program: it can only find an INSTALLED top-level ``scripts``.
+
+Byte-identical in all forty-one packages, enforced by the
+``guard-shim-not-canonical`` rule. Generated from
+``monorepo_guards.guard_shim_template``; edit that, not this.
 """
 
 from __future__ import annotations
@@ -13,70 +21,29 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-
-from scripts import _test_hooks
-
-# Record the script path at module load time for production use.
-_test_hooks.set_script_path(Path(__file__).resolve())
+from typing import Protocol
 
 
-def _find_monorepo_root(start: Path) -> Path:
-    """Find the monorepo root by looking for a 'libs' directory.
-
-    Args:
-        start: Starting path to search upward from.
-
-    Returns:
-        Path to the monorepo root.
-
-    Raises:
-        RuntimeError: When no ancestor directory contains 'libs'.
-    """
-    current = start
-    while True:
-        if _test_hooks.is_dir(current / "libs"):
-            return current
-        if current.parent == current:
-            raise RuntimeError("monorepo root with 'libs' directory not found")
-        current = current.parent
+class _RunGuard(Protocol):
+    def __call__(self, argv: Sequence[str] | None, *, project_root: Path) -> int: ...
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the guard checks for this project.
+    """Run every guard rule against this package.
 
     Args:
-        argv: Command line arguments, excluding the program name. Defaults to
-            the process arguments.
+        argv: Arguments excluding the program name, or None to read the
+            process arguments.
 
     Returns:
-        Exit code, 0 when no violations were found.
+        0 when no violations were found, 2 when there were.
     """
-    script_path = _test_hooks.get_script_path()
-    project_root = script_path.parents[1]
-    monorepo_root = _find_monorepo_root(project_root)
-    run_for_project = _test_hooks.load_orchestrator(monorepo_root)
-
-    args = list(argv) if argv is not None else list(sys.argv[1:])
-    root_override: Path | None = None
-    verbose = False
-    idx = 0
-    while idx < len(args):
-        token = args[idx]
-        if token == "--root" and idx + 1 < len(args):
-            root_override = Path(args[idx + 1]).resolve()
-            idx += 2
-        elif token in ("-v", "--verbose"):
-            verbose = True
-            idx += 1
-        else:
-            idx += 1
-
-    target_root = root_override if root_override is not None else project_root
-    rc = run_for_project(monorepo_root=monorepo_root, project_root=target_root)
-    if verbose:
-        sys.stdout.write(f"guard_exit_code code={rc}\n")
-    return rc
+    here = Path(__file__).resolve()
+    sys.path.insert(0, str(here.parents[3] / "libs" / "monorepo_guards" / "src"))
+    module = __import__("monorepo_guards.shim", fromlist=["run_guard"])
+    run_guard: _RunGuard = module.run_guard
+    return run_guard(argv, project_root=here.parents[1])
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(None))
+    raise SystemExit(main())

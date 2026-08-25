@@ -26,8 +26,6 @@ def reset_hooks() -> None:
     _test_hooks.redis_raw_for_rq = _test_hooks._default_redis_raw_for_rq
     _test_hooks.rq_queue = _test_hooks._default_rq_queue
     _test_hooks.rq_retry = _test_hooks._default_rq_retry
-    _test_hooks.guard_find_monorepo_root = _test_hooks._default_guard_find_monorepo_root
-    _test_hooks.guard_load_orchestrator = _test_hooks._default_guard_load_orchestrator
     _test_hooks.load_httpx_module = _test_hooks._default_load_httpx_module
     _test_hooks.build_digits_enqueuer = _test_hooks._default_build_digits_enqueuer
     _test_hooks.setup_logging = _test_hooks._default_setup_logging

@@ -106,8 +106,6 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     original_rq_queue_factory = _test_hooks.rq_queue_factory
     original_artifact_store_factory = _test_hooks.artifact_store_factory
     original_run_worker = _test_hooks.run_worker
-    original_guard_find = _test_hooks.guard_find_monorepo_root
-    original_guard_load = _test_hooks.guard_load_orchestrator
     original_pil_image_open = _test_hooks.pil_image_open
     original_import_module = _test_hooks.import_module
     original_thread_factory = _test_hooks.thread_factory
@@ -248,8 +246,6 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     _test_hooks.rq_queue_factory = original_rq_queue_factory
     _test_hooks.artifact_store_factory = original_artifact_store_factory
     _test_hooks.run_worker = original_run_worker
-    _test_hooks.guard_find_monorepo_root = original_guard_find
-    _test_hooks.guard_load_orchestrator = original_guard_load
     _test_hooks.pil_image_open = original_pil_image_open
     _test_hooks.import_module = original_import_module
     _test_hooks.thread_factory = original_thread_factory

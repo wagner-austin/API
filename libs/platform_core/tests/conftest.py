@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Generator
 
 import pytest
-from scripts import guard as guard_mod
 
 from platform_core import json_utils as json_utils_mod
 from platform_core.config import _test_hooks
@@ -27,11 +26,3 @@ def _restore_json_utils_hooks() -> Generator[None, None, None]:
     original_json_loads = json_utils_mod._json_loads
     yield
     json_utils_mod._json_loads = original_json_loads
-
-
-@pytest.fixture(autouse=True)
-def _restore_guard_hooks() -> Generator[None, None, None]:
-    """Restore guard hooks after each test."""
-    original_is_dir = guard_mod._is_dir
-    yield
-    guard_mod._is_dir = original_is_dir

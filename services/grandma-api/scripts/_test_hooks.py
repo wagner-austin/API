@@ -9,7 +9,6 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 import http.server
-from pathlib import Path
 from typing import Protocol
 
 
@@ -79,52 +78,18 @@ def _real_server_factory(
 server_factory: ServerFactoryProtocol = _real_server_factory
 
 
-class IsDirProtocol(Protocol):
-    """Protocol for checking if a path is a directory."""
-
-    def __call__(self, path: Path) -> bool:
-        """Check if path is a directory.
-
-        Args:
-            path: Path to check.
-
-        Returns:
-            True if path is a directory, False otherwise.
-        """
-        ...
-
-
-def _real_is_dir(path: Path) -> bool:
-    """Real implementation using Path.is_dir().
-
-    Args:
-        path: Path to check.
-
-    Returns:
-        True if path is a directory, False otherwise.
-    """
-    return path.is_dir()
-
-
-is_dir: IsDirProtocol = _real_is_dir
-
-
 def reset_hooks() -> None:
     """Reset all hooks to their default implementations."""
-    global serve_forever, is_dir, server_factory
+    global serve_forever, server_factory
     serve_forever = _real_serve_forever
-    is_dir = _real_is_dir
     server_factory = _real_server_factory
 
 
 __all__ = [
-    "IsDirProtocol",
     "ServeForeverProtocol",
     "ServerFactoryProtocol",
-    "_real_is_dir",
     "_real_serve_forever",
     "_real_server_factory",
-    "is_dir",
     "reset_hooks",
     "serve_forever",
     "server_factory",

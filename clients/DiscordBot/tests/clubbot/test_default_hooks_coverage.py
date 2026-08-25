@@ -7,7 +7,6 @@ coverage tests.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import pytest
 from discord.abc import Snowflake as DiscordSnowflake
@@ -136,14 +135,6 @@ def test_default_trainer_api_client_factory_creates_client() -> None:
     )
     # Result should have train method (TrainerApiClientLike)
     assert callable(result.train)
-
-
-def test_default_guard_find_monorepo_root_from_current() -> None:
-    """Test _default_guard_find_monorepo_root finds root from current directory."""
-    # Start from this file's directory and find the monorepo root
-    start = Path(__file__).parent
-    result = _test_hooks._default_guard_find_monorepo_root(start)
-    assert (result / "libs").is_dir()
 
 
 def test_default_rq_retry_creates_retry_object() -> None:

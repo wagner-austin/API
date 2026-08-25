@@ -11,7 +11,6 @@ are in :mod:`clubbot._hook_defaults` and the bindings in
 from __future__ import annotations
 
 import urllib.parse as _url
-from pathlib import Path
 from typing import Protocol
 
 from platform_core.config import DiscordbotSettings
@@ -72,30 +71,6 @@ class RqRetryProtocol(Protocol):
 
     def __call__(self, *, max_retries: int, intervals: list[int]) -> RQRetryLike:
         """Create RQ retry configuration."""
-        ...
-
-
-class GuardFindMonorepoRootProtocol(Protocol):
-    """Protocol for finding monorepo root."""
-
-    def __call__(self, start: Path) -> Path:
-        """Find the monorepo root from a starting path."""
-        ...
-
-
-class GuardLoadOrchestratorProtocol(Protocol):
-    """Protocol for loading guard orchestrator."""
-
-    def __call__(self, monorepo_root: Path) -> GuardRunForProjectProtocol:
-        """Load the orchestrator module and return run_for_project."""
-        ...
-
-
-class GuardRunForProjectProtocol(Protocol):
-    """Protocol for run_for_project function from monorepo_guards."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guards for a project."""
         ...
 
 

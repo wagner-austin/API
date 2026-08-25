@@ -42,8 +42,6 @@ from clubbot._hook_defaults import (
     _default_discord_exception_types,
     _default_extract_video_id,
     _default_get_service_registry,
-    _default_guard_find_monorepo_root,
-    _default_guard_load_orchestrator,
     _default_load_httpx_module,
     _default_load_settings,
     _default_orchestrator_build_bot,
@@ -71,9 +69,6 @@ from clubbot._hook_protocols_platform import (
     CreateServiceContainerProtocol,
     DigitsEnqueuerLike,
     FetchedUserLike,
-    GuardFindMonorepoRootProtocol,
-    GuardLoadOrchestratorProtocol,
-    GuardRunForProjectProtocol,
     HttpxModuleProtocol,
     LoadHttpxModuleProtocol,
     LoadSettingsProtocol,
@@ -161,11 +156,7 @@ rq_queue: RqQueueProtocol = _default_rq_queue
 rq_retry: RqRetryProtocol = _default_rq_retry
 
 # Hook for guard find_monorepo_root. Tests override to return fake paths.
-guard_find_monorepo_root: GuardFindMonorepoRootProtocol = _default_guard_find_monorepo_root
-
 # Hook for guard load_orchestrator. Tests override to return fake orchestrators.
-guard_load_orchestrator: GuardLoadOrchestratorProtocol = _default_guard_load_orchestrator
-
 # Hook for loading httpx module (used by transcript api_client).
 load_httpx_module: LoadHttpxModuleProtocol = _default_load_httpx_module
 
@@ -280,9 +271,6 @@ __all__ = [
     "ExtractVideoIdProtocol",
     "FetchedUserLike",
     "GetServiceRegistryProtocol",
-    "GuardFindMonorepoRootProtocol",
-    "GuardLoadOrchestratorProtocol",
-    "GuardRunForProjectProtocol",
     "GuildLikeProto",
     "HttpxModuleProtocol",
     "LoadHttpxModuleProtocol",
@@ -332,8 +320,6 @@ __all__ = [
     "_default_discord_exception_types",
     "_default_extract_video_id",
     "_default_get_service_registry",
-    "_default_guard_find_monorepo_root",
-    "_default_guard_load_orchestrator",
     "_default_load_httpx_module",
     "_default_load_settings",
     "_default_orchestrator_build_bot",
@@ -366,8 +352,6 @@ __all__ = [
     "discord_exception_types",
     "extract_video_id",
     "get_service_registry",
-    "guard_find_monorepo_root",
-    "guard_load_orchestrator",
     "load_httpx_module",
     "load_settings",
     "orchestrator_build_bot",

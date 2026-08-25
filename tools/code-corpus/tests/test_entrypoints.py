@@ -83,11 +83,3 @@ class TestModuleExecutionGuards:
         with pytest.raises(SystemExit) as excinfo:
             runpy.run_module("code_corpus.cli.emit_corpus", run_name="__main__")
         assert excinfo.value.code == 0
-
-    def test_the_guard_runs_as_a_module(self, tmp_path: pathlib.Path, argv: list[str]) -> None:
-        """This is how the Makefile invokes it, so the path the build uses is
-        the path the suite exercises."""
-        _set(argv, ["--root", str(tmp_path)])
-        with pytest.raises(SystemExit) as excinfo:
-            runpy.run_module("scripts.guard", run_name="__main__")
-        assert excinfo.value.code == 0

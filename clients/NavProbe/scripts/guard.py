@@ -1,17 +1,19 @@
-"""Run the shared monorepo guard rules against this project.
+"""Run this package's guard checks.
 
-Invoked by ``make lint`` as ``python -m scripts.guard``. The rule set itself
-lives in ``libs/monorepo_guards`` and is shared with every other client; this
-module only applies it to ``src``, ``tests``, and ``scripts``. Project-specific
-rules, when they exist, are added to the shared library rather than forked
-here.
+A bootstrap, not an implementation. Every guard rule -- and the argument
+handling around it -- lives in ``libs/monorepo_guards``. This file exists
+only because that package is a dependency of four of the forty-one packages
+here and so cannot simply be imported by the other thirty-seven. It puts
+``monorepo_guards`` on the path and hands over.
 
-``monorepo-guards`` is a develop path dependency declared in
-``pyproject.toml``, so poetry installs a ``.pth`` into the venv and
-``monorepo_guards`` imports directly. The other clients reach it through
-``sys.path`` insertion plus ``__import__``, which predates that dependency and
-is no longer load-bearing; a direct import needs no Protocol indirection and
-cannot drift from the real signature.
+Invoked as ``python -m scripts.guard`` from the package directory, which is
+the single form every Makefile uses. Running this file BY PATH instead puts
+``scripts/`` on ``sys.path[0]`` rather than the package root, which is a
+different program: it can only find an INSTALLED top-level ``scripts``.
+
+Byte-identical in all forty-one packages, enforced by the
+``guard-shim-not-canonical`` rule. Generated from
+``monorepo_guards.guard_shim_template``; edit that, not this.
 """
 
 from __future__ import annotations
@@ -19,48 +21,29 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Protocol
 
-from monorepo_guards.orchestrator import run_for_project
 
-
-def parse_target_root(argv: Sequence[str], default: Path) -> Path:
-    """Resolve the directory the guard rules should be applied to.
-
-    Args:
-        argv: Argument list excluding the program name. ``--root <path>``
-            selects a directory other than the project root.
-        default: Directory to use when ``--root`` is absent.
-
-    Returns:
-        The resolved directory to check.
-    """
-    index = 0
-    target = default
-    while index < len(argv):
-        if argv[index] == "--root" and index + 1 < len(argv):
-            target = Path(argv[index + 1]).resolve()
-            index += 2
-        else:
-            index += 1
-    return target
+class _RunGuard(Protocol):
+    def __call__(self, argv: Sequence[str] | None, *, project_root: Path) -> int: ...
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the guard rules over this project.
+    """Run every guard rule against this package.
 
     Args:
-        argv: Argument list excluding the program name. ``None`` reads
-            ``sys.argv[1:]``.
+        argv: Arguments excluding the program name, or None to read the
+            process arguments.
 
     Returns:
-        ``0`` when no rule fired, non-zero otherwise.
+        0 when no violations were found, 2 when there were.
     """
-    project_root = Path(__file__).resolve().parents[1]
-    monorepo_root = project_root.parents[1]
-    args = list(argv) if argv is not None else list(sys.argv[1:])
-    target_root = parse_target_root(args, project_root)
-    return run_for_project(monorepo_root=monorepo_root, project_root=target_root)
+    here = Path(__file__).resolve()
+    sys.path.insert(0, str(here.parents[3] / "libs" / "monorepo_guards" / "src"))
+    module = __import__("monorepo_guards.shim", fromlist=["run_guard"])
+    run_guard: _RunGuard = module.run_guard
+    return run_guard(argv, project_root=here.parents[1])
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(None))
+    raise SystemExit(main())

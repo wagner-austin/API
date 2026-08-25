@@ -26,7 +26,6 @@ from covenant_radar_api.integrations.datadog import _test_hooks as datadog_test_
 from covenant_radar_api.integrations.datadog.tracing import reset_tracing_state
 from covenant_radar_api.seeding import _test_hooks as seeding_test_hooks
 from covenant_radar_api.worker import _test_hooks as worker_job_hooks
-from scripts import guard as guard_mod
 
 # =============================================================================
 # Container And Store for Testing
@@ -202,13 +201,6 @@ def _reset_worker_hooks_impl() -> Generator[None, None, None]:
     worker_job_hooks.data_bank_uploader = orig_data_bank_uploader
 
 
-def _reset_guard_hooks_impl() -> Generator[None, None, None]:
-    """Reset guard script hooks after each test."""
-    orig_is_dir = guard_mod._is_dir
-    yield
-    guard_mod._is_dir = orig_is_dir
-
-
 def _reset_seeding_hooks_impl() -> Generator[None, None, None]:
     """Reset seeding module hooks after each test."""
     orig_conn = seeding_test_hooks.connection_factory
@@ -275,7 +267,6 @@ container_with_store = pytest.fixture(_make_container_with_store)
 _reset_test_hooks = pytest.fixture(autouse=True)(_reset_test_hooks_impl)
 _reset_config_hooks = pytest.fixture(autouse=True)(_reset_config_hooks_impl)
 _reset_worker_hooks = pytest.fixture(autouse=True)(_reset_worker_hooks_impl)
-_reset_guard_hooks = pytest.fixture(autouse=True)(_reset_guard_hooks_impl)
 _reset_seeding_hooks = pytest.fixture(autouse=True)(_reset_seeding_hooks_impl)
 _disable_cuda = pytest.fixture(autouse=True)(_disable_cuda_impl)
 _reset_datadog_hooks = pytest.fixture(autouse=True)(_reset_datadog_hooks_impl)

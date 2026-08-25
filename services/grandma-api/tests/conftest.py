@@ -303,11 +303,9 @@ def _restore_scripts_hooks() -> Generator[None, None, None]:
     this the fakes outlive the test that set them.
     """
     original_serve_forever = scripts_test_hooks.serve_forever
-    original_is_dir = scripts_test_hooks.is_dir
     original_server_factory = scripts_test_hooks.server_factory
     yield
     scripts_test_hooks.serve_forever = original_serve_forever
-    scripts_test_hooks.is_dir = original_is_dir
     scripts_test_hooks.server_factory = original_server_factory
 
 

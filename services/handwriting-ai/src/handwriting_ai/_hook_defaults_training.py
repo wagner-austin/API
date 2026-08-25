@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -13,9 +12,6 @@ from PIL.Image import Image as PILImage
 from torch.nn import Module as TorchModule
 from torch.optim.optimizer import Optimizer as TorchOptimizer
 
-from handwriting_ai._hook_protocols import (
-    GuardRunForProjectProtocol,
-)
 from handwriting_ai._hook_protocols_ml import (
     InferenceTorchModelProtocol,
     PreprocessDatasetProtocol,
@@ -42,17 +38,6 @@ from handwriting_ai.training.calibration._types import (
 )
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
 from handwriting_ai.training.train_config import TrainConfig, TrainingResult
-
-
-def _default_guard_load_orchestrator(monorepo_root: Path) -> GuardRunForProjectProtocol:
-    """Production implementation - loads the orchestrator module."""
-    libs_path = monorepo_root / "libs"
-    guards_src = libs_path / "monorepo_guards" / "src"
-    sys.path.insert(0, str(guards_src))
-    sys.path.insert(0, str(libs_path))
-    mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
-    run_for_project: GuardRunForProjectProtocol = mod.run_for_project
-    return run_for_project
 
 
 def _default_get_memory_snapshot() -> MemorySnapshotDict:

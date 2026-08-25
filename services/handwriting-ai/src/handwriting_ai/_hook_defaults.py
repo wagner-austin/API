@@ -29,17 +29,6 @@ from handwriting_ai._hook_protocols_training import (
 )
 
 
-def _default_guard_find_monorepo_root(start: Path) -> Path:
-    """Production implementation - finds monorepo root by climbing directories."""
-    current = start
-    while True:
-        if (current / "libs").is_dir():
-            return current
-        if current.parent == current:
-            raise RuntimeError("monorepo root with 'libs' directory not found")
-        current = current.parent
-
-
 def _default_artifact_store_factory(api_url: str, api_key: str) -> ArtifactStoreProtocol:
     """Production implementation - creates real ArtifactStore."""
     from platform_core.data_bank_client import DataBankClient

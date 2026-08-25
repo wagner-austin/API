@@ -39,22 +39,6 @@ class WorkerRunnerProtocol(Protocol):
         ...
 
 
-class GuardRunForProjectProtocol(Protocol):
-    """Protocol for run_for_project function from monorepo_guards."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guards for a project."""
-        ...
-
-
-class GuardFindMonorepoRootProtocol(Protocol):
-    """Protocol for _find_monorepo_root function."""
-
-    def __call__(self, start: Path) -> Path:
-        """Find the monorepo root from a starting path."""
-        ...
-
-
 class KVStoreFactoryProtocol(Protocol):
     """Protocol for key-value store factory (returns RedisStrProto)."""
 

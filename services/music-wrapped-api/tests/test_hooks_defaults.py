@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import types
 import urllib.request
-from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONValue
@@ -74,35 +73,6 @@ def test_default_urlopen_post_type_error() -> None:
 
     with pytest.raises(TypeError, match=r"req must be a urllib\.request\.Request"):
         _test_hooks._default_urlopen_post(_FakeRequest(), 5.0)
-
-
-def test_default_guard_find_monorepo_root() -> None:
-    """Test _default_guard_find_monorepo_root finds monorepo root."""
-    # Start from this file's directory, which is inside the monorepo
-    start = Path(__file__).resolve().parent
-    root = _test_hooks._default_guard_find_monorepo_root(start)
-    # Verify it found a directory with 'libs'
-    assert (root / "libs").is_dir()
-
-
-def test_default_guard_find_monorepo_root_failure() -> None:
-    """Test _default_guard_find_monorepo_root raises for invalid path."""
-    # Use root directory which doesn't have 'libs'
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        with pytest.raises(RuntimeError, match="monorepo root"):
-            _test_hooks._default_guard_find_monorepo_root(tmp_path)
-
-
-def test_default_guard_load_orchestrator() -> None:
-    """Test _default_guard_load_orchestrator loads the orchestrator."""
-    start = Path(__file__).resolve().parent
-    root = _test_hooks._default_guard_find_monorepo_root(start)
-    run_for_project = _test_hooks._default_guard_load_orchestrator(root)
-    # Verify it returns a callable
-    assert callable(run_for_project)
 
 
 class _FakeHttpResponse:

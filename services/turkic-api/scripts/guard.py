@@ -1,7 +1,19 @@
-"""Guard script for running monorepo checks on this project.
+"""Run this package's guard checks.
 
-This script finds the monorepo root and runs the guard orchestrator
-to check for code quality violations.
+A bootstrap, not an implementation. Every guard rule -- and the argument
+handling around it -- lives in ``libs/monorepo_guards``. This file exists
+only because that package is a dependency of four of the forty-one packages
+here and so cannot simply be imported by the other thirty-seven. It puts
+``monorepo_guards`` on the path and hands over.
+
+Invoked as ``python -m scripts.guard`` from the package directory, which is
+the single form every Makefile uses. Running this file BY PATH instead puts
+``scripts/`` on ``sys.path[0]`` rather than the package root, which is a
+different program: it can only find an INSTALLED top-level ``scripts``.
+
+Byte-identical in all forty-one packages, enforced by the
+``guard-shim-not-canonical`` rule. Generated from
+``monorepo_guards.guard_shim_template``; edit that, not this.
 """
 
 from __future__ import annotations
@@ -11,99 +23,27 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
-from scripts import _test_hooks
 
-
-class _RunForProject(Protocol):
-    """Protocol for the run_for_project function from monorepo_guards."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guard checks for a project.
-
-        Args:
-            monorepo_root: Path to the monorepo root directory.
-            project_root: Path to the project root directory.
-
-        Returns:
-            Exit code: 0 for success, non-zero for failures.
-        """
-        ...
-
-
-def _find_monorepo_root(start: Path) -> Path:
-    """Find the monorepo root by searching for the libs directory.
-
-    Args:
-        start: Starting path to search from.
-
-    Returns:
-        Path to the monorepo root directory.
-
-    Raises:
-        RuntimeError: If libs directory not found in any parent.
-    """
-    current = start
-    while True:
-        if _test_hooks.is_dir(current / "libs"):
-            return current
-        if current.parent == current:
-            raise RuntimeError("monorepo root with 'libs' directory not found")
-        current = current.parent
-
-
-def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
-    """Load the guard orchestrator from monorepo libs.
-
-    Args:
-        monorepo_root: Path to the monorepo root directory.
-
-    Returns:
-        The run_for_project function from monorepo_guards.
-    """
-    libs_path = monorepo_root / "libs"
-    guards_src = libs_path / "monorepo_guards" / "src"
-    sys.path.insert(0, str(guards_src))
-    sys.path.insert(0, str(libs_path))
-    mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
-    run_for_project: _RunForProject = mod.run_for_project
-    return run_for_project
+class _RunGuard(Protocol):
+    def __call__(self, argv: Sequence[str] | None, *, project_root: Path) -> int: ...
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run guard checks for this project.
+    """Run every guard rule against this package.
 
     Args:
-        argv: Command line arguments. If None, uses sys.argv[1:].
+        argv: Arguments excluding the program name, or None to read the
+            process arguments.
 
     Returns:
-        Exit code: 0 for success, non-zero for failures.
+        0 when no violations were found, 2 when there were.
     """
-    script_path = Path(__file__).resolve()
-    project_root = script_path.parents[1]
-    monorepo_root = _find_monorepo_root(project_root)
-    run_for_project = _load_orchestrator(monorepo_root)
-
-    args = list(argv) if argv is not None else list(sys.argv[1:])
-    root_override: Path | None = None
-    verbose = False
-    idx = 0
-    while idx < len(args):
-        token = args[idx]
-        if token == "--root" and idx + 1 < len(args):
-            root_override = Path(args[idx + 1]).resolve()
-            idx += 2
-        elif token in ("-v", "--verbose"):
-            verbose = True
-            idx += 1
-        else:
-            idx += 1
-
-    target_root = root_override if root_override is not None else project_root
-    rc = run_for_project(monorepo_root=monorepo_root, project_root=target_root)
-    if verbose:
-        sys.stdout.write(f"guard_exit_code code={rc}\n")
-    return rc
+    here = Path(__file__).resolve()
+    sys.path.insert(0, str(here.parents[3] / "libs" / "monorepo_guards" / "src"))
+    module = __import__("monorepo_guards.shim", fromlist=["run_guard"])
+    run_guard: _RunGuard = module.run_guard
+    return run_guard(argv, project_root=here.parents[1])
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(None))
+    raise SystemExit(main())

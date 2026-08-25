@@ -36,8 +36,6 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     original_lfm_get_session_json = _test_hooks.lfm_get_session_json
     original_spotify_exchange_code = _test_hooks.spotify_exchange_code
     original_rand_state = _test_hooks.rand_state
-    original_guard_find = _test_hooks.guard_find_monorepo_root
-    original_guard_load = _test_hooks.guard_load_orchestrator
 
     yield
 
@@ -59,8 +57,6 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     _test_hooks.lfm_get_session_json = original_lfm_get_session_json
     _test_hooks.spotify_exchange_code = original_spotify_exchange_code
     _test_hooks.rand_state = original_rand_state
-    _test_hooks.guard_find_monorepo_root = original_guard_find
-    _test_hooks.guard_load_orchestrator = original_guard_load
 
 
 @pytest.fixture(autouse=True)

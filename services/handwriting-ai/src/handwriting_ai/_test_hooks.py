@@ -8,11 +8,11 @@ assign fake implementations before running the code under test.
 
 Usage in production code:
     from handwriting_ai import _test_hooks
-    root = _test_hooks.guard_find_monorepo_root(start)
+    queue = _test_hooks.rq_queue_factory(name, connection=conn)
 
 Usage in tests:
     from handwriting_ai import _test_hooks
-    _test_hooks.guard_find_monorepo_root = lambda start: Path("/fake/root")
+    _test_hooks.rq_queue_factory = lambda name, *, connection: FakeQueue()
 """
 
 from __future__ import annotations
@@ -39,7 +39,6 @@ from handwriting_ai._hook_defaults import (
     _default_artifact_store_factory,
     _default_file_open,
     _default_get_logger,
-    _default_guard_find_monorepo_root,
     _default_is_cgroup_available,
     _default_load_settings,
     _default_log_system_info,
@@ -97,7 +96,6 @@ from handwriting_ai._hook_defaults_training import (
     _default_get_autocast_context,
     _default_get_memory_snapshot,
     _default_get_training_progress_module,
-    _default_guard_load_orchestrator,
     _default_measure_candidate_internal,
     _default_measure_training,
     _default_mp_get_all_start_methods,
@@ -115,7 +113,6 @@ from handwriting_ai._hook_protocols import (
     ArtifactStoreFactoryProtocol,
     FileOpenProtocol,
     GetLoggerProtocol,
-    GuardFindMonorepoRootProtocol,
     InjectBadStateDictListProtocol,
     InjectBadStateDictNonStringKeyProtocol,
     InjectBadStateDictValuesProtocol,
@@ -205,7 +202,6 @@ from handwriting_ai._hook_protocols_training import (
     GetMemoryGuardConfigProtocol,
     GetMemorySnapshotProtocol,
     GetTrainingProgressModuleProtocol,
-    GuardLoadOrchestratorProtocol,
     MeasureCandidateInternalProtocol,
     MeasureTrainingProtocol,
     MemoryGuardConfigDict,
@@ -281,10 +277,6 @@ def _default_get_memory_guard_config() -> MemoryGuardConfigDict:
 
 
 worker_runner: WorkerRunnerProtocol = run_rq_worker
-
-guard_find_monorepo_root: GuardFindMonorepoRootProtocol = _default_guard_find_monorepo_root
-
-guard_load_orchestrator: GuardLoadOrchestratorProtocol = _default_guard_load_orchestrator
 
 redis_factory: KVStoreFactoryProtocol = redis_for_kv
 

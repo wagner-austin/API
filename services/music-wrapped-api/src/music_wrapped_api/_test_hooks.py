@@ -23,7 +23,6 @@ import types
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
-from pathlib import Path
 from typing import Protocol
 
 from platform_core.config import _optional_env_str, _require_env_str
@@ -133,30 +132,6 @@ class UrlOpenPostProtocol(Protocol):
 
     def __call__(self, req: HttpRequestProtocol, timeout: float) -> HttpResponseProtocol:
         """Open a request and return a response."""
-        ...
-
-
-class GuardRunForProjectProtocol(Protocol):
-    """Protocol for run_for_project function from monorepo_guards."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guards for a project."""
-        ...
-
-
-class GuardFindMonorepoRootProtocol(Protocol):
-    """Protocol for _find_monorepo_root function."""
-
-    def __call__(self, start: Path) -> Path:
-        """Find the monorepo root from a starting path."""
-        ...
-
-
-class GuardLoadOrchestratorProtocol(Protocol):
-    """Protocol for _load_orchestrator function."""
-
-    def __call__(self, monorepo_root: Path) -> GuardRunForProjectProtocol:
-        """Load the orchestrator module and return run_for_project."""
         ...
 
 
@@ -316,30 +291,6 @@ def _default_rand_state() -> str:
     return _secrets.token_urlsafe(16)
 
 
-def _default_guard_find_monorepo_root(start: Path) -> Path:
-    """Production implementation - finds monorepo root by climbing directories."""
-    current = start
-    while True:
-        if (current / "libs").is_dir():
-            return current
-        if current.parent == current:
-            raise RuntimeError("monorepo root with 'libs' directory not found")
-        current = current.parent
-
-
-def _default_guard_load_orchestrator(monorepo_root: Path) -> GuardRunForProjectProtocol:
-    """Production implementation - loads the orchestrator module."""
-    import sys
-
-    libs_path = monorepo_root / "libs"
-    guards_src = libs_path / "monorepo_guards" / "src"
-    sys.path.insert(0, str(guards_src))
-    sys.path.insert(0, str(libs_path))
-    mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
-    run_for_project: GuardRunForProjectProtocol = mod.run_for_project
-    return run_for_project
-
-
 # =============================================================================
 # Module-level hooks
 # =============================================================================
@@ -415,16 +366,8 @@ spotify_exchange_code: Callable[[str, str, str, str], dict[str, JSONValue]] = (
 rand_state: Callable[[], str] = _default_rand_state
 
 # Hook for guard find_monorepo_root. Tests can override to return fake paths.
-guard_find_monorepo_root: GuardFindMonorepoRootProtocol = _default_guard_find_monorepo_root
-
 # Hook for guard load_orchestrator. Tests can override to return fake orchestrators.
-guard_load_orchestrator: GuardLoadOrchestratorProtocol = _default_guard_load_orchestrator
-
-
 __all__ = [
-    "GuardFindMonorepoRootProtocol",
-    "GuardLoadOrchestratorProtocol",
-    "GuardRunForProjectProtocol",
     "HttpRequestProtocol",
     "HttpResponseProtocol",
     "RQJobProtocol",
@@ -436,8 +379,6 @@ __all__ = [
     "_default_build_renderer",
     "_default_get_env",
     "_default_get_job",
-    "_default_guard_find_monorepo_root",
-    "_default_guard_load_orchestrator",
     "_default_lfm_get_session_json",
     "_default_make_request",
     "_default_rand_state",
@@ -451,8 +392,6 @@ __all__ = [
     "build_renderer",
     "get_env",
     "get_job",
-    "guard_find_monorepo_root",
-    "guard_load_orchestrator",
     "lfm_get_session_json",
     "make_request",
     "rand_state",
