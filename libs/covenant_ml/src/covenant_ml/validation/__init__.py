@@ -66,6 +66,7 @@ from covenant_ml.validation.runner import (
 )
 from covenant_ml.validation.splitter import (
     get_fold_data,
+    group_kfold_split,
     group_stratified_kfold_split,
     stratified_kfold_split,
 )
@@ -119,6 +120,7 @@ __all__ = [
     "get_fold_data",
     "get_oof_for_stacking",
     "get_regression_fold_data",
+    "group_kfold_split",
     "group_stratified_kfold_split",
     "kfold_split",
     "run_cross_validation",

@@ -427,8 +427,102 @@ def group_stratified_kfold_split(
     )
 
 
+def group_kfold_split(
+    y: NDArray[np.int64],
+    groups: NDArray[np.int64],
+    n_folds: int,
+    random_state: int,
+) -> CVSplitInfo:
+    """Plain grouped k-fold: whole groups per fold, no label stratification.
+
+    The instrument for grouped data whose groups carry MIXED labels —
+    co-elution windows holding both real and blank peaks, for example —
+    where :func:`group_stratified_kfold_split`'s any-positive group label
+    is undefined (every mixed group would count as positive and the
+    negative stratum would be empty). Groups shuffle once and split into
+    folds directly; with many mixed groups, class balance follows from
+    the mixing rather than from stratification.
+
+    Args:
+        y: Binary labels of shape (n_samples,), used for balance logging.
+        groups: Group IDs of shape (n_samples,). All samples with the
+            same group ID land in the same fold.
+        n_folds: Number of folds (must be >= 2).
+        random_state: Random seed for reproducibility.
+
+    Returns:
+        CVSplitInfo containing all fold splits and metadata.
+
+    Raises:
+        ValueError: If n_folds < 2, not enough groups, or groups/y
+            length mismatch.
+    """
+    n_samples = len(y)
+
+    if len(groups) != n_samples:
+        raise ValueError(f"groups length ({len(groups)}) must match y length ({n_samples})")
+
+    if n_folds < 2:
+        raise ValueError(f"n_folds must be >= 2, got {n_folds}")
+
+    unique_groups: NDArray[np.int64] = np.unique(groups)
+    n_groups = len(unique_groups)
+
+    if n_groups < n_folds:
+        raise ValueError(
+            f"Not enough groups ({n_groups}) for {n_folds} folds. Need at least {n_folds} groups."
+        )
+
+    group_indices: NDArray[np.intp] = np.arange(n_groups, dtype=np.intp)
+    rng = np.random.default_rng(random_state)
+    rng.shuffle(group_indices)
+    group_folds = _split_array_into_folds(group_indices, n_folds)
+
+    folds: list[CVSplit] = []
+    for fold_num in range(n_folds):
+        val_group_ids: NDArray[np.int64] = unique_groups[group_folds[fold_num]]
+        val_indices = _get_sample_indices_for_groups(groups, val_group_ids)
+
+        train_parts: list[NDArray[np.intp]] = [
+            group_folds[other_fold] for other_fold in range(n_folds) if other_fold != fold_num
+        ]
+        train_group_idx = _concat_indices(*train_parts)
+        train_group_ids: NDArray[np.int64] = unique_groups[train_group_idx]
+        train_indices = _get_sample_indices_for_groups(groups, train_group_ids)
+
+        rng.shuffle(train_indices)
+        rng.shuffle(val_indices)
+
+        folds.append(
+            CVSplit(
+                fold_number=fold_num,
+                train_indices=train_indices,
+                val_indices=val_indices,
+            )
+        )
+
+    n_pos = int(np.sum(y))
+    _log.info(
+        "Created plain grouped k-fold splits",
+        extra={
+            "n_folds": n_folds,
+            "n_samples": n_samples,
+            "n_groups": n_groups,
+            "n_positive_samples": n_pos,
+            "positive_sample_ratio": n_pos / n_samples,
+        },
+    )
+
+    return CVSplitInfo(
+        n_folds=n_folds,
+        n_samples=n_samples,
+        folds=tuple(folds),
+    )
+
+
 __all__ = [
     "get_fold_data",
+    "group_kfold_split",
     "group_stratified_kfold_split",
     "stratified_kfold_split",
 ]

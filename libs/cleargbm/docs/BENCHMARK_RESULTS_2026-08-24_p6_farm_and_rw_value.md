@@ -278,13 +278,57 @@ beside weather_tmax. Manifest:
 `BENCHMARK_MANIFEST_2026-08-24_p6_voc_match_quality_quality.json`; the
 derived `data.csv` (416 KB) is committed.
 
+## Landing B5 — metab_blank: blank-vs-real peaks from the Emily table
+
+The last named corpus (2026-08-25): the Emily/ProGenesis table
+(23,134 x 58; never joined to metab_confidence, per provenance rule)
+as a blank-vs-real peak classifier — the metabolomics-dashboard's own
+leading design. The lab's standard blank-filter rule IS the label: a
+peak is real when its biological-sample average is at least 3x its
+individual-blank average, or appears in samples only (the pooled
+combine blank excluded; the dashboard's open leaf-vs-root blank
+assignment dispute is sidestepped by its documented all-blanks option).
+`covenant_ml/scripts/build_metab_blank_corpus.py` computes the label
+from the intensity columns and emits NOTHING intensity-derived as a
+feature — the predictors are physicochemical measurables only: m/z,
+charge, retention time, chromatographic peak width, and the m/z and
+Kendrick (CH2) mass defects that contaminant homolog series like
+plasticizers and PEG are known to carry. **19,064 rows across 127
+retention windows** (positive ratio 0.641; 4,070 nowhere-detected rows
+dropped by counted rule; byte-deterministic; the sheet's own average
+columns cross-check the computed rule exactly).
+
+The corpus also forced one honest instrument extension: co-elution
+windows hold real and blank peaks TOGETHER, so the stratified group
+splitter's any-positive group label is undefined (it refused, with
+zero negative groups — correctly). covenant_ml gained
+`group_kfold_split` (plain grouped k-fold), and `cv_external` selects
+the instrument by a stated, data-driven property: label-uniform groups
+run the stratified protocol exactly as before (the rw_matches anchor
+re-reproduces 0.7295 ± 0.0728 fold-for-fold), mixed-label groups run
+plain grouped k-fold and SAY SO in the output.
+
+Grouped 5-fold CV, the flagship protocol, mean held-out AUC:
+
+| arm | mean AUC |
+|---|---|
+| lightgbm | 0.8710 ± 0.0136 |
+| cleargbm | 0.8691 ± 0.0120 |
+| cleargbm-leafwise | 0.8690 ± 0.0120 |
+
+A statistical three-way tie (the 0.002 spread sits inside the ±0.012
+fold spread) — and the finding is scientific: **contamination is
+physicochemically distinguishable at AUC ~0.87 with no intensity
+information at all.** Mass defects, elution position and peak shape
+carry most of what the blank injections measure, which means a
+blank-filter prior exists even for runs where blanks are missing,
+disputed, or contaminated — exactly the situation the dashboard's
+blank-assignment findings describe.
+
 ## Remaining P6 scope (recorded, not hidden)
 
-- The Emily/ProGenesis table (23,134 x 58) remains available for a
-  blank-vs-real peak classification corpus — separate from
-  metab_confidence by provenance rule ("Do not join them").
-- Larger farm rungs; closing the weather_tmax and voc_match_quality
-  gaps to LightGBM.
+- Larger-budget farm rungs (100+ trials with the coarseness dial in
+  the space) whenever the standing numbers warrant another push.
 
 ## Gates at landing
 

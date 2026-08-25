@@ -45,7 +45,13 @@ from covenant_ml.types import (
     TrainOutcome,
 )
 from numpy.typing import NDArray
-from scripts.cv_external import EXIT_BAD_USAGE, EXIT_OK, main
+from scripts.cv_external import (
+    EXIT_BAD_USAGE,
+    EXIT_OK,
+    _has_mixed_label_groups,
+    _split_for,
+    main,
+)
 
 from covenant_radar_api.worker import _test_hooks
 
@@ -331,6 +337,53 @@ def test_leafwise_variant_runs_with_a_leaf_budget(
     assert "grouped_fake via cleargbm-leafwise: 120 rows, 12 groups, 3 folds, seed 7" in out
     assert cv_hooks.growth_strategies_seen == ["leaf_wise", "leaf_wise", "leaf_wise"]
     assert cv_hooks.num_leaves_seen == [31, 31, 31]
+
+
+def _int64_array(values: tuple[int, ...]) -> NDArray[np.int64]:
+    """Create an int64 array from a tuple of ints without Any leakage.
+
+    Args:
+        values: The integer values.
+
+    Returns:
+        Array of int64 dtype.
+    """
+    result: NDArray[np.int64] = np.zeros(len(values), dtype=np.int64)
+    for i, v in enumerate(values):
+        result[i] = v
+    return result
+
+
+def test_mixed_label_groups_use_plain_grouped_kfold(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Groups holding both labels switch to the plain grouped instrument,
+    and the switch is announced — stratification's any-positive group
+    label is undefined for co-elution windows."""
+    y = _int64_array((1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0))
+    groups = _int64_array((0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5))
+    assert _has_mixed_label_groups(y, groups)
+
+    splits = _split_for(y, groups, 3, 42)
+    assert splits["n_folds"] == 3
+    assert capsys.readouterr().out == (
+        "groups carry mixed labels; label stratification is undefined -- "
+        "using plain grouped k-fold\n"
+    )
+
+
+def test_uniform_label_groups_keep_the_stratified_protocol(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Label-uniform groups run the stratified splitter silently — the
+    protocol every standing number ran under, unchanged."""
+    y = _int64_array((1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0))
+    groups = _int64_array((0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5))
+    assert not _has_mixed_label_groups(y, groups)
+
+    splits = _split_for(y, groups, 3, 42)
+    assert splits["n_folds"] == 3
+    assert capsys.readouterr().out == ""
 
 
 def test_a_bad_argument_count_prints_usage(capsys: pytest.CaptureFixture[str]) -> None:

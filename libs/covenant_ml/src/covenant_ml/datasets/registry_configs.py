@@ -218,6 +218,36 @@ VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
         n_features_expected=31,
         positive_class_ratio_expected=0.246,
     ),
+    # Metabolomics blank-vs-real peaks (Emily/Progenesis table)
+    # Built by covenant_ml's scripts/build_metab_blank_corpus.py from the
+    # sha256-pinned Emily_Data_Pruned_Labeled.xlsx (Normalized sheet):
+    # one row per Progenesis peak, target = the lab's standard blank
+    # filter verdict (real when the biological-sample average is at
+    # least 3x the individual-blank average, or samples-only).
+    # Predictors are physicochemical measurables ONLY (m/z, charge, RT,
+    # peak width, mass-defect signatures) — nothing intensity-derived,
+    # because the intensities define the label. Co-eluting adducts and
+    # in-source fragments of one molecule must never straddle splits,
+    # so the 0.1-minute retention window (rt_bin) is the GROUP column.
+    DatasetConfig(
+        name="metab_blank",
+        display_name="Metabolomics Blank-vs-Real Peaks (Emily)",
+        folder="metab_blank",
+        file_name="data.csv",
+        file_format="csv",
+        encoding="utf-8",
+        target=TargetColumnSpec(
+            column_name="real",
+            label_type="binary_int",
+            positive_values=(1,),
+            negative_values=(0,),
+        ),
+        exclude_columns=(),
+        n_samples_expected=19064,
+        n_features_expected=6,
+        positive_class_ratio_expected=0.641,
+        group_column="rt_bin",
+    ),
 )
 
 

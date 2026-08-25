@@ -18,11 +18,11 @@ confidence: high
 hubs: [libs]
 ---
 
-# ClearGBM on HPC3 — the farm runs; four new-domain corpora join the board
+# ClearGBM on HPC3 — the farm runs; five new-domain corpora join the board
 
-P6 Landings A and B1-B4 of the [[cleargbm-program-charter]] (board task
+P6 Landings A and B1-B5 of the [[cleargbm-program-charter]] (board task
 `1ad15eb6`): the experiment farm plus rw_value, weather_tmax,
-metab_confidence and voc_match_quality.
+metab_confidence, voc_match_quality and metab_blank.
 
 ## The farm (Landing A)
 
@@ -147,10 +147,29 @@ leads** (mean test RMSE 18.3170 vs cleargbm 18.4423, cleargbm@leaf_wise
 xgboost 1). ClearGBM is second at a 0.7% gap — the second corpus on
 the named-target list beside weather_tmax.
 
+## metab_blank (Landing B5)
+
+The Emily/ProGenesis table as a blank-vs-real peak classifier — the
+dashboard's own leading design, landed 2026-08-25. The lab's standard
+3x blank-filter rule IS the label (all individual blanks together,
+pooled combine excluded, sidestepping the documented leaf-vs-root
+assignment dispute); features are physicochemical measurables ONLY
+(m/z, charge, RT, peak width, m/z + Kendrick/CH2 mass defects — the
+contaminant-homolog signatures), never anything intensity-derived,
+because the intensities define the label. 19,064 rows across 127
+retention windows, positive ratio 0.641, byte-deterministic. The
+corpus forced one instrument extension: mixed-label co-elution groups
+make stratified group labels undefined, so covenant_ml gained plain
+`group_kfold_split` and cv_external selects the instrument by a
+stated data property (uniform → stratified exactly as before, anchor
+reproduced; mixed → plain grouped k-fold, announced). Result: a
+statistical three-way tie (lightgbm 0.8710, cleargbm 0.8691,
+leaf-wise 0.8690, spread inside the fold spread) and a scientific
+finding — contamination is physicochemically distinguishable at AUC
+~0.87 with no intensity information, so a blank-filter prior exists
+even where blanks are missing or disputed.
+
 ## Remaining P6 scope
 
-The Emily/ProGenesis table (23,134 x 58) remains a candidate for a
-separate blank-vs-real peak corpus (never joined to metab_confidence,
-by provenance rule). Later landings under the open board task: larger
-farm rungs, and closing the weather_tmax + voc_match_quality gaps to
-LightGBM.
+Larger-budget farm rungs (100+ trials with the coarseness dial in the
+space) whenever the standing numbers warrant another push.

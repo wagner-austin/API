@@ -38,7 +38,8 @@ from covenant_ml.types import (
     ClearGBMGrowthStrategy,
     LightGBMConfig,
 )
-from covenant_ml.validation.splitter import group_stratified_kfold_split
+from covenant_ml.validation.splitter import group_kfold_split, group_stratified_kfold_split
+from covenant_ml.validation.types import CVSplitInfo
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker import _test_hooks as hooks
@@ -164,6 +165,62 @@ def _config_for(
     return None
 
 
+def _has_mixed_label_groups(y: NDArray[np.int64], groups: NDArray[np.int64]) -> bool:
+    """Whether any group holds both a positive and a negative sample.
+
+    Group-STRATIFIED k-fold labels each group any-positive, which is only
+    meaningful when groups are label-uniform (a match has one outcome).
+    Co-elution windows hold real and blank peaks together, so their
+    stratification label is undefined and the plain grouped instrument
+    applies instead.
+
+    Args:
+        y: Binary labels of shape (n_samples,).
+        groups: Group IDs of shape (n_samples,).
+
+    Returns:
+        True when at least one group carries both labels.
+    """
+    unique_groups: NDArray[np.int64] = np.unique(groups)
+    for i in range(len(unique_groups)):
+        group_id = int(unique_groups.item(i))
+        mask: NDArray[np.bool_] = groups == group_id
+        group_labels: NDArray[np.int64] = y[mask]
+        if int(np.min(group_labels)) != int(np.max(group_labels)):
+            return True
+    return False
+
+
+def _split_for(
+    y: NDArray[np.int64],
+    groups: NDArray[np.int64],
+    n_folds: int,
+    seed: int,
+) -> CVSplitInfo:
+    """Pick the grouped CV instrument the data's structure calls for.
+
+    Label-uniform groups use the stratified splitter — the protocol every
+    standing number ran under, unchanged. Mixed-label groups use plain
+    grouped k-fold, and the choice is announced so no report hides it.
+
+    Args:
+        y: Binary labels of shape (n_samples,).
+        groups: Group IDs of shape (n_samples,).
+        n_folds: Number of folds.
+        seed: Shuffle seed.
+
+    Returns:
+        The fold splits.
+    """
+    if _has_mixed_label_groups(y, groups):
+        sys.stdout.write(
+            "groups carry mixed labels; label stratification is undefined -- "
+            "using plain grouped k-fold\n"
+        )
+        return group_kfold_split(y, groups, n_folds, seed)
+    return group_stratified_kfold_split(y, groups, n_folds, seed)
+
+
 def main(
     argv: Sequence[str] | None = None,
     external_dir: Path = Path("data/external"),
@@ -226,7 +283,7 @@ def main(
 
     x, y = dataset["x"], dataset["y"]
     feature_names = list(dataset["meta"]["feature_names"])
-    splits = group_stratified_kfold_split(y, groups, n_folds, seed)
+    splits = _split_for(y, groups, n_folds, seed)
     trainer = BaseTabularTrainer(hooks.registry_factory())
 
     floor_note = f", min_data_in_bin {min_data_in_bin}" if min_data_in_bin is not None else ""

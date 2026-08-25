@@ -1,0 +1,16 @@
+{
+  "sources": {
+    "workbook": {
+      "file_name": "Emily_Data_Pruned_Labeled.xlsx",
+      "sha256": "97aa4345bd6fe563c1c46099cec40c6beedc375f063487af015382a6462117fc"
+    }
+  },
+  "corpus": {
+    "rows": 19064,
+    "rt_bins": 127,
+    "real": 12215,
+    "blank_dominated": 6849,
+    "dropped_undetected": 4070,
+    "positive_ratio": 0.640736
+  }
+}
