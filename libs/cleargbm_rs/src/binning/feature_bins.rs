@@ -182,8 +182,15 @@ impl FeatureBins {
 pub fn precompute_feature_bins(
     x: &[&[f64]],
     max_bins: usize,
+    min_data_in_bin: usize,
     categorical_mask: Option<&[bool]>,
 ) -> Result<FeatureBins, ClearGbmError> {
+    if min_data_in_bin < 1_usize {
+        return Err(ClearGbmError::InvalidParameter {
+            name: "min_data_in_bin".to_string(),
+            reason: "must be >= 1".to_string(),
+        });
+    }
     if max_bins < 2_usize {
         return Err(ClearGbmError::InvalidParameter {
             name: "max_bins".to_string(),
@@ -256,7 +263,7 @@ pub fn precompute_feature_bins(
             }
             per_feature.push(FeatureBinning::Categorical(map));
         } else {
-            let be = compute_feature_edges(x, feat_idx, max_bins);
+            let be = compute_feature_edges(x, feat_idx, max_bins, min_data_in_bin);
             for (sample_idx, row) in x.iter().enumerate() {
                 let val = row[feat_idx];
                 if !val.is_nan() {

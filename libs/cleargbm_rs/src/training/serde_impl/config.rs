@@ -23,7 +23,7 @@ impl Serialize for GradientBoostingConfig {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 24) {
+        let mut state = match serializer.serialize_struct("GradientBoostingConfig", 25) {
             Ok(s) => s,
             Err(e) => return Err(e),
         };
@@ -129,6 +129,10 @@ impl Serialize for GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match state.serialize_field("min_data_in_bin", &self.min_data_in_bin()) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
         state.end()
     }
 }
@@ -175,6 +179,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                 let mut goss_top_rate: Option<Option<f64>> = None;
                 let mut goss_other_rate: Option<Option<f64>> = None;
                 let mut quantized_gradient_bins: Option<Option<usize>> = None;
+                let mut min_data_in_bin: Option<Option<usize>> = None;
 
                 loop {
                     let key: Option<GradientBoostingConfigField> = match map.next_key() {
@@ -330,6 +335,12 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                                 Err(e) => return Err(e),
                             });
                         }
+                        GradientBoostingConfigField::MinDataInBin => {
+                            min_data_in_bin = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
                     }
                 }
 
@@ -429,6 +440,10 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     Some(v) => v,
                     None => return Err(de::Error::missing_field("quantized_gradient_bins")),
                 };
+                let min_data_in_bin = match min_data_in_bin {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("min_data_in_bin")),
+                };
 
                 let params = GradientBoostingConfigParams {
                     n_estimators,
@@ -455,6 +470,7 @@ impl<'de> Deserialize<'de> for GradientBoostingConfig {
                     goss_top_rate,
                     goss_other_rate,
                     quantized_gradient_bins,
+                    min_data_in_bin,
                 };
                 match GradientBoostingConfig::new(params) {
                     Ok(cfg) => Ok(cfg),

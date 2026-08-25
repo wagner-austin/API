@@ -452,3 +452,30 @@ pub(super) fn validate_quantized(
     }
     Ok(())
 }
+
+/// Validates `min_data_in_bin`.
+///
+/// When set, the floor must be at least 2: a floor of 1 is exactly the
+/// unset behavior (every distinct value may hold its own bin), and two
+/// spellings of one behavior would make configs lie about themselves.
+///
+/// # Errors
+///
+/// Returns `ClearGbmError::InvalidParameter` for a floor below 2.
+pub(super) fn validate_min_data_in_bin(
+    params: &GradientBoostingConfigParams,
+) -> Result<(), ClearGbmError> {
+    let Some(floor) = params.min_data_in_bin else {
+        return Ok(());
+    };
+    if floor < 2_usize {
+        return Err(ClearGbmError::InvalidParameter {
+            name: "min_data_in_bin".to_string(),
+            reason: format!(
+                "must be >= 2 when set (a floor of {floor} is the unset behavior; \
+                 use null instead of a second spelling for it)"
+            ),
+        });
+    }
+    Ok(())
+}

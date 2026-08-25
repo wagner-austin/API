@@ -108,6 +108,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
         dict,
         "quantized_gradient_bins"
     ));
+    let min_data_in_bin = propagate!(extract_optional_usize_required_key(dict, "min_data_in_bin"));
 
     let params = GradientBoostingConfigParams {
         n_estimators,
@@ -134,6 +135,7 @@ pub(super) fn extract_config(dict: &Bound<'_, PyDict>) -> PyResult<GradientBoost
         goss_top_rate,
         goss_other_rate,
         quantized_gradient_bins,
+        min_data_in_bin,
     };
 
     Ok(propagate_into!(GradientBoostingConfig::new(params)))

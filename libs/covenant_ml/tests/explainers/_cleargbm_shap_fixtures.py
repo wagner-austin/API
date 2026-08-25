@@ -70,6 +70,7 @@ def _make_config() -> GradientBoostingConfig:
         goss_top_rate=None,
         goss_other_rate=None,
         quantized_gradient_bins=None,
+        min_data_in_bin=None,
         max_bins=64,
         subsample=1.0,
         random_state=42,

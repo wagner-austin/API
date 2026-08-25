@@ -36,6 +36,7 @@ const CONFIG_FIELDS: &[&str] = &[
     "goss_top_rate",
     "goss_other_rate",
     "quantized_gradient_bins",
+    "min_data_in_bin",
 ];
 
 // =============================================================================

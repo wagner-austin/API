@@ -96,6 +96,12 @@ pub struct GradientBoostingConfigParams {
     /// from the original floats. Single-score objectives only, and
     /// exclusive with `categorical_features`.
     pub quantized_gradient_bins: Option<usize>,
+    /// Minimum samples per histogram bin during edge construction
+    /// (None = 1: every distinct value may hold its own bin; Some(k)
+    /// with k >= 2 merges values until each bin holds at least k
+    /// samples — a binning-coarseness regularizer). Some(1) is
+    /// rejected: it aliases None.
+    pub min_data_in_bin: Option<usize>,
 }
 
 /// Configuration for gradient boosting training.
@@ -154,6 +160,8 @@ pub struct GradientBoostingConfig {
     goss_other_rate: Option<f64>,
     /// Quantized-training bin count (None = float histograms).
     quantized_gradient_bins: Option<usize>,
+    /// Minimum samples per histogram bin (None = 1, no coarseness floor).
+    min_data_in_bin: Option<usize>,
 }
 
 impl GradientBoostingConfig {
@@ -192,6 +200,10 @@ impl GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
+        match config_rules::validate_min_data_in_bin(&params) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
 
         let GradientBoostingConfigParams {
             n_estimators,
@@ -218,6 +230,7 @@ impl GradientBoostingConfig {
             goss_top_rate,
             goss_other_rate,
             quantized_gradient_bins,
+            min_data_in_bin,
         } = params;
 
         Ok(Self {
@@ -245,6 +258,7 @@ impl GradientBoostingConfig {
             goss_top_rate,
             goss_other_rate,
             quantized_gradient_bins,
+            min_data_in_bin,
         })
     }
 
@@ -399,6 +413,13 @@ impl GradientBoostingConfig {
     #[must_use]
     pub fn quantized_gradient_bins(&self) -> Option<usize> {
         self.quantized_gradient_bins
+    }
+
+    /// Returns the minimum samples per histogram bin (None = 1, no
+    /// coarseness floor).
+    #[must_use]
+    pub fn min_data_in_bin(&self) -> Option<usize> {
+        self.min_data_in_bin
     }
 
     /// Returns the leaf budget, set exactly under `LeafWise` growth.

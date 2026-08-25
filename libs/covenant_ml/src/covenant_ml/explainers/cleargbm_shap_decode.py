@@ -271,6 +271,7 @@ def _decode_rust_config(raw: JSONValue) -> GradientBoostingConfig:
         goss_top_rate=_optional_float(cfg.get("goss_top_rate")),
         goss_other_rate=_optional_float(cfg.get("goss_other_rate")),
         quantized_gradient_bins=_optional_int(cfg.get("quantized_gradient_bins")),
+        min_data_in_bin=None,
         max_bins=narrow_json_to_int(cfg["max_bins"]),
         subsample=narrow_json_to_float(cfg["subsample"]),
         random_state=narrow_json_to_int(cfg["random_state"]),

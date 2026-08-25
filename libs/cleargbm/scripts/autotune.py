@@ -102,6 +102,7 @@ def make_config(
         goss_top_rate=None,
         goss_other_rate=None,
         quantized_gradient_bins=None,
+        min_data_in_bin=None,
         max_bins=max_bins,
         subsample=1.0,
         random_state=random_state,

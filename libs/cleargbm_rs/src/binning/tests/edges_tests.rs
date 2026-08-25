@@ -92,7 +92,7 @@ fn test_per_value_bins_when_distinct_fits_budget() -> Result<(), ClearGbmError> 
     data.push(vec![2.0_f64]);
     data.push(vec![3.0_f64]);
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 64_usize) {
+    let edges = match compute_bin_edges(&refs, 64_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -112,7 +112,7 @@ fn test_zero_inflated_feature_keeps_tail_resolution() -> Result<(), ClearGbmErro
         data.push(vec![f64::from(i)]);
     }
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 8_usize) {
+    let edges = match compute_bin_edges(&refs, 8_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -136,7 +136,7 @@ fn test_heavy_value_closes_a_bin_on_arrival() -> Result<(), ClearGbmError> {
         data.push(vec![v]);
     }
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 4_usize) {
+    let edges = match compute_bin_edges(&refs, 4_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -158,7 +158,7 @@ fn test_rest_budget_exhausts_before_late_heavy_values() -> Result<(), ClearGbmEr
         data.push(vec![9.0_f64]);
     }
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 4_usize) {
+    let edges = match compute_bin_edges(&refs, 4_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -177,7 +177,7 @@ fn test_adjacent_double_midpoint_stays_below_upper_value() -> Result<(), ClearGb
     let b = f64::from_bits(1.0_f64.to_bits() + 2_u64);
     let data: Vec<Vec<f64>> = vec![vec![a], vec![b]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 4_usize) {
+    let edges = match compute_bin_edges(&refs, 4_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -188,13 +188,65 @@ fn test_adjacent_double_midpoint_stays_below_upper_value() -> Result<(), ClearGb
     Ok(())
 }
 
+// ── min_data_in_bin floor ──────────────────────────────────────────
+
+#[test]
+fn test_min_data_floor_merges_rare_values() -> Result<(), ClearGbmError> {
+    // Singles 1..4 plus four 5s under a roomy budget, floor 2: rare
+    // neighbours merge until each bin holds two samples — {1,2}, {3,4},
+    // {5,5,5,5} — instead of one bin per distinct value.
+    let mut data: Vec<Vec<f64>> = (1_u32..=4_u32).map(|v| vec![f64::from(v)]).collect();
+    for _ in 0_usize..4_usize {
+        data.push(vec![5.0_f64]);
+    }
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    let edges = match compute_bin_edges(&refs, 64_usize, 2_usize) {
+        Ok(e) => e,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(edges[0].edges(), &[2.5_f64, 4.5_f64]);
+    assert_eq!(edges[0].n_regular_bins(), 3_usize);
+    Ok(())
+}
+
+#[test]
+fn test_min_data_floor_caps_greedy_budget() -> Result<(), ClearGbmError> {
+    // Ten distinct singles under an 8-bin budget with floor 5: the
+    // effective budget caps at 10/5 = 2 bins, so one edge splits the
+    // values at their count midpoint.
+    let data: Vec<Vec<f64>> = (1_u32..=10_u32).map(|v| vec![f64::from(v)]).collect();
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    let edges = match compute_bin_edges(&refs, 8_usize, 5_usize) {
+        Ok(e) => e,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(edges[0].edges(), &[5.5_f64]);
+    assert_eq!(edges[0].n_regular_bins(), 2_usize);
+    Ok(())
+}
+
+#[test]
+fn test_min_data_floor_zero_is_refused() -> Result<(), ClearGbmError> {
+    let data: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![2.0_f64]];
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    match compute_bin_edges(&refs, 4_usize, 0_usize) {
+        Err(ClearGbmError::InvalidParameter { name, .. }) => {
+            assert_eq!(name, "min_data_in_bin");
+            Ok(())
+        }
+        other => Err(ClearGbmError::TreeConstructionFailed {
+            reason: format!("expected InvalidParameter, got {other:?}"),
+        }),
+    }
+}
+
 // ── compute_bin_edges ──────────────────────────────────────────────
 
 #[test]
 fn test_compute_bin_edges_basic() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![2.0_f64], vec![3.0_f64], vec![4.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 3_usize) {
+    let edges = match compute_bin_edges(&refs, 3_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -216,7 +268,7 @@ fn test_compute_bin_edges_two_features() -> Result<(), ClearGbmError> {
         vec![3.0_f64, 30.0_f64],
     ];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 4_usize) {
+    let edges = match compute_bin_edges(&refs, 4_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -228,7 +280,7 @@ fn test_compute_bin_edges_two_features() -> Result<(), ClearGbmError> {
 fn test_compute_bin_edges_all_nan_feature() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![f64::NAN], vec![f64::NAN]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 4_usize) {
+    let edges = match compute_bin_edges(&refs, 4_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -242,7 +294,7 @@ fn test_compute_bin_edges_all_nan_feature() -> Result<(), ClearGbmError> {
 fn test_compute_bin_edges_single_unique_value() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![5.0_f64], vec![5.0_f64], vec![5.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 4_usize) {
+    let edges = match compute_bin_edges(&refs, 4_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -260,7 +312,7 @@ fn test_compute_bin_edges_with_nan_and_valid() -> Result<(), ClearGbmError> {
         vec![5.0_f64],
     ];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 4_usize) {
+    let edges = match compute_bin_edges(&refs, 4_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -272,7 +324,7 @@ fn test_compute_bin_edges_with_nan_and_valid() -> Result<(), ClearGbmError> {
 fn test_compute_bin_edges_max_bins_too_small() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let result = compute_bin_edges(&refs, 1_usize);
+    let result = compute_bin_edges(&refs, 1_usize, 1_usize);
     assert!(result.is_err());
     Ok(())
 }
@@ -287,7 +339,7 @@ fn test_compute_bin_edges_max_bins_exceeds_u32() -> Result<(), ClearGbmError> {
     let large_max_bins = u32_max_usize + 2_usize;
     let data: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![2.0_f64]];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let result = compute_bin_edges(&refs, large_max_bins);
+    let result = compute_bin_edges(&refs, large_max_bins, 1_usize);
     match result {
         Err(ClearGbmError::InvalidParameter { name, reason }) => {
             assert_eq!(name, "max_bins");
@@ -303,7 +355,7 @@ fn test_compute_bin_edges_max_bins_exceeds_u32() -> Result<(), ClearGbmError> {
 #[test]
 fn test_compute_bin_edges_empty_x() -> Result<(), ClearGbmError> {
     let refs: Vec<&[f64]> = Vec::new();
-    let result = compute_bin_edges(&refs, 4_usize);
+    let result = compute_bin_edges(&refs, 4_usize, 1_usize);
     assert!(result.is_err());
     Ok(())
 }
@@ -312,7 +364,7 @@ fn test_compute_bin_edges_empty_x() -> Result<(), ClearGbmError> {
 fn test_compute_bin_edges_zero_features() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = vec![Vec::new()];
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let result = compute_bin_edges(&refs, 4_usize);
+    let result = compute_bin_edges(&refs, 4_usize, 1_usize);
     assert!(result.is_err());
     Ok(())
 }
@@ -322,7 +374,7 @@ fn test_compute_bin_edges_inconsistent_row_lengths() -> Result<(), ClearGbmError
     let data1 = vec![1.0_f64, 2.0_f64];
     let data2 = vec![3.0_f64];
     let refs: Vec<&[f64]> = vec![data1.as_slice(), data2.as_slice()];
-    let result = compute_bin_edges(&refs, 4_usize);
+    let result = compute_bin_edges(&refs, 4_usize, 1_usize);
     match result {
         Err(ClearGbmError::ShapeMismatch { .. }) => Ok(()),
         other => Err(ClearGbmError::TreeConstructionFailed {
@@ -335,7 +387,7 @@ fn test_compute_bin_edges_inconsistent_row_lengths() -> Result<(), ClearGbmError
 fn test_compute_bin_edges_deduplication() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = (0_usize..100_usize).map(|_| vec![42.0_f64]).collect();
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 256_usize) {
+    let edges = match compute_bin_edges(&refs, 256_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
@@ -347,7 +399,7 @@ fn test_compute_bin_edges_deduplication() -> Result<(), ClearGbmError> {
 fn test_compute_bin_edges_many_bins() -> Result<(), ClearGbmError> {
     let data: Vec<Vec<f64>> = (0_u32..100_u32).map(|i| vec![f64::from(i)]).collect();
     let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
-    let edges = match compute_bin_edges(&refs, 10_usize) {
+    let edges = match compute_bin_edges(&refs, 10_usize, 1_usize) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };

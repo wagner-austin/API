@@ -117,6 +117,12 @@ class GradientBoostingConfig(TypedDict):
             ``[2, 126]`` (values pack into int8). Single-score objectives
             only, exclusive with ``categorical_features``; those pairings
             are enforced at the Rust boundary.
+        min_data_in_bin: Minimum samples per histogram bin during edge
+            construction (None = no floor: every distinct value may hold
+            its own bin). When set (>= 2), rare adjacent values merge
+            until each bin holds at least the floor, and the greedy
+            budget caps at ``n / floor`` — a binning-coarseness
+            regularizer. A floor of 1 is rejected: it aliases None.
         max_bins: Number of histogram bins for split finding (64-256 typical).
         subsample: Row subsampling ratio.
         random_state: Random seed.
@@ -170,6 +176,7 @@ class GradientBoostingConfig(TypedDict):
     goss_top_rate: float | None
     goss_other_rate: float | None
     quantized_gradient_bins: int | None
+    min_data_in_bin: int | None
     max_bins: int
     subsample: float
     random_state: int
@@ -271,6 +278,7 @@ def encode_gradient_boosting_config(
         "goss_top_rate": config["goss_top_rate"],
         "goss_other_rate": config["goss_other_rate"],
         "quantized_gradient_bins": config["quantized_gradient_bins"],
+        "min_data_in_bin": config["min_data_in_bin"],
         "max_bins": config["max_bins"],
         "subsample": config["subsample"],
         "random_state": config["random_state"],
@@ -386,6 +394,32 @@ def _decode_quantized_gradient_bins(raw: JSONDict) -> int | None:
     return value
 
 
+def _decode_min_data_in_bin(raw: JSONDict) -> int | None:
+    """Decode the optional minimum-samples-per-bin floor.
+
+    Args:
+        raw: Raw dictionary from JSON.
+
+    Returns:
+        The floor, or None when absent or null.
+
+    Raises:
+        JSONTypeError: If the value is not an int.
+        ValueError: If the floor is below 2 (a floor of 1 is the unset
+            behavior; two spellings of one behavior would make configs
+            lie about themselves).
+    """
+    value = _get_optional_int(raw, "min_data_in_bin")
+    if value is None:
+        return None
+    if value < 2:
+        raise ValueError(
+            f"min_data_in_bin must be >= 2 when set (a floor of {value} is the unset "
+            "behavior; use null instead of a second spelling for it)"
+        )
+    return value
+
+
 def decode_gradient_boosting_config(
     raw: JSONDict,
 ) -> GradientBoostingConfig:
@@ -433,6 +467,7 @@ def decode_gradient_boosting_config(
     if goss_other_rate is not None:
         goss_other_rate = require_open_unit_float(goss_other_rate, "goss_other_rate")
     quantized_gradient_bins = _decode_quantized_gradient_bins(raw)
+    min_data_in_bin = _decode_min_data_in_bin(raw)
     max_bins = require_positive_int(_require_int(raw, "max_bins"), "max_bins")
     subsample = require_unit_float(_require_float(raw, "subsample"), "subsample")
     random_state = _require_int(raw, "random_state")
@@ -476,6 +511,7 @@ def decode_gradient_boosting_config(
         goss_top_rate=goss_top_rate,
         goss_other_rate=goss_other_rate,
         quantized_gradient_bins=quantized_gradient_bins,
+        min_data_in_bin=min_data_in_bin,
         max_bins=max_bins,
         subsample=subsample,
         random_state=random_state,

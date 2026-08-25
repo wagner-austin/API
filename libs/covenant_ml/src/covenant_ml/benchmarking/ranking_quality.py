@@ -296,6 +296,7 @@ def _cleargbm_config(config: RankingBenchConfig, seed: int) -> GradientBoostingC
         goss_top_rate=None,
         goss_other_rate=None,
         quantized_gradient_bins=None,
+        min_data_in_bin=None,
         max_bins=config["max_bins"],
         subsample=1.0,
         random_state=seed,

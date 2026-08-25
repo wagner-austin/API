@@ -24,7 +24,12 @@ fn test_each_distinct_code_gets_its_own_bin_ascending() -> Result<(), ClearGbmEr
     ];
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
     let mask = vec![true, false];
-    let fb = propagate!(precompute_feature_bins(&refs, 4_usize, Some(&mask)));
+    let fb = propagate!(precompute_feature_bins(
+        &refs,
+        4_usize,
+        1_usize,
+        Some(&mask)
+    ));
 
     assert_eq!(category_codes(&fb, 0_usize), &[0.0_f64, 2.0_f64, 7.0_f64]);
     match &fb.per_feature()[0] {
@@ -46,7 +51,12 @@ fn test_missing_values_keep_the_nan_bin() -> Result<(), ClearGbmError> {
     let rows: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![f64::NAN], vec![3.0_f64]];
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
     let mask = vec![true];
-    let fb = propagate!(precompute_feature_bins(&refs, 4_usize, Some(&mask)));
+    let fb = propagate!(precompute_feature_bins(
+        &refs,
+        4_usize,
+        1_usize,
+        Some(&mask)
+    ));
     // NaN bin sits at n_regular_bins = 4.
     assert_eq!(fb.bins(), &[0_u8, 4_u8, 1_u8]);
     Ok(())
@@ -57,7 +67,12 @@ fn test_negative_zero_normalizes_into_the_zero_bin() -> Result<(), ClearGbmError
     let rows: Vec<Vec<f64>> = vec![vec![-0.0_f64], vec![0.0_f64], vec![1.0_f64]];
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
     let mask = vec![true];
-    let fb = propagate!(precompute_feature_bins(&refs, 4_usize, Some(&mask)));
+    let fb = propagate!(precompute_feature_bins(
+        &refs,
+        4_usize,
+        1_usize,
+        Some(&mask)
+    ));
     assert_eq!(category_codes(&fb, 0_usize), &[0.0_f64, 1.0_f64]);
     assert_eq!(fb.bins(), &[0_u8, 0_u8, 1_u8]);
     Ok(())
@@ -68,7 +83,7 @@ fn test_non_integer_code_is_rejected_naming_feature_and_row() -> Result<(), Clea
     let rows: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![2.5_f64]];
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
     let mask = vec![true];
-    match precompute_feature_bins(&refs, 4_usize, Some(&mask)) {
+    match precompute_feature_bins(&refs, 4_usize, 1_usize, Some(&mask)) {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
             reason: "a non-integer categorical value must be rejected".to_string(),
         }),
@@ -87,7 +102,7 @@ fn test_negative_code_is_rejected() -> Result<(), ClearGbmError> {
     let rows: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![-3.0_f64]];
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
     let mask = vec![true];
-    match precompute_feature_bins(&refs, 4_usize, Some(&mask)) {
+    match precompute_feature_bins(&refs, 4_usize, 1_usize, Some(&mask)) {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
             reason: "a negative categorical value must be rejected".to_string(),
         }),
@@ -104,7 +119,7 @@ fn test_infinite_code_is_rejected() -> Result<(), ClearGbmError> {
     let rows: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![f64::INFINITY]];
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
     let mask = vec![true];
-    match precompute_feature_bins(&refs, 4_usize, Some(&mask)) {
+    match precompute_feature_bins(&refs, 4_usize, 1_usize, Some(&mask)) {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
             reason: "an infinite categorical value must be rejected".to_string(),
         }),
@@ -131,7 +146,7 @@ fn test_too_many_categories_is_rejected_not_grouped() -> Result<(), ClearGbmErro
         .collect();
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
     let mask = vec![true];
-    match precompute_feature_bins(&refs, 4_usize, Some(&mask)) {
+    match precompute_feature_bins(&refs, 4_usize, 1_usize, Some(&mask)) {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
             reason: "an over-budget category count must be rejected".to_string(),
         }),
@@ -150,7 +165,7 @@ fn test_mask_length_mismatch_is_rejected() -> Result<(), ClearGbmError> {
     let rows: Vec<Vec<f64>> = vec![vec![1.0_f64, 2.0_f64]];
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
     let mask = vec![true];
-    match precompute_feature_bins(&refs, 4_usize, Some(&mask)) {
+    match precompute_feature_bins(&refs, 4_usize, 1_usize, Some(&mask)) {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
             reason: "a short categorical mask must be rejected".to_string(),
         }),
@@ -168,7 +183,7 @@ fn test_code_beyond_u32_is_rejected() -> Result<(), ClearGbmError> {
     let rows: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![4_294_967_296.0_f64]];
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
     let mask = vec![true];
-    match precompute_feature_bins(&refs, 4_usize, Some(&mask)) {
+    match precompute_feature_bins(&refs, 4_usize, 1_usize, Some(&mask)) {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
             reason: "a code beyond u32::MAX must be rejected".to_string(),
         }),
@@ -183,7 +198,7 @@ fn test_code_beyond_u32_is_rejected() -> Result<(), ClearGbmError> {
 #[test]
 fn test_precompute_rejects_an_empty_matrix() -> Result<(), ClearGbmError> {
     let refs: Vec<&[f64]> = Vec::new();
-    match precompute_feature_bins(&refs, 4_usize, None) {
+    match precompute_feature_bins(&refs, 4_usize, 1_usize, None) {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
             reason: "an empty matrix must be rejected".to_string(),
         }),
@@ -196,7 +211,7 @@ fn test_precompute_rejects_an_empty_matrix() -> Result<(), ClearGbmError> {
 fn test_precompute_rejects_ragged_rows() -> Result<(), ClearGbmError> {
     let rows: Vec<Vec<f64>> = vec![vec![1.0_f64, 2.0_f64], vec![3.0_f64]];
     let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
-    match precompute_feature_bins(&refs, 4_usize, None) {
+    match precompute_feature_bins(&refs, 4_usize, 1_usize, None) {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
             reason: "ragged rows must be rejected".to_string(),
         }),
@@ -209,7 +224,7 @@ fn test_precompute_rejects_ragged_rows() -> Result<(), ClearGbmError> {
 fn test_precompute_rejects_zero_features() -> Result<(), ClearGbmError> {
     let row: Vec<f64> = Vec::new();
     let refs: Vec<&[f64]> = vec![row.as_slice()];
-    match precompute_feature_bins(&refs, 4_usize, None) {
+    match precompute_feature_bins(&refs, 4_usize, 1_usize, None) {
         Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
             reason: "a zero-feature matrix must be rejected".to_string(),
         }),

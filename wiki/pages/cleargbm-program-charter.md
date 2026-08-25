@@ -148,8 +148,16 @@ The primary operator of this library is an AI session. Therefore:
   features (hot_excess: 2,359 distinct values → 6 bins) — and the fix
   (GreedyFindBin semantics on value-count pairs, no new knob) flips
   BOTH gaps to ClearGBM leads with no regression anywhere on the
-  board; us-binary leaf-wise now ties LightGBM's AUC exactly.
-  Remaining: the rw_matches binary re-baseline on the next farm rung.
+  board; us-binary leaf-wise now ties LightGBM's AUC exactly. The
+  re-baseline that followed retired the rw_matches 0.7492 flagship
+  lead as a coarse-binning regularization artifact (0.7295 vs 0.7299
+  under matched binning — LightGBM's arm reproduced its standing
+  number exactly). Landing D (min_data_in_bin, 2026-08-25) — see
+  [[cleargbm-min-data-in-bin]]: the corpus-named coarseness dial
+  (config field 25, required-with-null, Some(1) rejected as an alias)
+  measurably recovers the retired regularization — inert at
+  conventional floors on this corpus, 0.7460 at floor 32768 vs
+  LightGBM's 0.7299 on the identical protocol, with a real optimum.
   Distributed/GPU training only when single-node ceilings measurably
   bind.
 

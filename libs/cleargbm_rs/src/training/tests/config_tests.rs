@@ -71,6 +71,40 @@ fn test_config_with_early_stopping() -> Result<(), ClearGbmError> {
 }
 
 #[test]
+fn test_min_data_in_bin_one_is_refused() -> Result<(), ClearGbmError> {
+    // Some(1) aliases the unset behavior; two spellings of one behavior
+    // would make configs lie about themselves. Some(0) is equally out.
+    for floor in [0_usize, 1_usize] {
+        let mut params = default_params();
+        params.min_data_in_bin = Some(floor);
+        match GradientBoostingConfig::new(params) {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: format!("expected error for min_data_in_bin={floor}"),
+                })
+            }
+            Err(ClearGbmError::InvalidParameter { name, .. }) => {
+                assert_eq!(name, "min_data_in_bin");
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_min_data_in_bin_two_is_accepted() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.min_data_in_bin = Some(2_usize);
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(config.min_data_in_bin(), Some(2_usize));
+    Ok(())
+}
+
+#[test]
 fn test_n_estimators_zero() -> Result<(), ClearGbmError> {
     let mut params = default_params();
     params.n_estimators = 0_usize;

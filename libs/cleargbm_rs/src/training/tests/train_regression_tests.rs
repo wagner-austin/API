@@ -48,6 +48,48 @@ fn test_regression_training_runs_and_reports_objective() -> Result<(), ClearGbmE
 }
 
 #[test]
+fn test_min_data_in_bin_changes_the_model() -> Result<(), ClearGbmError> {
+    // Knob-sensitivity: every distinct value in this dataset appears
+    // once, so a floor of 4 merges them into far coarser bins and
+    // training must produce different predictions than the unset
+    // config — a value that reached no code path would not.
+    let (rows, y_train, feature_names) = make_regression_dataset();
+    let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let baseline_config = match make_regression_config(5_usize) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let mut floored_params = default_regression_params();
+    floored_params.n_estimators = 5_usize;
+    floored_params.min_data_in_bin = Some(4_usize);
+    let floored_config = match GradientBoostingConfig::new(floored_params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let baseline =
+        match train_regression(&x_train, &y_train, None, &baseline_config, &feature_names) {
+            Ok(m) => m,
+            Err(e) => return Err(e),
+        };
+    let floored = match train_regression(&x_train, &y_train, None, &floored_config, &feature_names)
+    {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(floored.config().min_data_in_bin(), Some(4_usize));
+    let baseline_preds = match baseline.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    let floored_preds = match floored.predict_raw(&x_train) {
+        Ok(p) => p,
+        Err(e) => return Err(e),
+    };
+    assert_ne!(baseline_preds, floored_preds);
+    Ok(())
+}
+
+#[test]
 fn test_regression_base_score_is_label_mean() -> Result<(), ClearGbmError> {
     let (rows, y_train, feature_names) = make_regression_dataset();
     let x_train: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();

@@ -123,6 +123,7 @@ class _FakeCVBackend:
         self.inner_groups_seen: list[bool] = []
         self.growth_strategies_seen: list[str] = []
         self.num_leaves_seen: list[int | None] = []
+        self.min_data_in_bin_seen: list[int | None] = []
 
     def train(
         self,
@@ -139,6 +140,7 @@ class _FakeCVBackend:
         if _is_cleargbm_config(config):
             self.growth_strategies_seen.append(config["growth_strategy"])
             self.num_leaves_seen.append(config["num_leaves"])
+            self.min_data_in_bin_seen.append(config.get("min_data_in_bin"))
         model_path = output_dir / "model.json"
         model_path.write_text("fake", encoding="utf-8")
         metrics: EvalMetrics = {
@@ -333,7 +335,48 @@ def test_leafwise_variant_runs_with_a_leaf_budget(
 
 def test_a_bad_argument_count_prints_usage(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["only-one"]) == EXIT_BAD_USAGE
-    assert capsys.readouterr().out == "usage: cv_external <dataset> <backend> [folds] [seed]\n"
+    assert capsys.readouterr().out == (
+        "usage: cv_external <dataset> <backend> [folds] [seed] [min_data_in_bin]\n"
+    )
+
+
+def test_min_data_in_bin_reaches_every_fold_config(
+    cv_hooks: _FakeCVBackend, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """The optional floor threads into each fold's ClearGBM config and is
+    announced in the header; without it the wire key stays absent."""
+    assert main(["grouped_fake", "cleargbm", "3", "7", "8"], external_dir=tmp_path) == EXIT_OK
+    out = capsys.readouterr().out.splitlines()
+    assert (
+        "grouped_fake via cleargbm: 120 rows, 12 groups, 3 folds, seed 7, min_data_in_bin 8"
+    ) in out
+    assert cv_hooks.min_data_in_bin_seen == [8, 8, 8]
+
+    assert main(["grouped_fake", "cleargbm", "3", "7"], external_dir=tmp_path) == EXIT_OK
+    assert cv_hooks.min_data_in_bin_seen == [8, 8, 8, None, None, None]
+
+
+def test_min_data_in_bin_below_two_is_refused(
+    cv_hooks: _FakeCVBackend, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    assert main(["grouped_fake", "cleargbm", "3", "7", "1"], external_dir=tmp_path) == (
+        EXIT_BAD_USAGE
+    )
+    assert capsys.readouterr().out == (
+        "min_data_in_bin must be >= 2 (a floor of 1 is the unset behavior)\n"
+    )
+
+
+def test_min_data_in_bin_with_lightgbm_is_refused(
+    cv_hooks: _FakeCVBackend, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    assert main(["grouped_fake", "lightgbm", "3", "7", "8"], external_dir=tmp_path) == (
+        EXIT_BAD_USAGE
+    )
+    assert capsys.readouterr().out == (
+        "min_data_in_bin is a ClearGBM protocol variant; the LightGBM backend's own "
+        "floor is not exposed here\n"
+    )
 
 
 def test_module_entry_point_exits_with_the_run_result(

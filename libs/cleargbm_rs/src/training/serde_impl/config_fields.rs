@@ -62,6 +62,8 @@ pub(crate) enum GradientBoostingConfigField {
     GossOtherRate,
     /// The quantized-training bin count (optional).
     QuantizedGradientBins,
+    /// The minimum samples per histogram bin (optional).
+    MinDataInBin,
 }
 
 /// Visitor for deserializing `GradientBoostingConfigField` from string.
@@ -108,6 +110,7 @@ impl<'de> Visitor<'de> for GradientBoostingConfigFieldVisitor {
             "goss_top_rate" => Ok(GradientBoostingConfigField::GossTopRate),
             "goss_other_rate" => Ok(GradientBoostingConfigField::GossOtherRate),
             "quantized_gradient_bins" => Ok(GradientBoostingConfigField::QuantizedGradientBins),
+            "min_data_in_bin" => Ok(GradientBoostingConfigField::MinDataInBin),
             _ => Err(E::unknown_field(value, GRADIENT_BOOSTING_CONFIG_FIELDS)),
         }
     }
@@ -148,4 +151,5 @@ pub(crate) const GRADIENT_BOOSTING_CONFIG_FIELDS: &[&str] = &[
     "goss_top_rate",
     "goss_other_rate",
     "quantized_gradient_bins",
+    "min_data_in_bin",
 ];

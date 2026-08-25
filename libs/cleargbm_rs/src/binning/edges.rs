@@ -5,8 +5,10 @@
 //!
 //! The algorithm works on (distinct value, count) pairs, following the
 //! shipped semantics of LightGBM's `GreedyFindBin` (src/io/bin.cpp, archived
-//! in the tech-wiki as `lightgbm-bin-cpp.html`) with `min_data_in_bin`
-//! fixed at 1 — no such knob exists in ClearGBM's config:
+//! in the tech-wiki as `lightgbm-bin-cpp.html`). The `min_data_in_bin`
+//! floor (config field 25; unset = 1) is a binning-coarseness regularizer:
+//! it merges rare adjacent values until every bin holds at least the floor,
+//! and caps the greedy budget at `n / floor`. With no floor:
 //!
 //! - When a feature has at most `max_bins` distinct values, EVERY distinct
 //!   value gets its own bin (edges at midpoints between neighbours).
@@ -21,9 +23,9 @@
 //! bins because ~95% of days have zero excess and every quantile position
 //! landed on the zero — and on low-cardinality features it merged distinct
 //! values even when bins were free (41 species into 36 bins at 64 budget).
-//! Divergences from the shipped code, both deliberate: no `min_data_in_bin`
-//! knob (fixed 1), and the running mean is not refreshed once the rest-bin
-//! budget hits zero (the shipped code divides by zero there).
+//! One deliberate divergence from the shipped code: the running mean is
+//! not refreshed once the rest-bin budget hits zero (the shipped code
+//! divides by zero there).
 
 use crate::error::ClearGbmError;
 
@@ -126,6 +128,7 @@ fn midpoint_edge(a: f64, b: f64) -> f64 {
 ///
 /// * `x` - Row-major feature matrix `[n_samples][n_features]`.
 /// * `max_bins` - Maximum number of bins per feature (>= 2, ≤ u32::MAX).
+/// * `min_data_in_bin` - Minimum samples per bin (>= 1; 1 = no floor).
 ///
 /// # Returns
 ///
@@ -133,10 +136,21 @@ fn midpoint_edge(a: f64, b: f64) -> f64 {
 ///
 /// # Errors
 ///
-/// * `ClearGbmError::InvalidParameter` if `max_bins < 2` or `max_bins > u32::MAX`.
+/// * `ClearGbmError::InvalidParameter` if `max_bins < 2`,
+///   `max_bins > u32::MAX`, or `min_data_in_bin < 1`.
 /// * `ClearGbmError::EmptyInput` if `x` is empty.
 /// * `ClearGbmError::ShapeMismatch` if rows have inconsistent lengths.
-pub fn compute_bin_edges(x: &[&[f64]], max_bins: usize) -> Result<Vec<BinEdges>, ClearGbmError> {
+pub fn compute_bin_edges(
+    x: &[&[f64]],
+    max_bins: usize,
+    min_data_in_bin: usize,
+) -> Result<Vec<BinEdges>, ClearGbmError> {
+    if min_data_in_bin < 1_usize {
+        return Err(ClearGbmError::InvalidParameter {
+            name: "min_data_in_bin".to_string(),
+            reason: "must be >= 1".to_string(),
+        });
+    }
     if max_bins < 2_usize {
         return Err(ClearGbmError::InvalidParameter {
             name: "max_bins".to_string(),
@@ -176,7 +190,12 @@ pub fn compute_bin_edges(x: &[&[f64]], max_bins: usize) -> Result<Vec<BinEdges>,
 
     let mut result = Vec::with_capacity(n_features);
     for feat_idx in 0_usize..n_features {
-        result.push(compute_feature_edges(x, feat_idx, max_bins));
+        result.push(compute_feature_edges(
+            x,
+            feat_idx,
+            max_bins,
+            min_data_in_bin,
+        ));
     }
 
     Ok(result)
@@ -194,11 +213,18 @@ pub fn compute_bin_edges(x: &[&[f64]], max_bins: usize) -> Result<Vec<BinEdges>,
 /// * `x` - Row-major feature matrix, already shape-validated by the caller.
 /// * `feat_idx` - The feature to bin.
 /// * `max_bins` - Bin budget (>= 2, validated by the caller).
+/// * `min_data_in_bin` - Minimum samples per bin (>= 1, validated by the
+///   caller; 1 = no floor).
 ///
 /// # Returns
 ///
 /// The feature's `BinEdges` (empty for all-NaN or single-valued columns).
-pub(super) fn compute_feature_edges(x: &[&[f64]], feat_idx: usize, max_bins: usize) -> BinEdges {
+pub(super) fn compute_feature_edges(
+    x: &[&[f64]],
+    feat_idx: usize,
+    max_bins: usize,
+    min_data_in_bin: usize,
+) -> BinEdges {
     // Collect non-NaN values for this feature
     let mut valid_values: Vec<f64> = Vec::new();
     for row in x {
@@ -241,39 +267,50 @@ pub(super) fn compute_feature_edges(x: &[&[f64]], feat_idx: usize, max_bins: usi
 
     if distinct.len() <= max_bins {
         return BinEdges {
-            edges: per_value_edges(&distinct),
+            edges: per_value_edges(&distinct, &counts, min_data_in_bin),
         };
     }
     BinEdges {
-        edges: greedy_edges(&distinct, &counts, n_valid, max_bins),
+        edges: greedy_edges(&distinct, &counts, n_valid, max_bins, min_data_in_bin),
     }
 }
 
-/// One bin per distinct value: edges at the midpoints between neighbours.
+/// One bin per qualifying distinct value: edges at midpoints between
+/// neighbours, closed only once a bin holds `min_data_in_bin` samples.
 ///
 /// The exact-resolution case — the feature has no more distinct values
-/// than the bin budget, so no two distinct values ever share a bin.
+/// than the bin budget. With no floor (`min_data_in_bin = 1`) every
+/// distinct value gets its own bin; a floor merges rare adjacent values
+/// until each bin holds at least the floor, with the final bin taking
+/// the remainder.
 ///
 /// # Args
 ///
 /// * `distinct` - Sorted distinct values, at least two.
-fn per_value_edges(distinct: &[f64]) -> Vec<f64> {
+/// * `counts` - Sample count per distinct value.
+/// * `min_data_in_bin` - Minimum samples per bin (>= 1).
+fn per_value_edges(distinct: &[f64], counts: &[usize], min_data_in_bin: usize) -> Vec<f64> {
     let mut edges_vec: Vec<f64> = Vec::with_capacity(distinct.len() - 1_usize);
+    let mut cur_count = 0_usize;
     for i in 0_usize..distinct.len() - 1_usize {
-        // Each edge lies in [distinct[i], distinct[i+1]) — disjoint,
-        // ordered intervals — so edges are strictly increasing by
-        // construction and need no dedup.
-        edges_vec.push(midpoint_edge(distinct[i], distinct[i + 1_usize]));
+        cur_count += counts[i];
+        if cur_count >= min_data_in_bin {
+            // Each edge lies in [distinct[i], distinct[i+1]) — disjoint,
+            // ordered intervals — so edges are strictly increasing by
+            // construction and need no dedup.
+            edges_vec.push(midpoint_edge(distinct[i], distinct[i + 1_usize]));
+            cur_count = 0_usize;
+        }
     }
     edges_vec
 }
 
 /// Greedy equal-count binning over (distinct value, count) pairs.
 ///
-/// The shipped `GreedyFindBin` walk with `min_data_in_bin = 1`: values
-/// heavier than the mean bin size take a bin of their own up front and
-/// the mean re-spreads over the rest; a bin closes when it reaches the
-/// running mean, on a heavy value, or just before one once half-full.
+/// The shipped `GreedyFindBin` walk: values heavier than the mean bin
+/// size take a bin of their own up front and the mean re-spreads over
+/// the rest; a bin closes when it reaches the running mean, on a heavy
+/// value, or just before one once half-full.
 ///
 /// # Args
 ///
@@ -281,8 +318,18 @@ fn per_value_edges(distinct: &[f64]) -> Vec<f64> {
 /// * `counts` - Sample count per distinct value.
 /// * `n_valid` - Total sample count.
 /// * `max_bins` - Bin budget (>= 2).
-fn greedy_edges(distinct: &[f64], counts: &[usize], n_valid: usize, max_bins: usize) -> Vec<f64> {
+/// * `min_data_in_bin` - Minimum samples per bin (>= 1); caps the
+///   effective budget at `n_valid / min_data_in_bin` per the shipped
+///   semantics, so no bin can be forced below the floor by the budget.
+fn greedy_edges(
+    distinct: &[f64],
+    counts: &[usize],
+    n_valid: usize,
+    max_bins: usize,
+    min_data_in_bin: usize,
+) -> Vec<f64> {
     let n_distinct = distinct.len();
+    let max_bins = max_bins.min(n_valid / min_data_in_bin).max(1_usize);
     let mut mean_bin_size = count_to_f64(n_valid) / count_to_f64(max_bins);
 
     // Values heavier than the mean take a bin of their own; the mean

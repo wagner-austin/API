@@ -136,6 +136,7 @@ def _config_to_rust_dict(
         "goss_top_rate": config["goss_top_rate"],
         "goss_other_rate": config["goss_other_rate"],
         "quantized_gradient_bins": config["quantized_gradient_bins"],
+        "min_data_in_bin": config["min_data_in_bin"],
     }
 
 

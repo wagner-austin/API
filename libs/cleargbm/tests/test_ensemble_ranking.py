@@ -36,6 +36,7 @@ def _make_ranking_config(
         goss_top_rate=None,
         goss_other_rate=None,
         quantized_gradient_bins=None,
+        min_data_in_bin=None,
         max_bins=16,
         subsample=1.0,
         random_state=42,

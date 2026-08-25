@@ -33,6 +33,7 @@ def _make_raw_config(n_classes: int | None, objective: str) -> JSONDict:
         "goss_top_rate": None,
         "goss_other_rate": None,
         "quantized_gradient_bins": None,
+        "min_data_in_bin": None,
         "max_bins": 64,
         "subsample": 1.0,
         "random_state": 0,
@@ -102,6 +103,7 @@ class TestGradientBoostingModel:
             "goss_top_rate": None,
             "goss_other_rate": None,
             "quantized_gradient_bins": None,
+            "min_data_in_bin": None,
             "max_bins": 64,
             "subsample": 1.0,
             "random_state": 0,
@@ -232,6 +234,31 @@ class TestConfigNClasses:
         raw["quantized_gradient_bins"] = 5
         with pytest.raises(ValueError, match="quantized_gradient_bins must be even"):
             decode_gradient_boosting_config(raw)
+
+    def test_decode_carries_a_valid_min_data_in_bin_floor(self) -> None:
+        """A floor of at least 2 passes through the decode unchanged."""
+        raw = _make_raw_config(None, "binary_log_loss")
+        raw["scale_pos_weight"] = 1.0
+        raw["min_data_in_bin"] = 3
+        decoded = decode_gradient_boosting_config(raw)
+        assert decoded["min_data_in_bin"] == 3
+
+    def test_decode_rejects_a_min_data_in_bin_floor_below_two(self) -> None:
+        """A floor of 1 aliases the unset behavior; 0 is equally out."""
+        raw = _make_raw_config(None, "binary_log_loss")
+        raw["scale_pos_weight"] = 1.0
+        for floor in (0, 1):
+            raw["min_data_in_bin"] = floor
+            with pytest.raises(ValueError, match="min_data_in_bin must be >= 2"):
+                decode_gradient_boosting_config(raw)
+
+    def test_decode_reads_an_absent_min_data_in_bin_as_none(self) -> None:
+        """Artifacts saved before the field existed decode with no floor."""
+        raw = _make_raw_config(None, "binary_log_loss")
+        raw["scale_pos_weight"] = 1.0
+        raw.pop("min_data_in_bin", None)
+        decoded = decode_gradient_boosting_config(raw)
+        assert decoded["min_data_in_bin"] is None
 
 
 class TestClassBasePredictions:

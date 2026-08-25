@@ -316,6 +316,7 @@ class ClearGBMBackend(ClassifierBackend):
             goss_top_rate=None,
             goss_other_rate=None,
             quantized_gradient_bins=None,
+            min_data_in_bin=cfg.get("min_data_in_bin"),
             max_bins=cfg["max_bins"],
             subsample=cfg["subsample"],
             random_state=cfg["random_state"],

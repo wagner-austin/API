@@ -5,7 +5,7 @@ Strict typing only. No Any, casts, or stubs.
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, TypedDict
+from typing import Literal, NotRequired, Protocol, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -379,6 +379,12 @@ class ClearGBMConfig(TypedDict, total=True):
         val_ratio: Fraction of data for validation.
         test_ratio: Fraction of data for testing.
         early_stopping_rounds: Rounds without improvement to stop.
+        min_data_in_bin: Minimum samples per histogram bin during edge
+            construction (absent = no floor). When present (>= 2), rare
+            adjacent values merge until each bin holds at least the
+            floor — a binning-coarseness regularizer. Optional on the
+            wire so configs written before the field existed keep their
+            meaning; the engine rejects a floor below 2.
     """
 
     n_estimators: int
@@ -402,6 +408,7 @@ class ClearGBMConfig(TypedDict, total=True):
     val_ratio: float
     test_ratio: float
     early_stopping_rounds: int
+    min_data_in_bin: NotRequired[int]
 
 
 LogRegSolver = Literal["lbfgs", "liblinear", "newton-cg", "newton-cholesky", "sag", "saga"]

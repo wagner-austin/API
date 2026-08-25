@@ -13,8 +13,11 @@ rows, which no training in that fold has seen. The report is per-fold AUC
 plus mean and standard deviation -- the spread IS the finding, not noise to
 hide.
 
-Run as ``python -m scripts.cv_external <dataset> <backend> [folds] [seed]``
-with backend ``cleargbm`` or ``lightgbm``.
+Run as ``python -m scripts.cv_external <dataset> <backend> [folds] [seed]
+[min_data_in_bin]`` with backend ``cleargbm`` or ``lightgbm``. The optional
+``min_data_in_bin`` floor (>= 2) is a ClearGBM protocol variant — the
+binning-coarseness regularizer — and is refused for the LightGBM backend,
+whose own floor is not exposed here.
 """
 
 from __future__ import annotations
@@ -53,26 +56,33 @@ DEFAULT_SEED = 42
 INNER_RATIOS = (0.70, 0.15, 0.15)
 
 
-def _cleargbm_config(seed: int, growth_strategy: ClearGBMGrowthStrategy) -> ClearGBMConfig:
+def _cleargbm_config(
+    seed: int,
+    growth_strategy: ClearGBMGrowthStrategy,
+    min_data_in_bin: int | None,
+) -> ClearGBMConfig:
     """Fixed ClearGBM hyperparameters for the evaluation protocol.
 
     Deliberately not tunable from the command line: this script measures the
     evaluation spread, and a per-run hyperparameter surface would turn every
-    comparison into a two-variable experiment. The one exception is the
-    growth strategy, selected by backend NAME (``cleargbm`` vs
-    ``cleargbm-leafwise``) rather than a knob — a protocol variant, not a
-    hyperparameter. The leaf-wise budget is fixed at 31, matching the
-    LightGBM arm's ``num_leaves`` so the two policies build same-sized trees.
+    comparison into a two-variable experiment. The two exceptions are
+    protocol variants, not hyperparameter surfaces: the growth strategy,
+    selected by backend NAME (``cleargbm`` vs ``cleargbm-leafwise``), and
+    the ``min_data_in_bin`` floor. The leaf-wise budget is fixed at 31,
+    matching the LightGBM arm's ``num_leaves`` so the two policies build
+    same-sized trees.
 
     Args:
         seed: Random seed for the fold's training.
         growth_strategy: Tree growth policy for every fold's training.
+        min_data_in_bin: Optional binning-coarseness floor (>= 2), the
+            second protocol variant. None leaves the wire key absent.
 
     Returns:
         The training configuration.
     """
     num_leaves = 31 if growth_strategy == "leaf_wise" else None
-    return ClearGBMConfig(
+    config = ClearGBMConfig(
         n_estimators=300,
         max_depth=5,
         learning_rate=0.1,
@@ -95,6 +105,9 @@ def _cleargbm_config(seed: int, growth_strategy: ClearGBMGrowthStrategy) -> Clea
         test_ratio=INNER_RATIOS[2],
         early_stopping_rounds=10,
     )
+    if min_data_in_bin is not None:
+        config["min_data_in_bin"] = min_data_in_bin
+    return config
 
 
 def _lightgbm_config(seed: int) -> LightGBMConfig:
@@ -125,21 +138,27 @@ def _lightgbm_config(seed: int) -> LightGBMConfig:
     )
 
 
-def _config_for(backend: str, seed: int) -> tuple[BackendName, ClassifierTrainConfig] | None:
+def _config_for(
+    backend: str,
+    seed: int,
+    min_data_in_bin: int | None,
+) -> tuple[BackendName, ClassifierTrainConfig] | None:
     """Resolve a supported backend name and its fixed config.
 
     Args:
         backend: The requested backend.
         seed: Random seed for training.
+        min_data_in_bin: Optional ClearGBM binning-coarseness floor; the
+            caller has already refused it for the LightGBM backend.
 
     Returns:
         The typed backend name and configuration, or None for a backend
         this protocol does not cover.
     """
     if backend == "cleargbm":
-        return "cleargbm", _cleargbm_config(seed, "depth_wise")
+        return "cleargbm", _cleargbm_config(seed, "depth_wise", min_data_in_bin)
     if backend == "cleargbm-leafwise":
-        return "cleargbm", _cleargbm_config(seed, "leaf_wise")
+        return "cleargbm", _cleargbm_config(seed, "leaf_wise", min_data_in_bin)
     if backend == "lightgbm":
         return "lightgbm", _lightgbm_config(seed)
     return None
@@ -152,8 +171,8 @@ def main(
     """Run grouped k-fold CV for the dataset and backend named on the CLI.
 
     Args:
-        argv: ``<dataset> <backend> [folds] [seed]``. ``None`` reads the
-            process arguments.
+        argv: ``<dataset> <backend> [folds] [seed] [min_data_in_bin]``.
+            ``None`` reads the process arguments.
         external_dir: Root directory for datasets, a parameter so a test can
             point it at a scratch tree.
 
@@ -162,19 +181,33 @@ def main(
         argument shape, an unsupported backend, or a dataset without groups.
     """
     args = list(argv) if argv is not None else sys.argv[1:]
-    if len(args) not in (2, 3, 4):
-        sys.stdout.write("usage: cv_external <dataset> <backend> [folds] [seed]\n")
+    if len(args) not in (2, 3, 4, 5):
+        sys.stdout.write(
+            "usage: cv_external <dataset> <backend> [folds] [seed] [min_data_in_bin]\n"
+        )
         return EXIT_BAD_USAGE
     dataset_name, backend = args[0], args[1]
     n_folds = int(args[2]) if len(args) >= 3 else DEFAULT_FOLDS
-    seed = int(args[3]) if len(args) == 4 else DEFAULT_SEED
+    seed = int(args[3]) if len(args) >= 4 else DEFAULT_SEED
+    min_data_in_bin = int(args[4]) if len(args) == 5 else None
+    if min_data_in_bin is not None and min_data_in_bin < 2:
+        sys.stdout.write(
+            f"min_data_in_bin must be >= 2 (a floor of {min_data_in_bin} is the unset behavior)\n"
+        )
+        return EXIT_BAD_USAGE
+    if min_data_in_bin is not None and backend == "lightgbm":
+        sys.stdout.write(
+            "min_data_in_bin is a ClearGBM protocol variant; the LightGBM backend's own "
+            "floor is not exposed here\n"
+        )
+        return EXIT_BAD_USAGE
 
     registry = hooks.dataset_registry_factory()
     if dataset_name not in registry:
         available = ", ".join(registry.list_names())
         sys.stdout.write(f"dataset must be one of: {available} (got {dataset_name})\n")
         return EXIT_BAD_USAGE
-    resolved = _config_for(backend, seed)
+    resolved = _config_for(backend, seed, min_data_in_bin)
     if resolved is None:
         sys.stdout.write(
             f"backend must be cleargbm, cleargbm-leafwise or lightgbm (got {backend})\n"
@@ -196,9 +229,10 @@ def main(
     splits = group_stratified_kfold_split(y, groups, n_folds, seed)
     trainer = BaseTabularTrainer(hooks.registry_factory())
 
+    floor_note = f", min_data_in_bin {min_data_in_bin}" if min_data_in_bin is not None else ""
     sys.stdout.write(
         f"{dataset_name} via {backend}: {len(y)} rows, "
-        f"{len(np.unique(groups))} groups, {n_folds} folds, seed {seed}\n"
+        f"{len(np.unique(groups))} groups, {n_folds} folds, seed {seed}{floor_note}\n"
     )
     aucs: list[float] = []
     for split in splits["folds"]:

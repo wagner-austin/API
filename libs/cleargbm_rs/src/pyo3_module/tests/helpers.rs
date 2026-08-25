@@ -228,6 +228,10 @@ pub(super) fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict
         Ok(()) => {}
         Err(e) => return Err(wrap_py_err(&e)),
     };
+    match config.set_item("min_data_in_bin", py.None()) {
+        Ok(()) => {}
+        Err(e) => return Err(wrap_py_err(&e)),
+    };
     Ok(config)
 }
 

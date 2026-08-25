@@ -247,6 +247,7 @@ def _cleargbm_config(
         goss_top_rate=config["top_rate"] if goss else None,
         goss_other_rate=config["other_rate"] if goss else None,
         quantized_gradient_bins=None,
+        min_data_in_bin=None,
         max_bins=config["max_bins"],
         subsample=1.0,
         random_state=seed,

@@ -114,6 +114,7 @@ pub(super) fn prepare_training(
     let feature_bins = propagate!(precompute_feature_bins(
         x_train,
         config.max_bins(),
+        config.min_data_in_bin().unwrap_or(1_usize),
         categorical_mask.as_deref()
     ));
     let bin_thresholds = feature_bins.bin_thresholds();

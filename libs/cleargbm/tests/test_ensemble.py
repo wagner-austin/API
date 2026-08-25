@@ -50,6 +50,7 @@ def _make_config(
         goss_top_rate=None,
         goss_other_rate=None,
         quantized_gradient_bins=None,
+        min_data_in_bin=None,
         max_bins=8,
         subsample=1.0,
         random_state=42,
@@ -128,7 +129,7 @@ class TestConfigToRustDict:
     """Config translation: every field crosses; monotonic list is passed through."""
 
     def test_carries_every_hyperparameter_plus_n_jobs(self) -> None:
-        """The Rust-side dict has exactly the 25 keys the Rust trainer reads."""
+        """The Rust-side dict has exactly the 26 keys the Rust trainer reads."""
         result = _config_to_rust_dict(_make_config())
         expected = {
             "n_classes",
@@ -136,6 +137,7 @@ class TestConfigToRustDict:
             "goss_top_rate",
             "goss_other_rate",
             "quantized_gradient_bins",
+            "min_data_in_bin",
             "n_estimators",
             "max_depth",
             "learning_rate",
@@ -430,6 +432,40 @@ class TestTrainRegression:
                 config=_make_regression_config(),
                 feature_names=names,
             )
+
+
+class TestMinDataInBin:
+    """The binning-coarseness floor through the public surface."""
+
+    def test_min_data_in_bin_changes_the_model(self) -> None:
+        """Knob sensitivity: a floor of 8 coarsens this all-distinct
+        dataset's bins, so the trained model must differ from the unset
+        config — a value that reached no code path would not."""
+        x, y, names = _make_binary_dataset()
+        baseline_config = _make_config()
+        floored_config: GradientBoostingConfig = {
+            **baseline_config,
+            "min_data_in_bin": 8,
+        }
+        floored = train_gradient_boosting(
+            x_train=x,
+            y_train=y,
+            x_val=None,
+            y_val=None,
+            config=floored_config,
+            feature_names=names,
+        )
+        baseline = train_gradient_boosting(
+            x_train=x,
+            y_train=y,
+            x_val=None,
+            y_val=None,
+            config=baseline_config,
+            feature_names=names,
+        )
+        floored_document = export_model_json(floored)
+        assert '"min_data_in_bin":8' in floored_document
+        assert floored_document != export_model_json(baseline)
 
 
 class TestSampleWeights:
