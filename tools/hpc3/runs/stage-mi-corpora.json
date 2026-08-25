@@ -12,7 +12,7 @@
     "cleaning_manifest_written": "2026-08-15T00:28",
     "gate": "LSTM/analysis/rebuild-2026-08/audit_rebuild.py exit 0 on 2026-08-25: 'audit clean: corpora and snippets carry only what the rules emit'",
     "independent_check": "character counts verified against cleaning_manifest.json chars_written, all 7 languages exact",
-    "supersedes": "/pub/wagnera3/abl/corpora/4c91fbc1... which was raw oscar_en.txt mixed with a wiki export, never language-ID filtered and never transliterated"
+    "relationship_to_abl": "SEPARATE EXPERIMENT, supersedes nothing. /pub/wagnera3/abl/corpora/4c91fbc1... is arm C of the published wiki extraction ablation (wiki/pages/wiki-corpus-extraction-ablation.md), where 7:1 OSCAR English dilution is the deliberate treatment and the readout is 2,627 cloze items, not perplexity. These corpora feed the LSTM Turkic mutual-intelligibility study instead. Both use OSCAR; they are not versions of each other."
   },
   "files": [
     {
