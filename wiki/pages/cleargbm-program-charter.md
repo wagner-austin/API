@@ -140,10 +140,18 @@ The primary operator of this library is an AI session. Therefore:
   ten-site GC-MS peak table — 5,850 rows grouped by site, target NIST
   Match1.Quality, pre-annotation predictors (species, RT, chromatogram
   context) through a new stdlib XLSX reader; real signal (R²
-  0.37-0.48) and honestly adverse: LightGBM leads, ClearGBM second at
-  0.7%. Remaining: larger farm rungs, and closing the weather_tmax +
-  voc_match_quality gaps. Distributed/GPU training only when
-  single-node ceilings measurably bind.
+  0.37-0.48) and honestly adverse at landing: LightGBM led, ClearGBM
+  second at 0.7%. Landing C (count-aware binning, 2026-08-25) — see
+  [[cleargbm-count-aware-binning]]: rung 2 (48 members, both adverse
+  corpora x a 24-point protocol grid) plus a direct bin-count probe
+  pinned the mechanism — quantile-of-multiset edges starved skewed
+  features (hot_excess: 2,359 distinct values → 6 bins) — and the fix
+  (GreedyFindBin semantics on value-count pairs, no new knob) flips
+  BOTH gaps to ClearGBM leads with no regression anywhere on the
+  board; us-binary leaf-wise now ties LightGBM's AUC exactly.
+  Remaining: the rw_matches binary re-baseline on the next farm rung.
+  Distributed/GPU training only when single-node ceilings measurably
+  bind.
 
 Out of scope until a real need names them: sparse-matrix input, external
 memory, DART, in-library CV (covenant_ml owns CV).
