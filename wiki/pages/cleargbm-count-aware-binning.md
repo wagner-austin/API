@@ -60,9 +60,22 @@ anchors).
   stays the weak-signal tie; financial_distress joins the registry
   harness as a near-tie (no old-binning baseline under this harness).
 - us binary head-to-head: cleargbm@leaf_wise auc_roc 0.6881 — an exact
-  four-decimal tie with LightGBM (was 0.6874) at better auc_pr.
-- Remaining named work: the rw_matches binary flagship re-baseline
-  (through radar's optimize pipeline) rides the next farm rung.
+  four-decimal tie with LightGBM (was 0.6874) at better auc_pr; wall
+  clock re-baselined at 1.312x raw / 0.863x per-leaf.
+- **The honest cost — the rw_matches flagship lead was a binning
+  artifact.** Re-run through the identical weighted grouped-5-fold
+  protocol (LightGBM reproduces its standing 0.7299 ± 0.0749 EXACTLY,
+  proving protocol identity), ClearGBM's 0.7492 became 0.7295: matched
+  binning, matched quality. The old coarse binning suppressed
+  tail-noise on rw_matches' zero-inflated counters (a regularizer by
+  accident) while destroying tail-signal on weather/voc. One rule
+  cannot maximize both — which names a `min_data_in_bin`-style
+  coarseness knob (LightGBM ships 3; ours is fixed at 1) as a
+  corpus-named candidate for a future landing.
+- The scoreboard after all of it: ClearGBM leads weather_tmax,
+  voc_match_quality and rw_value; ties rw_matches, metab_confidence
+  and the us binary; financial_distress is a near-tie nominally led by
+  xgboost. No material LightGBM lead anywhere.
 
 Full numbers: `BENCHMARK_RESULTS_2026-08-25_count_aware_binning.md`;
 manifests `BENCHMARK_MANIFEST_2026-08-25_binning_*` + rung-2 results in

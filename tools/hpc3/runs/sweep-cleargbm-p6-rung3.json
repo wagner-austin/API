@@ -1,0 +1,78 @@
+{
+  "project": "cleargbm",
+  "name": "p6-rung3",
+  "experiment": {
+    "phase": "P6",
+    "goal": "binary-family-rebaseline-new-binning",
+    "grid": "4x4-dataset-preset",
+    "trials": "20",
+    "compare_to": "p6-rung1",
+    "repo_commit": "57fd5ab"
+  },
+  "members": [
+    {
+      "suffix": "taiwan-none",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d taiwan -n 20 -f none --device cpu --no-save-model"
+    },
+    {
+      "suffix": "taiwan-log-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d taiwan -n 20 -f log_only --device cpu --no-save-model"
+    },
+    {
+      "suffix": "taiwan-ratios-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d taiwan -n 20 -f ratios_only --device cpu --no-save-model"
+    },
+    {
+      "suffix": "taiwan-full",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d taiwan -n 20 -f full --device cpu --no-save-model"
+    },
+    {
+      "suffix": "us-none",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d us -n 20 -f none --device cpu --no-save-model"
+    },
+    {
+      "suffix": "us-log-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d us -n 20 -f log_only --device cpu --no-save-model"
+    },
+    {
+      "suffix": "us-ratios-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d us -n 20 -f ratios_only --device cpu --no-save-model"
+    },
+    {
+      "suffix": "us-full",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d us -n 20 -f full --device cpu --no-save-model"
+    },
+    {
+      "suffix": "polish-none",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d polish -n 20 -f none --device cpu --no-save-model"
+    },
+    {
+      "suffix": "polish-log-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d polish -n 20 -f log_only --device cpu --no-save-model"
+    },
+    {
+      "suffix": "polish-ratios-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d polish -n 20 -f ratios_only --device cpu --no-save-model"
+    },
+    {
+      "suffix": "polish-full",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d polish -n 20 -f full --device cpu --no-save-model"
+    },
+    {
+      "suffix": "kaggle-give-me-credit-none",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d kaggle_give_me_credit -n 20 -f none --device cpu --no-save-model"
+    },
+    {
+      "suffix": "kaggle-give-me-credit-log-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d kaggle_give_me_credit -n 20 -f log_only --device cpu --no-save-model"
+    },
+    {
+      "suffix": "kaggle-give-me-credit-ratios-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d kaggle_give_me_credit -n 20 -f ratios_only --device cpu --no-save-model"
+    },
+    {
+      "suffix": "kaggle-give-me-credit-full",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d kaggle_give_me_credit -n 20 -f full --device cpu --no-save-model"
+    }
+  ]
+}

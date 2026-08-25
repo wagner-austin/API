@@ -114,11 +114,77 @@ A 0.7% deficit became a 0.8% lead. Per-seed wins: was lightgbm 3; now
 - us binary head-to-head (the canonical binary harness, 200 trees,
   seeds 42-44): cleargbm@leaf_wise auc_roc 0.6874 → **0.6881 — now
   exactly tying LightGBM at four decimals** — with the better auc_pr
-  (0.1410 vs 0.1366); depth-wise 0.6824 → 0.6832. (Timing in this
-  manifest ran at repeats=1 and is not a wall-clock re-baseline.)
-- The rw_matches binary flagship re-baseline rides the next farm rung
-  (its standing number came through radar's optimize pipeline, not the
-  local harness).
+  (0.1410 vs 0.1366); depth-wise 0.6824 → 0.6832. Wall clock
+  re-baselined at the standing protocol (repeats 5, warmups 2): raw
+  ratio 1.312x vs LightGBM, per-leaf 0.863x
+  (`BENCHMARK_MANIFEST_2026-08-25_binning_us_binary_timed.json`).
+
+## The honest cost: the rw_matches flagship lead was a binning artifact
+
+The standing scoreboard's headline — ClearGBM 0.7492 vs LightGBM 0.7299
+mean held-out AUC on rw_matches grouped 5-fold CV — did NOT survive the
+fix, and the reason is instructive. Re-run through the identical
+protocol (radar's `scripts.cv_external`, production config, weighted,
+569,561 rows / 99 groups / 5 folds / seed 42; the LightGBM arm
+reproduces its standing number EXACTLY, 0.7299 ± 0.0749, proving
+protocol identity):
+
+| arm | old binning | new binning |
+|---|---|---|
+| cleargbm | **0.7492 ± 0.0754** | 0.7295 ± 0.0728 |
+| lightgbm | 0.7299 ± 0.0749 | 0.7299 ± 0.0749 |
+
+Matched binning produced matched quality: the 2-point lead was
+substantially a REGULARIZATION artifact of the old coarse
+quantile-of-multiset binning. rw_matches' zero-inflated counter
+features carry noise in their tails at 99-group correlation, and the
+old rule's accidental coarseness suppressed it; weather and voc carry
+SIGNAL in their tails, and the same coarseness destroyed it. One
+binning rule cannot maximize both, which NAMES the missing dial: a
+`min_data_in_bin`-style coarseness knob (LightGBM itself ships
+min_data_in_bin=3; ours is fixed at 1, slightly finer than LightGBM).
+That knob is now a corpus-named candidate for a future landing under
+the config-honesty rules — not silently defaulted, and not added in
+this one.
+
+## Rung 3: the bankruptcy family re-baselined (16 members, new binning)
+
+The full rung-1 grid (4 datasets x 4 feature presets, 20 Optuna trials
+each through radar's `scripts.optimize`) re-ran on HPC3 under the new
+wheel — 320 trials, 0 pruned, 0 failed. Best validation AUC per member:
+
+| dataset | none | log_only | ratios_only | full |
+|---|---|---|---|---|
+| taiwan | 0.9481 | 0.9557 | 0.9538 | 0.9412 |
+| us | 0.8146 | 0.8146 | 0.8372 | 0.8438 |
+| polish | 0.9622 | 0.9622 | 0.9547 | 0.9483 |
+| kaggle_give_me_credit | 0.8691 | 0.8701 | 0.8687 | 0.8691 |
+
+At the per-dataset tuned best — the number the standing tracks — the
+family is a statistical wash vs rung 1's old-binning grid: taiwan
+0.9575 → 0.9557, us 0.8457 → 0.8438, polish 0.9593 → **0.9622**,
+kaggle 0.8701 → 0.8701 exactly. Two slightly down, one up, one tied,
+at deltas comparable to 20-trial Optuna noise. No systematic
+regression; "tie on the bankruptcy family" stands.
+
+One structural change worth recording: `log_only` no longer ties
+`none` to four decimals (taiwan 0.9557 vs 0.9481). The old at-value
+edges made histogram training AND prediction invariant to per-feature
+monotone transforms; the new midpoint edges keep training partitions
+invariant but place thresholds differently for UNSEEN values (a raw
+midpoint is a log-space geometric mean), so validation routing — and
+hence early stopping and the tuner's path — can differ. The preset is
+no longer provably decorative for tree backends; it is merely usually
+irrelevant.
+
+## The standing after everything
+
+ClearGBM leads weather_tmax, voc_match_quality and rw_value;
+statistically ties rw_matches (0.7295 vs 0.7299), metab_confidence,
+the us binary head-to-head, and the bankruptcy family;
+financial_distress is a near-tie nominally led by xgboost (full
+four-arm spread 0.4% of RMSE). No corpus shows a material LightGBM
+lead anywhere on the board. Wall clock 1.312x raw, 0.863x per leaf.
 
 Manifests: `BENCHMARK_MANIFEST_2026-08-25_binning_*_quality.json`
 (weather_tmax, voc_match_quality, rw_value, metab_confidence,

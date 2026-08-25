@@ -159,11 +159,15 @@ memory, DART, in-library CV (covenant_ml owns CV).
 ## How "better than any other model" gets decided
 
 Not by assertion. The dataset registry (rw_matches, taiwan, us, polish,
-the kaggle credit family, and the weather/metabolomics corpora as they are
+the kaggle credit family, and the weather/metabolomics/VOC corpora now
 onboarded) is the standing benchmark; LightGBM and XGBoost under identical
 protocols are the standing opponents; the leaf-normalized and
 weighted-symmetric disciplines from this week are the rules. Current
-standing, 2026-08-22: quality lead on rw_matches (0.7492 vs 0.7299), tie
-on the bankruptcy family, ~1.25x wall clock. The program wins when the
-quality column leads everywhere it matters and nobody has to squint at an
-asterisk.
+standing, 2026-08-25 (post count-aware binning): ClearGBM leads
+weather_tmax, voc_match_quality and rw_value; ties rw_matches (0.7295 vs
+0.7299 — the old 0.7492 lead was measured to be a coarse-binning
+regularization artifact and is retired honestly), metab_confidence and
+the us binary head-to-head; financial_distress is a near-tie nominally
+led by xgboost; ~1.31x wall clock, 0.86x per leaf. The program wins when
+the quality column leads everywhere it matters and nobody has to squint
+at an asterisk.
