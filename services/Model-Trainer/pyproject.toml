@@ -51,6 +51,7 @@ pytest-xdist = "^3.6.1"
 [tool.poetry.scripts]
 modeltrainer-rq-worker = "model_trainer.worker_entry:main"
 modeltrainer-cluster-train = "model_trainer.cluster.entry:entrypoint"
+modeltrainer-score-baseline = "model_trainer.cli.score_baseline:entrypoint"
 
 [tool.mypy]
 python_version = "3.11"
