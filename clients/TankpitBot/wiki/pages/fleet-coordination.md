@@ -111,7 +111,23 @@ Codecs: `fleetshare.codecs` — full `require_*` validation on decode.
   of labor needs no behavioral surgery: a tile a sibling scanned is
   covered here too. Mines need no fleet row — reveals are
   team-scoped in the game itself ([[walk-mechanics]]), so teammates'
-  radar reveals already arrive on each bot's own wire.
+  radar reveals already arrive on each bot's own wire. User
+  corroboration (verbatim, 2026-08-25): *"if another person on your
+  team radars, you will see the revealed mines, fuel, and equipment.
+  and if the person on your team collects any fuel or equipment or
+  destroys enemy mines, you'll see that live, no re-radar
+  necessary."* The wire carriers are the 0x43 `CacheUpdate`
+  (fuel/equipment reveals and value-0 removals) and 0x40
+  `OverlayUpdate` (mine reveals/clears), both ingested regardless of
+  which team client caused them (`world_state_tiles.py`). The
+  in-viewport live layer is therefore the SERVER's own; the fleet
+  exchange adds only the cross-map dimension (container atlas,
+  coverage, tombstones, enemy sightings) — and the s9-2 correction
+  ([[radar-mechanics]]) is about exactly that seam: a cross-map
+  coverage mark is not mine knowledge, because reveals only ever
+  arrived on the wire of clients who could see the ground, and mines
+  planted since a scan are invisible to the whole team until someone
+  re-scans.
 - **Coverage steps WALK, never teleport** (user free-radar doctrine:
   "scan, walk, walk, scan — to scan a whole viewport with the free
   radar"): forage dispatches `plan_viewport_walk`, a pure-walk
