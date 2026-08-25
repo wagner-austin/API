@@ -17,7 +17,12 @@ from platform_core.determinism_env import (
 from platform_core.json_utils import JSONValue
 
 from hpc3.contracts.job import JobSpec
-from hpc3.core.sbatch import format_walltime, job_comment, render_sbatch
+from hpc3.core.sbatch import (
+    _code_provenance_export,
+    format_walltime,
+    job_comment,
+    render_sbatch,
+)
 from tests.against_hpc3 import decode_job_spec
 from tests.conftest import gpus
 
@@ -380,3 +385,59 @@ class TestResumeSurface:
         assert "#SBATCH --requeue" in script
         assert "HPC3_RESTART_COUNT" in script
         assert 'export HPC3_CHECKPOINT_STEPS="50"' in script
+
+
+class TestCodeProvenance:
+    """``git_commit`` was null in every artifact HPC3 has produced.
+
+    The trainer prefers a build-stamped ``GIT_COMMIT`` because a deployed
+    environment carries no ``.git``, and nothing set it -- so both MI arms of
+    2026-08-25 uploaded 462 MB tarballs that cannot say which trainer built
+    them. These assertions are about the emitted text, which is what the
+    cluster acts on -- consistent with the rest of this module.
+    """
+
+    def test_the_commit_is_exported_from_a_stamp_inside_the_environment(self) -> None:
+        script = render_sbatch(_spec(), log_dir=_LOG_DIR)
+        assert (
+            'export GIT_COMMIT="$(cat /pub/wagnera3/envs/abl-pinned/GIT_COMMIT '
+            "2>/dev/null || echo '')\"" in script
+        )
+
+    def test_the_stamp_is_read_from_the_env_not_the_submitters_tree(self) -> None:
+        """A submitter's HEAD moves on every edit; the env changes only when a
+        wheel is installed. Recording the former as the latter is the
+        lock-versus-manifest failure one layer down."""
+        script = render_sbatch(_spec(env_path="/pub/wagnera3/envs/other"), log_dir=_LOG_DIR)
+        assert "/pub/wagnera3/envs/other/GIT_COMMIT" in script
+        assert "/pub/wagnera3/envs/abl-pinned/GIT_COMMIT" not in script
+
+    def test_the_commit_is_echoed_into_the_job_log(self) -> None:
+        script = render_sbatch(_spec(), log_dir=_LOG_DIR)
+        assert 'echo "commit    ${GIT_COMMIT:-<unstamped>}"' in script
+
+    def test_the_export_is_set_before_the_payload_runs(self) -> None:
+        lines = render_sbatch(_spec(), log_dir=_LOG_DIR).splitlines()
+        export = next(i for i, line in enumerate(lines) if line.startswith("export GIT_COMMIT="))
+        payload = next(i for i, line in enumerate(lines) if line == "python train.py --seed 42")
+        assert export < payload
+
+    def test_the_guarded_substitution_cannot_abort_under_set_u(self) -> None:
+        """Both halves of the guard are present, in the order that matters.
+
+        ``2>/dev/null`` keeps a missing stamp from writing to the one stream
+        a real failure arrives by, and ``|| echo ''`` supplies a value so the
+        assignment succeeds -- the generated script runs under ``set -u`` and
+        an unset expansion downstream would abort it.
+
+        This asserts the emitted text, not a shell's behaviour on it. An
+        execution test was written and removed: on this host, ``bash``
+        resolves through a WSL interop shim in which command substitution
+        returns empty for a file the same shell can ``cat`` and ``wc -c``
+        successfully. Such a test could only be red forever or green for a
+        reason unrelated to the artifact.
+        """
+        line = _code_provenance_export(_spec())
+        assert "2>/dev/null" in line
+        assert line.index("2>/dev/null") < line.index("|| echo ''")
+        assert line.endswith("')\"")

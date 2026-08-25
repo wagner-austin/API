@@ -113,6 +113,36 @@ def _determinism_exports(spec: JobSpec) -> list[str]:
     ]
 
 
+def _code_provenance_export(spec: JobSpec) -> str:
+    """Build the line that tells the payload which code it is running.
+
+    The trainer stamps ``GIT_COMMIT`` into every manifest it writes, and
+    prefers this variable precisely because a deployed environment carries
+    no ``.git`` for ``git rev-parse`` to answer from. Nothing set it, so
+    ``git_commit`` was null in every artifact HPC3 has produced -- including
+    both MI arms of 2026-08-25, whose 462 MB tarballs cannot say which
+    trainer built them.
+
+    The value is read from a file INSIDE the environment rather than passed
+    down from the submitter. Those are routinely different commits: the
+    submitter's working tree moves every time someone edits, while the env
+    changes only when a wheel is installed into it. Recording the submitter's
+    HEAD would be the lock-versus-manifest failure one layer down -- a record
+    of intent presented as a record of fact.
+
+    Args:
+        spec: The spec being rendered.
+
+    Returns:
+        An export whose value is empty when the environment carries no stamp.
+        Empty is correct there: the trainer reads an unset or empty variable
+        as "not stamped" and records null, which is true, rather than
+        inventing a commit that never built anything.
+    """
+    inner = f"$(cat {spec['env_path']}/GIT_COMMIT 2>/dev/null || echo '')"
+    return f'export GIT_COMMIT="{inner}"'
+
+
 def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
     """Render a validated job spec into a batch script.
 
@@ -193,11 +223,16 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
         # knows what its checkpoint means -- so it surfaces the count and
         # leaves the decision where the knowledge is.
         'export HPC3_RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"',
+        _code_provenance_export(spec),
         f'export PATH="{spec["env_path"]}/bin:$PATH"',
         "",
         'echo "host      $(hostname)"',
         'echo "job       ${SLURM_JOB_ID:-none}"',
         'echo "restart   ${HPC3_RESTART_COUNT}"',
+        # Echoed as well as exported: the manifest inside a tarball is the
+        # durable record, but a log line answers "what did THIS job run"
+        # without unpacking 462 MB, and it is visible while the job is live.
+        'echo "commit    ${GIT_COMMIT:-<unstamped>}"',
         # A CPU node has no nvidia-smi, and calling it there writes a
         # command-not-found to stderr on every run -- which trains whoever
         # reads these logs to ignore stderr, on the one stream a real failure
