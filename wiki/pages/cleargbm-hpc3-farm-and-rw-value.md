@@ -32,7 +32,10 @@ project block in the workspace (`tools/hpc3/runs/hpc3.json`): 4 cpus,
 16 GB, 60 minutes, `gpu: null`, `deterministic: true`, with
 numpy/lightgbm/xgboost pinned to the exact local benchmark versions and
 enforced by preflight against the cluster env
-(`/pub/wagnera3/envs/cleargbm`, conda-forge py311, `cleargbm_rs` wheel
+(`/pub/wagnera3/envs/cleargbm`, conda-forge py311 — and since 2026-08-25
+the Anaconda default-channel ToS gate in conda 25.11.1 is cleared too:
+the operator directed acceptance for `pkgs/main`/`pkgs/r` under
+`wagnera3`, so either channel family works; `cleargbm_rs` wheel
 built on-cluster under rustup stable).
 
 First rung: 16 members (4 datasets x 4 feature presets), 20 Optuna TPE
