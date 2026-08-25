@@ -19,10 +19,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from platform_core.comparability import encode_run_fingerprint
 from platform_core.json_utils import JSONValue, dump_json_str
 from platform_core.logging import get_logger
 from platform_core.trainer_keys import baseline_cloze_key
-from platform_core.comparability import encode_run_fingerprint
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.cloze import encode_cloze_item_outcome

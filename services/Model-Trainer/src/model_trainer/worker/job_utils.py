@@ -8,6 +8,7 @@ from typing import Final
 
 from platform_core.config import _optional_env_str
 from platform_core.determinism_env import DETERMINISM_ENV_VAR, determinism_requested
+from platform_core.determinism_record import encode_determinism_record
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import default_events_channel
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
@@ -19,7 +20,6 @@ from platform_core.trainer_metrics_events import (
     make_config_event,
     make_progress_metrics_event,
 )
-from platform_core.determinism_record import encode_determinism_record
 from platform_ml import RequestedDevice, ResolvedDevice
 from platform_workers.redis import RedisStrProto
 

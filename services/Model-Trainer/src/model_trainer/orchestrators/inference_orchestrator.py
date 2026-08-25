@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
+from platform_core.comparability import RunFingerprint, decode_run_fingerprint
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import (
     JSONValue,
@@ -17,7 +18,6 @@ from platform_core.trainer_keys import (
     generate_key,
     score_key,
 )
-from platform_core.comparability import RunFingerprint, decode_run_fingerprint
 from platform_workers.redis import RedisStrProto
 from typing_extensions import TypedDict
 
