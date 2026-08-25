@@ -70,14 +70,22 @@ interleavings, more opportunity for a different summation order. Under that mode
 device with 46 SMs should tolerate a larger coupled group than one with 84 before the
 boundary is crossed. That prediction is falsified.
 
-What survives is the explanation the original page argues for on structural grounds: the
-threshold is set by **what the contacts connect**, not by how the resulting work is spread.
-Once a chain of constraints shares degrees of freedom, accumulation order matters, and it
-matters at the same group size regardless of how much parallel width is available to
-disorder it.
+What survives is that **parallel width** does not place the boundary. Once a chain of
+constraints shares degrees of freedom, it fails at the same group size regardless of how
+much width is available to disorder it.
 
-Practically, it also means body counts published on this wiki are not device-specific
-trivia. A reader on different Ampere hardware can expect the same boundary.
+**What does not survive is the stronger reading this page previously carried** — that the
+threshold is set by what the contacts connect "and not by how the resulting work is
+spread". That generalised from one scheduling knob to all of them, and it is false:
+changing a single kernel's CUDA block size moves the 5-body scene from never reproducing
+to reproducing most of the time, on a bit-identical trajectory
+([[coupled-body-threshold-turns-on-one-kernels-block-size]]). SM count varies how many
+blocks run *concurrently*; block size varies which accumulations share a block and a warp,
+which is what sets the order. Falsifying the first says nothing about the second.
+
+Practically, body counts published on this wiki are portable across Ampere devices of
+different width — but they are **not** portable across `block_dim` settings, and
+`block_dim` defaults are a vendor choice that a version bump can change.
 
 ## What this does not establish
 

@@ -1,6 +1,6 @@
 # NavProbe Wiki
 
-**Read this first.** 5 topic hubs, 29 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
+**Read this first.** 5 topic hubs, 30 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
 
 NavProbe is a reproducibility instrument for simulated navigation. This wiki records two things kept deliberately apart: **what the instrument was built to be** (design decisions and their reasoning) and **what it has measured** (results, with the conditions they were taken under).
 
@@ -30,7 +30,7 @@ wall clocks move by up to 4x with host load.
 
 ## Hubs
 
-[Determinism Measurement](hubs/determinism-measurement.md) -- what reproducible means here, and every physics trial this instrument has run (12 pages)
+[Determinism Measurement](hubs/determinism-measurement.md) -- what reproducible means here, and every physics trial this instrument has run (13 pages)
 [Rendered Observations](hubs/rendered-observations.md) -- the batch renderer, and whether the pixel stream a policy consumes reproduces (3 pages)
 [Instrument Design](hubs/instrument-design.md) -- canonical encoding, digest folding, record formats, and the injectivity obligations behind them (7 pages)
 [Simulator Adapters](hubs/simulator-adapters.md) -- the vendor boundary: typing untyped APIs, keeping the declarations honest, and what each backend requires (3 pages)

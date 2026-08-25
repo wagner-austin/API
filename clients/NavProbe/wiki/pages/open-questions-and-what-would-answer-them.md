@@ -48,7 +48,7 @@ Each writes a `navprobe-sweep-run/1` document; `navprobe.codecs.sweep_run.decode
 
 **One constraint to plan around:** 4 GiB of VRAM. The scale ladder needed `constraint_capacity` right-sized to 256 to fit 4096 worlds on a 24 GiB card ([[deterministic-mode-cost-falls-with-scale]]), so the top rungs will cap lower here. Irrelevant to the threshold sweep, which runs at `world_count = 2`.
 
-**Cheaper partial answer available first:** MJWarp exposes `Model.block_dim`. Varying it on *this* hardware tests the scheduling hypothesis without another card, and has not been done.
+**The cheaper partial answer has now been taken, and it changes how this question must be run.** MJWarp exposes `Model.block_dim` — not a scalar but a 23-field struct — and varying it on this hardware moves the 5-body scene from 0/20 reproducing to 17/20, on a bit-identical trajectory. It localises to one field, `linesearch_iterative`, at one value, 64 ([[coupled-body-threshold-turns-on-one-kernels-block-size]]). **Consequence for the sweep below: `linesearch_iterative` must be pinned explicitly on BOTH devices and recorded in `measured_with`.** A default that differs by architecture or tile constraint would produce a "threshold moved" result that is block size and nothing to do with sm_75 versus sm_86.
 
 **What is no longer needed for this question:** `emerald`. Its one job was the AVX-without-AVX2 rung, and that axis is closed by construction — MuJoCo's shipped binary will not import below AVX ([[mujoco-requires-avx-so-pre-avx-hosts-are-ineligible]]), so no processor exists that could extend it. It has no discrete GPU and no unmeasured CPU property, so it answers nothing here. Its pending Ubuntu reimage was a Windows-10-end-of-life plan, not a measurement need.
 
@@ -68,7 +68,7 @@ The cross-backend divergence begins at the first contact solve ([[backend-diverg
 
 The coupled-body boundary sits at five or six bodies depending on the harness. Nothing here inspects a kernel, so the mechanism is a hypothesis: a scheduling or block-size boundary rather than anything physical.
 
-**What would answer it:** reading the generated CUDA, or the `block_dim` sweep in question 2 — which is why that one is worth doing first.
+**What would answer it:** reading the generated CUDA. The `block_dim` sweep this question used to defer to has been run, and it narrows where to read: the boundary case reproduces when `linesearch_iterative`'s block size is 64 and not at 32, 96, 128 or 256, while the `JTDAJ` accumulation kernels — the obvious suspects — do nothing ([[coupled-body-threshold-turns-on-one-kernels-block-size]]). So the question is now specific: what does that kernel's generated CUDA do differently at exactly two warps? No mechanism is claimed; "only 64" is a fact awaiting one.
 
 ## 6. Does the renderer stay clean under an irreproducible trajectory?
 
