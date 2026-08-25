@@ -468,3 +468,49 @@ class TestBuildTrialConfig:
         assert config["num_leaves"] is None
         assert config["max_features"] is None
         assert config["colsample_bytree"] is None
+
+    def test_coarseness_divisor_resolves_against_the_trial_rows(self) -> None:
+        """The sampled divisor becomes a concrete floor of the trial's own
+        training rows; a divisor of 1 (and an absent key) is no floor."""
+        y = np.zeros(1000, dtype=np.int64)
+        y[:100] = 1
+        floored = _build_trial_config(
+            int_params=SampledIntParams(n_estimators=10, max_depth=3, min_data_in_bin_denom=16),
+            float_params=SampledFloatParams(learning_rate=0.1),
+            y_train=y,
+            random_state=42,
+            early_stopping_rounds=5,
+        )
+        assert floored["min_data_in_bin"] == 62  # 1000 // 16
+
+        off = _build_trial_config(
+            int_params=SampledIntParams(n_estimators=10, max_depth=3, min_data_in_bin_denom=1),
+            float_params=SampledFloatParams(learning_rate=0.1),
+            y_train=y,
+            random_state=42,
+            early_stopping_rounds=5,
+        )
+        assert off["min_data_in_bin"] is None
+
+        absent = _build_trial_config(
+            int_params=SampledIntParams(n_estimators=10, max_depth=3),
+            float_params=SampledFloatParams(learning_rate=0.1),
+            y_train=y,
+            random_state=42,
+            early_stopping_rounds=5,
+        )
+        assert absent["min_data_in_bin"] is None
+
+    def test_coarseness_divisor_never_resolves_below_the_config_minimum(self) -> None:
+        """A huge divisor on a tiny corpus resolves to 2, the smallest
+        floor the config accepts — never to the rejected 0 or 1."""
+        y = np.zeros(20, dtype=np.int64)
+        y[:5] = 1
+        config = _build_trial_config(
+            int_params=SampledIntParams(n_estimators=10, max_depth=3, min_data_in_bin_denom=256),
+            float_params=SampledFloatParams(learning_rate=0.1),
+            y_train=y,
+            random_state=42,
+            early_stopping_rounds=5,
+        )
+        assert config["min_data_in_bin"] == 2

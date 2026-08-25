@@ -158,6 +158,18 @@ class TestSamplingRoundTrip:
 
         assert extracted_keys == sampled_keys
 
+    def test_cleargbm_samples_the_coarseness_divisor(self) -> None:
+        """The strategy layer samples min_data_in_bin_denom.
+
+        When the dial landed (2026-08-25) it initially reached only the
+        per-backend optimizer, not this layer — the production optimize
+        path — and the first end-to-end run silently tuned without it.
+        This pins the layer that actually runs.
+        """
+        space = _default_space("cleargbm")
+        int_params, _, _ = _sample_params(_RecordingTrial(), space)
+        assert int_params.get("min_data_in_bin_denom") in (1, 256, 64, 16, 4)
+
     def test_random_forest_samples_no_learning_rate(self) -> None:
         """RandomForest is not boosted; demanding a learning rate is the bug."""
         space = _default_space("random_forest")

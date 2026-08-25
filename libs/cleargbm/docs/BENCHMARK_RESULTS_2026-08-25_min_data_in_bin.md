@@ -79,6 +79,28 @@ floor was not swept here. What this measurement establishes is that
 the retired lead was recoverable regularization, now available
 honestly, with the optimizer free to sample the dial per corpus.
 
+## The dial reaches the optimizer
+
+The Optuna search space samples the floor as `min_data_in_bin_denom` —
+a DIVISOR of the trial's training rows, categorical over {1, 256, 64,
+16, 4} with 1 meaning no floor — because the floor's active range
+scales with the corpus, so an absolute-valued space would be inert on
+large corpora and absurd on small ones. The objective resolves the
+divisor against its own training rows (`max(2, n_train // denom)`; 1 →
+null), so the trained config always records the honest resolved value,
+and the optimal-config record carries `best_min_data_in_bin_denom`.
+
+Landing this surfaced — and fixed — one more member of the dataflow
+class: the codebase has TWO ClearGBM sampling layers (the per-backend
+`optuna_backend/cleargbm.py` and the strategy registry's
+`_tpe_params.py`, which is what radar's production optimize actually
+runs), and the dial initially reached only the first. The first
+end-to-end smoke tuned without it — caught because the smoke checked
+the record for the key, and now pinned by a strategy-layer test plus
+the existing sample-then-extract round-trip. The end-to-end smoke
+(radar `scripts.optimize`, 5 trials) confirms the record carries the
+sampled divisor.
+
 ## Gates at landing
 
 - cleargbm_rs: full gate green, 100.00% segment coverage (1,680

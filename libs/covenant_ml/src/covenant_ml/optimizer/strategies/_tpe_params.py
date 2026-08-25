@@ -201,6 +201,9 @@ def _sample_cleargbm_params(
         "min_samples_split": _sample_int(trial, "min_samples_split", space["min_samples_split"]),
         "min_samples_leaf": _sample_int(trial, "min_samples_leaf", space["min_samples_leaf"]),
         "max_bins": _sample_int(trial, "max_bins", space["max_bins"]),
+        "min_data_in_bin_denom": _sample_int(
+            trial, "min_data_in_bin_denom", space["min_data_in_bin_denom"]
+        ),
     }
     float_params: SampledFloatParams = {
         "learning_rate": _sample_float(trial, "learning_rate", space["learning_rate"]),
@@ -381,6 +384,7 @@ def _extract_cleargbm_best_params(
         "min_samples_split": int(best_params["min_samples_split"]),
         "min_samples_leaf": int(best_params["min_samples_leaf"]),
         "max_bins": int(best_params["max_bins"]),
+        "min_data_in_bin_denom": int(best_params["min_data_in_bin_denom"]),
     }
     float_params: SampledFloatParams = {
         "learning_rate": float(best_params["learning_rate"]),

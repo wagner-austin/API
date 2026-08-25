@@ -100,6 +100,9 @@ class OptunaClearGBMOptimizer:
                     trial, "min_samples_leaf", search_space["min_samples_leaf"]
                 ),
                 "max_bins": sample_param_int(trial, "max_bins", search_space["max_bins"]),
+                "min_data_in_bin_denom": sample_param_int(
+                    trial, "min_data_in_bin_denom", search_space["min_data_in_bin_denom"]
+                ),
             }
 
             float_params: SampledFloatParams = {
@@ -173,6 +176,7 @@ class OptunaClearGBMOptimizer:
             "min_samples_split": int(best_params["min_samples_split"]),
             "min_samples_leaf": int(best_params["min_samples_leaf"]),
             "max_bins": int(best_params["max_bins"]),
+            "min_data_in_bin_denom": int(best_params["min_data_in_bin_denom"]),
         }
         best_float_params: SampledFloatParams = {
             "learning_rate": float(best_params["learning_rate"]),

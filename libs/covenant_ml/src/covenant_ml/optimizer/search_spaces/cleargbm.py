@@ -25,6 +25,11 @@ def make_cleargbm_default_space() -> ClearGBMSearchSpace:
     - min_samples_leaf 2-20 (minimum samples in a leaf)
     - max_bins 32-128 (histogram bins for split finding)
     - subsample 0.6-1.0 (row subsampling ratio)
+    - min_data_in_bin_denom {1, 256, 64, 16, 4} (binning-coarseness floor
+      as a divisor of the trial's training rows: 1 = no floor, k = floor
+      of n_train / k — divisors because absolute floors below
+      n/max_bins are inert, so the active range scales with the corpus;
+      measured on rw_matches 2026-08-25)
 
     Returns:
         ClearGBMSearchSpace with sensible default ranges.
@@ -69,6 +74,10 @@ def make_cleargbm_default_space() -> ClearGBMSearchSpace:
         "high": 1.0,
         "log_scale": False,
     }
+    min_data_in_bin_denom_spec: CategoricalIntSpec = {
+        "param_type": "categorical_int",
+        "choices": (1, 256, 64, 16, 4),
+    }
 
     space: ClearGBMSearchSpace = {
         "n_estimators": n_estimators_spec,
@@ -78,6 +87,7 @@ def make_cleargbm_default_space() -> ClearGBMSearchSpace:
         "min_samples_leaf": min_samples_leaf_spec,
         "max_bins": max_bins_spec,
         "subsample": subsample_spec,
+        "min_data_in_bin_denom": min_data_in_bin_denom_spec,
     }
     return space
 
@@ -146,6 +156,13 @@ def make_cleargbm_focused_space(
         "high": 1.0,
         "log_scale": False,
     }
+    # The focused space keeps the full divisor menu: coarseness is a
+    # per-corpus property, and a first-pass best carries no evidence
+    # about which floor the fine-tune region prefers.
+    min_data_in_bin_denom_spec: CategoricalIntSpec = {
+        "param_type": "categorical_int",
+        "choices": (1, 256, 64, 16, 4),
+    }
 
     space: ClearGBMSearchSpace = {
         "n_estimators": n_estimators_spec,
@@ -155,6 +172,7 @@ def make_cleargbm_focused_space(
         "min_samples_leaf": min_samples_leaf_spec,
         "max_bins": max_bins_spec,
         "subsample": subsample_spec,
+        "min_data_in_bin_denom": min_data_in_bin_denom_spec,
     }
     return space
 

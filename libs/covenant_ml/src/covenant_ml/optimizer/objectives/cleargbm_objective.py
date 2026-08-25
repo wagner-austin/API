@@ -58,6 +58,28 @@ def _extract_positive_class_proba(
     return np.array(positive_probs, dtype=np.float64)
 
 
+def _resolve_min_data_in_bin(denom: int, n_train: int) -> int | None:
+    """Resolve the sampled coarseness divisor into a config floor.
+
+    The sampler encodes the binning-coarseness floor as a divisor of the
+    trial's training rows, because the floor's active range scales with
+    the corpus (absolute floors below ``n / max_bins`` are inert). A
+    divisor of 1 means no floor and resolves to None — the config's one
+    honest spelling of "off" — and any other divisor resolves to at
+    least 2, the smallest floor the config accepts.
+
+    Args:
+        denom: Sampled divisor (1 = no floor; k = floor of n_train / k).
+        n_train: The trial's training row count.
+
+    Returns:
+        The resolved floor, or None for no floor.
+    """
+    if denom == 1:
+        return None
+    return max(2, n_train // denom)
+
+
 def _build_trial_config(
     *,
     int_params: SampledIntParams,
@@ -98,7 +120,9 @@ def _build_trial_config(
         goss_top_rate=None,
         goss_other_rate=None,
         quantized_gradient_bins=None,
-        min_data_in_bin=None,
+        min_data_in_bin=_resolve_min_data_in_bin(
+            int_params.get("min_data_in_bin_denom", 1), int(y_train.shape[0])
+        ),
         max_bins=int_params.get("max_bins", 64),
         subsample=float_params.get("subsample", 1.0),
         random_state=random_state,

@@ -89,6 +89,9 @@ class SampledIntParams(TypedDict, total=False):
     min_samples_split: int
     min_samples_leaf: int
     max_bins: int
+    # ClearGBM binning-coarseness floor, sampled as a divisor of the
+    # trial's training rows (1 = no floor; k = floor of n_train / k).
+    min_data_in_bin_denom: int
     # LogReg-specific params
     max_iter: int
 
@@ -234,6 +237,10 @@ class ClearGBMSearchSpace(TypedDict, total=True):
     - min_samples_leaf: Minimum samples in a leaf
     - max_bins: Histogram bins for split finding
     - subsample: Row subsampling ratio
+    - min_data_in_bin_denom: Binning-coarseness floor as a divisor of the
+      trial's training rows (1 = no floor; k = floor of n_train / k). A
+      divisor rather than an absolute floor because the active range is
+      corpus-scale-dependent — absolute floors below n/max_bins are inert.
     """
 
     n_estimators: IntRangeSpec | CategoricalIntSpec
@@ -243,6 +250,7 @@ class ClearGBMSearchSpace(TypedDict, total=True):
     min_samples_leaf: IntRangeSpec | CategoricalIntSpec
     max_bins: IntRangeSpec | CategoricalIntSpec
     subsample: FloatRangeSpec | CategoricalFloatSpec
+    min_data_in_bin_denom: IntRangeSpec | CategoricalIntSpec
 
 
 class _LogRegSearchSpaceRequired(TypedDict, total=True):

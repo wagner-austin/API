@@ -65,10 +65,23 @@ floor is a tuned dial, and LightGBM's own floor was not swept — but
 what the old binning did by accident is now a stated, tunable,
 artifact-recorded config value the optimizer can sample per corpus.
 
+## The dial reaches the optimizer
+
+The Optuna space samples `min_data_in_bin_denom` — a divisor of the
+trial's training rows, categorical {1, 256, 64, 16, 4}, 1 = no floor —
+and the objective resolves it against its own rows (`max(2, n//denom)`)
+so configs always record the honest resolved value; the optimal-config
+record carries `best_min_data_in_bin_denom`. Wiring it surfaced one
+more dataflow-class member: TWO ClearGBM sampling layers exist
+(per-backend optimizer and the strategy registry radar actually runs),
+and the dial initially reached only the first — the end-to-end smoke
+caught the silent drop, and a strategy-layer test now pins the path
+that runs in production.
+
 ## Gates
 
 cleargbm_rs full gate (100.00% segment coverage), cleargbm 257 tests
 (the Rust-boundary key census is 26; test_types_model.py split by role
-at the 600-line ceiling), covenant_ml 2,542, radar full gate — all
-green at landing. Full numbers:
+at the 600-line ceiling), covenant_ml 2,546, radar 2,602 — all green
+at landing. Full numbers:
 `BENCHMARK_RESULTS_2026-08-25_min_data_in_bin.md`.

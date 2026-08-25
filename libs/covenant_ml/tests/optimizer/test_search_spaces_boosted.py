@@ -191,6 +191,7 @@ def test_make_cleargbm_default_space_returns_complete_space() -> None:
     assert "min_samples_leaf" in space
     assert "max_bins" in space
     assert "subsample" in space
+    assert "min_data_in_bin_denom" in space
 
 
 def test_make_cleargbm_default_space_param_types() -> None:
@@ -209,6 +210,20 @@ def test_make_cleargbm_default_space_param_types() -> None:
 
     # Categorical int
     assert space["max_bins"]["param_type"] == "categorical_int"
+    assert space["min_data_in_bin_denom"]["param_type"] == "categorical_int"
+
+
+def test_cleargbm_coarseness_divisor_menu_includes_off() -> None:
+    """Both spaces sample the divisor menu with 1 (no floor) present —
+    the tuner must always be able to choose the unfloored baseline."""
+    for space in (
+        make_cleargbm_default_space(),
+        make_cleargbm_focused_space(best_max_depth=5, best_learning_rate=0.1),
+    ):
+        spec = space["min_data_in_bin_denom"]
+        assert spec["param_type"] == "categorical_int"
+        if spec["param_type"] == "categorical_int":
+            assert spec["choices"] == (1, 256, 64, 16, 4)
 
 
 def test_make_cleargbm_default_space_ranges() -> None:

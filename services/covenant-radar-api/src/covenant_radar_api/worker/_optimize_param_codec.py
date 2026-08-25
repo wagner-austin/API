@@ -29,6 +29,8 @@ def _encode_int_tree_params(params: SampledIntParams, result: JSONObject) -> Non
         result["min_samples_split"] = params["min_samples_split"]
     if "min_samples_leaf" in params:
         result["min_samples_leaf"] = params["min_samples_leaf"]
+    if "min_data_in_bin_denom" in params:
+        result["min_data_in_bin_denom"] = params["min_data_in_bin_denom"]
 
 
 def _encode_int_nn_params(params: SampledIntParams, result: JSONObject) -> None:

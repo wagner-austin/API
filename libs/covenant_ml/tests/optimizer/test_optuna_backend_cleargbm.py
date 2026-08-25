@@ -56,8 +56,9 @@ def test_cleargbm_optimizer_returns_best_params() -> None:
             config=make_optuna_config(n_trials=3),
             objective=FakeObjective(),
         )
-        # ClearGBM has 5 int params
-        assert len(summary["best_int_params"]) == 5
+        # ClearGBM has 6 int params (the coarseness divisor joined 2026-08-25)
+        assert len(summary["best_int_params"]) == 6
+        assert summary["best_int_params"]["min_data_in_bin_denom"] in (1, 256, 64, 16, 4)
         # ClearGBM has 2 float params
         assert len(summary["best_float_params"]) == 2
         # ClearGBM has no string params
