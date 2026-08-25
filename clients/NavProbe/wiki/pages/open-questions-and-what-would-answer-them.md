@@ -38,11 +38,13 @@ Everything GPU-side was measured on two Ampere sm_86 devices: the RTX 3090 Ti (8
 **The recipe**, once the card is in — one run per device, then compare the decoded records rather than the terminal output:
 
 ```
-python -m scripts.gpu_deterministic_sweep RUN_TO_RUN <fresh-cache-0> 64 --device cuda:0
-python -m scripts.gpu_deterministic_sweep RUN_TO_RUN <fresh-cache-1> 64 --device cuda:1
+python -m scripts.gpu_deterministic_sweep RUN_TO_RUN <fresh-cache-0> 64 --device cuda:0 --linesearch-block-dim 32
+python -m scripts.gpu_deterministic_sweep RUN_TO_RUN <fresh-cache-1> 64 --device cuda:1 --linesearch-block-dim 32
 ```
 
-Each writes a `navprobe-sweep-run/1` document; `navprobe.codecs.sweep_run.decode_sweep_run` reads both, and the comparison is scene-by-scene on the verdicts. A fresh cache directory per device is not optional — a shared one would let the second run load the first's compiled kernels, which is the one thing a codegen question must not allow.
+Each writes a `navprobe-sweep-run/2` document; `navprobe.codecs.sweep_run.decode_sweep_run` reads both, and the comparison is scene-by-scene on the verdicts. A fresh cache directory per device is not optional — a shared one would let the second run load the first's compiled kernels, which is the one thing a codegen question must not allow.
+
+**`--linesearch-block-dim 32` is not decoration either.** It pins the one setting known to move the verdict ([[coupled-body-threshold-turns-on-one-kernels-block-size]]), and 32 specifically because that is the vendor default every published figure on this wiki was measured under — so the comparison extends the existing corpus rather than starting a new one. Passing it explicitly rather than relying on the default is what makes the report *say* which block size ran: the value is carried in the record, so two sweeps that pinned different values are visibly incomparable instead of quietly so. Omit it on one device and the whole experiment is uninterpretable, because a moved threshold could be the architecture or could be the block size.
 
 **It also makes `GPU_TO_GPU` testable for the first time.** That mode compiles under the alias patch ([[tactile-alias-patch-clears-warp-deterministic-compile]]) but has never been swept, because a mode whose entire claim is *the same digest on different devices* cannot be tested with one architecture. Two architectures in one box turns it into a real experiment, and it absorbs the cross-machine digest repetition left over from question 1. If the digests match across sm_75 and sm_86 under `GPU_TO_GPU`, coupled-body reproducibility is portable rather than merely per-device — a stronger result than anything on this wiki so far.
 
