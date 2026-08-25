@@ -249,7 +249,6 @@ def test_benchmark_entrypoint_runs_as_main() -> None:
     try:
         with pytest.raises(SystemExit) as exc:
             runpy.run_module("scripts.benchmark", run_name="__main__")
-        code = exc.value.code if isinstance(exc.value.code, int) else 0
-        assert code == 0
+        assert exc.value.code == 0
     finally:
         sys.argv = original_argv

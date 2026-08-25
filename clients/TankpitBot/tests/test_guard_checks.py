@@ -99,8 +99,7 @@ def test_guard_entrypoint_runs_as_main(tmp_path: Path) -> None:
             str(Path(__file__).resolve().parents[0].parent / "scripts" / "guard.py"),
             run_name="__main__",
         )
-    code = exc.value.code if isinstance(exc.value.code, int) else 0
-    assert code == 0
+    assert exc.value.code == 0
 
     sys.argv = orig_argv
 

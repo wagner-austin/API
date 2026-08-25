@@ -9,7 +9,6 @@ description = "Gradient Boosting You Can See Through - from-scratch interpretabl
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "cleargbm", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/cleargbm/py.typed"]

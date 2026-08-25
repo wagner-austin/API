@@ -9,7 +9,6 @@ description = "Loan covenant monitoring and breach prediction API"
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "covenant_radar_api", from = "src" },
-  { include = "scripts" }
 ]
 readme = "README.md"
 include = [

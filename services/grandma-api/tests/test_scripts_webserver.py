@@ -233,14 +233,20 @@ def test_reset_hooks_restores_defaults() -> None:
 
 def test_webserver_subprocess_integration() -> None:
     """Test that webserver starts and serves files over HTTPS via subprocess."""
-    web_dir = Path(__file__).parent.parent / "web"
-    script_path = Path(__file__).parent.parent / "scripts" / "webserver.py"
+    project_root = Path(__file__).parent.parent
+    web_dir = project_root / "web"
     port = _find_free_port()
 
-    # Start server in subprocess
+    # Launched exactly as scripts/start.ps1 launches it: `-m` from the project
+    # root, with the directory to serve passed as argv[2] (main() chdirs to it).
+    # Running the file BY PATH with cwd=web_dir instead put scripts/ on
+    # sys.path[0] rather than the project root, so `from scripts import
+    # _test_hooks` at the top of webserver.py could only resolve against an
+    # INSTALLED top-level `scripts` package -- one that every package here
+    # shipped, so the copy found was whichever installed last.
     proc = subprocess.Popen(
-        [sys.executable, str(script_path), str(port)],
-        cwd=str(web_dir),
+        [sys.executable, "-m", "scripts.webserver", str(port), str(web_dir)],
+        cwd=str(project_root),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

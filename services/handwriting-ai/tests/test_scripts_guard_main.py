@@ -12,10 +12,8 @@ def _project_root() -> Path:
 
 def test_guard_main_with_empty_root_succeeds(tmp_path: Path) -> None:
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
     result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(tmp_path)],
+        [sys.executable, "-m", "scripts.guard", "--root", str(tmp_path)],
         cwd=str(project_root),
         capture_output=True,
         text=True,

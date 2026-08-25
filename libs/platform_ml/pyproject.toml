@@ -9,7 +9,6 @@ description = "Shared ML artifact handling: manifest schema, tarball helpers, an
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_ml", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_ml/py.typed"]

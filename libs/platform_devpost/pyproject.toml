@@ -9,7 +9,6 @@ description = "Devpost hackathon discovery with codebase capability matching."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_devpost", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_devpost/py.typed"]

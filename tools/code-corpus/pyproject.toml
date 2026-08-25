@@ -9,7 +9,6 @@ description = "Emit training corpora from the monorepo's own source code, with p
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "code_corpus", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/code_corpus/py.typed"]

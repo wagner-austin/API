@@ -10,20 +10,20 @@ from scripts import guard as guard_mod
 def test_guard_main_runs_successfully() -> None:
     """Test that guard main function runs and returns valid exit code."""
     rc = guard_mod.main(None)
-    assert rc >= 0, f"Expected non-negative exit code, got {rc}"
+    assert rc == 0
 
 
 def test_guard_main_with_verbose_flag() -> None:
     """Test guard main with verbose flag exercises that code path."""
     project_root = Path(__file__).resolve().parents[1]
     rc = guard_mod.main(["--root", str(project_root), "--verbose"])
-    assert rc >= 0, f"Expected non-negative exit code, got {rc}"
+    assert rc == 0
 
 
 def test_guard_main_with_unknown_flag() -> None:
     """Test guard main with unknown flag to exercise else branch."""
     rc = guard_mod.main(["--unknown-flag"])
-    assert rc >= 0, f"Expected non-negative exit code, got {rc}"
+    assert rc == 0
 
 
 def test_guard_find_monorepo_root_with_hook() -> None:

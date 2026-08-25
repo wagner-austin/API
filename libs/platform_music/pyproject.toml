@@ -9,7 +9,6 @@ description = "Core music analytics library for Music Wrapped (TypedDict + Proto
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_music", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_music/py.typed"]

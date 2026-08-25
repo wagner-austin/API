@@ -48,10 +48,9 @@ def test_guard_detects_violations(tmp_path: Path) -> None:
     _write(tests_errors, "class ErrorCode(Exception):\n    ...\n")
 
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
 
     result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(tmp_path)],
+        [sys.executable, "-m", "scripts.guard", "--root", str(tmp_path)],
         cwd=str(project_root),
         capture_output=True,
         text=True,
@@ -66,11 +65,17 @@ def test_guard_detects_violations(tmp_path: Path) -> None:
 
 
 def test_guard_main_entry_no_violations(tmp_path: Path) -> None:
+    # Invoked as `-m` from the project root, which is what the Makefile does.
+    # Running the file BY PATH instead puts scripts/ on sys.path[0] rather than
+    # the project root, so `from scripts import _test_hooks` inside guard.py
+    # could only resolve against an INSTALLED top-level `scripts` package. That
+    # package was shipped by every one of the 40 pyprojects, so the copy it
+    # found was whichever one installed last -- and on a real wheel install it
+    # was the wrong one. `-m` reproduces the only invocation anything uses.
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
 
     result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(tmp_path)],
+        [sys.executable, "-m", "scripts.guard", "--root", str(tmp_path)],
         cwd=str(project_root),
         capture_output=True,
         text=True,

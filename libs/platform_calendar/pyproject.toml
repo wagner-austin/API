@@ -9,7 +9,6 @@ description = "Google Calendar API integration for competition deadline tracking
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_calendar", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_calendar/py.typed"]

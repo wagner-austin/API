@@ -9,7 +9,6 @@ description = "Strict, typed GitHub stats SVG generation API (FastAPI)."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "github_stats_api", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 

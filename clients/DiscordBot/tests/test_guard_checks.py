@@ -40,10 +40,8 @@ def test_guard_detects_violations(tmp_path: Path) -> None:
     _write(bad, code)
 
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
     result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(root)],
+        [sys.executable, "-m", "scripts.guard", "--root", str(root)],
         cwd=str(project_root),
         capture_output=True,
         text=True,
@@ -79,10 +77,8 @@ def test_guard_detects_violations_verbose(tmp_path: Path) -> None:
     _write(bad, code)
 
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
     result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(root), "-v"],
+        [sys.executable, "-m", "scripts.guard", "--root", str(root), "-v"],
         cwd=str(project_root),
         capture_output=True,
         text=True,
@@ -97,10 +93,8 @@ def test_guard_detects_violations_verbose(tmp_path: Path) -> None:
 
 def test_guard_main_entry_no_violations(tmp_path: Path) -> None:
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
     result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(tmp_path)],
+        [sys.executable, "-m", "scripts.guard", "--root", str(tmp_path)],
         cwd=str(project_root),
         capture_output=True,
         text=True,
@@ -111,10 +105,8 @@ def test_guard_main_entry_no_violations(tmp_path: Path) -> None:
 
 def test_guard_main_entry_no_violations_verbose(tmp_path: Path) -> None:
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
     result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(tmp_path), "--verbose"],
+        [sys.executable, "-m", "scripts.guard", "--root", str(tmp_path), "--verbose"],
         cwd=str(project_root),
         capture_output=True,
         text=True,
@@ -127,10 +119,8 @@ def test_guard_main_entry_no_violations_verbose(tmp_path: Path) -> None:
 
 def test_guard_ignores_unknown_arguments(tmp_path: Path) -> None:
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
     result = subprocess.run(
-        [sys.executable, str(guard_path), "ignored-flag", "--root", str(tmp_path)],
+        [sys.executable, "-m", "scripts.guard", "ignored-flag", "--root", str(tmp_path)],
         cwd=str(project_root),
         capture_output=True,
         text=True,

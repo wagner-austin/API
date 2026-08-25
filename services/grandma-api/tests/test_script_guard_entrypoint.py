@@ -46,8 +46,8 @@ def test_main_runs_orchestrator() -> None:
     # Run with verbose flag to verify execution
     rc = guard.main(["--verbose"])
 
-    # Guard should complete - rc is an integer exit code
-    assert rc == 0 or rc > 0  # Any valid exit code
+    # The guard must PASS, not merely finish: 0 is "no violations found".
+    assert rc == 0
 
 
 def test_main_with_root_override() -> None:
@@ -57,8 +57,8 @@ def test_main_with_root_override() -> None:
 
     rc = guard.main(["--root", str(project_root), "--verbose"])
 
-    # Guard should complete - rc is an integer exit code
-    assert rc == 0 or rc > 0  # Any valid exit code
+    # The guard must PASS, not merely finish: 0 is "no violations found".
+    assert rc == 0
 
 
 def test_main_without_verbose() -> None:
@@ -66,8 +66,8 @@ def test_main_without_verbose() -> None:
     # Run without verbose flag
     rc = guard.main([])
 
-    # Guard should complete - rc is an integer exit code
-    assert rc == 0 or rc > 0  # Any valid exit code
+    # The guard must PASS, not merely finish: 0 is "no violations found".
+    assert rc == 0
 
 
 def test_main_with_unknown_argument() -> None:
@@ -75,8 +75,8 @@ def test_main_with_unknown_argument() -> None:
     # Run with an unknown argument - should be ignored
     rc = guard.main(["--unknown-flag", "some-value", "-x"])
 
-    # Guard should complete - rc is an integer exit code
-    assert rc == 0 or rc > 0  # Any valid exit code
+    # The guard must PASS, not merely finish: 0 is "no violations found".
+    assert rc == 0
 
 
 def test_real_is_dir() -> None:
@@ -104,10 +104,7 @@ def test_guard_entrypoint_runs_as_main() -> None:
         # Running as a module should exit with a code
         with pytest.raises(SystemExit) as exc:
             runpy.run_module("scripts.guard", run_name="__main__")
-        err = exc.value
-        code: int = err.code if isinstance(err.code, int) else 0
-        # Guard should complete with exit code 0 (pass) or 2 (violations)
-        assert code in (0, 2)
+        assert exc.value.code == 0
     finally:
         # Restore modules for other tests
         sys.modules.update(saved_modules)

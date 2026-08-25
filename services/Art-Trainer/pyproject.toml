@@ -9,7 +9,6 @@ description = "Art Trainer API and worker for LoRA/IP-Adapter training (SD1.5, S
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "art_trainer", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/art_trainer/py.typed"]

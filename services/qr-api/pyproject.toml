@@ -9,7 +9,6 @@ description = "Strict, typed QR code generation API service (FastAPI)."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "qr_api", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 

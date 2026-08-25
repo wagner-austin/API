@@ -23,7 +23,7 @@ def test_guard_find_monorepo_root_raises(tmp_path: Path) -> None:
 def test_guard_main_verbose_and_root() -> None:
     root = _repo_root()
     rc = guard.main(["--root", str(root), "--verbose"])
-    assert isinstance(rc, int) and rc in (0, 2)
+    assert rc == 0
 
 
 # Coverage for line 52: unrecognized argument is skipped (else branch)
@@ -32,4 +32,4 @@ def test_guard_main_unrecognized_argument() -> None:
     # Pass an unrecognized argument that is not --root or --verbose/-v
     # This exercises the else branch at line 52 where idx += 1
     rc = guard.main(["--root", str(root), "--unknown-flag", "some-value"])
-    assert isinstance(rc, int) and rc in (0, 2)
+    assert rc == 0

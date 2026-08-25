@@ -9,7 +9,6 @@ description = "Strict, typed procedural-art core library."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "procart", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/procart/py.typed"]

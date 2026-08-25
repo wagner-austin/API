@@ -9,7 +9,6 @@ description = "Multi-provider email library supporting Microsoft Outlook and Gma
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_email", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_email/py.typed"]

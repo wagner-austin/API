@@ -9,7 +9,6 @@ description = "Text translation with pluggable backends (Claude, DeepL, NLLB)."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_translate", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_translate/py.typed"]

@@ -9,7 +9,6 @@ description = "Strict, typed workers tooling: Redis helpers and RQ harness."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_workers", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_workers/py.typed"]

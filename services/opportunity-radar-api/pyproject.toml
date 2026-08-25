@@ -9,7 +9,6 @@ description = "Discover Kaggle competitions and Devpost hackathons matching code
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "opportunity_radar_api", from = "src" },
-  { include = "scripts" }
 ]
 readme = "README.md"
 include = ["src/opportunity_radar_api/py.typed"]

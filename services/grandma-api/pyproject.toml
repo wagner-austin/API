@@ -9,7 +9,6 @@ description = "Multi-language audio to English translation API — Whisper STT, 
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "grandma_api", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/grandma_api/py.typed"]

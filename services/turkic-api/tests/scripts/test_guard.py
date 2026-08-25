@@ -45,7 +45,7 @@ def test_main_runs_orchestrator() -> None:
     """Test main function loads and runs orchestrator."""
     rc = guard.main(["--verbose"])
 
-    assert rc == 0 or rc > 0
+    assert rc == 0
 
 
 def test_main_with_root_override() -> None:
@@ -55,21 +55,21 @@ def test_main_with_root_override() -> None:
 
     rc = guard.main(["--root", str(project_root), "--verbose"])
 
-    assert rc == 0 or rc > 0
+    assert rc == 0
 
 
 def test_main_without_verbose() -> None:
     """Test main function runs without verbose flag."""
     rc = guard.main([])
 
-    assert rc == 0 or rc > 0
+    assert rc == 0
 
 
 def test_main_with_unknown_argument() -> None:
     """Test main function ignores unknown arguments."""
     rc = guard.main(["--unknown-flag", "some-value", "-x"])
 
-    assert rc == 0 or rc > 0
+    assert rc == 0
 
 
 def test_real_is_dir() -> None:
@@ -91,8 +91,6 @@ def test_guard_entrypoint_runs_as_main() -> None:
     try:
         with pytest.raises(SystemExit) as exc:
             runpy.run_module("scripts.guard", run_name="__main__")
-        err = exc.value
-        code: int = err.code if isinstance(err.code, int) else 0
-        assert code in (0, 2)
+        assert exc.value.code == 0
     finally:
         sys.modules.update(saved_modules)

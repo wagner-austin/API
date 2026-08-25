@@ -9,7 +9,6 @@ description = "XGBoost wrapper for covenant breach risk prediction: training and
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "covenant_ml", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/covenant_ml/py.typed"]

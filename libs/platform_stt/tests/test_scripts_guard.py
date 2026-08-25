@@ -12,7 +12,7 @@ def test_guard_main_and_main_block() -> None:
     from scripts import guard as guard_mod
 
     rc = guard_mod.main(None)
-    assert rc >= 0
+    assert rc == 0
 
     # Execute the file as if __name__ == "__main__" using compile+exec.
     # This covers the SystemExit path without using runpy (which returns Any).
@@ -42,7 +42,7 @@ def test_guard_verbose_flag_and_root_override() -> None:
 
     project_root = Path(__file__).resolve().parents[1]
     rc = guard_mod.main(["--root", str(project_root), "--verbose"])
-    assert rc >= 0
+    assert rc == 0
 
 
 def test_guard_unknown_flag_hits_else_branch() -> None:
@@ -50,7 +50,7 @@ def test_guard_unknown_flag_hits_else_branch() -> None:
     from scripts import guard as guard_mod
 
     rc = guard_mod.main(["--unknown-flag"])
-    assert rc >= 0
+    assert rc == 0
 
 
 def test_guard_default_is_dir() -> None:
@@ -84,4 +84,4 @@ def test_guard_short_verbose_flag() -> None:
     from scripts import guard as guard_mod
 
     rc = guard_mod.main(["-v"])
-    assert rc >= 0
+    assert rc == 0

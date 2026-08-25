@@ -9,7 +9,6 @@ description = "Typed platform event schemas shared across services and clients."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_core", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_core/py.typed"]

@@ -9,7 +9,6 @@ description = "Handwriting AI service for MNIST digit inference (HTTP)."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "handwriting_ai", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/handwriting_ai/py.typed"]

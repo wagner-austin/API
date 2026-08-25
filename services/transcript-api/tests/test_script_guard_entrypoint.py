@@ -8,12 +8,10 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_guard_entrypoint_runs_as_main(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Running as a module should exit with 0 or 2 depending on checks
+    # Running as a module must exit 0: the guard found no violations.
     with pytest.raises(SystemExit) as exc:
         runpy.run_module("scripts.guard", run_name="__main__")
-    err = exc.value
-    code: int = err.code if isinstance(err.code, int) else 0
-    assert code in (0, 2)
+    assert exc.value.code == 0
 
 
 logger = logging.getLogger(__name__)

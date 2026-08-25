@@ -20,8 +20,7 @@ class TestGuardEntrypoint:
             del sys.modules["scripts.guard"]
         with pytest.raises(SystemExit) as exc:
             runpy.run_module("scripts.guard", run_name="__main__")
-        code = exc.value.code if isinstance(exc.value.code, int) else 0
-        assert code in (0, 2)
+        assert exc.value.code == 0
 
 
 class TestFindMonorepoRoot:
@@ -97,7 +96,7 @@ class TestMain:
         """Test main function with verbose flag outputs exit code."""
         # Run main with verbose flag - it will run the actual guards
         exit_code = guard.main(["--verbose"])
-        assert exit_code in (0, 2)
+        assert exit_code == 0
 
     def test_main_with_root_override(self, tmp_path: Path) -> None:
         """Test main function with root override."""
@@ -113,4 +112,4 @@ class TestMain:
         """Test main function with unknown argument (covers else branch)."""
         # Pass an unknown argument to trigger the else branch at line 107-108
         exit_code = guard.main(["--unknown-flag", "some-value"])
-        assert exit_code in (0, 2)
+        assert exit_code == 0

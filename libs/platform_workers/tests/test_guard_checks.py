@@ -14,13 +14,13 @@ from pytest import raises
 def test_guard_main_entry_no_violations(tmp_path: Path) -> None:
     """Test guard.main with no violations in an empty directory."""
     rc = guard_mod.main(["--root", str(tmp_path)])
-    assert rc in (0, 2)
+    assert rc == 0
 
 
 def test_guard_main_unknown_flag_is_ignored(tmp_path: Path) -> None:
     """Test guard.main ignores unknown flags."""
     rc = guard_mod.main(["--root", str(tmp_path), "ignored-flag"])
-    assert rc in (0, 2)
+    assert rc == 0
 
 
 def test_guard_main_verbose_flag_prints_exit_code(tmp_path: Path) -> None:
@@ -30,8 +30,8 @@ def test_guard_main_verbose_flag_prints_exit_code(tmp_path: Path) -> None:
     try:
         rc = guard_mod.main(["--root", str(tmp_path), "--verbose"])
         output = sys.stdout.getvalue()
-        assert rc in (0, 2)
-        assert f"guard_exit_code code={rc}\n" in output
+        assert rc == 0
+        assert "guard_exit_code code=0\n" in output
     finally:
         sys.stdout = old_stdout
 

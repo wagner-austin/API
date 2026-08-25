@@ -273,8 +273,95 @@ src = ["src"]
     assert len(violations) == 0
 
 
+def _repo_with_packages(tmp_path: Path, packages_block: str) -> Path:
+    """Build a minimal package whose only interesting content is `packages`.
+
+    Args:
+        tmp_path: Per-test temporary directory.
+        packages_block: The `packages = [...]` lines to write.
+
+    Returns:
+        Path to a source file inside it, for handing to ``rule.run``.
+    """
+    repo = tmp_path / "repo"
+    (repo / "src").mkdir(parents=True)
+    source = repo / "src" / "mod.py"
+    source.write_text("x = 1", encoding="utf-8")
+    (repo / "pyproject.toml").write_text(
+        f"""
+[tool.poetry]
+name = "thing"
+{packages_block}
+
+[tool.mypy]
+files = ["src"]
+strict = true
+disallow_any_expr = true
+disallow_any_explicit = true
+disallow_any_unimported = true
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Any".msg = "banned"
+"typing.cast".msg = "banned"
+""",
+        encoding="utf-8",
+    )
+    return source
+
+
+def test_config_rule_detects_a_package_include_without_from(tmp_path: Path) -> None:
+    """The defect this rule exists for, in the exact shape it shipped in.
+
+    Every one of the 40 Python packages here carried this line. It made
+    poetry put the project ROOT on each consumer's sys.path and ship a
+    top-level `scripts` module in the wheel, so the packages overwrote each
+    other on install.
+    """
+    source = _repo_with_packages(
+        tmp_path,
+        'packages = [\n  { include = "thing", from = "src" },\n  { include = "scripts" },\n]',
+    )
+
+    violations = [v for v in ConfigRule().run([source]) if v.kind == "package-include-without-from"]
+
+    assert len(violations) == 1
+    assert violations[0].line_no == 6
+    assert 'include="scripts"' in violations[0].line
+
+
+def test_config_rule_accepts_a_package_include_with_from(tmp_path: Path) -> None:
+    """An entry naming a source root is the correct shape and stays silent."""
+    source = _repo_with_packages(
+        tmp_path, 'packages = [\n  { include = "thing", from = "src" },\n]'
+    )
+
+    violations = [v for v in ConfigRule().run([source]) if v.kind == "package-include-without-from"]
+
+    assert violations == []
+
+
+def test_config_rule_names_the_two_ways_a_rootless_include_hurts(tmp_path: Path) -> None:
+    """The message has to teach, because the failure is invisible locally.
+
+    A stale sys.path entry and a colliding wheel are different symptoms of
+    one line, and whoever hits either one needs to be told about both.
+    """
+    source = _repo_with_packages(tmp_path, 'packages = [\n  { include = "scripts" },\n]')
+
+    violations = [v for v in ConfigRule().run([source]) if v.kind == "package-include-without-from"]
+
+    assert len(violations) == 1
+    assert "sys.path" in violations[0].line
+    assert "wheel" in violations[0].line
+
+
 __all__ = [
+    "test_config_rule_accepts_a_package_include_with_from",
     "test_config_rule_accepts_valid_config",
+    "test_config_rule_detects_a_package_include_without_from",
     "test_config_rule_detects_missing_banned_api",
     "test_config_rule_detects_missing_mypy_files",
     "test_config_rule_detects_missing_ruff_src",
@@ -283,5 +370,6 @@ __all__ = [
     "test_config_rule_handles_files_in_category_dirs",
     "test_config_rule_handles_no_files",
     "test_config_rule_handles_nonexistent_pyproject",
+    "test_config_rule_names_the_two_ways_a_rootless_include_hurts",
     "test_config_rule_skips_repos_without_expected_dirs",
 ]

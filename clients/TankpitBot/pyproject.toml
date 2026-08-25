@@ -9,7 +9,6 @@ description = "Automated bot client for Tankpit.com browser game"
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "tankpit_bot", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/tankpit_bot/py.typed"]

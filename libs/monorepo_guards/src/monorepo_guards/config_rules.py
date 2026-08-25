@@ -7,6 +7,7 @@ from monorepo_guards.toml_reader import (
     check_banned_api,
     extract_mypy_bool,
     extract_mypy_files,
+    extract_package_includes,
     extract_ruff_src,
     read_pyproject,
 )
@@ -175,6 +176,53 @@ class ConfigRule:
 
         return violations
 
+    def _check_package_includes(self, repo_root: Path, toml_content: str) -> list[Violation]:
+        """Check that no shipped package puts the repository root on sys.path.
+
+        A ``packages`` entry with no ``from`` names a directory at the project
+        root, which makes poetry treat the ROOT as a source root. Two things
+        follow, and both bite silently:
+
+        * the built wheel ships that directory as a TOP-LEVEL module, so two
+          packages declaring the same name overwrite each other on install;
+        * the editable install writes the project root into the consumer's
+          ``.pth``, putting that directory on the ``sys.path`` of every
+          package that depends on this one.
+
+        All 40 Python packages here declared ``{ include = "scripts" }`` --
+        a dev-only guard shim that nothing installs a package to run. Three
+        foreign ``scripts/`` packages sat on Model-Trainer's path at once,
+        resolving correctly only because pytest's ``pythonpath`` happened to
+        sort first. On HPC3, where the installs are real wheels rather than
+        editable, the wrong copy won and the guard died on ImportError.
+
+        Args:
+            repo_root: Directory holding the ``pyproject.toml``.
+            toml_content: Its full contents.
+
+        Returns:
+            One violation per rootless entry, naming what it would collide on.
+        """
+        violations: list[Violation] = []
+        for entry in extract_package_includes(toml_content):
+            if entry.has_from:
+                continue
+            violations.append(
+                Violation(
+                    file=repo_root / "pyproject.toml",
+                    line_no=entry.line_no,
+                    kind="package-include-without-from",
+                    line=(
+                        f'packages entry include="{entry.include}" has no from=, so the '
+                        f"project root goes on every consumer's sys.path and a top-level "
+                        f'"{entry.include}" ships in the wheel, colliding with any other '
+                        f"package that declares it. Add from=, or delete the entry if it "
+                        f"is a dev-only directory that nothing installs the package to run."
+                    ),
+                )
+            )
+        return violations
+
     def _check_pyproject(self, pyproject_path: Path) -> list[Violation]:
         """Check a single pyproject.toml file."""
         violations: list[Violation] = []
@@ -182,6 +230,8 @@ class ConfigRule:
 
         toml_content = read_pyproject(pyproject_path)
         expected_dirs = self._get_expected_dirs(repo_root)
+
+        violations.extend(self._check_package_includes(repo_root, toml_content))
 
         if expected_dirs:
             violations.extend(self._check_mypy_files(repo_root, toml_content, expected_dirs))

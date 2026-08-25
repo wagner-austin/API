@@ -9,7 +9,6 @@ description = "Kaggle competition discovery with codebase capability matching."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_kaggle", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_kaggle/py.typed"]

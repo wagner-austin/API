@@ -46,10 +46,8 @@ def test_project_guard_detects_violations(tmp_path: Path) -> None:
     _write(bad, code)
 
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
     result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(root)],
+        [sys.executable, "-m", "scripts.guard", "--root", str(root)],
         cwd=str(project_root),
         capture_output=True,
         text=True,
@@ -64,10 +62,8 @@ def test_project_guard_detects_violations(tmp_path: Path) -> None:
 
 def test_project_guard_verbose_success(tmp_path: Path) -> None:
     project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
     result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(tmp_path), "-v"],
+        [sys.executable, "-m", "scripts.guard", "--root", str(tmp_path), "-v"],
         cwd=str(project_root),
         capture_output=True,
         text=True,

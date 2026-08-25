@@ -9,7 +9,6 @@ description = "PyTorch neural network backends (MLP, LSTM) for covenant_ml."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "covenant_nn", from = "src" },
-  { include = "scripts" },
 ]
 include = ["src/covenant_nn/py.typed"]
 

@@ -9,7 +9,6 @@ description = "Strictly typed IO for analytical chemistry instrument data format
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "instrument_io", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/instrument_io/py.typed"]

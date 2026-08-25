@@ -16,6 +16,15 @@ _PATH_DEPENDENCY = re.compile(
 )
 
 
+# An entry of the [tool.poetry] `packages` array, written as an inline table.
+# Not anchored, so a single-line `packages = [{...}, {...}]` yields both.
+_PACKAGE_INCLUDE = re.compile(
+    r"""\{\s*include\s*=\s*["'](?P<include>[^"']+)["'](?P<rest>[^}]*)\}"""
+)
+_POETRY_SECTION = re.compile(r"^\[tool\.poetry\]\s*$")
+_FROM_KEY = re.compile(r"\bfrom\s*=")
+
+
 class PathDependency(NamedTuple):
     """One dependency declared as a filesystem path.
 
@@ -67,6 +76,53 @@ def extract_path_dependencies(toml_content: str) -> list[PathDependency]:
                 line_no=line_no,
             )
         )
+    return found
+
+
+class PackageInclude(NamedTuple):
+    """One entry of the ``[tool.poetry]`` ``packages`` array.
+
+    Attributes:
+        include (str): The directory name the entry ships.
+        has_from (bool): Whether the entry names a source root with ``from``.
+        line_no (int): One-based line the entry sits on.
+    """
+
+    include: str
+    has_from: bool
+    line_no: int
+
+
+def extract_package_includes(toml_content: str) -> list[PackageInclude]:
+    """Find every package a pyproject declares it ships.
+
+    Read line by line for the same reason as
+    :func:`extract_path_dependencies`: reporting a violation needs the line
+    number, which a decoded TOML document does not carry, and ``tomllib`` is
+    banned outside the guard configuration loader.
+
+    Args:
+        toml_content (str): Full contents of a ``pyproject.toml``.
+
+    Returns:
+        list[PackageInclude]: One entry per declared package, in file order.
+    """
+    found: list[PackageInclude] = []
+    in_poetry = False
+    for line_no, line in enumerate(toml_content.splitlines(), start=1):
+        if _ANY_SECTION.match(line):
+            in_poetry = bool(_POETRY_SECTION.match(line))
+            continue
+        if not in_poetry:
+            continue
+        for match in _PACKAGE_INCLUDE.finditer(line):
+            found.append(
+                PackageInclude(
+                    include=str(match.group("include")),
+                    has_from=_FROM_KEY.search(str(match.group("rest"))) is not None,
+                    line_no=line_no,
+                )
+            )
     return found
 
 
@@ -127,10 +183,12 @@ def read_pyproject(path: Path) -> str:
 
 
 __all__ = [
+    "PackageInclude",
     "PathDependency",
     "check_banned_api",
     "extract_mypy_bool",
     "extract_mypy_files",
+    "extract_package_includes",
     "extract_path_dependencies",
     "extract_ruff_src",
     "read_pyproject",

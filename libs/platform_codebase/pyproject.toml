@@ -9,7 +9,6 @@ description = "Codebase capability detection and profiling for monorepos."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_codebase", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_codebase/py.typed"]

@@ -9,7 +9,6 @@ description = "Submit digest-verified training jobs to UCI's HPC3 Slurm cluster 
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "hpc3", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/hpc3/py.typed"]

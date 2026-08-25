@@ -9,7 +9,6 @@ description = "Strict, typed Music Wrapped API service (FastAPI + RQ)."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "music_wrapped_api", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 

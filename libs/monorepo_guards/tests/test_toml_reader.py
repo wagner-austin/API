@@ -5,9 +5,11 @@ from pathlib import Path
 import pytest
 
 from monorepo_guards.toml_reader import (
+    PackageInclude,
     check_banned_api,
     extract_mypy_bool,
     extract_mypy_files,
+    extract_package_includes,
     extract_ruff_src,
     read_pyproject,
 )
@@ -151,6 +153,61 @@ def test_read_pyproject_raises_on_missing_file(tmp_path: Path) -> None:
         read_pyproject(pyproject)
 
 
+def test_extract_package_includes_reports_from_per_entry() -> None:
+    """The shape every package in this monorepo used until 2026-08-24."""
+    toml_content = """
+[tool.poetry]
+name = "platform-core"
+packages = [
+  { include = "platform_core", from = "src" },
+  { include = "scripts" },
+]
+"""
+    assert extract_package_includes(toml_content) == [
+        PackageInclude(include="platform_core", has_from=True, line_no=5),
+        PackageInclude(include="scripts", has_from=False, line_no=6),
+    ]
+
+
+def test_extract_package_includes_reads_a_single_line_array() -> None:
+    """Poetry accepts the whole array on one line; both entries are found."""
+    toml_content = """
+[tool.poetry]
+packages = [{ include = "a", from = "src" }, { include = "b" }]
+"""
+    assert extract_package_includes(toml_content) == [
+        PackageInclude(include="a", has_from=True, line_no=3),
+        PackageInclude(include="b", has_from=False, line_no=3),
+    ]
+
+
+def test_extract_package_includes_ignores_other_sections() -> None:
+    """A `packages` key outside [tool.poetry] is not a poetry declaration.
+
+    Without the section check this reads a foreign tool's config as if it
+    governed what ships in the wheel.
+    """
+    toml_content = """
+[tool.poetry]
+name = "thing"
+
+[tool.other]
+packages = [
+  { include = "not_poetrys_business" },
+]
+"""
+    assert extract_package_includes(toml_content) == []
+
+
+def test_extract_package_includes_returns_empty_without_a_packages_key() -> None:
+    toml_content = """
+[tool.poetry]
+name = "thing"
+version = "0.1.0"
+"""
+    assert extract_package_includes(toml_content) == []
+
+
 __all__ = [
     "test_check_banned_api_finds_typing_any",
     "test_check_banned_api_finds_typing_cast",
@@ -161,6 +218,10 @@ __all__ = [
     "test_extract_mypy_files_parses_array",
     "test_extract_mypy_files_returns_none_when_empty",
     "test_extract_mypy_files_returns_none_when_missing",
+    "test_extract_package_includes_ignores_other_sections",
+    "test_extract_package_includes_reads_a_single_line_array",
+    "test_extract_package_includes_reports_from_per_entry",
+    "test_extract_package_includes_returns_empty_without_a_packages_key",
     "test_extract_ruff_src_parses_array",
     "test_extract_ruff_src_returns_none_when_empty",
     "test_extract_ruff_src_returns_none_when_missing",

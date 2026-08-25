@@ -147,8 +147,6 @@ def test_guard_entrypoint_runs_as_main() -> None:
     try:
         with pytest.raises(SystemExit) as exc:
             runpy.run_module("scripts.guard", run_name="__main__")
-        err = exc.value
-        code: int = err.code if isinstance(err.code, int) else 0
-        assert code in (0, 2)
+        assert exc.value.code == 0
     finally:
         sys.modules.update(saved_modules)

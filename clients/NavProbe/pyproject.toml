@@ -9,7 +9,6 @@ description = "Reproducibility instrument for simulated navigation: seeded rollo
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "navprobe", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/navprobe/py.typed"]

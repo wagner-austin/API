@@ -10,7 +10,7 @@ from scripts import guard as guard_mod
 
 def test_guard_main_and_main_block_service() -> None:
     rc = guard_mod.main(None)
-    assert rc >= 0
+    assert rc == 0
 
     # Execute the service's guard.py directly as __main__ to cover main block.
     script_path = Path(__file__).resolve().parents[1] / "scripts" / "guard.py"
@@ -33,12 +33,12 @@ def test_guard_find_root_raises_when_libs_missing_service() -> None:
 def test_guard_verbose_flag_and_root_override_service() -> None:
     project_root = Path(__file__).resolve().parents[1]
     rc = guard_mod.main(["--root", str(project_root), "--verbose"])
-    assert rc >= 0
+    assert rc == 0
 
 
 def test_guard_unknown_flag_hits_else_branch_service() -> None:
     rc = guard_mod.main(["--unknown-flag"])  # triggers the else branch
-    assert rc >= 0
+    assert rc == 0
 
 
 def test_guard_force_all_branches_service() -> None:
@@ -51,5 +51,5 @@ def test_guard_force_all_branches_service() -> None:
     with redirect_stdout(buf):
         rc = guard_mod.main(["--unknown-flag", "-v"])  # branches
     out = buf.getvalue()
-    assert rc >= 0
+    assert rc == 0
     assert "guard_exit_code code=" in out

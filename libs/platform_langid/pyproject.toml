@@ -9,7 +9,6 @@ description = "Spoken language identification from audio using MMS-LID."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_langid", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_langid/py.typed"]

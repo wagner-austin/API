@@ -9,7 +9,6 @@ description = "Headless Rusted Warfare client: JVM agent bridge plus autonomous 
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "rw_bot", from = "src" },
-  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/rw_bot/py.typed"]
