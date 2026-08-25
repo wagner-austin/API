@@ -15,8 +15,14 @@ infra:
 up-databank: infra
 	Set-Location services/data-bank-api; docker compose up -d --build
 
+# GIT_COMMIT is exported here rather than left to the operator's shell. The
+# Dockerfile bakes it so every manifest and run fingerprint can name the code
+# that produced a number, and it defaults to empty -- so a build that forgets
+# it records null and nobody notices until the provenance audit. That is not
+# hypothetical: every manifest archived by the 2026-08-18 audit has
+# git_commit null for exactly this reason.
 up-trainer: infra
-	Set-Location services/Model-Trainer; docker compose build --progress plain; docker compose up -d
+	$$env:GIT_COMMIT = (git rev-parse HEAD); Set-Location services/Model-Trainer; docker compose build --progress plain; docker compose up -d
 
 up-art-trainer: infra
 	Set-Location services/Art-Trainer; docker compose build --progress plain; docker compose up -d
