@@ -24,8 +24,10 @@ from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
 from hpc3.contracts.image import (
     HOST_BOUND_ROOTS,
     decode_image_reference,
-    decode_image_spec,
     encode_image_reference,
+)
+from hpc3.contracts.image_spec import (
+    decode_image_spec,
     encode_image_spec,
     encode_symbol_check,
     require_symbol_check,
@@ -238,12 +240,68 @@ class TestRemainingFields:
             _ = require_symbol_check("nope", "where")
 
 
+def _ref(**overrides: JSONValue) -> dict[str, JSONValue]:
+    """Build a valid image-reference payload with optional overrides.
+
+    Args:
+        **overrides: Fields to replace in the valid baseline.
+
+    Returns:
+        A JSON object suitable for :func:`decode_image_reference`.
+    """
+    base: dict[str, JSONValue] = {
+        "path": "/pub/wagnera3/images/abl.sif",
+        "sha256": _DIGEST,
+        "binds": ["/pub/wagnera3"],
+    }
+    base.update(overrides)
+    return base
+
+
 class TestImageReference:
     """What a job carries to say which image it runs inside."""
 
     def test_it_round_trips(self) -> None:
-        payload: JSONValue = {"path": "/pub/wagnera3/images/abl.sif", "sha256": _DIGEST}
+        payload: JSONValue = {
+            "path": "/pub/wagnera3/images/abl.sif",
+            "sha256": _DIGEST,
+            "binds": ["/pub/wagnera3"],
+        }
         assert encode_image_reference(decode_image_reference(payload, "image")) == payload
+
+    def test_binds_are_required_rather_than_defaulted(self) -> None:
+        """An unbound job on HPC3 finds none of its data and still starts."""
+        with pytest.raises(JSONTypeError, match="binds"):
+            _ = decode_image_reference({"path": "/pub/abl.sif", "sha256": _DIGEST}, "image")
+
+    def test_binds_may_be_empty_for_a_self_contained_image(self) -> None:
+        reference = decode_image_reference(
+            {"path": "/pub/abl.sif", "sha256": _DIGEST, "binds": []}, "image"
+        )
+        if reference is None:
+            raise AssertionError("a populated reference must decode")
+        assert reference["binds"] == []
+
+    @pytest.mark.parametrize("bad", ["relative/path", "/pub/../etc", "/pub\\wagnera3"])
+    def test_a_malformed_bind_is_refused(self, bad: str) -> None:
+        with pytest.raises(JSONTypeError, match="binds"):
+            _ = decode_image_reference(
+                {"path": "/pub/abl.sif", "sha256": _DIGEST, "binds": [bad]}, "image"
+            )
+
+    def test_a_non_string_bind_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must be a string"):
+            _ = decode_image_reference(
+                {"path": "/pub/abl.sif", "sha256": _DIGEST, "binds": [7]}, "image"
+            )
+
+    def test_a_trailing_slash_is_trimmed(self) -> None:
+        reference = decode_image_reference(
+            {"path": "/pub/abl.sif", "sha256": _DIGEST, "binds": ["/pub/wagnera3/"]}, "image"
+        )
+        if reference is None:
+            raise AssertionError("a populated reference must decode")
+        assert reference["binds"] == ["/pub/wagnera3"]
 
     def test_absence_means_no_image(self) -> None:
         """A host run is a state, not a missing value."""
@@ -253,7 +311,12 @@ class TestImageReference:
     def test_a_bind_mounted_path_is_allowed(self) -> None:
         """Unlike env_prefix: the .sif is a file the HOST reads."""
         reference = decode_image_reference(
-            {"path": "/pub/wagnera3/images/abl.sif", "sha256": _DIGEST}, "image"
+            {
+                "path": "/pub/wagnera3/images/abl.sif",
+                "sha256": _DIGEST,
+                "binds": ["/pub/wagnera3"],
+            },
+            "image",
         )
         if reference is None:
             raise AssertionError("a populated reference must decode")
@@ -261,11 +324,11 @@ class TestImageReference:
 
     def test_a_relative_path_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="absolute POSIX path"):
-            _ = decode_image_reference({"path": "images/abl.sif", "sha256": _DIGEST}, "image")
+            _ = decode_image_reference(_ref(path="images/abl.sif"), "image")
 
     def test_a_parent_segment_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must not contain"):
-            _ = decode_image_reference({"path": "/pub/../etc/abl.sif", "sha256": _DIGEST}, "image")
+            _ = decode_image_reference(_ref(path="/pub/../etc/abl.sif"), "image")
 
     def test_a_backslashed_path_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="forward-slashed"):
@@ -278,12 +341,12 @@ class TestImageReference:
     def test_a_malformed_digest_is_refused(self, digest: str) -> None:
         """A re-cased or truncated digest names different bytes."""
         with pytest.raises(JSONTypeError, match="lowercase hex"):
-            _ = decode_image_reference({"path": "/pub/abl.sif", "sha256": digest}, "image")
+            _ = decode_image_reference(_ref(sha256=digest), "image")
 
     def test_a_missing_digest_is_refused(self) -> None:
         """A path can be rebuilt in place; only the digest names bytes."""
         with pytest.raises(JSONTypeError, match="sha256"):
-            _ = decode_image_reference({"path": "/pub/abl.sif"}, "image")
+            _ = decode_image_reference({"path": "/pub/abl.sif", "binds": []}, "image")
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a JSON object"):

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from platform_core.json_utils import JSONValue
 
-from hpc3.contracts.image import ImageSpec, decode_image_spec
+from hpc3.contracts.image_spec import ImageSpec, decode_image_spec
 from hpc3.core.image_definition import render_definition, render_requirements
 from hpc3.core.image_layout import (
     COMMIT_NAME,

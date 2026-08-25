@@ -29,7 +29,7 @@ from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
 from hpc3.cli import _fatal, _test_hooks
-from hpc3.contracts.image import decode_image_spec
+from hpc3.contracts.image_spec import decode_image_spec
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.image_build import render_build_script
 from hpc3.core.image_definition import render_definition, render_requirements

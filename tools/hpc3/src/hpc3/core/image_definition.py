@@ -17,7 +17,7 @@ remove, arriving through the one step that looked harmless.
 
 from __future__ import annotations
 
-from hpc3.contracts.image import ImageSpec
+from hpc3.contracts.image_spec import ImageSpec
 from hpc3.core.image_layout import (
     COMMIT_NAME,
     REQUIREMENTS_NAME,

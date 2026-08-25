@@ -40,7 +40,12 @@ from platform_core import cli_args
 from platform_core.json_utils import dump_json_str
 
 from hpc3.cli import _config, _fatal, _test_hooks
-from hpc3.contracts.image import ImageSpec, SymbolCheck, decode_image_spec, encode_image_spec
+from hpc3.contracts.image_spec import (
+    ImageSpec,
+    SymbolCheck,
+    decode_image_spec,
+    encode_image_spec,
+)
 from hpc3.contracts.workspace import require_project_config
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.env_probe import parse_installed, probe_command

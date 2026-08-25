@@ -197,11 +197,20 @@ def _payload_lines(spec: JobSpec) -> list[str]:
     env_bin = f"{spec['env_path']}/bin"
     if image is None:
         return [f'export PATH="{env_bin}:$PATH"', "", spec["command"]]
-    return [
-        f'apptainer exec "{image["path"]}" \\',
-        f'    env PATH="{env_bin}:$PATH" \\',
-        f"    {spec['command']}",
-    ]
+    lines = ["apptainer exec \\"]
+    # Each bind mounted at its own path, so a payload's absolute paths mean
+    # the same thing inside and out. Without these the job starts and finds
+    # nothing: /pub on HPC3 is a symlink to /dfs6b/pub, and apptainer carries
+    # the BeeGFS mounts but not the symlink.
+    lines.extend(f'    --bind "{path}:{path}" \\' for path in image["binds"])
+    lines.extend(
+        [
+            f'    "{image["path"]}" \\',
+            f'    env PATH="{env_bin}:$PATH" \\',
+            f"    {spec['command']}",
+        ]
+    )
+    return lines
 
 
 def _code_provenance_export(spec: JobSpec) -> str:

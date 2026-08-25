@@ -14,7 +14,7 @@ the DeterminismReport rename actually did to the cluster's wheels.
 
 from __future__ import annotations
 
-from hpc3.contracts.image import ImageSpec, SymbolCheck
+from hpc3.contracts.image_spec import ImageSpec, SymbolCheck
 
 _HEADER = (
     '"""Verify the built image before it is allowed to exist.',

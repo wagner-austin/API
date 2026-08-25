@@ -32,6 +32,7 @@ _SIF = "/pub/wagnera3/images/abl.sif"
 _IMAGE: JSONValue = {
     "path": _SIF,
     "sha256": "9ed4e27fd0d8207de3f84e833b98e0cf7e6ab09af66726849ca1cf023326cd51",
+    "binds": ["/pub/wagnera3"],
 }
 
 
@@ -404,7 +405,44 @@ class TestImageRuns:
 
     def test_the_payload_runs_through_apptainer(self) -> None:
         script = render_sbatch(_spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR)
-        assert f'apptainer exec "{_SIF}" \\' in script.splitlines()
+        assert f'    "{_SIF}" \\' in script.splitlines()
+
+    def test_the_data_directories_are_bound_at_their_own_paths(self) -> None:
+        """Without this the job starts and finds none of its data.
+
+        /pub on HPC3 is a symlink to /dfs6b/pub; apptainer carries the BeeGFS
+        mounts but not the symlink, so an unbound /pub/... does not resolve
+        inside the container at all. Measured 2026-08-25.
+        """
+        script = render_sbatch(_spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR)
+        assert '    --bind "/pub/wagnera3:/pub/wagnera3" \\' in script.splitlines()
+
+    def test_every_declared_bind_is_emitted(self) -> None:
+        image: JSONValue = {
+            "path": _SIF,
+            "sha256": "9ed4e27fd0d8207de3f84e833b98e0cf7e6ab09af66726849ca1cf023326cd51",
+            "binds": ["/pub/wagnera3", "/dfs7/scratch"],
+        }
+        script = render_sbatch(_spec(image=image, env_path="/opt/env"), log_dir=_LOG_DIR)
+        assert script.count("--bind") == 2
+
+    def test_the_binds_precede_the_image(self) -> None:
+        """apptainer reads options before the image argument."""
+        lines = render_sbatch(_spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR)
+        script = lines.splitlines()
+        bind = script.index('    --bind "/pub/wagnera3:/pub/wagnera3" \\')
+        image_line = script.index(f'    "{_SIF}" \\')
+        assert bind < image_line
+
+    def test_an_image_with_no_binds_emits_none(self) -> None:
+        """A self-contained computation needs nothing mounted."""
+        image: JSONValue = {
+            "path": _SIF,
+            "sha256": "9ed4e27fd0d8207de3f84e833b98e0cf7e6ab09af66726849ca1cf023326cd51",
+            "binds": [],
+        }
+        script = render_sbatch(_spec(image=image, env_path="/opt/env"), log_dir=_LOG_DIR)
+        assert "--bind" not in script
 
     def test_the_apptainer_module_is_loaded(self) -> None:
         """`which apptainer` returns nothing on HPC3 until the module loads."""

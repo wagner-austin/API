@@ -16,7 +16,7 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
 
 from hpc3.cli import image_capture as capture_cli
-from hpc3.contracts.image import decode_image_spec
+from hpc3.contracts.image_spec import decode_image_spec
 from tests.conftest import FakeRun, project_config, workspace_document, write_workspace
 
 _FREEZE = "\n".join(

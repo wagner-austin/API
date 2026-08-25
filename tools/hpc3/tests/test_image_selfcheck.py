@@ -19,7 +19,7 @@ import sys
 
 from platform_core.json_utils import JSONValue
 
-from hpc3.contracts.image import ImageSpec, decode_image_spec
+from hpc3.contracts.image_spec import ImageSpec, decode_image_spec
 from hpc3.core.image_selfcheck import render_selfcheck
 
 _PACKAGE = "fixturepkg"
