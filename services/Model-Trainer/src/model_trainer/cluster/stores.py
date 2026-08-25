@@ -16,7 +16,9 @@ around, because there is nothing here to download from.
 from __future__ import annotations
 
 import hashlib
+import os
 import tarfile
+import tempfile
 from pathlib import Path
 
 from platform_core.data_bank_protocol import FileUploadResponse
@@ -117,7 +119,21 @@ class LocalArtifacts:
             the tarball's digest.
         """
         self.root.mkdir(parents=True, exist_ok=True)
-        staging = self.root / f"{artifact_name}{_TARBALL_SUFFIX}.partial"
+        # mkstemp, not a name built from artifact_name. The staging file is
+        # transient and nobody reads it by name, so its only requirement is to
+        # be unique -- and deriving it from the caller's name makes uniqueness
+        # the CALLER's property. Two runs handed the same artifact_name would
+        # write the same .partial and one would tar into the other's file.
+        #
+        # That is not hypothetical here: the preflight round-trip called this
+        # with a constant name, and the sibling collision it created killed an
+        # arm of the Kazakh A/B 19 seconds in. Fixing the caller fixed that
+        # instance; taking the name out of the caller's hands fixes the class.
+        handle, staged_path = tempfile.mkstemp(
+            dir=self.root, prefix=".upload-", suffix=f"{_TARBALL_SUFFIX}.partial"
+        )
+        os.close(handle)
+        staging = Path(staged_path)
         with tarfile.open(staging, "w:gz") as tar:
             tar.add(dir_path, arcname=dir_path.name)
 

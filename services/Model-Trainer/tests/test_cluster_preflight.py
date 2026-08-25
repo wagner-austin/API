@@ -9,6 +9,7 @@ expensive work was already done.
 
 from __future__ import annotations
 
+import hashlib
 import pathlib
 
 import pytest
@@ -79,12 +80,12 @@ class _RefusingStore:
 
 class TestCheckWritable:
     def test_writable_roots_pass(self, tmp_path: pathlib.Path) -> None:
-        preflight.check_writable({"artifacts": tmp_path / "a", "runs": tmp_path / "b"})
+        preflight.check_writable({"artifacts": tmp_path / "a", "runs": tmp_path / "b"}, token="r1")
         assert (tmp_path / "a").is_dir()
         assert (tmp_path / "b").is_dir()
 
     def test_it_leaves_no_probe_behind(self, tmp_path: pathlib.Path) -> None:
-        preflight.check_writable({"artifacts": tmp_path / "a"})
+        preflight.check_writable({"artifacts": tmp_path / "a"}, token="r1")
         assert list((tmp_path / "a").iterdir()) == []
 
     def test_a_root_that_cannot_be_created_is_refused(self, tmp_path: pathlib.Path) -> None:
@@ -93,7 +94,7 @@ class TestCheckWritable:
         blocker = tmp_path / "not-a-directory"
         blocker.write_text("I am a file", encoding="utf-8")
         with pytest.raises(AppError) as excinfo:
-            preflight.check_writable({"APP__ARTIFACTS_ROOT": blocker / "artifacts"})
+            preflight.check_writable({"APP__ARTIFACTS_ROOT": blocker / "artifacts"}, token="r1")
         assert excinfo.value.code is ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED
 
     def test_the_refusal_names_the_setting_not_only_the_path(self, tmp_path: pathlib.Path) -> None:
@@ -101,16 +102,41 @@ class TestCheckWritable:
         blocker = tmp_path / "blocker"
         blocker.write_text("x", encoding="utf-8")
         with pytest.raises(AppError) as excinfo:
-            preflight.check_writable({"APP__RUNS_ROOT": blocker / "runs"})
+            preflight.check_writable({"APP__RUNS_ROOT": blocker / "runs"}, token="r1")
         assert "APP__RUNS_ROOT" in excinfo.value.message
         assert "train to completion and then fail saving" in excinfo.value.message
+
+    def test_two_runs_sharing_a_root_do_not_delete_each_other_s_probe(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The failure that killed arm B of the Kazakh A/B, 19 seconds in.
+
+        Both arms wrote `.preflight-probe` into the same artifacts root on a
+        shared filesystem, seconds apart. Arm A's cleanup removed the file arm
+        B had just written, so B's own unlink raised FileNotFoundError and the
+        check meant to protect the run is what ended it.
+
+        Interleaved deliberately: run A writes, run B writes, A finishes, B
+        finishes. With one shared name that ordering cannot survive.
+        """
+        shared = {"APP__ARTIFACTS_ROOT": tmp_path / "shared"}
+        (tmp_path / "shared").mkdir()
+
+        probe_a = tmp_path / "shared" / f"{preflight.PROBE_NAME}-armA"
+        probe_b = tmp_path / "shared" / f"{preflight.PROBE_NAME}-armB"
+        assert probe_a != probe_b
+
+        preflight.check_writable(shared, token="armA")
+        preflight.check_writable(shared, token="armB")
+
+        assert list((tmp_path / "shared").iterdir()) == []
 
     def test_every_root_is_checked_not_just_the_first(self, tmp_path: pathlib.Path) -> None:
         blocker = tmp_path / "blocker"
         blocker.write_text("x", encoding="utf-8")
         with pytest.raises(AppError) as excinfo:
             preflight.check_writable(
-                {"good": tmp_path / "fine", "APP__LOGS_ROOT": blocker / "logs"}
+                {"good": tmp_path / "fine", "APP__LOGS_ROOT": blocker / "logs"}, token="r1"
             )
         assert "APP__LOGS_ROOT" in excinfo.value.message
 
@@ -118,7 +144,9 @@ class TestCheckWritable:
 class TestCheckArtifactRoundTrip:
     def test_a_working_store_passes(self, tmp_path: pathlib.Path) -> None:
         store = LocalArtifacts(tmp_path / "artifacts")
-        preflight.check_artifact_round_trip(store, tmp_path / "scratch", tmp_path / "artifacts")
+        preflight.check_artifact_round_trip(
+            store, tmp_path / "scratch", tmp_path / "artifacts", token="r1"
+        )
 
     def test_it_leaves_nothing_behind_in_the_output_directory(self, tmp_path: pathlib.Path) -> None:
         """A check that litters makes the run's own output harder to read
@@ -126,7 +154,7 @@ class TestCheckArtifactRoundTrip:
         300-byte probe tarball beside two 462 MB models."""
         artifacts = tmp_path / "artifacts"
         preflight.check_artifact_round_trip(
-            LocalArtifacts(artifacts), tmp_path / "scratch", artifacts
+            LocalArtifacts(artifacts), tmp_path / "scratch", artifacts, token="r1"
         )
         assert list(artifacts.iterdir()) == []
         assert not (tmp_path / "scratch").exists()
@@ -140,10 +168,28 @@ class TestCheckArtifactRoundTrip:
         real.write_bytes(b"a real trained model\n")
 
         preflight.check_artifact_round_trip(
-            LocalArtifacts(artifacts), tmp_path / "scratch", artifacts
+            LocalArtifacts(artifacts), tmp_path / "scratch", artifacts, token="r1"
         )
         assert real.read_bytes() == b"a real trained model\n"
         assert [p.name for p in artifacts.iterdir()] == [real.name]
+
+    def test_a_sibling_arm_s_probe_artifact_survives_this_run_s_sweep(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Same collision, one layer down. The sweep used to glob the bare
+        probe name, so a concurrent arm's probe artifact was removed out from
+        under its round trip. Scoping the glob to this run's token fixes it."""
+        artifacts = tmp_path / "artifacts"
+        artifacts.mkdir()
+        sibling = artifacts / f"{preflight.PROBE_ARTIFACT}-armA-0000.tar.gz"
+        sibling.write_bytes(b"arm A is mid-round-trip\n")
+
+        preflight.check_artifact_round_trip(
+            LocalArtifacts(artifacts), tmp_path / "scratch", artifacts, token="armB"
+        )
+
+        assert sibling.read_bytes() == b"arm A is mid-round-trip\n"
+        assert [p.name for p in artifacts.iterdir()] == [sibling.name]
 
     def test_a_store_that_returns_the_wrong_bytes_is_refused(self, tmp_path: pathlib.Path) -> None:
         """A configuration check cannot see this: the store answers, it just
@@ -154,6 +200,7 @@ class TestCheckArtifactRoundTrip:
                 _RefusingStore(tmp_path / "artifacts"),
                 tmp_path / "scratch",
                 tmp_path / "artifacts",
+                token="r1",
             )
         assert excinfo.value.code is ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED
         assert "different bytes" in excinfo.value.message
@@ -173,5 +220,115 @@ class TestCheckArtifactRoundTrip:
         credentials it never uses. That refusal came from the CALLER, which
         could not know what the store required."""
         store = LocalArtifacts(tmp_path / "artifacts")
-        preflight.check_artifact_round_trip(store, tmp_path / "scratch", tmp_path / "artifacts")
+        preflight.check_artifact_round_trip(
+            store, tmp_path / "scratch", tmp_path / "artifacts", token="r1"
+        )
         assert (tmp_path / "artifacts").is_dir()
+
+
+def _stage(corpus_dir: pathlib.Path, body: bytes, *, certified: bool) -> str:
+    """Place a corpus keyed by its true digest, optionally certified.
+
+    Args:
+        corpus_dir: Directory to place it in.
+        body: Corpus bytes.
+        certified: Whether to write a record admitting the digest.
+
+    Returns:
+        The digest the corpus is stored under.
+    """
+    corpus_dir.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256(body).hexdigest()
+    (corpus_dir / digest).write_bytes(body)
+    if certified:
+        (corpus_dir / f"turkic-mi-v3{preflight.CERTIFICATION_SUFFIX}").write_text(
+            f"# certified by the audit gate\n{digest}  oscar_kk_ipa.txt\n",
+            encoding="utf-8",
+        )
+    return digest
+
+
+class TestCheckCorpusCertified:
+    def test_a_staged_certified_corpus_passes(self, tmp_path: pathlib.Path) -> None:
+        digest = _stage(tmp_path / "corpora", b"kynI ospw bojenSa\n", certified=True)
+        preflight.check_corpus_certified(tmp_path / "corpora", digest)
+
+    def test_an_absent_corpus_is_refused(self, tmp_path: pathlib.Path) -> None:
+        corpora = tmp_path / "corpora"
+        corpora.mkdir()
+        with pytest.raises(AppError) as excinfo:
+            preflight.check_corpus_certified(corpora, "0" * 64)
+        assert excinfo.value.code is ModelTrainerErrorCode.CORPUS_EMPTY
+        assert "stage it first" in excinfo.value.message
+
+    def test_a_corpus_whose_bytes_do_not_match_its_name_is_refused(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The corpus is addressed BY digest, and nothing was checking the
+        bytes at that name actually hash to it. A file named after a digest it
+        does not have is indistinguishable from the real one until the
+        results are wrong."""
+        corpora = tmp_path / "corpora"
+        digest = _stage(corpora, b"the real corpus\n", certified=True)
+        (corpora / digest).write_bytes(b"something else entirely\n")
+
+        with pytest.raises(AppError) as excinfo:
+            preflight.check_corpus_certified(corpora, digest)
+
+        assert excinfo.value.code is ModelTrainerErrorCode.CORPUS_EMPTY
+        assert "hash to" in excinfo.value.message
+
+    def test_an_uncertified_corpus_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """The failure this exists for. The corpus hashed correctly to its own
+        name and was still the wrong thing -- raw OSCAR English concatenated
+        with a wiki export, assembled by hand and copied up. It trained to
+        completion twice and reported perplexities for cookie banners."""
+        digest = _stage(tmp_path / "corpora", b"raw scrape, no provenance\n", certified=False)
+
+        with pytest.raises(AppError) as excinfo:
+            preflight.check_corpus_certified(tmp_path / "corpora", digest)
+
+        assert excinfo.value.code is ModelTrainerErrorCode.CORPUS_EMPTY
+        assert "0 record(s) found" in excinfo.value.message
+
+    def test_a_record_naming_other_corpora_does_not_admit_this_one(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A record present is not a record that admits YOU. Staging seven
+        languages certifies seven digests, not the eighth file someone
+        dropped in beside them."""
+        corpora = tmp_path / "corpora"
+        digest = _stage(corpora, b"uncertified newcomer\n", certified=False)
+        (corpora / f"other{preflight.CERTIFICATION_SUFFIX}").write_text(
+            f"{'a' * 64}  oscar_tr_ipa.txt\n{'b' * 64}  oscar_uz_ipa.txt\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            preflight.check_corpus_certified(corpora, digest)
+
+        assert "1 record(s) found, 2 digest(s)" in excinfo.value.message
+
+    def test_digests_are_read_from_every_record_present(self, tmp_path: pathlib.Path) -> None:
+        """The suffix is a suffix, not a fixed name, so a second certification
+        run adds a record rather than overwriting the first."""
+        corpora = tmp_path / "corpora"
+        digest = _stage(corpora, b"certified by the later run\n", certified=False)
+        (corpora / f"first{preflight.CERTIFICATION_SUFFIX}").write_text(
+            f"{'c' * 64}\n", encoding="utf-8"
+        )
+        (corpora / f"second{preflight.CERTIFICATION_SUFFIX}").write_text(
+            f"{digest}\n", encoding="utf-8"
+        )
+
+        preflight.check_corpus_certified(corpora, digest)
+
+    def test_a_corpus_larger_than_one_read_block_hashes_correctly(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Real corpora are ~15 MB and are read in blocks; a digest computed
+        from only the first block would admit a truncated file."""
+        body = b"".join(f"line {i}\n".encode() for i in range(200_000))
+        assert len(body) > 1 << 20
+        digest = _stage(tmp_path / "corpora", body, certified=True)
+        preflight.check_corpus_certified(tmp_path / "corpora", digest)

@@ -130,6 +130,50 @@ def _require_flag(parsed: dict[str, str], flag: str) -> str:
     return value
 
 
+def _payload_run_id(payload: JSONObject) -> str:
+    """Read the run identifier, which every preflight probe is named after.
+
+    Args:
+        payload: The decoded run payload.
+
+    Returns:
+        The ``run_id``.
+
+    Raises:
+        ValueError: If ``run_id`` is absent or not a string. Not defaulted to
+            a constant, and not generated: a constant reintroduces the
+            collision this exists to remove, and a generated one would leave
+            probes nothing can attribute when a run dies mid-check.
+    """
+    run_id = payload.get("run_id")
+    if not isinstance(run_id, str) or not run_id:
+        raise ValueError("payload must carry a non-empty string 'run_id'")
+    return run_id
+
+
+def _payload_corpus_file_id(payload: JSONObject) -> str:
+    """Read the corpus digest a payload asks for.
+
+    Args:
+        payload: The decoded run payload.
+
+    Returns:
+        The requested ``corpus_file_id``.
+
+    Raises:
+        ValueError: If ``request.corpus_file_id`` is absent or not a string.
+            Not defaulted: a run that cannot say which corpus it wants must
+            not be given one.
+    """
+    request = payload.get("request")
+    if not isinstance(request, dict):
+        raise ValueError("payload must carry a 'request' object")
+    file_id = request.get("corpus_file_id")
+    if not isinstance(file_id, str):
+        raise ValueError("payload request must carry a string 'corpus_file_id'")
+    return file_id
+
+
 def _parse(tokens: Sequence[str]) -> dict[str, str]:
     """Parse ``--flag value`` pairs.
 
@@ -192,26 +236,41 @@ def main(argv: Sequence[str] | None = None) -> int:
     # safety check something you take on faith. `setup_logging` clears
     # existing handlers, so the later call inside the job is not a duplicate.
     setup_job_logging(settings)
+
+    # The payload is read BEFORE the preflights, not after, because its run_id
+    # is what makes every probe below unique to this run. Sibling arms share an
+    # output root on a shared filesystem; with a fixed probe name the first
+    # arm's cleanup deletes the second arm's probe, and the second dies on the
+    # check meant to protect it. That happened.
+    raw = load_json_str(payload_path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"{payload_path} must hold a JSON object")
+    payload: JSONObject = raw
+    token = _payload_run_id(payload)
+
     preflight.check_writable(
         {
             "APP__ARTIFACTS_ROOT": Path(settings["app"]["artifacts_root"]),
             "APP__RUNS_ROOT": Path(settings["app"]["runs_root"]),
             "APP__LOGS_ROOT": Path(settings["app"]["logs_root"]),
             "--artifacts-dir": artifacts_dir,
-        }
+        },
+        token=token,
     )
     preflight.check_artifact_round_trip(
         _test_hooks.artifact_store_factory(
             settings["app"]["data_bank_api_url"], settings["app"]["data_bank_api_key"]
         ),
-        artifacts_dir / ".preflight",
+        artifacts_dir / f".preflight-{token}",
         artifacts_dir,
+        token=token,
     )
 
-    raw = load_json_str(payload_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError(f"{payload_path} must hold a JSON object")
-    payload: JSONObject = raw
+    # The input, checked as hard as the outputs above. A corpus is the one
+    # thing a training run cannot recover from getting wrong: everything else
+    # fails loudly, while the wrong corpus trains to completion and reports
+    # perplexities for text nobody meant to model.
+    preflight.check_corpus_certified(corpus_dir, _payload_corpus_file_id(payload))
 
     _log.info(
         "cluster training start",

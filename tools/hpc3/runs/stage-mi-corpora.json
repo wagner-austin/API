@@ -1,0 +1,54 @@
+{
+  "destination": "/pub/wagnera3/mi/corpora",
+  "provenance": {
+    "corpus": "Turkic MI corpora v3",
+    "source_tree": "~/PROJECTS/LSTM/rebuild_2026-08/corpora_clean_v3",
+    "source_repo_commit": "7ed90b7",
+    "upstream_text": "OSCAR, sourced via turkic-api (streams OSCAR/Wikipedia/CulturaX)",
+    "language_id": "FastText lid218e.bin",
+    "transliteration": "deterministic rules, turkic_translit (src/turkic_translit/rules/*.rules)",
+    "cleaner": "turkic_translit.corpus.clean via turkic-clean-corpus",
+    "clean_params": "min_ipa_ratio=0.95 min_line_chars=30 equalized_char_budget=11658775 budget_language=uz",
+    "cleaning_manifest_written": "2026-08-15T00:28",
+    "gate": "LSTM/analysis/rebuild-2026-08/audit_rebuild.py exit 0 on 2026-08-25: 'audit clean: corpora and snippets carry only what the rules emit'",
+    "independent_check": "character counts verified against cleaning_manifest.json chars_written, all 7 languages exact",
+    "supersedes": "/pub/wagnera3/abl/corpora/4c91fbc1... which was raw oscar_en.txt mixed with a wiki export, never language-ID filtered and never transliterated"
+  },
+  "files": [
+    {
+      "name": "oscar_az_ipa.txt",
+      "sha256": "e3dbdaa758d2b3db97012ebde1c78ac1b07335edc659d76e7dd345a1ed0fb33e",
+      "size_bytes": 14738481
+    },
+    {
+      "name": "oscar_fi_ipa.txt",
+      "sha256": "dff6e3e4aed891c721d48a17858b3c3f6734f7ea352d249d887a0b46a0d5aaff",
+      "size_bytes": 14275783
+    },
+    {
+      "name": "oscar_kk_ipa.txt",
+      "sha256": "90f484f2ece7cae97b87d62bcdbfe82851ae72c18b51574634a65af661b91748",
+      "size_bytes": 15294526
+    },
+    {
+      "name": "oscar_ky_ipa.txt",
+      "sha256": "2bfc012b9135940bae1521dacf32fa9e0e78b0ef4567fd85bffa3e0e613ed890",
+      "size_bytes": 14816815
+    },
+    {
+      "name": "oscar_tr_ipa.txt",
+      "sha256": "19049664c3dd7cdeb875c1de0882fd6ff8a69baff9cd44fe82fffd3449da69ff",
+      "size_bytes": 13978998
+    },
+    {
+      "name": "oscar_ug_ipa.txt",
+      "sha256": "63cd9a8dda95952c2adc74c54cd5bbeb6add18852ca5be1260c025b558fddc93",
+      "size_bytes": 14491824
+    },
+    {
+      "name": "oscar_uz_ipa.txt",
+      "sha256": "35d3d502ffdefa5b18f2e7d19445c7b3b865931faade5dfa77746066ba041255",
+      "size_bytes": 13096424
+    }
+  ]
+}

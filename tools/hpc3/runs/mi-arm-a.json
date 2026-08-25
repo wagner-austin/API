@@ -1,0 +1,30 @@
+{
+  "run_id": "mi-kk-armA-nosplit-seed42",
+  "user_id": 1,
+  "request": {
+    "model_family": "hf_lm",
+    "model_size": "small",
+    "hub_model_id": "gpt2",
+    "finetuning_strategy": "full",
+    "max_seq_len": 512,
+    "num_epochs": 20,
+    "batch_size": 8,
+    "learning_rate": 5e-05,
+    "tokenizer_id": null,
+    "corpus_file_id": "90f484f2ece7cae97b87d62bcdbfe82851ae72c18b51574634a65af661b91748",
+    "seed": 42,
+    "pretrained_run_id": null,
+    "freeze_embed": false,
+    "gradient_clipping": 1.0,
+    "optimizer": "adamw",
+    "device": "cuda",
+    "precision": "bf16",
+    "early_stopping_patience": 5,
+    "finetune_lr_cap": 5e-05,
+    "loss_mask_prefix_separator": null,
+    "user_id": 1,
+    "holdout_fraction": 0.0,
+    "test_split_ratio": 0.0
+  },
+  "resume": false
+}

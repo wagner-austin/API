@@ -1,0 +1,28 @@
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "budget": {
+    "max_gpu_hours": 12.0,
+    "max_service_units": 0.0
+  },
+  "projects": {
+    "mi": {
+      "partition": "free-gpu",
+      "gpu": { "model": "A100", "count": 1 },
+      "cpus": 8,
+      "mem_gb": 64,
+      "minutes": 240,
+      "requeue": true,
+      "checkpoint_steps": 500,
+      "env_path": "/pub/wagnera3/envs/abl-pinned",
+      "pinned_packages": {
+        "torch": "2.6.0+cu124",
+        "transformers": "4.46.3"
+      },
+      "deterministic": true
+    }
+  }
+}

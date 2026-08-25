@@ -109,6 +109,36 @@ class TestLocalArtifacts:
         store.upload_artifact(self._run_dir(tmp_path), artifact_name="run-abc", request_id="r1")
         assert list((tmp_path / "artifacts").glob("*.partial")) == []
 
+    def test_two_uploads_of_one_name_do_not_share_a_staging_file(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The staging name must not be derived from artifact_name.
+
+        Deriving it makes uniqueness the CALLER's property: two runs handed
+        the same name write the same .partial and one tars into the other's
+        file. The preflight round-trip was exactly such a caller -- it passed
+        a constant -- and the collision killed an arm of the Kazakh A/B.
+
+        Interleaved on purpose. Both uploads are in flight against one
+        directory under one name; with a caller-derived staging path the
+        second would land on the first's file.
+        """
+        artifacts = tmp_path / "artifacts"
+        store = LocalArtifacts(artifacts)
+        first = tmp_path / "first"
+        second = tmp_path / "second"
+        first.mkdir()
+        second.mkdir()
+        (first / "w.txt").write_bytes(b"first run output\n")
+        (second / "w.txt").write_bytes(b"second run output\n")
+
+        a = store.upload_artifact(first, artifact_name="same-name", request_id="r1")
+        b = store.upload_artifact(second, artifact_name="same-name", request_id="r2")
+
+        assert a["file_id"] != b["file_id"]
+        assert list(artifacts.glob("*.partial")) == []
+        assert len(list(artifacts.glob("same-name-*.tar.gz"))) == 2
+
     def test_the_reported_digest_is_of_the_bytes_on_disk(self, tmp_path: pathlib.Path) -> None:
         """Computed from the written file rather than reported from memory,
         so the value a run records is a fact about the artifact and is

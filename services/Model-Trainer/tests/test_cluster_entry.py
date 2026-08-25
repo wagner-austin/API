@@ -21,9 +21,17 @@ from platform_core.json_utils import JSONObject, dump_json_str
 
 from model_trainer.cluster import _test_hooks as cluster_hooks
 from model_trainer.cluster import entry as cluster_entry
+from model_trainer.cluster import preflight
 from model_trainer.core import _test_hooks
 
-_PAYLOAD: JSONObject = {"run_id": "abl-armB-s42", "user_id": 1, "request": {"seed": 42}}
+_CORPUS_BODY = b"kynI ospw bojenSa qojelGan surAqtar\n"
+_CORPUS_ID = hashlib.sha256(_CORPUS_BODY).hexdigest()
+
+_PAYLOAD: JSONObject = {
+    "run_id": "abl-armB-s42",
+    "user_id": 1,
+    "request": {"seed": 42, "corpus_file_id": _CORPUS_ID},
+}
 
 
 def _restore_module_globals() -> Generator[None, None, None]:
@@ -75,6 +83,13 @@ def _args(tmp_path: pathlib.Path, payload: JSONObject | None = None) -> list[str
     """
     path = tmp_path / "payload.json"
     path.write_text(dump_json_str(_PAYLOAD if payload is None else payload), encoding="utf-8")
+    # A certified corpus, because main() now refuses to train without one.
+    corpora = tmp_path / "corpora"
+    corpora.mkdir(parents=True, exist_ok=True)
+    (corpora / _CORPUS_ID).write_bytes(_CORPUS_BODY)
+    (corpora / f"turkic-mi-v3{preflight.CERTIFICATION_SUFFIX}").write_text(
+        f"{_CORPUS_ID}  oscar_kk_ipa.txt\n", encoding="utf-8"
+    )
     return [
         cluster_entry.PAYLOAD_FLAG,
         str(path),
@@ -253,6 +268,34 @@ class TestMain:
         # Written AFTER _args, which writes a valid payload to the same path.
         (tmp_path / "payload.json").write_text("[1, 2, 3]", encoding="utf-8")
         with pytest.raises(ValueError, match="must hold a JSON object"):
+            cluster_entry.main(args)
+
+    def test_a_payload_with_no_run_id_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """The run_id names every preflight probe. Without one there is no
+        unique name, and a shared name is what killed a sibling arm."""
+        args = _args(tmp_path, {"user_id": 1, "request": {"corpus_file_id": _CORPUS_ID}})
+        with pytest.raises(ValueError, match="non-empty string 'run_id'"):
+            cluster_entry.main(args)
+
+    def test_an_empty_run_id_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """Empty is worse than absent: it produces a probe named for nothing,
+        which collides with every other empty-id run in the same root."""
+        args = _args(
+            tmp_path, {"run_id": "", "user_id": 1, "request": {"corpus_file_id": _CORPUS_ID}}
+        )
+        with pytest.raises(ValueError, match="non-empty string 'run_id'"):
+            cluster_entry.main(args)
+
+    def test_a_payload_with_no_request_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """No request means no corpus can be named, so no corpus can be
+        checked. Defaulting one would train on whatever happened to be there."""
+        args = _args(tmp_path, {"run_id": "r", "user_id": 1})
+        with pytest.raises(ValueError, match="must carry a 'request' object"):
+            cluster_entry.main(args)
+
+    def test_a_request_with_no_corpus_file_id_is_refused(self, tmp_path: pathlib.Path) -> None:
+        args = _args(tmp_path, {"run_id": "r", "user_id": 1, "request": {"seed": 42}})
+        with pytest.raises(ValueError, match="string 'corpus_file_id'"):
             cluster_entry.main(args)
 
 

@@ -1,0 +1,50 @@
+{
+  "destination": "/pub/wagnera3/mi/perception",
+  "provenance": {
+    "corpus": "Turkic MI perception snippets v3",
+    "purpose": "zero-shot cross-entropy evaluation targets; the text each language's model is scored against",
+    "source_tree": "~/PROJECTS/LSTM/rebuild_2026-08/perception_v3",
+    "source_repo_commit": "7ed90b7",
+    "produced_by": "Moldir Baidildinova (human perception study)",
+    "transliteration": "deterministic rules, turkic_translit",
+    "gate": "LSTM/analysis/rebuild-2026-08/audit_rebuild.py exit 0 on 2026-08-25, snippets included in the audit",
+    "note": "held out of training entirely; these are evaluation targets, never corpus"
+  },
+  "files": [
+    {
+      "name": "perception_az.txt",
+      "sha256": "09180d7d1eadcc3cdd86acd01e1f9ebec2e84d2a89bfe09c004ff861995026cf",
+      "size_bytes": 6409
+    },
+    {
+      "name": "perception_fi.txt",
+      "sha256": "0c65562a7c2666dd68415d66bc9e766bf142c3e81ce7f6c4dc868f245edf9a4e",
+      "size_bytes": 5580
+    },
+    {
+      "name": "perception_kk.txt",
+      "sha256": "c5a41ed18dfacae2200b37f988b6e3b23100f1f011b9cbc7938222c8a3a7a148",
+      "size_bytes": 6652
+    },
+    {
+      "name": "perception_ky.txt",
+      "sha256": "7db3b5815f4cc270420eb9f655d0ca3303dc643ef369bad08d24a156f219112d",
+      "size_bytes": 6618
+    },
+    {
+      "name": "perception_tr.txt",
+      "sha256": "e9f3eed6fcafad81da3f912f604ad7cf96600c8e601ec3e2c7b4d4c4c98d2276",
+      "size_bytes": 6192
+    },
+    {
+      "name": "perception_ug.txt",
+      "sha256": "8f08462266712866b2f1032b42fd15a175cc191c1b95f0f041b25e6209873208",
+      "size_bytes": 7041
+    },
+    {
+      "name": "perception_uz.txt",
+      "sha256": "edd0b90e6f88b5644f4203ac963b9d5a863625db255586abe0bb54d9744ac078",
+      "size_bytes": 5599
+    }
+  ]
+}

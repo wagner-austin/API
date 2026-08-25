@@ -1,0 +1,15 @@
+{
+  "project": "mi",
+  "name": "mi-kk-armA-nosplit",
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 APP__DATA_ROOT=/pub/wagnera3/mi/data APP__ARTIFACTS_ROOT=/pub/wagnera3/mi/data/artifacts APP__RUNS_ROOT=/pub/wagnera3/mi/data/runs APP__LOGS_ROOT=/pub/wagnera3/mi/data/logs modeltrainer-cluster-train --payload /pub/wagnera3/mi/payloads/mi-arm-a.json --corpus-dir /pub/wagnera3/mi/train-corpora --artifacts-dir /pub/wagnera3/mi/artifacts",
+  "experiment": {
+    "arm": "A-nosplit",
+    "seed": "42",
+    "base_model": "gpt2",
+    "language": "kk",
+    "corpus": "90f484f2",
+    "corpus_version": "turkic-mi-v3",
+    "holdout": "0.0",
+    "test_split": "0.0"
+  }
+}
