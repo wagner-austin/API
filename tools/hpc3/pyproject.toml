@@ -29,6 +29,7 @@ pytest-xdist = "^3.6.1"
 [tool.poetry.scripts]
 hpc3-cancel = "hpc3.cli.cancel:entrypoint"
 hpc3-chain = "hpc3.cli.chain:entrypoint"
+hpc3-image = "hpc3.cli.image:entrypoint"
 hpc3-preflight = "hpc3.cli.preflight:entrypoint"
 hpc3-stage = "hpc3.cli.stage:entrypoint"
 hpc3-submit = "hpc3.cli.submit:entrypoint"

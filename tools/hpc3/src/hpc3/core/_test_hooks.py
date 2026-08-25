@@ -154,21 +154,54 @@ def _default_file_exists(path: pathlib.Path) -> bool:
     return path.is_file()
 
 
+def _default_write_text(path: pathlib.Path, text: str) -> None:
+    """Write text to a file, replacing any existing contents.
+
+    Written with an explicit LF newline. A rendered definition or shell
+    script authored on Windows and translated to CRLF makes the cluster's
+    kernel report the interpreter as missing, which reads as a broken image
+    rather than a line-ending problem.
+
+    Args:
+        path: File to write. Its parent must already exist; creating it
+            silently here would let a typo in a destination produce a
+            plausible-looking tree in the wrong place.
+        text: Complete file contents, including its own trailing newline.
+    """
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
+def _default_make_dir(path: pathlib.Path) -> None:
+    """Create a directory and any missing parents.
+
+    Args:
+        path: Directory to create. Existing is not an error: rendering the
+            same build twice is an ordinary act, and the files inside are
+            replaced rather than merged.
+    """
+    path.mkdir(parents=True, exist_ok=True)
+
+
 run: RunProtocol = _default_run
 log_event: LogEventProtocol = _default_log_event
 read_bytes: Callable[[pathlib.Path], bytes] = _default_read_bytes
 append_text: Callable[[pathlib.Path, str], None] = _default_append_text
 file_exists: Callable[[pathlib.Path], bool] = _default_file_exists
+write_text: Callable[[pathlib.Path, str], None] = _default_write_text
+make_dir: Callable[[pathlib.Path], None] = _default_make_dir
 
 
 def reset_hooks() -> None:
     """Rebind every hook to its production implementation."""
-    global run, log_event, read_bytes, append_text, file_exists
+    global run, log_event, read_bytes, append_text, file_exists, write_text, make_dir
     run = _default_run
     log_event = _default_log_event
     read_bytes = _default_read_bytes
     append_text = _default_append_text
     file_exists = _default_file_exists
+    write_text = _default_write_text
+    make_dir = _default_make_dir
 
 
 __all__ = [
@@ -178,7 +211,9 @@ __all__ = [
     "append_text",
     "file_exists",
     "log_event",
+    "make_dir",
     "read_bytes",
     "reset_hooks",
     "run",
+    "write_text",
 ]
