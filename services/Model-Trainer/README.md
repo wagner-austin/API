@@ -348,6 +348,40 @@ lives finds the wrong one as readily as none.
 The payload is the same shape the queue carries:
 `{"run_id": ..., "user_id": ..., "request": {...}, "resume": false}`.
 
+### Scoring an untrained baseline on a node
+
+`modeltrainer-score-baseline` is the same idea for the other measurement a
+cluster needs: what an UNTRAINED model scores on an item set. That number is
+the floor every arm's accuracy is read as lift over, and
+`POST /runs/baselines/cloze` can only produce it where an API, Redis and an
+RQ worker are running.
+
+```bash
+modeltrainer-score-baseline \
+    --model        gpt2 \
+    --items        /pub/<user>/abl/items.jsonl \
+    --device       cuda \
+    --max-seq-len  512 \
+    --experiment   wiki-corpus-extraction-ablation \
+    --label        gpt2-floor-a100 \
+    --out          /pub/<user>/abl/records/gpt2-floor-a100.json
+```
+
+The item set is a **path**, not a data-bank file id: a compute node has no
+data-bank, so the job stages the file. The parser, the scorer and the
+determinism pin are the same code the worker calls.
+
+It writes a `platform_core.run_record.RunRecord` — the accuracy, chance,
+correct and total as named observations, the fingerprint that produced them
+(image digest, card, driver, determinism), and a sha256 of the per-item
+outcomes. The digest is what catches two runs agreeing on an accuracy while
+disagreeing on which items they got right.
+
+Running in-process also avoids a failure the queue path has: the worker runs
+two RQ workers, so two scoring jobs enqueued together contend for one GPU.
+That is what killed the first re-score of the gpt2 floor, with an illegal
+CUDA memory access. Score baselines one at a time, or score them here.
+
 ### Installing into a cluster environment
 
 Build wheels locally and install them with `--no-deps`, rather than copying
