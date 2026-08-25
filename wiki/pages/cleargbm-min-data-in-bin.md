@@ -78,6 +78,18 @@ and the dial initially reached only the first — the end-to-end smoke
 caught the silent drop, and a strategy-layer test now pins the path
 that runs in production.
 
+Farm rung 4 (the rung-3 grid with the dial in the space, 320 trials, 0
+failures): three of four datasets improved at the same 20-trial budget
+— taiwan 0.9557→0.9603, us 0.8438→**0.8495** (the best us number
+across every rung, old binning included), polish 0.9622→0.9646, kaggle
+flat — and the rung-4b deterministic replay proves EVERY winner
+sampled a floor (taiwan/us/polish denom 64, kaggle 256). Rung 4 also
+surfaced and root-fixed a stale-install hazard: the cluster's
+installed radar package predated the farm-filename fix (per-member
+optimal-configs overwrote last-writer-wins while logs stayed
+authoritative); the package is now installed editable, so a git pull
+suffices forever after.
+
 ## Gates
 
 cleargbm_rs full gate (100.00% segment coverage), cleargbm 257 tests

@@ -1,0 +1,110 @@
+host      hpc3-20-05
+job       55571124
+restart   0
+gpu       cpu-only
+2026-08-25T01:31:18-07:00
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Hyperparameter Optimization                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+                               Run Configuration                                
+┌────────────────┬────────────┬────────────────────────────────────────────────┐
+│ Backend        │ ClearGBM   │ ML model backend                               │
+│ Dataset        │ TAIWAN     │ External bankruptcy dataset                    │
+│ Trials         │ 20         │ Optuna TPE Bayesian optimization trials        │
+│ Feature Preset │ full       │ Original + log + ratios + products (max ~800   │
+│                │            │ features)                                      │
+│ Device         │ CPU        │ GPU (CUDA) or CPU                              │
+│ Optimizer      │ Optuna TPE │ Tree-structured Parzen Estimator               │
+│ Metric         │ AUC-ROC    │ Area under ROC curve (validation set)          │
+└────────────────┴────────────┴────────────────────────────────────────────────┘
+
+INFO     Applied feature engineering for ClearGBM                               
+INFO     Starting Optuna TPE optimization                                       
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Auto-calculated scale_pos_weight for ClearGBM                          
+INFO     Trial complete                                                         
+INFO     Optuna TPE optimization complete                                       
+  1m 32s Saving results... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100%
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OPTIMIZATION COMPLETE                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+                Optimization Results                
+┌────────────────┬─────────────────────────────────┐
+│ Backend        │ ClearGBM                        │
+│ Dataset        │ TAIWAN                          │
+│ Feature Preset │ full                            │
+│ Samples        │ 6,819                           │
+│ Features       │ 880                             │
+│ Best AUC       │  0.9436                         │
+│ Best Trial     │ #5                              │
+│ Trials         │ 20 complete, 0 pruned, 0 failed │
+│ Time           │ 93.0s                           │
+└────────────────┴─────────────────────────────────┘
+
+Best Hyperparameters (ClearGBM) 
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Parameter         ┃    Value ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ max_depth         │        4 │
+│ n_estimators      │      243 │
+│ min_samples_split │        5 │
+│ min_samples_leaf  │       17 │
+│ max_bins          │      128 │
+│ learning_rate     │ 0.030816 │
+│ subsample         │ 0.625423 │
+└───────────────────┴──────────┘
+
+                Run Comparison                
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━┓
+┃ Metric          ┃    AUC ┃     Delta ┃ Run ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━┩
+│ Current Run     │ 0.9436 │           │ now │
+│ Previous Best   │    N/A │ first run │     │
+│ All-Time Best ★ │ 0.9436 │       NEW │ now │
+└─────────────────┴────────┴───────────┴─────┘
+
+ ★ NEW BEST AUC: 0.9436 ★ 
+
+2026-08-25T01:32:54-07:00
+exit      0

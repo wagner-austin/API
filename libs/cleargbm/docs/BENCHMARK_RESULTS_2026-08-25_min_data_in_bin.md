@@ -101,6 +101,46 @@ the existing sample-then-extract round-trip. The end-to-end smoke
 (radar `scripts.optimize`, 5 trials) confirms the record carries the
 sampled divisor.
 
+## Rung 4: the tuner uses the dial on the farm
+
+The rung-1/rung-3 grid (4 datasets x 4 presets, 20 Optuna TPE trials
+each) re-ran on HPC3 with the dial in the search space — 320 trials,
+0 pruned, 0 failed. Best validation AUC per dataset, against rung 3
+(same binning, no dial):
+
+| dataset | rung 3 best | rung 4 best | delta |
+|---|---|---|---|
+| taiwan | 0.9557 | **0.9603** (ratios_only) | +0.0046 |
+| us | 0.8438 | **0.8495** (full) | +0.0057 |
+| polish | 0.9622 | **0.9646** (none / log_only) | +0.0024 |
+| kaggle_give_me_credit | 0.8701 | 0.8695 (log_only) | -0.0006 |
+
+Three of four datasets improved with the dial in the space at the same
+20-trial budget; us's 0.8495 is the best us number across every rung,
+including old-binning rung 1's 0.8457. kaggle is statistically flat.
+
+**Every winner chose a floor.** The rung-4b replay (the four winning
+members re-run under the fixed per-member filenames; per-config
+determinism reproduced each best AUC to the last digit) records the
+sampled divisor: taiwan, us and polish all tuned to
+`min_data_in_bin_denom = 64` (floors of roughly n_train/64: ~74, ~860
+and ~76 rows respectively) and kaggle to 256. The improvements are the
+dial, not sampler-trajectory luck — on every corpus tested, deliberate
+binning coarseness is a quality axis the tuner exploits.
+
+Landing the farm rung surfaced one more infrastructure defect, fixed
+at the root: the cluster env's INSTALLED covenant-radar-api package
+was still the bootstrap build, predating the farm-filename fix — so
+`scripts/` (resolved from the fresh clone's working directory) wrote
+per-job-suffixed history files while `save_optimization_results`
+(imported from the stale installed package) overwrote one unsuffixed
+optimal-config per dataset, last-writer-wins. Per-job logs are
+authoritative by design, so no rung result was lost, but the winners'
+sampled dial values were — recovered by replaying the four winning
+members under the fix (per-config determinism reproduces their exact
+trials). The radar package on the cluster is now installed EDITABLE,
+so a `git pull` is sufficient forever after.
+
 ## Gates at landing
 
 - cleargbm_rs: full gate green, 100.00% segment coverage (1,680

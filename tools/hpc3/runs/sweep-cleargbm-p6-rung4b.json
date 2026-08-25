@@ -1,0 +1,29 @@
+{
+  "project": "cleargbm",
+  "name": "p6-rung4b",
+  "experiment": {
+    "phase": "P6",
+    "goal": "replay-winners-capture-dial-choice",
+    "trials": "20",
+    "compare_to": "p6-rung4",
+    "repo_commit": "80221ea"
+  },
+  "members": [
+    {
+      "suffix": "taiwan-ratios-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d taiwan -n 20 -f ratios_only --device cpu --no-save-model"
+    },
+    {
+      "suffix": "polish-none",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d polish -n 20 -f none --device cpu --no-save-model"
+    },
+    {
+      "suffix": "us-full",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d us -n 20 -f full --device cpu --no-save-model"
+    },
+    {
+      "suffix": "kaggle-give-me-credit-log-only",
+      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d kaggle_give_me_credit -n 20 -f log_only --device cpu --no-save-model"
+    }
+  ]
+}
