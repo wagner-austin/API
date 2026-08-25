@@ -188,7 +188,10 @@ def test_set_cublas_workspace_returns_what_it_wrote() -> None:
     assert env.values[CUBLAS_WORKSPACE_ENV_VAR] == CUBLAS_DETERMINISTIC_WORKSPACE
 
 
-def test_encode_renders_both_boolean_spellings() -> None:
+def test_encode_carries_every_field_at_its_own_type() -> None:
+    # Native JSON types, not rendered strings. The report is persisted and
+    # read back by decode_determinism_report, so a bool that left as "true"
+    # would round-trip only if reader and writer agreed on the spelling.
     encoded = encode_determinism_report(
         DeterminismReport(
             deterministic_algorithms=True,
@@ -201,12 +204,12 @@ def test_encode_renders_both_boolean_spellings() -> None:
     )
 
     assert encoded == {
-        "deterministic_algorithms": "true",
+        "deterministic_algorithms": True,
         "cublas_workspace_config": CUBLAS_DETERMINISTIC_WORKSPACE,
-        "matmul_tf32": "false",
-        "cudnn_tf32": "false",
-        "cudnn_deterministic": "true",
-        "cudnn_benchmark": "false",
+        "matmul_tf32": False,
+        "cudnn_tf32": False,
+        "cudnn_deterministic": True,
+        "cudnn_benchmark": False,
     }
 
 

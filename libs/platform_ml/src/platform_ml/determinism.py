@@ -57,6 +57,13 @@ from platform_core.determinism_env import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
 )
+from platform_core.json_utils import (
+    JSONObject,
+    JSONValue,
+    narrow_json_to_dict,
+    require_bool,
+    require_str,
+)
 
 
 class DeterminismReport(TypedDict):
@@ -205,34 +212,54 @@ def apply_determinism(
     )
 
 
-def encode_determinism_report(report: DeterminismReport) -> dict[str, str]:
-    """Render a report as flat string pairs for a log line or a manifest.
+def encode_determinism_report(report: DeterminismReport) -> JSONObject:
+    """Encode a report for a run record or a structured log field.
 
-    Strings rather than mixed types because the destinations are a structured
-    log record and a provenance block, both of which are string-valued, and a
-    bool rendered by two different call sites as ``True`` and ``true`` is a
-    difference that will eventually be compared.
+    Native JSON types rather than rendered strings, so the value round-trips
+    through :func:`decode_determinism_report` without a parsing step that
+    could disagree with the writer about how a bool is spelled.
 
     Args:
-        report: The report to render.
+        report: The report to encode.
 
     Returns:
-        A mapping with one entry per field, booleans as ``"true"`` /
-        ``"false"``.
+        A JSON object with one entry per field.
     """
     return {
-        "deterministic_algorithms": _render_bool(report["deterministic_algorithms"]),
+        "deterministic_algorithms": report["deterministic_algorithms"],
         "cublas_workspace_config": report["cublas_workspace_config"],
-        "matmul_tf32": _render_bool(report["matmul_tf32"]),
-        "cudnn_tf32": _render_bool(report["cudnn_tf32"]),
-        "cudnn_deterministic": _render_bool(report["cudnn_deterministic"]),
-        "cudnn_benchmark": _render_bool(report["cudnn_benchmark"]),
+        "matmul_tf32": report["matmul_tf32"],
+        "cudnn_tf32": report["cudnn_tf32"],
+        "cudnn_deterministic": report["cudnn_deterministic"],
+        "cudnn_benchmark": report["cudnn_benchmark"],
     }
 
 
-def _render_bool(value: bool) -> str:
-    """Render a bool in the one spelling this module emits."""
-    return "true" if value else "false"
+def decode_determinism_report(value: JSONValue) -> DeterminismReport:
+    """Validate a JSON value as a determinism report.
+
+    Args:
+        value: The value to validate, typically from a stored run record.
+
+    Returns:
+        The validated report.
+
+    Raises:
+        JSONTypeError: When ``value`` is not an object, or any field is
+            absent or of the wrong type. Every field is required: a report
+            missing one describes a run whose determinism is partly unknown,
+            which is indistinguishable from a run that was never pinned and
+            must not decode into one that looks pinned.
+    """
+    obj = narrow_json_to_dict(value)
+    return DeterminismReport(
+        deterministic_algorithms=require_bool(obj, "deterministic_algorithms"),
+        cublas_workspace_config=require_str(obj, "cublas_workspace_config"),
+        matmul_tf32=require_bool(obj, "matmul_tf32"),
+        cudnn_tf32=require_bool(obj, "cudnn_tf32"),
+        cudnn_deterministic=require_bool(obj, "cudnn_deterministic"),
+        cudnn_benchmark=require_bool(obj, "cudnn_benchmark"),
+    )
 
 
 __all__ = [
@@ -244,6 +271,7 @@ __all__ = [
     "SetDeterministicAlgorithmsProtocol",
     "SetEnvProtocol",
     "apply_determinism",
+    "decode_determinism_report",
     "encode_determinism_report",
     "set_cublas_workspace",
 ]
