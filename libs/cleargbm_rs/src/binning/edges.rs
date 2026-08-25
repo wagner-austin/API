@@ -1,7 +1,29 @@
 //! Bin edge computation for feature discretization.
 //!
-//! Computes quantile-based bin edges for each feature, converting continuous
+//! Computes count-aware bin edges for each feature, converting continuous
 //! values into discrete bins for histogram-based split finding.
+//!
+//! The algorithm works on (distinct value, count) pairs, following the
+//! shipped semantics of LightGBM's `GreedyFindBin` (src/io/bin.cpp, archived
+//! in the tech-wiki as `lightgbm-bin-cpp.html`) with `min_data_in_bin`
+//! fixed at 1 — no such knob exists in ClearGBM's config:
+//!
+//! - When a feature has at most `max_bins` distinct values, EVERY distinct
+//!   value gets its own bin (edges at midpoints between neighbours).
+//! - Otherwise, bins are formed greedily to equal sample counts, with any
+//!   single value heavier than the mean bin size taking a bin of its own
+//!   and the remaining budget re-spread over the rest.
+//!
+//! This replaced a quantile-of-multiset rule (edges at quantile positions of
+//! the sorted value array, deduplicated) on 2026-08-24: on zero-inflated
+//! features that rule collapsed thousands of distinct values into a handful
+//! of bins — weather_tmax's `hot_excess` (2,359 distinct values) got SIX
+//! bins because ~95% of days have zero excess and every quantile position
+//! landed on the zero — and on low-cardinality features it merged distinct
+//! values even when bins were free (41 species into 36 bins at 64 budget).
+//! Divergences from the shipped code, both deliberate: no `min_data_in_bin`
+//! knob (fixed 1), and the running mean is not refreshed once the rest-bin
+//! budget hits zero (the shipped code divides by zero there).
 
 use crate::error::ClearGbmError;
 
@@ -69,34 +91,36 @@ impl BinEdges {
     }
 }
 
-/// Computes `floor(a * b / c)` without usize overflow, given `a < c`.
+/// Converts a sample count to f64, saturating at `u32::MAX`.
 ///
-/// Uses the identity `a*b/c = a*(b/c) + a*(b%c)/c` when `a*b` would overflow.
-/// The fallback requires `a < c` and `c² ≤ usize::MAX` (guaranteed when
-/// `max_bins ≤ u32::MAX` on 64-bit targets).
+/// Counts are bounded by the row count; datasets beyond `u32::MAX` rows
+/// are outside every supported scale, so saturation is unreachable in
+/// practice. The idiom matches the loss modules' count conversions.
+fn count_to_f64(v: usize) -> f64 {
+    f64::from(u32::try_from(v).unwrap_or(u32::MAX))
+}
+
+/// Picks the bin edge between two adjacent distinct values.
 ///
-/// # Args
-///
-/// * `a` - Numerator factor, must be < `c`.
-/// * `b` - Numerator factor.
-/// * `c` - Denominator, must be > 0.
-pub(crate) fn quantile_position(a: usize, b: usize, c: usize) -> usize {
-    match a.checked_mul(b) {
-        Some(product) => product / c,
-        None => {
-            // a * b overflows usize. Split using: a*b/c = a*(b/c) + a*(b%c)/c.
-            // Safe because a < c guarantees:
-            //   a*(b/c) < c*(b/c) ≤ b (fits in usize)
-            //   a*(b%c) < c*c = c² (fits when c ≤ u32::MAX on 64-bit)
-            a * (b / c) + a * (b % c) / c
-        }
+/// The midpoint, unless floating-point rounding lands it on `b` (possible
+/// for adjacent doubles), in which case the edge sits on `a`. Either way
+/// `a <= edge < b`, so under the `value <= edge` bin rule `a` always
+/// routes left and `b` always routes right.
+fn midpoint_edge(a: f64, b: f64) -> f64 {
+    let m = a * 0.5_f64 + b * 0.5_f64;
+    if m >= b {
+        a
+    } else {
+        m
     }
 }
 
-/// Computes quantile-based bin edges for each feature.
+/// Computes count-aware bin edges for each feature.
 ///
-/// For each feature column, collects non-NaN values, sorts them, and picks
-/// up to `max_bins - 1` quantile thresholds. Duplicate edges are removed.
+/// For each feature column, collects non-NaN values, folds them into
+/// (distinct value, count) pairs, and picks up to `max_bins - 1` edges —
+/// one bin per distinct value when they fit the budget, greedy
+/// equal-count bins otherwise. See the module docs for the algorithm.
 ///
 /// # Args
 ///
@@ -119,7 +143,7 @@ pub fn compute_bin_edges(x: &[&[f64]], max_bins: usize) -> Result<Vec<BinEdges>,
             reason: "must be >= 2".to_string(),
         });
     }
-    // Validate max_bins fits in u32 to guarantee overflow safety in quantile_position.
+    // Validate max_bins fits in u32 so count_to_f64 conversions stay exact.
     let _ = match u32::try_from(max_bins) {
         Ok(v) => v,
         Err(_) => {
@@ -158,11 +182,12 @@ pub fn compute_bin_edges(x: &[&[f64]], max_bins: usize) -> Result<Vec<BinEdges>,
     Ok(result)
 }
 
-/// Computes the quantile bin edges for one feature column.
+/// Computes the count-aware bin edges for one feature column.
 ///
 /// The per-feature body of [`compute_bin_edges`], extracted so mixed
 /// numeric/categorical binning can compute numeric edges only for the
-/// features that need them. Byte-identical to the pre-extraction loop.
+/// features that need them. See the module docs for the algorithm and
+/// its provenance.
 ///
 /// # Args
 ///
@@ -174,8 +199,6 @@ pub fn compute_bin_edges(x: &[&[f64]], max_bins: usize) -> Result<Vec<BinEdges>,
 ///
 /// The feature's `BinEdges` (empty for all-NaN or single-valued columns).
 pub(super) fn compute_feature_edges(x: &[&[f64]], feat_idx: usize, max_bins: usize) -> BinEdges {
-    let n_edges = max_bins - 1_usize;
-
     // Collect non-NaN values for this feature
     let mut valid_values: Vec<f64> = Vec::new();
     for row in x {
@@ -194,34 +217,131 @@ pub(super) fn compute_feature_edges(x: &[&[f64]], feat_idx: usize, max_bins: usi
     valid_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
     let n_valid = valid_values.len();
 
-    // Single unique value → empty edges
+    // Single unique value (or a range below f64 resolution) → empty edges
     if n_valid == 1_usize
         || (valid_values[0] - valid_values[n_valid - 1_usize]).abs() < f64::EPSILON
     {
         return BinEdges { edges: Vec::new() };
     }
 
-    // Compute quantile edges using integer arithmetic.
-    // pos = floor(edge_idx / max_bins * (n_valid - 1))
-    // Equivalent to: edge_idx * (n_valid - 1) / max_bins (integer division).
-    let n_valid_minus_one = n_valid - 1_usize;
-    let mut edges_vec: Vec<f64> = Vec::new();
-
-    for edge_idx in 1_usize..=n_edges {
-        let pos = quantile_position(edge_idx, n_valid_minus_one, max_bins);
-        let edge_value = valid_values[pos];
-
-        // Deduplicate: only add if strictly greater than last edge
-        let should_add = match edges_vec.last() {
-            Some(&last) => edge_value > last,
-            None => true,
-        };
-        if should_add {
-            edges_vec.push(edge_value);
+    // Fold the sorted values into (distinct value, count) pairs. Equal
+    // values are adjacent after the sort, and NaN was already excluded,
+    // so exact equality is the right test.
+    let mut distinct: Vec<f64> = Vec::new();
+    let mut counts: Vec<usize> = Vec::new();
+    for &val in &valid_values {
+        if distinct.last() == Some(&val) {
+            let last_idx = counts.len() - 1_usize;
+            counts[last_idx] += 1_usize;
+        } else {
+            distinct.push(val);
+            counts.push(1_usize);
         }
     }
 
-    BinEdges { edges: edges_vec }
+    if distinct.len() <= max_bins {
+        return BinEdges {
+            edges: per_value_edges(&distinct),
+        };
+    }
+    BinEdges {
+        edges: greedy_edges(&distinct, &counts, n_valid, max_bins),
+    }
+}
+
+/// One bin per distinct value: edges at the midpoints between neighbours.
+///
+/// The exact-resolution case — the feature has no more distinct values
+/// than the bin budget, so no two distinct values ever share a bin.
+///
+/// # Args
+///
+/// * `distinct` - Sorted distinct values, at least two.
+fn per_value_edges(distinct: &[f64]) -> Vec<f64> {
+    let mut edges_vec: Vec<f64> = Vec::with_capacity(distinct.len() - 1_usize);
+    for i in 0_usize..distinct.len() - 1_usize {
+        // Each edge lies in [distinct[i], distinct[i+1]) — disjoint,
+        // ordered intervals — so edges are strictly increasing by
+        // construction and need no dedup.
+        edges_vec.push(midpoint_edge(distinct[i], distinct[i + 1_usize]));
+    }
+    edges_vec
+}
+
+/// Greedy equal-count binning over (distinct value, count) pairs.
+///
+/// The shipped `GreedyFindBin` walk with `min_data_in_bin = 1`: values
+/// heavier than the mean bin size take a bin of their own up front and
+/// the mean re-spreads over the rest; a bin closes when it reaches the
+/// running mean, on a heavy value, or just before one once half-full.
+///
+/// # Args
+///
+/// * `distinct` - Sorted distinct values, more than `max_bins` of them.
+/// * `counts` - Sample count per distinct value.
+/// * `n_valid` - Total sample count.
+/// * `max_bins` - Bin budget (>= 2).
+fn greedy_edges(distinct: &[f64], counts: &[usize], n_valid: usize, max_bins: usize) -> Vec<f64> {
+    let n_distinct = distinct.len();
+    let mut mean_bin_size = count_to_f64(n_valid) / count_to_f64(max_bins);
+
+    // Values heavier than the mean take a bin of their own; the mean
+    // re-spreads over what remains.
+    let mut is_big: Vec<bool> = vec![false; n_distinct];
+    let mut rest_bins = max_bins;
+    let mut rest_samples = n_valid;
+    for i in 0_usize..n_distinct {
+        if count_to_f64(counts[i]) >= mean_bin_size {
+            is_big[i] = true;
+            rest_bins = rest_bins.saturating_sub(1_usize);
+            rest_samples -= counts[i];
+        }
+    }
+    // At least one rest bin always remains here: a big value holds at
+    // least the mean bin size, so all bins going big would need every
+    // sample — yet the greedy case has more distinct values than bins,
+    // so a non-big value always exists and the division is safe.
+    mean_bin_size = count_to_f64(rest_samples) / count_to_f64(rest_bins);
+
+    // Walk the distinct values, closing bins at the running mean. Each
+    // closed bin records its last value and the next bin's first value;
+    // the edge lands at their midpoint.
+    let mut upper: Vec<f64> = Vec::new();
+    let mut lower: Vec<f64> = vec![distinct[0]];
+    let mut cur_count = 0_usize;
+    for i in 0_usize..n_distinct - 1_usize {
+        if !is_big[i] {
+            rest_samples -= counts[i];
+        }
+        cur_count += counts[i];
+        let half_full = count_to_f64(cur_count) >= (mean_bin_size * 0.5_f64).max(1.0_f64);
+        let close = is_big[i]
+            || count_to_f64(cur_count) >= mean_bin_size
+            || (is_big[i + 1_usize] && half_full);
+        if close {
+            upper.push(distinct[i]);
+            lower.push(distinct[i + 1_usize]);
+            if upper.len() >= max_bins - 1_usize {
+                break;
+            }
+            cur_count = 0_usize;
+            if !is_big[i] {
+                rest_bins = rest_bins.saturating_sub(1_usize);
+                if rest_bins > 0_usize {
+                    mean_bin_size = count_to_f64(rest_samples) / count_to_f64(rest_bins);
+                }
+            }
+        }
+    }
+
+    let mut edges_vec: Vec<f64> = Vec::with_capacity(upper.len());
+    for i in 0_usize..upper.len() {
+        // Each edge lies in [upper[i], lower[i+1]) and the next bin
+        // starts at or above lower[i+1] — disjoint, ordered intervals —
+        // so edges are strictly increasing by construction.
+        edges_vec.push(midpoint_edge(upper[i], lower[i + 1_usize]));
+    }
+    edges_vec
 }
 
 /// Converts a non-negative integer-valued f64 to usize without `as` casts.

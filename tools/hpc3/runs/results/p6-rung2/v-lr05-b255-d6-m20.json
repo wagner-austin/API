@@ -1,0 +1,222 @@
+{
+ "config": {
+  "dataset": "voc_match_quality",
+  "n_estimators": 300,
+  "max_depth": 6,
+  "num_leaves": 31,
+  "learning_rate": 0.05,
+  "max_bins": 255,
+  "min_samples_leaf": 20,
+  "early_stopping_rounds": 30
+ },
+ "seeds": [
+  42,
+  43,
+  44,
+  45,
+  46
+ ],
+ "grouped": true,
+ "results": [
+  {
+   "model": "cleargbm",
+   "seed": 42,
+   "quality": {
+    "rmse": 16.322092992667795,
+    "mae": 12.143818750969341,
+    "r_squared": 0.48489315018043533
+   },
+   "fit_seconds": 0.13556241197511554
+  },
+  {
+   "model": "cleargbm@leaf_wise",
+   "seed": 42,
+   "quality": {
+    "rmse": 16.208970969882575,
+    "mae": 12.113659371119693,
+    "r_squared": 0.4920084148490821
+   },
+   "fit_seconds": 0.1443532188422978
+  },
+  {
+   "model": "lightgbm",
+   "seed": 42,
+   "quality": {
+    "rmse": 15.838036844943701,
+    "mae": 11.64222439660659,
+    "r_squared": 0.5149926419818482
+   },
+   "fit_seconds": 0.11872721323743463
+  },
+  {
+   "model": "xgboost",
+   "seed": 42,
+   "quality": {
+    "rmse": 16.895395019667543,
+    "mae": 12.592863381289582,
+    "r_squared": 0.448072123510877
+   },
+   "fit_seconds": 0.21598830400034785
+  },
+  {
+   "model": "cleargbm",
+   "seed": 43,
+   "quality": {
+    "rmse": 17.055247435829962,
+    "mae": 12.84653321794399,
+    "r_squared": 0.4677899715564695
+   },
+   "fit_seconds": 0.20522005204111338
+  },
+  {
+   "model": "cleargbm@leaf_wise",
+   "seed": 43,
+   "quality": {
+    "rmse": 17.10847724969181,
+    "mae": 12.878506784505724,
+    "r_squared": 0.4644627082881301
+   },
+   "fit_seconds": 0.16480760276317596
+  },
+  {
+   "model": "lightgbm",
+   "seed": 43,
+   "quality": {
+    "rmse": 17.067824745794102,
+    "mae": 12.773862957456082,
+    "r_squared": 0.46700473068988735
+   },
+   "fit_seconds": 0.11865016398951411
+  },
+  {
+   "model": "xgboost",
+   "seed": 43,
+   "quality": {
+    "rmse": 17.264051422698085,
+    "mae": 12.975373779205565,
+    "r_squared": 0.4546787185459312
+   },
+   "fit_seconds": 0.15947764599695802
+  },
+  {
+   "model": "cleargbm",
+   "seed": 44,
+   "quality": {
+    "rmse": 18.63846287473012,
+    "mae": 13.710793860815278,
+    "r_squared": 0.5042026138778061
+   },
+   "fit_seconds": 0.14106447296217084
+  },
+  {
+   "model": "cleargbm@leaf_wise",
+   "seed": 44,
+   "quality": {
+    "rmse": 18.563495685164742,
+    "mae": 13.673546033958976,
+    "r_squared": 0.5081829622221168
+   },
+   "fit_seconds": 0.14504914730787277
+  },
+  {
+   "model": "lightgbm",
+   "seed": 44,
+   "quality": {
+    "rmse": 18.705927281509,
+    "mae": 13.874721900138576,
+    "r_squared": 0.5006069082941988
+   },
+   "fit_seconds": 0.07404046086594462
+  },
+  {
+   "model": "xgboost",
+   "seed": 44,
+   "quality": {
+    "rmse": 18.642620458992837,
+    "mae": 14.046884407957505,
+    "r_squared": 0.5039813993573004
+   },
+   "fit_seconds": 0.0823238929733634
+  },
+  {
+   "model": "cleargbm",
+   "seed": 45,
+   "quality": {
+    "rmse": 18.489684881097617,
+    "mae": 14.046665944517638,
+    "r_squared": 0.40319533416844167
+   },
+   "fit_seconds": 0.2373918523080647
+  },
+  {
+   "model": "cleargbm@leaf_wise",
+   "seed": 45,
+   "quality": {
+    "rmse": 18.551630017566307,
+    "mae": 13.976696111378926,
+    "r_squared": 0.3991897413506753
+   },
+   "fit_seconds": 0.24733412126079202
+  },
+  {
+   "model": "lightgbm",
+   "seed": 45,
+   "quality": {
+    "rmse": 18.692941043207476,
+    "mae": 14.288381439225038,
+    "r_squared": 0.3900019268959751
+   },
+   "fit_seconds": 0.07884552702307701
+  },
+  {
+   "model": "xgboost",
+   "seed": 45,
+   "quality": {
+    "rmse": 18.62092184368885,
+    "mae": 14.318506812769646,
+    "r_squared": 0.3946932105395574
+   },
+   "fit_seconds": 0.10502729006111622
+  },
+  {
+   "model": "cleargbm",
+   "seed": 46,
+   "quality": {
+    "rmse": 18.376736224791678,
+    "mae": 13.5261453289364,
+    "r_squared": 0.4987620761367684
+   },
+   "fit_seconds": 0.33462646789848804
+  },
+  {
+   "model": "cleargbm@leaf_wise",
+   "seed": 46,
+   "quality": {
+    "rmse": 18.235832964397698,
+    "mae": 13.54410296288067,
+    "r_squared": 0.5064190719054116
+   },
+   "fit_seconds": 0.1807650220580399
+  },
+  {
+   "model": "lightgbm",
+   "seed": 46,
+   "quality": {
+    "rmse": 18.546523807229487,
+    "mae": 13.648610627891655,
+    "r_squared": 0.4894571458737157
+   },
+   "fit_seconds": 0.13630342530086637
+  },
+  {
+   "model": "xgboost",
+   "seed": 46,
+   "quality": {
+    "rmse": 18.741833780286655,
+    "mae": 14.057746714846456,
+    "r_squared": 0.4786476650834739
+   },
+   "fit_seconds": 0.08354926202446222
+  }
+ ]
+}

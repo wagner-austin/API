@@ -1,6 +1,6 @@
 //! Tests for bin edge computation.
 
-use crate::binning::edges::{compute_bin_edges, f64_to_usize_checked, quantile_position, BinEdges};
+use crate::binning::edges::{compute_bin_edges, f64_to_usize_checked, BinEdges};
 use crate::error::ClearGbmError;
 
 // ── BinEdges construction ──────────────────────────────────────────
@@ -82,49 +82,109 @@ fn test_bin_edges_infinity() -> Result<(), ClearGbmError> {
     Ok(())
 }
 
-// ── quantile_position ────────────────────────────────────────────
+// ── count-aware binning ────────────────────────────────────────────
 
 #[test]
-fn test_quantile_position_basic() -> Result<(), ClearGbmError> {
-    // pos = floor(1/3 * 9) = 3
-    assert_eq!(quantile_position(1_usize, 9_usize, 3_usize), 3_usize);
-    // pos = floor(2/3 * 9) = 6
-    assert_eq!(quantile_position(2_usize, 9_usize, 3_usize), 6_usize);
+fn test_per_value_bins_when_distinct_fits_budget() -> Result<(), ClearGbmError> {
+    // 5 ones, one 2, one 3: three distinct values under a 64 budget →
+    // every distinct value gets its own bin, edges at midpoints.
+    let mut data: Vec<Vec<f64>> = (0_usize..5_usize).map(|_| vec![1.0_f64]).collect();
+    data.push(vec![2.0_f64]);
+    data.push(vec![3.0_f64]);
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    let edges = match compute_bin_edges(&refs, 64_usize) {
+        Ok(e) => e,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(edges[0].edges(), &[1.5_f64, 2.5_f64]);
+    assert_eq!(edges[0].n_regular_bins(), 3_usize);
     Ok(())
 }
 
 #[test]
-fn test_quantile_position_small_values() -> Result<(), ClearGbmError> {
-    // edge_idx=1, n_valid-1=3, max_bins=4 → pos = 1*3/4 = 0
-    assert_eq!(quantile_position(1_usize, 3_usize, 4_usize), 0_usize);
-    // edge_idx=2, n_valid-1=3, max_bins=4 → pos = 2*3/4 = 1
-    assert_eq!(quantile_position(2_usize, 3_usize, 4_usize), 1_usize);
-    // edge_idx=3, n_valid-1=3, max_bins=4 → pos = 3*3/4 = 2
-    assert_eq!(quantile_position(3_usize, 3_usize, 4_usize), 2_usize);
+fn test_zero_inflated_feature_keeps_tail_resolution() -> Result<(), ClearGbmError> {
+    // 90 zeros plus 1..=10 once each, 8-bin budget. The heavy zero takes
+    // one bin and the tail keeps the rest: 8 bins, 7 edges. The replaced
+    // quantile-of-multiset rule put every quantile position on the zero
+    // and produced 2 bins from this shape.
+    let mut data: Vec<Vec<f64>> = (0_usize..90_usize).map(|_| vec![0.0_f64]).collect();
+    for i in 1_u32..=10_u32 {
+        data.push(vec![f64::from(i)]);
+    }
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    let edges = match compute_bin_edges(&refs, 8_usize) {
+        Ok(e) => e,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(
+        edges[0].edges(),
+        &[0.5_f64, 2.5_f64, 4.5_f64, 6.5_f64, 7.5_f64, 8.5_f64, 9.5_f64]
+    );
+    assert_eq!(edges[0].n_regular_bins(), 8_usize);
     Ok(())
 }
 
 #[test]
-fn test_quantile_position_overflow_uses_fallback() -> Result<(), ClearGbmError> {
-    // Create values where a * b overflows usize.
-    // a=2, b=usize::MAX/2 + 1, c=3 → a*b = usize::MAX + 1 → overflows.
-    let a = 2_usize;
-    let b = usize::MAX / 2_usize + 1_usize;
-    let c = 3_usize;
-    let result = quantile_position(a, b, c);
-
-    // Verify using the fallback formula: a*(b/c) + a*(b%c)/c
-    let expected = a * (b / c) + a * (b % c) / c;
-    assert_eq!(result, expected);
-    assert!(result > 0_usize);
+fn test_heavy_value_closes_a_bin_on_arrival() -> Result<(), ClearGbmError> {
+    // 50 fives among singles 1,2,3,4,6,7,8,9 under a 4-bin budget. The
+    // heavy five closes its bin the moment it arrives; the singles bins
+    // form around it at the running mean.
+    let mut data: Vec<Vec<f64>> = (0_usize..50_usize).map(|_| vec![5.0_f64]).collect();
+    for v in [
+        1.0_f64, 2.0_f64, 3.0_f64, 4.0_f64, 6.0_f64, 7.0_f64, 8.0_f64, 9.0_f64,
+    ] {
+        data.push(vec![v]);
+    }
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    let edges = match compute_bin_edges(&refs, 4_usize) {
+        Ok(e) => e,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(edges[0].edges(), &[3.5_f64, 5.5_f64, 8.5_f64]);
+    assert_eq!(edges[0].n_regular_bins(), 4_usize);
     Ok(())
 }
 
 #[test]
-fn test_quantile_position_edge_one() -> Result<(), ClearGbmError> {
-    // a=1, any b, c: pos = b/c
-    assert_eq!(quantile_position(1_usize, 99_usize, 10_usize), 9_usize);
-    assert_eq!(quantile_position(1_usize, 0_usize, 10_usize), 0_usize);
+fn test_rest_budget_exhausts_before_late_heavy_values() -> Result<(), ClearGbmError> {
+    // Singles 1..6 spend both rest bins before the two heavy values
+    // (8, 9, ten copies each) arrive; once the rest budget hits zero
+    // the running mean stops refreshing and the heavies still close
+    // their own bins. Budget 4: total 26, mean 6.5, both heavies big;
+    // rest mean 6/2 = 3 → closes at 3, at 6 (budget spent), at 8.
+    let mut data: Vec<Vec<f64>> = (1_u32..=6_u32).map(|v| vec![f64::from(v)]).collect();
+    for _ in 0_usize..10_usize {
+        data.push(vec![8.0_f64]);
+        data.push(vec![9.0_f64]);
+    }
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    let edges = match compute_bin_edges(&refs, 4_usize) {
+        Ok(e) => e,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(edges[0].edges(), &[3.5_f64, 7.0_f64, 8.5_f64]);
+    assert_eq!(edges[0].n_regular_bins(), 4_usize);
+    Ok(())
+}
+
+#[test]
+fn test_adjacent_double_midpoint_stays_below_upper_value() -> Result<(), ClearGbmError> {
+    // For adjacent doubles the midpoint can round onto the upper value;
+    // the edge must still route the lower value left and the upper right.
+    // An odd-mantissa lower value forces round-half-to-even UP onto the
+    // (even-mantissa) upper value, exercising the collapse guard.
+    let a = f64::from_bits(1.0_f64.to_bits() + 1_u64);
+    let b = f64::from_bits(1.0_f64.to_bits() + 2_u64);
+    let data: Vec<Vec<f64>> = vec![vec![a], vec![b]];
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    let edges = match compute_bin_edges(&refs, 4_usize) {
+        Ok(e) => e,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(edges[0].edges().len(), 1_usize);
+    let edge = edges[0].edges()[0];
+    assert!(edge >= a);
+    assert!(edge < b);
     Ok(())
 }
 
