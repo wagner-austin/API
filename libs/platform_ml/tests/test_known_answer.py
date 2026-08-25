@@ -13,7 +13,7 @@ import pytest
 from platform_core.json_utils import JSONTypeError
 
 from platform_ml.comparability import RunFingerprint
-from platform_ml.determinism import DeterminismReport
+from platform_ml.determinism import FALSE, TORCH_STACK, TRUE, determinism_record
 from platform_ml.known_answer import (
     KnownAnswer,
     check_known_answer,
@@ -22,13 +22,16 @@ from platform_ml.known_answer import (
     encode_known_answer,
 )
 
-PINNED = DeterminismReport(
-    deterministic_algorithms=True,
-    cublas_workspace_config=":4096:8",
-    matmul_tf32=False,
-    cudnn_tf32=False,
-    cudnn_deterministic=True,
-    cudnn_benchmark=False,
+PINNED = determinism_record(
+    TORCH_STACK,
+    {
+        "deterministic_algorithms": TRUE,
+        "cublas_workspace_config": ":4096:8",
+        "matmul_tf32": FALSE,
+        "cudnn_tf32": FALSE,
+        "cudnn_deterministic": TRUE,
+        "cudnn_benchmark": FALSE,
+    },
 )
 
 

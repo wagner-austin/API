@@ -25,7 +25,7 @@ this module does not restate them.
 
 from __future__ import annotations
 
-from platform_ml import DeterminismReport, RunFingerprint
+from platform_ml import DeterminismRecord, RunFingerprint
 
 from model_trainer.core import _test_hooks
 
@@ -38,7 +38,7 @@ CUDA_DEVICE = "cuda"
 NO_GPU = ""
 
 
-def capture_run_fingerprint(device: str, determinism: DeterminismReport) -> RunFingerprint:
+def capture_run_fingerprint(device: str, determinism: DeterminismRecord) -> RunFingerprint:
     """Record what this process is about to compute a number on.
 
     The card and driver are read only for a cuda run. Querying them for a cpu

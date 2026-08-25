@@ -15,6 +15,7 @@ import pytest
 from numpy.typing import NDArray
 
 from covenant_ml.validation import (
+    group_kfold_split,
     group_stratified_kfold_split,
 )
 from tests.validation._splitter_fixtures import (
@@ -353,3 +354,70 @@ class TestGroupHelpers:
         indices = _get_sample_indices_for_groups(groups, selected)
 
         assert len(indices) == 0
+
+
+class TestGroupKfoldSplit:
+    """Tests for group_kfold_split — the mixed-label-group instrument."""
+
+    def test_creates_correct_number_of_folds(self) -> None:
+        """Creates exactly n_folds splits over mixed-label groups."""
+        groups = _make_groups((3,) * 10)
+        # Every group mixed: labels 1,0,1 within each 3-sample group.
+        y = _make_int64_array(tuple([1, 0, 1] * 10))
+
+        split_info = group_kfold_split(y, groups, n_folds=5, random_state=42)
+
+        assert split_info["n_folds"] == 5
+        assert len(split_info["folds"]) == 5
+        assert split_info["n_samples"] == 30
+
+    def test_groups_stay_together_and_partition_the_samples(self) -> None:
+        """Whole groups per fold; every sample validates exactly once."""
+        sizes = (2, 3, 4, 2, 3, 4, 2, 3, 4, 2)
+        groups = _make_groups(sizes)
+        y = _make_int64_array(tuple(i % 2 for i in range(sum(sizes))))
+
+        split_info = group_kfold_split(y, groups, n_folds=5, random_state=42)
+
+        seen_val: set[int] = set()
+        for fold in split_info["folds"]:
+            train_groups = _get_groups_for_indices(groups, fold["train_indices"])
+            val_groups = _get_groups_for_indices(groups, fold["val_indices"])
+            assert train_groups & val_groups == set()
+            fold_val = _indices_to_set(fold["val_indices"])
+            assert seen_val & fold_val == set()
+            seen_val |= fold_val
+        assert seen_val == set(range(sum(sizes)))
+
+    def test_reproducibility_with_same_seed(self) -> None:
+        """The same seed reproduces identical folds."""
+        groups = _make_groups((3,) * 10)
+        y = _make_int64_array(tuple([1, 0, 1] * 10))
+
+        first = group_kfold_split(y, groups, n_folds=5, random_state=7)
+        second = group_kfold_split(y, groups, n_folds=5, random_state=7)
+
+        for fold_a, fold_b in zip(first["folds"], second["folds"], strict=True):
+            np.testing.assert_array_equal(fold_a["train_indices"], fold_b["train_indices"])
+            np.testing.assert_array_equal(fold_a["val_indices"], fold_b["val_indices"])
+
+    def test_requires_matching_lengths(self) -> None:
+        """A groups array of the wrong length is refused."""
+        y = _make_int64_array((0, 1, 0, 1))
+        groups = _make_int64_array((0, 0, 1))
+        with pytest.raises(ValueError, match="groups length"):
+            group_kfold_split(y, groups, n_folds=2, random_state=42)
+
+    def test_requires_at_least_two_folds(self) -> None:
+        """A single fold is not cross-validation."""
+        y = _make_int64_array((0, 1, 0, 1))
+        groups = _make_int64_array((0, 0, 1, 1))
+        with pytest.raises(ValueError, match="n_folds must be >= 2"):
+            group_kfold_split(y, groups, n_folds=1, random_state=42)
+
+    def test_requires_enough_groups(self) -> None:
+        """Fewer groups than folds is refused."""
+        y = _make_int64_array((0, 1, 0, 1))
+        groups = _make_int64_array((0, 0, 1, 1))
+        with pytest.raises(ValueError, match="Not enough groups"):
+            group_kfold_split(y, groups, n_folds=3, random_state=42)

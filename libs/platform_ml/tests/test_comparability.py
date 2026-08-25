@@ -20,25 +20,28 @@ from platform_ml.comparability import (
     describe_verdict,
     find_differences,
 )
-from platform_ml.determinism import DeterminismReport
-
-DETERMINISTIC = DeterminismReport(
-    deterministic_algorithms=True,
-    cublas_workspace_config=":4096:8",
-    matmul_tf32=False,
-    cudnn_tf32=False,
-    cudnn_deterministic=True,
-    cudnn_benchmark=False,
+from platform_ml.determinism import (
+    FALSE,
+    TORCH_STACK,
+    TRUE,
+    UNPINNED_STACK,
+    DeterminismRecord,
+    determinism_record,
 )
 
-NONDETERMINISTIC = DeterminismReport(
-    deterministic_algorithms=False,
-    cublas_workspace_config="",
-    matmul_tf32=True,
-    cudnn_tf32=True,
-    cudnn_deterministic=False,
-    cudnn_benchmark=True,
+DETERMINISTIC = determinism_record(
+    TORCH_STACK,
+    {
+        "deterministic_algorithms": TRUE,
+        "cublas_workspace_config": ":4096:8",
+        "matmul_tf32": FALSE,
+        "cudnn_tf32": FALSE,
+        "cudnn_deterministic": TRUE,
+        "cudnn_benchmark": FALSE,
+    },
 )
+
+NONDETERMINISTIC = determinism_record(UNPINNED_STACK, {})
 
 
 def fingerprint(
@@ -46,7 +49,7 @@ def fingerprint(
     image: str = "sha256:aaaa",
     gpu: str = "NVIDIA GeForce RTX 3090 Ti",
     driver: str = "550.90.07",
-    determinism: DeterminismReport = DETERMINISTIC,
+    determinism: DeterminismRecord = DETERMINISTIC,
 ) -> RunFingerprint:
     """Build a fingerprint, defaulting to the local card fully pinned."""
     return RunFingerprint(
@@ -182,20 +185,23 @@ def test_determinism_settings_are_an_axis() -> None:
 
     assert verdict["kind"] == "uncalibrated"
     assert [d["axis"] for d in verdict["uncalibrated"]] == ["determinism"]
-    assert "deterministic=True" in verdict["differences"][0]["left"]
-    assert "deterministic=False" in verdict["differences"][0]["right"]
+    assert verdict["differences"][0]["left"].startswith(f"{TORCH_STACK}[")
+    assert verdict["differences"][0]["right"] == f"{UNPINNED_STACK}[]"
 
 
 def test_a_single_flipped_determinism_flag_is_still_a_difference() -> None:
     # TF32 alone changes the numbers, so a report differing only there must
     # not compare equal to one that pinned it.
-    tf32_on = DeterminismReport(
-        deterministic_algorithms=True,
-        cublas_workspace_config=":4096:8",
-        matmul_tf32=True,
-        cudnn_tf32=False,
-        cudnn_deterministic=True,
-        cudnn_benchmark=False,
+    tf32_on = determinism_record(
+        TORCH_STACK,
+        {
+            "deterministic_algorithms": TRUE,
+            "cublas_workspace_config": ":4096:8",
+            "matmul_tf32": TRUE,
+            "cudnn_tf32": FALSE,
+            "cudnn_deterministic": TRUE,
+            "cudnn_benchmark": FALSE,
+        },
     )
 
     assert find_differences(fingerprint(), fingerprint(determinism=tf32_on)) != ()

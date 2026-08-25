@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Protocol
 
 import torch
-from platform_ml import DeterminismReport
+from platform_ml import DeterminismRecord
 from platform_ml.testing import (
     WandbModuleProtocol as WandbModuleLike,
 )
@@ -33,7 +33,7 @@ class ApplyDeterminismProto(Protocol):
     stack and without leaking settings into the rest of the suite.
     """
 
-    def __call__(self) -> DeterminismReport:
+    def __call__(self) -> DeterminismRecord:
         """Pin kernel determinism and report what was actually applied."""
         ...
 

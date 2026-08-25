@@ -19,7 +19,7 @@ from platform_core.trainer_metrics_events import (
     make_config_event,
     make_progress_metrics_event,
 )
-from platform_ml import RequestedDevice, ResolvedDevice, encode_determinism_report
+from platform_ml import RequestedDevice, ResolvedDevice, encode_determinism_record
 from platform_workers.redis import RedisStrProto
 
 from model_trainer.core import _test_hooks
@@ -268,7 +268,7 @@ def setup_env(settings: Settings) -> int:
         return threads
 
     report = _test_hooks.apply_determinism_hook()
-    _log.info("determinism pinned", extra={"determinism": encode_determinism_report(report)})
+    _log.info("determinism pinned", extra={"determinism": encode_determinism_record(report)})
     return threads
 
 

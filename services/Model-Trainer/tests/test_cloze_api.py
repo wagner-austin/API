@@ -44,12 +44,15 @@ _FINGERPRINT: JSONValue = {
     "gpu_model": "NVIDIA GeForce RTX 3090 Ti",
     "driver_version": "591.86",
     "determinism": {
-        "deterministic_algorithms": True,
-        "cublas_workspace_config": ":4096:8",
-        "matmul_tf32": False,
-        "cudnn_tf32": False,
-        "cudnn_deterministic": True,
-        "cudnn_benchmark": False,
+        "stack": "torch",
+        "settings": {
+            "deterministic_algorithms": "true",
+            "cublas_workspace_config": ":4096:8",
+            "matmul_tf32": "false",
+            "cudnn_tf32": "false",
+            "cudnn_deterministic": "true",
+            "cudnn_benchmark": "false",
+        },
     },
 }
 
@@ -225,7 +228,8 @@ class TestClozeOrchestrator:
             raise AssertionError("expected a fingerprint on a completed record")
         assert fingerprint["gpu_model"] == "NVIDIA GeForce RTX 3090 Ti"
         assert fingerprint["driver_version"] == "591.86"
-        assert fingerprint["determinism"]["cublas_workspace_config"] == ":4096:8"
+        assert fingerprint["determinism"]["stack"] == "torch"
+        assert ("cublas_workspace_config", ":4096:8") in fingerprint["determinism"]["settings"]
 
     def test_get_rejects_outcomes_that_are_not_a_list(self) -> None:
         orch, redis, _ = self._make_orchestrator()

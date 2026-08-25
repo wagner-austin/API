@@ -14,7 +14,14 @@ import re
 from collections.abc import Generator
 
 import pytest
-from platform_ml import DeterminismReport, decode_run_fingerprint, encode_run_fingerprint
+from platform_ml import (
+    FALSE,
+    TORCH_STACK,
+    TRUE,
+    decode_run_fingerprint,
+    determinism_record,
+    encode_run_fingerprint,
+)
 
 from model_trainer.core import _test_hooks
 from model_trainer.core._hook_defaults import _default_cuda_driver_version
@@ -25,13 +32,16 @@ from model_trainer.core.run_fingerprint import (
     describe_run_fingerprint,
 )
 
-PINNED = DeterminismReport(
-    deterministic_algorithms=True,
-    cublas_workspace_config=":4096:8",
-    matmul_tf32=False,
-    cudnn_tf32=False,
-    cudnn_deterministic=True,
-    cudnn_benchmark=False,
+PINNED = determinism_record(
+    TORCH_STACK,
+    {
+        "deterministic_algorithms": TRUE,
+        "cublas_workspace_config": ":4096:8",
+        "matmul_tf32": FALSE,
+        "cudnn_tf32": FALSE,
+        "cudnn_deterministic": TRUE,
+        "cudnn_benchmark": FALSE,
+    },
 )
 
 

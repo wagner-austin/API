@@ -8,7 +8,7 @@ No conditionals needed - just call the hook directly.
 from __future__ import annotations
 
 from platform_core.logging import get_logger
-from platform_ml import DeterminismReport, apply_determinism
+from platform_ml import DeterminismRecord, apply_determinism
 from platform_workers.redis import (
     redis_for_kv,
     redis_raw_for_rq,
@@ -136,7 +136,7 @@ def _default_pkg_version(name: str) -> str:
         return "unknown"
 
 
-def _default_apply_determinism() -> DeterminismReport:
+def _default_apply_determinism() -> DeterminismRecord:
     """Production determinism pin - used as default hook.
 
     Imported inside the function so that merely importing this module does

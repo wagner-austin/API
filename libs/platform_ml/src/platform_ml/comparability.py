@@ -53,9 +53,10 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from platform_ml.determinism import (
-    DeterminismReport,
-    decode_determinism_report,
-    encode_determinism_report,
+    DeterminismRecord,
+    decode_determinism_record,
+    encode_determinism_record,
+    render_determinism_record,
 )
 
 
@@ -81,7 +82,7 @@ class RunFingerprint(TypedDict):
     image_digest: str
     gpu_model: str
     driver_version: str
-    determinism: DeterminismReport
+    determinism: DeterminismRecord
 
 
 class AxisDifference(TypedDict):
@@ -160,18 +161,6 @@ class UncalibratedVerdict(TypedDict):
     uncalibrated: tuple[AxisDifference, ...]
 
 
-def _render_determinism(report: DeterminismReport) -> str:
-    """Render a determinism report as one stable comparison key."""
-    return (
-        f"deterministic={report['deterministic_algorithms']},"
-        f"cublas={report['cublas_workspace_config']},"
-        f"matmul_tf32={report['matmul_tf32']},"
-        f"cudnn_tf32={report['cudnn_tf32']},"
-        f"cudnn_deterministic={report['cudnn_deterministic']},"
-        f"cudnn_benchmark={report['cudnn_benchmark']}"
-    )
-
-
 #: How each axis is read off a fingerprint, keyed by axis name.
 #:
 #: A mapping rather than a chain of comparisons, so there is no "unknown
@@ -183,7 +172,7 @@ _AXIS_READERS: Mapping[str, Callable[[RunFingerprint], str]] = {
     "image_digest": lambda f: f["image_digest"],
     "gpu_model": lambda f: f["gpu_model"],
     "driver_version": lambda f: f["driver_version"],
-    "determinism": lambda f: _render_determinism(f["determinism"]),
+    "determinism": lambda f: render_determinism_record(f["determinism"]),
 }
 
 #: The axes a run's numbers depend on, in the order a verdict reports them.
@@ -334,7 +323,7 @@ def encode_run_fingerprint(fingerprint: RunFingerprint) -> JSONObject:
         "image_digest": fingerprint["image_digest"],
         "gpu_model": fingerprint["gpu_model"],
         "driver_version": fingerprint["driver_version"],
-        "determinism": encode_determinism_report(fingerprint["determinism"]),
+        "determinism": encode_determinism_record(fingerprint["determinism"]),
     }
 
 
@@ -360,7 +349,7 @@ def decode_run_fingerprint(value: JSONValue) -> RunFingerprint:
         image_digest=require_str(obj, "image_digest"),
         gpu_model=require_str(obj, "gpu_model"),
         driver_version=require_str(obj, "driver_version"),
-        determinism=decode_determinism_report(require_dict(obj, "determinism")),
+        determinism=decode_determinism_record(require_dict(obj, "determinism")),
     )
 
 

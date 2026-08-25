@@ -22,20 +22,23 @@ from platform_core.determinism_env import (
     DETERMINISM_OFF,
     DETERMINISM_ON,
 )
-from platform_ml import DeterminismReport
+from platform_ml import FALSE, TORCH_STACK, TRUE, DeterminismRecord, determinism_record
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.worker.job_utils import setup_env
 from tests.conftest import SettingsFactory
 
-_REPORT = DeterminismReport(
-    deterministic_algorithms=True,
-    cublas_workspace_config=CUBLAS_DETERMINISTIC_WORKSPACE,
-    matmul_tf32=False,
-    cudnn_tf32=False,
-    cudnn_deterministic=True,
-    cudnn_benchmark=False,
+_REPORT = determinism_record(
+    TORCH_STACK,
+    {
+        "deterministic_algorithms": TRUE,
+        "cublas_workspace_config": CUBLAS_DETERMINISTIC_WORKSPACE,
+        "matmul_tf32": FALSE,
+        "cudnn_tf32": FALSE,
+        "cudnn_deterministic": TRUE,
+        "cudnn_benchmark": FALSE,
+    },
 )
 
 
@@ -48,7 +51,7 @@ class _CountingPin:
         """Start with no calls recorded."""
         self.calls = 0
 
-    def __call__(self) -> DeterminismReport:
+    def __call__(self) -> DeterminismRecord:
         """Record an invocation and return a fixed report.
 
         Returns:

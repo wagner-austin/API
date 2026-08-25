@@ -20,19 +20,18 @@ from platform_ml.comparability import (
     encode_comparability_verdict,
     encode_run_fingerprint,
 )
-from platform_ml.determinism import (
-    DeterminismReport,
-    decode_determinism_report,
-    encode_determinism_report,
-)
+from platform_ml.determinism import FALSE, TORCH_STACK, TRUE, determinism_record
 
-REPORT = DeterminismReport(
-    deterministic_algorithms=True,
-    cublas_workspace_config=":4096:8",
-    matmul_tf32=False,
-    cudnn_tf32=False,
-    cudnn_deterministic=True,
-    cudnn_benchmark=False,
+REPORT = determinism_record(
+    TORCH_STACK,
+    {
+        "deterministic_algorithms": TRUE,
+        "cublas_workspace_config": ":4096:8",
+        "matmul_tf32": FALSE,
+        "cudnn_tf32": FALSE,
+        "cudnn_deterministic": TRUE,
+        "cudnn_benchmark": FALSE,
+    },
 )
 
 FINGERPRINT = RunFingerprint(
@@ -51,39 +50,9 @@ CALIBRATION = Calibration(
 )
 
 
-def test_determinism_report_round_trips() -> None:
-    assert decode_determinism_report(encode_determinism_report(REPORT)) == REPORT
-
-
-def test_determinism_encode_emits_native_types_not_rendered_strings() -> None:
-    # Native types are what makes the round-trip exact. A rendered "true"
-    # would decode only if the reader agreed on the spelling.
-    encoded = encode_determinism_report(REPORT)
-
-    assert encoded["deterministic_algorithms"] is True
-    assert encoded["cudnn_benchmark"] is False
-    assert encoded["cublas_workspace_config"] == ":4096:8"
-
-
-def test_determinism_decode_rejects_a_non_object() -> None:
-    with pytest.raises(JSONTypeError):
-        decode_determinism_report(["not", "an", "object"])
-
-
-def test_determinism_decode_rejects_a_missing_field() -> None:
-    encoded = encode_determinism_report(REPORT)
-    del encoded["cudnn_benchmark"]
-
-    with pytest.raises(JSONTypeError):
-        decode_determinism_report(encoded)
-
-
-def test_determinism_decode_rejects_a_bool_sent_as_a_string() -> None:
-    encoded = encode_determinism_report(REPORT)
-    encoded["matmul_tf32"] = "false"
-
-    with pytest.raises(JSONTypeError):
-        decode_determinism_report(encoded)
+# The determinism record's own codec is covered in test_determinism.py,
+# beside the type it encodes. This module is about the fingerprint and the
+# verdict, and only exercises the record as a nested value.
 
 
 def test_fingerprint_round_trips_including_the_nested_report() -> None:
