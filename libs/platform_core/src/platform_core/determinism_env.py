@@ -22,6 +22,8 @@ CUDA.
 
 from __future__ import annotations
 
+from typing import Protocol
+
 CUBLAS_WORKSPACE_ENV_VAR = "CUBLAS_WORKSPACE_CONFIG"
 """Name of the variable cuBLAS reads when it creates its handle."""
 
@@ -91,11 +93,77 @@ def determinism_requested(raw: str | None) -> bool:
     )
 
 
+BLAS_THREAD_ENV_VARS: tuple[str, ...] = (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+)
+"""The thread-count variables a CPU numeric stack reads when it loads.
+
+The CPU analogue of :data:`CUBLAS_WORKSPACE_ENV_VAR`, and it exists for the
+same reason: a multi-threaded BLAS splits a reduction across threads and
+combines the partial sums in whatever order they finish, so the same dot
+product over the same inputs can produce different last bits between two runs
+on one machine. Floating-point addition is not associative, and nothing about
+seeding touches this.
+
+All four are named because a numpy wheel may be linked against OpenBLAS or
+MKL, and numexpr reads its own. Setting only the one that happens to matter
+today leaves the record claiming a posture the next wheel will not honour.
+
+The timing constraint is the same as cuBLAS's and just as unforgiving: these
+are read when the native library is loaded, which happens on first import of
+numpy or its dependents. Setting them afterwards is accepted in silence and
+does nothing.
+"""
+
+SINGLE_THREAD = "1"
+"""One thread, which is what makes a BLAS reduction order deterministic.
+
+Deterministic rather than fast, deliberately. A parallel reduction can be
+made reproducible only by fixing the split as well as the count, which no
+portable interface exposes, so the reproducible choice is the serial one.
+The cost is real and belongs to whoever chooses it -- which is why this is a
+constant to pass rather than a default anything applies.
+"""
+
+
+class SetEnvProtocol(Protocol):
+    """A writer for one process environment variable.
+
+    A write-only seam rather than a mapping, for two reasons. Production
+    passes ``os.putenv``, which reaches the real process environment that a
+    C library's ``getenv`` reads -- the only environment cuBLAS or OpenBLAS
+    consults. And the monorepo bans reading config out of ``os.environ``,
+    correctly: configuration comes from the config layer. Writing a variable
+    that a native library requires is a different act, and this Protocol
+    keeps the two from being confused.
+
+    Deliberately no read side. ``os.putenv`` does not update ``os.environ``,
+    so a "did it get set?" helper built on the Python mapping would report
+    False on a correctly configured process.
+
+    Parameters are positional-only: ``os.putenv`` names them ``name`` and
+    ``value``, and a Protocol that named them otherwise would reject the one
+    implementation that matters.
+
+    Here rather than beside either pinner because both need it: the torch one
+    writes the cuBLAS workspace, the CPU one writes thread counts, and a
+    second copy of this Protocol would be two spellings of one seam.
+    """
+
+    def __call__(self, key: str, value: str, /) -> None: ...
+
+
 __all__ = [
+    "BLAS_THREAD_ENV_VARS",
     "CUBLAS_DETERMINISTIC_WORKSPACE",
     "CUBLAS_WORKSPACE_ENV_VAR",
     "DETERMINISM_ENV_VAR",
     "DETERMINISM_OFF",
     "DETERMINISM_ON",
+    "SINGLE_THREAD",
+    "SetEnvProtocol",
     "determinism_requested",
 ]

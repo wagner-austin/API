@@ -56,6 +56,7 @@ from typing import Protocol
 from platform_core.determinism_env import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
+    SetEnvProtocol,
 )
 from platform_core.determinism_record import (
     FALSE,
@@ -88,29 +89,6 @@ class SetDeterministicAlgorithmsProtocol(Protocol):
     """``torch.use_deterministic_algorithms``."""
 
     def __call__(self, mode: bool) -> None: ...
-
-
-class SetEnvProtocol(Protocol):
-    """A writer for one process environment variable.
-
-    A write-only seam rather than a mapping, for two reasons. Production
-    passes ``os.putenv``, which reaches the real process environment that a
-    C library's ``getenv`` reads -- the only environment cuBLAS consults.
-    And the monorepo bans reading config out of ``os.environ``, correctly:
-    configuration comes from the config layer. Writing a variable that a
-    native library requires is a different act, and this Protocol keeps the
-    two from being confused.
-
-    Deliberately no read side. ``os.putenv`` does not update ``os.environ``,
-    so a "did it get set?" helper built on the Python mapping would report
-    False on a correctly configured process.
-
-    Parameters are positional-only: ``os.putenv`` names them ``name`` and
-    ``value``, and a Protocol that named them otherwise would reject the one
-    implementation that matters.
-    """
-
-    def __call__(self, key: str, value: str, /) -> None: ...
 
 
 def set_cublas_workspace(set_env: SetEnvProtocol) -> str:
