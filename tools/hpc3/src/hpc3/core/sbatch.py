@@ -79,11 +79,18 @@ def job_comment(spec: JobSpec) -> str:
         That is precisely why the ledger exists and why nothing in this
         package reads provenance back from the cluster.
     """
+    image = spec["image"]
+    # A directory path names a place that can be rebuilt under the same name;
+    # a digest names bytes. When the job runs in an image, the digest is the
+    # honest answer to "which environment is this", so it is what the queue
+    # carries. Truncated because --comment is one token and the full 64
+    # characters would crowd out the experiment fragment that follows.
+    runtime = spec["env_path"] if image is None else f"sif:{image['sha256'][:12]}"
     return (
         f"project={spec['project']}"
         f";gpu={describe_gpu_request(spec['gpu'])}"
         f";cpus={spec['cpus']}"
-        f";env={spec['env_path']}"
+        f";env={runtime}"
         f";det={'on' if spec['deterministic'] else 'off'}"
         f";exp={comment_fragment(spec['experiment'])}"
     )
@@ -113,6 +120,60 @@ def _determinism_exports(spec: JobSpec) -> list[str]:
     ]
 
 
+APPTAINER_MODULE = "apptainer/1.4.5"
+
+
+def _runtime_module_lines(spec: JobSpec) -> list[str]:
+    """Load whatever the job's runtime needs before anything uses it.
+
+    ``apptainer`` is a module on HPC3 rather than on the default PATH --
+    ``which apptainer`` returns nothing on a login node until it is loaded --
+    so an image run that skipped this fails with "command not found" on a
+    cluster that has it installed. Emitted before the provenance export
+    because that export reads the commit stamp through ``apptainer exec``.
+
+    Args:
+        spec: The spec being rendered.
+
+    Returns:
+        The lines, empty for a host run.
+    """
+    if spec["image"] is None:
+        return []
+    return [f"module load {APPTAINER_MODULE}"]
+
+
+def _payload_lines(spec: JobSpec) -> list[str]:
+    """Render the payload, wrapped in its runtime.
+
+    A host run puts the environment's ``bin`` on PATH and executes the
+    command directly. An image run executes it through ``apptainer exec``,
+    setting PATH inside the container -- ``env_path`` is then a container
+    path the job contract has already refused to place under a bind-mounted
+    root, so it survives the mounts the cluster applies.
+
+    Args:
+        spec: The spec being rendered.
+
+    Returns:
+        The lines that run the payload and nothing else.
+
+        The image is named by PATH here, not by digest, because apptainer
+        takes a file. The digest is recorded in ``--comment``, so the queue
+        says which image a job is running and a later reader can check the
+        file still matches it.
+    """
+    image = spec["image"]
+    env_bin = f"{spec['env_path']}/bin"
+    if image is None:
+        return [f'export PATH="{env_bin}:$PATH"', "", spec["command"]]
+    return [
+        f'apptainer exec "{image["path"]}" \\',
+        f'    env PATH="{env_bin}:$PATH" \\',
+        f"    {spec['command']}",
+    ]
+
+
 def _code_provenance_export(spec: JobSpec) -> str:
     """Build the line that tells the payload which code it is running.
 
@@ -139,8 +200,13 @@ def _code_provenance_export(spec: JobSpec) -> str:
         as "not stamped" and records null, which is true, rather than
         inventing a commit that never built anything.
     """
-    inner = f"$(cat {spec['env_path']}/GIT_COMMIT 2>/dev/null || echo '')"
-    return f'export GIT_COMMIT="{inner}"'
+    stamp = f"{spec['env_path']}/GIT_COMMIT"
+    image = spec["image"]
+    # For an image run the stamp lives INSIDE the image, at a container path.
+    # A bare `cat` would look on the host, find nothing, and export empty --
+    # reporting an image that does know its commit as unstamped.
+    reader = f"cat {stamp}" if image is None else f'apptainer exec "{image["path"]}" cat {stamp}'
+    return f"export GIT_COMMIT=\"$({reader} 2>/dev/null || echo '')\""
 
 
 def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
@@ -223,8 +289,8 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
         # knows what its checkpoint means -- so it surfaces the count and
         # leaves the decision where the knowledge is.
         'export HPC3_RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"',
+        *_runtime_module_lines(spec),
         _code_provenance_export(spec),
-        f'export PATH="{spec["env_path"]}/bin:$PATH"',
         "",
         'echo "host      $(hostname)"',
         'echo "job       ${SLURM_JOB_ID:-none}"',
@@ -247,7 +313,7 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
         ),
         "date -Is",
         "",
-        spec["command"],
+        *_payload_lines(spec),
         "rc=$?",
         "",
         "date -Is",

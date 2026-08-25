@@ -44,6 +44,29 @@ from typing_extensions import TypedDict
 
 _PIN_SEPARATOR = "=="
 
+SHA256_HEX_LENGTH = 64
+
+_HEX_DIGITS = frozenset("0123456789abcdef")
+
+
+class ImageReference(TypedDict):
+    """An image a job runs inside, named by path and pinned by digest.
+
+    Attributes:
+        path: Absolute POSIX path to the ``.sif`` on the cluster. A host
+            path, unlike :attr:`ImageSpec.env_prefix`, because the file is
+            read from the filesystem rather than from inside a container.
+        sha256: Digest of the image's exact bytes, lowercase hex. Required
+            rather than optional: a path names a file that can be rebuilt in
+            place, and "the environment is a directory nobody edited" is the
+            assumption an image exists to replace. Recorded into the job's
+            provenance so a queued row says which image it is running, not
+            merely where it was read from.
+    """
+
+    path: str
+    sha256: str
+
 
 class SymbolCheck(TypedDict):
     """One attribute whose presence proves a fresh wheel was baked.
@@ -351,6 +374,99 @@ def _require_symbol_checks(obj: JSONObject, key: str) -> list[SymbolCheck]:
     return [require_symbol_check(item, f"{key}[{index}]") for index, item in enumerate(raw)]
 
 
+def _require_host_path(obj: JSONObject, key: str) -> str:
+    """Read a required absolute POSIX path on the cluster's filesystem.
+
+    Distinct from :func:`_require_container_dir`: this names a file the
+    cluster reads, so a bind-mounted root is exactly where it belongs and
+    refusing one would refuse every real image.
+
+    Args:
+        obj: Object being decoded.
+        key: Field name.
+
+    Returns:
+        The field's value.
+
+    Raises:
+        JSONTypeError: If the field is missing, not a string, not absolute,
+            backslashed, or holds a ``..`` segment.
+    """
+    value = require_str(obj, key)
+    if not value.startswith("/"):
+        raise JSONTypeError(f"Field '{key}' must be an absolute POSIX path, got {value!r}")
+    if "\\" in value:
+        raise JSONTypeError(f"Field '{key}' must be forward-slashed, got {value!r}")
+    if ".." in value.split("/"):
+        raise JSONTypeError(f"Field '{key}' must not contain '..', got {value!r}")
+    return value
+
+
+def _require_digest(obj: JSONObject, key: str) -> str:
+    """Read a required lowercase-hex sha256 field.
+
+    Args:
+        obj: Object being decoded.
+        key: Field name.
+
+    Returns:
+        The field's value.
+
+    Raises:
+        JSONTypeError: If the field is missing, not a string, not exactly 64
+            characters, or holds a non-hex or uppercase character. A re-cased
+            or truncated digest no longer names the bytes it came from, so
+            comparing against it would pass on the wrong image.
+    """
+    value = require_str(obj, key)
+    if len(value) != SHA256_HEX_LENGTH or any(ch not in _HEX_DIGITS for ch in value):
+        raise JSONTypeError(
+            f"Field '{key}' must be {SHA256_HEX_LENGTH} lowercase hex characters, got {value!r}"
+        )
+    return value
+
+
+def decode_image_reference(value: JSONValue, key: str) -> ImageReference | None:
+    """Decode the image a job runs inside, which may be absent.
+
+    Args:
+        value: The field's value. ``None`` means the job runs from a
+            directory environment on the host rather than inside an image.
+        key: Field name, used in error messages.
+
+    Returns:
+        The validated reference, or None.
+
+    Raises:
+        JSONTypeError: If the value is neither null nor an object, the path is
+            not an absolute POSIX path, or the digest is not 64 lowercase hex
+            characters. The digest is required rather than optional because a
+            path names a file that can be rebuilt in place, which is the
+            mutable-directory problem an image exists to solve.
+    """
+    if value is None:
+        return None
+    obj = _require_object(value, key)
+    return ImageReference(
+        path=_require_host_path(obj, "path"),
+        sha256=_require_digest(obj, "sha256"),
+    )
+
+
+def encode_image_reference(reference: ImageReference | None) -> JSONValue:
+    """Encode an image reference, or null when the job uses no image.
+
+    Args:
+        reference: Reference to encode, or None.
+
+    Returns:
+        The JSON form, round-trippable through :func:`decode_image_reference`.
+    """
+    if reference is None:
+        return None
+    return {"path": reference["path"], "sha256": reference["sha256"]}
+
+
 def encode_symbol_check(check: SymbolCheck) -> JSONObject:
     """Encode a symbol assertion to a JSON object.
 
@@ -420,9 +536,13 @@ def decode_image_spec(value: JSONValue) -> ImageSpec:
 
 __all__ = [
     "HOST_BOUND_ROOTS",
+    "SHA256_HEX_LENGTH",
+    "ImageReference",
     "ImageSpec",
     "SymbolCheck",
+    "decode_image_reference",
     "decode_image_spec",
+    "encode_image_reference",
     "encode_image_spec",
     "encode_symbol_check",
     "require_symbol_check",

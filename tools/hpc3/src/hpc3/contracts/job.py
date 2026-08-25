@@ -54,6 +54,12 @@ from hpc3.contracts.cluster import (
 )
 from hpc3.contracts.dependency import Dependency, decode_dependency, encode_dependency
 from hpc3.contracts.experiment import encode_experiment, require_experiment
+from hpc3.contracts.image import (
+    HOST_BOUND_ROOTS,
+    ImageReference,
+    decode_image_reference,
+    encode_image_reference,
+)
 from hpc3.contracts.layout import require_project
 from hpc3.contracts.pins import encode_pinned_packages, require_pinned_packages
 
@@ -92,8 +98,19 @@ class JobSpec(TypedDict):
             ``--kill-on-invalid-dep=yes`` so an unsatisfiable wait cancels
             rather than parking forever. See
             :mod:`hpc3.contracts.dependency`.
-        env_path: Absolute path on the cluster to a directory with a ``bin``
-            holding the payload's interpreter or binary.
+        image: Image the payload runs inside, or None to run directly on the
+            host. When present, ``env_path`` names a directory INSIDE that
+            image rather than on the cluster, and the batch script wraps the
+            payload in ``apptainer exec``. The reference carries a digest, so
+            a queued job says which image it is running rather than merely
+            where the file was read from -- see
+            :mod:`hpc3.contracts.image`.
+        env_path: Absolute path to a directory with a ``bin`` holding the
+            payload's interpreter or binary. On the cluster when ``image`` is
+            None; inside the image when it is not. A host-bound path is
+            refused in the second case: HPC3 mounts ``/pub`` into every
+            container, so an in-image environment there would be shadowed at
+            runtime by the host directory and the interpreter would vanish.
         pinned_packages: Distribution versions that environment must actually
             contain. Checked at preflight against the environment's own
             report, because a path proves the directory exists and nothing
@@ -122,6 +139,7 @@ class JobSpec(TypedDict):
     requeue: bool
     checkpoint_steps: int
     depends_on: Dependency | None
+    image: ImageReference | None
     env_path: str
     pinned_packages: dict[str, str]
     deterministic: bool
@@ -145,6 +163,41 @@ def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
     value = require_str(obj, key)
     if value == "":
         raise JSONTypeError(f"Field '{key}' must not be empty")
+    return value
+
+
+def _require_env_path(obj: dict[str, JSONValue], image: ImageReference | None) -> str:
+    """Read the interpreter directory, checked against where it will resolve.
+
+    The same field names two different filesystems depending on ``image``,
+    and getting that wrong fails in a way nothing reports. HPC3 bind-mounts
+    ``/pub`` into every container, so an in-image environment under it is
+    replaced at runtime by the host directory: the batch script would put a
+    path on PATH that exists on both sides and holds the wrong interpreter,
+    or none.
+
+    Args:
+        obj: Object being decoded.
+        image: The image the job runs inside, or None for a host run.
+
+    Returns:
+        The field's value.
+
+    Raises:
+        JSONTypeError: If the field is missing, not a string, or empty; or,
+            when an image is present, if the path sits under a root the
+            cluster bind-mounts over.
+    """
+    value = _require_nonempty_str(obj, "env_path")
+    if image is None:
+        return value
+    first_segment = value.strip("/").split("/")[0]
+    if first_segment in HOST_BOUND_ROOTS:
+        raise JSONTypeError(
+            f"Field 'env_path' is inside an image but sits under /{first_segment}, "
+            f"which the cluster bind-mounts over -- the host directory would shadow "
+            f"the image's own environment at runtime, got {value!r}"
+        )
     return value
 
 
@@ -322,6 +375,7 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
         "requeue": spec["requeue"],
         "checkpoint_steps": spec["checkpoint_steps"],
         "depends_on": encode_dependency(spec["depends_on"]),
+        "image": encode_image_reference(spec["image"]),
         "env_path": spec["env_path"],
         "pinned_packages": encode_pinned_packages(spec["pinned_packages"]),
         "deterministic": spec["deterministic"],
@@ -369,6 +423,8 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
     _check_time_limit(cluster, partition, minutes)
     _check_preemption_protection(cluster, partition, minutes, requeue, checkpoint_steps)
 
+    image = decode_image_reference(value.get("image"), "image")
+
     return JobSpec(
         project=require_project(value, "project"),
         name=_require_nonempty_str(value, "name"),
@@ -380,7 +436,8 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
         requeue=requeue,
         checkpoint_steps=checkpoint_steps,
         depends_on=decode_dependency(value.get("depends_on"), "depends_on"),
-        env_path=_require_nonempty_str(value, "env_path"),
+        image=image,
+        env_path=_require_env_path(value, image),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
         deterministic=require_bool(value, "deterministic"),
         experiment=require_experiment(value, "experiment"),

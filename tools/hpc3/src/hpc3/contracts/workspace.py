@@ -48,6 +48,11 @@ from hpc3.contracts.cluster import (
     encode_gpu_request,
     require_partition,
 )
+from hpc3.contracts.image import (
+    ImageReference,
+    decode_image_reference,
+    encode_image_reference,
+)
 from hpc3.contracts.layout import require_project, require_root
 from hpc3.contracts.pins import encode_pinned_packages, require_pinned_packages
 
@@ -76,8 +81,12 @@ class ProjectConfig(TypedDict):
         minutes: Wall-clock limit per job.
         requeue: Whether Slurm should resubmit after a preemption.
         checkpoint_steps: Training steps between checkpoints; 0 means none.
-        env_path: Absolute path to this project's Python environment on the
-            cluster.
+        image: Image this project's payloads run inside, or None to run
+            directly on the cluster. This is where a project adopts an image:
+            one field, and every run and sweep it declares inherits it. See
+            :mod:`hpc3.contracts.image`.
+        env_path: Absolute path to this project's Python environment. On the
+            cluster when ``image`` is None; inside the image when it is not.
         pinned_packages: Distribution versions the environment must actually
             contain, keyed by name. Required as a field, may be empty: a
             project whose payload is a compiled binary has no Python packages
@@ -103,6 +112,7 @@ class ProjectConfig(TypedDict):
     minutes: int
     requeue: bool
     checkpoint_steps: int
+    image: ImageReference | None
     env_path: str
     pinned_packages: dict[str, str]
     deterministic: bool
@@ -145,6 +155,7 @@ PROJECT_FIELDS = (
     "minutes",
     "requeue",
     "checkpoint_steps",
+    "image",
     "env_path",
     "pinned_packages",
     "deterministic",
@@ -234,6 +245,7 @@ def decode_project_config(value: JSONValue, cluster: ClusterFacts) -> ProjectCon
         minutes=_require_positive(value, "minutes"),
         requeue=require_bool(value, "requeue"),
         checkpoint_steps=checkpoint_steps,
+        image=decode_image_reference(value.get("image"), "image"),
         env_path=_require_nonempty_str(value, "env_path"),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
         deterministic=require_bool(value, "deterministic"),
@@ -257,6 +269,7 @@ def encode_project_config(config: ProjectConfig) -> dict[str, JSONValue]:
         "minutes": config["minutes"],
         "requeue": config["requeue"],
         "checkpoint_steps": config["checkpoint_steps"],
+        "image": encode_image_reference(config["image"]),
         "env_path": config["env_path"],
         "pinned_packages": encode_pinned_packages(config["pinned_packages"]),
         "deterministic": config["deterministic"],

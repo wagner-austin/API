@@ -82,6 +82,10 @@ def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
             # several ways, so if the rung depends on a staging job then each
             # of its members does.
             depends_on=spec["base"]["depends_on"],
+            # A sweep varies the payload, never the environment: members whose
+            # runtimes differ are not one experiment run several ways, they
+            # are several experiments whose contrasts nothing may subtract.
+            image=spec["base"]["image"],
             env_path=spec["base"]["env_path"],
             pinned_packages=spec["base"]["pinned_packages"],
             deterministic=spec["base"]["deterministic"],

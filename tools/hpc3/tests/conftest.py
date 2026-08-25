@@ -318,6 +318,7 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
+        "image": None,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,

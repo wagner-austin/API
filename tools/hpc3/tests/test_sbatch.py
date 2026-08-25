@@ -8,13 +8,14 @@ from contract to script: the GPU model always appears in ``--gres``, and
 
 from __future__ import annotations
 
+import pytest
 from platform_core.determinism_env import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
     DETERMINISM_ENV_VAR,
     determinism_requested,
 )
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.contracts.job import JobSpec
 from hpc3.core.sbatch import (
@@ -27,6 +28,11 @@ from tests.against_hpc3 import decode_job_spec
 from tests.conftest import gpus
 
 _LOG_DIR = "/pub/wagnera3/logs"
+_SIF = "/pub/wagnera3/images/abl.sif"
+_IMAGE: JSONValue = {
+    "path": _SIF,
+    "sha256": "9ed4e27fd0d8207de3f84e833b98e0cf7e6ab09af66726849ca1cf023326cd51",
+}
 
 
 def _spec(**overrides: JSONValue) -> JobSpec:
@@ -385,6 +391,76 @@ class TestResumeSurface:
         assert "#SBATCH --requeue" in script
         assert "HPC3_RESTART_COUNT" in script
         assert 'export HPC3_CHECKPOINT_STEPS="50"' in script
+
+
+class TestImageRuns:
+    """A job that runs inside an image, rather than out of a directory.
+
+    The distinction is not cosmetic. A directory environment is mutable and
+    unrecorded; an image is content-addressed. These assertions cover the
+    three places that difference has to reach: how the payload is executed,
+    where the commit stamp is read from, and what the queue records.
+    """
+
+    def test_the_payload_runs_through_apptainer(self) -> None:
+        script = render_sbatch(_spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR)
+        assert f'apptainer exec "{_SIF}" \\' in script.splitlines()
+
+    def test_the_apptainer_module_is_loaded(self) -> None:
+        """`which apptainer` returns nothing on HPC3 until the module loads."""
+        assert (
+            "module load apptainer/1.4.5"
+            in render_sbatch(
+                _spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR
+            ).splitlines()
+        )
+
+    def test_an_image_run_refuses_a_host_bound_env_path(self) -> None:
+        """The baseline env_path is a HOST path, so pairing it with an image
+        must be refused rather than rendered into a script that silently
+        resolves the wrong interpreter."""
+        with pytest.raises(JSONTypeError, match="bind-mounts over"):
+            _ = _spec(image=_IMAGE)
+
+    def test_a_host_run_loads_no_module_and_calls_no_apptainer(self) -> None:
+        script = render_sbatch(_spec(), log_dir=_LOG_DIR)
+        assert "module load apptainer/1.4.5" not in script
+        assert "apptainer exec" not in script
+
+    def test_path_is_set_inside_the_container(self) -> None:
+        """env_path names a container directory once an image is present."""
+        script = render_sbatch(
+            _spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR
+        ).splitlines()
+        assert '    env PATH="/opt/env/bin:$PATH" \\' in script
+
+    def test_a_host_run_exports_path_directly(self) -> None:
+        script = render_sbatch(_spec(), log_dir=_LOG_DIR).splitlines()
+        assert 'export PATH="/pub/wagnera3/envs/abl-pinned/bin:$PATH"' in script
+
+    def test_the_commit_stamp_is_read_from_inside_the_image(self) -> None:
+        """A bare `cat` would look on the host, find nothing, and export empty
+        -- reporting an image that does know its commit as unstamped."""
+        script = render_sbatch(_spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR)
+        assert (
+            'export GIT_COMMIT="$(apptainer exec "/pub/wagnera3/images/abl.sif" '
+            "cat /opt/env/GIT_COMMIT 2>/dev/null || echo '')\"" in script.splitlines()
+        )
+
+    def test_the_module_loads_before_the_stamp_is_read(self) -> None:
+        script = render_sbatch(_spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR)
+        lines = script.splitlines()
+        module = lines.index("module load apptainer/1.4.5")
+        stamp = next(i for i, line in enumerate(lines) if line.startswith("export GIT_COMMIT="))
+        assert module < stamp
+
+    def test_the_queue_records_the_digest_not_the_path(self) -> None:
+        """A path names a place that can be rebuilt; a digest names bytes."""
+        comment = job_comment(_spec(image=_IMAGE, env_path="/opt/env"))
+        assert ";env=sif:9ed4e27fd0d8;" in comment
+
+    def test_a_host_run_records_its_directory(self) -> None:
+        assert ";env=/pub/wagnera3/envs/abl-pinned;" in job_comment(_spec())
 
 
 class TestCodeProvenance:
