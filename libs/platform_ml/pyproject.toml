@@ -69,6 +69,19 @@ src = ["src", "tests", "scripts"]
 exclude = [".venv"]
 
 [tool.ruff.lint]
+# preview is on ONLY to make F822 apply inside __init__.py. By default ruff
+# suppresses "undefined name in __all__" there, on the assumption that a
+# package re-exports names it does not define -- so a stale entry in __all__
+# passes lint, passes mypy --strict, and fails at runtime on `import *`.
+# That is not hypothetical: a stale name was reintroduced here and a full
+# `make check` went green on it.
+#
+# explicit-preview-rules keeps the blast radius at exactly this: preview-gated
+# RULES stay off unless named in select, so turning preview on does not quietly
+# enlist a pile of unstable checks. Measured before keeping it -- ruff over
+# src, tests and scripts with this config reports zero new violations.
+preview = true
+explicit-preview-rules = true
 select = [
   "E","F","I","B","BLE","UP","N","C4","SIM","RET","C90","RUF","ANN"
 ]
