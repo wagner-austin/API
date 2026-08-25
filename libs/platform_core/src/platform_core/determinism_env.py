@@ -101,12 +101,17 @@ BLAS_THREAD_ENV_VARS: tuple[str, ...] = (
 )
 """The thread-count variables a CPU numeric stack reads when it loads.
 
-The CPU analogue of :data:`CUBLAS_WORKSPACE_ENV_VAR`, and it exists for the
-same reason: a multi-threaded BLAS splits a reduction across threads and
-combines the partial sums in whatever order they finish, so the same dot
-product over the same inputs can produce different last bits between two runs
-on one machine. Floating-point addition is not associative, and nothing about
-seeding touches this.
+The CPU analogue of :data:`CUBLAS_WORKSPACE_ENV_VAR`. A multi-threaded BLAS
+splits a reduction across threads and the thread COUNT decides the
+partitioning, so two runs that split the same sum differently reach different
+bits. Floating-point addition is not associative, and nothing about seeding
+touches this.
+
+Measured rather than assumed (2026-08-25, numpy 2.3.5 / scipy-openblas
+0.3.30, 24 cores): at a fixed thread count the result is bit-identical run
+after run, and across 1, 8 and 24 threads it is not -- three different
+answers from identical bytes. The hazard is therefore an unrecorded INPUT,
+not an unpredictable library.
 
 All four are named because a numpy wheel may be linked against OpenBLAS or
 MKL, and numexpr reads its own. Setting only the one that happens to matter

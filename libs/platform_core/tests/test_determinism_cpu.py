@@ -4,6 +4,14 @@ This is the non-torch half of the determinism story, and it exists because
 most of the research here is non-torch. The case that carries the design is
 the last one: a CPU run and a torch run must not compare equal just because
 neither mentions the other's settings.
+
+The premise was measured before this was written, and the measurement
+corrected it. On numpy 2.3.5 / scipy-openblas 0.3.30 a 4096x4096 float32
+matmul over identical bytes is BIT-IDENTICAL run after run at a fixed thread
+count, and differs across 1, 8 and 24 threads -- 865,498 of 16,777,216
+elements, max absolute difference 1.4e-4. So the thing worth pinning is an
+unrecorded INPUT, not an unpredictable library, and these tests assert that
+the count reaches every variable and lands in the record.
 """
 
 from __future__ import annotations

@@ -5,12 +5,29 @@ not torch. Most of this monorepo's is not: gradient boosting, transliteration
 and metabolomics pull no torch at all, and a future job may have no GPU to
 pin anything on.
 
-WHAT THIS PINS AND WHY IT IS THE RIGHT ANALOGUE. A multi-threaded BLAS splits
-a reduction across threads and combines the partial sums in whatever order
-they finish. Floating-point addition is not associative, so the same dot
-product over the same inputs can produce different last bits between two runs
-on one machine, with one seed, on one binary. That is the CPU version of the
-cuBLAS reduction-order problem, and seeding does not touch it.
+WHAT THIS PINS, STATED AS MEASURED RATHER THAN AS ASSUMED. A multi-threaded
+BLAS splits a reduction across threads, and the thread COUNT decides the
+partitioning. Floating-point addition is not associative, so two runs that
+split the same sum differently reach different bits.
+
+Measured on 2026-08-25, numpy 2.3.5 on scipy-openblas 0.3.30, 24 cores, a
+4096x4096 float32 matmul over identical bytes, fresh process each time:
+
+* At a FIXED thread count the result is bit-identical, run after run. 1, 8
+  and 24 threads each reproduced themselves exactly.
+* ACROSS thread counts the results differ. 1, 8 and 24 threads produced three
+  different answers -- 865,498 of 16,777,216 elements changed, max absolute
+  difference 1.4e-4 on values averaging 51.
+
+So the hazard is not that a threaded BLAS is unpredictable; on this stack it
+is quite predictable. The hazard is that the thread count is an INPUT nobody
+records. A run on a 24-core box and a run on an 8-core box, or one that set
+the variable and one that inherited a default, produce different numbers from
+the same code and the same data -- and nothing in either result says why.
+Pinning it makes the count part of the configuration a fingerprint carries.
+
+That is the same shape as the cuBLAS workspace problem, and seeding does not
+touch either.
 
 WHAT IT DOES NOT DO, deliberately:
 
