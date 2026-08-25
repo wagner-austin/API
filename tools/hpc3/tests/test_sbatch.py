@@ -454,6 +454,27 @@ class TestImageRuns:
         stamp = next(i for i, line in enumerate(lines) if line.startswith("export GIT_COMMIT="))
         assert module < stamp
 
+    def test_the_image_digest_is_exported_for_the_payload(self) -> None:
+        """capture_run_fingerprint reads this to decide comparability.
+
+        An image cannot compute its own digest from inside itself, so the
+        launcher -- which pins it in the spec -- is where it comes from.
+        """
+        script = render_sbatch(_spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR)
+        digest = "9ed4e27fd0d8207de3f84e833b98e0cf7e6ab09af66726849ca1cf023326cd51"
+        assert f'export IMAGE_DIGEST="{digest}"' in script.splitlines()
+
+    def test_a_host_run_exports_no_digest(self) -> None:
+        """Unset reads as unknown, which is true: there is no image."""
+        assert "IMAGE_DIGEST" not in render_sbatch(_spec(), log_dir=_LOG_DIR)
+
+    def test_the_digest_is_exported_before_the_payload(self) -> None:
+        lines = render_sbatch(_spec(image=_IMAGE, env_path="/opt/env"), log_dir=_LOG_DIR)
+        script = lines.splitlines()
+        export = next(i for i, line in enumerate(script) if line.startswith("export IMAGE_DIGEST="))
+        payload = next(i for i, line in enumerate(script) if line.startswith("apptainer exec"))
+        assert export < payload
+
     def test_the_queue_records_the_digest_not_the_path(self) -> None:
         """A path names a place that can be rebuilt; a digest names bytes."""
         comment = job_comment(_spec(image=_IMAGE, env_path="/opt/env"))

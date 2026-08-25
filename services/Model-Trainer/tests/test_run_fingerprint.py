@@ -67,11 +67,11 @@ def _restore_hooks() -> Generator[None, None, None]:
     Yields:
         None, for the duration of one test.
     """
-    git = _test_hooks.env_git_commit
+    digest = _test_hooks.env_image_digest
     name = _test_hooks.cuda_device_name
     driver = _test_hooks.cuda_driver_version
     yield
-    _test_hooks.env_git_commit = git
+    _test_hooks.env_image_digest = digest
     _test_hooks.cuda_device_name = name
     _test_hooks.cuda_driver_version = driver
 
@@ -82,7 +82,7 @@ restore_hooks = pytest.fixture(_restore_hooks)
 @pytest.mark.usefixtures("restore_hooks")
 def test_a_cuda_run_records_the_card_and_the_driver() -> None:
     rec = _Recorder("NVIDIA GeForce RTX 3090 Ti", "591.86")
-    _test_hooks.env_git_commit = lambda: "sha256:abc"
+    _test_hooks.env_image_digest = lambda: "sha256:abc"
     _test_hooks.cuda_device_name = rec.device_name
     _test_hooks.cuda_driver_version = rec.driver_version
 
@@ -102,7 +102,7 @@ def test_a_cpu_run_never_touches_the_cuda_accessors() -> None:
     # run does not use, and would put a card in the record of a measurement
     # that never had one.
     rec = _Recorder("NVIDIA GeForce RTX 3090 Ti", "591.86")
-    _test_hooks.env_git_commit = lambda: "sha256:abc"
+    _test_hooks.env_image_digest = lambda: "sha256:abc"
     _test_hooks.cuda_device_name = rec.device_name
     _test_hooks.cuda_driver_version = rec.driver_version
 
@@ -118,7 +118,7 @@ def test_an_unstamped_build_records_an_unknown_digest() -> None:
     # Empty is not a wildcard: it differs from every known digest, so a run
     # from an unstamped image never compares equal to a stamped one.
     rec = _Recorder("NVIDIA GeForce RTX 3090 Ti", "591.86")
-    _test_hooks.env_git_commit = lambda: None
+    _test_hooks.env_image_digest = lambda: None
     _test_hooks.cuda_device_name = rec.device_name
     _test_hooks.cuda_driver_version = rec.driver_version
 
@@ -130,7 +130,7 @@ def test_an_unstamped_build_records_an_unknown_digest() -> None:
 @pytest.mark.usefixtures("restore_hooks")
 def test_a_captured_fingerprint_round_trips_through_storage() -> None:
     rec = _Recorder("NVIDIA A100 80GB PCIe", "550.90.07")
-    _test_hooks.env_git_commit = lambda: "sha256:def"
+    _test_hooks.env_image_digest = lambda: "sha256:def"
     _test_hooks.cuda_device_name = rec.device_name
     _test_hooks.cuda_driver_version = rec.driver_version
 

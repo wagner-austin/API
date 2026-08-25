@@ -26,6 +26,7 @@ from model_trainer.core._hook_defaults import (
     _default_datetime_utcnow_iso,
     _default_dump_json_str,
     _default_env_git_commit,
+    _default_env_image_digest,
     _default_freeze_embeddings,
     _default_get_directory_size_bytes,
     _default_httpx_client_factory,
@@ -71,6 +72,7 @@ from model_trainer.core._hook_protocols import (
     DatetimeUtcnowIsoProto,
     DumpJsonStrProto,
     EnvGitCommitProto,
+    EnvImageDigestProto,
     GetDirectorySizeBytesProto,
     GpuMaxMemoryAllocatedProto,
     GpuResetPeakMemoryStatsProto,
@@ -206,6 +208,8 @@ cuda_device_name: CudaDeviceNameProto = _default_cuda_device_name
 cuda_driver_version: CudaDriverVersionProto = _default_cuda_driver_version
 
 env_git_commit: EnvGitCommitProto = _default_env_git_commit
+
+env_image_digest: EnvImageDigestProto = _default_env_image_digest
 
 pkg_version: PkgVersionProto = _default_pkg_version
 

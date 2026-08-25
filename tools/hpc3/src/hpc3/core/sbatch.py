@@ -123,6 +123,36 @@ def _determinism_exports(spec: JobSpec) -> list[str]:
 APPTAINER_MODULE = "apptainer/1.4.5"
 
 
+def _image_digest_export(spec: JobSpec) -> list[str]:
+    """Build the line that tells the payload which image it is running in.
+
+    The image cannot compute its own digest from inside itself -- the digest
+    covers the whole squashfs, including whatever would be doing the
+    computing. The launcher knows it, because the spec pins it, so the
+    launcher is where it comes from.
+
+    Read by ``model_trainer.core.run_fingerprint.capture_run_fingerprint``
+    for the field that decides whether two measured numbers may be
+    subtracted. That field previously held the code COMMIT, which is a
+    different question: a commit says which code was built, a digest says
+    which environment ran it, and two runs sharing a commit can differ in
+    torch. This is the variable that makes the distinction real.
+
+    Args:
+        spec: The spec being rendered.
+
+    Returns:
+        The export line, or nothing for a host run. Nothing rather than an
+        empty export: the trainer reads unset as "unknown", which is the
+        truth for a directory environment that has no digest, and an
+        exported empty string would say the same thing less clearly.
+    """
+    image = spec["image"]
+    if image is None:
+        return []
+    return [f'export IMAGE_DIGEST="{image["sha256"]}"']
+
+
 def _runtime_module_lines(spec: JobSpec) -> list[str]:
     """Load whatever the job's runtime needs before anything uses it.
 
@@ -290,6 +320,7 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
         # leaves the decision where the knowledge is.
         'export HPC3_RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"',
         *_runtime_module_lines(spec),
+        *_image_digest_export(spec),
         _code_provenance_export(spec),
         "",
         'echo "host      $(hostname)"',

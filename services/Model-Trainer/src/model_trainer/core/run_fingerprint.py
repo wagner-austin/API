@@ -59,15 +59,24 @@ def capture_run_fingerprint(device: str, determinism: DeterminismRecord) -> RunF
             :func:`platform_ml.determinism.apply_determinism`.
 
     Returns:
-        The fingerprint, with the image digest taken from the build-stamped
-        commit. An unstamped build records the empty string, which reads as
-        "unknown" and differs from every known digest rather than matching
-        any of them.
+        The fingerprint. ``image_digest`` is the digest of the image that
+        ran, read from the variable the launcher exports; a run with no
+        image records the empty string, which reads as "unknown" and differs
+        from every known digest rather than matching any of them.
+
+        It is deliberately NOT the code commit. This field held the commit
+        while no image existed, and the two are different questions: a
+        commit says which code was built, a digest says which environment
+        ran it. Two runs can share a commit and differ in torch -- which is
+        precisely the difference that put four published contrasts across a
+        torch major-version boundary, and precisely what a fingerprint is
+        for. The commit remains in the training manifest, where it answers
+        its own question.
     """
-    stamped = _test_hooks.env_git_commit()
+    digest = _test_hooks.env_image_digest()
     on_cuda = device == CUDA_DEVICE
     return RunFingerprint(
-        image_digest=stamped if stamped is not None else NO_GPU,
+        image_digest=digest if digest is not None else NO_GPU,
         gpu_model=_test_hooks.cuda_device_name() if on_cuda else NO_GPU,
         driver_version=_test_hooks.cuda_driver_version() if on_cuda else NO_GPU,
         determinism=determinism,

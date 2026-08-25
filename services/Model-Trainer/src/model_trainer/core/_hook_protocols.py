@@ -33,6 +33,20 @@ class EnvGitCommitProto(Protocol):
         ...
 
 
+class EnvImageDigestProto(Protocol):
+    """Protocol for env_image_digest hook."""
+
+    def __call__(self) -> str | None:
+        """Read the IMAGE_DIGEST variable, None when unset or empty.
+
+        Distinct from the commit: a commit says which code was built, an
+        image digest says which environment ran it. Two runs can share a
+        commit and differ in torch, which is exactly the difference a
+        fingerprint exists to catch.
+        """
+        ...
+
+
 class PkgVersionProto(Protocol):
     """Protocol for pkg_version hook."""
 

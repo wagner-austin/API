@@ -190,6 +190,26 @@ def _default_env_git_commit() -> str | None:
     return value if value else None
 
 
+def _default_env_image_digest() -> str | None:
+    """Production env_image_digest - used as default hook.
+
+    The image cannot compute its own digest from inside itself: the digest
+    covers the whole squashfs, including the file that would be doing the
+    computing. The launcher knows it -- it is what the job's spec pins -- so
+    it exports IMAGE_DIGEST and this reads it.
+
+    An empty or unset variable is None, which the fingerprint records as
+    unknown. That is the honest answer for a run out of a directory
+    environment, where there is no image and therefore no digest, and it
+    compares as a difference against every known digest rather than matching
+    all of them.
+    """
+    from platform_core.config import config_test_hooks
+
+    value = config_test_hooks.get_env("IMAGE_DIGEST")
+    return value if value else None
+
+
 def _default_model_dir(settings: Settings, run_id: str) -> Path:
     """Production model_dir - used as default hook."""
     from model_trainer.core.infra.paths import model_dir as _model_dir
