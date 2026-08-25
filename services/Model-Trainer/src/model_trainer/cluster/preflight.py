@@ -82,7 +82,26 @@ def check_writable(roots: dict[str, Path]) -> None:
     _log.info("output roots writable", extra={"roots": ",".join(sorted(roots))})
 
 
-def check_artifact_round_trip(store: ArtifactStoreProto, scratch: Path) -> None:
+def _discard(tree: Path) -> None:
+    """Remove a probe tree and everything under it.
+
+    No existence guard: the only caller creates this tree immediately before,
+    so a check for its absence would be a branch nothing can take. If that
+    ever stops being true the ``FileNotFoundError`` is the correct outcome --
+    it means the probe went somewhere other than where it was cleaned up.
+
+    Args:
+        tree: Directory to remove, deepest entries first.
+    """
+    for child in sorted(tree.rglob("*"), reverse=True):
+        if child.is_file():
+            child.unlink()
+        else:
+            child.rmdir()
+    tree.rmdir()
+
+
+def check_artifact_round_trip(store: ArtifactStoreProto, scratch: Path, written_to: Path) -> None:
     """Prove the artifact store can store and retrieve, before it is needed.
 
     Pushes a real directory through ``upload_artifact`` and pulls it back
@@ -90,9 +109,17 @@ def check_artifact_round_trip(store: ArtifactStoreProto, scratch: Path) -> None:
     the failure this exists for: the store was fine and the caller refused to
     reach it.
 
+    The probe is removed afterwards, including whatever the store wrote for
+    it. A check that leaves 300-byte tarballs beside a run's real output
+    makes the output directory harder to read every time it passes, which is
+    every time.
+
     Args:
         store: The artifact store the run will actually use.
         scratch: Directory to build the probe in and extract it back into.
+            Removed before returning.
+        written_to: Directory the store writes into, swept for the probe's
+            own artifact once the round trip has proven it works.
 
     Raises:
         AppError: With ``ARTIFACT_UPLOAD_FAILED`` if the round trip does not
@@ -109,7 +136,12 @@ def check_artifact_round_trip(store: ArtifactStoreProto, scratch: Path) -> None:
         request_id="preflight",
         expected_root=PROBE_ARTIFACT,
     )
-    if (restored / "probe.txt").read_bytes() != _PROBE_BYTES:
+    round_tripped = (restored / "probe.txt").read_bytes()
+    _discard(scratch)
+    for leftover in written_to.glob(f"{PROBE_ARTIFACT}*"):
+        leftover.unlink()
+
+    if round_tripped != _PROBE_BYTES:
         raise AppError(
             ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED,
             "The artifact store returned different bytes than it was given; "

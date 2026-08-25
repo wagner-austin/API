@@ -118,7 +118,32 @@ class TestCheckWritable:
 class TestCheckArtifactRoundTrip:
     def test_a_working_store_passes(self, tmp_path: pathlib.Path) -> None:
         store = LocalArtifacts(tmp_path / "artifacts")
-        preflight.check_artifact_round_trip(store, tmp_path / "scratch")
+        preflight.check_artifact_round_trip(store, tmp_path / "scratch", tmp_path / "artifacts")
+
+    def test_it_leaves_nothing_behind_in_the_output_directory(self, tmp_path: pathlib.Path) -> None:
+        """A check that litters makes the run's own output harder to read
+        every time it passes -- which is every time. The first version left a
+        300-byte probe tarball beside two 462 MB models."""
+        artifacts = tmp_path / "artifacts"
+        preflight.check_artifact_round_trip(
+            LocalArtifacts(artifacts), tmp_path / "scratch", artifacts
+        )
+        assert list(artifacts.iterdir()) == []
+        assert not (tmp_path / "scratch").exists()
+
+    def test_cleanup_does_not_touch_the_run_s_real_output(self, tmp_path: pathlib.Path) -> None:
+        """The sweep is scoped to the probe's own name. A cleanup that took
+        the run's model with it would be far worse than the litter."""
+        artifacts = tmp_path / "artifacts"
+        artifacts.mkdir()
+        real = artifacts / "model-abl-armC-a-seed42-8821d462f859.tar.gz"
+        real.write_bytes(b"a real trained model\n")
+
+        preflight.check_artifact_round_trip(
+            LocalArtifacts(artifacts), tmp_path / "scratch", artifacts
+        )
+        assert real.read_bytes() == b"a real trained model\n"
+        assert [p.name for p in artifacts.iterdir()] == [real.name]
 
     def test_a_store_that_returns_the_wrong_bytes_is_refused(self, tmp_path: pathlib.Path) -> None:
         """A configuration check cannot see this: the store answers, it just
@@ -126,7 +151,9 @@ class TestCheckArtifactRoundTrip:
         not at all, which is the worse of the two."""
         with pytest.raises(AppError) as excinfo:
             preflight.check_artifact_round_trip(
-                _RefusingStore(tmp_path / "artifacts"), tmp_path / "scratch"
+                _RefusingStore(tmp_path / "artifacts"),
+                tmp_path / "scratch",
+                tmp_path / "artifacts",
             )
         assert excinfo.value.code is ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED
         assert "different bytes" in excinfo.value.message
@@ -146,5 +173,5 @@ class TestCheckArtifactRoundTrip:
         credentials it never uses. That refusal came from the CALLER, which
         could not know what the store required."""
         store = LocalArtifacts(tmp_path / "artifacts")
-        preflight.check_artifact_round_trip(store, tmp_path / "scratch")
+        preflight.check_artifact_round_trip(store, tmp_path / "scratch", tmp_path / "artifacts")
         assert (tmp_path / "artifacts").is_dir()

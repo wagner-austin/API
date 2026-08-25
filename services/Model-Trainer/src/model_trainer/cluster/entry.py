@@ -37,6 +37,7 @@ from model_trainer.cluster import preflight
 from model_trainer.cluster.stores import LocalArtifacts, StagedCorpus
 from model_trainer.core import _test_hooks
 from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
+from model_trainer.worker.job_utils import setup_job_logging
 
 _log = get_logger(__name__)
 
@@ -183,6 +184,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     # already been spent -- which is exactly how 49 minutes of A100 time was
     # lost to an empty configuration string.
     settings = _test_hooks.load_settings()
+    # Logging FIRST, so preflight's own findings are visible. Without this it
+    # runs before `process_train_job` configures logging, its records go to an
+    # unconfigured logger, and a passing check leaves no trace -- the only
+    # evidence it ran at all was a leftover probe directory. Failures were
+    # always loud, because they raise; successes were silent, which makes a
+    # safety check something you take on faith. `setup_logging` clears
+    # existing handlers, so the later call inside the job is not a duplicate.
+    setup_job_logging(settings)
     preflight.check_writable(
         {
             "APP__ARTIFACTS_ROOT": Path(settings["app"]["artifacts_root"]),
@@ -196,6 +205,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             settings["app"]["data_bank_api_url"], settings["app"]["data_bank_api_key"]
         ),
         artifacts_dir / ".preflight",
+        artifacts_dir,
     )
 
     raw = load_json_str(payload_path.read_text(encoding="utf-8"))
