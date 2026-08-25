@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from monorepo_guards import Rule, RuleReport, Violation
+from monorepo_guards.all_exports_rules import AllExportsRule
 from monorepo_guards.capability_rules import CapabilityDerivationRule
 from monorepo_guards.config import GuardConfig
 from monorepo_guards.config_helpers_rules import ConfigHelpersRule
@@ -54,6 +55,7 @@ def _run_with_config(config: GuardConfig) -> int:
         ConfigRule(),
         TypingRule(),
         ImportsRule(),
+        AllExportsRule(),
         PolicyTestsRule(),
         PatternRule(config),
         LoggingRule(),
