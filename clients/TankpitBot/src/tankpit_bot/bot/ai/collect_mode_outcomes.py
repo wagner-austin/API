@@ -48,6 +48,14 @@ from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 # thing in both places.
 _SUSTAINED_FIRE_HIT_FLOOR = 3
 
+_MAP_ANSWER_WAIT_MS = 10_000
+"""How long the out-of-fuel exit waits on an in-flight map answer.
+
+The map-open stall budget: answers measure 2-6 s of latency and the
+walk-for-fuel rung eats exactly the dots the answer carries, so an
+exit inside this window is the exit racing its own rescue (arterial's
+islet exit came 3 s after the open, 2026-08-26 06:01)."""
+
 # Movement-dead floor: this many server cant_go refusals inside the
 # fire window mean the tank cannot walk ANYWHERE right now (boxed by
 # terrain, tanks, or unrevealed mines), so the escape skips every
@@ -136,6 +144,32 @@ def _exhausted_collect_outcome(
     walk = walk_for_fuel_last_resort(ctx, base_state)
     if walk is not None:
         return walk
+
+    if (
+        base_state["last_map_open_ms"] > ctx.ws.map_data_ingested_ms
+        and ctx.timestamp_ms - base_state["last_map_open_ms"] <= _MAP_ANSWER_WAIT_MS
+    ):
+        # A map-for-dots answer is still in flight (measured latency
+        # 2-6 s, [[map-data-decode]]) and its dots are exactly what
+        # the walk rung above eats. The islet marooning (arterial
+        # 06:01:47-50, 2026-08-26) exited out_of_fuel THREE seconds
+        # after dispatching the open -- the same exit-races-answer
+        # disease as the phantom no_viable_targets exit. Hold the
+        # tick; the ingestion stamp or the wait budget ends the hold.
+        emit_ai(
+            "out-of-fuel exit deferred: map answer in flight (%d ms since open)",
+            ctx.timestamp_ms - base_state["last_map_open_ms"],
+        )
+        return make_decision(
+            make_hold_command(),
+            "COLLECT",
+            COLLECT_SCORE,
+            ctx.self_state["x"],
+            ctx.self_state["y"],
+            "await_map_answer",
+            base_state,
+            ctx.equip,
+        )
 
     raise SessionExitError(
         "out_of_fuel",

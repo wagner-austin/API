@@ -223,6 +223,10 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     cost rather than fuel < cost + reserve.
     """
     ws = WorldService()
+    # The recent open was ANSWERED -- without the ingestion stamp
+    # the exit correctly defers behind the in-flight map answer
+    # (the islet fix, 2026-08-26).
+    ws.map_data_ingested_ms = 96500
     world, self_state = make_world(fuel=30, scanned=True)
     ai_state = AIStateDict(
         **{

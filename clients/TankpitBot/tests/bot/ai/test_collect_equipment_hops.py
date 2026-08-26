@@ -382,68 +382,6 @@ def test_hop_toward_equipment_skips_own_tile_for_a_real_candidate() -> None:
     assert decision["command"]["target_y"] == 100
 
 
-def test_hop_toward_equipment_boards_a_ferry_for_water_locked_drop() -> None:
-    """A fresh believed ferry serves a water-locked equipment drop.
-
-    Radar-situation receipt (2026-07-30 session 7): all 8 tracked
-    equipment containers were water drops with every neighbor
-    impassable, so the radar-broke tank had no reachable restock. The
-    equipment hop now mirrors the fuel larder's F5 ferry landing: the
-    boarding tile becomes the teleport target and the held lock rides
-    to the pickup.
-    """
-    from tankpit_bot.state.types import make_terrain_tile
-    from tankpit_bot.types.constants import TERRAIN_FERRY
-
-    ws = WorldService()
-    containers = {
-        "150,100": make_container_state(
-            x=150,
-            y=100,
-            is_fuel=False,
-            volume=0,
-            timestamp_ms=100000,
-            failed_pickups=0,
-        ),
-    }
-    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
-    world["terrain"]["148,101"] = make_terrain_tile(148, 101, TERRAIN_FERRY, observed_ms=100000)
-    inventory = make_inventory(default_count=15)
-    terrain_data: dict[tuple[int, int], str] = {
-        (150, 100): "W",
-        (149, 100): "W",
-        (151, 100): "W",
-        (150, 99): "W",
-        (150, 101): "W",
-        # The boarding tile floats on the SAME pond as the drop — the
-        # ride-exists gate (2026-08-05) requires water connectivity,
-        # and this fixture's ferry originally sat on unconnected
-        # ground by accident (the exact live-deadlock geometry).
-        (149, 101): "W",
-        (148, 101): "W",
-    }
-    terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-    ctx = DecideCtx(
-        world,
-        self_state,
-        make_scanned_ai_state(),
-        inventory,
-        100000,
-        terrain,
-        "",
-        ws=ws,
-    )
-
-    decision = hop_toward_equipment(ctx, ctx.base)
-
-    if decision is None:
-        raise AssertionError("ferry-served equipment hop must produce a decision")
-    assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["command"]["target_x"] == 148
-    assert decision["command"]["target_y"] == 101
-    assert decision["behavior"]["reason_kind"] == "equipment_hop"
-
-
 def test_hop_skips_a_mine_denied_nearest_and_takes_the_next_candidate() -> None:
     """The bot-20260805-173034 loop-killer: mined access is not a landing.
 

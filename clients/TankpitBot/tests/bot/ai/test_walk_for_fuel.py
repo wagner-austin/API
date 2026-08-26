@@ -33,6 +33,11 @@ def _marooned_ctx(
     opened so the dot-hop path cannot learn anything new.
     """
     ws = WorldService()
+    # The open at 99000 was ANSWERED (the premise "the map recently
+    # opened so the dot-hop path cannot learn anything new" requires
+    # the answer to have landed) -- without this stamp the exit
+    # correctly defers behind the in-flight map answer.
+    ws.map_data_ingested_ms = 99500
     containers = {}
     if with_blacklisted_sliver:
         sliver = make_container_state(
@@ -137,6 +142,35 @@ def test_marooned_exit_ignores_blacklisted_containers() -> None:
         decide_collect_mode(_marooned_ctx(with_blacklisted_sliver=True))
 
 
+def test_exit_defers_while_a_map_answer_is_in_flight() -> None:
+    """A pending map-for-dots answer holds the out_of_fuel exit.
+
+    The islet marooning (arterial 2026-08-26 06:01): the exit fired
+    3 s after dispatching the open, inside the measured 2-6 s answer
+    latency — the exit racing its own rescue, the phantom-exit
+    disease. With the open unanswered the tick holds instead.
+    """
+    ctx = _marooned_ctx()
+    ctx.ws.map_data_ingested_ms = 98000  # before the 99000 open
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected the await-map-answer hold")
+    assert decision["behavior"]["reason_kind"] == "await_map_answer"
+    assert decision["command"]["cmd_type"] == "hold"
+
+
+def test_exit_stands_when_the_map_answer_wait_lapses() -> None:
+    """An open past the wait budget no longer defers the exit."""
+    ctx = _marooned_ctx()
+    ctx.ws.map_data_ingested_ms = 0
+    ctx.base["last_map_open_ms"] = 89000  # 11 s ago, budget is 10 s
+
+    with pytest.raises(SessionExitError, match="out_of_fuel"):
+        decide_collect_mode(ctx)
+
+
 def _edge_ctx(
     *,
     maroon_pan: tuple[int, int] | None = None,
@@ -151,6 +185,8 @@ def _edge_ctx(
     exhausted and only a free pan can make progress.
     """
     ws = WorldService()
+    # The 99000 open was answered -- see the _marooned_ctx note.
+    ws.map_data_ingested_ms = 99500
     world, self_state = make_world(self_x=100, self_y=100, fuel=88, scanned=True)
     world["viewport"] = make_viewport_state(left=85, top=92, width=16, height=16)
     world["scanned_tiles"] = {f"{x},{y}": 100000 for y in range(92, 108) for x in range(85, 101)}

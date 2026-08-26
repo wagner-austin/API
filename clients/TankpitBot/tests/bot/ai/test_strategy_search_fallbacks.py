@@ -405,6 +405,10 @@ class TestFuelSearchFallbacks:
         # ``hunt_min_fuel`` reserve drop (2026-06-24) means stranding
         # now requires fuel < raw teleport cost.
         ws = self.ws
+        # The 96000 open was ANSWERED (empty atlas) -- without the
+        # ingestion stamp the out-of-fuel exit correctly defers behind
+        # the in-flight map answer (the islet fix, 2026-08-26).
+        ws.map_data_ingested_ms = 96500
         world, self_state = _make_world(fuel=30, scanned=True)
         # Recent map open: the dot atlas is empty and a re-open inside
         # the cooldown teaches nothing, so the hop declines.
@@ -428,6 +432,10 @@ class TestFuelSearchFallbacks:
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         ws = self.ws
+        # The 96000 open was ANSWERED (empty atlas) -- without the
+        # ingestion stamp the out-of-fuel exit correctly defers behind
+        # the in-flight map answer (the islet fix, 2026-08-26).
+        ws.map_data_ingested_ms = 96500
         terrain_data: dict[tuple[int, int], str] = {}
         for x in range(92, 108):
             for y in range(92, 108):

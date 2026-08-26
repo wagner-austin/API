@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from typing_extensions import TypedDict
 
+from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
@@ -85,6 +86,9 @@ class FuelLarderSelectionDict(TypedDict):
         ferry_served: Candidates whose landing is a ferry boarding
             tile ([[flag-triage-20260729]] F5) rather than the
             container's own ground.
+        ride_dead: Ferry-served candidates skipped because the tank
+            already stands at the boarding tile — the ride-failed
+            receipt (the islet loop, 2026-08-26).
     """
 
     container: ContainerStateDict | None
@@ -98,6 +102,7 @@ class FuelLarderSelectionDict(TypedDict):
     unprofitable: int
     dreg: int
     ferry_served: int
+    ride_dead: int
 
 
 def _live_fuel_beliefs(ctx: DecideCtx) -> list[ContainerStateDict]:
@@ -160,6 +165,52 @@ def _is_walk_territory(
     return abs(container["x"] - sx) + abs(container["y"] - sy) <= WALK_DOMINANT_RANGE
 
 
+def _resolve_larder_landing(
+    ctx: DecideCtx,
+    terrain: TerrainMapProtocol,
+    container: ContainerStateDict,
+    sx: int,
+    sy: int,
+) -> tuple[tuple[int, int] | None, str]:
+    """Resolve a candidate's landing tile and its kind.
+
+    Ground landings come from ``find_attainable_landing_tile``; a
+    water-locked container falls through to its ferry boarding tile
+    ([[flag-triage-20260729]] F5; riding pickup law in
+    [[ferry-mechanics]]) — teleport to the ferry, then the held lock
+    rides to the pickup.
+
+    The ``ride_dead`` kind is the islet-loop breaker (arterial
+    2026-08-26 05:46-05:59): standing at (or beside) the boarding
+    tile and STILL deriving the boarding hop IS the ride-failed
+    receipt — a working plan would be riding by now. That session
+    re-hopped 254 times onto a real parked ferry whose rides the
+    server refused, burning 900 fuel, because the hop SUCCEEDS every
+    lap and success is never counted by any ledger. From the boarding
+    tile the candidate is dead until the tank moves away.
+
+    Args:
+        ctx: Decision context (ferry beliefs).
+        terrain: Composed decision terrain (caller-narrowed non-None).
+        container: Candidate fuel container.
+        sx: Self X.
+        sy: Self Y.
+
+    Returns:
+        ``(landing, kind)`` — kind is ``"ground"``, ``"ferry"``,
+        ``"ride_dead"`` (landing None), or ``"none"`` (landing None).
+    """
+    landing = find_attainable_landing_tile(terrain, container["x"], container["y"])
+    if landing is not None:
+        return landing, "ground"
+    boarding = find_ferry_boarding_tile(ctx.world, terrain, container["x"], container["y"])
+    if boarding is None:
+        return None, "none"
+    if max(abs(sx - boarding[0]), abs(sy - boarding[1])) <= 1:
+        return None, "ride_dead"
+    return boarding, "ferry"
+
+
 def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     """Score every believed fuel container and return the best harvest hop.
 
@@ -192,6 +243,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     unprofitable = 0
     dreg = 0
     ferry_served = 0
+    ride_dead = 0
     best: ContainerStateDict | None = None
     best_landing_x = 0
     best_landing_y = 0
@@ -202,20 +254,13 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
         if _is_walk_territory(ctx, container, sx, sy):
             too_close += 1
             continue
-        landing = find_attainable_landing_tile(terrain, container["x"], container["y"])
-        if landing is None:
-            # Water-locked container: a believed ferry near it is the
-            # boarding-tile landing — teleport to the ferry, then the
-            # held lock rides to the pickup ([[flag-triage-20260729]]
-            # F5; riding pickup law in [[ferry-mechanics]]).
-            landing = find_ferry_boarding_tile(
-                ctx.world,
-                terrain,
-                container["x"],
-                container["y"],
-            )
-            if landing is not None:
-                ferry_served += 1
+        landing, landing_kind = _resolve_larder_landing(ctx, terrain, container, sx, sy)
+        if landing_kind == "ferry":
+            ferry_served += 1
+        elif landing_kind == "ride_dead":
+            ferry_served += 1
+            ride_dead += 1
+            continue
         if landing is None:
             no_landing += 1
             continue
@@ -268,6 +313,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
         unprofitable=unprofitable,
         dreg=dreg,
         ferry_served=ferry_served,
+        ride_dead=ride_dead,
     )
 
 

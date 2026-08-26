@@ -341,6 +341,42 @@ def test_water_locked_fuel_is_ferry_served() -> None:
     assert selection["no_landing"] == 0
 
 
+def test_standing_at_the_boarding_tile_kills_the_ferry_served_candidate() -> None:
+    """From the boarding tile the same boarding hop never re-derives.
+
+    The islet loop (arterial 2026-08-26 05:46-05:59): 254 re-hops
+    onto a real parked ferry whose rides the server refused, 900 fuel
+    burned, because the hop SUCCEEDS every lap and no ledger counts
+    success. Standing at (or beside) the boarding tile and still
+    deriving the boarding hop is the ride-failed receipt — the
+    candidate is dead until the tank moves away.
+    """
+    from tankpit_bot.sniffer.world_service import WorldService
+    from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
+
+    containers = {
+        "125,100": make_container(125, 100, 800, is_fuel=True),
+    }
+    world, self_state = make_world(self_x=122, self_y=102, fuel=500, containers=containers)
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(),
+        100000,
+        _water_everywhere_terrain(),
+        "",
+        ws=WorldService(),
+    )
+    ctx.world["terrain"]["122,101"] = _ferry_tile(122, 101, observed_ms=100000)
+
+    selection = select_fuel_larder_hop(ctx)
+
+    assert selection["container"] is None
+    assert selection["ride_dead"] == 1
+    assert selection["ferry_served"] == 1
+
+
 def test_ferry_on_a_disjoint_pond_stays_no_landing() -> None:
     """A ferry on a separate water body cannot serve the container.
 

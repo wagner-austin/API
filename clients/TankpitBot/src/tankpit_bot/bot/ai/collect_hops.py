@@ -70,12 +70,22 @@ def _equipment_hop_landing(
     landing = find_attainable_landing_tile(terrain, container["x"], container["y"])
     if landing is not None:
         return landing
-    return find_ferry_boarding_tile(
+    boarding = find_ferry_boarding_tile(
         ctx.world,
         terrain,
         container["x"],
         container["y"],
     )
+    if boarding is not None:
+        sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+        if max(abs(sx - boarding[0]), abs(sy - boarding[1])) <= 1:
+            # Standing at the boarding tile and still deriving the
+            # boarding hop IS the ride-failed receipt (the islet
+            # loop, 2026-08-26) — the candidate is dead until the
+            # tank moves away. Mirrors the fuel larder's ride_dead
+            # gate.
+            return None
+    return boarding
 
 
 def _equipment_hop_barred(ctx: DecideCtx, base_state: AIStateDict) -> bool:
@@ -342,6 +352,7 @@ def _hop_toward_fuel_larder(
                 unprofitable=selection["unprofitable"],
                 dreg=selection["dreg"],
                 ferry_served=selection["ferry_served"],
+                ride_dead=selection["ride_dead"],
                 fuel=ctx.fuel,
             )
         return None

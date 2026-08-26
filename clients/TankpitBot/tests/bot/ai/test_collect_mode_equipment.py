@@ -151,6 +151,10 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     # ``hunt_min_fuel`` reserve was dropped 2026-06-24, so genuine
     # stranding requires fuel below the raw short-hop cost.
     ws = WorldService()
+    # The recent open was ANSWERED -- without the ingestion stamp
+    # the exit correctly defers behind the in-flight map answer
+    # (the islet fix, 2026-08-26).
+    ws.map_data_ingested_ms = 96500
     world, self_state = make_world(fuel=30, scanned=True)
     # "Genuinely boxed in" must also mean no frontier: the 2026-08-14
     # lawnmower continuation walks toward any unscanned adjacent band,
@@ -199,6 +203,10 @@ def test_collect_mode_raises_when_fully_boxed_in() -> None:
 
     # Fuel below the short-hop cost so no teleport is affordable.
     ws = WorldService()
+    # The recent open was ANSWERED -- without the ingestion stamp
+    # the exit correctly defers behind the in-flight map answer
+    # (the islet fix, 2026-08-26).
+    ws.map_data_ingested_ms = 96500
     world, self_state = make_world(fuel=30, scanned=True)
     # "Genuinely boxed in" must also mean no frontier: the 2026-08-14
     # lawnmower continuation walks toward any unscanned adjacent band,
