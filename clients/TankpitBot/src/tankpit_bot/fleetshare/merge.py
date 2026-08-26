@@ -14,6 +14,8 @@ threat ranking prefers.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from platform_core.json_utils import JSONTypeError, load_json_str, require_int
 from typing_extensions import TypedDict
 
@@ -54,6 +56,43 @@ class FleetMergeSummaryDict(TypedDict):
     scanned: int
 
 
+_REPORT_READ_ATTEMPTS = 3
+"""Bounded re-open budget for a sibling report hit mid-replace.
+
+Windows refuses a concurrent open with ``PermissionError`` for the
+microseconds ``os.replace`` swaps the report file — the first
+two-fighter session at full tick rate hit it (arterial tick 264,
+2026-08-26 03:01:06, ``[Errno 13]`` on artax's knowledge.json; POSIX
+rename never refuses the open, which is why 2,500+ single-bot and
+short pair sessions never saw it). The writer's swap completes within
+the failed open itself, so an immediate retry lands. A persistent
+denial across the whole budget is no longer the race — it is a real
+permission fault, and it still raises."""
+
+
+def _read_report_text(path: Path) -> str:
+    """Read a sibling report, absorbing the Windows replace window.
+
+    Args:
+        path: The report file.
+
+    Returns:
+        The file text.
+
+    Raises:
+        PermissionError: When every attempt in the budget is denied —
+            a real permission fault, never the transient swap race.
+    """
+    attempt = 0
+    while True:
+        try:
+            return _test_hooks.read_text(path)
+        except PermissionError:
+            attempt += 1
+            if attempt >= _REPORT_READ_ATTEMPTS:
+                raise
+
+
 def read_team_reports(
     own_instance: str,
     own_team: int,
@@ -86,7 +125,7 @@ def read_team_reports(
     for path in paths:
         if path == own_path:
             continue
-        parsed = load_json_str(_test_hooks.read_text(path))
+        parsed = load_json_str(_read_report_text(path))
         if not isinstance(parsed, dict):
             raise JSONTypeError(f"fleet report must be an object, got {type(parsed).__name__}")
         # Freshness gates BEFORE full decode, two-sided: every fleet
