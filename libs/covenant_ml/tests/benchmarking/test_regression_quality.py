@@ -72,6 +72,15 @@ def write_rw_value_fixture(
     (folder / "data.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+NOT_LOADED: tuple[str, ...] = ()
+"""A module table with no native numeric library in it.
+
+This test module has numpy loaded -- it is a numpy test suite -- so the pin
+would rightly refuse against the real `sys.modules`. Stating the precondition
+keeps the fixture describing a production run rather than this process.
+"""
+
+
 def _discard_env(name: str, value: str) -> None:
     """Accept a pinned variable without writing it.
 
@@ -82,7 +91,7 @@ def _discard_env(name: str, value: str) -> None:
 
 
 _FINGERPRINT = cpu_run_fingerprint(
-    apply_cpu_determinism(_discard_env, SINGLE_THREAD),
+    apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
     {"IMAGE_DIGEST": "sha256:" + "ef" * 32}.get,
 )
 """The configuration these benchmarks claim to run under.

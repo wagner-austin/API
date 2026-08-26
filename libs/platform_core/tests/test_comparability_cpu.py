@@ -30,6 +30,14 @@ _DIGEST = "sha256:" + "ab" * 32
 _NO_ENV: dict[str, str] = {}
 """A launcher that exported nothing, which is a run outside any image."""
 
+NOT_LOADED: tuple[str, ...] = ()
+"""A module table with no native numeric library in it.
+
+Stated rather than left to `sys.modules`: `apply_cpu_determinism` refuses
+once the natives are loaded, and a test whose meaning depended on what else
+the pytest worker imported would be worse than no test.
+"""
+
 
 def _discard_env(name: str, value: str) -> None:
     """Accept a pinned variable without writing it.
@@ -59,7 +67,7 @@ class TestImageDigestFromEnv:
 
 class TestCpuRunFingerprint:
     def test_it_carries_the_image_and_the_pinned_posture(self) -> None:
-        determinism = apply_cpu_determinism(_discard_env, SINGLE_THREAD)
+        determinism = apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED)
 
         fingerprint = cpu_run_fingerprint(determinism, {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get)
 
@@ -69,7 +77,7 @@ class TestCpuRunFingerprint:
     def test_the_thread_count_is_what_the_posture_records(self) -> None:
         """The axis that decides a cpu run's numbers, in the record."""
         fingerprint = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD), _NO_ENV.get
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED), _NO_ENV.get
         )
 
         settings = dict(fingerprint["determinism"]["settings"])
@@ -78,7 +86,7 @@ class TestCpuRunFingerprint:
     def test_no_card_is_recorded_as_empty_rather_than_omitted(self) -> None:
         """Empty differs from every real card; an absent axis would not."""
         fingerprint = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD), _NO_ENV.get
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED), _NO_ENV.get
         )
 
         assert fingerprint["gpu_model"] == NO_VALUE
@@ -96,11 +104,11 @@ class TestItComparesAgainstTheOtherPaths:
 
     def test_two_cpu_runs_in_one_image_at_one_thread_count_are_identical(self) -> None:
         left = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD),
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
         )
         right = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD),
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
         )
 
@@ -109,11 +117,11 @@ class TestItComparesAgainstTheOtherPaths:
     def test_a_different_thread_count_is_a_difference(self) -> None:
         """The 24-core node versus the 8-core one, caught rather than assumed."""
         one = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD),
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
         )
         eight = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, "8"),
+            apply_cpu_determinism(_discard_env, "8", NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
         )
 
@@ -123,7 +131,7 @@ class TestItComparesAgainstTheOtherPaths:
 
     def test_a_run_that_pinned_nothing_differs_from_one_that_did(self) -> None:
         pinned = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD),
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
         )
         unpinned = cpu_run_fingerprint(
@@ -136,11 +144,11 @@ class TestItComparesAgainstTheOtherPaths:
     def test_the_same_code_in_two_images_is_a_difference(self) -> None:
         """What `versions.torch` and a git commit both fail to distinguish."""
         here = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD),
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
         )
         there = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD),
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: "sha256:" + "cd" * 32}.get,
         )
 

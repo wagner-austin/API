@@ -17,18 +17,48 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from typing import Protocol
 
 from platform_core.comparability import cpu_run_fingerprint
 from platform_core.config import config_test_hooks
 from platform_core.determinism_cpu import apply_cpu_determinism
 from platform_core.determinism_env import SINGLE_THREAD
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
 
-from covenant_ml.benchmarking.regression_quality import (
-    RegressionBenchConfig,
-    encode_regression_manifest,
-    run_regression_benchmark,
-)
+# NOTHING FROM covenant_ml IS IMPORTED AT MODULE SCOPE, and that is a
+# correctness requirement rather than a preference. `covenant_ml/__init__`
+# pulls numpy, the BLAS thread variables are read when numpy loads, and a pin
+# after that point writes variables nobody reads. `apply_cpu_determinism` now
+# refuses in that case instead of reporting a posture the run does not have,
+# which is exactly what this file did between 8c3baa07 and this commit.
+#
+# The imports it needs live inside `main`, after the pin.
+
+
+class PinProtocol(Protocol):
+    """Protocol for pinning this process's CPU reduction order."""
+
+    def __call__(self) -> DeterminismRecord:
+        """Pin the thread count and report what was pinned.
+
+        Returns:
+            The posture the process now has.
+        """
+        ...
+
+
+def _real_pin() -> DeterminismRecord:
+    """Pin the BLAS thread count to one and report it.
+
+    Returns:
+        The record naming every thread variable that was set.
+
+    Raises:
+        NativeLibrariesAlreadyLoadedError: When a native numeric library is
+            already imported, so the write cannot take effect.
+    """
+    return apply_cpu_determinism(os.putenv, SINGLE_THREAD)
 
 
 def _write(message: str) -> None:
@@ -76,15 +106,40 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, pin: PinProtocol = _real_pin) -> int:
     """Run the benchmark and report.
 
     Args:
         argv: Command-line arguments. Defaults to ``sys.argv[1:]``.
+        pin: How to pin CPU determinism, defaulting to the real pin. A test
+            supplies a stand-in for one reason only: the real pin refuses
+            once a native numeric library is loaded, and a numpy test suite
+            has numpy loaded before collection begins. Substituting it does
+            NOT excuse this module from being pinnable -- that property is
+            asserted directly, by importing this file and checking nothing
+            numeric arrived with it.
 
     Returns:
         Process exit code.
     """
+    # PIN FIRST, THEN IMPORT. The thread count decides how a BLAS partitions
+    # a reduction and floating-point addition is not associative, so the count
+    # is an input to every number below -- measured at 865,498 of 16,777,216
+    # matmul elements changing between 1, 8 and 24 threads. These variables
+    # are read when the native library loads, so this has to happen above the
+    # covenant_ml import rather than merely before the benchmark call.
+    determinism = pin()
+    # Read through the config layer, not os.environ. Writing a variable a
+    # native library requires is a different act from reading configuration,
+    # and only the first is this script's business.
+    fingerprint = cpu_run_fingerprint(determinism, config_test_hooks.get_env)
+
+    from covenant_ml.benchmarking.regression_quality import (
+        RegressionBenchConfig,
+        encode_regression_manifest,
+        run_regression_benchmark,
+    )
+
     parsed = build_parser().parse_args(argv)
     dataset: str = parsed.dataset
     external_dir: Path = parsed.external_dir
@@ -107,20 +162,6 @@ def main(argv: list[str] | None = None) -> int:
         min_samples_leaf=min_samples_leaf,
         early_stopping_rounds=early_stopping_rounds,
     )
-
-    # Pin BEFORE the benchmark touches numpy-backed arrays. The thread count
-    # decides how a BLAS partitions a reduction, floating-point addition is
-    # not associative, and platform_core.determinism_cpu measured 865,498 of
-    # 16,777,216 matmul elements changing between 1, 8 and 24 threads. Left
-    # unpinned, a 24-core node and an 8-core node produce different numbers
-    # from the same code and the same data, and nothing in either result says
-    # why. Recorded as well as applied, so the count is part of what the run
-    # IS rather than something a reader has to reconstruct.
-    determinism = apply_cpu_determinism(os.putenv, SINGLE_THREAD)
-    # Read through the config layer, not os.environ. Writing a variable a
-    # native library requires is a different act from reading configuration,
-    # and only the first is this script's business.
-    fingerprint = cpu_run_fingerprint(determinism, config_test_hooks.get_env)
 
     manifest = run_regression_benchmark(config, seeds, external_dir, fingerprint)
     split_kind = "grouped" if manifest["grouped"] else "row"
