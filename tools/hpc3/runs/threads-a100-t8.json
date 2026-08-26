@@ -1,0 +1,31 @@
+{
+  "project": "mi",
+  "name": "threadtest-a100-t8",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 16,
+  "minutes": 20,
+  "requeue": false,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v6/abl.sif",
+    "sha256": "1112dbb11706245c5110c59f54b0da5c2dd8d6618ed84aafdc67164cbd024828",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "OMP_NUM_THREADS=8 python -c 'import torch, json; from model_trainer.cli.known_answer_probe import probe_run_record; from platform_core.run_record import encode_run_record; r = probe_run_record(\"cuda\"); open(\"/pub/wagnera3/probe/threads-a100-t8.json\", \"w\").write(json.dumps({\"resolved_threads\": torch.get_num_threads(), \"record\": encode_run_record(r)}))'",
+  "artifact": "/pub/wagnera3/probe/threads-a100-t8.json",
+  "experiment": {
+    "kind": "thread-count-sensitivity",
+    "label": "gpt2-tiny-L2-d128-h2-v512-len64-seed42",
+    "card": "A100",
+    "image": "v6",
+    "omp_num_threads": "8",
+    "question": "does_host_thread_count_change_a_cuda_probe_result"
+  }
+}

@@ -114,17 +114,16 @@ class TestTheRecordItWrites:
 
 
 class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
-    """A cpu probe used to pin no thread count and record none.
+    """A cpu probe pinned no thread count and recorded none, so it varied
+    with the answering node's core count -- unpinned and unstated.
 
-    Its number therefore depended on the core count of whichever node
-    answered -- a CPU reduction sums its partials in completion order -- and
-    nothing in the record said so. Measured on this stack: a 4096x4096 matmul
-    at one thread and at eight differs in 865,498 of 16,777,216 elements.
-
-    Found from a real artifact. `/pub/wagnera3/probe/v6-cpu-check.json` on
+    Found from a real artifact: `/pub/wagnera3/probe/v6-cpu-check.json` on
     HPC3 carries six CUDA settings, no thread count, and a value
-    (6.250983238220215) that differs from every cuda record
-    (6.250983715057373).
+    (6.250983238220215) differing from every cuda record (6.250983715057373).
+
+    The pin buys reproducibility BY CONSTRUCTION, not a fix for a live drift.
+    Measured 2026-08-26: `probe_forward_loss("cpu")` at 1, 2, 4 and 8 threads
+    returns 6.250983238220215 every time. See `PROBE_CPU_THREADS`.
     """
 
     def test_a_cpu_probe_records_the_thread_count_it_pinned(self) -> None:
@@ -132,18 +131,22 @@ class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
 
         assert settings[TORCH_THREAD_SETTING] == str(probe_cli.PROBE_CPU_THREADS)
 
-    def test_a_cpu_probe_pins_one_thread_so_the_answer_does_not_move(self) -> None:
-        """A known answer that changes with the node's core count is not one."""
+    def test_a_cpu_probe_pins_one_thread(self) -> None:
+        """One removes the degree of freedom entirely rather than fixing it
+        at whatever the first machine happened to have."""
         assert probe_cli.PROBE_CPU_THREADS == 1
 
     def test_a_cuda_probe_records_no_thread_count(self) -> None:
-        """NOT cosmetic, and NOT an oversight -- it is what keeps the eight
-        registered answers comparable.
+        """NOT cosmetic, and now MEASURED rather than assumed.
 
-        Every entry in known-answers.json was registered without a thread
-        count. Adding one to the cuda axis would make every future probe
-        report `configuration_differs` against all of them, for a setting no
-        run has shown to affect a cuda result.
+        HPC3 jobs 55598648 and 55598652 -- one A100 each, image 1112dbb1,
+        driver 580.82.07, identical but for OMP_NUM_THREADS -- returned
+        6.250983715057373 at resolved_threads 1 and at 8, bit for bit. The
+        host thread count does not reach a cuda result.
+
+        Recording one anyway would make every future probe report
+        `configuration_differs` against all eight entries in
+        known-answers.json, which were registered without it.
         """
         assert TORCH_THREAD_SETTING not in dict(probe_cli.probe_determinism("cuda")["settings"])
 

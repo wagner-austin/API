@@ -68,12 +68,21 @@ _FLAGS = (DEVICE_FLAG, OUT_FLAG)
 PROBE_CPU_THREADS = 1
 """Thread count a cpu probe pins itself to.
 
-One, because a probe exists to produce the same number twice. A CPU reduction
-splits across threads and sums the partials in completion order, so the count
-IS the arithmetic: measured on this stack, a 4096x4096 matmul at one thread
-and at eight differs in 865,498 of 16,777,216 elements. A probe that inherited
-the node's core count would be a known answer that changes with which machine
-answered it.
+STABLE BY CONSTRUCTION RATHER THAN BY LUCK, which is a weaker claim than the
+one first written here and is the one the measurements support.
+
+This probe is NOT currently sensitive to the count. Measured 2026-08-26 by
+running ``probe_forward_loss("cpu")`` at 1, 2, 4 and 8 threads: all four
+return 6.250983238220215, bit for bit. A 4096x4096 matmul at one thread and
+at eight DOES differ, in 865,498 of 16,777,216 elements -- but that is a
+different computation, and citing it as the reason this probe needed pinning
+was an inference, not a result.
+
+The pin stays because the count is a real degree of freedom that otherwise
+varies with the node's core count, unpinned and unrecorded. Invariance at
+L2/d128/h2/v512/len64 on one machine's BLAS is an empirical accident of size,
+not a guarantee that survives a larger probe or a different library. One
+thread costs nothing here and makes the number reproducible by construction.
 """
 
 
@@ -87,21 +96,29 @@ def probe_determinism(device: str) -> DeterminismRecord:
     so a cpu record carries none; CUDA kernels do a cuda run's arithmetic and
     the host thread count does not enter it, so a cuda record carries none.
 
-    A CPU run's thread count is the opposite case -- it IS the arithmetic,
-    because a reduction split across threads sums its partials in completion
-    order -- and until now the probe pinned no thread count at all. Its number
-    therefore depended on the core count of whichever node answered, and
-    nothing in the record said so.
+    A CPU run's thread count participates in the arithmetic -- a reduction
+    split across threads sums its partials in completion order -- and the
+    probe pinned none at all, so it varied with the answering node's core
+    count, unrecorded. See :data:`PROBE_CPU_THREADS` for what that is and is
+    not worth: this probe turns out to be INSENSITIVE to the count, so the
+    pin buys reproducibility by construction rather than fixing a live drift.
 
-    NOT MEASURED: that a cuda probe is insensitive to the host thread count.
-    The evidence is suggestive rather than controlled -- images v5
-    ``685fd4d4`` and v6 ``1112dbb1``, on A100 and V100, all report
-    6.250983715057373 to the last digit, across nodes whose core counts were
-    not held equal -- but no run has varied the count on cuda and compared.
-    Pinning it there anyway would carry a real cost against no demonstrated
-    benefit: all eight entries in ``known-answers.json`` were registered
-    without a thread count, so adding one to that axis would make every
-    future probe report ``configuration_differs`` against every one of them.
+    MEASURED, on cuda, 2026-08-26 -- HPC3 jobs 55598648 and 55598652, one
+    A100 each in image ``1112dbb1``, driver 580.82.07, identical but for
+    ``OMP_NUM_THREADS``:
+
+        resolved_threads 1 -> 6.250983715057373
+        resolved_threads 8 -> 6.250983715057373
+
+    Bit-identical, and the artifacts carry ``resolved_threads`` so the
+    manipulation is evidenced rather than assumed. The host thread count does
+    not reach a cuda result, which is why one is not recorded on that path.
+
+    That also spares a real cost: all eight entries in
+    ``known-answers.json`` were registered without a thread count, so adding
+    one to the cuda axis would make every future probe report
+    ``configuration_differs`` against every one of them -- for a setting now
+    shown not to change the number.
 
     Args:
         device: Device the measurement runs on.
