@@ -28,6 +28,7 @@ class WorldServiceRadarMixin:
     world_state: WorldStateDict
     radar_scan_complete: bool
     map_data_processed: bool
+    map_data_ingested_ms: int
     viewport_update_processed: bool
     pending_radar_uses_extra: bool
     pending_radar_empty_delta_ms: int
@@ -62,8 +63,19 @@ class WorldServiceRadarMixin:
         return result
 
     def mark_map_data_processed(self) -> None:
-        """Record that a MAP_DATA world-state blob was parsed into positions."""
+        """Record that a MAP_DATA world-state blob was parsed into positions.
+
+        Besides the completion flag, the INGESTION TIME is stamped:
+        ``map_data_ingested_ms`` is what "the map snapshot is fresh"
+        must mean. The hunt's no-viable-targets exit previously aged
+        the snapshot from the map open's DISPATCH time — run
+        bot-20260825-212920 ended on a phantom "fresh empty map"
+        because the final open completed on an orphan flag while the
+        dying wire delivered no data at all; dispatch recency said
+        2 s, data recency said far beyond the cooldown.
+        """
         self.map_data_processed = True
+        self.map_data_ingested_ms = _test_hooks.get_current_time_ms()
 
     def mark_viewport_update_processed(self) -> None:
         """Record that a 0x5A ViewportUpdate was ingested.

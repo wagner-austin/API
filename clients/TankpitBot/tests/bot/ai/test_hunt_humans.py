@@ -285,6 +285,7 @@ def test_relay_leg_cost_is_capped_at_the_engagement_budget() -> None:
     progress dot at ~300.
     """
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: honestly fresh
     consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
@@ -439,6 +440,7 @@ def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
     would leave 100 < the 200 floor -- the cheaper dot wins instead.
     """
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: honestly fresh
     consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),

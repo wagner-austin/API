@@ -421,11 +421,21 @@ class DispatchMixin(CompletionsMixin):
     def open_map(self) -> bool:
         """Dispatch the wire ``CMD_MAP_OPEN`` command.
 
+        Any stale map-data mark is cleared at dispatch so the
+        completion flag means "a MAP_DATA arrived since THIS open" —
+        the scope pan's 2026-08-20 discipline. Without the clear, a
+        stalled open's late response leaves an orphan flag and the
+        NEXT open "completes" in milliseconds with no fresh dots (run
+        bot-20260825-212920: the final open closed in 12 ms on an
+        orphan while the dying wire delivered nothing, feeding the
+        no-viable-targets gate a phantom fresh snapshot).
+
         Returns:
             True if the command was sent.
         """
         from tankpit_bot.protocol.commands import CMD_MAP_OPEN, build_query_command
 
+        self.world.check_and_clear_map_data_processed()
         if self._send_bytes(build_query_command(CMD_MAP_OPEN), "map_open"):
             now = get_current_time_ms()
             action = make_in_flight_action("map_open", 0, 0, now)

@@ -82,6 +82,7 @@ def test_hunt_acquire_exits_when_fresh_map_has_no_viable_targets() -> None:
     with ``no_viable_targets`` so the run is analyzable.
     """
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: the snapshot is honestly fresh
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(
         **{
@@ -97,6 +98,38 @@ def test_hunt_acquire_exits_when_fresh_map_has_no_viable_targets() -> None:
 
     with pytest.raises(SessionExitError, match="no_viable_targets"):
         decide_hunt_mode(ctx)
+
+
+def test_hunt_acquire_keeps_searching_when_data_is_stale_despite_fresh_dispatch() -> None:
+    """A recent map OPEN is not a recent map ANSWER: keep searching.
+
+    Run bot-20260825-212920's phantom ending: the final open completed
+    on an orphan flag while the dying wire delivered no data, and the
+    old gate aged the snapshot from ``last_map_open_ms`` — "I asked
+    2 s ago" read as "I heard 2 s ago" — exiting under 27 live
+    enemies all rejected ``stale_map_data``. With no fresh ingestion
+    stamp the session must dispatch another search, never exit; a
+    truly dead wire then ends the run honestly as
+    ``connection_lost``.
+    """
+    ws = WorldService()
+    world, self_state = make_world(fuel=800)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "map_open"
+    assert decision["behavior"]["reason_kind"] == "find_enemies"
 
 
 def test_hunt_search_does_not_enter_confirm_kill_without_target() -> None:

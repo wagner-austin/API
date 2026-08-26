@@ -121,6 +121,23 @@ class TestDispatchCommand:
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
+    def test_dispatch_map_open_clears_stale_data_mark(self, fake_env: FakeEnv) -> None:
+        """An orphan map-data flag cannot complete THIS open instantly.
+
+        Run bot-20260825-212920's ending: a stalled open's late
+        response left the ``map_data_processed`` flag set, the next
+        open "completed" in 12 ms with no fresh dots, and the phantom
+        fresh-empty snapshot exited the session under 27 live
+        enemies. The dispatch now clears any stale mark (the scope
+        pan's 2026-08-20 discipline) so the flag means "a MAP_DATA
+        arrived since THIS open".
+        """
+        bot, _fake_cdp = _make_bot(fake_env)
+        bot.world.mark_map_data_processed()
+        result = dispatch_command(bot, make_map_open_command(), _make_snapshot())
+        assert result is True
+        assert bot.world.check_and_clear_map_data_processed() is False
+
     def test_dispatch_chat(self, fake_env: FakeEnv) -> None:
         """Dispatches chat command via bot.send_chat."""
         from tankpit_bot.bot.types import make_chat_command

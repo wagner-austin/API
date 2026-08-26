@@ -125,6 +125,7 @@ def test_hunt_acquire_relays_via_dot_toward_unaffordable_enemy() -> None:
     fuel-low reserve are both skipped.
     """
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: the snapshot is honestly fresh
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(),
         # Stale map entry: rejected for a non-affordability reason, so
@@ -175,6 +176,7 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
     in the registry exercises the relay's non-enemy filter.
     """
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: the snapshot is honestly fresh
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(),
         "80": make_tank_state(
@@ -223,6 +225,7 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
 def test_hunt_relay_tie_breaks_on_cheaper_hop() -> None:
     """Dots equidistant from the enemy keep the cheaper teleport."""
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: the snapshot is honestly fresh
     tanks: dict[str, TankStateDict] = {"60": make_map_known_enemy()}
     world, self_state = make_world(fuel=1100, tanks=tanks)
     ai_state = AIStateDict(
@@ -261,6 +264,7 @@ def test_hunt_relay_exits_when_only_dot_is_impassable() -> None:
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: the snapshot is honestly fresh
     tanks: dict[str, TankStateDict] = {"60": make_map_known_enemy()}
     world, self_state = make_world(fuel=700, tanks=tanks)
     ai_state = AIStateDict(
@@ -303,6 +307,7 @@ def test_hunt_refuels_in_place_when_no_dot_makes_progress() -> None:
     declines it but the refuel fallback takes it.
     """
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: the snapshot is honestly fresh
     tanks: dict[str, TankStateDict] = {"60": make_map_known_enemy()}
     world, self_state = make_world(fuel=700, tanks=tanks)
     ai_state = AIStateDict(
@@ -345,6 +350,7 @@ def test_hunt_refuel_exits_at_fuel_capacity() -> None:
     end-to-end, beyond what this rank can ever carry.
     """
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: the snapshot is honestly fresh
     tanks: dict[str, TankStateDict] = {"60": make_map_known_enemy()}
     world, self_state = make_world(fuel=1200, tanks=tanks)
     ai_state = AIStateDict(

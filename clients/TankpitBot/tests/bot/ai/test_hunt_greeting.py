@@ -113,6 +113,7 @@ def test_greeting_approach_declines_when_teleport_unaffordable() -> None:
     from tests.in_memory_terrain_map import InMemoryTerrainMap
 
     ws = WorldService()
+    ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: honestly fresh
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=101, y=100, name="red-5"),
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),

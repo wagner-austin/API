@@ -79,6 +79,7 @@ class TestDecideMapOpen:
         ``test_hunt_search_dispatches_map_open_not_radar_during_acquire``).
         """
         ws = WorldService()
+        ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: the snapshot is honestly fresh
         world, self_state = make_world(fuel=1200, scanned=False)
         ai_state = AIStateDict(
             **{

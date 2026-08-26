@@ -432,8 +432,14 @@ def _decide_hunt_acquire_fresh(
     if map_target is not None:
         return _acquire_map_target(ctx, ai_state, map_target)
 
-    map_age_ms = ctx.timestamp_ms - ctx.ai_state["last_map_open_ms"]
-    if ctx.ai_state["last_map_open_ms"] > 0 and map_age_ms <= ctx.config["map_open_cooldown_ms"]:
+    # Snapshot freshness means DATA recency, never dispatch recency:
+    # aging from ``last_map_open_ms`` let run bot-20260825-212920 exit
+    # no_viable_targets on a phantom "fresh empty map" — the final
+    # open completed on an orphan flag while the dying wire delivered
+    # no data, so "I asked 2 s ago" was read as "I heard 2 s ago"
+    # while all 27 practice bots sat rejected as stale_map_data.
+    map_age_ms = ctx.timestamp_ms - ctx.ws.map_data_ingested_ms
+    if ctx.ws.map_data_ingested_ms > 0 and map_age_ms <= ctx.config["map_open_cooldown_ms"]:
         relay = relay_toward_unaffordable_enemy(ctx, ai_state)
         if relay is not None:
             return relay

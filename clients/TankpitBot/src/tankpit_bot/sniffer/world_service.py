@@ -155,6 +155,7 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         self.teleport_landed: bool = False
         self.radar_scan_complete: bool = False
         self.map_data_processed: bool = False
+        self.map_data_ingested_ms: int = 0
         self.viewport_update_processed: bool = False
         # Stamped on every dispatched binary world message -- the only
         # truthful liveness signal for the GAME session. Session 3 of
