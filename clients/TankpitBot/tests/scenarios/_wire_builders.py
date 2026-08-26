@@ -45,7 +45,7 @@ def tank_info(
     name: str,
     team: int = DEFAULT_ENEMY_TEAM,
     persistent_tank_id: int = 0,
-    decoration_state: bytes = b"",
+    decoration_state: bytes = bytes(4),
 ) -> TankInfoDict:
     """Build a 0x21 ``TankInfo`` message for the registry.
 
@@ -55,7 +55,7 @@ def tank_info(
         team: Team id (0-3).
         persistent_tank_id: Cross-session tank identity (``0`` when
             test doesn't care).
-        decoration_state: Cosmetic decoration bytes; empty for tests.
+        decoration_state: Packed award bytes; undecorated (4 zero bytes) for tests.
 
     Returns:
         A :class:`TankInfoDict` ready for ``BotScenario.ingest``.

@@ -333,7 +333,7 @@ class TestSelfIdentityRecording:
                 tank_id=777,
                 name="stranger",
                 team=3,
-                decoration_state=b"",
+                decoration_state=bytes(4),
                 persistent_tank_id=999,
             ),
         )

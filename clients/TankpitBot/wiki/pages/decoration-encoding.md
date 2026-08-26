@@ -25,6 +25,18 @@ Decorations are transmitted as 4 bytes in TankInfo (0x21), TankEntry (0x28), and
 a[3], a[4], a[5], a[6]  — 4 decoration bytes
 ```
 
+**The packed state is live-verified (2026-08-26)** and implemented in
+`protocol/decorations.py` (`unpack_decoration_state`, the yg law):
+Arterial's live `04000000` unpacks to slot 1 level 1 — the BRONZE
+TANK AWARD earned an hour earlier — and Artax's `1e000000` to
+(2, 3, 1): DOUBLE STAR, GOLDEN TANK AWARD, COMBAT HONOR MEDAL, three
+medals the account had carried unread while the bytes were mislabeled
+"cosmetic skin" in the dispatch comment. Every tank announces this
+state in its 0x21 TankInfo at identification — **no check request
+exists and none is needed; the server pushes the full profile
+unprompted**. The `tank_identity` diagnostic now carries the decoded
+`awards=` list beside the raw hex.
+
 ## Decode Function (yg, line 204)
 
 ```javascript

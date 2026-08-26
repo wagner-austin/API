@@ -69,7 +69,7 @@ class TestDispatchTunneledMines:
                 tank_id=777,
                 name="placer",
                 team=3,
-                decoration_state=b"",
+                decoration_state=bytes(4),
                 persistent_tank_id=0,
             ),
         )

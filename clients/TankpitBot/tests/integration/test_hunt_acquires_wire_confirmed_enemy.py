@@ -57,7 +57,7 @@ class TestHuntAcquiresWireConfirmedEnemy:
                 tank_id=1229,
                 team=1,
                 name="red-77",
-                decoration_state=b"",
+                decoration_state=bytes(4),
                 persistent_tank_id=0,
             ),
         )
@@ -129,7 +129,7 @@ class TestHuntAcquiresWireConfirmedEnemy:
                 tank_id=1229,
                 team=1,
                 name="red-77",
-                decoration_state=b"",
+                decoration_state=bytes(4),
                 persistent_tank_id=0,
             ),
         )

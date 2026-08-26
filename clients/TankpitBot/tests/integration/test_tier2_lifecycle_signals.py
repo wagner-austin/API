@@ -260,7 +260,7 @@ class TestCombatHitAdvancesDamageState:
                 tank_id=1229,
                 team=1,
                 name="Yuppler",
-                decoration_state=b"",
+                decoration_state=bytes(4),
                 persistent_tank_id=0,
             ),
         )

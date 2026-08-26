@@ -400,7 +400,7 @@ class BotScenario:
                 tank_id=tank_id,
                 team=team,
                 name=name,
-                decoration_state=b"",
+                decoration_state=bytes(4),
                 persistent_tank_id=0,
             )
         )

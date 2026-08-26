@@ -27,6 +27,48 @@ DECORATION_NAMES: tuple[tuple[str, str, str], ...] = (
 """The nine award categories, three tiers each, client order."""
 
 
+def unpack_decoration_state(state: bytes) -> tuple[int, ...]:
+    """Unpack the 4 packed decoration bytes into 9 award levels.
+
+    The client's ``yg`` law ([[decoration-encoding]]): the 4 bytes form
+    a little-endian 32-bit integer, 2 bits per slot, slots 0-8. Live
+    verification 2026-08-26: Arterial's ``04000000`` unpacks to slot 1
+    level 1 (the bronze earned an hour earlier) and Artax's
+    ``1e000000`` to slots (2, 3, 1) — DOUBLE STAR, GOLDEN TANK AWARD,
+    COMBAT HONOR MEDAL.
+
+    Args:
+        state: The 4 decoration bytes from TankInfo / TankStatusFull.
+
+    Returns:
+        Nine award levels, slot order, each 0 (none) through 3.
+
+    Raises:
+        ValueError: When ``state`` is not exactly 4 bytes — the wire
+            layout fixes the width, so anything else is a decode bug.
+    """
+    if len(state) != 4:
+        raise ValueError(f"decoration state must be 4 bytes, got {len(state)}")
+    value = state[0] | (state[1] << 8) | (state[2] << 16) | (state[3] << 24)
+    return tuple((value >> (2 * slot)) & 3 for slot in range(9))
+
+
+def decoration_names_from_state(state: bytes) -> tuple[str, ...]:
+    """Return the award names a packed decoration state carries.
+
+    Args:
+        state: The 4 decoration bytes from TankInfo / TankStatusFull.
+
+    Returns:
+        Names of every held award, slot order; empty when undecorated.
+    """
+    return tuple(
+        DECORATION_NAMES[slot][level - 1]
+        for slot, level in enumerate(unpack_decoration_state(state))
+        if level > 0
+    )
+
+
 def decoration_name(slot: int, level: int) -> str | None:
     """Return the award name for a slot/level pair.
 
@@ -48,4 +90,6 @@ def decoration_name(slot: int, level: int) -> str | None:
 __all__ = [
     "DECORATION_NAMES",
     "decoration_name",
+    "decoration_names_from_state",
+    "unpack_decoration_state",
 ]

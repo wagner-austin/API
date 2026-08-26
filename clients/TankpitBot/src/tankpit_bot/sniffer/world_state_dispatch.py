@@ -16,6 +16,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
 from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_NAMES
+from tankpit_bot.protocol.decorations import decoration_names_from_state
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
 )
@@ -132,10 +133,13 @@ def _dispatch_tank_state(ws: WorldService, decoded: protocol.BinaryMessage) -> b
             # opponent-tracking signal: persistent_tank_id stays
             # constant across respawns and sessions (game-engine fact,
             # mined from JS Tf.h ``a.aa``); decoration_state is the
-            # tank's cosmetic skin bytes, useful for visual ID. Emit
-            # as a diagnostic so the bot's session log carries the
-            # mapping name <-> persistent_id and downstream analyzers
-            # ("did we fight this player last match?") can join on it.
+            # tank's packed AWARD state (yg law, [[decoration-encoding]]
+            # -- NOT cosmetic skin bytes, the pre-2026-08-26 misread),
+            # so every tank announces its medals at identification and
+            # no 0x4E event or check request is ever needed. Emit as a
+            # diagnostic so the session log carries name <->
+            # persistent_id <-> awards and downstream analyzers ("did
+            # we fight this player last match?") can join on it.
             emit_diagnostic(
                 diagnostic_kind="tank_identity",
                 tank_id=tid,
@@ -143,6 +147,7 @@ def _dispatch_tank_state(ws: WorldService, decoded: protocol.BinaryMessage) -> b
                 name=name,
                 persistent_tank_id=persistent_id,
                 decoration_state_hex=decoration.hex(),
+                awards=", ".join(decoration_names_from_state(decoration)) or "none",
             )
             self_state = ws.world_state["self_state"]
             if self_state is not None and self_state["tank_id"] == tid:
