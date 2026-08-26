@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from platform_core.determinism_record import DeterminismRecord
+from platform_core.comparability import RunFingerprint
 from typing_extensions import TypedDict
 
 
@@ -22,11 +22,21 @@ class TrainingManifestVersions(TypedDict):
 
 
 class TrainingManifestSystem(TypedDict):
+    """Where the run happened, for the axes nothing compares on.
+
+    The card is NOT here. It used to be, as ``gpu_name``, read from the same
+    ``cuda_device_name`` hook the run fingerprint reads -- one value computed
+    twice, stored under two names, in two shapes, and never read back by
+    anything. Meanwhile the fingerprint, which IS read, could not see the
+    training path at all. The card now lives in
+    :attr:`TrainingManifest.fingerprint` with the driver and the image beside
+    it, which is where a comparison looks for it.
+    """
+
     cpu_count: int
     platform: str
     platform_release: str
     machine: str
-    gpu_name: str | None
 
 
 class TrainingManifestTiming(TypedDict):
@@ -111,18 +121,27 @@ class TrainingManifest(TypedDict):
     pretrained_run_id: str | None
     versions: TrainingManifestVersions
     system: TrainingManifestSystem
-    # What determinism was in force, from the pin the worker applied before
-    # any CUDA work. Recorded here because until 2026-08-25 it reached only a
-    # log line -- so for every arm published before that the posture is
-    # already unrecoverable, and two runs cannot be told apart on the axis
-    # most likely to separate them.
+    # The configuration this run's numbers were produced under: image digest,
+    # card, driver and determinism posture. The SAME type the scoring path
+    # records, so `compare_configurations` reads a training run and a scoring
+    # run without knowing which is which.
+    #
+    # It replaces two fields that each answered part of this and disagreed
+    # about the shape: `system.gpu_name` (the card, from the same hook, never
+    # read by anything) and a top-level `determinism`. Neither carried the
+    # image digest or the driver, so the training path could not answer the
+    # question the scoring path was already answering -- and the image digest
+    # is now the axis that matters most, because these runs happen inside
+    # abl.sif.
     #
     # None in manifests written before the field existed, which the decoder
-    # reads as "not recorded" -- the treatment git_commit and gpu_name
-    # already get, and for the same reason: refusing to decode an old
-    # manifest would break LOADING a trained model, and loading is not
-    # comparing.
-    determinism: DeterminismRecord | None
+    # reads as "not recorded" -- the treatment git_commit already gets, and
+    # for the same reason: refusing to decode an old manifest would break
+    # LOADING a trained model, and loading is not comparing. A run that
+    # writes one always writes it whole; there is no half-populated
+    # fingerprint, because an axis silently absent compares equal to another
+    # run missing the same axis.
+    fingerprint: RunFingerprint | None
     git_commit: str | None
     device: str
     precision: str
@@ -199,7 +218,7 @@ class TrainingManifestFull(TypedDict):
     pretrained_run_id: str | None
     versions: TrainingManifestVersions
     system: TrainingManifestSystem
-    determinism: DeterminismRecord | None
+    fingerprint: RunFingerprint | None
     git_commit: str | None
     config: TrainingManifestConfig
     device: str

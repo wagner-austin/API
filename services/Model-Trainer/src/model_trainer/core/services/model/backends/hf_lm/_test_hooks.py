@@ -82,7 +82,7 @@ def _default_create_trainer(
     progress: ProgressCallback | None,
     service_name: str,
     wandb_publisher: WandbPublisher | None,
-    determinism: DeterminismRecord | None,
+    determinism: DeterminismRecord,
 ) -> TrainerProto:
     """Production implementation for creating BaseTrainer.
 

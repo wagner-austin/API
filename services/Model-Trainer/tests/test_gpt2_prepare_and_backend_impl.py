@@ -12,6 +12,7 @@ from model_trainer.core.services.dataset.local_text_builder import LocalTextData
 from model_trainer.core.services.model.backend_factory import create_gpt2_backend
 from model_trainer.core.services.model.backends.gpt2 import prepare_gpt2_with_handle
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
+from tests.conftest import UNPINNED
 
 
 class _SettingsFactory(Protocol):
@@ -182,6 +183,7 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
         resume=False,
         prepared=prepared,
         progress=track_loss,
+        determinism=UNPINNED,
     )
     assert res["loss"] >= 0.0
     loss_before = train_losses[0]

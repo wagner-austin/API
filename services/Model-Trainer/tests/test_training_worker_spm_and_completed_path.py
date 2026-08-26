@@ -212,7 +212,7 @@ class _Backend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome:
         # Exercise the worker's progress callback wrapper so that the
         # training_worker._progress closure is covered.

@@ -190,7 +190,7 @@ class _TrainerCore:
         ) = None,
         service_name: str = "base-trainer",
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> None:
         """Initialize the trainer.
 
@@ -209,6 +209,14 @@ class _TrainerCore:
                 (step, epoch, loss, ppl, grad_norm, samples_per_sec, val_loss, val_ppl).
             service_name: Service name for logging.
             wandb_publisher: Optional WandbPublisher for experiment tracking.
+            determinism: What numerical determinism the worker put in force
+                before any CUDA work, which the manifest records as part of
+                this run's fingerprint. Required rather than defaulted: a
+                default would let a caller that never pinned anything write a
+                manifest claiming a posture, and "deliberately not pinned" is
+                already expressible as
+                ``determinism_record(UNPINNED_STACK, {})``. There is no third
+                state worth a None.
         """
         self._prepared = prepared
         self._cfg = cfg

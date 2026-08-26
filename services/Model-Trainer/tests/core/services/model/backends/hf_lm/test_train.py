@@ -8,6 +8,7 @@ from typing import Protocol
 
 from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
+from tests.conftest import UNPINNED
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel, TrainOutcome
@@ -179,6 +180,7 @@ class TestTrainPreparedHfLm:
             redis_hb=heartbeat,
             cancelled=cancelled,
             resume=False,
+            determinism=UNPINNED,
         )
 
         trainer = _require_trainer(factory)
@@ -234,6 +236,7 @@ class TestTrainPreparedHfLm:
             cancelled=lambda: False,
             resume=False,
             progress=progress,
+            determinism=UNPINNED,
         )
 
         trainer = _require_trainer(factory)
@@ -266,6 +269,7 @@ class TestTrainPreparedHfLm:
             cancelled=lambda: False,
             resume=False,
             wandb_publisher=None,
+            determinism=UNPINNED,
         )
 
         trainer = _require_trainer(factory)

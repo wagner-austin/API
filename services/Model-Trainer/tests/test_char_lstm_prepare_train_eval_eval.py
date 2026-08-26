@@ -20,6 +20,7 @@ from tests._char_lstm_prepare_support import (
     _train_char_tokenizer,
     _write_tiny_corpus,
 )
+from tests.conftest import UNPINNED
 
 
 def test_char_lstm_gradient_flow(settings_with_paths: Settings, tmp_path: Path) -> None:
@@ -213,6 +214,7 @@ def test_char_lstm_generation_determinism(settings_with_paths: Settings, tmp_pat
         resume=False,
         prepared=prepared,
         progress=track_loss,
+        determinism=UNPINNED,
     )
 
     # Verify training produced valid losses
@@ -322,6 +324,7 @@ def test_char_lstm_continued_training_reduces_loss(
         resume=False,
         prepared=prepared,
         progress=collect_initial,
+        determinism=UNPINNED,
     )
 
     # Verify initial training worked
@@ -386,6 +389,7 @@ def test_char_lstm_continued_training_reduces_loss(
         resume=False,
         prepared=prepared,
         progress=collect_continued,
+        determinism=UNPINNED,
     )
 
     # Verify continued training shows loss decrease

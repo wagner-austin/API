@@ -214,7 +214,7 @@ class _Backend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome:
         return TrainOutcome(
             cancelled=False,

@@ -7,7 +7,7 @@ from platform_core.determinism_record import (
     UNPINNED_STACK,
     determinism_record,
 )
-from platform_core.json_utils import JSONTypeError, dump_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
 from model_trainer.worker import manifest
 
@@ -22,7 +22,7 @@ def test_as_model_family_variants_and_invalid() -> None:
         _ = manifest.as_model_family("bert")
 
 
-def _base_manifest() -> _ManifestDict:
+def _base_manifest() -> dict[str, JSONValue]:
     return {
         "run_id": "r",
         "model_family": "gpt2",
@@ -79,11 +79,7 @@ def _base_manifest() -> _ManifestDict:
     }
 
 
-_ManifestValue = str | int | float | None | dict[str, str]
-_ManifestDict = dict[str, str | int | float | bool | None | dict[str, _ManifestValue]]
-
-
-def _manifest_unknown() -> _ManifestDict:
+def _manifest_unknown() -> dict[str, JSONValue]:
     return _base_manifest().copy()
 
 
@@ -135,7 +131,7 @@ def test_load_manifest_versions_require_strings(field: str, value: int) -> None:
     assert isinstance(versions_raw, dict) and len(versions_raw) == 4
     versions = dict(versions_raw)
     versions[field] = value
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **base,
         "versions": versions,
     }
@@ -146,7 +142,7 @@ def test_load_manifest_versions_require_strings(field: str, value: int) -> None:
 
 def test_load_manifest_system_not_dict() -> None:
     base = _manifest_unknown()
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **base,
         "system": "oops",
     }
@@ -169,7 +165,7 @@ def test_load_manifest_system_field_types(field: str, value: str | int, message:
     assert isinstance(system_raw, dict) and len(system_raw) == 4
     system = dict(system_raw)
     system[field] = value
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **base,
         "system": system,
     }
@@ -178,7 +174,7 @@ def test_load_manifest_system_field_types(field: str, value: str | int, message:
 
 
 def test_load_manifest_loss_must_be_number() -> None:
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **_manifest_unknown(),
         "loss": "high",
     }
@@ -188,7 +184,7 @@ def test_load_manifest_loss_must_be_number() -> None:
 
 def test_load_manifest_pretrained_run_id_must_be_str_or_null() -> None:
     """Cover manifest.py lines 100-101 - _decode_manifest_str_or_none error case."""
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **_base_manifest(),
         "pretrained_run_id": 123,  # should be str or null, not int
     }
@@ -198,7 +194,7 @@ def test_load_manifest_pretrained_run_id_must_be_str_or_null() -> None:
 
 def test_load_manifest_pretrained_run_id_valid_string() -> None:
     """Cover manifest.py line 102 - _decode_manifest_str_or_none returns valid string."""
-    valid_manifest: _ManifestDict = {
+    valid_manifest: dict[str, JSONValue] = {
         **_base_manifest(),
         "pretrained_run_id": "run-base-123",  # valid string value
     }
@@ -234,7 +230,7 @@ def test_as_precision_variants_and_invalid() -> None:
 
 def test_load_manifest_freeze_embed_must_be_bool() -> None:
     """Cover manifest.py _decode_manifest_bool error case."""
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **_base_manifest(),
         "freeze_embed": "yes",  # should be bool, not string
     }
@@ -244,7 +240,7 @@ def test_load_manifest_freeze_embed_must_be_bool() -> None:
 
 def test_load_manifest_float_or_none_error_case() -> None:
     """Cover manifest.py _decode_manifest_float_or_none error (line 137)."""
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **_base_manifest(),
         "test_loss": "not-a-number",  # should be float or null
     }
@@ -254,7 +250,7 @@ def test_load_manifest_float_or_none_error_case() -> None:
 
 def test_load_manifest_tokenizer_id_null_for_hf_lm() -> None:
     """Cover manifest.py tokenizer_id None case (for hf_lm models)."""
-    hf_lm_manifest: _ManifestDict = {
+    hf_lm_manifest: dict[str, JSONValue] = {
         **_base_manifest(),
         "model_family": "hf_lm",
         "tokenizer_id": None,  # hf_lm models don't need tokenizer_id
@@ -266,7 +262,7 @@ def test_load_manifest_tokenizer_id_null_for_hf_lm() -> None:
 
 def test_load_manifest_tokenizer_id_non_string_error() -> None:
     """Cover manifest.py tokenizer_id type error case."""
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **_base_manifest(),
         "tokenizer_id": 123,  # should be str or null, not int
     }
@@ -276,7 +272,7 @@ def test_load_manifest_tokenizer_id_non_string_error() -> None:
 
 def test_load_manifest_peak_gpu_memory_mb_bool_error() -> None:
     """Cover manifest.py _decode_manifest_performance bool check for peak_gpu_memory_mb."""
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **_base_manifest(),
         "performance": {
             "peak_gpu_memory_mb": True,  # should be number or null, not bool
@@ -288,9 +284,25 @@ def test_load_manifest_peak_gpu_memory_mb_bool_error() -> None:
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
 
 
-def test_load_manifest_system_gpu_name_string_accepted() -> None:
-    """A manifest naming the GPU model decodes; the field pins which card trained the run."""
-    ok_manifest: _ManifestDict = {
+def test_the_system_block_no_longer_answers_which_card_ran() -> None:
+    """The card moved to the fingerprint, and `system` must not keep a copy.
+
+    It used to live here as `gpu_name`, read from the same
+    `cuda_device_name` hook the fingerprint reads -- one value under two
+    names, in two shapes, that nothing ever read back. A manifest still
+    carrying it in `system` would mean the fork survived the consolidation.
+    """
+    loaded = manifest.load_manifest_from_text(dump_json_str(_base_manifest()))
+    assert sorted(loaded["system"]) == ["cpu_count", "machine", "platform", "platform_release"]
+
+
+def test_a_stale_gpu_name_in_the_system_block_is_ignored_not_adopted() -> None:
+    """An old manifest on disk still has it; decoding must not resurrect it.
+
+    Reading it back into `system` would give two answers to "which card" that
+    could disagree -- the exact state this consolidation removed.
+    """
+    stale: dict[str, JSONValue] = {
         **_base_manifest(),
         "system": {
             "cpu_count": 1,
@@ -300,30 +312,13 @@ def test_load_manifest_system_gpu_name_string_accepted() -> None:
             "gpu_name": "NVIDIA GeForce RTX 3090",
         },
     }
-    loaded = manifest.load_manifest_from_text(dump_json_str(ok_manifest))
-    assert loaded["run_id"] == _base_manifest()["run_id"]
-    assert loaded["system"]["gpu_name"] == "NVIDIA GeForce RTX 3090"
-
-
-def test_load_manifest_system_gpu_name_wrong_type_error() -> None:
-    """gpu_name must be a string or absent; a number is a corrupted manifest."""
-    bad_manifest: _ManifestDict = {
-        **_base_manifest(),
-        "system": {
-            "cpu_count": 1,
-            "platform": "x",
-            "platform_release": "y",
-            "machine": "z",
-            "gpu_name": 3090,
-        },
-    }
-    with pytest.raises(JSONTypeError, match="gpu_name"):
-        _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
+    loaded = manifest.load_manifest_from_text(dump_json_str(stale))
+    assert "gpu_name" not in loaded["system"]
 
 
 def test_load_manifest_peak_gpu_memory_mb_string_error() -> None:
     """Cover manifest.py _decode_manifest_performance else branch for peak_gpu_memory_mb."""
-    bad_manifest: _ManifestDict = {
+    bad_manifest: dict[str, JSONValue] = {
         **_base_manifest(),
         "performance": {
             "peak_gpu_memory_mb": "high",  # should be number or null, not string
@@ -337,7 +332,7 @@ def test_load_manifest_peak_gpu_memory_mb_string_error() -> None:
 
 def test_load_manifest_peak_gpu_memory_mb_valid_number() -> None:
     """Cover manifest.py _decode_manifest_performance valid float path for peak_gpu_memory_mb."""
-    valid_manifest: _ManifestDict = {
+    valid_manifest: dict[str, JSONValue] = {
         **_base_manifest(),
         "performance": {
             "peak_gpu_memory_mb": 1024.5,  # valid float value
@@ -373,23 +368,55 @@ def test_load_manifest_rejects_boolean_resumed_from_epoch() -> None:
         _ = manifest.load_manifest_from_text(dump_json_str(obj))
 
 
-def test_a_manifest_carries_the_determinism_posture_it_ran_under() -> None:
-    """The gap this field closes.
+def _fingerprint_json(**overrides: JSONValue) -> dict[str, JSONValue]:
+    """Build a complete fingerprint object for a manifest under test.
 
-    Until 2026-08-25 the posture reached a log line and nothing else, so for
-    every arm published before that it is unrecoverable once container logs
-    rotate -- and two runs could not be told apart on the axis most likely to
-    separate them.
+    Complete by default because the decoder refuses a partial one: a
+    fingerprint missing an axis compares equal to another missing the same
+    axis, which reports two differently-configured runs as identical. Tests
+    that want a partial one remove a key deliberately.
+
+    Args:
+        **overrides: Axes to replace.
+
+    Returns:
+        The JSON object.
+    """
+    base: dict[str, JSONValue] = {
+        "image_digest": "sha256:" + "ab" * 32,
+        "gpu_model": "NVIDIA A100 80GB PCIe",
+        "driver_version": "580.82.07",
+        "determinism": {
+            "stack": "torch",
+            "settings": {"cudnn_deterministic": "true", "matmul_tf32": "false"},
+        },
+    }
+    base.update(overrides)
+    return base
+
+
+def test_a_manifest_carries_the_whole_configuration_it_ran_under() -> None:
+    """The gap this field closes, and why it is one field and not two.
+
+    Until 2026-08-25 the determinism posture reached a log line and nothing
+    else. It then briefly became a manifest field of its own, beside a
+    `system.gpu_name` that answered a different part of the same question --
+    and neither carried the image digest or the driver, so the training path
+    still could not say what the scoring path could. One `RunFingerprint`
+    answers all four axes, and it is the SAME type the scoring path records.
     """
     obj = _base_manifest()
-    obj["determinism"] = {
-        "stack": "torch",
-        "settings": {"cudnn_deterministic": "true", "matmul_tf32": "false"},
-    }
+    obj["fingerprint"] = _fingerprint_json()
 
     decoded = manifest.load_manifest_from_text(dump_json_str(obj))
+    fingerprint = decoded["fingerprint"]
+    if fingerprint is None:
+        raise AssertionError("the manifest declared a fingerprint and must decode one")
 
-    assert decoded["determinism"] == determinism_record(
+    assert fingerprint["image_digest"] == "sha256:" + "ab" * 32
+    assert fingerprint["gpu_model"] == "NVIDIA A100 80GB PCIe"
+    assert fingerprint["driver_version"] == "580.82.07"
+    assert fingerprint["determinism"] == determinism_record(
         "torch", {"cudnn_deterministic": TRUE, "matmul_tf32": FALSE}
     )
 
@@ -397,12 +424,33 @@ def test_a_manifest_carries_the_determinism_posture_it_ran_under() -> None:
 def test_a_run_that_pinned_nothing_is_distinguishable_from_one_that_did() -> None:
     """ "Deliberately not pinned" must be a recorded fact, not an absence."""
     obj = _base_manifest()
-    obj["determinism"] = {"stack": UNPINNED_STACK, "settings": {}}
+    obj["fingerprint"] = _fingerprint_json(determinism={"stack": UNPINNED_STACK, "settings": {}})
 
     decoded = manifest.load_manifest_from_text(dump_json_str(obj))
+    fingerprint = decoded["fingerprint"]
+    if fingerprint is None:
+        raise AssertionError("the manifest declared a fingerprint and must decode one")
 
-    assert decoded["determinism"] == determinism_record(UNPINNED_STACK, {})
-    assert decoded["determinism"] != determinism_record("torch", {"x": TRUE})
+    assert fingerprint["determinism"] == determinism_record(UNPINNED_STACK, {})
+    assert fingerprint["determinism"] != determinism_record("torch", {"x": TRUE})
+
+
+def test_a_cpu_run_records_no_card_rather_than_omitting_the_axis() -> None:
+    """Empty is a value; absent is not.
+
+    An empty string differs from every real card, so a cpu-trained model
+    never compares equal to a cuda-trained one. An omitted axis would.
+    """
+    obj = _base_manifest()
+    obj["fingerprint"] = _fingerprint_json(gpu_model="", driver_version="")
+
+    decoded = manifest.load_manifest_from_text(dump_json_str(obj))
+    fingerprint = decoded["fingerprint"]
+    if fingerprint is None:
+        raise AssertionError("the manifest declared a fingerprint and must decode one")
+
+    assert fingerprint["gpu_model"] == ""
+    assert fingerprint["driver_version"] == ""
 
 
 def test_a_manifest_written_before_the_field_existed_reads_as_not_recorded() -> None:
@@ -410,21 +458,38 @@ def test_a_manifest_written_before_the_field_existed_reads_as_not_recorded() -> 
 
     Refusing to decode would break LOADING a model trained before the field
     existed, and loading is not comparing -- the same treatment git_commit
-    and gpu_name already get.
+    already gets.
     """
     obj = _base_manifest()
-    assert "determinism" not in obj
+    assert "fingerprint" not in obj
 
     decoded = manifest.load_manifest_from_text(dump_json_str(obj))
 
-    assert decoded["determinism"] is None
+    assert decoded["fingerprint"] is None
 
 
 def test_a_malformed_posture_is_refused_rather_than_read_as_pinned() -> None:
     """Present means decoded strictly: a record that cannot say what pinned
     it must not reach a comparison looking like one that can."""
     obj = _base_manifest()
-    obj["determinism"] = {"stack": "", "settings": {}}
+    obj["fingerprint"] = _fingerprint_json(determinism={"stack": "", "settings": {}})
 
     with pytest.raises(JSONTypeError, match="stack"):
+        _ = manifest.load_manifest_from_text(dump_json_str(obj))
+
+
+def test_a_fingerprint_missing_an_axis_is_refused_rather_than_defaulted() -> None:
+    """The one failure a comparability record must not have.
+
+    A fingerprint with no `driver_version` would compare equal to another
+    with no `driver_version`, reporting two runs on different drivers as
+    identically configured. Defaulting the axis would make that silent, so
+    the partial record is refused instead.
+    """
+    obj = _base_manifest()
+    partial = _fingerprint_json()
+    del partial["driver_version"]
+    obj["fingerprint"] = partial
+
+    with pytest.raises(JSONTypeError, match="driver_version"):
         _ = manifest.load_manifest_from_text(dump_json_str(obj))

@@ -8,6 +8,7 @@ import pytest
 import torch
 from tests.core.services.model.backends.char_lstm._train_branches_support import (
     _LM,
+    UNPINNED,
     _make_cfg,
     _make_fake_wandb_module,
     _make_prepared,
@@ -75,6 +76,7 @@ def test_early_stopping_triggers_after_patience_exceeded() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     trainer._device = torch.device("cpu")
@@ -134,6 +136,7 @@ def test_apply_lr_cap_no_log_when_lr_below_cap() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     effective_lr = trainer._apply_lr_cap()
@@ -165,6 +168,7 @@ def test_make_loader_returns_none_for_empty_files(tmp_path: Path) -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     train_loader, val_loader, test_loader = trainer._build_all_loaders()
@@ -200,6 +204,7 @@ def test_build_all_loaders_raises_when_no_train_data(tmp_path: Path) -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     with pytest.raises(RuntimeError, match="No training data available"):
@@ -225,6 +230,7 @@ def test_log_wandb_config_called_when_publisher_present() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
+        determinism=UNPINNED,
     )
 
     trainer._log_wandb_config()
@@ -254,6 +260,7 @@ def test_log_wandb_step_called_when_publisher_present() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
+        determinism=UNPINNED,
     )
 
     trainer._log_wandb_step(
@@ -290,6 +297,7 @@ def test_log_wandb_epoch_called_when_publisher_present() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
+        determinism=UNPINNED,
     )
 
     trainer._log_wandb_epoch(
@@ -329,6 +337,7 @@ def test_log_wandb_final_called_when_publisher_present() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
+        determinism=UNPINNED,
     )
 
     trainer._log_wandb_final(
@@ -363,6 +372,7 @@ def test_log_wandb_final_skips_none_values() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
+        determinism=UNPINNED,
     )
 
     trainer._log_wandb_final(
@@ -392,6 +402,7 @@ def test_log_wandb_epoch_table_skips_when_no_publisher() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=None,
+        determinism=UNPINNED,
     )
 
     # Should not raise
@@ -417,6 +428,7 @@ def test_log_wandb_epoch_table_skips_when_no_summaries() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
+        determinism=UNPINNED,
     )
 
     # Ensure epoch_summaries is empty
@@ -447,6 +459,7 @@ def test_log_wandb_epoch_table_logs_data_when_summaries_exist() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
+        determinism=UNPINNED,
     )
 
     # Add epoch summaries: (epoch, train_loss, train_ppl, val_loss, val_ppl)
@@ -476,6 +489,7 @@ def test_finish_wandb_skips_when_no_publisher() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=None,
+        determinism=UNPINNED,
     )
 
     # Should not raise
@@ -501,6 +515,7 @@ def test_finish_wandb_calls_finish_when_publisher_present() -> None:
         progress=None,
         service_name="char-lstm-train",
         wandb_publisher=wandb_pub,
+        determinism=UNPINNED,
     )
 
     trainer._finish_wandb()

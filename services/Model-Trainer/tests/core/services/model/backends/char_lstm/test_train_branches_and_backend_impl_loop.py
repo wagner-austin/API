@@ -8,6 +8,7 @@ from pathlib import Path
 import torch
 from tests.core.services.model.backends.char_lstm._train_branches_support import (
     _LM,
+    UNPINNED,
     _make_cfg,
     _make_prepared,
     _make_settings,
@@ -63,6 +64,7 @@ def test_trainer_train_one_epoch_progress_none_inside_loop() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
     trainer._device = torch.device("cpu")
 
@@ -112,6 +114,7 @@ def test_run_training_loop_progress_called_when_no_batches() -> None:
         resume=False,
         progress=_progress_cb,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     trainer._device = torch.device("cpu")
@@ -253,6 +256,7 @@ def test_train_with_freeze_embed_enabled(tmp_path: Path) -> None:
         resume=False,
         progress=track_loss,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     _ = trainer.train()
@@ -361,6 +365,7 @@ def test_apply_lr_cap_when_finetuning() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     effective_lr = trainer._apply_lr_cap()
@@ -387,6 +392,7 @@ def test_apply_lr_cap_no_cap_when_not_finetuning() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     effective_lr = trainer._apply_lr_cap()

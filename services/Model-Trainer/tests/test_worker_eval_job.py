@@ -25,6 +25,7 @@ from model_trainer.core.services.model.backends.gpt2 import (
 )
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 from model_trainer.worker.eval_job import process_eval_job
+from tests.conftest import UNPINNED
 
 
 class _SettingsFactory(Protocol):
@@ -165,6 +166,7 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
         redis_hb=_hb,
         cancelled=_cancelled,
         resume=False,
+        determinism=UNPINNED,
     )
     loss_final: float = result["loss"]
     assert loss_final <= loss_initial or loss_final >= 0.0

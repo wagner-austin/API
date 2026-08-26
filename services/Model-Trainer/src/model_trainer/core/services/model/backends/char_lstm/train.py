@@ -27,7 +27,7 @@ def train_prepared_char_lstm(
     resume: bool,
     progress: ProgressCallback | None = None,
     wandb_publisher: WandbPublisher | None = None,
-    determinism: DeterminismRecord | None = None,
+    determinism: DeterminismRecord,
 ) -> TrainOutcome:
     """Train a prepared CharLSTM model.
 

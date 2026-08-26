@@ -36,6 +36,7 @@ from model_trainer.core.services.model.backends.gpt2 import (
 )
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 from model_trainer.worker.cloze_job import parse_items, process_cloze_job
+from tests.conftest import UNPINNED
 
 
 class _SettingsFactory(Protocol):
@@ -149,6 +150,7 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
         redis_hb=lambda _: None,
         cancelled=lambda: False,
         resume=False,
+        determinism=UNPINNED,
     )
 
     run_dir = _model_dir(settings, run_id)

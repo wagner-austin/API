@@ -145,7 +145,7 @@ class CreateTrainerFn(Protocol):
         progress: ProgressCallback | None,
         service_name: str,
         wandb_publisher: WandbPublisher | None,
-        determinism: DeterminismRecord | None,
+        determinism: DeterminismRecord,
     ) -> TrainerProto:
         """Create a trainer instance.
 

@@ -27,7 +27,7 @@ def train_prepared_gpt2(
     resume: bool,
     progress: ProgressCallback | None = None,
     wandb_publisher: WandbPublisher | None = None,
-    determinism: DeterminismRecord | None = None,
+    determinism: DeterminismRecord,
 ) -> TrainOutcome:
     """Train a prepared GPT2 model.
 

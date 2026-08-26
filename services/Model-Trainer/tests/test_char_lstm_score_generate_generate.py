@@ -26,6 +26,7 @@ from model_trainer.core.services.model.backends.char_lstm.generate import (
 )
 from model_trainer.core.services.model.backends.char_lstm.score import score_char_lstm
 from model_trainer.core.services.tokenizer.char_backend import CharBackend
+from tests.conftest import UNPINNED
 
 
 def _never() -> bool:
@@ -117,6 +118,7 @@ def _prepare_trained_model(settings: Settings, tmp_path: Path) -> tuple[Prepared
         resume=False,
         prepared=prepared,
         progress=None,
+        determinism=UNPINNED,
     )
     return prepared, corpus_path
 

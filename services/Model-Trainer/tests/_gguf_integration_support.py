@@ -197,7 +197,7 @@ class _HfLmBackend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome:
         for step in range(3):
             if progress:

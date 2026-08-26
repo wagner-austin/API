@@ -7,6 +7,7 @@ from pathlib import Path
 import torch
 from tests.core.services.model.backends.char_lstm._train_branches_support import (
     _LM,
+    UNPINNED,
     _eval_trainer,
     _EvalDS,
     _make_cfg,
@@ -111,6 +112,7 @@ def test_trainer_train_one_epoch_cancelled_early_triggers_return() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
     trainer._device = torch.device("cpu")
 
@@ -176,6 +178,7 @@ def test_trainer_train_one_epoch_progress_and_heartbeat() -> None:
         resume=False,
         progress=_progress_cb,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
     trainer._device = torch.device("cpu")
 
@@ -215,6 +218,7 @@ def test_trainer_run_training_loop_breaks_on_cancelled() -> None:
         resume=False,  # Always cancelled
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     trainer._device = torch.device("cpu")
@@ -312,6 +316,7 @@ def test_train_prepared_calls_save_when_not_cancelled(
         cancelled=lambda: False,
         resume=False,
         progress=None,
+        determinism=UNPINNED,
     )
     expected_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "models" / "rid2"
     assert expected_dir.exists()
@@ -398,6 +403,7 @@ def test_train_prepared_skips_save_when_cancelled(
         cancelled=lambda: True,
         resume=False,  # Always cancelled - save should be skipped
         progress=None,
+        determinism=UNPINNED,
     )
     # Save should be skipped when cancelled=True
     assert rec2.saved == []
@@ -425,6 +431,7 @@ def test_trainer_run_training_loop_progress_none_branch() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     trainer._device = torch.device("cpu")

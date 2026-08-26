@@ -8,6 +8,7 @@ import pytest
 import torch
 from tests.core.services.model.backends.char_lstm._train_branches_support import (
     _LM,
+    UNPINNED,
     _make_cfg,
     _make_prepared,
     _make_settings,
@@ -37,6 +38,7 @@ def test_setup_device_cuda_not_available() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     with pytest.raises(RuntimeError, match="CUDA requested but not available"):
@@ -136,6 +138,7 @@ def test_train_one_epoch_fp16_scaler_paths() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
     # Mock device as CUDA to trigger scaler path
     trainer._device = torch.device("cuda")
@@ -236,6 +239,7 @@ def test_setup_device_cuda_available() -> None:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
 
     device = trainer._setup_device()

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from platform_core.determinism_record import DeterminismRecord, decode_determinism_record
+from platform_core.comparability import (
+    RunFingerprint,
+    decode_run_fingerprint,
+)
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -91,9 +94,6 @@ def _decode_manifest_system(obj: JSONObject) -> TrainingManifestSystem:
         "platform": require_str(sys, "platform"),
         "platform_release": require_str(sys, "platform_release"),
         "machine": require_str(sys, "machine"),
-        # Absent in manifests written before the field existed; absence means
-        # the GPU model was not recorded, which None states exactly.
-        "gpu_name": _optional_str(sys, "gpu_name"),
     }
 
 
@@ -193,27 +193,31 @@ def _optional_float(obj: JSONObject, key: str) -> float | None:
     return float(val)
 
 
-def _optional_determinism(obj: JSONObject, key: str) -> DeterminismRecord | None:
-    """Extract an optional determinism record.
+def _optional_fingerprint(obj: JSONObject, key: str) -> RunFingerprint | None:
+    """Extract an optional run fingerprint.
 
     Absent means the run predates the field, and None states that. Present
-    means it is decoded strictly -- a malformed posture must surface as an
-    error rather than reach a comparison as a record that looks pinned.
+    means it is decoded STRICTLY, by the same decoder the scoring path uses:
+    a fingerprint missing an axis would compare equal to another fingerprint
+    missing the same axis, reporting two differently-configured runs as
+    identical. That is the one failure a comparability record must not have,
+    so a partial one is refused rather than repaired.
 
     Args:
         obj: The manifest object.
         key: The field name.
 
     Returns:
-        The record, or None when the field is absent or explicitly null.
+        The fingerprint, or None when the field is absent or explicitly null.
 
     Raises:
-        JSONTypeError: When the value is present but is not a valid record.
+        JSONTypeError: When the value is present but is not a valid
+            fingerprint.
     """
     val = obj.get(key)
     if val is None:
         return None
-    return decode_determinism_record(val)
+    return decode_run_fingerprint(val)
 
 
 def _optional_int(obj: JSONObject, key: str) -> int | None:
@@ -245,7 +249,7 @@ class _ManifestFields:
     freeze_embed: bool
     gradient_clipping: float
     seed: int
-    determinism: DeterminismRecord | None
+    fingerprint: RunFingerprint | None
     git_commit: str | None
     pretrained_run_id: str | None
     device: str
@@ -284,7 +288,7 @@ class _ManifestFields:
         freeze_embed: bool,
         gradient_clipping: float,
         seed: int,
-        determinism: DeterminismRecord | None,
+        fingerprint: RunFingerprint | None,
         git_commit: str | None,
         pretrained_run_id: str | None,
         device: str,
@@ -315,7 +319,7 @@ class _ManifestFields:
         self.freeze_embed = freeze_embed
         self.gradient_clipping = gradient_clipping
         self.seed = seed
-        self.determinism = determinism
+        self.fingerprint = fingerprint
         self.git_commit = git_commit
         self.pretrained_run_id = pretrained_run_id
         self.device = device
@@ -359,7 +363,7 @@ def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
         # the posture was not recorded, which None states exactly. Refusing
         # here would break loading a model trained before 2026-08-25, and
         # loading is not comparing.
-        determinism=_optional_determinism(obj, "determinism"),
+        fingerprint=_optional_fingerprint(obj, "fingerprint"),
         git_commit=_optional_str(obj, "git_commit"),
         pretrained_run_id=_optional_str(obj, "pretrained_run_id"),
         loss_mask_prefix_separator=_optional_str(obj, "loss_mask_prefix_separator"),
@@ -438,7 +442,7 @@ def load_manifest_from_text(text: str) -> TrainingManifest:
         "pretrained_run_id": fields.pretrained_run_id,
         "versions": versions,
         "system": system,
-        "determinism": fields.determinism,
+        "fingerprint": fields.fingerprint,
         "git_commit": fields.git_commit,
         "device": fields.device,
         "precision": fields.precision,

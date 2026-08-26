@@ -90,7 +90,7 @@ class UnavailableBackend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome:
         raise AppError(
             ModelTrainerErrorCode.UNSUPPORTED_BACKEND,

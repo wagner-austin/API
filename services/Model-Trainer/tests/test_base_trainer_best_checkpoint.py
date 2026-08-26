@@ -34,6 +34,7 @@ from model_trainer.core.services.training import base_trainer as bt
 from model_trainer.core.types import LMModelProto
 from tests.core.services.model.backends.char_lstm._train_branches_support import (
     _LM,
+    UNPINNED,
     _make_cfg,
     _make_prepared,
     _make_settings,
@@ -97,6 +98,7 @@ def _trainer_for(model: _DiskBackedLM) -> bt.BaseTrainer:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
     trainer._device = torch.device("cpu")
     trainer._es_state = EarlyStoppingState(best_val_loss=1.0586, epochs_no_improve=3)
@@ -227,6 +229,7 @@ def test_a_holdout_run_ships_the_weights_it_scored(
         resume=False,
         prepared=prepared,
         progress=_capture,
+        determinism=UNPINNED,
     )
 
     # The premise: a holdout ran, so a best checkpoint was tracked.

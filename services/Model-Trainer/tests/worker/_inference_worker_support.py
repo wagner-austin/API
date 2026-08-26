@@ -267,7 +267,7 @@ class _FakeBackendWithTopk:
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome:
         return TrainOutcome(
             loss=0.5,
@@ -365,7 +365,7 @@ class _FakeBackendNoTopk:
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome:
         return TrainOutcome(
             loss=0.5,

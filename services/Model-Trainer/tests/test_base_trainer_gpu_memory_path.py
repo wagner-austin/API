@@ -19,6 +19,8 @@ from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.backend_factory import create_char_lstm_backend
 from model_trainer.core.services.tokenizer.char_backend import CharBackend
+from model_trainer.worker.manifest import load_manifest_from_text
+from tests.conftest import UNPINNED
 
 
 class _SettingsFactory(Protocol):
@@ -200,6 +202,7 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
             resume=False,
             prepared=prepared,
             progress=track_progress,
+            determinism=UNPINNED,
         )
         # Verify training completed
         assert out["steps"] >= 1
@@ -212,12 +215,22 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
         )
 
         # The manifest pins provenance: the stamped commit wins over rev-parse,
-        # and the GPU model is recorded because cuda_is_available said cuda.
+        # and the card is recorded because cuda_is_available said cuda.
+        #
+        # Read back through the DECODER rather than by poking at keys. The
+        # fingerprint is the one part of the manifest that is not JSON-native
+        # -- a DeterminismRecord holds its settings as sorted pairs -- and a
+        # writer that dumped it raw produced a file this decode rejects. So
+        # this assertion is also the round-trip test for that.
         manifest_path = artifacts / "models" / "run-gpu-test" / "manifest.json"
         manifest_obj = narrow_json_to_dict(load_json_str(manifest_path.read_text(encoding="utf-8")))
         assert manifest_obj["git_commit"] == "stamped0commit0hash"
-        system_obj = narrow_json_to_dict(manifest_obj["system"])
-        assert system_obj["gpu_name"] == "Fake GPU Model 9000"
+        decoded = load_manifest_from_text(manifest_path.read_text(encoding="utf-8"))
+        fingerprint = decoded["fingerprint"]
+        if fingerprint is None:
+            raise AssertionError("a run that trained must record what it ran on")
+        assert fingerprint["gpu_model"] == "Fake GPU Model 9000"
+        assert "gpu_name" not in narrow_json_to_dict(manifest_obj["system"])
     finally:
         # Restore hooks
         _test_hooks.gpu_max_memory_allocated = orig_gpu_mem
@@ -228,15 +241,15 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
         _test_hooks.env_git_commit = orig_env_git_commit
 
 
-def test_cpu_manifest_records_no_gpu_name(
+def test_a_cpu_run_records_no_card_even_on_a_cuda_box(
     tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
-    """A cpu-device run's manifest records gpu_name null even on a CUDA box.
+    """The fingerprint pins what the run USED, not what hardware exists.
 
-    The field pins what the run used, not what hardware exists — and the cpu
-    branch must not query the device name, because doing so initialises a
-    CUDA context in the writing process (the node-down crash that pairing
-    caused in this suite is why the gate reads the config device).
+    The cpu branch must also not query the device name, because doing so
+    initialises a CUDA context in the writing process (the node-down crash
+    that pairing caused in this suite is why the gate reads the config
+    device).
     """
     artifacts = tmp_path / "artifacts"
     artifacts.mkdir()
@@ -309,6 +322,7 @@ def test_cpu_manifest_records_no_gpu_name(
         resume=False,
         prepared=prepared,
         progress=track_progress,
+        determinism=UNPINNED,
     )
     assert out["steps"] >= 1
     loss_before = train_losses[0]
@@ -318,6 +332,13 @@ def test_cpu_manifest_records_no_gpu_name(
     )
 
     manifest_path = artifacts / "models" / "run-cpu-test" / "manifest.json"
-    manifest_obj = narrow_json_to_dict(load_json_str(manifest_path.read_text(encoding="utf-8")))
-    system_obj = narrow_json_to_dict(manifest_obj["system"])
-    assert system_obj["gpu_name"] is None
+    decoded = load_manifest_from_text(manifest_path.read_text(encoding="utf-8"))
+    fingerprint = decoded["fingerprint"]
+    if fingerprint is None:
+        raise AssertionError("a run that trained must record what it ran on")
+
+    # Empty, not absent and not null. An empty string differs from every real
+    # card, so this cpu run never compares equal to a cuda one; an omitted
+    # axis would compare equal to any other manifest that also omitted it.
+    assert fingerprint["gpu_model"] == ""
+    assert fingerprint["driver_version"] == ""

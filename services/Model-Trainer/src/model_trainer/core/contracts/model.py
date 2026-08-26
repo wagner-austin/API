@@ -325,7 +325,7 @@ class ModelBackend(Protocol):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome: ...
 
     def evaluate(

@@ -20,6 +20,7 @@ from tests._char_lstm_prepare_support import (
     _train_char_tokenizer,
     _write_tiny_corpus,
 )
+from tests.conftest import UNPINNED
 
 
 def test_char_lstm_end_to_end_small(settings_with_paths: Settings, tmp_path: Path) -> None:
@@ -87,6 +88,7 @@ def test_char_lstm_end_to_end_small(settings_with_paths: Settings, tmp_path: Pat
         resume=False,
         prepared=prepared,
         progress=track_loss,
+        determinism=UNPINNED,
     )
     assert out["steps"] >= 1
     assert math.isfinite(out["loss"])
@@ -244,6 +246,7 @@ def test_char_lstm_freeze_embed_preserves_embedding_weights(
         resume=False,
         prepared=prepared,
         progress=track_loss,
+        determinism=UNPINNED,
     )
     assert out["steps"] >= 1, "Training should complete at least 1 step"
 
@@ -343,6 +346,7 @@ def test_char_lstm_training_reduces_loss(settings_with_paths: Settings, tmp_path
         resume=False,
         prepared=prepared,
         progress=capture_loss,
+        determinism=UNPINNED,
     )
 
     # Verify we captured multiple losses
@@ -428,6 +432,7 @@ def test_char_lstm_save_load_consistency(settings_with_paths: Settings, tmp_path
         resume=False,
         prepared=prepared,
         progress=track_loss,
+        determinism=UNPINNED,
     )
 
     # Verify training produced valid losses

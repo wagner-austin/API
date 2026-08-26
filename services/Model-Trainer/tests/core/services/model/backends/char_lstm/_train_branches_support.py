@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import torch
+from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_core.json_utils import JSONValue
 from platform_ml.testing import WandbTableProtocol
 
@@ -21,6 +22,16 @@ from model_trainer.core.types import (
     NamedParameter,
     ParameterLike,
 )
+
+UNPINNED = determinism_record(UNPINNED_STACK, {})
+"""What these tests actually ran under, not a placeholder.
+
+A unit test constructing a trainer pins nothing, so "deliberately not
+pinned" is the true posture and the record says exactly that. Passing it
+explicitly is the point of `determinism` having no default: a test that
+supplied nothing would have written a manifest claiming a posture no process
+ever put in force.
+"""
 
 
 class _LM(LMModelProto):
@@ -177,6 +188,7 @@ def _eval_trainer(*, cancelled: bool) -> bt.BaseTrainer:
         resume=False,
         progress=None,
         service_name="char-lstm-train",
+        determinism=UNPINNED,
     )
     trainer._device = torch.device("cpu")
     return trainer

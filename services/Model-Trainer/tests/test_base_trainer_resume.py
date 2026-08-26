@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 import torch
+from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONValue, load_json_str, narrow_json_to_dict
 
@@ -100,6 +101,10 @@ def _make_cfg(corpus_path: str, tokenizer_id: str) -> ModelTrainConfig:
     }
 
 
+UNPINNED = determinism_record(UNPINNED_STACK, {})
+"""What this test ran under: nothing pinned, recorded as that rather than null."""
+
+
 def _noop(_: float) -> None:
     return None
 
@@ -147,6 +152,7 @@ def _train(
         resume=resume,
         prepared=prepared,
         progress=progress,
+        determinism=UNPINNED,
     )
 
 
@@ -419,6 +425,7 @@ def test_apply_checkpoint_restores_best_and_summaries(
         redis_hb=_noop,
         cancelled=_never,
         resume=True,
+        determinism=UNPINNED,
     )
     meta: TrainingCheckpointMeta = {
         "schema_version": CHECKPOINT_SCHEMA_VERSION,

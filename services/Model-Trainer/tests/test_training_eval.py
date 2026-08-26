@@ -17,6 +17,7 @@ from model_trainer.core.services.model.backends.gpt2 import (
     train_prepared_gpt2,
 )
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
+from tests.conftest import UNPINNED
 
 
 class _SettingsFactory(Protocol):
@@ -177,6 +178,7 @@ def test_training_and_eval_tiny(
         cancelled=_cancelled,
         resume=False,
         progress=track_loss,
+        determinism=UNPINNED,
     )
     assert res["loss"] >= 0.0
     loss_before = train_losses[0]
@@ -358,6 +360,7 @@ def test_cancel_during_eval_returns_partial_results(
         cancelled=_cancelled,
         resume=False,
         progress=track_progress,
+        determinism=UNPINNED,
     )
     # Training should complete or be cancelled - either way loss should be valid
     assert res["loss"] >= 0.0

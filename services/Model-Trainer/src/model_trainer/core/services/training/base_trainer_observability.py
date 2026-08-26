@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONObject, dump_json_str
 
-from model_trainer.core import _test_hooks
+from model_trainer.core.run_fingerprint import capture_run_fingerprint
 from model_trainer.core.services.training.base_trainer_core import (
     _gather_lib_versions,
     _maybe_git_commit,
@@ -22,6 +22,7 @@ from model_trainer.infra.persistence.models import (
     TrainingManifestTiming,
     TrainingManifestVersions,
 )
+from model_trainer.worker.manifest_encoding import encode_training_manifest_full
 
 
 class _TrainerObservability(_TrainerCore):
@@ -113,19 +114,15 @@ class _TrainerObservability(_TrainerCore):
                 "platform": _platform.system(),
                 "platform_release": _platform.release(),
                 "machine": _platform.machine(),
-                # Gated on the run's device, not on hardware presence: a cpu
-                # run records null even on a CUDA box (the field pins what the
-                # run USED), and querying the name would needlessly initialise
-                # a CUDA context in the writing process. _setup_device already
-                # guarantees device "cuda" implies CUDA is available.
-                "gpu_name": (
-                    _test_hooks.cuda_device_name() if self._cfg["device"] == "cuda" else None
-                ),
             },
-            # The posture the worker pinned before any CUDA work. None when
-            # nothing was carried in, which reads as "not recorded" -- never
-            # as pinned.
-            "determinism": self._determinism,
+            # The whole configuration, from the SAME function the scoring path
+            # calls, so a training run and a scoring run are comparable by one
+            # rule rather than two. It is keyed on the run's DEVICE, not on
+            # hardware presence: a cpu run records no card even on a CUDA box,
+            # and querying one would needlessly initialise a CUDA context in
+            # the writing process. _setup_device already guarantees that
+            # device "cuda" implies CUDA is available.
+            "fingerprint": capture_run_fingerprint(self._cfg["device"], self._determinism),
             "git_commit": _maybe_git_commit(self._settings, self._service_name),
             "device": self._cfg["device"],
             "precision": self._cfg["precision"],
@@ -187,7 +184,7 @@ class _TrainerObservability(_TrainerCore):
             "pretrained_run_id": manifest["pretrained_run_id"],
             "versions": manifest["versions"],
             "system": manifest["system"],
-            "determinism": manifest["determinism"],
+            "fingerprint": manifest["fingerprint"],
             "git_commit": manifest["git_commit"],
             "config": cfg_block,
             "device": manifest["device"],
@@ -207,7 +204,13 @@ class _TrainerObservability(_TrainerCore):
             "gguf_export": manifest["gguf_export"],
         }
 
-        Path(out_dir).joinpath("manifest.json").write_text(dump_json_str(full), encoding="utf-8")
+        # Encoded rather than dumped. The fingerprint is not JSON-native -- a
+        # DeterminismRecord holds its settings as sorted (name, value) PAIRS
+        # -- so dumping the manifest raw writes a list where the decoder
+        # requires an object, producing a file the code that wrote it cannot
+        # read back.
+        payload: JSONObject = encode_training_manifest_full(full)
+        Path(out_dir).joinpath("manifest.json").write_text(dump_json_str(payload), encoding="utf-8")
 
     def _log_wandb_config(self) -> None:
         """Log training configuration to wandb at start of training."""

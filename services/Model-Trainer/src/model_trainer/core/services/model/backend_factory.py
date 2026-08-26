@@ -87,7 +87,7 @@ class TrainFn(Protocol):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome: ...
 
 
@@ -201,7 +201,7 @@ class _FactoryBackend:
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome:
         return self._funcs["train"](
             prepared,
@@ -213,6 +213,7 @@ class _FactoryBackend:
             resume=resume,
             progress=progress,
             wandb_publisher=wandb_publisher,
+            determinism=determinism,
         )
 
     def evaluate(

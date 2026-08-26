@@ -226,7 +226,7 @@ class _BackendWithLoad(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome:
         self.resume_seen = resume
         # Simulate training progress with decreasing loss
@@ -456,7 +456,7 @@ class _HfLmBackend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
-        determinism: DeterminismRecord | None = None,
+        determinism: DeterminismRecord,
     ) -> TrainOutcome:
         losses = [2.0, 1.5, 1.0, 0.5]
         for step, loss_val in enumerate(losses):

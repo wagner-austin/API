@@ -6,6 +6,7 @@ from typing import Literal, Protocol
 
 import pytest
 from platform_core.config import config_test_hooks
+from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_ml import sentencepiece as _spm_init
 from platform_ml import torch_types as platform_ml_torch_types
 from platform_workers.testing import (
@@ -25,6 +26,15 @@ from model_trainer.core.services.model.backends.hf_lm._test_hooks import Hooks a
 
 # Use the import to cache sentencepiece in sys.modules with SWIG warnings suppressed
 _ = _spm_init
+
+UNPINNED = determinism_record(UNPINNED_STACK, {})
+"""The posture a test process actually ran under, which is none.
+
+`determinism` has no default anywhere in the training chain, so every caller
+has to state what was in force. For a test that is not "unknown" -- the test
+pinned nothing, and `UNPINNED_STACK` says exactly that. Shared here so nine
+test modules assert the same fact rather than nine spellings of it.
+"""
 
 
 class SettingsFactory(Protocol):

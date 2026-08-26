@@ -23,6 +23,7 @@ from model_trainer.core.types import (
     NamedParameter,
     ParameterLike,
 )
+from tests.conftest import UNPINNED
 
 
 class _FakeForwardOut(ForwardOutProto):
@@ -167,6 +168,7 @@ def test_unavailable_backend_all_methods_raise() -> None:
             cancelled=lambda: False,
             resume=False,
             prepared=dummy,
+            determinism=UNPINNED,
         )
     with pytest.raises(AppError):
         _ = ub.evaluate(run_id="r1", cfg=cfg, settings=s)

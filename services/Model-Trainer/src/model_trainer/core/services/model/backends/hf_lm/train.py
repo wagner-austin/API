@@ -29,7 +29,7 @@ def train_prepared_hf_lm(
     resume: bool,
     progress: ProgressCallback | None = None,
     wandb_publisher: WandbPublisher | None = None,
-    determinism: DeterminismRecord | None = None,
+    determinism: DeterminismRecord,
 ) -> TrainOutcome:
     """Train a HuggingFace LM model.
 
