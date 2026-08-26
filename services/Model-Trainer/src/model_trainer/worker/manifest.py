@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from platform_core.determinism_record import DeterminismRecord, decode_determinism_record
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -192,6 +193,29 @@ def _optional_float(obj: JSONObject, key: str) -> float | None:
     return float(val)
 
 
+def _optional_determinism(obj: JSONObject, key: str) -> DeterminismRecord | None:
+    """Extract an optional determinism record.
+
+    Absent means the run predates the field, and None states that. Present
+    means it is decoded strictly -- a malformed posture must surface as an
+    error rather than reach a comparison as a record that looks pinned.
+
+    Args:
+        obj: The manifest object.
+        key: The field name.
+
+    Returns:
+        The record, or None when the field is absent or explicitly null.
+
+    Raises:
+        JSONTypeError: When the value is present but is not a valid record.
+    """
+    val = obj.get(key)
+    if val is None:
+        return None
+    return decode_determinism_record(val)
+
+
 def _optional_int(obj: JSONObject, key: str) -> int | None:
     """Extract optional integer field."""
     val = obj.get(key)
@@ -221,6 +245,7 @@ class _ManifestFields:
     freeze_embed: bool
     gradient_clipping: float
     seed: int
+    determinism: DeterminismRecord | None
     git_commit: str | None
     pretrained_run_id: str | None
     device: str
@@ -259,6 +284,7 @@ class _ManifestFields:
         freeze_embed: bool,
         gradient_clipping: float,
         seed: int,
+        determinism: DeterminismRecord | None,
         git_commit: str | None,
         pretrained_run_id: str | None,
         device: str,
@@ -289,6 +315,7 @@ class _ManifestFields:
         self.freeze_embed = freeze_embed
         self.gradient_clipping = gradient_clipping
         self.seed = seed
+        self.determinism = determinism
         self.git_commit = git_commit
         self.pretrained_run_id = pretrained_run_id
         self.device = device
@@ -328,6 +355,11 @@ def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
         finetune_lr_cap=require_float(obj, "finetune_lr_cap"),
         freeze_embed=require_bool(obj, "freeze_embed"),
         early_stopped=require_bool(obj, "early_stopped"),
+        # Absent in manifests written before the field existed; absence means
+        # the posture was not recorded, which None states exactly. Refusing
+        # here would break loading a model trained before 2026-08-25, and
+        # loading is not comparing.
+        determinism=_optional_determinism(obj, "determinism"),
         git_commit=_optional_str(obj, "git_commit"),
         pretrained_run_id=_optional_str(obj, "pretrained_run_id"),
         loss_mask_prefix_separator=_optional_str(obj, "loss_mask_prefix_separator"),
@@ -406,6 +438,7 @@ def load_manifest_from_text(text: str) -> TrainingManifest:
         "pretrained_run_id": fields.pretrained_run_id,
         "versions": versions,
         "system": system,
+        "determinism": fields.determinism,
         "git_commit": fields.git_commit,
         "device": fields.device,
         "precision": fields.precision,

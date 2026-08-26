@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -26,6 +27,7 @@ def train_prepared_char_lstm(
     resume: bool,
     progress: ProgressCallback | None = None,
     wandb_publisher: WandbPublisher | None = None,
+    determinism: DeterminismRecord | None = None,
 ) -> TrainOutcome:
     """Train a prepared CharLSTM model.
 
@@ -56,5 +58,6 @@ def train_prepared_char_lstm(
         progress=progress,
         service_name="char-lstm-train",
         wandb_publisher=wandb_publisher,
+        determinism=determinism,
     )
     return trainer.train()

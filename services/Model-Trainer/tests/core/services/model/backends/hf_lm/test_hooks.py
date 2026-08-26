@@ -501,6 +501,7 @@ class TestDefaultCreateTrainer:
             progress=None,
             service_name="test-service",
             wandb_publisher=None,
+            determinism=None,
         )
 
         # Verify trainer has expected methods

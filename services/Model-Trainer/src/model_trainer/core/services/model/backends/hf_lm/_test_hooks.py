@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -81,6 +82,7 @@ def _default_create_trainer(
     progress: ProgressCallback | None,
     service_name: str,
     wandb_publisher: WandbPublisher | None,
+    determinism: DeterminismRecord | None,
 ) -> TrainerProto:
     """Production implementation for creating BaseTrainer.
 
@@ -94,6 +96,8 @@ def _default_create_trainer(
         progress: Optional progress callback.
         service_name: Name of the service.
         wandb_publisher: Optional W&B publisher.
+        determinism: What the worker pinned before any CUDA work, so the
+            manifest can record it rather than leaving it to a log line.
 
     Returns:
         Trainer instance.
@@ -111,6 +115,7 @@ def _default_create_trainer(
         progress=progress,
         service_name=service_name,
         wandb_publisher=wandb_publisher,
+        determinism=determinism,
     )
     return trainer
 

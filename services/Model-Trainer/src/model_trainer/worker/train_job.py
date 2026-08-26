@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
@@ -58,6 +59,7 @@ def _execute_training(
     ctx: JobContext,
     created_at: datetime,
     resume: bool,
+    determinism: DeterminismRecord,
 ) -> None:
     """Execute training workflow."""
     from model_trainer.core.contracts.progress import TrainingPhase, TrainingProgress
@@ -228,6 +230,7 @@ def _execute_training(
         resume=resume,
         progress=_progress,
         wandb_publisher=wandb_pub,
+        determinism=determinism,
     )
     if result["cancelled"]:
         _save_progress(
@@ -367,7 +370,7 @@ def process_train_job(payload_raw: JSONObject) -> None:
     # fetch or config failure must record the run as failed exactly like a
     # training failure, or the job store advertises "running" forever.
     try:
-        threads = setup_env(settings)
+        threads, determinism = setup_env(settings)
         fid = str(req["corpus_file_id"]).strip()
         fetcher = _test_hooks.corpus_fetcher_factory(
             settings["app"]["data_bank_api_url"],
@@ -389,6 +392,7 @@ def process_train_job(payload_raw: JSONObject) -> None:
             ctx,
             created_at,
             payload["resume"],
+            determinism,
         )
     except Exception as e:
         _log.exception("Training job failed", extra={"run_id": run_id, "user_id": user_id})

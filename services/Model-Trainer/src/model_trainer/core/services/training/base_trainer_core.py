@@ -10,6 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import torch
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.logging import get_logger
 from platform_ml.wandb_publisher import WandbPublisher
 
@@ -189,6 +190,7 @@ class _TrainerCore:
         ) = None,
         service_name: str = "base-trainer",
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> None:
         """Initialize the trainer.
 
@@ -218,6 +220,10 @@ class _TrainerCore:
         self._progress = progress
         self._service_name = service_name
         self._wandb = wandb_publisher
+        # What the worker pinned before any CUDA work, carried here so the
+        # manifest can record it. None when the caller did not pin -- which
+        # the manifest records as "not recorded" rather than as pinned.
+        self._determinism = determinism
         self._epoch_summaries: list[tuple[int, float, float, float, float]] = []
         # Initialize training metrics tracking (may be overwritten in train())
         self._training_start_time = 0.0

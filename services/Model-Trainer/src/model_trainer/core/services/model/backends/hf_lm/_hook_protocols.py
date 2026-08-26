@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import torch
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -144,6 +145,7 @@ class CreateTrainerFn(Protocol):
         progress: ProgressCallback | None,
         service_name: str,
         wandb_publisher: WandbPublisher | None,
+        determinism: DeterminismRecord | None,
     ) -> TrainerProto:
         """Create a trainer instance.
 
@@ -157,6 +159,10 @@ class CreateTrainerFn(Protocol):
             progress: Optional progress callback.
             service_name: Name of the service.
             wandb_publisher: Optional W&B publisher.
+            determinism: What the worker pinned before any CUDA work, so the
+                manifest can record it. None when nothing was carried in,
+                which the manifest reads as "not recorded" -- never as
+                pinned.
 
         Returns:
             Trainer instance.

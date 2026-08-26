@@ -8,6 +8,7 @@ from typing import Literal, Protocol
 
 import torch
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
@@ -225,6 +226,7 @@ class _BackendWithLoad(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         self.resume_seen = resume
         # Simulate training progress with decreasing loss
@@ -454,6 +456,7 @@ class _HfLmBackend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         losses = [2.0, 1.5, 1.0, 0.5]
         for step, loss_val in enumerate(losses):

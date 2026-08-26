@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import torch
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.job_types import job_key
 from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.redis import RedisStrProto
@@ -205,6 +206,7 @@ class _Backend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         return TrainOutcome(
             cancelled=True,

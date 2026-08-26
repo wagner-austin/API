@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -26,6 +27,7 @@ def train_prepared_gpt2(
     resume: bool,
     progress: ProgressCallback | None = None,
     wandb_publisher: WandbPublisher | None = None,
+    determinism: DeterminismRecord | None = None,
 ) -> TrainOutcome:
     """Train a prepared GPT2 model.
 
@@ -56,5 +58,6 @@ def train_prepared_gpt2(
         progress=progress,
         service_name="gpt2-train",
         wandb_publisher=wandb_publisher,
+        determinism=determinism,
     )
     return trainer.train()

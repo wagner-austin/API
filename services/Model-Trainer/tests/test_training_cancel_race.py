@@ -7,6 +7,7 @@ from typing import Literal, Protocol
 
 import torch
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.job_types import job_key
 from platform_core.trainer_keys import cancel_key
 from platform_ml.wandb_publisher import WandbPublisher
@@ -213,6 +214,7 @@ class _Backend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         return TrainOutcome(
             cancelled=False,

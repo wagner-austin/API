@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
 from platform_core.trainer_keys import artifact_file_id_key, eval_key
 from platform_ml.wandb_publisher import WandbPublisher
@@ -205,6 +206,7 @@ class _StubBackend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         raise NotImplementedError
 

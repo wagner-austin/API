@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol, TypedDict
 
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -86,6 +87,7 @@ class TrainFn(Protocol):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome: ...
 
 
@@ -199,6 +201,7 @@ class _FactoryBackend:
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         return self._funcs["train"](
             prepared,

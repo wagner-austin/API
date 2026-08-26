@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_ml.wandb_publisher import WandbPublisher
 
@@ -89,6 +90,7 @@ class UnavailableBackend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         raise AppError(
             ModelTrainerErrorCode.UNSUPPORTED_BACKEND,

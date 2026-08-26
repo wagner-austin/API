@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -28,6 +29,7 @@ def train_prepared_hf_lm(
     resume: bool,
     progress: ProgressCallback | None = None,
     wandb_publisher: WandbPublisher | None = None,
+    determinism: DeterminismRecord | None = None,
 ) -> TrainOutcome:
     """Train a HuggingFace LM model.
 
@@ -60,6 +62,7 @@ def train_prepared_hf_lm(
         progress=progress,
         service_name="hf-lm-train",
         wandb_publisher=wandb_publisher,
+        determinism=determinism,
     )
     return trainer.train()
 

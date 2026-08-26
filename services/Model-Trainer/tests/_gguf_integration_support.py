@@ -7,6 +7,7 @@ from pathlib import Path
 
 import torch
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.redis import RedisStrProto
 
@@ -196,6 +197,7 @@ class _HfLmBackend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         for step in range(3):
             if progress:

@@ -25,6 +25,7 @@ from platform_core.determinism_env import (
 from platform_core.determinism_record import (
     FALSE,
     TRUE,
+    UNPINNED_STACK,
     DeterminismRecord,
     determinism_record,
 )
@@ -129,8 +130,10 @@ class TestPosture:
         Nothing about adding a launcher may change what it does."""
         settings = _settings(settings_factory)
         pin = _stated({})
-        assert setup_env(settings) == 2
+        threads, record = setup_env(settings)
+        assert threads == 2
         assert pin.calls == 1
+        assert record == _REPORT
 
     def test_an_explicit_on_pins_determinism(self, settings_factory: SettingsFactory) -> None:
         settings = _settings(settings_factory)
@@ -154,7 +157,26 @@ class TestPosture:
         """The early return must not skip what the caller asked for."""
         settings = _settings(settings_factory)
         _stated({DETERMINISM_ENV_VAR: DETERMINISM_OFF})
-        assert setup_env(settings) == 2
+        threads, _ = setup_env(settings)
+        assert threads == 2
+
+    def test_declining_records_that_nothing_was_pinned(
+        self, settings_factory: SettingsFactory
+    ) -> None:
+        """The declining path must SAY so, not say nothing.
+
+        A run deliberately left free and a run whose posture is unknown are
+        the same thing to a later comparison, and both differ from a pinned
+        one. Returning an empty record rather than None is what makes the
+        manifest able to state it.
+        """
+        settings = _settings(settings_factory)
+        _stated({DETERMINISM_ENV_VAR: DETERMINISM_OFF})
+
+        _, record = setup_env(settings)
+
+        assert record == determinism_record(UNPINNED_STACK, {})
+        assert record != _REPORT
 
     def test_an_unreadable_posture_fails_the_job_before_any_cuda_work(
         self, settings_factory: SettingsFactory

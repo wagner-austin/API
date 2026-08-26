@@ -6,6 +6,7 @@ from typing import Literal, Protocol
 
 import torch
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.redis import RedisStrProto
@@ -211,6 +212,7 @@ class _Backend(ModelBackend):
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         # Exercise the worker's progress callback wrapper so that the
         # training_worker._progress closure is covered.

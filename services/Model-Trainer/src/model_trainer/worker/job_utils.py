@@ -8,7 +8,12 @@ from typing import Final
 
 from platform_core.config import _optional_env_str
 from platform_core.determinism_env import DETERMINISM_ENV_VAR, determinism_requested
-from platform_core.determinism_record import encode_determinism_record
+from platform_core.determinism_record import (
+    UNPINNED_STACK,
+    DeterminismRecord,
+    determinism_record,
+    encode_determinism_record,
+)
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import default_events_channel
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
@@ -218,7 +223,7 @@ def publish_metrics(r: RedisStrProto, message: str) -> None:
     r.publish(EVENTS_CHANNEL, message)
 
 
-def setup_env(settings: Settings) -> int:
+def setup_env(settings: Settings) -> tuple[int, DeterminismRecord]:
     """Setup environment for training job.
 
     Also pins kernel-level numerical determinism, and does it HERE because
@@ -233,12 +238,18 @@ def setup_env(settings: Settings) -> int:
     every run. That variance was previously indistinguishable from seed
     spread in any experiment reading small between-arm differences.
 
-    The applied settings are logged rather than assumed, because a run whose
-    determinism settings are unknown cannot be compared with one whose are.
-    That logging is also the ONLY truthful record of the posture: a launcher
-    can declare determinism, but only the process that makes the torch calls
-    knows whether they happened. A run that skips them logs that it skipped
-    them, in the same field, so the two are never distinguished by absence.
+    The applied settings are RETURNED as well as logged, because a log line
+    is not a record: container logs rotate, and for every arm published
+    before 2026-08-25 the posture is already unrecoverable that way. Only the
+    process that makes the torch calls knows whether they happened -- a
+    launcher can declare determinism and be wrong -- so this is the one place
+    the truth exists, and the caller carries it into the run's manifest.
+
+    A run that declines determinism returns a record naming
+    :const:`~platform_core.determinism_record.UNPINNED_STACK` rather than
+    nothing. "Deliberately not pinned" and "unknown" are the same thing to a
+    later comparison and both differ from pinned, so the declining path must
+    say so in the same field rather than by absence.
 
     The posture comes from the environment via
     :func:`~platform_core.determinism_env.determinism_requested`, which
@@ -250,7 +261,8 @@ def setup_env(settings: Settings) -> int:
         settings: Application settings supplying the thread count.
 
     Returns:
-        The resolved thread count.
+        The resolved thread count, and what determinism was actually put in
+        force.
 
     Raises:
         ValueError: If the determinism variable is present and unreadable.
@@ -265,12 +277,16 @@ def setup_env(settings: Settings) -> int:
     __import__("os").putenv("TOKENIZERS_PARALLELISM", "1")
 
     if not determinism_requested(_optional_env_str(DETERMINISM_ENV_VAR)):
-        _log.info("determinism declined", extra={"determinism": "off"})
-        return threads
+        declined = determinism_record(UNPINNED_STACK, {})
+        _log.info(
+            "determinism declined",
+            extra={"determinism": encode_determinism_record(declined)},
+        )
+        return threads, declined
 
     report = _test_hooks.apply_determinism_hook()
     _log.info("determinism pinned", extra={"determinism": encode_determinism_record(report)})
-    return threads
+    return threads, report
 
 
 def build_cfg(req: TrainRequestPayload, corpus_path: str) -> ModelTrainConfig:

@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
+from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
@@ -94,6 +95,7 @@ class _CapturingTrainerFactory:
         progress: ProgressCallback | None,
         service_name: str,
         wandb_publisher: WandbPublisher | None,
+        determinism: DeterminismRecord | None,
     ) -> TrainerProto:
         """Create and capture trainer."""
         trainer = _FakeTrainer(

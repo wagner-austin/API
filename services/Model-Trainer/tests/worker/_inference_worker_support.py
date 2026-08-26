@@ -8,6 +8,7 @@ from typing import Literal, Protocol
 
 import torch
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
 from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.redis import RedisStrProto
@@ -266,6 +267,7 @@ class _FakeBackendWithTopk:
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         return TrainOutcome(
             loss=0.5,
@@ -363,6 +365,7 @@ class _FakeBackendNoTopk:
             | None
         ) = None,
         wandb_publisher: WandbPublisher | None = None,
+        determinism: DeterminismRecord | None = None,
     ) -> TrainOutcome:
         return TrainOutcome(
             loss=0.5,

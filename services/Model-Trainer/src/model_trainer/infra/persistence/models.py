@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from platform_core.determinism_record import DeterminismRecord
 from typing_extensions import TypedDict
 
 
@@ -110,6 +111,18 @@ class TrainingManifest(TypedDict):
     pretrained_run_id: str | None
     versions: TrainingManifestVersions
     system: TrainingManifestSystem
+    # What determinism was in force, from the pin the worker applied before
+    # any CUDA work. Recorded here because until 2026-08-25 it reached only a
+    # log line -- so for every arm published before that the posture is
+    # already unrecoverable, and two runs cannot be told apart on the axis
+    # most likely to separate them.
+    #
+    # None in manifests written before the field existed, which the decoder
+    # reads as "not recorded" -- the treatment git_commit and gpu_name
+    # already get, and for the same reason: refusing to decode an old
+    # manifest would break LOADING a trained model, and loading is not
+    # comparing.
+    determinism: DeterminismRecord | None
     git_commit: str | None
     device: str
     precision: str
@@ -186,6 +199,7 @@ class TrainingManifestFull(TypedDict):
     pretrained_run_id: str | None
     versions: TrainingManifestVersions
     system: TrainingManifestSystem
+    determinism: DeterminismRecord | None
     git_commit: str | None
     config: TrainingManifestConfig
     device: str

@@ -122,6 +122,10 @@ class _TrainerObservability(_TrainerCore):
                     _test_hooks.cuda_device_name() if self._cfg["device"] == "cuda" else None
                 ),
             },
+            # The posture the worker pinned before any CUDA work. None when
+            # nothing was carried in, which reads as "not recorded" -- never
+            # as pinned.
+            "determinism": self._determinism,
             "git_commit": _maybe_git_commit(self._settings, self._service_name),
             "device": self._cfg["device"],
             "precision": self._cfg["precision"],
@@ -183,6 +187,7 @@ class _TrainerObservability(_TrainerCore):
             "pretrained_run_id": manifest["pretrained_run_id"],
             "versions": manifest["versions"],
             "system": manifest["system"],
+            "determinism": manifest["determinism"],
             "git_commit": manifest["git_commit"],
             "config": cfg_block,
             "device": manifest["device"],

@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 import pytest
+from platform_core.determinism_record import (
+    FALSE,
+    TRUE,
+    UNPINNED_STACK,
+    determinism_record,
+)
 from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from model_trainer.worker import manifest
@@ -73,7 +79,8 @@ def _base_manifest() -> _ManifestDict:
     }
 
 
-_ManifestDict = dict[str, str | int | float | bool | None | dict[str, str | int | float | None]]
+_ManifestValue = str | int | float | None | dict[str, str]
+_ManifestDict = dict[str, str | int | float | bool | None | dict[str, _ManifestValue]]
 
 
 def _manifest_unknown() -> _ManifestDict:
@@ -363,4 +370,61 @@ def test_load_manifest_rejects_boolean_resumed_from_epoch() -> None:
     obj = _base_manifest()
     obj["resumed_from_epoch"] = True
     with pytest.raises(JSONTypeError, match="resumed_from_epoch"):
+        _ = manifest.load_manifest_from_text(dump_json_str(obj))
+
+
+def test_a_manifest_carries_the_determinism_posture_it_ran_under() -> None:
+    """The gap this field closes.
+
+    Until 2026-08-25 the posture reached a log line and nothing else, so for
+    every arm published before that it is unrecoverable once container logs
+    rotate -- and two runs could not be told apart on the axis most likely to
+    separate them.
+    """
+    obj = _base_manifest()
+    obj["determinism"] = {
+        "stack": "torch",
+        "settings": {"cudnn_deterministic": "true", "matmul_tf32": "false"},
+    }
+
+    decoded = manifest.load_manifest_from_text(dump_json_str(obj))
+
+    assert decoded["determinism"] == determinism_record(
+        "torch", {"cudnn_deterministic": TRUE, "matmul_tf32": FALSE}
+    )
+
+
+def test_a_run_that_pinned_nothing_is_distinguishable_from_one_that_did() -> None:
+    """ "Deliberately not pinned" must be a recorded fact, not an absence."""
+    obj = _base_manifest()
+    obj["determinism"] = {"stack": UNPINNED_STACK, "settings": {}}
+
+    decoded = manifest.load_manifest_from_text(dump_json_str(obj))
+
+    assert decoded["determinism"] == determinism_record(UNPINNED_STACK, {})
+    assert decoded["determinism"] != determinism_record("torch", {"x": TRUE})
+
+
+def test_a_manifest_written_before_the_field_existed_reads_as_not_recorded() -> None:
+    """Absence is None, not a guess.
+
+    Refusing to decode would break LOADING a model trained before the field
+    existed, and loading is not comparing -- the same treatment git_commit
+    and gpu_name already get.
+    """
+    obj = _base_manifest()
+    assert "determinism" not in obj
+
+    decoded = manifest.load_manifest_from_text(dump_json_str(obj))
+
+    assert decoded["determinism"] is None
+
+
+def test_a_malformed_posture_is_refused_rather_than_read_as_pinned() -> None:
+    """Present means decoded strictly: a record that cannot say what pinned
+    it must not reach a comparison looking like one that can."""
+    obj = _base_manifest()
+    obj["determinism"] = {"stack": "", "settings": {}}
+
+    with pytest.raises(JSONTypeError, match="stack"):
         _ = manifest.load_manifest_from_text(dump_json_str(obj))
