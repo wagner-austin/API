@@ -15,12 +15,15 @@ finishing with the pickup.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from tankpit_bot import _test_hooks
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.ledger.ring import outcome_counts
 from tankpit_bot.sim.session import deliver_batch
 from tests.in_memory_terrain_map import InMemoryTerrainMap
-from tests.sim.seam import SEAM_CLIENT_ID, boot_seam
+from tests.sim.seam import SEAM_CLIENT_ID, SeamClock, boot_seam
 
 _FUEL_X, _FUEL_Y = 130, 100
 _ROUNDS = 40
@@ -35,26 +38,33 @@ def test_marooned_tank_pans_and_walks_to_fuel_beyond_the_window() -> None:
     must NOT oscillate at the window edge: the gait is walk-to-edge,
     pan, walk the revealed ground, pan again, then the ordinary pickup.
     """
-    bot, server, link, table = boot_seam(
-        client_fuel=0,
-        containers=((_FUEL_X, _FUEL_Y, 400),),
-        enemy_alive=False,
-    )
-    del table
-    ws = bot.world
-    ws.terrain_map = InMemoryTerrainMap()
-
+    clock = SeamClock(100_000)
+    original_clock: Callable[[], int] = _test_hooks.get_current_time_ms
+    _test_hooks.get_current_time_ms = clock
     try:
-        for _ in range(_ROUNDS):
-            _tick_once(bot)
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
-    except SessionExitError as error:
-        # After the refuel the world holds no more containers and no
-        # enemies, so the session ends the production way. Any exit
-        # BEFORE the refuel — out_of_fuel above all — is the marooning
-        # this test exists to prevent, and propagates.
-        if error.reason not in ("no_productive_collect", "no_viable_targets"):
-            raise
+        bot, server, link, table = boot_seam(
+            client_fuel=0,
+            containers=((_FUEL_X, _FUEL_Y, 400),),
+            enemy_alive=False,
+        )
+        del table
+        ws = bot.world
+        ws.terrain_map = InMemoryTerrainMap()
+
+        try:
+            for _ in range(_ROUNDS):
+                _tick_once(bot)
+                deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+                clock.advance(1000)
+        except SessionExitError as error:
+            # After the refuel the world holds no more containers and no
+            # enemies, so the session ends the production way. Any exit
+            # BEFORE the refuel — out_of_fuel above all — is the marooning
+            # this test exists to prevent, and propagates.
+            if error.reason not in ("no_productive_collect", "no_viable_targets"):
+                raise
+    finally:
+        _test_hooks.get_current_time_ms = original_clock
 
     assert link.sent_commands.count("scope") >= 2, (
         f"the window-edge clamp never drew its pans: {link.sent_commands}"

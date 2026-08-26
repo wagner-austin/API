@@ -12,13 +12,16 @@ the 08-05 ancestor and 4-in-10-seconds in the 2026-08-21 marooning.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from tankpit_bot import _test_hooks
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.sim.session import deliver_batch
 from tankpit_bot.sim.world import place_mine
 from tankpit_bot.state.types import make_container_state
 from tests.in_memory_terrain_map import InMemoryTerrainMap
-from tests.sim.seam import SEAM_CLIENT_ID, boot_seam
+from tests.sim.seam import SEAM_CLIENT_ID, SeamClock, boot_seam
 
 _RING_X, _RING_Y = 130, 100
 _ENEMY_TEAM = 1
@@ -35,47 +38,54 @@ def test_ringed_hop_is_refused_once_and_never_re_certified() -> None:
     shows exactly ONE teleport decision at the ring — pre-fix it
     showed one per replan cycle, forever.
     """
-    bot, server, link, table = boot_seam(
-        client_fuel=1100,
-        containers=(),
-        counts=(15, 15, 15, 15, 15),
-        equipment=((_RING_X, _RING_Y),),
-    )
-    del table
-    ws = bot.world
-    # The hop lane needs a static map (terrain-less worlds have no
-    # teleport planning at all — the walk lanes own everything).
-    ws.terrain_map = InMemoryTerrainMap()
-    # The full service ring the sim's teleport tries (target, E, N, W,
-    # S) is mined by the enemy team — and the bot has NEVER revealed
-    # any of it: its beliefs are mine-blind, the exact marooning state.
-    for dx, dy in ((0, 0), (1, 0), (0, -1), (-1, 0), (0, 1)):
-        place_mine(server.world, _RING_X + dx, _RING_Y + dy, _ENEMY_TEAM)
-    # The equipment belief from "an earlier scan": the hop's tracked
-    # container, injected through the production state shape.
-    ws.world_state["containers"][f"{_RING_X},{_RING_Y}"] = make_container_state(
-        x=_RING_X,
-        y=_RING_Y,
-        is_fuel=False,
-        volume=0,
-        timestamp_ms=1,
-        failed_pickups=0,
-    )
-
+    clock = SeamClock(100_000)
+    original_clock: Callable[[], int] = _test_hooks.get_current_time_ms
+    _test_hooks.get_current_time_ms = clock
     rounds = 0
     try:
-        for _ in range(14):
-            rounds += 1
-            _tick_once(bot)
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
-    except SessionExitError as error:
-        # An exhausted world ends the session the production way once
-        # the ringed container is released — a legitimate end state
-        # (the seam smoke's seeding rule, inverted on purpose), and
-        # only that one: any other exit reason is a scenario bug and
-        # propagates.
-        if error.reason != "no_productive_collect":
-            raise
+        bot, server, link, table = boot_seam(
+            client_fuel=1100,
+            containers=(),
+            counts=(15, 15, 15, 15, 15),
+            equipment=((_RING_X, _RING_Y),),
+        )
+        del table
+        ws = bot.world
+        # The hop lane needs a static map (terrain-less worlds have no
+        # teleport planning at all — the walk lanes own everything).
+        ws.terrain_map = InMemoryTerrainMap()
+        # The full service ring the sim's teleport tries (target, E, N, W,
+        # S) is mined by the enemy team — and the bot has NEVER revealed
+        # any of it: its beliefs are mine-blind, the exact marooning state.
+        for dx, dy in ((0, 0), (1, 0), (0, -1), (-1, 0), (0, 1)):
+            place_mine(server.world, _RING_X + dx, _RING_Y + dy, _ENEMY_TEAM)
+        # The equipment belief from "an earlier scan": the hop's tracked
+        # container, injected through the production state shape.
+        ws.world_state["containers"][f"{_RING_X},{_RING_Y}"] = make_container_state(
+            x=_RING_X,
+            y=_RING_Y,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=1,
+            failed_pickups=0,
+        )
+
+        try:
+            for _ in range(14):
+                rounds += 1
+                _tick_once(bot)
+                deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+                clock.advance(1000)
+        except SessionExitError as error:
+            # An exhausted world ends the session the production way once
+            # the ringed container is released — a legitimate end state
+            # (the seam smoke's seeding rule, inverted on purpose), and
+            # only that one: any other exit reason is a scenario bug and
+            # propagates.
+            if error.reason != "no_productive_collect":
+                raise
+    finally:
+        _test_hooks.get_current_time_ms = original_clock
 
     sent_teleports = link.sent_commands.count("teleport")
     assert sent_teleports == 1, (
