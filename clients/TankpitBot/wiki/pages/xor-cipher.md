@@ -52,6 +52,18 @@ function za(a, b) {
 - XOR is symmetric: same function encodes and decodes
 - Key table wraps at 1000 bytes
 
+**The wrap is load-bearing, not theoretical.** 2026-08-26: a practice
+room holding 30+ tanks grew a container-dense viewport patch to 1051
+ciphered bytes — the first body past 1000 in a 282,783-message archive
+(previous max 931). The bot's decoder at the time treated the table
+length as a frame bound and crashed the session
+(`XorBodyTooLongError`, artax tick 1176); the decoder now implements
+the `% pa` wrap verbatim, and the killer frame is pinned as a replay
+regression (`tests/capture/oversize_frame_20260826.json` — decodes to
+a clean 21-container patch). Never reintroduce a span cap: the server
+sizes frames to room density, and the archive maximum only records
+the busiest room seen so far.
+
 ## Which Messages Use XOR
 
 ### Server→Client (inbound)
