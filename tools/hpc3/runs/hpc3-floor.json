@@ -18,8 +18,8 @@
       "requeue": true,
       "checkpoint_steps": 0,
       "image": {
-        "path": "/pub/wagnera3/images/v3/abl.sif",
-        "sha256": "3bd2e694857821c383c5e90b1c23b63c706ece20069a6bf34431512ef1c041d4",
+        "path": "/pub/wagnera3/images/v4/abl.sif",
+        "sha256": "df841c661b9ed41a2213aec1470e2c347723be05785b15cef05d6f301cb791be",
         "binds": ["/pub/wagnera3"]
       },
       "env_path": "/opt/env",
