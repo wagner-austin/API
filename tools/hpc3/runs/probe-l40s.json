@@ -1,0 +1,15 @@
+{
+  "project": "mi",
+  "name": "ka-probe-l40s",
+  "partition": "free-gpu32",
+  "gpu": { "model": "L40S", "count": 1 },
+  "minutes": 20,
+  "requeue": false,
+  "checkpoint_steps": 0,
+  "command": "python /pub/wagnera3/probe/known_answer_probe.py",
+  "experiment": {
+    "kind": "known-answer",
+    "label": "gpt2-tiny-forward-seed42-len64",
+    "card": "L40S"
+  }
+}
