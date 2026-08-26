@@ -2,10 +2,13 @@
 
 Implements the [[larder-plan]] fuel scorer: per COLLECT tick with a
 fuel deficit, every believed fuel container competes on
-``min(volume, deficit) / teleport_cost`` and the argmax wins -- a 900
-at 25 tiles beats a 300 at 10 when the tank is down 700, and loses
-when it is down 200. The selection is re-run every tick so the plan
-never goes stale (user ruling: no fixed-container errands).
+``min(volume, deficit) * landing_walkable_fraction / teleport_cost``
+and the argmax wins -- a 900 at 25 tiles beats a 300 at 10 when the
+tank is down 700, and loses when it is down 200. The walkable factor
+is the islet lesson (2026-08-26): landings price their NEIGHBORHOOD,
+so a lake boarding tile no longer ties a meadow. The selection is
+re-run every tick so the plan never goes stale (user ruling: no
+fixed-container errands).
 
 Landing reuses ``find_attainable_landing_tile``: the container tile
 itself when landing-legal and mine-free, else a cardinal shore
@@ -25,6 +28,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
+from tankpit_bot.bot.ai.resource_search import _viewport_walkable_fraction
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.state.types import ContainerStateDict
@@ -235,6 +239,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     assert terrain is not None  # caller guarantees this
     deficit = fuel_capacity(ctx.self_state["rank"]) - ctx.fuel
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    viewport = ctx.world["viewport"]
     reserve = ctx.config["fuel_low_threshold"]
     candidates = 0
     too_close = 0
@@ -294,7 +299,26 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
         if gain < _LARDER_MIN_GAIN and not completes_hunt_readiness:
             dreg += 1
             continue
-        score = gain / max(cost, 1)
+        # Landing quality prices the hop, not just the fuel (the islet
+        # lesson, 2026-08-26): a boarding tile in open water and a
+        # meadow landing used to score identically per gain/cost, so a
+        # water-locked 357 across a lake out-ranked every mainland
+        # alternative and the tank teleported into a neighborhood with
+        # no ground, no other fuel, and no exit but teleport. The
+        # search hop has priced landings by walkable fraction since
+        # 2026-07-18 — the larder now does the same: a ~95%-water
+        # landing viewport slashes the score ~20x while ordinary
+        # ground (fraction ~1.0) keeps today's economics exactly.
+        # Quality shapes RANKING only — eligibility gates above stay
+        # on raw gain, so a sole rich water cache is still harvested.
+        walkable = _viewport_walkable_fraction(
+            ctx,
+            landing_x - viewport["width"] // 2,
+            landing_y - viewport["height"] // 2,
+            viewport["width"],
+            viewport["height"],
+        )
+        score = gain * walkable / max(cost, 1)
         if best is None or score > best_score:
             best = container
             best_landing_x = landing_x

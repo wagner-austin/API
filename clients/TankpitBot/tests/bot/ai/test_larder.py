@@ -341,6 +341,58 @@ def test_water_locked_fuel_is_ferry_served() -> None:
     assert selection["no_landing"] == 0
 
 
+def test_lake_landing_loses_to_mainland_fuel_despite_better_raw_economics() -> None:
+    """Landing quality prices the hop: a meadow beats a lake boarding tile.
+
+    The islet lesson (arterial 2026-08-26): per raw gain/cost the
+    water-locked 800 across the lake (cost 132 via its boarding tile,
+    raw score 6.1) out-scores the mainland 800 at cost 199 (raw score
+    4.0) — and the old scorer
+    teleported into a neighborhood with no ground, no other fuel, and
+    no exit but teleport. The walkable-fraction factor slashes the
+    ~94%-water landing viewport ~16x, so the mainland candidate wins.
+    """
+    containers = {
+        "125,100": make_container(125, 100, 800, is_fuel=True),
+        "128,118": make_container(128, 118, 800, is_fuel=True),
+    }
+    ctx = _ctx(
+        fuel=_fuel_at_deficit(900),
+        containers=containers,
+        terrain=_water_everywhere_terrain(),
+    )
+    ctx.world["terrain"]["122,101"] = _ferry_tile(122, 101, observed_ms=100000)
+
+    selection = select_fuel_larder_hop(ctx)
+
+    assert selection["container"] == containers["128,118"]
+    assert selection["ferry_served"] == 1
+
+
+def test_a_sole_water_cache_is_still_harvested_at_low_quality() -> None:
+    """Quality shapes ranking only — the only candidate still wins.
+
+    Eligibility gates stay on raw gain, so a rich water-locked cache
+    with no mainland alternative is harvested exactly as before the
+    quality factor (the F5 doctrine: ferries unlock fuel nothing else
+    reaches).
+    """
+    containers = {
+        "125,100": make_container(125, 100, 800, is_fuel=True),
+    }
+    ctx = _ctx(
+        fuel=_fuel_at_deficit(900),
+        containers=containers,
+        terrain=_water_everywhere_terrain(),
+    )
+    ctx.world["terrain"]["122,101"] = _ferry_tile(122, 101, observed_ms=100000)
+
+    selection = select_fuel_larder_hop(ctx)
+
+    assert selection["container"] == containers["125,100"]
+    assert (selection["landing_x"], selection["landing_y"]) == (122, 101)
+
+
 def test_standing_at_the_boarding_tile_kills_the_ferry_served_candidate() -> None:
     """From the boarding tile the same boarding hop never re-derives.
 
