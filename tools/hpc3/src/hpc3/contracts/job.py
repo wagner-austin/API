@@ -14,12 +14,13 @@ into a run.
    and the partition must agree in BOTH directions: a GPU on a CPU partition
    pends forever, and no GPU on a GPU partition runs happily while occupying
    a card it never touches.
-2. The partition does not charge. This package submits free work only, so a
-   billing partition is refused outright rather than gated behind a consent
-   flag -- a flag would be a limit a run could switch off. A partition's name
-   is not evidence either way: HPC3 has a QOS named ``free-gpu`` that charges
-   full rate, and a default partition named ``standard`` that charges too.
-   Only the measured usage factor decides.
+2. The partition does not charge, unless the workspace has declared a
+   service-unit budget to charge it against. Not a per-run consent flag -- a
+   flag would be a limit a run could switch off; the allowance is a declared
+   cap that also binds how much may be spent. A partition's name is not
+   evidence either way: HPC3 has a QOS named ``free-gpu`` that charges full
+   rate, and a default partition named ``standard`` that charges too. Only the
+   measured usage factor decides.
 3. A preemptible run long enough to matter carries requeue and checkpointing.
    Under ``PreemptMode=CANCEL`` an eviction destroys unsaved work.
 4. The wall clock fits the partition. Slurm rejects the rest at submission.
@@ -182,21 +183,40 @@ def require_artifact_in_command(obj: dict[str, JSONValue], command: str) -> str 
     an output path edited in one place and not the other -- without pretending
     to understand what the command does with it.
 
+    The key is REQUIRED; only its value may be null. Absent and null used to
+    read alike, and the result was an index with its answer column empty: of
+    130 recorded runs, 8 carried an image digest -- which fills itself in from
+    the spec -- and ONE named where its result went. Every probe run in
+    ``runs/`` writes ``--out /pub/wagnera3/probe/<name>.json`` and none of them
+    said so, so `hpc3-trace` could reach the job and the image and then stop.
+
+    Requiring the key does not force a fiction on a run that produces nothing.
+    It forces the author to SAY which of the two they mean, once, in the spec
+    -- and writing ``"artifact": null`` next to a command with an ``--out``
+    flag is a claim somebody has to make on purpose rather than a field they
+    never noticed.
+
     Args:
         obj: The run document being decoded.
         command: The command this run will execute, already validated.
 
     Returns:
-        The declared path, or None when the run declares no artifact. None is
-        a legitimate answer: a smoke test and a staging job produce nothing
-        durable, and forcing them to name a file would put a fiction in the
-        index.
+        The declared path, or None when the run states it produces nothing
+        durable. A directory is a legitimate answer where a run writes several
+        files into one place: the reader follows it and finds them.
 
     Raises:
-        JSONTypeError: If ``artifact`` is present but is not a non-empty
-            string, or names a path its own command does not contain.
+        JSONTypeError: If ``artifact`` is absent, is present but is not a
+            non-empty string or null, or names a path its own command does
+            not contain.
     """
-    artifact = obj.get("artifact")
+    if "artifact" not in obj:
+        raise JSONTypeError(
+            "Field 'artifact' is required. Name the path this run writes its result to -- "
+            "the ledger publishes it, so `hpc3-trace` can answer 'which file holds this "
+            "run's answer'. Write null to state that the run produces nothing durable."
+        )
+    artifact = obj["artifact"]
     if artifact is None:
         return None
     if not isinstance(artifact, str):
@@ -318,34 +338,49 @@ def _check_partition_carries_gpu(
         )
 
 
-def _check_partition_is_free(cluster: ClusterFacts, partition: str) -> None:
-    """Reject any partition that charges service units.
+def _check_partition_is_funded(
+    cluster: ClusterFacts, partition: str, max_service_units: float
+) -> None:
+    """Reject a billed partition when the workspace has declared no budget for it.
 
-    This package submits free work only. That is a standing decision, so it is
-    a refusal rather than a flag: an ``accept_billing`` field would make the
-    limit something a run could turn off, which is the same shape as declaring
-    ``max_gpus_per_user: 999`` to raise a ceiling. Both disable the check
-    instead of changing the fact.
+    This refusal used to be unconditional, on the reasoning that an
+    ``accept_billing`` field would make the limit something a run could turn
+    off -- the same shape as declaring ``max_gpus_per_user: 999`` to raise a
+    ceiling, which disables a check instead of changing the fact.
+
+    That argument still holds, and this is not that. The allowance is not a
+    per-run flag: it is the workspace's declared service-unit budget, the same
+    number :func:`~hpc3.core.budget.check_projection` enforces the size of the
+    spend against. A workspace that has declared none still cannot submit
+    billed work, and the refusal now says so in terms of the budget rather
+    than as a property of the package. Raising it is a deliberate edit to a
+    declared cap, and the cap then binds how much may be spent -- which is
+    changing the fact, not turning off the check.
 
     Args:
         cluster: The selected cluster.
         partition: Target partition.
+        max_service_units: The workspace's declared service-unit cap. Zero
+            means free work only.
 
     Raises:
         AppError: With ``PARTITION_BILLS`` if the partition's usage factor is
-            above zero. The message names the measured factor and lists the
-            free partitions, because the useful next step is which partition
-            to use instead.
+            above zero and no budget has been declared. The message names the
+            measured factor and lists the free partitions, because the useful
+            next step is usually which partition to use instead.
     """
     if not partition_bills(cluster, partition):
+        return
+    if max_service_units > 0.0:
         return
     factor = partition_facts(cluster, partition)["usage_factor"]
     free = [name for name in partition_names(cluster) if not partition_bills(cluster, name)]
     raise AppError(
         Hpc3ErrorCode.PARTITION_BILLS,
         f"Partition {partition!r} on {cluster['slug']!r} charges service units "
-        f"(UsageFactor {factor}), and this package submits free work only. "
-        f"Free partitions on this cluster: {free}.",
+        f"(UsageFactor {factor}), and this workspace declares a service-unit "
+        f"budget of 0. Free partitions on this cluster: {free}. To spend, raise "
+        f"'max_service_units' in the workspace budget deliberately.",
     )
 
 
@@ -433,13 +468,19 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
     }
 
 
-def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
+def decode_job_spec(
+    value: JSONValue, cluster: ClusterFacts, *, max_service_units: float
+) -> JobSpec:
     """Decode and validate a JSON value into a job spec.
 
     Args:
         value: Value produced by the JSON loader.
         cluster: The cluster whose measured limits the rules are checked
             against.
+        max_service_units: The workspace's declared service-unit budget.
+            Keyword-only and required: a default would answer the billing
+            question on behalf of a caller that never asked, and the safe
+            answer and the intended answer differ between call sites.
 
     Returns:
         A spec that satisfies every submission rule on that cluster.
@@ -468,7 +509,7 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
         )
 
     _check_partition_carries_gpu(cluster, partition, gpu)
-    _check_partition_is_free(cluster, partition)
+    _check_partition_is_funded(cluster, partition, max_service_units)
     _check_time_limit(cluster, partition, minutes)
     _check_preemption_protection(cluster, partition, minutes, requeue, checkpoint_steps)
 

@@ -222,8 +222,17 @@ class TestMemberValidation:
             decode_sweep_member({"suffix": "a\\b", "command": "x"})
 
     def test_a_valid_member_decodes(self) -> None:
-        member = decode_sweep_member({"suffix": "s0", "command": "python x.py"})
+        member = decode_sweep_member(
+            {"suffix": "s0", "command": "python x.py", "artifact": None}
+        )
         assert member == {"suffix": "s0", "command": "python x.py", "artifact": None}
+
+    def test_a_member_that_never_mentions_an_artifact_is_refused(self) -> None:
+        """Per member, because a sweep is where the omission costs most: six
+        arms silently sharing no declared output is six results nobody can
+        reach, and they were all going to be compared."""
+        with pytest.raises(JSONTypeError, match="Field 'artifact' is required"):
+            decode_sweep_member({"suffix": "s0", "command": "python x.py"})
 
     def test_a_member_declaring_an_artifact_its_command_writes_is_kept(self) -> None:
         """Per member, because six arms writing one path are five lost results."""

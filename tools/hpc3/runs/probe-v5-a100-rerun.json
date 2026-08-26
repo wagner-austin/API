@@ -2,7 +2,10 @@
   "project": "mi",
   "name": "ka-probe-v5-a100-rerun",
   "partition": "free-gpu",
-  "gpu": { "model": "A100", "count": 1 },
+  "gpu": {
+    "model": "A100",
+    "count": 1
+  },
   "cpus": 4,
   "mem_gb": 16,
   "minutes": 20,
@@ -11,9 +14,12 @@
   "image": {
     "path": "/pub/wagnera3/images/v5/abl.sif",
     "sha256": "685fd4d47559845c1524619ad66aed55afbfe9ab7237595af89cf7fb402453da",
-    "binds": ["/pub/wagnera3"]
+    "binds": [
+      "/pub/wagnera3"
+    ]
   },
   "command": "python -c 'from model_trainer.cli.known_answer_probe import main; raise SystemExit(main([\"--device\",\"cuda\",\"--out\",\"/pub/wagnera3/probe/v5-a100-rerun.json\"]))'",
+  "artifact": "/pub/wagnera3/probe/v5-a100-rerun.json",
   "experiment": {
     "kind": "known-answer",
     "label": "gpt2-tiny-L2-d128-h2-v512-len64-seed42",

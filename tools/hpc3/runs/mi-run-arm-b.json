@@ -2,6 +2,7 @@
   "project": "mi",
   "name": "mi-kk-armB-realsplit",
   "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 APP__DATA_ROOT=/pub/wagnera3/mi/data APP__ARTIFACTS_ROOT=/pub/wagnera3/mi/data/artifacts APP__RUNS_ROOT=/pub/wagnera3/mi/data/runs APP__LOGS_ROOT=/pub/wagnera3/mi/data/logs modeltrainer-cluster-train --payload /pub/wagnera3/mi/payloads/mi-arm-b.json --corpus-dir /pub/wagnera3/mi/train-corpora --artifacts-dir /pub/wagnera3/mi/artifacts",
+  "artifact": "/pub/wagnera3/mi/artifacts",
   "experiment": {
     "arm": "B-realsplit",
     "seed": "42",
