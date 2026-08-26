@@ -253,9 +253,15 @@ def collect_return_fire(ctx: DecideCtx, base_state: AIStateDict) -> TickDecision
     fuel-low break, or with any weapon reserve below its break bar,
     this rung declines and the escape doctrine owns the tick
     unchanged. Gatherers never fire ([[fleet-coordination]] role
-    gate). The main-target exclusion passes ``-1``: in COLLECT no
-    engage path is serving a held lock, so even the lock's own tank
-    qualifies for return fire.
+    gate). The main-target exclusion is the HELD lock: a COLLECT tick
+    with a live ``combat_target_id`` is a break-restock, and the
+    broken-from enemy belongs to the solvency law and its resume
+    machinery — the first live hour of this rung proved the ``-1``
+    variant re-fights the exact enemy the break just walked away from
+    (artax vs red-8, 03:50:16: break at projected fuel 318 < floor
+    354, then six return shots at the same tank, fuel 851→686). With
+    no lock held (the Yuppler shape) the exclusion matches nobody and
+    every consented attacker qualifies.
 
     Args:
         ctx: Decision context.
@@ -271,7 +277,7 @@ def collect_return_fire(ctx: DecideCtx, base_state: AIStateDict) -> TickDecision
         return None
     if not recent_attacker_ids(ctx):
         return None
-    return opportunity_shot_decision(ctx, -1, base_state)
+    return opportunity_shot_decision(ctx, base_state["combat_target_id"], base_state)
 
 
 __all__ = [

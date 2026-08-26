@@ -162,3 +162,43 @@ def test_unseen_attacker_cannot_draw_the_shot() -> None:
     ctx = _ctx(tanks=None)
 
     assert collect_return_fire(ctx, ctx.base) is None
+
+
+def _with_lock(ctx: DecideCtx, lock_id: int) -> DecideCtx:
+    """Rebuild the ctx holding a combat lock (a break-restock tick)."""
+    locked = AIStateDict(**{**ctx.ai_state, "combat_target_id": lock_id})
+    return DecideCtx(
+        ctx.world,
+        ctx.self_state,
+        locked,
+        ctx.inventory,
+        ctx.timestamp_ms,
+        ctx.terrain,
+        ctx.combat_feedback,
+        ws=ctx.ws,
+    )
+
+
+def test_break_restock_never_re_fights_the_broken_from_lock() -> None:
+    """The held lock's own tank draws no return fire during its break.
+
+    The first live hour proved the inverse (artax vs red-8, 03:50:16):
+    the solvency break walked away at projected fuel 318 < floor 354
+    and the rung shot the same tank six times anyway, fuel 851→686.
+    The broken-from enemy belongs to the resume machinery.
+    """
+    ctx = _with_lock(_ctx(tanks={str(_ATTACKER_ID): _attacker(103, 100)}), _ATTACKER_ID)
+
+    assert collect_return_fire(ctx, ctx.base) is None
+
+
+def test_a_second_attacker_still_draws_fire_during_a_break_restock() -> None:
+    """Only the lock is excluded: another consented attacker gets shot."""
+    ctx = _with_lock(_ctx(tanks={str(_ATTACKER_ID): _attacker(103, 100)}), 999)
+
+    decision = collect_return_fire(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected return fire at the non-lock attacker")
+    assert decision["command"]["cmd_type"] == "shoot"
+    assert decision["command"]["target_id"] == _ATTACKER_ID
