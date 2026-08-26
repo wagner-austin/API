@@ -50,11 +50,13 @@ from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
     describe_run_fingerprint,
 )
-from model_trainer.core.services.model.known_answer_probe import (
+from model_trainer.core.services.model.known_answer_probe import probe_forward_loss
+from model_trainer.core.services.model.probe_shapes import (
+    GATE_RUNG,
     PROBE_EXPERIMENT,
     PROBE_LABEL,
     PROBE_OBSERVATION,
-    probe_forward_loss,
+    require_probe_shape,
 )
 
 _log = get_logger(__name__)
@@ -151,7 +153,7 @@ def probe_run_record(device: str) -> RunRecord:
     """
     fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
 
-    loss = probe_forward_loss(device)
+    loss = probe_forward_loss(device, require_probe_shape(GATE_RUNG))
 
     return run_record(
         experiment=PROBE_EXPERIMENT,

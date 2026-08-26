@@ -21,16 +21,21 @@ from platform_ml.determinism import TORCH_THREAD_SETTING, with_torch_thread_coun
 
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import known_answer_probe as probe_cli
-from model_trainer.core.services.model.known_answer_probe import (
+from model_trainer.core.services.model.known_answer_probe import probe_forward_loss
+from model_trainer.core.services.model.model_sizes import GPT2_MODEL_SIZES
+from model_trainer.core.services.model.probe_shapes import (
+    GATE_RUNG,
     PROBE_EXPERIMENT,
     PROBE_LABEL,
-    PROBE_MODEL_SIZE,
     PROBE_OBSERVATION,
-    PROBE_SEQUENCE_LEN,
-    PROBE_VOCAB_SIZE,
-    probe_forward_loss,
+    ProbeShape,
+    require_probe_shape,
 )
-from model_trainer.core.services.model.model_sizes import GPT2_MODEL_SIZES
+
+#: The rung this file is about. The ladder's other rungs are exercised in
+#: `test_probe_ladder.py`; everything here concerns the one rung that gates an
+#: environment, which is the only one a registry entry ever names.
+GATE_SHAPE = require_probe_shape(GATE_RUNG)
 
 
 def _out_path(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -50,8 +55,8 @@ class TestTheProbeItself:
         # The property the whole known-answer mechanism rests on. If a probe
         # cannot reproduce itself in one process it can never establish an
         # expected value for anything.
-        first = probe_forward_loss("cpu")
-        second = probe_forward_loss("cpu")
+        first = probe_forward_loss("cpu", GATE_SHAPE)
+        second = probe_forward_loss("cpu", GATE_SHAPE)
 
         assert first == second
 
@@ -60,14 +65,40 @@ class TestTheProbeItself:
         # the loss must sit near ln(512) = 6.2383. Asserting the value lands
         # where the arithmetic says it must is what distinguishes this from
         # asserting that some number came back.
-        loss = probe_forward_loss("cpu")
+        loss = probe_forward_loss("cpu", GATE_SHAPE)
 
         assert loss == pytest.approx(6.24, abs=0.5)
+
+    def test_a_sequence_longer_than_the_vocabulary_is_refused(self) -> None:
+        # The input is the identity `arange`, so such a shape would index
+        # embeddings that do not exist. Refused here rather than wrapped with
+        # a modulo: wrapping would silently change what "the input" means for
+        # long rungs while leaving short ones alone, and the ladder's length
+        # axis would stop being one axis.
+        overlong: ProbeShape = {"model_size": "tiny", "sequence_len": 513, "vocab_size": 512}
+
+        with pytest.raises(ValueError, match="sequence_len 513 exceeds vocab_size 512"):
+            probe_forward_loss("cpu", overlong)
+
+    def test_a_sequence_exactly_as_long_as_the_vocabulary_is_allowed(self) -> None:
+        # The boundary the refusal sits on, and a real rung: `tiny-len512`
+        # would be refused by an off-by-one here and the ladder would lose
+        # its longest length rung.
+        exact: ProbeShape = {"model_size": "tiny", "sequence_len": 512, "vocab_size": 512}
+
+        assert probe_forward_loss("cpu", exact) == probe_forward_loss(
+            "cpu", require_probe_shape("tiny-len512")
+        )
 
     def test_the_label_names_every_axis_that_changes_the_number(self) -> None:
         # A label that did not name the shape would let a re-widened probe
         # register under the same name and overwrite an expected value it
         # cannot reproduce.
+        #
+        # Asserted as a literal, not derived. Eight entries in the deployed
+        # registry carry this exact string; a refactor that renames the gate
+        # rung strands all of them as answers to a probe that no longer
+        # exists, and a derived assertion would follow the rename silently.
         assert PROBE_LABEL == "gpt2-tiny-L2-d128-h2-v512-len64-seed42"
 
     def test_the_label_tracks_the_shared_size_table_rather_than_restating_it(
@@ -76,13 +107,13 @@ class TestTheProbeItself:
         # The dimensions come from GPT2_MODEL_SIZES, so changing "tiny" there
         # renames this probe instead of silently redefining it under a label
         # whose expected value was measured on the old shape.
-        dims = GPT2_MODEL_SIZES[PROBE_MODEL_SIZE]
+        dims = GPT2_MODEL_SIZES[GATE_SHAPE["model_size"]]
 
         assert f"-L{dims['n_layer']}-" in PROBE_LABEL
         assert f"-d{dims['hidden_size']}-" in PROBE_LABEL
         assert f"-h{dims['n_head']}-" in PROBE_LABEL
-        assert f"-v{PROBE_VOCAB_SIZE}-" in PROBE_LABEL
-        assert f"-len{PROBE_SEQUENCE_LEN}-" in PROBE_LABEL
+        assert f"-v{GATE_SHAPE['vocab_size']}-" in PROBE_LABEL
+        assert f"-len{GATE_SHAPE['sequence_len']}-" in PROBE_LABEL
 
 
 class TestTheRecordItWrites:
@@ -94,7 +125,7 @@ class TestTheRecordItWrites:
         assert record["experiment"] == PROBE_EXPERIMENT
         assert record["label"] == PROBE_LABEL
         assert [o["name"] for o in record["observations"]] == [PROBE_OBSERVATION]
-        assert record["observations"][0]["value"] == probe_forward_loss("cpu")
+        assert record["observations"][0]["value"] == probe_forward_loss("cpu", GATE_SHAPE)
 
     def test_a_cpu_run_records_no_card_and_no_driver(self) -> None:
         # Not cosmetic. The empty string differs from every real card, so a
@@ -122,7 +153,7 @@ class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
     (6.250983238220215) differing from every cuda record (6.250983715057373).
 
     The pin buys reproducibility BY CONSTRUCTION, not a fix for a live drift.
-    Measured 2026-08-26: `probe_forward_loss("cpu")` at 1, 2, 4 and 8 threads
+    Measured 2026-08-26: `probe_forward_loss("cpu", GATE_SHAPE)` at 1, 2, 4 and 8 threads
     returns 6.250983238220215 every time. See `PROBE_CPU_THREADS`.
     """
 
@@ -182,7 +213,7 @@ class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
         decoded = decode_run_record(written)
 
         assert decoded["label"] == PROBE_LABEL
-        assert decoded["observations"][0]["value"] == probe_forward_loss("cpu")
+        assert decoded["observations"][0]["value"] == probe_forward_loss("cpu", GATE_SHAPE)
 
     def test_main_creates_the_parent_directory_it_was_pointed_at(
         self, tmp_path: pathlib.Path

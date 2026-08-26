@@ -247,6 +247,128 @@ def compare_run_records(
     return RunComparison(kind="compared", verdict=verdict, deltas=deltas, unmatched=unmatched)
 
 
+class ObservationAgreement(TypedDict):
+    """One observation's values across a set of runs.
+
+    Attributes:
+        name: The observation every run in the set reported.
+        values: That observation's value from each run, in the order the runs
+            were given. Kept in full rather than reduced to a summary,
+            because which run is the odd one out is the whole finding when a
+            set of three or more disagrees.
+        distinct: How many different values appear. One means bit-identical
+            agreement across every run -- the only value that means agreement,
+            since a difference of 1e-16 is still a difference and the reason
+            this exists is that "close enough" was how a stack change got
+            through.
+        spread: Largest value minus smallest. Zero exactly when ``distinct``
+            is one; carried alongside it because the SIZE of a disagreement
+            says whether it is last-bit rounding or a different computation.
+    """
+
+    name: str
+    values: tuple[float, ...]
+    distinct: int
+    spread: float
+
+
+class RunAgreement(TypedDict):
+    """Whether a set of runs computed the same numbers.
+
+    Distinct from :class:`RunComparison`, which asks a different question and
+    must not be reached for here. That one subtracts two runs whose
+    configurations a calibration permits subtracting, and refuses when none
+    does. This one asks whether N runs AGREE, which is exactly the measurement
+    that would establish such a calibration -- so requiring one first would be
+    circular, and it deliberately does not consult them.
+
+    The corollary is that the caller owns the configuration question. This
+    reports agreement between whatever it was handed; that the runs differ
+    only on the axis under study is established with
+    :func:`~platform_core.comparability.find_differences`, not here.
+
+    Attributes:
+        experiment: The experiment all the runs answer. They must agree on it,
+            since agreement between answers to different questions is not a
+            quantity.
+        runs: How many runs were compared.
+        shared: One entry per observation EVERY run reported, in name order.
+        unmatched: Observation names some run reported and some did not.
+            Reported rather than dropped: a ladder missing a rung agrees
+            trivially over the rungs it kept, and a set of shared results that
+            silently omitted it would read as complete.
+    """
+
+    experiment: str
+    runs: int
+    shared: tuple[ObservationAgreement, ...]
+    unmatched: tuple[str, ...]
+
+
+def agree_across_runs(records: tuple[RunRecord, ...]) -> RunAgreement:
+    """Report whether several runs produced the same numbers.
+
+    Args:
+        records: The runs to compare, in the order the caller wants their
+            values reported.
+
+    Returns:
+        The agreement: every observation all of them share, with its values
+        and whether those values are identical.
+
+    Raises:
+        ValueError: If fewer than two records are given -- agreement is a
+            property of a set and a set of one always has it, so answering
+            would be reporting a fact about arithmetic rather than about the
+            runs. Also if the records name different experiments, for the
+            reason :class:`RunAgreement` gives.
+    """
+    if len(records) < 2:
+        raise ValueError(f"agreement needs at least two runs, got {len(records)}")
+
+    experiments = {record["experiment"] for record in records}
+    if len(experiments) != 1:
+        raise ValueError(
+            "cannot judge agreement across different experiments: "
+            + ", ".join(sorted(repr(name) for name in experiments))
+        )
+
+    by_name = [{o["name"]: o["value"] for o in record["observations"]} for record in records]
+    every = set(by_name[0]).intersection(*by_name[1:])
+    seen: set[str] = set()
+    for values in by_name:
+        seen |= set(values)
+
+    shared = tuple(
+        _observation_agreement(name, tuple(values[name] for values in by_name))
+        for name in sorted(every)
+    )
+    return RunAgreement(
+        experiment=records[0]["experiment"],
+        runs=len(records),
+        shared=shared,
+        unmatched=tuple(sorted(seen - every)),
+    )
+
+
+def _observation_agreement(name: str, values: tuple[float, ...]) -> ObservationAgreement:
+    """Judge one observation's values.
+
+    Args:
+        name: The observation's name.
+        values: Its value from each run, in run order.
+
+    Returns:
+        The agreement entry for it.
+    """
+    return ObservationAgreement(
+        name=name,
+        values=values,
+        distinct=len(set(values)),
+        spread=max(values) - min(values),
+    )
+
+
 def encode_run_record(record: RunRecord) -> JSONObject:
     """Encode a record for the ledger.
 
@@ -304,9 +426,12 @@ def decode_run_record(value: JSONValue) -> RunRecord:
 __all__ = [
     "NO_PAYLOAD",
     "Observation",
+    "ObservationAgreement",
     "ObservationDelta",
+    "RunAgreement",
     "RunComparison",
     "RunRecord",
+    "agree_across_runs",
     "compare_run_records",
     "decode_run_record",
     "encode_run_record",

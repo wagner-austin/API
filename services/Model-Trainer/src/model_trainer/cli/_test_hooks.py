@@ -11,6 +11,7 @@ of pure code tests the fake.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Protocol
 
 from platform_core.determinism_record import DeterminismRecord
@@ -18,6 +19,11 @@ from platform_core.determinism_record import DeterminismRecord
 from model_trainer.core._hook_protocols_ml import PinTorchThreadsProto
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem
 from model_trainer.core.contracts.model import PreparedLMModel
+
+# Safe at module scope where the others are not: `probe_shapes` is a table of
+# TypedDicts and a label formatter, and imports no torch. That separation is
+# the reason it is its own module -- see its docstring.
+from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES, ProbeShape
 
 
 class LoadHubModelProto(Protocol):
@@ -58,6 +64,31 @@ class ApplyDeterminismProto(Protocol):
     def __call__(self) -> DeterminismRecord:
         """Pin kernel determinism and report what was actually applied."""
         ...
+
+
+class LadderShapesProto(Protocol):
+    """Protocol for the probe ladder the report command walks.
+
+    Behind a hook for a different reason than the others: not because the real
+    thing needs a GPU, but because it needs one to be REASONABLE. The ladder
+    ends at a 1.5-billion-parameter model, which is the measurement's point
+    and is not something to construct on a test runner. Tests install a
+    two-rung ladder and exercise every line of the walk; the cluster runs the
+    real one.
+    """
+
+    def __call__(self) -> Mapping[str, ProbeShape]:
+        """Return the rungs to walk, in the order to walk them."""
+        ...
+
+
+def _default_ladder_shapes() -> Mapping[str, ProbeShape]:
+    """Production probe ladder - used as default hook.
+
+    Returns:
+        Every declared rung, in table order.
+    """
+    return PROBE_SHAPES
 
 
 def _default_load_hub_model(hub_model_id: str, /) -> PreparedLMModel:
@@ -155,12 +186,17 @@ apply_determinism_hook: ApplyDeterminismProto = _default_apply_determinism
 
 pin_torch_threads: PinTorchThreadsProto = _default_pin_torch_threads
 
+ladder_shapes: LadderShapesProto = _default_ladder_shapes
+
 
 __all__ = [
     "ApplyDeterminismProto",
+    "LadderShapesProto",
     "LoadHubModelProto",
     "ScoreClozeProto",
     "apply_determinism_hook",
+    "ladder_shapes",
     "load_hub_model",
+    "pin_torch_threads",
     "score_cloze",
 ]
