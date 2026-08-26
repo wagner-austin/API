@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from platform_core.json_utils import dump_json_str, load_json_str
 
+from tankpit_bot.bot.ai.threat_primitives import human_combat_consented
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.tick_body import _exchange_fleet_knowledge
 from tankpit_bot.browser import get_current_time_ms
@@ -67,6 +68,7 @@ def test_exchange_publishes_and_merges_a_sibling(
         x=90,
         y=90,
         engaged_target_id=506,
+        combat_consent_ids=[709],
         written_ms=sibling_ms,
         enemies=[
             FleetEnemySightingDict(
@@ -104,6 +106,11 @@ def test_exchange_publishes_and_merges_a_sibling(
     assert "506" in ws.world_state["tanks"]
     assert ws.world_state["containers"]["80,90"]["volume"] == 650
     assert ws.fleet_engaged_target_ids == {506: sibling_ms}
+    # The sibling's consent evidence is inherited (operator ruling
+    # 2026-08-26: the human engaged our COLOR, not one tank) — the
+    # exact gap that kept arterial farming while artax dueled Beerus.
+    assert ws.fleet_consented_tank_ids == {709}
+    assert human_combat_consented(ws, 709) is True
     merged = [
         event_fields(record)
         for record in records

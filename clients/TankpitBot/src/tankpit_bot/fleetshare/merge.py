@@ -241,7 +241,9 @@ def merge_fleet_reports(
     removed_merged = 0
     scanned_merged = 0
     engaged: dict[int, int] = {}
+    consented: set[int] = set()
     for report in reports:
+        consented.update(report["combat_consent_ids"])
         target_id = report["engaged_target_id"]
         if target_id not in (-1, own_tank_id):
             recorded = engaged.get(target_id, 0)
@@ -257,6 +259,11 @@ def merge_fleet_reports(
         )
         scanned_merged += advanced
     ws.fleet_engaged_target_ids = engaged
+    # Wholesale replacement, the engaged-ids pattern: a departed
+    # sibling's shared consent ages out with its report TTL; by then
+    # the human has long since granted the survivor organic consent
+    # (or the fight is over).
+    ws.fleet_consented_tank_ids = consented
     return FleetMergeSummaryDict(
         reports=len(reports),
         enemies=enemies_merged,

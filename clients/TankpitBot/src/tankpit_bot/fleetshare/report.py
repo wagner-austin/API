@@ -164,6 +164,27 @@ def _scanned_rows(ws: WorldService, now_ms: int) -> list[FleetScannedTileDict]:
     return rows
 
 
+def _combat_consent_rows(ws: WorldService) -> list[int]:
+    """Tank ids whose combat-consent evidence this session holds.
+
+    The same two proofs :func:`~tankpit_bot.bot.ai.threat_primitives.
+    human_combat_consented` reads locally — they chatted this session,
+    or they struck us (a ``taken`` row in the damage book). Published
+    so a sibling inherits the consent (operator ruling 2026-08-26:
+    a human who engages one tank of our color has consented to
+    fighting the color).
+
+    Args:
+        ws: The session's world service.
+
+    Returns:
+        Sorted consent-evidence tank ids.
+    """
+    ids = set(ws.chat_seen_tank_ids)
+    ids.update(int(key) for key in ws.damage_book["taken"])
+    return sorted(ids)
+
+
 def build_fleet_report(
     ws: WorldService,
     *,
@@ -200,6 +221,7 @@ def build_fleet_report(
         x=self_state["x"],
         y=self_state["y"],
         engaged_target_id=engaged_target_id,
+        combat_consent_ids=_combat_consent_rows(ws),
         written_ms=now_ms,
         enemies=_enemy_rows(ws, own_team, now_ms),
         containers=_container_rows(ws, now_ms),

@@ -52,6 +52,7 @@ def _report(
         x=90,
         y=90,
         engaged_target_id=engaged_target_id,
+        combat_consent_ids=[],
         written_ms=written_ms,
         enemies=list(enemies) if enemies else [],
         containers=list(containers) if containers else [],

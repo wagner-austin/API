@@ -131,7 +131,12 @@ def human_combat_consented(ws: WorldService, tank_id: int) -> bool:
     * they CHATTED this session -- any non-self-echo 0x4D from their
       id (the HELLO response, or anything else they say), or
     * they SHOT US -- the damage book's ``taken`` side holds a row
-      for their id.
+      for their id, or
+    * they consented to a SIBLING -- a same-color teammate's fleet
+      report carries their id in ``combat_consent_ids`` (operator
+      ruling 2026-08-26: "if one has consent the other doesn't need
+      it" -- the human engaged our color, not one tank; run
+      bot-20260826, the Beerus duel, is the motivating fight).
 
     Practice bots never pass through this predicate; callers gate it
     behind :func:`~tankpit_bot.bot.ai.humans.is_human_name`.
@@ -146,7 +151,9 @@ def human_combat_consented(ws: WorldService, tank_id: int) -> bool:
     service = ws
     if tank_id in service.chat_seen_tank_ids:
         return True
-    return str(tank_id) in service.damage_book["taken"]
+    if str(tank_id) in service.damage_book["taken"]:
+        return True
+    return tank_id in service.fleet_consented_tank_ids
 
 
 def _finish_priority(damage_state: int) -> int:

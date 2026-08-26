@@ -238,6 +238,11 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # acquisition within one exchange. Threat ranking prefers
         # these ids inside a priority tier (focus fire).
         self.fleet_engaged_target_ids: dict[int, int] = {}
+        # Consent evidence inherited from same-color siblings
+        # ([[fleet-coordination]], operator ruling 2026-08-26): ids the
+        # FLEET has proof consented to combat. Replaced wholesale per
+        # merge, like the engaged ids above.
+        self.fleet_consented_tank_ids: set[int] = set()
         # ContainerPickup de-duplication. The server broadcasts each
         # 0x43 pickup TWICE within ~200 ms (one to the picker, one to
         # the world view) -- empirical 43.9% duplicate rate across 13

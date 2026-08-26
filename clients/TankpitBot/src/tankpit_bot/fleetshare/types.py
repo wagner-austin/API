@@ -133,6 +133,15 @@ class FleetReportDict(TypedDict):
         role: The reporter's :data:`FleetRole`.
         x: The reporter's X at write time.
         y: The reporter's Y at write time.
+        combat_consent_ids: Tank ids whose combat-consent evidence
+            this reporter holds (they chatted to it, or struck it).
+            Operator ruling 2026-08-26: "if one has consent the other
+            doesn't need it" — a human who engages one tank of our
+            color has consented to fighting the COLOR, so the
+            evidence rides the report like sightings do. Receivers
+            still gate on ``is_human_name`` at the call sites, and
+            fire-authorization still requires own-viewport
+            confirmation.
         engaged_target_id: The reporter's held combat lock (-1 for
             none) — the focus-fire signal teammates' acquisition
             prefers.
@@ -155,6 +164,7 @@ class FleetReportDict(TypedDict):
     x: int
     y: int
     engaged_target_id: int
+    combat_consent_ids: list[int]
     written_ms: int
     enemies: list[FleetEnemySightingDict]
     containers: list[FleetContainerSightingDict]

@@ -232,6 +232,7 @@ def encode_fleet_report(report: FleetReportDict) -> JSONObject:
         "x": report["x"],
         "y": report["y"],
         "engaged_target_id": report["engaged_target_id"],
+        "combat_consent_ids": list(report["combat_consent_ids"]),
         "written_ms": report["written_ms"],
         "enemies": [encode_fleet_enemy_sighting(sighting) for sighting in report["enemies"]],
         "containers": [
@@ -240,6 +241,29 @@ def encode_fleet_report(report: FleetReportDict) -> JSONObject:
         "removed": [encode_fleet_container_removal(removal) for removal in report["removed"]],
         "scanned": [encode_fleet_scanned_tile(tile) for tile in report["scanned"]],
     }
+
+
+def _require_int_list(data: JSONObject, key: str) -> list[int]:
+    """Decode a required list-of-ints field.
+
+    Args:
+        data: JSON object holding the field.
+        key: Field name.
+
+    Returns:
+        The validated int list.
+
+    Raises:
+        JSONTypeError: If the field is absent, not a list, or holds a
+            non-int entry.
+    """
+    raw = require_list(data, key)
+    out: list[int] = []
+    for i, value in enumerate(raw):
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise JSONTypeError(f"{key}[{i}] must be an int, got {type(value).__name__}")
+        out.append(value)
+    return out
 
 
 def decode_fleet_report(data: JSONValue) -> FleetReportDict:
@@ -265,6 +289,7 @@ def decode_fleet_report(data: JSONValue) -> FleetReportDict:
         x=require_int(data, "x"),
         y=require_int(data, "y"),
         engaged_target_id=require_int(data, "engaged_target_id"),
+        combat_consent_ids=_require_int_list(data, "combat_consent_ids"),
         written_ms=require_int(data, "written_ms"),
         enemies=[decode_fleet_enemy_sighting(entry) for entry in require_list(data, "enemies")],
         containers=[

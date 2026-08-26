@@ -31,6 +31,7 @@ def _report() -> FleetReportDict:
         x=100,
         y=120,
         engaged_target_id=506,
+        combat_consent_ids=[],
         written_ms=100000,
         enemies=[
             FleetEnemySightingDict(
@@ -82,6 +83,14 @@ def test_decode_report_rejects_missing_field() -> None:
     payload = encode_fleet_report(_report())
     del payload["tank_id"]
     with pytest.raises(JSONTypeError, match="tank_id"):
+        decode_fleet_report(payload)
+
+
+def test_decode_report_rejects_non_int_consent_id() -> None:
+    """A non-int entry in ``combat_consent_ids`` raises with its index."""
+    payload = encode_fleet_report(_report())
+    payload["combat_consent_ids"] = [709, "1301"]
+    with pytest.raises(JSONTypeError, match=r"combat_consent_ids\[1\] must be an int"):
         decode_fleet_report(payload)
 
 
