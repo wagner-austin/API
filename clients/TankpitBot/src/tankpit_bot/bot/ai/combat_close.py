@@ -308,7 +308,7 @@ def close_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     # target, one shot may divert to a visible finisher or an active
     # attacker. The lock is untouched -- next tick the main fight
     # resumes (in view, the re-entry is a free same-tile shot).
-    opportunity = opportunity_shot_decision(ctx, target["tank_id"])
+    opportunity = opportunity_shot_decision(ctx, target["tank_id"], ctx.base)
     if opportunity is not None:
         return opportunity
     if has_cardinal_combat_shot(ctx.self_state, target) or (

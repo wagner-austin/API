@@ -167,7 +167,7 @@ def pursuit_fire(ctx: DecideCtx, pursuit: EnemyThreatDict) -> TickDecisionDict:
         Engage decision (stamping the pursuit-shot window), or the
         map-chase decision when either gate blocks the shot.
     """
-    opportunity = opportunity_shot_decision(ctx, pursuit["tank_id"])
+    opportunity = opportunity_shot_decision(ctx, pursuit["tank_id"], ctx.base)
     if opportunity is not None:
         # Firefight doctrine (2026-08-14): a visible finisher or an
         # active attacker outranks a shot at a DEPARTED target's

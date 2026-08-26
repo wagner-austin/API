@@ -25,6 +25,7 @@ from tankpit_bot.bot.ai.collect_pickups import (
     select_and_pickup_equipment,
     select_and_pickup_fuel,
 )
+from tankpit_bot.bot.ai.combat_opportunity import collect_return_fire
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
 )
@@ -231,10 +232,15 @@ def _sense_and_safety_gates(
     before any pickup" (2026-07-03), and a DISPLACED harvest landing
     keeps its lock -- running the lock first walked blind into the
     unobserved minefield three ticks straight. Clean suppressed
-    landings still latch silently and fall through to the lock. The
-    under-fire escape, the own-mine-hit reveal scan (user ruling
-    2026-08-13, flag 2), and the desync rescan follow in that order:
-    survival beats reveal, reveal beats resync, resync beats pursuit.
+    landings still latch silently and fall through to the lock.
+    Return fire follows (operator ruling 2026-08-26, Yuppler receipt:
+    a stocked tank under fire spends the tick DAMAGING the attacker,
+    with the refill riding as the shot's secondary — the survival
+    bars inside the rung keep the escape doctrine senior when stock
+    is broken). The under-fire escape, the own-mine-hit reveal scan
+    (user ruling 2026-08-13, flag 2), and the desync rescan follow in
+    that order: survival beats reveal, reveal beats resync, resync
+    beats pursuit.
 
     Args:
         ctx: Decision context.
@@ -248,6 +254,10 @@ def _sense_and_safety_gates(
     landing_scan, base_state = _scan_on_landing_decision(ctx, base_state)
     if landing_scan is not None:
         return landing_scan, base_state
+
+    return_fire = collect_return_fire(ctx, base_state)
+    if return_fire is not None:
+        return return_fire, base_state
 
     under_fire = _escape_under_fire_decision(ctx, base_state)
     if under_fire is not None:

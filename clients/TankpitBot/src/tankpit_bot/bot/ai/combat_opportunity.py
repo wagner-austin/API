@@ -18,9 +18,14 @@ attacker has consented by attacking.
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.combat_strategy import has_cardinal_combat_shot, has_combat_shot
+from tankpit_bot.bot.ai.combat_strategy import (
+    _find_combat_pickup,
+    has_cardinal_combat_shot,
+    has_combat_shot,
+)
 from tankpit_bot.bot.ai.combat_target import has_clear_shot_line
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
+from tankpit_bot.bot.ai.mode_gates import weapon_reserves_below_break
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
@@ -147,7 +152,11 @@ def select_opportunity_shot(ctx: DecideCtx, main_target_id: int) -> EnemyThreatD
     return None
 
 
-def opportunity_fire(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
+def opportunity_fire(
+    ctx: DecideCtx,
+    target: EnemyThreatDict,
+    ai_state: AIStateDict,
+) -> TickDecisionDict:
     """Dispatch one diverted shot without touching the held lock.
 
     The lock fields (``combat_target_*``) and the engagement stamp
@@ -158,9 +167,16 @@ def opportunity_fire(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
     its miss/rejection consequences to shots aimed at its own target,
     so a diverted miss can never block the main lock.
 
+    The adjacent-container pickup rides as the secondary command, the
+    same free rider ``engage_target`` gives its own shots (operator
+    ruling 2026-08-26, Yuppler receipt: ticks under fire are DAMAGE
+    ticks — the refill costs the shot nothing).
+
     Args:
         ctx: Decision context.
         target: The divert target from :func:`select_opportunity_shot`.
+        ai_state: AI state the decision builds on (the caller's
+            threaded base, so gate-latched fields survive the divert).
 
     Returns:
         The diverted shoot decision.
@@ -172,6 +188,9 @@ def opportunity_fire(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         target["y"],
         target["damage_state"],
     )
+    secondary = _find_combat_pickup(ctx)
+    if secondary is not None:
+        emit_ai("mid-combat pickup %s", secondary["cmd_type"])
     return make_decision(
         make_shoot_command(target["x"], target["y"], target["tank_id"]),
         "HUNT",
@@ -181,7 +200,7 @@ def opportunity_fire(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         "opportunity_shot",
         AIStateDict(
             **{
-                **ctx.base,
+                **ai_state,
                 "last_shoot_ms": ctx.timestamp_ms,
                 "last_shot_target_id": target["tank_id"],
                 "last_shot_target_name": target["name"],
@@ -189,10 +208,15 @@ def opportunity_fire(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         ),
         ctx.equip,
         reason_context={"target_name": target["name"]},
+        secondary_command=secondary,
     )
 
 
-def opportunity_shot_decision(ctx: DecideCtx, main_target_id: int) -> TickDecisionDict | None:
+def opportunity_shot_decision(
+    ctx: DecideCtx,
+    main_target_id: int,
+    ai_state: AIStateDict,
+) -> TickDecisionDict | None:
     """Return the divert decision when one applies, else ``None``.
 
     The single entry the combat paths call before serving their main
@@ -201,6 +225,7 @@ def opportunity_shot_decision(ctx: DecideCtx, main_target_id: int) -> TickDecisi
     Args:
         ctx: Decision context.
         main_target_id: The main target the caller is serving.
+        ai_state: AI state the divert decision builds on.
 
     Returns:
         Diverted shot decision, or ``None`` when the tick belongs to
@@ -209,12 +234,50 @@ def opportunity_shot_decision(ctx: DecideCtx, main_target_id: int) -> TickDecisi
     target = select_opportunity_shot(ctx, main_target_id)
     if target is None:
         return None
-    return opportunity_fire(ctx, target)
+    return opportunity_fire(ctx, target, ai_state)
+
+
+def collect_return_fire(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict | None:
+    """Return fire from a COLLECT-owned tick while stock permits.
+
+    The Yuppler receipt (run bot/arterial 2026-08-26 03:14): ten human
+    shots landed while the between-kills restock out-collected the
+    damage on a 1,025-volume pile — and the first return shot waited
+    37 s for the tank to touch cap, because only combat paths consult
+    the opportunity doctrine. Operator ruling 2026-08-26: a consented
+    attacker in view makes ticks under fire DAMAGE ticks — the divert
+    fires from where the tank stands and the pickup rides as the
+    secondary command, so returning fire costs the refill nothing.
+
+    The 2026-07-25 survival contract stays senior: at or below the
+    fuel-low break, or with any weapon reserve below its break bar,
+    this rung declines and the escape doctrine owns the tick
+    unchanged. Gatherers never fire ([[fleet-coordination]] role
+    gate). The main-target exclusion passes ``-1``: in COLLECT no
+    engage path is serving a held lock, so even the lock's own tank
+    qualifies for return fire.
+
+    Args:
+        ctx: Decision context.
+        base_state: AI state threaded from the collect gates.
+
+    Returns:
+        The return-fire decision, or ``None`` when no confirmed recent
+        attacker has a legal immediate shot or the survival bars veto.
+    """
+    if ctx.config["role"] == "gatherer":
+        return None
+    if ctx.fuel <= ctx.config["fuel_low_threshold"] or weapon_reserves_below_break(ctx):
+        return None
+    if not recent_attacker_ids(ctx):
+        return None
+    return opportunity_shot_decision(ctx, -1, base_state)
 
 
 __all__ = [
     "FINISHER_MAX_DAMAGE_STATE",
     "RETURN_FIRE_WINDOW_MS",
+    "collect_return_fire",
     "opportunity_shot_decision",
     "select_opportunity_shot",
 ]
