@@ -9,6 +9,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
+from tankpit_bot.protocol.decorations import decoration_name
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
 )
@@ -244,11 +245,17 @@ def _dispatch_tank_announcements(ws: WorldService, decoded: protocol.BinaryMessa
             "slot": int(slot),
             "level": int(level),
         }:
+            # The field is decoration_level, NOT level: 'level' is a
+            # reserved JSONL record key and the encoder raises on the
+            # collision -- the first live 0x4E (05:11:16, Arterial's
+            # BRONZE TANK AWARD for 100 career deactivations) crashed
+            # BOTH fleet bots simultaneously on this exact kwarg.
             emit_diagnostic(
                 diagnostic_kind="tank_decoration",
                 tank_id=tid,
                 slot=slot,
-                level=level,
+                decoration_level=level,
+                award=decoration_name(slot, level) or "unknown",
             )
             return True
         case {

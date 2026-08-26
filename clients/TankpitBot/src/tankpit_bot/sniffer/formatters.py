@@ -9,6 +9,7 @@ from __future__ import annotations
 from tankpit_bot import protocol
 from tankpit_bot.container.types import ContainerPickupRecordDict
 from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
+from tankpit_bot.protocol.decorations import decoration_name
 from tankpit_bot.sniffer.constants import (
     COMBAT_MSG_TYPES,
     DAMAGE_NAMES,
@@ -251,7 +252,9 @@ def format_misc_details(d: protocol.BinaryMessage) -> str:
         banner = " (banner)" if d["was_promoted"] else ""
         return f"new_rank={rank_name(d['new_rank'])}{banner}"
     if d["msg_type"] == 0x4E:
-        return f"tank={d['tank_id']} slot={d['slot']} level={d['level']}"
+        award = decoration_name(d["slot"], d["level"])
+        award_text = f" award={award}" if award is not None else ""
+        return f"tank={d['tank_id']} slot={d['slot']} level={d['level']}{award_text}"
     if d["msg_type"] == 0x4C:
         return f"tanks={len(d['tanks'])}"
     if d["msg_type"] == 0x3C:

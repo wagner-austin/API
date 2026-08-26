@@ -43,7 +43,7 @@ from tankpit_bot.runtime_logging_handlers import (
     reset_artifact_files,
     session_logger_name,
 )
-from tankpit_bot.runtime_records import RuntimeLogExtraDict
+from tankpit_bot.runtime_records import _RESERVED_EVENT_KEYS, RuntimeLogExtraDict
 
 _EMITTER_LOGGER = get_logger(EMITTER_LOGGER_NAME)
 
@@ -379,7 +379,18 @@ def _emit_runtime_event(
         **fields: Structured key/value payload spread into the JSONL event
             at the top level. Must not collide with the reserved event keys
             (timestamp, level, logger, mode, channel, message).
+
+    Raises:
+        ValueError: When a field name collides with a reserved event
+            key. Validated HERE, at the call, not only in the JSONL
+            handler: unit tests run without the handler attached, so
+            a handler-only check let a covered ``level=`` emit ship
+            and crash both fleet bots on the first live 0x4E
+            decoration announcement (2026-08-26 05:11:17).
     """
+    for key in fields:
+        if key in _RESERVED_EVENT_KEYS:
+            raise ValueError(f"runtime event field name {key!r} collides with reserved record key")
     formatted = message % args if args else message
     extra = RuntimeLogExtraDict(
         runtime_channel=channel,

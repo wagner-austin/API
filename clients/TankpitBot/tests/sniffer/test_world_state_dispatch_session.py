@@ -117,6 +117,23 @@ class TestDispatchDecoration:
         after = ws.world_state["tanks"]["44"]
         assert after == before
 
+    def test_unknown_award_slot_dispatches_without_a_name(self) -> None:
+        """A slot outside the known table books the numbers, no crash.
+
+        The 0x4E fields are raw bytes; a future server-side award
+        category must never take the session down (2026-08-26: the
+        FIRST live 0x4E crashed both fleet bots on a reserved-key
+        collision — this dispatch is the class's regression guard).
+        """
+        from tankpit_bot.protocol import DecorationDict
+
+        ws = WorldService()
+        msg = DecorationDict(msg_type=0x4E, tank_id=44, slot=9, level=4)
+
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.world_state["tanks"] == {}
+
 
 class TestDispatchSupervisorText:
     """Tests for dispatch_world_state_update with 0x3C SupervisorText (wg)."""

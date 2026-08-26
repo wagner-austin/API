@@ -176,6 +176,16 @@ class TestFormatMessageFunctions:
         assert "tank=99" in result
         assert "slot=2" in result
         assert "level=3" in result
+        assert "award=HEROIC HONOR MEDAL" in result
+
+    def test_format_misc_details_decoration_unknown_slot_has_no_award(self) -> None:
+        """A slot outside the known table renders numbers only."""
+        from tankpit_bot.protocol import DecorationDict
+
+        msg = DecorationDict(msg_type=0x4E, tank_id=99, slot=9, level=1)
+        result = format_misc_details(msg)
+        assert "slot=9" in result
+        assert "award=" not in result
 
     def test_format_misc_details_supervisor_text(self) -> None:
         """Test format_misc_details for SupervisorText (0x3C)."""

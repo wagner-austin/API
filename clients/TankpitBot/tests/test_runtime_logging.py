@@ -301,6 +301,22 @@ def test_encode_runtime_event_record_rejects_reserved_key_in_fields() -> None:
         encode_runtime_event_record(record)
 
 
+def test_emit_rejects_reserved_field_names_at_the_call() -> None:
+    """A reserved kwarg raises at emit time, handler or no handler.
+
+    The encoder-level check only runs with the JSONL handler attached,
+    which unit tests never do — so a fully covered ``level=`` emit
+    shipped and crashed BOTH fleet bots on the first live 0x4E
+    decoration announcement (2026-08-26 05:11:17). Validation now
+    happens at the call, so coverage of an emit line proves its field
+    names are legal.
+    """
+    import pytest
+
+    with pytest.raises(ValueError, match="'level' collides with reserved record key"):
+        emit_diagnostic(diagnostic_kind="test_kind", level=3)
+
+
 def test_decode_runtime_event_record_rejects_non_primitive_field_value() -> None:
     """A non-primitive field value at the top level raises during decode."""
     import pytest
