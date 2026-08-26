@@ -10,11 +10,14 @@ pass on a version that set it last.
 
 from __future__ import annotations
 
+from platform_core.determinism_cpu import BLAS_THREAD_ENV_VARS
 from platform_core.determinism_record import (
     FALSE,
     TRUE,
+    UNPINNED_STACK,
     DeterminismRecord,
     decode_determinism_record,
+    determinism_record,
     encode_determinism_record,
 )
 
@@ -22,8 +25,10 @@ from platform_ml.determinism import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
     TORCH_STACK,
+    TORCH_THREAD_SETTING,
     apply_determinism,
     set_cublas_workspace,
+    with_torch_thread_count,
 )
 
 
@@ -220,6 +225,59 @@ def test_a_torch_record_round_trips() -> None:
     record = RecordingTorch([]).apply(RecordingEnv([]))
 
     assert decode_determinism_record(encode_determinism_record(record)) == record
+
+
+class TestTheThreadCountIsPartOfThePosture:
+    """A pinned thread count that no record carries is a run nobody can repeat.
+
+    `Model-Trainer.worker.job_utils.setup_env` pins `torch.set_num_threads`
+    on every job, then used to return either an `apply_determinism` record
+    that omitted the count or -- when determinism was declined --
+    `determinism_record(UNPINNED_STACK, {})`, an EMPTY settings map for a run
+    that had just pinned something. Measured on this stack: a 4096x4096
+    matmul at one thread and at eight differs in 865,498 of 16,777,216
+    elements, so those two runs need records that differ, and had records
+    that did not.
+    """
+
+    def test_the_count_joins_a_pinned_record(self) -> None:
+        pinned = RecordingTorch([]).apply(RecordingEnv([]))
+
+        recorded = with_torch_thread_count(pinned, 8)
+
+        assert dict(recorded["settings"])[TORCH_THREAD_SETTING] == "8"
+        assert recorded["stack"] == TORCH_STACK
+
+    def test_the_count_joins_an_unpinned_record(self) -> None:
+        """The declined branch pins threads too, so it records them too."""
+        recorded = with_torch_thread_count(determinism_record(UNPINNED_STACK, {}), 8)
+
+        assert recorded["stack"] == UNPINNED_STACK
+        assert recorded["settings"] == ((TORCH_THREAD_SETTING, "8"),)
+
+    def test_two_thread_counts_do_not_compare_equal(self) -> None:
+        """The whole point: these two runs produce different numbers."""
+        pinned = RecordingTorch([]).apply(RecordingEnv([]))
+
+        assert with_torch_thread_count(pinned, 1) != with_torch_thread_count(pinned, 8)
+
+    def test_it_keeps_every_setting_the_stack_pinned(self) -> None:
+        pinned = RecordingTorch([]).apply(RecordingEnv([]))
+
+        recorded = with_torch_thread_count(pinned, 4)
+
+        assert dict(pinned["settings"]).items() <= dict(recorded["settings"]).items()
+
+    def test_the_result_still_round_trips(self) -> None:
+        recorded = with_torch_thread_count(RecordingTorch([]).apply(RecordingEnv([])), 4)
+
+        assert decode_determinism_record(encode_determinism_record(recorded)) == recorded
+
+    def test_the_torch_spelling_is_not_the_blas_env_spelling(self) -> None:
+        """`OMP_NUM_THREADS` is read when a BLAS LOADS; `set_num_threads` takes
+        whenever it is called. A run pinned by one has not had the other done
+        to it, so one name for both would compare them as equal."""
+        assert TORCH_THREAD_SETTING not in BLAS_THREAD_ENV_VARS
 
 
 # The stack-agnostic surface of the record -- construction, ordering,

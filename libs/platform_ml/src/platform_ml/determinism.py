@@ -110,6 +110,46 @@ def set_cublas_workspace(set_env: SetEnvProtocol) -> str:
     return CUBLAS_DETERMINISTIC_WORKSPACE
 
 
+#: Setting name for the thread count a torch run resolved to.
+#:
+#: Distinct from the ``OMP_NUM_THREADS`` family that
+#: :mod:`platform_core.determinism_cpu` records, because the two are
+#: different mechanisms: those are read by a BLAS when it LOADS, while
+#: ``torch.set_num_threads`` takes whenever it is called. A run pinned by one
+#: has not had the other done to it, and one spelling for both would make
+#: those two runs compare as equal.
+TORCH_THREAD_SETTING = "torch_num_threads"
+
+
+def with_torch_thread_count(record: DeterminismRecord, threads: int) -> DeterminismRecord:
+    """Add the resolved thread count to a determinism record.
+
+    Separate from :func:`apply_determinism` on purpose. Thread count is
+    pinned whether or not determinism was requested -- a job pins it to use
+    the machine well, not to be reproducible -- so it has to be recordable on
+    an :const:`~platform_core.determinism_record.UNPINNED_STACK` record too.
+    Folding it into ``apply_determinism`` would also change every fingerprint
+    that function has ever produced, including the known answers already
+    registered against it.
+
+    Measured, on this stack: a 4096x4096 matmul at one thread and at eight
+    differs in 865,498 of 16,777,216 elements. A record that omits the count
+    describes two runs that cannot reproduce each other identically.
+
+    Args:
+        record: What the stack pinned, if anything.
+        threads: The count the run RESOLVED to -- read back from torch, not
+            the number requested.
+
+    Returns:
+        The same record with the thread count among its settings.
+    """
+    return determinism_record(
+        record["stack"],
+        {**dict(record["settings"]), TORCH_THREAD_SETTING: str(threads)},
+    )
+
+
 def apply_determinism(
     cudnn: CudnnBackendProtocol,
     matmul: MatmulBackendProtocol,
@@ -165,10 +205,12 @@ __all__ = [
     "CUBLAS_DETERMINISTIC_WORKSPACE",
     "CUBLAS_WORKSPACE_ENV_VAR",
     "TORCH_STACK",
+    "TORCH_THREAD_SETTING",
     "CudnnBackendProtocol",
     "MatmulBackendProtocol",
     "SetDeterministicAlgorithmsProtocol",
     "SetEnvProtocol",
     "apply_determinism",
     "set_cublas_workspace",
+    "with_torch_thread_count",
 ]

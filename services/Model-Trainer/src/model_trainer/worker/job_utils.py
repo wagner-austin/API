@@ -26,6 +26,7 @@ from platform_core.trainer_metrics_events import (
     make_progress_metrics_event,
 )
 from platform_ml import RequestedDevice, ResolvedDevice
+from platform_ml.determinism import with_torch_thread_count
 from platform_workers.redis import RedisStrProto
 
 from model_trainer.core import _test_hooks
@@ -282,15 +283,22 @@ def setup_env(settings: Settings) -> tuple[int, DeterminismRecord]:
     threads = _test_hooks.pin_torch_threads(requested)
     __import__("os").putenv("TOKENIZERS_PARALLELISM", "1")
 
+    # The thread count goes into the record on BOTH paths, because it is
+    # pinned on both. The declined branch used to return
+    # `determinism_record(UNPINNED_STACK, {})` -- an empty settings map --
+    # while the line above had just pinned the count, so the record said
+    # "nothing was pinned" about a run where something was. And the pinned
+    # branch dropped it too, which made a one-thread run and an eight-thread
+    # run produce byte-identical provenance for numbers that differ.
     if not determinism_requested(_optional_env_str(DETERMINISM_ENV_VAR)):
-        declined = determinism_record(UNPINNED_STACK, {})
+        declined = with_torch_thread_count(determinism_record(UNPINNED_STACK, {}), threads)
         _log.info(
             "determinism declined",
             extra={"determinism": encode_determinism_record(declined)},
         )
         return threads, declined
 
-    report = _test_hooks.apply_determinism_hook()
+    report = with_torch_thread_count(_test_hooks.apply_determinism_hook(), threads)
     _log.info("determinism pinned", extra={"determinism": encode_determinism_record(report)})
     return threads, report
 

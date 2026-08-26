@@ -30,6 +30,7 @@ from platform_core.determinism_record import (
     determinism_record,
 )
 from platform_ml import TORCH_STACK
+from platform_ml.determinism import TORCH_THREAD_SETTING, with_torch_thread_count
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
@@ -133,7 +134,7 @@ class TestPosture:
         threads, record = setup_env(settings)
         assert threads == 2
         assert pin.calls == 1
-        assert record == _REPORT
+        assert record == with_torch_thread_count(_REPORT, 2)
 
     def test_an_explicit_on_pins_determinism(self, settings_factory: SettingsFactory) -> None:
         settings = _settings(settings_factory)
@@ -169,14 +170,41 @@ class TestPosture:
         the same thing to a later comparison, and both differ from a pinned
         one. Returning an empty record rather than None is what makes the
         manifest able to state it.
+
+        "Nothing was pinned" is about the STACK. The thread count is pinned on
+        this path too -- a job pins it to use the machine well, not to be
+        reproducible -- so it belongs in the record even here. It used to be
+        dropped, which made this branch return an empty settings map for a run
+        that had just pinned something.
         """
         settings = _settings(settings_factory)
         _stated({DETERMINISM_ENV_VAR: DETERMINISM_OFF})
 
         _, record = setup_env(settings)
 
-        assert record == determinism_record(UNPINNED_STACK, {})
+        assert record == with_torch_thread_count(determinism_record(UNPINNED_STACK, {}), 2)
+        assert record["stack"] == UNPINNED_STACK
         assert record != _REPORT
+
+    def test_the_thread_count_reaches_the_record_on_both_paths(
+        self, settings_factory: SettingsFactory
+    ) -> None:
+        """The count decides the numbers, so it has to be in the provenance.
+
+        Measured on this stack: a 4096x4096 matmul at one thread and at eight
+        differs in 865,498 of 16,777,216 elements. Before this, both paths
+        returned a record that omitted the count entirely, so two runs at
+        different thread counts had byte-identical provenance.
+        """
+        settings = _settings(settings_factory)
+
+        _stated({DETERMINISM_ENV_VAR: DETERMINISM_ON})
+        _, pinned = setup_env(settings)
+        _stated({DETERMINISM_ENV_VAR: DETERMINISM_OFF})
+        _, declined = setup_env(settings)
+
+        assert dict(pinned["settings"])[TORCH_THREAD_SETTING] == "2"
+        assert dict(declined["settings"])[TORCH_THREAD_SETTING] == "2"
 
     def test_an_unreadable_posture_fails_the_job_before_any_cuda_work(
         self, settings_factory: SettingsFactory

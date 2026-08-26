@@ -168,6 +168,7 @@ def apply_cpu_determinism(
 
 
 __all__ = [
+    "BLAS_THREAD_ENV_VARS",
     "CPU_STACK",
     "NUMERIC_MODULES",
     "NativeLibrariesAlreadyLoadedError",
