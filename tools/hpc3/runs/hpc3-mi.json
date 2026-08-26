@@ -17,7 +17,12 @@
       "minutes": 240,
       "requeue": true,
       "checkpoint_steps": 500,
-      "env_path": "/pub/wagnera3/envs/abl-pinned",
+      "image": {
+        "path": "/pub/wagnera3/images/v4/abl.sif",
+        "sha256": "df841c661b9ed41a2213aec1470e2c347723be05785b15cef05d6f301cb791be",
+        "binds": ["/pub/wagnera3"]
+      },
+      "env_path": "/opt/env",
       "pinned_packages": {
         "torch": "2.6.0+cu124",
         "transformers": "4.46.3"
