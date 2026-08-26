@@ -393,15 +393,25 @@ class TestTheCommittedSpec:
         fail on the cluster with an unknown ``--outcomes`` flag. A required
         symbol only detects a stale wheel if it names something the new code
         introduced.
+
+        The last two are the environment known-answer probe, added by
+        another session on 2026-08-25. They arrived here as a FAILURE of
+        this test rather than as a silent widening, which is the exactness
+        earning its keep: the spec grew, and someone had to look.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
         symbols = sorted(
             (check["module"], check["attribute"]) for check in spec["required_symbols"]
         )
         assert symbols == [
+            ("model_trainer.cli.known_answer_probe", "probe_run_record"),
             ("model_trainer.cli.score_baseline", "main"),
             ("model_trainer.cli.score_baseline", "score_with_outcomes"),
             ("model_trainer.cluster.preflight", "check_corpus_certified"),
+            (
+                "model_trainer.core.services.model.known_answer_probe",
+                "probe_forward_loss",
+            ),
             (
                 "model_trainer.core.services.training.base_trainer_checkpoints",
                 "_TrainerCheckpoints",

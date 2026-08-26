@@ -14,9 +14,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
+from platform_core.comparability import cpu_run_fingerprint
+from platform_core.config import config_test_hooks
+from platform_core.determinism_cpu import apply_cpu_determinism
+from platform_core.determinism_env import SINGLE_THREAD
 from platform_core.json_utils import dump_json_str
 
 from covenant_ml.benchmarking.regression_quality import (
@@ -103,7 +108,21 @@ def main(argv: list[str] | None = None) -> int:
         early_stopping_rounds=early_stopping_rounds,
     )
 
-    manifest = run_regression_benchmark(config, seeds, external_dir)
+    # Pin BEFORE the benchmark touches numpy-backed arrays. The thread count
+    # decides how a BLAS partitions a reduction, floating-point addition is
+    # not associative, and platform_core.determinism_cpu measured 865,498 of
+    # 16,777,216 matmul elements changing between 1, 8 and 24 threads. Left
+    # unpinned, a 24-core node and an 8-core node produce different numbers
+    # from the same code and the same data, and nothing in either result says
+    # why. Recorded as well as applied, so the count is part of what the run
+    # IS rather than something a reader has to reconstruct.
+    determinism = apply_cpu_determinism(os.putenv, SINGLE_THREAD)
+    # Read through the config layer, not os.environ. Writing a variable a
+    # native library requires is a different act from reading configuration,
+    # and only the first is this script's business.
+    fingerprint = cpu_run_fingerprint(determinism, config_test_hooks.get_env)
+
+    manifest = run_regression_benchmark(config, seeds, external_dir, fingerprint)
     split_kind = "grouped" if manifest["grouped"] else "row"
     _write(f"regression corpus: {dataset} ({split_kind} split), seeds {seeds}\n")
     for result in manifest["results"]:

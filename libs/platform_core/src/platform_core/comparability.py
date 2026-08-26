@@ -86,6 +86,85 @@ class RunFingerprint(TypedDict):
     determinism: DeterminismRecord
 
 
+IMAGE_DIGEST_ENV_VAR = "IMAGE_DIGEST"
+"""What the launcher exports to tell a payload which image it is running in.
+
+An image cannot compute its own digest from inside itself -- the digest covers
+the whole squashfs, including whatever would be doing the computing. The
+launcher knows it, because the job's spec pins it, so it exports it and the
+payload reads it.
+
+Named here rather than in each service because every research stack in this
+monorepo eventually asks the same question, and a second spelling of the
+variable is a silent "unknown image" in whichever copy drifts.
+"""
+
+NO_VALUE = ""
+"""What an axis records when nothing is known about it.
+
+Empty rather than absent, and never a wildcard: it differs from every real
+value, so a run with no image never compares equal to one with an image, and
+a cpu run never compares equal to a cuda one. An axis that were simply absent
+would compare equal to any other record missing the same axis, which is the
+one failure a comparability record must not have.
+"""
+
+
+def image_digest_from_env(get_env: Callable[[str], str | None]) -> str:
+    """Read the digest of the image this process is running in.
+
+    Args:
+        get_env: Reader for a process environment variable, injected so a
+            test can state what the launcher exported without touching the
+            real environment.
+
+    Returns:
+        The digest, or :const:`NO_VALUE` when the variable is unset or empty.
+        Both mean the same thing -- nobody told this process which image it
+        is in -- and that is the honest answer for a run out of a directory
+        environment, where there is no image and so no digest.
+    """
+    value = get_env(IMAGE_DIGEST_ENV_VAR)
+    if value is None:
+        return NO_VALUE
+    return value
+
+
+def cpu_run_fingerprint(
+    determinism: DeterminismRecord, get_env: Callable[[str], str | None]
+) -> RunFingerprint:
+    """Describe the configuration of a run that uses no GPU.
+
+    For the research in this monorepo that pulls no torch -- gradient
+    boosting, transliteration, metabolomics. Those runs still have a
+    configuration that decides their numbers: which image, and what the BLAS
+    thread count was pinned to (see :mod:`platform_core.determinism_cpu`,
+    where a 4096x4096 matmul changed 865,498 of 16,777,216 elements between
+    thread counts).
+
+    The card and driver are recorded as :const:`NO_VALUE` rather than
+    omitted. A cpu run genuinely has no card, and saying so is what stops it
+    comparing equal to a cuda run of the same code.
+
+    Args:
+        determinism: What was actually pinned, from
+            :func:`~platform_core.determinism_cpu.apply_cpu_determinism`.
+            Passed in rather than applied here: pinning writes process-global
+            state and belongs to the job, while this only describes.
+        get_env: Reader for a process environment variable.
+
+    Returns:
+        The fingerprint, comparable against any other by
+        :func:`compare_configurations`.
+    """
+    return RunFingerprint(
+        image_digest=image_digest_from_env(get_env),
+        gpu_model=NO_VALUE,
+        driver_version=NO_VALUE,
+        determinism=determinism,
+    )
+
+
 class AxisDifference(TypedDict):
     """One axis on which two fingerprints disagree.
 
@@ -451,6 +530,8 @@ def encode_comparability_verdict(
 
 __all__ = [
     "COMPARABILITY_AXES",
+    "IMAGE_DIGEST_ENV_VAR",
+    "NO_VALUE",
     "AxisDifference",
     "Calibration",
     "IdenticalVerdict",
@@ -458,6 +539,7 @@ __all__ = [
     "RunFingerprint",
     "UncalibratedVerdict",
     "compare_configurations",
+    "cpu_run_fingerprint",
     "decode_calibration",
     "decode_run_fingerprint",
     "describe_verdict",
@@ -465,4 +547,5 @@ __all__ = [
     "encode_comparability_verdict",
     "encode_run_fingerprint",
     "find_differences",
+    "image_digest_from_env",
 ]

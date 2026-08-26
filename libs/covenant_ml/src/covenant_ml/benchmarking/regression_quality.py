@@ -25,6 +25,7 @@ import numpy as np
 from cleargbm.ensemble import predict_raw, train_gradient_boosting_regression
 from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
+from platform_core.comparability import RunFingerprint, encode_run_fingerprint
 from platform_core.json_utils import JSONValue
 
 from ..datasets.loader import DatasetLoader
@@ -95,12 +96,32 @@ class RegressionManifest(TypedDict):
         seeds: Every split seed measured.
         grouped: Whether the split was by group (the dataset's law).
         results: One record per arm per seed.
+        fingerprint: The configuration these numbers were produced under.
+            Until 2026-08-25 this manifest recorded the hyperparameters and
+            NOTHING about the environment -- no image, no library versions,
+            no determinism posture -- while the p6 sweeps were running on
+            HPC3. Results measured on the cluster and results measured on a
+            workstation were therefore indistinguishable, and an RMSE from
+            one could be subtracted from an RMSE from the other with nothing
+            anywhere to say that was unsound.
+
+            The axis that matters most here is not the card, because these
+            arms use none. It is the BLAS thread count, which
+            :mod:`platform_core.determinism_cpu` measured changing 865,498
+            of 16,777,216 elements of a matmul between 1, 8 and 24 threads.
+            A 24-core node and an 8-core node run the same code on the same
+            data and get different numbers.
+
+            The same :class:`~platform_core.comparability.RunFingerprint`
+            the training and scoring paths record, so one rule compares all
+            three rather than three rules that drift.
     """
 
     config: RegressionBenchConfig
     seeds: list[int]
     grouped: bool
     results: list[RegressionArmResult]
+    fingerprint: RunFingerprint
 
 
 class _LGBMRegProto(Protocol):
@@ -368,6 +389,7 @@ def run_regression_benchmark(
     config: RegressionBenchConfig,
     seeds: list[int],
     external_dir: Path,
+    fingerprint: RunFingerprint,
 ) -> RegressionManifest:
     """Run all four arms across every seed, timing each fit.
 
@@ -375,9 +397,18 @@ def run_regression_benchmark(
         config: Shared hyperparameters.
         seeds: Split seeds to measure.
         external_dir: Root directory holding the registered datasets.
+        fingerprint: The configuration this measurement runs under, from
+            :func:`~platform_core.comparability.cpu_run_fingerprint`. Taken
+            as an argument rather than captured here for the same reason the
+            training path takes it: the determinism inside it is a
+            process-global pin that belongs to whoever starts the process,
+            and a function that both applied and described it could report a
+            posture no caller ever chose.
 
     Returns:
-        The complete manifest.
+        The complete manifest, carrying the numbers and the configuration
+        that produced them together. Separately they are two facts nobody
+        can pair up later.
     """
     registry = make_default_regression_registry()
     dataset_config = registry.get(config["dataset"])
@@ -472,6 +503,7 @@ def run_regression_benchmark(
         seeds=list(seeds),
         grouped=groups is not None,
         results=results,
+        fingerprint=fingerprint,
     )
 
 
@@ -498,6 +530,7 @@ def encode_regression_manifest(manifest: RegressionManifest) -> JSONValue:
         },
         "seeds": list(manifest["seeds"]),
         "grouped": manifest["grouped"],
+        "fingerprint": encode_run_fingerprint(manifest["fingerprint"]),
         "results": [
             {
                 "model": r["model"],

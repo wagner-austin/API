@@ -13,6 +13,9 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_core.comparability import cpu_run_fingerprint, decode_run_fingerprint
+from platform_core.determinism_cpu import apply_cpu_determinism
+from platform_core.determinism_env import SINGLE_THREAD
 from platform_core.json_utils import (
     dump_json_str,
     load_json_str,
@@ -67,6 +70,28 @@ def write_rw_value_fixture(
                 f"{remaining}"
             )
     (folder / "data.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _discard_env(name: str, value: str) -> None:
+    """Accept a pinned variable without writing it.
+
+    Args:
+        name: The variable the pin would set.
+        value: The value it would be set to.
+    """
+
+
+_FINGERPRINT = cpu_run_fingerprint(
+    apply_cpu_determinism(_discard_env, SINGLE_THREAD),
+    {"IMAGE_DIGEST": "sha256:" + "ef" * 32}.get,
+)
+"""The configuration these benchmarks claim to run under.
+
+Built from the real `apply_cpu_determinism` with a no-op writer, so the
+record says exactly what a production run's would say without this test
+process reaching into the environment of every other test sharing the
+worker. The image digest is supplied rather than read for the same reason.
+"""
 
 
 def _small_config() -> RegressionBenchConfig:
@@ -143,7 +168,7 @@ class TestRunRegressionBenchmark:
     def test_all_four_arms_report_on_a_grouped_corpus(self, tmp_path: Path) -> None:
         """One record per arm per seed, all finite, with fit times."""
         write_rw_value_fixture(tmp_path)
-        manifest = run_regression_benchmark(_small_config(), [42], tmp_path)
+        manifest = run_regression_benchmark(_small_config(), [42], tmp_path, _FINGERPRINT)
         assert manifest["grouped"] is True
         arms = [r["model"] for r in manifest["results"]]
         assert arms == ["cleargbm", "cleargbm@leaf_wise", "lightgbm", "xgboost"]
@@ -156,14 +181,55 @@ class TestRunRegressionBenchmark:
     def test_the_signal_is_learnable(self, tmp_path: Path) -> None:
         """The decaying-signal fixture rewards real learning: R2 > 0."""
         write_rw_value_fixture(tmp_path)
-        manifest = run_regression_benchmark(_small_config(), [42], tmp_path)
+        manifest = run_regression_benchmark(_small_config(), [42], tmp_path, _FINGERPRINT)
         by_arm = {r["model"]: r["quality"] for r in manifest["results"]}
         assert by_arm["cleargbm"]["r_squared"] > 0.0
+
+    def test_the_manifest_says_what_configuration_produced_the_numbers(
+        self, tmp_path: Path
+    ) -> None:
+        """Until 2026-08-25 it said nothing, while the p6 sweeps ran on HPC3.
+
+        An RMSE measured on a 24-core cluster node and one measured on an
+        8-core workstation were indistinguishable in the file, and could be
+        subtracted with nothing anywhere to say that was unsound. The BLAS
+        thread count alone changed 865,498 of 16,777,216 matmul elements
+        between 1, 8 and 24 threads.
+        """
+        write_rw_value_fixture(tmp_path)
+        manifest = run_regression_benchmark(_small_config(), [42], tmp_path, _FINGERPRINT)
+
+        assert manifest["fingerprint"] == _FINGERPRINT
+
+    def test_the_configuration_survives_to_the_file_on_disk(self, tmp_path: Path) -> None:
+        """A fingerprint the encoder drops is a fingerprint nobody ever reads."""
+        write_rw_value_fixture(tmp_path)
+        manifest = run_regression_benchmark(_small_config(), [42], tmp_path, _FINGERPRINT)
+
+        encoded = narrow_json_to_dict(
+            load_json_str(dump_json_str(encode_regression_manifest(manifest)))
+        )
+
+        assert decode_run_fingerprint(encoded["fingerprint"]) == _FINGERPRINT
+
+    def test_the_thread_count_is_in_the_recorded_posture(self, tmp_path: Path) -> None:
+        """The axis that decides these numbers, named in the record itself.
+
+        These arms use no GPU, so the card is not the interesting axis here.
+        The reduction order is, and it is set by a thread count that nothing
+        recorded before.
+        """
+        write_rw_value_fixture(tmp_path)
+        manifest = run_regression_benchmark(_small_config(), [42], tmp_path, _FINGERPRINT)
+
+        settings = dict(manifest["fingerprint"]["determinism"]["settings"])
+        assert settings["OMP_NUM_THREADS"] == SINGLE_THREAD
+        assert manifest["fingerprint"]["gpu_model"] == ""
 
     def test_manifest_encodes_to_json(self, tmp_path: Path) -> None:
         """The encoded manifest round-trips through the JSON codec."""
         write_rw_value_fixture(tmp_path)
-        manifest = run_regression_benchmark(_small_config(), [42], tmp_path)
+        manifest = run_regression_benchmark(_small_config(), [42], tmp_path, _FINGERPRINT)
         encoded = encode_regression_manifest(manifest)
         decoded = narrow_json_to_dict(load_json_str(dump_json_str(encoded)))
         assert narrow_json_to_bool(decoded["grouped"]) is True
