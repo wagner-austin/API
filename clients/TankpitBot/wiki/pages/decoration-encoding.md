@@ -145,6 +145,19 @@ Returns empty string if no decorations, otherwise newline-separated award names.
 
 ## V.N — Decoration Event (0x4E, Sf class, line 163)
 
+**Live-confirmed 2026-08-26 05:11:16** — the first 0x4E ever received
+in the capture corpus: `tank_id=602 (Arterial), slot=1, level=1` →
+BRONZE TANK AWARD (100 career deactivations), decoded identically
+from both fleet bots' captures, byte-for-byte per the Sf trace below.
+The event also exposed two bot defects, both fixed the same hour: the
+`tank_decoration` diagnostic used a field named `level` (a reserved
+JSONL record key — the collision crashed BOTH bots simultaneously;
+field renamed `decoration_level`, and reserved-name validation moved
+to the emit call so any covered emit proves its names), and awards
+now decode to their names via `protocol/decorations.py` (this page's
+nb table, in code — unknown slots render as raw numbers, never
+crash).
+
 When a tank earns a new decoration:[^1]
 
 ```javascript
