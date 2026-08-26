@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "d11efacd231ef92426eaf92483c33a8504bd770f",
+  "git_commit": "445a4aac9920129dfba128afc93a431ec216f93e",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -106,6 +106,10 @@
     {
       "module": "model_trainer.core.services.training.base_trainer_checkpoints",
       "attribute": "_TrainerCheckpoints"
+    },
+    {
+      "module": "model_trainer.cli.score_baseline",
+      "attribute": "main"
     }
   ],
   "labels": {
