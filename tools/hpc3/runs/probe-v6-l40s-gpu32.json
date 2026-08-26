@@ -18,8 +18,8 @@
       "/pub/wagnera3"
     ]
   },
-  "command": "python -m model_trainer.cli.known_answer_probe --device cuda --out /pub/wagnera3/probe/v6-l40s.json",
-  "artifact": "/pub/wagnera3/probe/v6-l40s.json",
+  "command": "python -m model_trainer.cli.known_answer_probe --device cuda --out /pub/wagnera3/probe/v6-l40s-gpu32.json",
+  "artifact": "/pub/wagnera3/probe/v6-l40s-gpu32.json",
   "experiment": {
     "kind": "known-answer",
     "label": "gpt2-tiny-L2-d128-h2-v512-len64-seed42",
