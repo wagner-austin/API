@@ -12,14 +12,14 @@ from platform_discord.rate_limiter import RateLimiter
 
 from .. import _test_hooks
 from ..cogs.base import BaseCog, _BotProto
-from ..config import DiscordbotSettings
+from ..config import Settings
 
 
 class TrainerCog(BaseCog):
     def __init__(
         self,
         bot: _BotProto | None,
-        config: DiscordbotSettings,
+        config: Settings,
         *,
         autostart_subscriber: bool = True,
     ) -> None:

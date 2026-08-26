@@ -5,7 +5,7 @@ from typing import TypedDict
 from ._utils import _optional_env_str, _parse_str, _require_env_str
 
 
-class TurkicApiSettings(TypedDict):
+class Settings(TypedDict):
     redis_url: str
     data_dir: str
     environment: str
@@ -13,7 +13,7 @@ class TurkicApiSettings(TypedDict):
     data_bank_api_key: str
 
 
-def load_turkic_api_settings() -> TurkicApiSettings:
+def load_settings() -> Settings:
     redis_env = _optional_env_str("TURKIC_REDIS_URL")
     data_dir_env = _optional_env_str("TURKIC_DATA_DIR")
     gateway_url = _parse_str("API_GATEWAY_URL", "")
@@ -29,4 +29,4 @@ def load_turkic_api_settings() -> TurkicApiSettings:
     }
 
 
-__all__ = ["TurkicApiSettings", "load_turkic_api_settings"]
+__all__ = ["Settings", "load_settings"]

@@ -83,8 +83,9 @@ def _completed() -> TrainerCompletedMetricsV1:
     return make_completed_metrics_event(
         job_id="r",
         user_id=1,
-        test_loss=0.5,
-        test_ppl=2.0,
+        final_loss=0.5,
+        final_ppl=2.0,
+        held_out=True,
         artifact_path="/x",
     )
 

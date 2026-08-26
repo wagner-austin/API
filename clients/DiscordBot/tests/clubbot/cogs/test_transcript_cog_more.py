@@ -14,7 +14,7 @@ from tests.support.settings import build_settings
 from clubbot import _test_hooks
 from clubbot.cogs.base import _Logger
 from clubbot.cogs.transcript import TranscriptCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.transcript.client import (
     TranscriptResult,
     TranscriptService,
@@ -26,7 +26,7 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def _cfg(*, provider: str = "api", attach_mb: int | None = None) -> DiscordbotSettings:
+def _cfg(*, provider: str = "api", attach_mb: int | None = None) -> Settings:
     return build_settings(
         qr_default_border=1,
         qr_public_responses=False,
@@ -45,7 +45,7 @@ class _FakeTranscriptService(TranscriptService):
 
     def __init__(
         self,
-        cfg: DiscordbotSettings,
+        cfg: Settings,
         *,
         result: TranscriptResult | None = None,
         raise_error: Exception | None = None,
@@ -103,7 +103,7 @@ class _TestingCog(TranscriptCog):
         errors: list[str],
         exceptions: list[Exception],
         bot: FakeBot,
-        config: DiscordbotSettings,
+        config: Settings,
         svc: TranscriptService,
     ) -> None:
         super().__init__(bot=bot, config=config, transcript_service=svc)

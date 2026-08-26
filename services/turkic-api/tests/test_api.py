@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis, FakeRedisNoPong
 
 from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
-from turkic_api.api.main import RedisCombinedProtocol, create_app
+from turkic_api.api.main import create_app
 from turkic_api.api.models import parse_job_response_json
 from turkic_api.api.types import JSONValue, QueueProtocol, RQJobLike, RQRetryLike, _EnqCallable
 
@@ -39,7 +40,7 @@ class _QueueStub:
 _created_redis: list[FakeRedis] = []
 
 
-def _redis_provider(settings: Settings) -> RedisCombinedProtocol:
+def _redis_provider(settings: Settings) -> RedisStrProto:
     redis = FakeRedis()
     # Register a fake worker so health checks pass
     redis.sadd("rq:workers", "test-worker-1")
@@ -129,7 +130,7 @@ def test_readyz_ready_and_degraded_paths() -> None:
     _clear_redis_instances()
     degraded_redis: list[FakeRedis] = []
 
-    def _redis_false(settings: Settings) -> RedisCombinedProtocol:
+    def _redis_false(settings: Settings) -> RedisStrProto:
         r = FakeRedisNoPong()
         degraded_redis.append(r)
         return r

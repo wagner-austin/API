@@ -424,9 +424,9 @@ def process_external_train_job(
     """
     import tempfile
 
-    from covenant_radar_api.core.config import settings_from_env
+    from covenant_radar_api.core.config import load_settings
 
-    settings = settings_from_env()
+    settings = load_settings()
 
     # Get data-bank config
     data_bank_url = settings["app"]["data_bank_api_url"]

@@ -445,9 +445,9 @@ def process_optimize_job(config_json: str) -> dict[str, JSONValue]:
     Returns:
         JSON-serializable optimization result dict.
     """
-    from covenant_radar_api.core.config import settings_from_env
+    from covenant_radar_api.core.config import load_settings
 
-    settings = settings_from_env()
+    settings = load_settings()
 
     data_root = Path(settings["app"]["data_root"])
     external_dir = data_root / "external"

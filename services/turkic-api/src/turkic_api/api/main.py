@@ -8,7 +8,6 @@ from platform_core.errors import ErrorCode
 from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.logging import setup_logging
 from platform_core.request_context import install_request_id_middleware
-from platform_workers.redis import RedisStrProto
 
 from turkic_api.api.logging_fields import LOG_EXTRA_FIELDS
 from turkic_api.api.provider_context import (
@@ -51,12 +50,6 @@ def _init_logging() -> None:
         instance_id=None,
         extra_fields=LOG_EXTRA_FIELDS,
     )
-
-
-RedisCombinedProtocol = RedisStrProto
-
-
-# re-export selected context for tests (names expected by tests)
 
 
 def create_app(

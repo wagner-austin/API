@@ -7,10 +7,11 @@ from collections.abc import Generator
 import pytest
 from platform_core.logging import get_logger
 from platform_core.turkic_jobs import turkic_job_key
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeQueue, FakeRedis
 
 from turkic_api.api.config import Settings
-from turkic_api.api.main import RedisCombinedProtocol, create_app
+from turkic_api.api.main import create_app
 from turkic_api.api.routes.jobs import _to_hash_redis
 from turkic_api.api.types import JSONValue, LoggerProtocol, RQJobLike, RQRetryLike, _EnqCallable
 
@@ -137,7 +138,7 @@ def test_provider_context_generator_branch() -> None:
 
     captured_redis: list[FakeRedis] = []
 
-    def redis_provider(_settings: Settings) -> Generator[RedisCombinedProtocol, None, None]:
+    def redis_provider(_settings: Settings) -> Generator[RedisStrProto, None, None]:
         r = FakeRedis()
         captured_redis.append(r)
         yield r

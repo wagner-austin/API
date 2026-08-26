@@ -7,7 +7,7 @@ from platform_discord.embed_helpers import add_field, create_embed
 from platform_discord.protocols import InteractionProto
 
 from .. import _test_hooks
-from ..config import DiscordbotSettings
+from ..config import Settings
 from .base import BaseCog, _BotProto
 
 
@@ -19,7 +19,7 @@ def _resolve_app_id(client: _BotProto) -> int:
 
 
 class InviteCog(BaseCog):
-    def __init__(self, bot: _BotProto, config: DiscordbotSettings) -> None:
+    def __init__(self, bot: _BotProto, config: Settings) -> None:
         super().__init__()
         self.bot = bot
         self.config = config

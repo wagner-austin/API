@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-from platform_discord.discord_types import Embed, EmbedProto, File, User
+from platform_discord.discord_types import EmbedProto, File, User
 from platform_discord.embed_helpers import create_embed
 
 
-def test_embed_alias_is_embed_proto() -> None:
-    """Verify Embed is an alias for EmbedProto."""
-    assert Embed is EmbedProto
-
-
 def test_embed_type_with_create_embed() -> None:
-    """Verify create_embed returns something compatible with Embed type."""
-    embed: Embed = create_embed(title="Test")
+    """Verify create_embed returns something compatible with EmbedProto."""
+    embed: EmbedProto = create_embed(title="Test")
     assert embed.title == "Test"
 
 

@@ -28,7 +28,7 @@ from covenant_persistence import (
     MeasurementRepository,
 )
 from numpy.typing import NDArray
-from platform_core.config import CovenantRadarSettings
+from platform_core.config.covenant_radar import Settings
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, load_json_str
 from platform_core.logging import get_logger
 
@@ -419,7 +419,7 @@ def _upload_model_to_data_bank(
 
 def _train_and_upload(
     config_json: str,
-    settings: CovenantRadarSettings,
+    settings: Settings,
     model_output_dir: Path,
     data_bank_url: str,
     data_bank_key: str,
@@ -474,10 +474,10 @@ def process_train_job(config_json: str) -> dict[str, JSONValue]:
     """
     import tempfile
 
-    from covenant_radar_api.core.config import settings_from_env
+    from covenant_radar_api.core.config import load_settings
     from covenant_radar_api.core.container import ServiceContainer
 
-    settings = settings_from_env()
+    settings = load_settings()
 
     # Get data-bank config
     data_bank_url = settings["app"]["data_bank_api_url"]

@@ -9,7 +9,7 @@ from platform_core.json_utils import InvalidJsonError, JSONValue, load_json_str
 from tests.support.settings import build_settings
 
 from clubbot import _test_hooks
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.transcript.client import TranscriptResult, TranscriptService, _parse_langs
 
 
@@ -73,7 +73,7 @@ class _FakeClient:
         return self._resp
 
 
-def _cfg() -> DiscordbotSettings:
+def _cfg() -> Settings:
     return build_settings(transcript_provider="api")
 
 

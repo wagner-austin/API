@@ -10,10 +10,10 @@ from tests.support.settings import build_settings
 
 from clubbot import _test_hooks
 from clubbot.cogs.digits import DigitsCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 
 
-def _cfg_no_redis() -> DiscordbotSettings:
+def _cfg_no_redis() -> Settings:
     return build_settings(
         qr_default_border=2,
         redis_url=None,

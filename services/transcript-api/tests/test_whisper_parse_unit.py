@@ -3,14 +3,14 @@ from __future__ import annotations
 import logging
 
 import pytest
-from platform_core.json_utils import JSONTypeError
+from platform_core.json_utils import JSONTypeError, JSONValue
 
 import transcript_api.whisper_parse as wmod
-from transcript_api.types import JsonValue, VerboseResponseTD
+from transcript_api.types import VerboseResponseTD
 
 
 class _Obj1:
-    def to_dict(self) -> dict[str, JsonValue]:
+    def to_dict(self) -> dict[str, JSONValue]:
         return {"text": "", "segments": []}
 
 
@@ -49,7 +49,7 @@ def test_to_verbose_dict_method_raises_and_bubbles() -> None:
 
 def test_to_verbose_dict_non_dict_then_next_method() -> None:
     class _Obj:
-        def to_dict(self) -> JsonValue:
+        def to_dict(self) -> JSONValue:
             return [1, 2, 3]  # not a dict -> ignored
 
         def model_dump(

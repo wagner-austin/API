@@ -6,7 +6,7 @@ from tests.support.settings import build_settings
 
 from clubbot import _test_hooks
 from clubbot._test_hooks import BotTreeProto, SnowflakeLike
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.container import ServiceContainer
 from clubbot.orchestrator import BotOrchestrator, GuildLike
 from clubbot.services.qr.client import QRService
@@ -29,7 +29,7 @@ class _SyncCall:
         self.guild = guild
 
 
-def _make_cfg(guild_ids: list[int] | None = None) -> DiscordbotSettings:
+def _make_cfg(guild_ids: list[int] | None = None) -> Settings:
     ids: list[int] = list(guild_ids) if guild_ids is not None else []
     return build_settings(
         guild_ids=ids,

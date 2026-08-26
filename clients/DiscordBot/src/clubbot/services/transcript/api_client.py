@@ -9,8 +9,6 @@ from platform_core.json_utils import JSONValue, load_json_str
 
 from clubbot import _test_hooks
 
-HttpJsonPayload = JsonObject
-
 
 class _CaptionsPayload(TypedDict, total=True):
     url: str
@@ -32,7 +30,7 @@ class TranscriptApiClient(TypedDict):
     timeout_seconds: float
 
 
-def _post(client_dict: TranscriptApiClient, path: str, payload: HttpJsonPayload) -> _TranscriptOut:
+def _post(client_dict: TranscriptApiClient, path: str, payload: JsonObject) -> _TranscriptOut:
     url = client_dict["base_url"].rstrip("/") + path
     client: HttpxClient = _test_hooks.build_client(client_dict["timeout_seconds"])
     resp = client.post(url, json=payload, headers={})
@@ -66,7 +64,7 @@ def captions(
     client: TranscriptApiClient, *, url: str, preferred_langs: list[str] | None
 ) -> _TranscriptOut:
     langs: list[JSONValue] | None = list(preferred_langs) if preferred_langs is not None else None
-    payload: HttpJsonPayload = {
+    payload: JsonObject = {
         "url": url,
         "preferred_langs": langs,
     }
@@ -75,7 +73,7 @@ def captions(
 
 
 def stt(client: TranscriptApiClient, *, url: str) -> _TranscriptOut:
-    payload: HttpJsonPayload = {"url": url}
+    payload: JsonObject = {"url": url}
     out = _post(client, "/v1/stt", payload)
     return {"url": out["url"], "video_id": out["video_id"], "text": out["text"]}
 

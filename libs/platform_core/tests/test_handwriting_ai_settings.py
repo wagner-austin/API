@@ -5,15 +5,15 @@ from pathlib import Path
 import pytest
 
 from platform_core.config.handwriting_ai import (
-    HandwritingAiSettings,
+    Settings,
     _apply_app_env,
     _apply_digits_env,
     _apply_security_env,
     _base_settings,
     _bool_env,
     _finalize,
-    limits_from_handwriting_ai_settings,
-    load_handwriting_ai_settings,
+    limits_from_settings,
+    load_settings,
 )
 from platform_core.testing import make_fake_env
 
@@ -119,9 +119,9 @@ def test_base_settings_without_allowed_hosts(tmp_path: Path) -> None:
 
 def test_apply_app_env_overrides_all_fields(tmp_path: Path) -> None:
     env = make_fake_env()
-    from platform_core.config.handwriting_ai import HandwritingAiAppConfig
+    from platform_core.config.handwriting_ai import AppConfig
 
-    base_app: HandwritingAiAppConfig = {
+    base_app: AppConfig = {
         "data_root": Path("/base/data"),
         "artifacts_root": Path("/base/artifacts"),
         "logs_root": Path("/base/logs"),
@@ -146,9 +146,9 @@ def test_apply_app_env_overrides_all_fields(tmp_path: Path) -> None:
 
 def test_apply_app_env_port_out_of_range_raises() -> None:
     env = make_fake_env()
-    from platform_core.config.handwriting_ai import HandwritingAiAppConfig
+    from platform_core.config.handwriting_ai import AppConfig
 
-    base_app: HandwritingAiAppConfig = {"port": 8081}
+    base_app: AppConfig = {"port": 8081}
 
     env.set("APP__PORT", "0")
     with pytest.raises(RuntimeError):
@@ -161,9 +161,9 @@ def test_apply_app_env_port_out_of_range_raises() -> None:
 
 def test_apply_digits_env_overrides_all_fields(tmp_path: Path) -> None:
     env = make_fake_env()
-    from platform_core.config.handwriting_ai import HandwritingAiDigitsConfig
+    from platform_core.config.handwriting_ai import DigitsConfig
 
-    base_digits: HandwritingAiDigitsConfig = {
+    base_digits: DigitsConfig = {
         "model_dir": Path("/base/models"),
         "active_model": "base-model",
         "tta": False,
@@ -200,9 +200,9 @@ def test_apply_digits_env_overrides_all_fields(tmp_path: Path) -> None:
 
 def test_apply_security_env_overrides_all_fields() -> None:
     env = make_fake_env()
-    from platform_core.config.handwriting_ai import HandwritingAiSecurityConfig
+    from platform_core.config.handwriting_ai import SecurityConfig
 
-    base_sec: HandwritingAiSecurityConfig = {
+    base_sec: SecurityConfig = {
         "api_key": "base-key",
         "api_key_enabled": True,
     }
@@ -217,7 +217,7 @@ def test_apply_security_env_overrides_all_fields() -> None:
 
 
 def test_finalize_disabled_api_key_clears_key() -> None:
-    settings: HandwritingAiSettings = {
+    settings: Settings = {
         "app": {},
         "digits": {},
         "security": {"api_key": "secret", "api_key_enabled": False},
@@ -230,7 +230,7 @@ def test_finalize_disabled_api_key_clears_key() -> None:
 
 
 def test_finalize_enabled_api_key_preserves_key() -> None:
-    settings: HandwritingAiSettings = {
+    settings: Settings = {
         "app": {},
         "digits": {},
         "security": {"api_key": "secret", "api_key_enabled": True},
@@ -243,7 +243,7 @@ def test_finalize_enabled_api_key_preserves_key() -> None:
 
 
 def test_finalize_missing_api_key_enabled_defaults_to_enabled() -> None:
-    settings: HandwritingAiSettings = {
+    settings: Settings = {
         "app": {},
         "digits": {},
         "security": {"api_key": "secret"},
@@ -255,7 +255,7 @@ def test_finalize_missing_api_key_enabled_defaults_to_enabled() -> None:
     assert result["security"]["api_key_enabled"] is True
 
 
-def test_load_handwriting_ai_settings_integration(tmp_path: Path) -> None:
+def test_load_settings_integration(tmp_path: Path) -> None:
     env = make_fake_env()
     env.set("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
     env.set("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
@@ -263,7 +263,7 @@ def test_load_handwriting_ai_settings_integration(tmp_path: Path) -> None:
     env.set("HANDWRITING_MODEL_ID", "test-model")
     env.set("HANDWRITING_API_KEY", "test-key")
 
-    settings = load_handwriting_ai_settings(create_dirs=True)
+    settings = load_settings(create_dirs=True)
 
     assert settings["app"]["data_root"] == (tmp_path / "data").resolve()
     assert settings["app"]["artifacts_root"] == (tmp_path / "artifacts").resolve()
@@ -273,7 +273,7 @@ def test_load_handwriting_ai_settings_integration(tmp_path: Path) -> None:
     assert settings["security"]["api_key_enabled"] is True
 
 
-def test_load_handwriting_ai_settings_with_overrides(tmp_path: Path) -> None:
+def test_load_settings_with_overrides(tmp_path: Path) -> None:
     env = make_fake_env()
     env.set("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
     env.set("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
@@ -284,7 +284,7 @@ def test_load_handwriting_ai_settings_with_overrides(tmp_path: Path) -> None:
     env.set("DIGITS__TTA", "true")
     env.set("SECURITY__API_KEY_ENABLED", "false")
 
-    settings = load_handwriting_ai_settings(create_dirs=False)
+    settings = load_settings(create_dirs=False)
 
     assert settings["app"]["port"] == 9090
     assert settings["digits"]["tta"] is True
@@ -292,27 +292,27 @@ def test_load_handwriting_ai_settings_with_overrides(tmp_path: Path) -> None:
     assert settings["security"]["api_key_enabled"] is False
 
 
-def test_limits_from_handwriting_ai_settings() -> None:
-    settings: HandwritingAiSettings = {
+def test_limits_from_settings() -> None:
+    settings: Settings = {
         "app": {},
         "digits": {"max_image_mb": 15, "max_image_side_px": 3000},
         "security": {},
     }
 
-    limits = limits_from_handwriting_ai_settings(settings)
+    limits = limits_from_settings(settings)
 
     assert limits["max_bytes"] == 15 * 1024 * 1024
     assert limits["max_side_px"] == 3000
 
 
-def test_limits_from_handwriting_ai_settings_uses_defaults() -> None:
-    settings: HandwritingAiSettings = {
+def test_limits_from_settings_uses_defaults() -> None:
+    settings: Settings = {
         "app": {},
         "digits": {},
         "security": {},
     }
 
-    limits = limits_from_handwriting_ai_settings(settings)
+    limits = limits_from_settings(settings)
 
     assert limits["max_bytes"] == 10 * 1024 * 1024  # DEFAULT_MAX_IMAGE_MB
     assert limits["max_side_px"] == 2048  # DEFAULT_MAX_IMAGE_SIDE_PX
@@ -320,9 +320,9 @@ def test_limits_from_handwriting_ai_settings_uses_defaults() -> None:
 
 def test_apply_app_env_data_bank_overrides() -> None:
     env = make_fake_env()
-    from platform_core.config.handwriting_ai import HandwritingAiAppConfig, _apply_app_env
+    from platform_core.config.handwriting_ai import AppConfig, _apply_app_env
 
-    base_app: HandwritingAiAppConfig = {"threads": 0, "port": 8081}
+    base_app: AppConfig = {"threads": 0, "port": 8081}
     env.set("APP__DATA_BANK_API_URL", "http://db")
     env.set("APP__DATA_BANK_API_KEY", "secret")
 

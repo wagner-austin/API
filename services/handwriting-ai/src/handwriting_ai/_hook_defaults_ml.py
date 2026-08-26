@@ -7,7 +7,7 @@ from typing import BinaryIO
 
 import torch
 from PIL.Image import Image as PILImage
-from platform_core.config import HandwritingAiSettings
+from platform_core.config.handwriting_ai import Settings
 
 from handwriting_ai._hook_protocols_ml import (
     InferencePoolProtocol,
@@ -67,7 +67,7 @@ def _default_validate_state_dict(sd: dict[str, torch.Tensor], arch: str, n_class
     _validate(sd, arch, n_classes)
 
 
-def _default_make_inference_pool(settings: HandwritingAiSettings) -> InferencePoolProtocol:
+def _default_make_inference_pool(settings: Settings) -> InferencePoolProtocol:
     """Build the real bounded thread pool.
 
     The engine module is imported here rather than at module scope because it
@@ -85,7 +85,7 @@ def _default_make_inference_pool(settings: HandwritingAiSettings) -> InferencePo
 
 
 def _default_download_remote(
-    settings: HandwritingAiSettings, model_dir: Path, manifest_path: Path
+    settings: Settings, model_dir: Path, manifest_path: Path
 ) -> None:
     """Fetch the remote artifact named by a v2 manifest.
 

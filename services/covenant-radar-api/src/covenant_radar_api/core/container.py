@@ -196,8 +196,17 @@ class ServiceContainer:
         )
         # Get ML backend from settings (defaults to xgboost)
         ml_backend: MLBackend = settings["app"]["ml_backend"]
-        # active_model_path is pre-resolved by config loader based on ml_backend
-        resolved_model_path = model_path if model_path else settings["app"]["active_model_path"]
+        # The backend picks the artifact, and it is chosen HERE rather than in
+        # the config loader. The loader used to publish a third field,
+        # `active_model_path`, that only restated one of the two beside it --
+        # so the settings carried the same path twice under different names,
+        # and a reader could not tell which one was authoritative.
+        backend_model_path = (
+            settings["app"]["active_model_path_xgb"]
+            if ml_backend == "xgboost"
+            else settings["app"]["active_model_path_mlp"]
+        )
+        resolved_model_path = model_path if model_path else backend_model_path
         default_sector_encoder: dict[str, int] = (
             sector_encoder if sector_encoder is not None else DEFAULT_SECTOR_ENCODER
         )

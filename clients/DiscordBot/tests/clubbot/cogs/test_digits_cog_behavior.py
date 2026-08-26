@@ -11,7 +11,7 @@ from tests.support.settings import build_settings
 
 from clubbot.cogs.base import _Logger
 from clubbot.cogs.digits import DigitsCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.handai.client import HandwritingAPIError, PredictResult
 
 
@@ -45,7 +45,7 @@ class _ConfigurableDigitService(FakeDigitService):
         )
 
 
-def _make_cfg(public: bool = True, limit: int = 5, window: int = 60) -> DiscordbotSettings:
+def _make_cfg(public: bool = True, limit: int = 5, window: int = 60) -> Settings:
     return build_settings(
         qr_default_border=2,
         qr_public_responses=True,
@@ -96,7 +96,7 @@ async def test_read_rate_limit_message_on_second_call() -> None:
 @pytest.mark.asyncio
 async def test_read_handles_5xx_surfaces_api_error() -> None:
     class _Cog(DigitsCog):
-        def __init__(self, service: _ConfigurableDigitService, cfg: DiscordbotSettings) -> None:
+        def __init__(self, service: _ConfigurableDigitService, cfg: Settings) -> None:
             super().__init__(FakeBot(), cfg, service, autostart_subscriber=False)
             self.seen: list[str] = []
             self.msgs: list[str] = []

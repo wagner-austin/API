@@ -8,13 +8,13 @@ from platform_core.logging import setup_logging
 from platform_core.request_context import install_request_id_middleware
 
 from .. import _test_hooks
-from ..config import Settings, settings_from_env
+from ..config import Settings, load_settings
 from .routes import files as routes_files
 from .routes import health as routes_health
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
-    cfg = settings or settings_from_env()
+    cfg = settings or load_settings()
     setup_logging(
         level="INFO",
         format_mode="json",

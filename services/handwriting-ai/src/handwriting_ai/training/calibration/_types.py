@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TypedDict
 
 
-class CandidateDict(TypedDict):
+class Candidate(TypedDict):
     """Candidate configuration for calibration."""
 
     intra_threads: int
@@ -19,7 +19,7 @@ class CandidateDict(TypedDict):
     batch_size: int
 
 
-class CalibrationResultDict(TypedDict):
+class CalibrationResult(TypedDict):
     """Result from measuring a candidate configuration."""
 
     intra_threads: int
@@ -30,7 +30,7 @@ class CalibrationResultDict(TypedDict):
     p95_ms: float
 
 
-class BudgetConfigDict(TypedDict):
+class BudgetConfig(TypedDict):
     """Budget configuration for calibration stages."""
 
     start_pct_max: float
@@ -39,15 +39,15 @@ class BudgetConfigDict(TypedDict):
     max_failures: int
 
 
-class OrchestratorConfigDict(TypedDict):
+class OrchestratorConfig(TypedDict):
     """Configuration for the calibration orchestrator."""
 
-    stage_a_budget: BudgetConfigDict
-    stage_b_budget: BudgetConfigDict
+    stage_a_budget: BudgetConfig
+    stage_b_budget: BudgetConfig
     checkpoint_path: Path
 
 
-class CandidateErrorDict(TypedDict):
+class CandidateError(TypedDict):
     """Error information from a candidate run."""
 
     kind: str  # "timeout" | "oom" | "runtime"
@@ -55,19 +55,19 @@ class CandidateErrorDict(TypedDict):
     exit_code: int | None
 
 
-class CandidateOutcomeDict(TypedDict):
+class CandidateOutcome(TypedDict):
     """Outcome from running a calibration candidate."""
 
     ok: bool
-    res: CalibrationResultDict | None
-    error: CandidateErrorDict | None
+    res: CalibrationResult | None
+    error: CandidateError | None
 
 
 __all__ = [
-    "BudgetConfigDict",
-    "CalibrationResultDict",
-    "CandidateDict",
-    "CandidateErrorDict",
-    "CandidateOutcomeDict",
-    "OrchestratorConfigDict",
+    "BudgetConfig",
+    "CalibrationResult",
+    "Candidate",
+    "CandidateError",
+    "CandidateOutcome",
+    "OrchestratorConfig",
 ]

@@ -59,8 +59,9 @@ def test_decode_completed_roundtrip() -> None:
     ev = make_completed_metrics_event(
         job_id="r1",
         user_id=123,
-        test_loss=0.5,
-        test_ppl=2.0,
+        final_loss=0.5,
+        final_ppl=2.0,
+        held_out=True,
         artifact_path="/data/artifacts/models/run1",
     )
     out = decode_trainer_event(encode_trainer_metrics_event(ev))

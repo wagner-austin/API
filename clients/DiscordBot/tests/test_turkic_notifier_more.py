@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 
 import pytest
 from platform_core.job_events import JobEventV1
-from platform_discord.discord_types import Embed as EmbedType
+from platform_discord.discord_types import EmbedProto as EmbedType
 from platform_discord.embed_helpers import EmbedData, EmbedFieldData
 from platform_discord.subscriber import MessageSource
 

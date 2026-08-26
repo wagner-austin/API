@@ -24,7 +24,7 @@ from handwriting_ai._hook_protocols_training import (
     CalibrationRunnerResultDict,
     CandidateRunnerProtocol,
     DataLoaderConfigProtocol,
-    EffectiveConfigDict,
+    EffectiveConfig,
     GradScalerProtocol,
     MemorySnapshotDict,
     MultiprocessingContextProtocol,
@@ -33,8 +33,8 @@ from handwriting_ai._hook_protocols_training import (
     _LoaderIterator,
 )
 from handwriting_ai.training.calibration._types import (
-    CandidateDict,
-    OrchestratorConfigDict,
+    Candidate,
+    OrchestratorConfig,
 )
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
 from handwriting_ai.training.train_config import TrainConfig, TrainingResult
@@ -83,7 +83,7 @@ def _default_random() -> float:
 
 
 def _default_orchestrator_factory(
-    *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+    *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
 ) -> OrchestratorProtocol:
     """Production implementation - creates real Orchestrator."""
     from handwriting_ai.training.calibration.orchestrator import Orchestrator
@@ -209,7 +209,7 @@ def _default_build_dataset_from_spec(
 
 def _default_measure_candidate_internal(
     ds: PreprocessDatasetProtocol,
-    cand: CandidateDict,
+    cand: Candidate,
     samples: int,
     on_improvement: Callable[[CalibrationRunnerResultDict], None] | None,
     *,
@@ -266,7 +266,7 @@ def _default_calibrate_input_pipeline(
     cache_path: Path,
     ttl_seconds: int,
     force: bool,
-) -> EffectiveConfigDict:
+) -> EffectiveConfig:
     """Production implementation - runs real calibration."""
     from handwriting_ai.training.calibrate import calibrate_input_pipeline as _cip
 

@@ -6,13 +6,13 @@ from typing import Final, Protocol
 
 from clubbot.config import (
     DigitsConfig,
-    DiscordbotSettings,
     DiscordConfig,
     GatewayConfig,
     HandwritingConfig,
     ModelTrainerConfig,
     QRConfig,
     RedisConfig,
+    Settings,
     TranscriptConfig,
 )
 
@@ -63,7 +63,7 @@ class SettingsFactory(Protocol):
         model_trainer_api_max_retries: int | None = None,
         model_trainer_rate_limit: int | None = None,
         model_trainer_rate_window_seconds: int | None = None,
-    ) -> DiscordbotSettings: ...
+    ) -> Settings: ...
 
 
 def _resolve_optional_url(value: str | None, default: str) -> str | None:
@@ -118,8 +118,8 @@ def build_settings(
     model_trainer_api_max_retries: int | None = None,
     model_trainer_rate_limit: int | None = None,
     model_trainer_rate_window_seconds: int | None = None,
-) -> DiscordbotSettings:
-    """Build DiscordbotSettings with test defaults."""
+) -> Settings:
+    """Build Settings with test defaults."""
     token = discord_token if discord_token is not None else _BASE_DISCORD_TOKEN
 
     sync_global = commands_sync_global if commands_sync_global is not None else False
@@ -306,7 +306,7 @@ def make_settings_factory() -> SettingsFactory:
         model_trainer_api_max_retries: int | None = None,
         model_trainer_rate_limit: int | None = None,
         model_trainer_rate_window_seconds: int | None = None,
-    ) -> DiscordbotSettings:
+    ) -> Settings:
         return build_settings(
             discord_token=discord_token,
             guild_id=guild_id,

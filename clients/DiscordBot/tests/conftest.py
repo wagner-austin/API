@@ -9,7 +9,7 @@ from collections.abc import Generator
 import pytest
 
 from clubbot import _test_hooks
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.jobs import trainer_notifier
 from tests.support.settings import (
     SettingsFactory,
@@ -55,7 +55,7 @@ def _reset_hooks_fixture() -> Generator[None, None, None]:
     # Set load_settings to return test defaults for all tests
     test_settings = build_settings()
 
-    def _test_load_settings() -> DiscordbotSettings:
+    def _test_load_settings() -> Settings:
         return test_settings
 
     _test_hooks.load_settings = _test_load_settings
@@ -74,7 +74,7 @@ def _settings_factory() -> SettingsFactory:
 settings_factory = pytest.fixture(name="settings_factory")(_settings_factory)
 
 
-def _settings() -> DiscordbotSettings:
+def _settings() -> Settings:
     return build_settings()
 
 

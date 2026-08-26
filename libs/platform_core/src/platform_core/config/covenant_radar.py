@@ -10,20 +10,20 @@ from ._utils import _parse_bool, _parse_int, _parse_str, _require_env_str
 MLBackend = Literal["xgboost", "mlp", "lstm", "lightgbm"]
 
 
-class CovenantRadarLoggingConfig(TypedDict, total=True):
+class LoggingConfig(TypedDict, total=True):
     """Logging configuration."""
 
     level: LogLevel
 
 
-class CovenantRadarRedisConfig(TypedDict, total=True):
+class RedisConfig(TypedDict, total=True):
     """Redis connection configuration."""
 
     enabled: bool
     url: str
 
 
-class CovenantRadarRQConfig(TypedDict, total=True):
+class RQConfig(TypedDict, total=True):
     """RQ job queue configuration."""
 
     queue_name: str
@@ -32,7 +32,7 @@ class CovenantRadarRQConfig(TypedDict, total=True):
     failure_ttl_sec: int
 
 
-class CovenantRadarDatadogConfig(TypedDict, total=True):
+class DatadogConfig(TypedDict, total=True):
     """Datadog APM and metrics configuration.
 
     Fields:
@@ -54,7 +54,7 @@ class CovenantRadarDatadogConfig(TypedDict, total=True):
     trace_enabled: bool
 
 
-class CovenantRadarAppConfig(TypedDict, total=True):
+class AppConfig(TypedDict, total=True):
     """Application configuration."""
 
     data_root: str
@@ -68,15 +68,15 @@ class CovenantRadarAppConfig(TypedDict, total=True):
     data_bank_model_file_id: str
 
 
-class CovenantRadarSettings(TypedDict, total=True):
+class Settings(TypedDict, total=True):
     """Configuration for covenant-radar-api service."""
 
     app_env: Literal["dev", "prod"]
-    logging: CovenantRadarLoggingConfig
-    redis: CovenantRadarRedisConfig
-    rq: CovenantRadarRQConfig
-    app: CovenantRadarAppConfig
-    datadog: CovenantRadarDatadogConfig
+    logging: LoggingConfig
+    redis: RedisConfig
+    rq: RQConfig
+    app: AppConfig
+    datadog: DatadogConfig
     database_url: str
 
 
@@ -109,7 +109,7 @@ def _parse_datadog_env(env_var: str, default: DatadogEnv) -> DatadogEnv:
     raise ValueError(f"{env_var} must be 'dev', 'staging', or 'production', got '{value}'")
 
 
-def load_covenant_radar_settings() -> CovenantRadarSettings:
+def load_settings() -> Settings:
     """Load covenant-radar settings from environment variables.
 
     Environment variables:
@@ -152,16 +152,16 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
     elif level_str == "CRITICAL":
         level = "CRITICAL"
 
-    logging_cfg: CovenantRadarLoggingConfig = {
+    logging_cfg: LoggingConfig = {
         "level": level,
     }
 
-    redis_cfg: CovenantRadarRedisConfig = {
+    redis_cfg: RedisConfig = {
         "enabled": _parse_bool("REDIS__ENABLED", True),
         "url": _parse_str("REDIS_URL", "redis://redis:6379/0"),
     }
 
-    rq_cfg: CovenantRadarRQConfig = {
+    rq_cfg: RQConfig = {
         "queue_name": _parse_str("RQ__QUEUE_NAME", "covenant"),
         "job_timeout_sec": _parse_int("RQ__JOB_TIMEOUT_SEC", 3600),
         "result_ttl_sec": _parse_int("RQ__RESULT_TTL_SEC", 86_400),
@@ -173,7 +173,7 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
     active_model_path_xgb = _parse_str("APP__ACTIVE_MODEL_PATH_XGB", "/data/models/active_xgb.ubj")
     active_model_path_mlp = _parse_str("APP__ACTIVE_MODEL_PATH_MLP", "/data/models/active_mlp.pt")
 
-    app_cfg: CovenantRadarAppConfig = {
+    app_cfg: AppConfig = {
         "data_root": _parse_str("APP__DATA_ROOT", "/data"),
         "models_root": _parse_str("APP__MODELS_ROOT", "/data/models"),
         "logs_root": _parse_str("APP__LOGS_ROOT", "/data/logs"),
@@ -185,7 +185,7 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         "data_bank_model_file_id": _parse_str("DATA_BANK_MODEL_FILE_ID", ""),
     }
 
-    datadog_cfg: CovenantRadarDatadogConfig = {
+    datadog_cfg: DatadogConfig = {
         "enabled": _parse_bool("DATADOG__ENABLED", False),
         "service": _parse_str("DATADOG__SERVICE", "covenant-radar-api"),
         "env": _parse_datadog_env("DATADOG__ENV", "dev"),
@@ -215,12 +215,12 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
 
 
 __all__ = [
-    "CovenantRadarAppConfig",
-    "CovenantRadarDatadogConfig",
-    "CovenantRadarLoggingConfig",
-    "CovenantRadarRQConfig",
-    "CovenantRadarRedisConfig",
-    "CovenantRadarSettings",
+    "AppConfig",
+    "DatadogConfig",
+    "LoggingConfig",
     "MLBackend",
-    "load_covenant_radar_settings",
+    "RQConfig",
+    "RedisConfig",
+    "Settings",
+    "load_settings",
 ]

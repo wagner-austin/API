@@ -19,11 +19,11 @@ from handwriting_ai._hook_protocols_ml import (
     ResourceLimitsDict,
 )
 from handwriting_ai.training.calibration._types import (
-    BudgetConfigDict,
-    CalibrationResultDict,
-    CandidateDict,
-    CandidateOutcomeDict,
-    OrchestratorConfigDict,
+    BudgetConfig,
+    CalibrationResult,
+    Candidate,
+    CandidateOutcome,
+    OrchestratorConfig,
 )
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
 from handwriting_ai.training.progress import (
@@ -155,39 +155,39 @@ class CandidateRunnerProtocol(Protocol):
     def run(
         self,
         ds: PreprocessDatasetProtocol | PreprocessSpec,
-        cand: CandidateDict,
+        cand: Candidate,
         samples: int,
-        budget: BudgetConfigDict,
-    ) -> CandidateOutcomeDict: ...
+        budget: BudgetConfig,
+    ) -> CandidateOutcome: ...
 
 
 class OrchestratorProtocol(Protocol):
     """Protocol for calibration orchestrator."""
 
     def __init__(
-        self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+        self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
     ) -> None: ...
 
     def run_stage_a(
         self,
         ds: PreprocessDatasetProtocol | PreprocessSpec,
-        cands: list[CandidateDict],
+        cands: list[Candidate],
         samples: int,
-    ) -> list[CalibrationResultDict]: ...
+    ) -> list[CalibrationResult]: ...
 
     def run_stage_b(
         self,
         ds: PreprocessDatasetProtocol | PreprocessSpec,
-        shortlist: list[CalibrationResultDict],
+        shortlist: list[CalibrationResult],
         samples: int,
-    ) -> list[CalibrationResultDict]: ...
+    ) -> list[CalibrationResult]: ...
 
 
 class OrchestratorFactoryProtocol(Protocol):
     """Protocol for orchestrator factory."""
 
     def __call__(
-        self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+        self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
     ) -> OrchestratorProtocol: ...
 
 
@@ -348,7 +348,7 @@ class MeasureCandidateInternalProtocol(Protocol):
     def __call__(
         self,
         ds: PreprocessDatasetProtocol,
-        cand: CandidateDict,
+        cand: Candidate,
         samples: int,
         on_improvement: Callable[[CalibrationRunnerResultDict], None] | None,
         *,
@@ -385,7 +385,7 @@ class TrainEpochProtocol(Protocol):
     ) -> float: ...
 
 
-class EffectiveConfigDict(TypedDict):
+class EffectiveConfig(TypedDict):
     """Mirror of EffectiveConfig (training/runtime.py) to avoid circular import."""
 
     intra_threads: int
@@ -407,7 +407,7 @@ class CalibrateInputPipelineProtocol(Protocol):
         cache_path: Path,
         ttl_seconds: int,
         force: bool,
-    ) -> EffectiveConfigDict: ...
+    ) -> EffectiveConfig: ...
 
 
 class TempfileMkdtempProtocol(Protocol):

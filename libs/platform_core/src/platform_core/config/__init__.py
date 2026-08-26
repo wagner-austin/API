@@ -1,3 +1,28 @@
+"""Shared configuration helpers, and nothing service-specific.
+
+This barrel used to re-export every service's config types side by side. That
+flat namespace is the only reason those types carried their service name as a
+prefix: three ``RedisConfig`` cannot live in one module, so six of the seven
+services spelled theirs ``ArtTrainerRedisConfig``,
+``CovenantRadarRedisConfig``, ``ModelTrainerRedisConfig``, and paid for it at
+every call site. The seventh, ``discordbot``, arrived first and kept the plain
+names -- which is the whole argument in one observation: the prefix encoded
+import order, not meaning.
+
+Model-Trainer and Art-Trainer then aliased the prefix back off again in their
+own settings modules (``Settings = ModelTrainerSettings``), so the cost was
+paid twice and the names were ambiguous in both directions.
+
+So the per-service types are gone from here and each module owns unprefixed
+names. Import from the module that says whose they are:
+
+    from platform_core.config.model_trainer import Settings, load_settings
+    from platform_core.config.art_trainer import Settings as ArtSettings
+
+The module path carries the service, which is what a path is for. What stays
+here is what is genuinely shared: env parsing helpers and the test hooks.
+"""
+
 from __future__ import annotations
 
 from . import _test_hooks as config_test_hooks
@@ -14,103 +39,11 @@ from ._utils import (
     _require_env_csv,
     _require_env_str,
 )
-from .art_trainer import (
-    ArtTrainerAppConfig,
-    ArtTrainerLoggingConfig,
-    ArtTrainerRedisConfig,
-    ArtTrainerRQConfig,
-    ArtTrainerSecurityConfig,
-    ArtTrainerSettings,
-    load_art_trainer_settings,
-)
-from .covenant_radar import (
-    CovenantRadarAppConfig,
-    CovenantRadarDatadogConfig,
-    CovenantRadarLoggingConfig,
-    CovenantRadarRedisConfig,
-    CovenantRadarRQConfig,
-    CovenantRadarSettings,
-    MLBackend,
-    load_covenant_radar_settings,
-)
-from .data_bank import DataBankSettings, load_data_bank_settings
-from .discordbot import (
-    DigitsConfig,
-    DiscordbotSettings,
-    DiscordConfig,
-    GatewayConfig,
-    HandwritingConfig,
-    ModelTrainerConfig,
-    QRConfig,
-    RedisConfig,
-    TranscriptConfig,
-    load_discordbot_settings,
-    require_discord_token,
-)
-from .handwriting_ai import (
-    HandwritingAiAppConfig,
-    HandwritingAiDigitsConfig,
-    HandwritingAiLimits,
-    HandwritingAiSecurityConfig,
-    HandwritingAiSettings,
-    limits_from_handwriting_ai_settings,
-    load_handwriting_ai_settings,
-)
-from .model_trainer import (
-    ModelTrainerAppConfig,
-    ModelTrainerCleanupConfig,
-    ModelTrainerCorpusCacheCleanupConfig,
-    ModelTrainerLoggingConfig,
-    ModelTrainerRedisConfig,
-    ModelTrainerRQConfig,
-    ModelTrainerSecurityConfig,
-    ModelTrainerSettings,
-    ModelTrainerTokenizerCleanupConfig,
-    ModelTrainerWandbConfig,
-    load_model_trainer_settings,
-)
-from .turkic_api import TurkicApiSettings, load_turkic_api_settings
+from .covenant_radar import MLBackend
+from .discordbot import require_discord_token
 
 __all__ = [
-    "ArtTrainerAppConfig",
-    "ArtTrainerLoggingConfig",
-    "ArtTrainerRQConfig",
-    "ArtTrainerRedisConfig",
-    "ArtTrainerSecurityConfig",
-    "ArtTrainerSettings",
-    "CovenantRadarAppConfig",
-    "CovenantRadarDatadogConfig",
-    "CovenantRadarLoggingConfig",
-    "CovenantRadarRQConfig",
-    "CovenantRadarRedisConfig",
-    "CovenantRadarSettings",
-    "DataBankSettings",
-    "DigitsConfig",
-    "DiscordConfig",
-    "DiscordbotSettings",
-    "GatewayConfig",
-    "HandwritingAiAppConfig",
-    "HandwritingAiDigitsConfig",
-    "HandwritingAiLimits",
-    "HandwritingAiSecurityConfig",
-    "HandwritingAiSettings",
-    "HandwritingConfig",
     "MLBackend",
-    "ModelTrainerAppConfig",
-    "ModelTrainerCleanupConfig",
-    "ModelTrainerConfig",
-    "ModelTrainerCorpusCacheCleanupConfig",
-    "ModelTrainerLoggingConfig",
-    "ModelTrainerRQConfig",
-    "ModelTrainerRedisConfig",
-    "ModelTrainerSecurityConfig",
-    "ModelTrainerSettings",
-    "ModelTrainerTokenizerCleanupConfig",
-    "ModelTrainerWandbConfig",
-    "QRConfig",
-    "RedisConfig",
-    "TranscriptConfig",
-    "TurkicApiSettings",
     "_decode_table",
     "_decode_toml",
     "_default_get_env",
@@ -123,13 +56,5 @@ __all__ = [
     "_require_env_csv",
     "_require_env_str",
     "config_test_hooks",
-    "limits_from_handwriting_ai_settings",
-    "load_art_trainer_settings",
-    "load_covenant_radar_settings",
-    "load_data_bank_settings",
-    "load_discordbot_settings",
-    "load_handwriting_ai_settings",
-    "load_model_trainer_settings",
-    "load_turkic_api_settings",
     "require_discord_token",
 ]

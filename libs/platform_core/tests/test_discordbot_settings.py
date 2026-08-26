@@ -3,15 +3,15 @@ from __future__ import annotations
 import pytest
 
 from platform_core.config.discordbot import (
-    load_discordbot_settings,
+    load_settings,
     require_discord_token,
 )
 from platform_core.testing import make_fake_env
 
 
-def test_load_discordbot_settings_defaults() -> None:
+def test_load_settings_defaults() -> None:
     make_fake_env()
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["discord"]["token"] == ""
     assert settings["discord"]["guild_id"] is None
@@ -80,108 +80,108 @@ def test_load_discordbot_settings_defaults() -> None:
     assert settings["model_trainer"]["api_max_retries"] == 1
 
 
-def test_load_discordbot_settings_single_guild_id() -> None:
+def test_load_settings_single_guild_id() -> None:
     env = make_fake_env()
     env.set("DISCORD_GUILD_ID", "123456789")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["discord"]["guild_id"] == "123456789"
     assert settings["discord"]["guild_ids"] == [123456789]
 
 
-def test_load_discordbot_settings_multiple_guild_ids() -> None:
+def test_load_settings_multiple_guild_ids() -> None:
     env = make_fake_env()
     env.set("DISCORD_GUILD_IDS", "111,222,333")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["discord"]["guild_ids"] == [111, 222, 333]
 
 
-def test_load_discordbot_settings_guild_ids_with_spaces() -> None:
+def test_load_settings_guild_ids_with_spaces() -> None:
     env = make_fake_env()
     env.set("DISCORD_GUILD_IDS", "111 222 333")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["discord"]["guild_ids"] == [111, 222, 333]
 
 
-def test_load_discordbot_settings_guild_ids_filters_non_digits() -> None:
+def test_load_settings_guild_ids_filters_non_digits() -> None:
     env = make_fake_env()
     env.set("DISCORD_GUILD_IDS", "111,invalid,222,not-a-number,333")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["discord"]["guild_ids"] == [111, 222, 333]
 
 
-def test_load_discordbot_settings_retry_intervals_custom() -> None:
+def test_load_settings_retry_intervals_custom() -> None:
     env = make_fake_env()
     env.set("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "30,120")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["redis"]["rq_transcript_retry_intervals_sec"] == (30, 120)
 
 
-def test_load_discordbot_settings_retry_intervals_with_spaces() -> None:
+def test_load_settings_retry_intervals_with_spaces() -> None:
     env = make_fake_env()
     env.set("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "30 120")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["redis"]["rq_transcript_retry_intervals_sec"] == (30, 120)
 
 
-def test_load_discordbot_settings_retry_intervals_invalid_defaults() -> None:
+def test_load_settings_retry_intervals_invalid_defaults() -> None:
     env = make_fake_env()
     env.set("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "invalid")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["redis"]["rq_transcript_retry_intervals_sec"] == (60, 300)
 
 
-def test_load_discordbot_settings_retry_intervals_insufficient_parts() -> None:
+def test_load_settings_retry_intervals_insufficient_parts() -> None:
     env = make_fake_env()
     env.set("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "30")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["redis"]["rq_transcript_retry_intervals_sec"] == (60, 300)
 
 
-def test_load_discordbot_settings_openai_key_primary() -> None:
+def test_load_settings_openai_key_primary() -> None:
     env = make_fake_env()
     env.set("OPENAI_API_KEY", "primary-key")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["transcript"]["openai_api_key"] == "primary-key"
 
 
-def test_load_discordbot_settings_openai_key_alt() -> None:
+def test_load_settings_openai_key_alt() -> None:
     env = make_fake_env()
     env.set("OPEN_AI_API_KEY", "alt-key")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["transcript"]["openai_api_key"] == "alt-key"
 
 
-def test_load_discordbot_settings_openai_key_primary_takes_precedence() -> None:
+def test_load_settings_openai_key_primary_takes_precedence() -> None:
     env = make_fake_env()
     env.set("OPENAI_API_KEY", "primary-key")
     env.set("OPEN_AI_API_KEY", "alt-key")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["transcript"]["openai_api_key"] == "primary-key"
 
 
-def test_load_discordbot_settings_all_overrides() -> None:
+def test_load_settings_all_overrides() -> None:
     env = make_fake_env()
     env.set("DISCORD_TOKEN", "test-token")
     env.set("LOG_LEVEL", "debug")
@@ -194,7 +194,7 @@ def test_load_discordbot_settings_all_overrides() -> None:
     env.set("MODEL_TRAINER_API_URL", "http://trainer-api")
     env.set("MODEL_TRAINER_API_KEY", "trainer-key")
 
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     assert settings["discord"]["token"] == "test-token"
     assert settings["discord"]["log_level"] == "DEBUG"
@@ -210,7 +210,7 @@ def test_load_discordbot_settings_all_overrides() -> None:
 
 def test_require_discord_token_raises_when_empty() -> None:
     make_fake_env()
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     with pytest.raises(RuntimeError, match="DISCORD_TOKEN is required"):
         require_discord_token(settings)
@@ -219,6 +219,6 @@ def test_require_discord_token_raises_when_empty() -> None:
 def test_require_discord_token_succeeds_when_present() -> None:
     env = make_fake_env()
     env.set("DISCORD_TOKEN", "test-token")
-    settings = load_discordbot_settings()
+    settings = load_settings()
 
     require_discord_token(settings)

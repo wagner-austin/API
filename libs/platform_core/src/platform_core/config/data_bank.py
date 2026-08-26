@@ -5,7 +5,7 @@ from typing import TypedDict
 from ._utils import _optional_env_str, _require_env_csv, _require_env_str
 
 
-class DataBankSettings(TypedDict):
+class Settings(TypedDict):
     redis_url: str
     data_root: str
     min_free_gb: int
@@ -16,7 +16,7 @@ class DataBankSettings(TypedDict):
     api_delete_keys: frozenset[str]
 
 
-def load_data_bank_settings() -> DataBankSettings:
+def load_settings() -> Settings:
     redis_url = _require_env_str("REDIS_URL")
     upload_keys = _require_env_csv("API_UPLOAD_KEYS")
     read_keys = _optional_env_str("API_READ_KEYS")
@@ -37,4 +37,4 @@ def load_data_bank_settings() -> DataBankSettings:
     }
 
 
-__all__ = ["DataBankSettings", "load_data_bank_settings"]
+__all__ = ["Settings", "load_settings"]

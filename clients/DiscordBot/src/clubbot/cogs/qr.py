@@ -15,13 +15,13 @@ from platform_discord.protocols import (
 from platform_discord.rate_limiter import RateLimiter
 
 from .. import _test_hooks
-from ..config import DiscordbotSettings
+from ..config import Settings
 from .base import BaseCog, BotForSetup, _BotProto, _Logger
 
 
 class QRCog(BaseCog):
     def __init__(
-        self, bot: _BotProto, config: DiscordbotSettings, qr_service: _test_hooks.QRServiceLike
+        self, bot: _BotProto, config: Settings, qr_service: _test_hooks.QRServiceLike
     ) -> None:
         super().__init__()
         self.bot = bot

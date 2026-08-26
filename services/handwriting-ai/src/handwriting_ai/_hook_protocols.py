@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Protocol, TextIO
 
 import torch
-from platform_core.config import HandwritingAiSettings
+from platform_core.config.handwriting_ai import Settings
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.job_events import JobDomain
 from platform_core.json_utils import JSONValue
@@ -27,7 +27,7 @@ from platform_workers.redis import (
 from platform_workers.rq_harness import RQClientQueue, WorkerConfig
 
 from handwriting_ai.training.calibration._types import (
-    CandidateOutcomeDict,
+    CandidateOutcome,
 )
 
 
@@ -178,7 +178,7 @@ class OsAccessProtocol(Protocol):
 class LoadSettingsProtocol(Protocol):
     """Protocol for _load_settings function."""
 
-    def __call__(self, *, create_dirs: bool = True) -> HandwritingAiSettings: ...
+    def __call__(self, *, create_dirs: bool = True) -> Settings: ...
 
 
 class JobContextProtocol(Protocol):
@@ -243,7 +243,7 @@ class TryReadResultProtocol(Protocol):
 
     def __call__(
         self, out_path: str, *, exited: bool, exit_code: int | None
-    ) -> CandidateOutcomeDict | None: ...
+    ) -> CandidateOutcome | None: ...
 
 
 class NowTsProtocol(Protocol):

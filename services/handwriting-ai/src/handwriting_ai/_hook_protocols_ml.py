@@ -9,7 +9,7 @@ from typing import BinaryIO, Protocol, Self, TypedDict
 
 import torch
 from PIL.Image import Image as PILImage
-from platform_core.config import HandwritingAiSettings
+from platform_core.config.handwriting_ai import Settings
 
 from handwriting_ai.inference.types import PredictOutput
 
@@ -186,7 +186,7 @@ class InferencePoolProtocol(Protocol):
 class MakeInferencePoolProtocol(Protocol):
     """Protocol for the inference pool factory."""
 
-    def __call__(self, settings: HandwritingAiSettings) -> InferencePoolProtocol:
+    def __call__(self, settings: Settings) -> InferencePoolProtocol:
         """Build the pool the engine submits inference to.
 
         Args:
@@ -202,7 +202,7 @@ class DownloadRemoteProtocol(Protocol):
     """Protocol for fetching a v2 manifest's remote model artifact."""
 
     def __call__(
-        self, settings: HandwritingAiSettings, model_dir: Path, manifest_path: Path
+        self, settings: Settings, model_dir: Path, manifest_path: Path
     ) -> None:
         """Download the artifact the manifest names, if it names one.
 

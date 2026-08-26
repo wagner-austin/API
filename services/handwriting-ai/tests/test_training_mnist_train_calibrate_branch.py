@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 
 from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import ResourceLimitsDict
-from handwriting_ai._hook_protocols_training import BatchLoaderProtocol, EffectiveConfigDict
+from handwriting_ai._hook_protocols_training import BatchLoaderProtocol, EffectiveConfig
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
 from handwriting_ai.training.dataset import DataLoaderConfig
 from handwriting_ai.training.mnist_train import train_with_config
@@ -88,7 +88,7 @@ def test_train_with_calibration_calls_calibrate(tmp_path: Path) -> None:
 
     _test_hooks.train_epoch = _ok_train_epoch
 
-    # Provide a simple EffectiveConfigDict via calibrate_input_pipeline
+    # Provide a simple EffectiveConfig via calibrate_input_pipeline
     loader_cfg = DataLoaderConfig(
         batch_size=1,
         num_workers=0,
@@ -96,7 +96,7 @@ def test_train_with_calibration_calls_calibrate(tmp_path: Path) -> None:
         persistent_workers=False,
         prefetch_factor=2,
     )
-    e: EffectiveConfigDict = {
+    e: EffectiveConfig = {
         "intra_threads": 1,
         "interop_threads": None,
         "batch_size": 1,
@@ -112,7 +112,7 @@ def test_train_with_calibration_calls_calibrate(tmp_path: Path) -> None:
         cache_path: Path,
         ttl_seconds: int,
         force: bool,
-    ) -> EffectiveConfigDict:
+    ) -> EffectiveConfig:
         return e
 
     _test_hooks.calibrate_input_pipeline = _fake_calibrate

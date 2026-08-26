@@ -55,8 +55,9 @@ def test_decode_completed_fields() -> None:
     ev = make_completed_metrics_event(
         job_id="r",
         user_id=1,
-        test_loss=1.0,
-        test_ppl=2.0,
+        final_loss=1.0,
+        final_ppl=2.0,
+        held_out=True,
         artifact_path="/x",
     )
     out = decode_trainer_event(encode_trainer_metrics_event(ev))

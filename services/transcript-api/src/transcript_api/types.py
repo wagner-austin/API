@@ -9,9 +9,6 @@ from platform_core.logging import get_logger
 from platform_workers.rq_harness import RQJobLike, RQRetryLike
 from typing_extensions import TypedDict
 
-# Re-export JSONValue for local convenience
-JsonValue = JSONValue
-
 # Public JSON type for API boundaries - non-recursive, one-level deep
 JsonDict = dict[str, str | int | float | bool | None | list[str | int | float | bool | None]]
 
@@ -19,7 +16,7 @@ JsonDict = dict[str, str | int | float | bool | None | list[str | int | float | 
 class _EnqCallable(Protocol):
     def __call__(
         self,
-        *args: JsonValue,
+        *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,
         failure_ttl: int | None = None,
@@ -34,7 +31,7 @@ class LoggerProtocol(Protocol):
     def debug(
         self,
         msg: str,
-        *args: JsonValue,
+        *args: JSONValue,
         exc_info: bool
         | BaseException
         | tuple[type[BaseException], BaseException, TracebackType | None]
@@ -42,13 +39,13 @@ class LoggerProtocol(Protocol):
         | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        extra: Mapping[str, JsonValue] | None = None,
+        extra: Mapping[str, JSONValue] | None = None,
     ) -> None: ...
 
     def info(
         self,
         msg: str,
-        *args: JsonValue,
+        *args: JSONValue,
         exc_info: bool
         | BaseException
         | tuple[type[BaseException], BaseException, TracebackType | None]
@@ -56,13 +53,13 @@ class LoggerProtocol(Protocol):
         | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        extra: Mapping[str, JsonValue] | None = None,
+        extra: Mapping[str, JSONValue] | None = None,
     ) -> None: ...
 
     def warning(
         self,
         msg: str,
-        *args: JsonValue,
+        *args: JSONValue,
         exc_info: bool
         | BaseException
         | tuple[type[BaseException], BaseException, TracebackType | None]
@@ -70,13 +67,13 @@ class LoggerProtocol(Protocol):
         | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        extra: Mapping[str, JsonValue] | None = None,
+        extra: Mapping[str, JSONValue] | None = None,
     ) -> None: ...
 
     def error(
         self,
         msg: str,
-        *args: JsonValue,
+        *args: JSONValue,
         exc_info: bool
         | BaseException
         | tuple[type[BaseException], BaseException, TracebackType | None]
@@ -84,7 +81,7 @@ class LoggerProtocol(Protocol):
         | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        extra: Mapping[str, JsonValue] | None = None,
+        extra: Mapping[str, JSONValue] | None = None,
     ) -> None: ...
 
 
@@ -94,7 +91,7 @@ class QueueProtocol(Protocol):
     def enqueue(
         self,
         func: str | _EnqCallable,
-        *args: JsonValue,
+        *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,
         failure_ttl: int | None = None,
@@ -278,7 +275,7 @@ class _TracebackProto(Protocol):
 class YtDlpProto(Protocol):
     """Protocol for yt-dlp YoutubeDL instance.
 
-    Note: extract_info returns raw dict (JsonValue) since that's what yt-dlp returns.
+    Note: extract_info returns raw dict (JSONValue) since that's what yt-dlp returns.
     The caller is responsible for coercing to YtInfoTD via _coerce_yt_info().
     """
 
@@ -290,8 +287,8 @@ class YtDlpProto(Protocol):
         tb: _TracebackProto | None,
     ) -> None: ...
 
-    def extract_info(self, url: str, download: bool) -> dict[str, JsonValue]: ...
-    def prepare_filename(self, info: dict[str, JsonValue]) -> str: ...
+    def extract_info(self, url: str, download: bool) -> dict[str, JSONValue]: ...
+    def prepare_filename(self, info: dict[str, JSONValue]) -> str: ...
 
 
 logger = get_logger(__name__)

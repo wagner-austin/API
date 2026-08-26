@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from platform_discord.discord_types import Embed as _Embed
+from platform_discord.discord_types import EmbedProto as _Embed
 from platform_discord.embed_helpers import add_field as _add_field
 from platform_discord.embed_helpers import create_embed as _create_embed
 

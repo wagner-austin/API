@@ -1,37 +1,22 @@
-"""Settings configuration for Art-Trainer.
+"""Art-Trainer's settings, re-exported from platform_core.
 
-Re-exports the shared TypedDicts from platform_core for service use.
+Six aliases and a passthrough loader lived here, for the same reason
+Model-Trainer's did: platform_core's barrel held every service's types in one
+flat namespace, so each carried a service-name prefix, and each service
+aliased the prefix off again at home. platform_core's modules now own
+unprefixed names, so this is an explicit ``import X as X`` re-export -- one
+name for one type.
 """
 
 from __future__ import annotations
 
-from platform_core.config import (
-    ArtTrainerAppConfig,
-    ArtTrainerLoggingConfig,
-    ArtTrainerRedisConfig,
-    ArtTrainerRQConfig,
-    ArtTrainerSecurityConfig,
-    ArtTrainerSettings,
-    load_art_trainer_settings,
-)
-
-# Re-export the shared TypedDicts so callers keep identical types.
-LoggingConfig = ArtTrainerLoggingConfig
-RedisConfig = ArtTrainerRedisConfig
-RQConfig = ArtTrainerRQConfig
-AppConfig = ArtTrainerAppConfig
-SecurityConfig = ArtTrainerSecurityConfig
-Settings = ArtTrainerSettings
-
-
-def load_settings() -> Settings:
-    """Load Art-Trainer settings from the centralized platform_core config.
-
-    Returns:
-        Complete Settings TypedDict.
-    """
-    return load_art_trainer_settings()
-
+from platform_core.config.art_trainer import AppConfig as AppConfig
+from platform_core.config.art_trainer import LoggingConfig as LoggingConfig
+from platform_core.config.art_trainer import RedisConfig as RedisConfig
+from platform_core.config.art_trainer import RQConfig as RQConfig
+from platform_core.config.art_trainer import SecurityConfig as SecurityConfig
+from platform_core.config.art_trainer import Settings as Settings
+from platform_core.config.art_trainer import load_settings as load_settings
 
 __all__ = [
     "AppConfig",

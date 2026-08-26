@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 from platform_core.config import _test_hooks as config_test_hooks
 from platform_core.config.handwriting_ai import (
-    HandwritingAiAppConfig,
-    HandwritingAiDigitsConfig,
-    HandwritingAiSecurityConfig,
-    HandwritingAiSettings,
+    AppConfig,
+    DigitsConfig,
+    SecurityConfig,
+    Settings,
 )
 from platform_core.testing import make_fake_env
 
@@ -28,15 +28,15 @@ UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float
 pytestmark = pytest.mark.usefixtures("digits_redis")
 
 
-def _make_settings(tmp: Path) -> HandwritingAiSettings:
-    app: HandwritingAiAppConfig = {
+def _make_settings(tmp: Path) -> Settings:
+    app: AppConfig = {
         "data_root": tmp / "data",
         "artifacts_root": tmp / "artifacts",
         "logs_root": tmp / "logs",
         "threads": 0,
         "port": 8081,
     }
-    dig: HandwritingAiDigitsConfig = {
+    dig: DigitsConfig = {
         "model_dir": tmp / "models",
         "active_model": "m",
         "tta": False,
@@ -47,7 +47,7 @@ def _make_settings(tmp: Path) -> HandwritingAiSettings:
         "visualize_max_kb": 16,
         "retention_keep_runs": 1,
     }
-    sec: HandwritingAiSecurityConfig = {"api_key": ""}
+    sec: SecurityConfig = {"api_key": ""}
     return {"app": app, "digits": dig, "security": sec}
 
 
@@ -86,7 +86,7 @@ def test_process_train_job_missing_data_bank_credentials(tmp_path: Path) -> None
     # Set up fake settings
     settings = _make_settings(tmp_path)
 
-    def _fake_settings(*, create_dirs: bool = True) -> HandwritingAiSettings:
+    def _fake_settings(*, create_dirs: bool = True) -> Settings:
         _ = create_dirs
         return settings
 

@@ -15,7 +15,7 @@ from platform_workers.redis import RedisStrProto
 from typing_extensions import TypedDict
 
 from turkic_api import _test_hooks
-from turkic_api.api.config import Settings, settings_from_env
+from turkic_api.api.config import Settings, load_settings
 from turkic_api.api.job_store import TurkicJobStore
 from turkic_api.api.types import LoggerProtocol
 from turkic_api.core.models import ProcessSpec, is_language, is_source
@@ -355,7 +355,7 @@ def _decode_process_corpus(job_id: str, params: dict[str, JSONValue]) -> JobResu
     Note: params is dict[str, JSONValue] from RQ queue, decoded internally.
     Logging is initialized by worker_entry.py before the worker starts processing jobs.
     """
-    settings = settings_from_env()
+    settings = load_settings()
     logger = get_logger(__name__)
     client = _get_redis_client(settings["redis_url"])
 

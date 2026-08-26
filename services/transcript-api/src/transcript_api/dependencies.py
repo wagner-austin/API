@@ -5,13 +5,13 @@ from typing import Annotated
 
 from fastapi import Depends
 from platform_core.config import _require_env_str
+from platform_core.json_utils import JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import TRANSCRIPT_QUEUE
 from platform_workers.redis import RedisStrProto, redis_raw_for_rq
 from platform_workers.rq_harness import RQClientQueue, RQJobLike, RQRetryLike, rq_queue
 
 from transcript_api.types import (
-    JsonValue,
     LoggerProtocol,
     QueueProtocol,
     _EnqCallable,
@@ -82,7 +82,7 @@ def get_queue() -> QueueProtocol:
         def enqueue(
             self,
             func: str | _EnqCallable,
-            *args: JsonValue,
+            *args: JSONValue,
             job_timeout: int | None = None,
             result_ttl: int | None = None,
             failure_ttl: int | None = None,

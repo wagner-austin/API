@@ -1,3 +1,17 @@
+"""Model-Trainer's configuration.
+
+The names here are unprefixed because the module already says whose they are.
+They carried a ``ModelTrainer`` prefix until 2026-08-26, for one reason: the
+package barrel re-exported every service's types side by side, where three
+different ``RedisConfig`` would have collided. The prefix paid for that flat
+namespace at every call site, and Model-Trainer paid it back by aliasing the
+prefix away again in its own ``core/config/settings.py``.
+
+The barrel no longer re-exports these, so import from this module by name:
+
+    from platform_core.config.model_trainer import Settings, load_settings
+"""
+
 from __future__ import annotations
 
 from typing import Literal, TypedDict
@@ -11,16 +25,16 @@ from ._utils import (
 )
 
 
-class ModelTrainerLoggingConfig(TypedDict, total=True):
+class LoggingConfig(TypedDict, total=True):
     level: LogLevel
 
 
-class ModelTrainerRedisConfig(TypedDict, total=True):
+class RedisConfig(TypedDict, total=True):
     enabled: bool
     url: str
 
 
-class ModelTrainerRQConfig(TypedDict, total=True):
+class RQConfig(TypedDict, total=True):
     queue_name: str
     job_timeout_sec: int
     result_ttl_sec: int
@@ -29,26 +43,26 @@ class ModelTrainerRQConfig(TypedDict, total=True):
     retry_intervals_sec: str
 
 
-class ModelTrainerCleanupConfig(TypedDict, total=True):
+class CleanupConfig(TypedDict, total=True):
     enabled: bool
     verify_upload: bool
     grace_period_seconds: int
     dry_run: bool
 
 
-class ModelTrainerCorpusCacheCleanupConfig(TypedDict, total=True):
+class CorpusCacheCleanupConfig(TypedDict, total=True):
     enabled: bool
     max_bytes: int
     min_free_bytes: int
     eviction_policy: Literal["lru", "oldest"]
 
 
-class ModelTrainerTokenizerCleanupConfig(TypedDict, total=True):
+class TokenizerCleanupConfig(TypedDict, total=True):
     enabled: bool
     min_unused_days: int
 
 
-class ModelTrainerAppConfig(TypedDict, total=True):
+class AppConfig(TypedDict, total=True):
     data_root: str
     artifacts_root: str
     runs_root: str
@@ -57,31 +71,36 @@ class ModelTrainerAppConfig(TypedDict, total=True):
     tokenizer_sample_max_lines: int
     data_bank_api_url: str
     data_bank_api_key: str
-    cleanup: ModelTrainerCleanupConfig
-    corpus_cache_cleanup: ModelTrainerCorpusCacheCleanupConfig
-    tokenizer_cleanup: ModelTrainerTokenizerCleanupConfig
+    cleanup: CleanupConfig
+    corpus_cache_cleanup: CorpusCacheCleanupConfig
+    tokenizer_cleanup: TokenizerCleanupConfig
 
 
-class ModelTrainerSecurityConfig(TypedDict, total=True):
+class SecurityConfig(TypedDict, total=True):
     api_key: str
 
 
-class ModelTrainerWandbConfig(TypedDict, total=True):
+class WandbConfig(TypedDict, total=True):
     enabled: bool
     project: str
 
 
-class ModelTrainerSettings(TypedDict, total=True):
+class Settings(TypedDict, total=True):
     app_env: Literal["dev", "prod"]
-    logging: ModelTrainerLoggingConfig
-    redis: ModelTrainerRedisConfig
-    rq: ModelTrainerRQConfig
-    app: ModelTrainerAppConfig
-    security: ModelTrainerSecurityConfig
-    wandb: ModelTrainerWandbConfig
+    logging: LoggingConfig
+    redis: RedisConfig
+    rq: RQConfig
+    app: AppConfig
+    security: SecurityConfig
+    wandb: WandbConfig
 
 
-def load_model_trainer_settings() -> ModelTrainerSettings:
+def load_settings() -> Settings:
+    """Read Model-Trainer's settings from the process environment.
+
+    Returns:
+        The settings, with every unset variable at its documented default.
+    """
     level_str = _parse_str("LOGGING__LEVEL", "INFO")
     level: LogLevel = "INFO"
     if level_str == "DEBUG":
@@ -95,15 +114,15 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
     elif level_str == "CRITICAL":
         level = "CRITICAL"
 
-    logging_cfg: ModelTrainerLoggingConfig = {
+    logging_cfg: LoggingConfig = {
         "level": level,
     }
 
-    redis_cfg: ModelTrainerRedisConfig = {
+    redis_cfg: RedisConfig = {
         "enabled": _parse_bool("REDIS__ENABLED", True),
         "url": _parse_str("REDIS__URL", "redis://redis:6379/0"),
     }
-    rq_cfg: ModelTrainerRQConfig = {
+    rq_cfg: RQConfig = {
         "queue_name": _parse_str("RQ__QUEUE_NAME", "trainer"),
         "job_timeout_sec": _parse_int("RQ__JOB_TIMEOUT_SEC", 86_400),
         "result_ttl_sec": _parse_int("RQ__RESULT_TTL_SEC", 86_400),
@@ -112,13 +131,13 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
         "retry_intervals_sec": _parse_str("RQ__RETRY_INTERVALS_SEC", "300"),
     }
 
-    cleanup_cfg: ModelTrainerCleanupConfig = {
+    cleanup_cfg: CleanupConfig = {
         "enabled": _parse_bool("APP__CLEANUP__ENABLED", True),
         "verify_upload": _parse_bool("APP__CLEANUP__VERIFY_UPLOAD", True),
         "grace_period_seconds": _parse_int("APP__CLEANUP__GRACE_PERIOD_SECONDS", 0),
         "dry_run": _parse_bool("APP__CLEANUP__DRY_RUN", False),
     }
-    corpus_cache_cleanup_cfg: ModelTrainerCorpusCacheCleanupConfig = {
+    corpus_cache_cleanup_cfg: CorpusCacheCleanupConfig = {
         "enabled": _parse_bool("APP__CORPUS_CACHE_CLEANUP__ENABLED", False),
         "max_bytes": _parse_int("APP__CORPUS_CACHE_CLEANUP__MAX_BYTES", 10 * 1024 * 1024 * 1024),
         "min_free_bytes": _parse_int(
@@ -130,7 +149,7 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
             else "lru"
         ),
     }
-    tokenizer_cleanup_cfg: ModelTrainerTokenizerCleanupConfig = {
+    tokenizer_cleanup_cfg: TokenizerCleanupConfig = {
         "enabled": _parse_bool("APP__TOKENIZER_CLEANUP__ENABLED", False),
         "min_unused_days": _parse_int("APP__TOKENIZER_CLEANUP__MIN_UNUSED_DAYS", 30),
     }
@@ -139,7 +158,7 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
     direct_url = _parse_str("APP__DATA_BANK_API_URL", "")
     data_bank_url = f"{gateway_url}/data-bank" if gateway_url else direct_url
 
-    app_cfg: ModelTrainerAppConfig = {
+    app_cfg: AppConfig = {
         "data_root": _parse_str("APP__DATA_ROOT", "/data"),
         "artifacts_root": _parse_str("APP__ARTIFACTS_ROOT", "/data/artifacts"),
         "runs_root": _parse_str("APP__RUNS_ROOT", "/data/runs"),
@@ -153,11 +172,11 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
         "tokenizer_cleanup": tokenizer_cleanup_cfg,
     }
 
-    security_cfg: ModelTrainerSecurityConfig = {
+    security_cfg: SecurityConfig = {
         "api_key": _parse_str("SECURITY__API_KEY", ""),
     }
 
-    wandb_cfg: ModelTrainerWandbConfig = {
+    wandb_cfg: WandbConfig = {
         "enabled": _parse_bool("WANDB__ENABLED", False),
         "project": _parse_str("WANDB__PROJECT", "model-trainer"),
     }
@@ -177,15 +196,15 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
 
 
 __all__ = [
-    "ModelTrainerAppConfig",
-    "ModelTrainerCleanupConfig",
-    "ModelTrainerCorpusCacheCleanupConfig",
-    "ModelTrainerLoggingConfig",
-    "ModelTrainerRQConfig",
-    "ModelTrainerRedisConfig",
-    "ModelTrainerSecurityConfig",
-    "ModelTrainerSettings",
-    "ModelTrainerTokenizerCleanupConfig",
-    "ModelTrainerWandbConfig",
-    "load_model_trainer_settings",
+    "AppConfig",
+    "CleanupConfig",
+    "CorpusCacheCleanupConfig",
+    "LoggingConfig",
+    "RQConfig",
+    "RedisConfig",
+    "SecurityConfig",
+    "Settings",
+    "TokenizerCleanupConfig",
+    "WandbConfig",
+    "load_settings",
 ]

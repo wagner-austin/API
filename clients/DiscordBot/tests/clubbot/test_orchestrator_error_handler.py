@@ -13,7 +13,7 @@ from tests.support.settings import build_settings
 
 from clubbot import _test_hooks
 from clubbot._test_hooks import BotRunnerProtocol, BotTreeProto, SnowflakeLike
-from clubbot.config import DiscordbotSettings as Config
+from clubbot.config import Settings as Config
 from clubbot.container import ServiceContainer
 from clubbot.orchestrator import BotOrchestrator
 from clubbot.services.qr.client import QRService

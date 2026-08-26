@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from platform_core.testing import make_fake_env
 
-from covenant_radar_api.core import Settings, settings_from_env
+from covenant_radar_api.core import Settings, load_settings
 from covenant_radar_api.core.config import Settings as ConfigSettings
 
 
-def test_settings_from_env_loads_required_vars() -> None:
-    """Test settings_from_env loads from environment variables."""
+def test_load_settings_loads_required_vars() -> None:
+    """Test load_settings loads from environment variables."""
     env = make_fake_env()
     env.set("REDIS_URL", "redis://test-redis:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
 
-    s = settings_from_env()
+    s = load_settings()
 
     # Verify nested structure
     assert s["redis"]["url"] == "redis://test-redis:6379/0"
@@ -28,29 +28,35 @@ def test_settings_from_env_loads_required_vars() -> None:
     assert s["app_env"] == "dev"
 
 
-def test_settings_from_env_uses_redis_url_fallback() -> None:
+def test_load_settings_uses_redis_url_fallback() -> None:
     """Test settings uses REDIS_URL when REDIS__URL not set."""
     env = make_fake_env()
     env.set("REDIS_URL", "redis://from-redis-url:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
 
-    s = settings_from_env()
+    s = load_settings()
     assert s["redis"]["url"] == "redis://from-redis-url:6379/0"
 
 
-def test_settings_from_env_prefers_redis__url() -> None:
-    """Test settings prefers REDIS__URL over REDIS_URL."""
+def test_load_settings_reads_only_the_name_deployment_sets() -> None:
+    """One spelling, and it is the one this service's compose and .env set.
+
+    The loader preferred `REDIS__URL` and fell back to `REDIS_URL`. Nothing in
+    the repository sets `REDIS__URL` for covenant-radar -- both
+    `docker-compose.yml` and `.env` here set `REDIS_URL` -- so the preferred
+    branch was dead and the fallback was the only path ever taken.
+    """
     env = make_fake_env()
-    env.set("REDIS__URL", "redis://from-redis-double-underscore:6379/0")
-    env.set("REDIS_URL", "redis://from-redis-url:6379/0")
+    env.set("REDIS__URL", "redis://a-name-nothing-sets:6379/0")
+    env.set("REDIS_URL", "redis://what-compose-actually-sets:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
 
-    s = settings_from_env()
-    assert s["redis"]["url"] == "redis://from-redis-double-underscore:6379/0"
+    s = load_settings()
+    assert s["redis"]["url"] == "redis://what-compose-actually-sets:6379/0"
 
 
-def test_settings_from_env_custom_app_config() -> None:
-    """Test settings_from_env uses custom app config when set."""
+def test_load_settings_custom_app_config() -> None:
+    """Test load_settings uses custom app config when set."""
     env = make_fake_env()
     env.set("REDIS_URL", "redis://test:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
@@ -58,47 +64,47 @@ def test_settings_from_env_custom_app_config() -> None:
     env.set("APP__MODELS_ROOT", "/custom/models")
     env.set("APP__LOGS_ROOT", "/custom/logs")
 
-    s = settings_from_env()
+    s = load_settings()
 
     assert s["app"]["data_root"] == "/custom/data"
     assert s["app"]["models_root"] == "/custom/models"
     assert s["app"]["logs_root"] == "/custom/logs"
 
 
-def test_settings_from_env_custom_rq_config() -> None:
-    """Test settings_from_env uses custom RQ config when set."""
+def test_load_settings_custom_rq_config() -> None:
+    """Test load_settings uses custom RQ config when set."""
     env = make_fake_env()
     env.set("REDIS_URL", "redis://test:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("RQ__QUEUE_NAME", "custom-queue")
     env.set("RQ__JOB_TIMEOUT_SEC", "7200")
 
-    s = settings_from_env()
+    s = load_settings()
 
     assert s["rq"]["queue_name"] == "custom-queue"
     assert s["rq"]["job_timeout_sec"] == 7200
 
 
-def test_settings_from_env_custom_logging_level() -> None:
-    """Test settings_from_env uses custom logging level when set."""
+def test_load_settings_custom_logging_level() -> None:
+    """Test load_settings uses custom logging level when set."""
     env = make_fake_env()
     env.set("REDIS_URL", "redis://test:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("LOGGING__LEVEL", "DEBUG")
 
-    s = settings_from_env()
+    s = load_settings()
 
     assert s["logging"]["level"] == "DEBUG"
 
 
-def test_settings_from_env_prod_env() -> None:
-    """Test settings_from_env sets prod app_env."""
+def test_load_settings_prod_env() -> None:
+    """Test load_settings sets prod app_env."""
     env = make_fake_env()
     env.set("REDIS_URL", "redis://test:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("APP_ENV", "prod")
 
-    s = settings_from_env()
+    s = load_settings()
 
     assert s["app_env"] == "prod"
 

@@ -14,7 +14,7 @@ from clubbot._test_hooks import (
     TrainerEventSubscriberLike,
 )
 from clubbot.cogs.trainer import TrainerCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from tests.support.discord_fakes import FakeBot, FakeUser
 from tests.support.discord_recorders import RecordingInteraction
 from tests.support.settings import build_settings
@@ -90,7 +90,7 @@ class _FakeTrainerClient:
 
 def _base_cfg(
     *, trainer_url: str | None = "https://trainer.local", redis_url: str | None = None
-) -> DiscordbotSettings:
+) -> Settings:
     return build_settings(
         model_trainer_api_url=trainer_url if trainer_url else "",
         redis_url=redis_url,

@@ -6,7 +6,7 @@ from PIL import Image, ImageColor
 from PIL.Image import Image as PILImage
 from tests.conftest import _build_settings
 
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.qr.client import QRRequestPayload, QRService
 
 
@@ -30,7 +30,7 @@ class _FakeClient:
         return _make_png(self._box, self._border, self._back)
 
 
-def _cfg() -> DiscordbotSettings:
+def _cfg() -> Settings:
     return _build_settings(
         qr_default_box_size=10,
         qr_default_border=4,

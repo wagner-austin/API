@@ -22,9 +22,9 @@ from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import MultiprocessingProcessProtocol
 from handwriting_ai.training.calibration._types import (
-    BudgetConfigDict,
-    CandidateErrorDict,
-    CandidateOutcomeDict,
+    BudgetConfig as BudgetConfig,
+    CandidateError as CandidateError,
+    CandidateOutcome as CandidateOutcome,
 )
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import (
@@ -45,12 +45,9 @@ _LOGGER = get_logger("handwriting_ai")
 
 # CandidateError and CandidateOutcome are imported from _types to avoid circular imports.
 # Re-export for backwards compatibility.
-CandidateError = CandidateErrorDict
-CandidateOutcome = CandidateOutcomeDict
 
 # BudgetConfig is imported from _types to avoid circular imports.
 # Re-export for backwards compatibility.
-BudgetConfig = BudgetConfigDict
 
 
 class CandidateRunner(Protocol):

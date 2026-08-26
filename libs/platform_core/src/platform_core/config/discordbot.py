@@ -99,7 +99,7 @@ class GatewayConfig(TypedDict, total=True):
     api_url: str
 
 
-class DiscordbotSettings(TypedDict, total=True):
+class Settings(TypedDict, total=True):
     discord: DiscordConfig
     qr: QRConfig
     transcript: TranscriptConfig
@@ -110,7 +110,7 @@ class DiscordbotSettings(TypedDict, total=True):
     gateway: GatewayConfig
 
 
-def load_discordbot_settings() -> DiscordbotSettings:
+def load_settings() -> Settings:
     single_guild = _optional_env_str("DISCORD_GUILD_ID")
     multi_raw = _optional_env_str("DISCORD_GUILD_IDS")
     guild_ids: list[int] = []
@@ -235,7 +235,7 @@ def load_discordbot_settings() -> DiscordbotSettings:
     }
 
 
-def require_discord_token(settings: DiscordbotSettings) -> None:
+def require_discord_token(settings: Settings) -> None:
     if not settings["discord"]["token"]:
         raise RuntimeError("DISCORD_TOKEN is required. Set it in your .env file.")
 
@@ -243,14 +243,14 @@ def require_discord_token(settings: DiscordbotSettings) -> None:
 __all__ = [
     "DigitsConfig",
     "DiscordConfig",
-    "DiscordbotSettings",
     "GatewayConfig",
     "HandwritingConfig",
     "LogLevel",
     "ModelTrainerConfig",
     "QRConfig",
     "RedisConfig",
+    "Settings",
     "TranscriptConfig",
-    "load_discordbot_settings",
+    "load_settings",
     "require_discord_token",
 ]

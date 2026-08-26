@@ -7,7 +7,7 @@ from platform_core.logging import get_logger
 from platform_discord.protocols import wrap_bot
 
 from . import _test_hooks
-from .config import DiscordbotSettings, load_discordbot_settings, require_discord_token
+from .config import Settings, load_discordbot_settings, require_discord_token
 from .services.digits.app import DigitService
 from .services.qr.client import QRService
 from .services.transcript.client import TranscriptService
@@ -23,7 +23,7 @@ class ServiceContainer:
     def __init__(
         self,
         *,
-        cfg: DiscordbotSettings,
+        cfg: Settings,
         qr_service: QRService,
         transcript_service: TranscriptService | None = None,
         digits_service: DigitService | None = None,

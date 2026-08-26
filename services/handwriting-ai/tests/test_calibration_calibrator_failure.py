@@ -9,9 +9,9 @@ from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import CandidateRunnerProtocol, OrchestratorProtocol
 from handwriting_ai.training.calibration._types import (
-    CalibrationResultDict,
-    CandidateDict,
-    OrchestratorConfigDict,
+    CalibrationResult,
+    Candidate,
+    OrchestratorConfig,
 )
 from handwriting_ai.training.calibration.calibrator import (
     CalibrationError,
@@ -37,38 +37,38 @@ class _FakeMNIST:
 
 
 class _OrchEmpty:
-    def __init__(self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict) -> None:
+    def __init__(self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig) -> None:
         _ = (runner, config)
 
     def run_stage_a(
         self,
         ds: PreprocessDatasetProtocol | PreprocessSpec,
-        cands: list[CandidateDict],
+        cands: list[Candidate],
         samples: int,
-    ) -> list[CalibrationResultDict]:
+    ) -> list[CalibrationResult]:
         _ = (ds, cands, samples)
         return []
 
     def run_stage_b(
         self,
         ds: PreprocessDatasetProtocol | PreprocessSpec,
-        shortlist: list[CalibrationResultDict],
+        shortlist: list[CalibrationResult],
         samples: int,
-    ) -> list[CalibrationResultDict]:
+    ) -> list[CalibrationResult]:
         _ = (ds, shortlist, samples)
         return []
 
 
 class _OrchEmptyB:
-    def __init__(self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict) -> None:
+    def __init__(self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig) -> None:
         _ = (runner, config)
 
     def run_stage_a(
         self,
         ds: PreprocessDatasetProtocol | PreprocessSpec,
-        cands: list[CandidateDict],
+        cands: list[Candidate],
         samples: int,
-    ) -> list[CalibrationResultDict]:
+    ) -> list[CalibrationResult]:
         _ = (ds, cands, samples)
         return [
             {
@@ -84,16 +84,16 @@ class _OrchEmptyB:
     def run_stage_b(
         self,
         ds: PreprocessDatasetProtocol | PreprocessSpec,
-        shortlist: list[CalibrationResultDict],
+        shortlist: list[CalibrationResult],
         samples: int,
-    ) -> list[CalibrationResultDict]:
+    ) -> list[CalibrationResult]:
         _ = (ds, shortlist, samples)
         return []
 
 
 def test_calibrator_raises_on_empty_stage_a(tmp_path: Path) -> None:
     def _orch_factory(
-        *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+        *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
     ) -> OrchestratorProtocol:
         return _OrchEmpty(runner=runner, config=config)
 
@@ -138,7 +138,7 @@ def test_calibrator_raises_on_empty_stage_a(tmp_path: Path) -> None:
 
 def test_calibrator_raises_on_empty_stage_b(tmp_path: Path) -> None:
     def _orch_factory(
-        *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+        *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
     ) -> OrchestratorProtocol:
         return _OrchEmptyB(runner=runner, config=config)
 

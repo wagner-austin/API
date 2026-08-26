@@ -10,7 +10,7 @@ from platform_core.queues import TURKIC_QUEUE
 from platform_workers.rq_harness import WorkerConfig
 
 from turkic_api import _test_hooks
-from turkic_api.api.config import settings_from_env
+from turkic_api.api.config import load_settings
 from turkic_api.api.logging_fields import LOG_EXTRA_FIELDS
 
 
@@ -28,7 +28,7 @@ class WorkerRunnerProtocol(Protocol):
 
 def _build_config() -> WorkerConfig:
     """Build worker configuration from settings."""
-    settings = settings_from_env()
+    settings = load_settings()
     return {
         "redis_url": settings["redis_url"],
         "queue_name": TURKIC_QUEUE,

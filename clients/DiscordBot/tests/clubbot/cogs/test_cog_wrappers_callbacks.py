@@ -22,7 +22,7 @@ from clubbot.cogs.invite import InviteCog
 from clubbot.cogs.qr import QRCog
 from clubbot.cogs.trainer import TrainerCog
 from clubbot.cogs.transcript import TranscriptCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.qr.client import QRService
 from clubbot.services.transcript.client import TranscriptService
 
@@ -90,7 +90,7 @@ class _HasCallback(Protocol, Generic[_CB]):
 class _TrackingInviteCog(InviteCog):
     """InviteCog subclass that tracks impl calls."""
 
-    def __init__(self, bot: FakeBot, config: DiscordbotSettings) -> None:
+    def __init__(self, bot: FakeBot, config: Settings) -> None:
         super().__init__(bot, config)
         self.impl_called = 0
 
@@ -101,7 +101,7 @@ class _TrackingInviteCog(InviteCog):
 class _TrackingQRCog(QRCog):
     """QRCog subclass that tracks impl calls."""
 
-    def __init__(self, bot: FakeBot, config: DiscordbotSettings, svc: QRService) -> None:
+    def __init__(self, bot: FakeBot, config: Settings, svc: QRService) -> None:
         super().__init__(bot, config, svc)
         self.impl_called = 0
 
@@ -116,7 +116,7 @@ class _TrackingDigitsCog(DigitsCog):
     def __init__(
         self,
         bot: FakeBot,
-        config: DiscordbotSettings,
+        config: Settings,
         svc: _test_hooks.DigitsEnqueuerLike | None,
     ) -> None:
         from clubbot.services.digits.app import DigitService
@@ -148,7 +148,7 @@ class _TrackingDigitsCog(DigitsCog):
 class _TrackingTrainerCog(TrainerCog):
     """TrainerCog subclass that tracks impl calls."""
 
-    def __init__(self, bot: FakeBot, config: DiscordbotSettings) -> None:
+    def __init__(self, bot: FakeBot, config: Settings) -> None:
         super().__init__(bot=bot, config=config)
         self.impl_called = 0
 
@@ -184,7 +184,7 @@ class _TrackingTranscriptCog(TranscriptCog):
     def __init__(
         self,
         bot: FakeBot,
-        config: DiscordbotSettings,
+        config: Settings,
         svc: TranscriptService,
     ) -> None:
         super().__init__(bot=bot, config=config, transcript_service=svc)

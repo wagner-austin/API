@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from platform_core.config import _test_hooks as platform_hooks
+from platform_core.json_utils import JSONValue
 from platform_core.testing import make_fake_env
 from platform_workers.redis import RedisStrProto
 from platform_workers.rq_harness import RQJobLike, RQRetryLike
@@ -16,7 +17,7 @@ from transcript_api.dependencies import (
     get_request_logger,
     provider_context,
 )
-from transcript_api.types import JsonValue, QueueProtocol, _EnqCallable
+from transcript_api.types import QueueProtocol, _EnqCallable
 
 
 class _JobStub:
@@ -33,12 +34,12 @@ class _QueueStub:
     """Stub queue for testing implementing QueueProtocol."""
 
     def __init__(self) -> None:
-        self.enqueued: list[tuple[str, tuple[JsonValue, ...]]] = []
+        self.enqueued: list[tuple[str, tuple[JSONValue, ...]]] = []
 
     def enqueue(
         self,
         func: str | _EnqCallable,
-        *args: JsonValue,
+        *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,
         failure_ttl: int | None = None,

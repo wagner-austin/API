@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from platform_core.config import ModelTrainerSettings, load_model_trainer_settings
+from platform_core.config.model_trainer import Settings, load_settings
 from platform_core.testing import make_fake_env
 
 
 def test_model_trainer_settings_defaults() -> None:
     make_fake_env()
-    cfg: ModelTrainerSettings = load_model_trainer_settings()
+    cfg: Settings = load_settings()
     assert cfg["logging"]["level"] == "INFO"
     assert cfg["redis"] == {"enabled": True, "url": "redis://redis:6379/0"}
     assert cfg["rq"]["queue_name"] == "trainer"
@@ -69,7 +69,7 @@ def test_model_trainer_settings_env_overrides() -> None:
     env.set("SECURITY__API_KEY", "sekret")
     env.set("APP_ENV", "prod")
 
-    cfg = load_model_trainer_settings()
+    cfg = load_settings()
     assert cfg["logging"]["level"] == "DEBUG"
     assert cfg["redis"] == {"enabled": False, "url": "redis://override:6379/1"}
     assert cfg["rq"]["queue_name"] == "trainer"
@@ -108,23 +108,23 @@ def test_model_trainer_settings_log_levels() -> None:
     # Test WARNING
     env = make_fake_env()
     env.set("LOGGING__LEVEL", "WARNING")
-    cfg = load_model_trainer_settings()
+    cfg = load_settings()
     assert cfg["logging"]["level"] == "WARNING"
 
     # Test ERROR
     env.clear()
     env.set("LOGGING__LEVEL", "ERROR")
-    cfg = load_model_trainer_settings()
+    cfg = load_settings()
     assert cfg["logging"]["level"] == "ERROR"
 
     # Test CRITICAL
     env.clear()
     env.set("LOGGING__LEVEL", "CRITICAL")
-    cfg = load_model_trainer_settings()
+    cfg = load_settings()
     assert cfg["logging"]["level"] == "CRITICAL"
 
     # Test invalid level falls back to INFO
     env.clear()
     env.set("LOGGING__LEVEL", "INVALID")
-    cfg = load_model_trainer_settings()
+    cfg = load_settings()
     assert cfg["logging"]["level"] == "INFO"

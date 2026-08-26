@@ -11,7 +11,7 @@ from tests.support.settings import build_settings
 
 from clubbot.cogs.base import _Logger
 from clubbot.cogs.digits import DigitsCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.handai.client import HandwritingAPIError, PredictResult
 
 
@@ -42,7 +42,7 @@ class _RecordingDigitService(FakeDigitService):
         return self._res
 
 
-def _cfg() -> DiscordbotSettings:
+def _cfg() -> Settings:
     return build_settings(
         handwriting_api_url="https://api",
         handwriting_api_timeout_seconds=1,

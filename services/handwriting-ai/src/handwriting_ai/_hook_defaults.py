@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TextIO
 
-from platform_core.config import HandwritingAiSettings
+from platform_core.config.handwriting_ai import Settings
 from platform_core.job_events import JobDomain
 from platform_core.logging import (
     LogFormat,
@@ -96,7 +96,7 @@ def _default_mp_active_children() -> list[MultiprocessingChildProtocol]:
     return list(_mp.active_children())
 
 
-def _default_load_settings(*, create_dirs: bool = True) -> HandwritingAiSettings:
+def _default_load_settings(*, create_dirs: bool = True) -> Settings:
     """Production implementation - loads actual settings."""
     from handwriting_ai.config import load_settings as _ls
 

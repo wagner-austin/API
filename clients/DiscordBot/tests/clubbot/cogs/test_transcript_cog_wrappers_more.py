@@ -11,7 +11,7 @@ from tests.support.settings import build_settings
 from clubbot import _test_hooks
 from clubbot.cogs.base import _Logger
 from clubbot.cogs.transcript import TranscriptCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.transcript.client import TranscriptResult, TranscriptService
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class _ErrorCapturingCog(TranscriptCog):
     def __init__(
         self,
         bot: FakeBot,
-        config: DiscordbotSettings,
+        config: Settings,
         transcript_service: TranscriptService,
         errors: list[str],
     ) -> None:

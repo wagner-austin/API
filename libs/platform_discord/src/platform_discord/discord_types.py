@@ -10,9 +10,6 @@ from typing import Protocol
 
 from platform_discord.embed_helpers import EmbedProto
 
-# Re-export EmbedProto as Embed for backwards compatibility
-Embed = EmbedProto
-
 
 class File(Protocol):
     """Protocol defining the minimal discord.File interface we depend on."""
@@ -28,4 +25,4 @@ class User(Protocol):
     def id(self) -> int: ...
 
 
-__all__ = ["Embed", "EmbedProto", "File", "User"]
+__all__ = ["EmbedProto", "File", "User"]

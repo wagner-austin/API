@@ -5,12 +5,12 @@ import logging
 import pytest
 from tests.support.settings import build_settings
 
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.digits.app import DigitService
 from clubbot.services.handai.client import PredictResult
 
 
-def _cfg(url: str | None, mb: int = 2) -> DiscordbotSettings:
+def _cfg(url: str | None, mb: int = 2) -> Settings:
     return build_settings(
         handwriting_api_url=url,
         handwriting_api_timeout_seconds=5,

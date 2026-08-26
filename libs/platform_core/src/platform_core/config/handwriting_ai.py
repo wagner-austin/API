@@ -16,7 +16,7 @@ DEFAULT_UNCERTAIN_THRESHOLD: Final[float] = 0.7
 DEFAULT_ALLOWED_HOSTS: Final[frozenset[str]] = frozenset()
 
 
-class HandwritingAiAppConfig(TypedDict, total=False):
+class AppConfig(TypedDict, total=False):
     data_root: Path
     artifacts_root: Path
     logs_root: Path
@@ -26,7 +26,7 @@ class HandwritingAiAppConfig(TypedDict, total=False):
     data_bank_api_key: str
 
 
-class HandwritingAiDigitsConfig(TypedDict, total=False):
+class DigitsConfig(TypedDict, total=False):
     model_dir: Path
     seed_root: Path
     active_model: str
@@ -40,18 +40,18 @@ class HandwritingAiDigitsConfig(TypedDict, total=False):
     allowed_hosts: frozenset[str]
 
 
-class HandwritingAiSecurityConfig(TypedDict, total=False):
+class SecurityConfig(TypedDict, total=False):
     api_key: str
     api_key_enabled: bool
 
 
-class HandwritingAiSettings(TypedDict):
-    app: HandwritingAiAppConfig
-    digits: HandwritingAiDigitsConfig
-    security: HandwritingAiSecurityConfig
+class Settings(TypedDict):
+    app: AppConfig
+    digits: DigitsConfig
+    security: SecurityConfig
 
 
-class HandwritingAiLimits(TypedDict):
+class Limits(TypedDict):
     max_bytes: int
     max_side_px: int
 
@@ -67,7 +67,7 @@ def _bool_env(val: str | None, default: bool) -> bool:
     raise ValueError("Invalid boolean value")
 
 
-def _base_settings(create_dirs: bool) -> HandwritingAiSettings:
+def _base_settings(create_dirs: bool) -> Settings:
     data_root = Path(_require_env_str("HANDWRITING_DATA_ROOT")).resolve()
     artifacts_root = Path(_require_env_str("HANDWRITING_ARTIFACTS_ROOT")).resolve()
     logs_root = Path(_require_env_str("HANDWRITING_LOGS_ROOT")).resolve()
@@ -105,7 +105,7 @@ def _base_settings(create_dirs: bool) -> HandwritingAiSettings:
     }
 
 
-def _apply_app_env(app: HandwritingAiAppConfig) -> HandwritingAiAppConfig:
+def _apply_app_env(app: AppConfig) -> AppConfig:
     out = app.copy()
     if (v := _optional_env_str("APP__DATA_ROOT")) is not None:
         out["data_root"] = Path(v).resolve()
@@ -130,7 +130,7 @@ def _apply_app_env(app: HandwritingAiAppConfig) -> HandwritingAiAppConfig:
     return out
 
 
-def _apply_digits_env(digits: HandwritingAiDigitsConfig) -> HandwritingAiDigitsConfig:
+def _apply_digits_env(digits: DigitsConfig) -> DigitsConfig:
     out = digits.copy()
     if (v := _optional_env_str("DIGITS__MODEL_DIR")) is not None:
         out["model_dir"] = Path(v).resolve()
@@ -153,7 +153,7 @@ def _apply_digits_env(digits: HandwritingAiDigitsConfig) -> HandwritingAiDigitsC
     return out
 
 
-def _apply_security_env(sec: HandwritingAiSecurityConfig) -> HandwritingAiSecurityConfig:
+def _apply_security_env(sec: SecurityConfig) -> SecurityConfig:
     out = sec.copy()
     if (v := _optional_env_str("SECURITY__API_KEY")) is not None:
         out["api_key"] = v
@@ -162,7 +162,7 @@ def _apply_security_env(sec: HandwritingAiSecurityConfig) -> HandwritingAiSecuri
     return out
 
 
-def _finalize(settings: HandwritingAiSettings) -> HandwritingAiSettings:
+def _finalize(settings: Settings) -> Settings:
     sec = settings["security"].copy()
     if sec.get("api_key_enabled") is False:
         sec["api_key"] = ""
@@ -173,7 +173,7 @@ def _finalize(settings: HandwritingAiSettings) -> HandwritingAiSettings:
     return {"app": settings["app"], "digits": settings["digits"], "security": sec}
 
 
-def load_handwriting_ai_settings(*, create_dirs: bool = True) -> HandwritingAiSettings:
+def load_settings(*, create_dirs: bool = True) -> Settings:
     """Load handwriting-ai settings from environment variables.
 
     Environment variables:
@@ -197,11 +197,11 @@ def load_handwriting_ai_settings(*, create_dirs: bool = True) -> HandwritingAiSe
     app = _apply_app_env(base["app"])
     digits = _apply_digits_env(base["digits"])
     sec = _apply_security_env(base["security"])
-    after_env: HandwritingAiSettings = {"app": app, "digits": digits, "security": sec}
+    after_env: Settings = {"app": app, "digits": digits, "security": sec}
     return _finalize(after_env)
 
 
-def limits_from_handwriting_ai_settings(settings: HandwritingAiSettings) -> HandwritingAiLimits:
+def limits_from_settings(settings: Settings) -> Limits:
     """Extract image upload limits from settings."""
     digits = settings["digits"]
     max_mb = int(digits.get("max_image_mb", DEFAULT_MAX_IMAGE_MB))
@@ -210,11 +210,11 @@ def limits_from_handwriting_ai_settings(settings: HandwritingAiSettings) -> Hand
 
 
 __all__ = [
-    "HandwritingAiAppConfig",
-    "HandwritingAiDigitsConfig",
-    "HandwritingAiLimits",
-    "HandwritingAiSecurityConfig",
-    "HandwritingAiSettings",
-    "limits_from_handwriting_ai_settings",
-    "load_handwriting_ai_settings",
+    "AppConfig",
+    "DigitsConfig",
+    "Limits",
+    "SecurityConfig",
+    "Settings",
+    "limits_from_settings",
+    "load_settings",
 ]

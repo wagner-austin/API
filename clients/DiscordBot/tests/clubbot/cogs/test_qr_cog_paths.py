@@ -13,7 +13,7 @@ from tests.support.settings import build_settings
 from clubbot import _test_hooks
 from clubbot.cogs.base import _HasIntId
 from clubbot.cogs.qr import QRCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 
 
 class _Logger(Protocol):
@@ -28,7 +28,7 @@ class _QRResult:
 
 
 class _FakeService:
-    def __init__(self, cfg: DiscordbotSettings) -> None:
+    def __init__(self, cfg: Settings) -> None:
         _ = cfg
         self._res = _QRResult()
 
@@ -37,7 +37,7 @@ class _FakeService:
         return self._res
 
 
-def _cfg() -> DiscordbotSettings:
+def _cfg() -> Settings:
     return build_settings(
         qr_default_border=1,
         qr_public_responses=False,
@@ -121,7 +121,7 @@ def test_qr_extract_attr_and_setup() -> None:
             _ = cog
             added["ok"] = True
 
-    def _mk_service(cfg: DiscordbotSettings) -> _test_hooks.QRServiceLike:
+    def _mk_service(cfg: Settings) -> _test_hooks.QRServiceLike:
         return _FakeService(cfg)
 
     original_load = _test_hooks.load_settings

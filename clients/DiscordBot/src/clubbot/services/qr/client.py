@@ -10,7 +10,7 @@ from platform_core.logging import get_logger
 
 from clubbot import _test_hooks
 
-from ...config import DiscordbotSettings
+from ...config import Settings
 
 
 class QRRequestPayload(TypedDict, total=False):
@@ -123,7 +123,7 @@ class _QRHttpClientHelpers:
 class QRService:
     __slots__ = ("_client", "_logger", "cfg")
 
-    def __init__(self, cfg: DiscordbotSettings, client: QRClient | None = None) -> None:
+    def __init__(self, cfg: Settings, client: QRClient | None = None) -> None:
         self.cfg = cfg
         self._client = client
         self._logger = get_logger(__name__)

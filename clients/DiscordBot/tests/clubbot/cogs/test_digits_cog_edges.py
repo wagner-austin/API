@@ -18,7 +18,7 @@ from tests.support.settings import build_settings
 import clubbot.cogs.digits as digits_mod
 from clubbot.cogs.base import _Logger
 from clubbot.cogs.digits import DigitsCog, _format_result, _top_k_indices
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.handai.client import HandwritingAPIError, PredictResult
 
 
@@ -70,7 +70,7 @@ class _InteractionWithResp:
         return self._user
 
 
-def _make_cfg(public: bool = False) -> DiscordbotSettings:
+def _make_cfg(public: bool = False) -> Settings:
     return build_settings(
         qr_public_responses=True,
         digits_public_responses=public,

@@ -10,10 +10,10 @@ from tests.support.settings import build_settings
 
 from clubbot.cogs.base import _Logger
 from clubbot.cogs.trainer import TrainerCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 
 
-def _cfg_with_trainer() -> DiscordbotSettings:
+def _cfg_with_trainer() -> Settings:
     return build_settings(model_trainer_api_url="http://trainer.local", model_trainer_api_key="k")
 
 
@@ -39,7 +39,7 @@ class _ErrorCapturingCog(TrainerCog):
     def __init__(
         self,
         bot: FakeBot,
-        config: DiscordbotSettings,
+        config: Settings,
         errors: list[str],
     ) -> None:
         super().__init__(bot=bot, config=config)

@@ -6,7 +6,7 @@ import pytest
 from tests.support.settings import build_settings
 
 from clubbot import _test_hooks
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.container import ServiceContainer
 from clubbot.orchestrator import BotOrchestrator
 
@@ -19,7 +19,7 @@ async def test_sync_global_respects_disabled_flag() -> None:
         commands_sync_global=False,
     )
 
-    def _test_load_settings() -> DiscordbotSettings:
+    def _test_load_settings() -> Settings:
         return cfg
 
     _test_hooks.load_settings = _test_load_settings

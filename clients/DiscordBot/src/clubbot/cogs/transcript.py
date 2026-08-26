@@ -12,7 +12,7 @@ from platform_discord.protocols import InteractionProto
 from platform_discord.rate_limiter import RateLimiter
 
 from .. import _test_hooks
-from ..config import DiscordbotSettings, load_discordbot_settings
+from ..config import Settings, load_discordbot_settings
 from ..services.transcript.client import TranscriptService
 from .base import BaseCog, BotForSetup, _BotProto
 
@@ -26,7 +26,7 @@ class TranscriptCog(BaseCog):
     def __init__(
         self,
         bot: _BotProto,
-        config: DiscordbotSettings,
+        config: Settings,
         transcript_service: TranscriptService,
         *,
         autostart_subscriber: bool = True,

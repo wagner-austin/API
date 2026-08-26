@@ -11,7 +11,7 @@ from tests.support.discord_recorders import RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot.cogs.digits import DigitsCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 
 
 class FakeEnqueuer:
@@ -47,7 +47,7 @@ class FakeEnqueuer:
         return "job-xyz"
 
 
-def make_cfg(public: bool = False) -> DiscordbotSettings:
+def make_cfg(public: bool = False) -> Settings:
     return build_settings(
         qr_default_border=2,
         qr_public_responses=True,

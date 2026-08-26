@@ -9,11 +9,11 @@ from platform_discord.protocols import wrap_bot
 from tests.conftest import _build_settings
 
 from clubbot.cogs.qr import QRCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.qr.client import QRService
 
 
-def _make_cfg() -> DiscordbotSettings:
+def _make_cfg() -> Settings:
     return _build_settings(qr_default_border=2, qr_api_url="http://localhost:8080")
 
 

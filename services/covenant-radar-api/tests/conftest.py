@@ -91,7 +91,6 @@ def _make_test_settings(tmp_path: Path) -> Settings:
             "data_root": str(data_root),
             "models_root": str(models_root),
             "logs_root": str(logs_root),
-            "active_model_path": str(models_root / "active_xgb.ubj"),
             "ml_backend": "xgboost",
             "active_model_path_xgb": str(models_root / "active_xgb.ubj"),
             "active_model_path_mlp": str(models_root / "active_mlp.pt"),

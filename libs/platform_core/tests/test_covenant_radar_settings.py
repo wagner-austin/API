@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from platform_core.config import CovenantRadarSettings, load_covenant_radar_settings
+from platform_core.config.covenant_radar import Settings, load_settings
 from platform_core.testing import make_fake_env
 
 
@@ -14,7 +14,7 @@ def test_load_covenant_radar_settings_success() -> None:
     env.set("REDIS_URL", "redis://test-redis:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host:5432/db")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     # Verify nested structure
     assert settings["redis"]["url"] == "redis://test-redis:6379/0"
@@ -36,7 +36,7 @@ def test_load_covenant_radar_settings_uses_defaults() -> None:
     env = make_fake_env()
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     # Redis defaults to redis://redis:6379/0
     assert settings["redis"]["url"] == "redis://redis:6379/0"
@@ -53,7 +53,7 @@ def test_load_covenant_radar_settings_requires_database_url() -> None:
     _env = make_fake_env()  # Install fake env but set no vars
 
     with pytest.raises(RuntimeError, match="Missing required env var: DATABASE_URL"):
-        load_covenant_radar_settings()
+        load_settings()
 
 
 def test_load_covenant_radar_settings_rejects_blank_database_url() -> None:
@@ -62,7 +62,7 @@ def test_load_covenant_radar_settings_rejects_blank_database_url() -> None:
     env.set("DATABASE_URL", "   ")
 
     with pytest.raises(RuntimeError, match="Empty env var: DATABASE_URL"):
-        load_covenant_radar_settings()
+        load_settings()
 
 
 def test_load_covenant_radar_settings_custom_app_config() -> None:
@@ -76,7 +76,7 @@ def test_load_covenant_radar_settings_custom_app_config() -> None:
     env.set("APP__ACTIVE_MODEL_PATH_XGB", "/custom/models/my_xgb.ubj")
     env.set("APP__ACTIVE_MODEL_PATH_MLP", "/custom/models/my_mlp.pt")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["app"]["data_root"] == "/custom/data"
     assert settings["app"]["models_root"] == "/custom/models"
@@ -95,7 +95,7 @@ def test_load_covenant_radar_settings_custom_rq_config() -> None:
     env.set("RQ__RESULT_TTL_SEC", "172800")
     env.set("RQ__FAILURE_TTL_SEC", "1209600")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["rq"]["queue_name"] == "custom-queue"
     assert settings["rq"]["job_timeout_sec"] == 7200
@@ -117,7 +117,7 @@ def test_load_covenant_radar_settings_reads_only_the_name_deployment_sets() -> N
     env.set("REDIS_URL", "redis://what-compose-actually-sets:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["redis"]["url"] == "redis://what-compose-actually-sets:6379/0"
 
@@ -129,7 +129,7 @@ def test_load_covenant_radar_settings_prod_env() -> None:
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("APP_ENV", "prod")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["app_env"] == "prod"
 
@@ -142,28 +142,28 @@ def test_load_covenant_radar_settings_logging_levels() -> None:
 
     # Test DEBUG level
     env.set("LOGGING__LEVEL", "DEBUG")
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
     assert settings["logging"]["level"] == "DEBUG"
 
     # Test WARNING level
     env.set("LOGGING__LEVEL", "WARNING")
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
     assert settings["logging"]["level"] == "WARNING"
 
     # Test ERROR level
     env.set("LOGGING__LEVEL", "ERROR")
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
     assert settings["logging"]["level"] == "ERROR"
 
     # Test CRITICAL level
     env.set("LOGGING__LEVEL", "CRITICAL")
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
     assert settings["logging"]["level"] == "CRITICAL"
 
 
 def test_covenant_radar_settings_is_typed_dict() -> None:
-    """Test CovenantRadarSettings is a proper TypedDict."""
-    annotations = CovenantRadarSettings.__annotations__
+    """Test Settings is a proper TypedDict."""
+    annotations = Settings.__annotations__
     assert "redis" in annotations
     assert "database_url" in annotations
     assert "app" in annotations
@@ -180,7 +180,7 @@ def test_load_covenant_radar_settings_mlp_backend() -> None:
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("APP__ML_BACKEND", "mlp")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["app"]["ml_backend"] == "mlp"
     assert settings["app"]["active_model_path_xgb"] == "/data/models/active_xgb.ubj"
@@ -194,7 +194,7 @@ def test_load_covenant_radar_settings_lstm_backend() -> None:
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("APP__ML_BACKEND", "lstm")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["app"]["ml_backend"] == "lstm"
 
@@ -206,7 +206,7 @@ def test_load_covenant_radar_settings_lightgbm_backend() -> None:
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("APP__ML_BACKEND", "lightgbm")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["app"]["ml_backend"] == "lightgbm"
 
@@ -221,7 +221,7 @@ def test_load_covenant_radar_settings_invalid_backend_raises() -> None:
     env.set("APP__ML_BACKEND", "invalid_backend")
 
     with pytest.raises(ValueError, match="must be 'xgboost', 'mlp', 'lstm', or 'lightgbm'"):
-        load_covenant_radar_settings()
+        load_settings()
 
 
 def test_load_covenant_radar_settings_datadog_defaults() -> None:
@@ -229,7 +229,7 @@ def test_load_covenant_radar_settings_datadog_defaults() -> None:
     env = make_fake_env()
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["datadog"]["enabled"] is False
     assert settings["datadog"]["service"] == "covenant-radar-api"
@@ -252,7 +252,7 @@ def test_load_covenant_radar_settings_datadog_custom() -> None:
     env.set("DATADOG__DOGSTATSD_PORT", "9125")
     env.set("DATADOG__TRACE_ENABLED", "false")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["datadog"]["enabled"] is True
     assert settings["datadog"]["service"] == "my-service"
@@ -269,7 +269,7 @@ def test_load_covenant_radar_settings_datadog_staging_env() -> None:
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("DATADOG__ENV", "staging")
 
-    settings = load_covenant_radar_settings()
+    settings = load_settings()
 
     assert settings["datadog"]["env"] == "staging"
 
@@ -282,4 +282,4 @@ def test_load_covenant_radar_settings_datadog_invalid_env_raises() -> None:
     env.set("DATADOG__ENV", "invalid_env")
 
     with pytest.raises(ValueError, match="must be 'dev', 'staging', or 'production'"):
-        load_covenant_radar_settings()
+        load_settings()

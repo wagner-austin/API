@@ -11,11 +11,12 @@ from platform_core.config import config_test_hooks
 from platform_core.data_bank_client import DataBankClientError, HeadInfo, NotFoundError
 from platform_core.testing import make_fake_env
 from platform_core.turkic_jobs import turkic_job_key
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeQueue, FakeRedis
 
 from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
-from turkic_api.api.main import RedisCombinedProtocol, create_app
+from turkic_api.api.main import create_app
 from turkic_api.api.models import parse_job_status_json
 from turkic_api.api.types import QueueProtocol
 
@@ -81,7 +82,7 @@ def _make_client(tmp_path: Path) -> tuple[TestClient, FakeRedis]:
     r = FakeRedis()
     q = FakeQueue()
 
-    def _redis_provider(settings: Settings) -> RedisCombinedProtocol:
+    def _redis_provider(settings: Settings) -> RedisStrProto:
         return r
 
     def _queue_provider() -> QueueProtocol:
@@ -224,7 +225,7 @@ def test_job_result_data_bank_config_missing(tmp_path: Path) -> None:
     r = FakeRedis()
     q = FakeQueue()
 
-    def _redis_provider(settings: Settings) -> RedisCombinedProtocol:
+    def _redis_provider(settings: Settings) -> RedisStrProto:
         return r
 
     def _queue_provider() -> QueueProtocol:

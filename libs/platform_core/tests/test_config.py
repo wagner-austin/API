@@ -16,10 +16,10 @@ from platform_core.config import (
     _parse_str,
     _require_env_csv,
     _require_env_str,
-    load_art_trainer_settings,
-    load_data_bank_settings,
-    load_turkic_api_settings,
 )
+from platform_core.config.art_trainer import load_settings as load_art_trainer_settings
+from platform_core.config.data_bank import load_settings as load_data_bank_settings
+from platform_core.config.turkic_api import load_settings as load_turkic_api_settings
 from platform_core.json_utils import JSONValue
 from platform_core.testing import make_fake_env
 

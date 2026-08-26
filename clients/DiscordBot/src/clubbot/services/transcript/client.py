@@ -8,7 +8,7 @@ from platform_core.json_utils import JSONValue, load_json_str
 from platform_core.logging import get_logger
 
 from ... import _test_hooks
-from ...config import DiscordbotSettings
+from ...config import Settings
 
 
 class TranscriptResult:
@@ -47,7 +47,7 @@ class _TranscriptPayload(TypedDict, total=True):
 class TranscriptService:
     __slots__ = ("_client", "_logger", "_preferred_langs", "_timeout", "cfg")
 
-    def __init__(self, cfg: DiscordbotSettings, client: HttpxClient | None = None) -> None:
+    def __init__(self, cfg: Settings, client: HttpxClient | None = None) -> None:
         provider = cfg["transcript"]["provider"]
         base_url = cfg["transcript"]["api_url"]
         if provider != "api":

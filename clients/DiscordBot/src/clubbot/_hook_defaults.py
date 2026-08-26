@@ -12,8 +12,8 @@ import urllib.parse as _url
 
 from discord.abc import Snowflake as DiscordSnowflake
 from discord.app_commands import AppCommand
-from platform_core.config import DiscordbotSettings
-from platform_core.config import load_discordbot_settings as _real_load_discordbot_settings
+from platform_core.config.discordbot import Settings
+from platform_core.config.discordbot import load_settings as _real_load_discordbot_settings
 from platform_core.http_client import HttpxAsyncClient, HttpxClient
 from platform_core.http_client import build_async_client as _real_build_async_client
 from platform_core.http_client import build_client as _real_build_client
@@ -58,7 +58,7 @@ async def _default_bot_fetch_user(bot: BotProto, user_id: int) -> FetchedUserLik
     return await bot.fetch_user(user_id)
 
 
-def _default_qr_service_factory(cfg: DiscordbotSettings) -> QRServiceLike:
+def _default_qr_service_factory(cfg: Settings) -> QRServiceLike:
     """Production implementation - creates QRService."""
     from clubbot.services.qr.client import QRService
 
@@ -116,7 +116,7 @@ def _default_get_service_registry() -> dict[str, ServiceDef]:
     return SERVICE_REGISTRY
 
 
-def _default_load_settings() -> DiscordbotSettings:
+def _default_load_settings() -> Settings:
     """Production implementation - loads settings from environment."""
     return _real_load_discordbot_settings()
 

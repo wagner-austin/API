@@ -5,7 +5,7 @@ import time
 import discord
 from discord import app_commands
 
-from ..config import DiscordbotSettings, load_discordbot_settings
+from ..config import Settings, load_discordbot_settings
 from .base import BaseCog, BotForSetup, _BotProto
 
 
@@ -16,7 +16,7 @@ class ExampleCog(BaseCog):
       bot.load_extension("clubbot.cogs.example")
     """
 
-    def __init__(self, bot: _BotProto, config: DiscordbotSettings) -> None:
+    def __init__(self, bot: _BotProto, config: Settings) -> None:
         super().__init__()
         self.bot = bot
         self.config = config

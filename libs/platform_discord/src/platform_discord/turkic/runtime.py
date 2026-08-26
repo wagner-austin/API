@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from platform_discord.discord_types import Embed as _Embed
+from platform_discord.discord_types import EmbedProto as _Embed
 
 from .embeds import build_turkic_embed
 from .types import JobConfig, JobProgress, JobResult

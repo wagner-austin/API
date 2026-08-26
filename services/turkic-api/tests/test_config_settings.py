@@ -6,7 +6,7 @@ import pytest
 from platform_core.config import config_test_hooks
 from platform_core.testing import make_fake_env
 
-from turkic_api.api.config import settings_from_env
+from turkic_api.api.config import load_settings
 
 
 def test_missing_api_key_raises() -> None:
@@ -22,7 +22,7 @@ def test_missing_api_key_raises() -> None:
     config_test_hooks.get_env = env
 
     with pytest.raises(RuntimeError):
-        settings_from_env()
+        load_settings()
 
 
 def test_defaults_and_overrides() -> None:
@@ -35,7 +35,7 @@ def test_defaults_and_overrides() -> None:
     )
     config_test_hooks.get_env = env
 
-    cfg = settings_from_env()
+    cfg = load_settings()
     assert cfg["redis_url"] == "redis://redis:6379/0"
     assert cfg["data_dir"] == "/data"
     assert cfg["environment"] == "local"
@@ -51,5 +51,5 @@ def test_defaults_and_overrides() -> None:
     )
     config_test_hooks.get_env = env_with_override
 
-    cfg2 = settings_from_env()
+    cfg2 = load_settings()
     assert cfg2["redis_url"] == "redis://override"

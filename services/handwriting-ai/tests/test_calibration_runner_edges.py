@@ -11,7 +11,7 @@ from PIL import Image
 from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import CalibrationRunnerResultDict
-from handwriting_ai.training.calibration._types import CandidateDict
+from handwriting_ai.training.calibration._types import Candidate
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
 from handwriting_ai.training.calibration.runner import (
@@ -66,7 +66,7 @@ def test_child_entry_emits_logs_and_writes_result(tmp_path: Path) -> None:
 
     def _fake_measure_candidate_internal(
         ds: PreprocessDatasetProtocol,
-        cand: CandidateDict,
+        cand: Candidate,
         samples: int,
         on_improvement: Callable[[CalibrationRunnerResultDict], None] | None,
         *,
@@ -167,7 +167,7 @@ def test_child_entry_handler_without_flush(tmp_path: Path) -> None:
 
     def _fake_measure_candidate_internal(
         ds: PreprocessDatasetProtocol,
-        cand: CandidateDict,
+        cand: Candidate,
         samples: int,
         on_improvement: Callable[[CalibrationRunnerResultDict], None] | None,
         *,

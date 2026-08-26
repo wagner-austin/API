@@ -344,9 +344,9 @@ def test_openai_captioner_integration_real_api(tmp_path: Path) -> None:
     This test calls the real OpenAI API without hooks.
     Requires OPENAI_API_KEY in settings.
     """
-    from platform_core.config.art_trainer import load_art_trainer_settings
+    from platform_core.config.art_trainer import load_settings
 
-    settings = load_art_trainer_settings()
+    settings = load_settings()
     api_key = settings["app"]["openai_api_key"]
     if not api_key:
         pytest.skip("OPENAI_API_KEY not set in settings")

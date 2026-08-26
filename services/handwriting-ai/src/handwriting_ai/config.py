@@ -3,28 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Final
 
-from platform_core.config import (
-    HandwritingAiAppConfig as AppConfig,
-)
-from platform_core.config import (
-    HandwritingAiDigitsConfig as DigitsConfig,
-)
-from platform_core.config import (
-    HandwritingAiLimits as Limits,
-)
-from platform_core.config import (
-    HandwritingAiSecurityConfig as SecurityConfig,
-)
-from platform_core.config import (
-    HandwritingAiSettings as Settings,
-)
-from platform_core.config import (
-    limits_from_handwriting_ai_settings as limits_from_settings,
-)
-from platform_core.config import (
-    load_handwriting_ai_settings,
-)
 from platform_core.config._utils import _EnvError
+from platform_core.config.handwriting_ai import AppConfig as AppConfig
+from platform_core.config.handwriting_ai import DigitsConfig as DigitsConfig
+from platform_core.config.handwriting_ai import Limits as Limits
+from platform_core.config.handwriting_ai import SecurityConfig as SecurityConfig
+from platform_core.config.handwriting_ai import Settings as Settings
+from platform_core.config.handwriting_ai import limits_from_settings as limits_from_settings
+from platform_core.config.handwriting_ai import load_settings as _load_platform_settings
 from platform_core.config.handwriting_ai import (
     DEFAULT_ALLOWED_HOSTS,
     DEFAULT_MAX_IMAGE_MB,
@@ -126,7 +112,7 @@ def ensure_settings(settings: Settings, *, create_dirs: bool) -> Settings:
 def load_settings(*, create_dirs: bool = True) -> Settings:
     """Load settings via shared platform_core config helpers with safe fallback."""
     try:
-        base = load_handwriting_ai_settings(create_dirs=create_dirs)
+        base = _load_platform_settings(create_dirs=create_dirs)
     except _EnvError:
         get_logger("handwriting_ai").warning("env_settings_missing_using_default")
         base_default = _default_settings(create_dirs=create_dirs)

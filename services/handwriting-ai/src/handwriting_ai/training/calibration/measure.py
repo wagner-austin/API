@@ -14,7 +14,7 @@ from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import BatchIterableProtocol, DataLoaderConfigProtocol
 from handwriting_ai.monitoring import is_cgroup_available
-from handwriting_ai.training.calibration._types import CalibrationResultDict
+from handwriting_ai.training.calibration._types import CalibrationResult as CalibrationResult
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.dataset import DataLoaderConfig, PreprocessDataset
 from handwriting_ai.training.optim import (
@@ -45,7 +45,6 @@ class _BatchIterable(Protocol):
 
 # CalibrationResult is imported from _types to avoid circular imports.
 # Re-export for backwards compatibility.
-CalibrationResult = CalibrationResultDict
 
 
 # Cache a single calibration model per process to avoid repeated large

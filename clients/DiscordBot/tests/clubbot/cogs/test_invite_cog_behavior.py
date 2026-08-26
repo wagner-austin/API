@@ -9,10 +9,10 @@ from tests.support.discord_recorders import RecordedSend, RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot.cogs.invite import InviteCog, _resolve_app_id
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 
 
-def _cfg() -> DiscordbotSettings:
+def _cfg() -> Settings:
     return build_settings(qr_public_responses=True)
 
 

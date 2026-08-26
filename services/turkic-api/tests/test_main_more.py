@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis, FakeRedisError
 
 from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
-from turkic_api.api.main import RedisCombinedProtocol, create_app
+from turkic_api.api.main import create_app
 from turkic_api.api.types import JSONValue, QueueProtocol, RQJobLike, RQRetryLike, _EnqCallable
 
 
@@ -36,7 +37,7 @@ def _clear_captured_redis() -> None:
     _captured_redis.clear()
 
 
-def _redis_provider_stub(settings: Settings) -> RedisCombinedProtocol:
+def _redis_provider_stub(settings: Settings) -> RedisStrProto:
     r = FakeRedis()
     _captured_redis.append(r)
     return r
@@ -62,7 +63,7 @@ def test_get_job_result_404() -> None:
 def test_readyz_handles_redis_error() -> None:
     captured_err: list[FakeRedisError] = []
 
-    def _redis_err_provider(settings: Settings) -> RedisCombinedProtocol:
+    def _redis_err_provider(settings: Settings) -> RedisStrProto:
         r = FakeRedisError()
         captured_err.append(r)
         return r

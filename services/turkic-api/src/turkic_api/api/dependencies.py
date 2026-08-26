@@ -10,7 +10,7 @@ from platform_workers.redis import RedisStrProto, redis_raw_for_rq
 from platform_workers.rq_harness import RQClientQueue, rq_queue
 
 from turkic_api import _test_hooks
-from turkic_api.api.config import Settings, settings_from_env
+from turkic_api.api.config import Settings, load_settings
 from turkic_api.api.types import (
     JSONValue,
     LoggerProtocol,
@@ -23,7 +23,7 @@ from turkic_api.api.types import (
 
 def get_settings() -> Settings:
     """Dependency: typed application settings from environment."""
-    return settings_from_env()
+    return load_settings()
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]

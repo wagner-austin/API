@@ -13,7 +13,7 @@ from typing import Protocol
 import discord
 from discord.abc import Snowflake as DiscordSnowflake
 from discord.app_commands import AppCommand
-from platform_core.config import DiscordbotSettings
+from platform_core.config.discordbot import Settings
 from platform_discord.protocols import (
     BotProto,
     InteractionProto,
@@ -44,7 +44,7 @@ class QRServiceLike(Protocol):
 class QRServiceFactoryProtocol(Protocol):
     """Protocol for QR service factory."""
 
-    def __call__(self, cfg: DiscordbotSettings) -> QRServiceLike:
+    def __call__(self, cfg: Settings) -> QRServiceLike:
         """Create a QR service from config."""
         ...
 

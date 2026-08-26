@@ -3,20 +3,18 @@ from __future__ import annotations
 import torch
 
 from handwriting_ai import _test_hooks
-from handwriting_ai._hook_protocols_training import EffectiveConfigDict
+from handwriting_ai._hook_protocols_training import EffectiveConfig as EffectiveConfig
 
 from .dataset import DataLoaderConfig
 from .resources import ResourceLimits
 from .train_config import TrainConfig
 
-# EffectiveConfig is now an alias to the canonical EffectiveConfigDict
 # to avoid duplication and ensure consistent types across the codebase.
-EffectiveConfig = EffectiveConfigDict
 
 
 def build_effective_config(
     cfg: TrainConfig,
-) -> tuple[EffectiveConfigDict, ResourceLimits]:
+) -> tuple[EffectiveConfig, ResourceLimits]:
     limits = _test_hooks.detect_resource_limits()
     eff_threads = int(cfg["threads"]) if int(cfg["threads"]) > 0 else int(limits["optimal_threads"])
     # Clamp threads further under low-memory conditions to reduce allocator pressure
@@ -54,7 +52,7 @@ def build_effective_config(
     }, limits
 
 
-def apply_threads(ec: EffectiveConfigDict) -> None:
+def apply_threads(ec: EffectiveConfig) -> None:
     # Apply intra-op threads post-calibration; interop is set once before any parallel work
     torch.set_num_threads(int(ec["intra_threads"]))
 

@@ -11,11 +11,11 @@ from tests.support.discord_recorders import RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot.cogs.qr import QRCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.qr.client import QRClient, QRRequestPayload, QRResult, QRService
 
 
-def make_cfg(per: int = 1000, window: int = 1) -> DiscordbotSettings:
+def make_cfg(per: int = 1000, window: int = 1) -> Settings:
     return build_settings(
         qr_rate_limit=per,
         qr_rate_window_seconds=window,
@@ -30,7 +30,7 @@ class _QRResult(QRResult):
 
 
 class SlowQRService(QRService):
-    def __init__(self, cfg: DiscordbotSettings, delay: float = 0.1) -> None:
+    def __init__(self, cfg: Settings, delay: float = 0.1) -> None:
         super().__init__(cfg)
         self.delay = delay
 

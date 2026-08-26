@@ -14,7 +14,7 @@ from platform_discord.protocols import InteractionProto, UserProto
 from platform_discord.rate_limiter import RateLimiter
 
 from .. import _test_hooks
-from ..config import DiscordbotSettings
+from ..config import Settings
 from ..services.digits.app import DigitService
 from ..services.handai.client import HandwritingAPIError, PredictResult
 from ..services.jobs.digits_enqueuer import DigitsEnqueuer
@@ -35,7 +35,7 @@ class DigitsCog(BaseCog):
     def __init__(
         self,
         bot: _BotProto,
-        config: DiscordbotSettings,
+        config: Settings,
         service: DigitService,
         enqueuer: DigitsEnqueuer | None = None,
         *,

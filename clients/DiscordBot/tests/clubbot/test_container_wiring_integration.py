@@ -6,7 +6,7 @@ from discord.ext import commands
 from tests.support.settings import build_settings
 
 from clubbot import _test_hooks
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.container import ServiceContainer
 
 
@@ -18,7 +18,7 @@ async def test_container_wires_real_cogs() -> None:
         transcript_api_url="http://localhost:8000",
     )
 
-    def _test_load_settings() -> DiscordbotSettings:
+    def _test_load_settings() -> Settings:
         return cfg
 
     _test_hooks.load_settings = _test_load_settings

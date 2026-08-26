@@ -8,7 +8,7 @@ from discord.ext import commands
 from tests.support.settings import build_settings
 
 from clubbot import _test_hooks
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.container import ServiceContainer
 from clubbot.services.jobs.digits_enqueuer import DigitsEnqueuer
 
@@ -42,7 +42,7 @@ async def test_container_digits_wiring() -> None:
         redis_url="redis://fake",
     )
 
-    def _test_load_settings() -> DiscordbotSettings:
+    def _test_load_settings() -> Settings:
         return cfg
 
     _test_hooks.load_settings = _test_load_settings

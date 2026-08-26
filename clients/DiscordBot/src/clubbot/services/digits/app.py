@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from ...config import DiscordbotSettings
+from ...config import Settings
 from ..handai.client import HandwritingClient, HandwritingReader, PredictResult
 
 
@@ -14,7 +14,7 @@ class DigitServiceConfig(TypedDict):
 
 
 class DigitService:
-    def __init__(self, cfg: DiscordbotSettings, client: HandwritingReader | None = None) -> None:
+    def __init__(self, cfg: Settings, client: HandwritingReader | None = None) -> None:
         if not cfg["handwriting"]["api_url"]:
             raise RuntimeError("HANDWRITING_API_URL is not configured")
         self._client: HandwritingReader = client or HandwritingClient(

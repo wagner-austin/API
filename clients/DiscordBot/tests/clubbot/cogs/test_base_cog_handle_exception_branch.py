@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 import pytest
-from platform_discord.discord_types import Embed
+from platform_discord.discord_types import EmbedProto
 from platform_discord.protocols import (
     FileProto,
     FollowupProto,
@@ -30,7 +30,7 @@ class _ResponseWithTracking:
         self,
         content: str | None = None,
         *,
-        embed: Embed | None = None,
+        embed: EmbedProto | None = None,
         ephemeral: bool = False,
     ) -> None:
         self.sent.append((content, ephemeral))
@@ -49,7 +49,7 @@ class _FollowupWithTracking:
         self,
         content: str | None = None,
         *,
-        embed: Embed | None = None,
+        embed: EmbedProto | None = None,
         file: FileProto | None = None,
         ephemeral: bool = False,
     ) -> MessageProto:

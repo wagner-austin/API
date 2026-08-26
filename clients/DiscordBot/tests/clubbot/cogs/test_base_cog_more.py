@@ -5,7 +5,7 @@ import logging
 
 import discord
 import pytest
-from platform_discord.discord_types import Embed, File
+from platform_discord.discord_types import EmbedProto, File
 from platform_discord.protocols import (
     FileProto,
     FollowupProto,
@@ -33,7 +33,7 @@ class _ResponseWithSent:
         self,
         content: str | None = None,
         *,
-        embed: Embed | None = None,
+        embed: EmbedProto | None = None,
         ephemeral: bool = False,
     ) -> None:
         if self._raise:
@@ -54,7 +54,7 @@ class _FollowupWithSent:
         self,
         content: str | None = None,
         *,
-        embed: Embed | None = None,
+        embed: EmbedProto | None = None,
         file: FileProto | None = None,
         ephemeral: bool = False,
     ) -> MessageProto:
@@ -177,7 +177,7 @@ async def test_dm_file_success_path() -> None:
             self,
             content: str | None = None,
             *,
-            embed: Embed | None = None,
+            embed: EmbedProto | None = None,
             file: File | None = None,
         ) -> MessageProto:
             self.sent.append((content, file))

@@ -12,9 +12,9 @@ from handwriting_ai._hook_protocols_training import (
     OrchestratorProtocol,
 )
 from handwriting_ai.training.calibration._types import (
-    CalibrationResultDict,
-    CandidateDict,
-    OrchestratorConfigDict,
+    CalibrationResult,
+    Candidate,
+    OrchestratorConfig,
 )
 from handwriting_ai.training.calibration.calibrator import calibrate_input_pipeline as _cal
 from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
@@ -52,11 +52,11 @@ def _make_snapshot(limit_bytes: int) -> MemorySnapshotDict:
 
 
 def test_calibrator_low_mem_branch() -> None:
-    captured: list[OrchestratorConfigDict] = []
+    captured: list[OrchestratorConfig] = []
 
     class _Orch:
         def __init__(
-            self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+            self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
         ) -> None:
             _ = runner
             captured.append(config)
@@ -64,9 +64,9 @@ def test_calibrator_low_mem_branch() -> None:
         def run_stage_a(
             self,
             ds: PreprocessDatasetProtocol | PreprocessSpec,
-            cands: list[CandidateDict],
+            cands: list[Candidate],
             samples: int,
-        ) -> list[CalibrationResultDict]:
+        ) -> list[CalibrationResult]:
             _ = (ds, samples)
             return [
                 {
@@ -83,14 +83,14 @@ def test_calibrator_low_mem_branch() -> None:
         def run_stage_b(
             self,
             ds: PreprocessDatasetProtocol | PreprocessSpec,
-            shortlist: list[CalibrationResultDict],
+            shortlist: list[CalibrationResult],
             samples: int,
-        ) -> list[CalibrationResultDict]:
+        ) -> list[CalibrationResult]:
             _ = (ds, samples)
             return shortlist
 
     def _orch_factory(
-        *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+        *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
     ) -> OrchestratorProtocol:
         return _Orch(runner=runner, config=config)
 
@@ -141,11 +141,11 @@ def test_calibrator_low_mem_branch() -> None:
 
 
 def test_calibrator_high_mem_branch() -> None:
-    captured: list[OrchestratorConfigDict] = []
+    captured: list[OrchestratorConfig] = []
 
     class _Orch:
         def __init__(
-            self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+            self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
         ) -> None:
             _ = runner
             captured.append(config)
@@ -153,11 +153,11 @@ def test_calibrator_high_mem_branch() -> None:
         def run_stage_a(
             self,
             ds: PreprocessDatasetProtocol | PreprocessSpec,
-            cands: list[CandidateDict],
+            cands: list[Candidate],
             samples: int,
-        ) -> list[CalibrationResultDict]:
+        ) -> list[CalibrationResult]:
             _ = (ds, samples)
-            out: list[CalibrationResultDict] = []
+            out: list[CalibrationResult] = []
             for c in cands:
                 out.append(
                     {
@@ -174,14 +174,14 @@ def test_calibrator_high_mem_branch() -> None:
         def run_stage_b(
             self,
             ds: PreprocessDatasetProtocol | PreprocessSpec,
-            shortlist: list[CalibrationResultDict],
+            shortlist: list[CalibrationResult],
             samples: int,
-        ) -> list[CalibrationResultDict]:
+        ) -> list[CalibrationResult]:
             _ = (ds, samples)
             return shortlist
 
     def _orch_factory(
-        *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+        *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
     ) -> OrchestratorProtocol:
         return _Orch(runner=runner, config=config)
 

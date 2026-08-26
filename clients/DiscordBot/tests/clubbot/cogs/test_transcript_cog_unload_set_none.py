@@ -7,14 +7,14 @@ from tests.support.discord_fakes import FakeBot
 from tests.support.settings import build_settings
 
 from clubbot.cogs.transcript import TranscriptCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.transcript.client import TranscriptResult, TranscriptService
 
 logger = logging.getLogger(__name__)
 
 
 class _FakeTranscriptService(TranscriptService):
-    def __init__(self, cfg: DiscordbotSettings) -> None:
+    def __init__(self, cfg: Settings) -> None:
         super().__init__(cfg)
 
     def fetch_cleaned(self, url: str) -> TranscriptResult:

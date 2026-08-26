@@ -13,7 +13,7 @@ from __future__ import annotations
 import urllib.parse as _url
 from typing import Protocol
 
-from platform_core.config import DiscordbotSettings
+from platform_core.config.discordbot import Settings
 from platform_core.http_client import HttpxAsyncClient, HttpxClient, Timeout
 from platform_core.logging import LogFormat, LogLevel
 from platform_discord.protocols import (
@@ -29,7 +29,7 @@ from platform_workers.rq_harness import (
 class LoadSettingsProtocol(Protocol):
     """Protocol for settings loader function."""
 
-    def __call__(self) -> DiscordbotSettings:
+    def __call__(self) -> Settings:
         """Load and return settings."""
         ...
 
@@ -158,7 +158,7 @@ class SetupLoggingProtocol(Protocol):
 class ServiceContainerProtocol(Protocol):
     """Protocol for ServiceContainer - minimal interface for settings access."""
 
-    cfg: DiscordbotSettings
+    cfg: Settings
 
 
 class BotOrchestratorProtocol(Protocol):

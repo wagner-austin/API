@@ -10,7 +10,7 @@ from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.logging import setup_logging
 from platform_core.request_context import install_request_id_middleware
 
-from ..core.config import Settings, settings_from_env
+from ..core.config import Settings, load_settings
 from ..core.container import ServiceContainer
 from ..integrations.datadog.tracing import setup_datadog_tracing
 from .error_handlers import install_covenant_error_handlers
@@ -33,7 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     Returns:
         Configured FastAPI application instance.
     """
-    cfg = settings or settings_from_env()
+    cfg = settings or load_settings()
 
     # Setup Datadog tracing BEFORE anything else (per ddtrace requirements)
     # This must happen before other imports to ensure auto-instrumentation works

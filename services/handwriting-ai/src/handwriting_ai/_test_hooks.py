@@ -229,7 +229,7 @@ from handwriting_ai._hook_protocols_training import (
 from handwriting_ai._hook_protocols_training import (
     DataLoaderConfigProtocol as DataLoaderConfigProtocol,
 )
-from handwriting_ai._hook_protocols_training import EffectiveConfigDict as EffectiveConfigDict
+from handwriting_ai._hook_protocols_training import EffectiveConfig as EffectiveConfig
 from handwriting_ai._hook_protocols_training import MemorySnapshotDict as MemorySnapshotDict
 from handwriting_ai._hook_protocols_training import (
     MultiprocessingChildProtocol as MultiprocessingChildProtocol,

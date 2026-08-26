@@ -4,7 +4,7 @@ import logging
 from typing import NoReturn
 
 import pytest
-from platform_discord.discord_types import Embed, File
+from platform_discord.discord_types import EmbedProto, File
 from platform_discord.protocols import MessageProto, UserProto
 from tests.support.discord_fakes import FakeMessage
 
@@ -23,7 +23,7 @@ class _OkUser:
         self,
         content: str | None = None,
         *,
-        embed: Embed | None = None,
+        embed: EmbedProto | None = None,
         file: File | None = None,
     ) -> MessageProto:
         if content is not None:

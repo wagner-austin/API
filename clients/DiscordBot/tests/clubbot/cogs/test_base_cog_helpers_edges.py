@@ -6,7 +6,7 @@ from typing import NoReturn
 
 import discord
 import pytest
-from platform_discord.discord_types import Embed, File
+from platform_discord.discord_types import EmbedProto, File
 from platform_discord.protocols import (
     FileProto,
     FollowupProto,
@@ -36,7 +36,7 @@ class _ResponseForDefer:
         self,
         content: str | None = None,
         *,
-        embed: Embed | None = None,
+        embed: EmbedProto | None = None,
         ephemeral: bool = False,
     ) -> None:
         return None
@@ -49,7 +49,7 @@ class _FollowupStub:
         self,
         content: str | None = None,
         *,
-        embed: Embed | None = None,
+        embed: EmbedProto | None = None,
         file: FileProto | None = None,
         ephemeral: bool = False,
     ) -> MessageProto:
@@ -97,7 +97,7 @@ class _UserNoSend:
         self,
         content: str | None = None,
         *,
-        embed: Embed | None = None,
+        embed: EmbedProto | None = None,
         file: File | None = None,
     ) -> NoReturn:
         raise RuntimeError("User has no send")

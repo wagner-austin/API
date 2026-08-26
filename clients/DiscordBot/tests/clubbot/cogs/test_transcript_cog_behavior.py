@@ -8,14 +8,14 @@ from tests.support.discord_recorders import RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot.cogs.transcript import TranscriptCog
-from clubbot.config import DiscordbotSettings
+from clubbot.config import Settings
 from clubbot.services.transcript.client import TranscriptResult, TranscriptService
 
 
 class FakeTranscriptService(TranscriptService):
     def __init__(
         self,
-        cfg: DiscordbotSettings,
+        cfg: Settings,
         *,
         text: str = "hello world",
         vid: str = "dQw4w9WgXcQ",
@@ -32,7 +32,7 @@ class FakeTranscriptService(TranscriptService):
         )
 
 
-def make_cfg() -> DiscordbotSettings:
+def make_cfg() -> Settings:
     return build_settings(
         qr_default_border=2,
         qr_public_responses=True,

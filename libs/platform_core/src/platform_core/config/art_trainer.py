@@ -17,7 +17,7 @@ from ._utils import (
 )
 
 
-class ArtTrainerLoggingConfig(TypedDict, total=True):
+class LoggingConfig(TypedDict, total=True):
     """Logging configuration for Art-Trainer.
 
     Attributes:
@@ -27,7 +27,7 @@ class ArtTrainerLoggingConfig(TypedDict, total=True):
     level: LogLevel
 
 
-class ArtTrainerRedisConfig(TypedDict, total=True):
+class RedisConfig(TypedDict, total=True):
     """Redis configuration for Art-Trainer.
 
     Attributes:
@@ -39,7 +39,7 @@ class ArtTrainerRedisConfig(TypedDict, total=True):
     url: str
 
 
-class ArtTrainerRQConfig(TypedDict, total=True):
+class RQConfig(TypedDict, total=True):
     """RQ (Redis Queue) configuration for Art-Trainer.
 
     Attributes:
@@ -59,7 +59,7 @@ class ArtTrainerRQConfig(TypedDict, total=True):
     retry_intervals_sec: str
 
 
-class ArtTrainerAppConfig(TypedDict, total=True):
+class AppConfig(TypedDict, total=True):
     """Application configuration for Art-Trainer.
 
     Attributes:
@@ -89,7 +89,7 @@ class ArtTrainerAppConfig(TypedDict, total=True):
     openai_api_key: str
 
 
-class ArtTrainerSecurityConfig(TypedDict, total=True):
+class SecurityConfig(TypedDict, total=True):
     """Security configuration for Art-Trainer.
 
     Attributes:
@@ -99,7 +99,7 @@ class ArtTrainerSecurityConfig(TypedDict, total=True):
     api_key: str
 
 
-class ArtTrainerSettings(TypedDict, total=True):
+class Settings(TypedDict, total=True):
     """Complete settings for Art-Trainer service.
 
     Attributes:
@@ -112,18 +112,18 @@ class ArtTrainerSettings(TypedDict, total=True):
     """
 
     app_env: Literal["dev", "prod"]
-    logging: ArtTrainerLoggingConfig
-    redis: ArtTrainerRedisConfig
-    rq: ArtTrainerRQConfig
-    app: ArtTrainerAppConfig
-    security: ArtTrainerSecurityConfig
+    logging: LoggingConfig
+    redis: RedisConfig
+    rq: RQConfig
+    app: AppConfig
+    security: SecurityConfig
 
 
-def load_art_trainer_settings() -> ArtTrainerSettings:
+def load_settings() -> Settings:
     """Load Art-Trainer settings from environment variables.
 
     Returns:
-        Complete ArtTrainerSettings TypedDict.
+        Complete Settings TypedDict.
     """
     level_str = _parse_str("LOGGING__LEVEL", "INFO")
     level: LogLevel = "INFO"
@@ -138,16 +138,16 @@ def load_art_trainer_settings() -> ArtTrainerSettings:
     elif level_str == "CRITICAL":
         level = "CRITICAL"
 
-    logging_cfg: ArtTrainerLoggingConfig = {
+    logging_cfg: LoggingConfig = {
         "level": level,
     }
 
-    redis_cfg: ArtTrainerRedisConfig = {
+    redis_cfg: RedisConfig = {
         "enabled": _parse_bool("REDIS__ENABLED", True),
         "url": _parse_str("REDIS__URL", "redis://redis:6379/0"),
     }
 
-    rq_cfg: ArtTrainerRQConfig = {
+    rq_cfg: RQConfig = {
         "queue_name": _parse_str("RQ__QUEUE_NAME", "art-trainer"),
         "job_timeout_sec": _parse_int("RQ__JOB_TIMEOUT_SEC", 86_400),
         "result_ttl_sec": _parse_int("RQ__RESULT_TTL_SEC", 86_400),
@@ -160,7 +160,7 @@ def load_art_trainer_settings() -> ArtTrainerSettings:
     direct_url = _parse_str("APP__DATA_BANK_API_URL", "")
     data_bank_url = f"{gateway_url}/data-bank" if gateway_url else direct_url
 
-    app_cfg: ArtTrainerAppConfig = {
+    app_cfg: AppConfig = {
         "data_root": _parse_str("APP__DATA_ROOT", "/data"),
         "output_root": _parse_str("APP__OUTPUT_ROOT", "/data/output"),
         "logs_root": _parse_str("APP__LOGS_ROOT", "/data/logs"),
@@ -176,7 +176,7 @@ def load_art_trainer_settings() -> ArtTrainerSettings:
         "openai_api_key": _parse_str("OPENAI_API_KEY", ""),
     }
 
-    security_cfg: ArtTrainerSecurityConfig = {
+    security_cfg: SecurityConfig = {
         "api_key": _parse_str("SECURITY__API_KEY", ""),
     }
 
@@ -194,11 +194,11 @@ def load_art_trainer_settings() -> ArtTrainerSettings:
 
 
 __all__ = [
-    "ArtTrainerAppConfig",
-    "ArtTrainerLoggingConfig",
-    "ArtTrainerRQConfig",
-    "ArtTrainerRedisConfig",
-    "ArtTrainerSecurityConfig",
-    "ArtTrainerSettings",
-    "load_art_trainer_settings",
+    "AppConfig",
+    "LoggingConfig",
+    "RQConfig",
+    "RedisConfig",
+    "SecurityConfig",
+    "Settings",
+    "load_settings",
 ]
