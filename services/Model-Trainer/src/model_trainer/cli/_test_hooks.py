@@ -15,6 +15,7 @@ from typing import Protocol
 
 from platform_core.determinism_record import DeterminismRecord
 
+from model_trainer.core._hook_protocols_ml import PinTorchThreadsProto
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem
 from model_trainer.core.contracts.model import PreparedLMModel
 
@@ -127,11 +128,32 @@ def _default_apply_determinism() -> DeterminismRecord:
     return core_hooks.apply_determinism_hook()
 
 
+def _default_pin_torch_threads(threads: int) -> int:
+    """Production torch thread pin - used as default hook.
+
+    Delegates to the worker's hook for the same reason
+    :func:`_default_apply_determinism` does: a probe run from the command
+    line and a job run through the queue must pin by the same call, or the
+    two postures diverge without anyone noticing.
+
+    Args:
+        threads: Count to request.
+
+    Returns:
+        The count torch resolved to, which may differ from the request.
+    """
+    from model_trainer.core import _test_hooks as core_hooks
+
+    return core_hooks.pin_torch_threads(threads)
+
+
 load_hub_model: LoadHubModelProto = _default_load_hub_model
 
 score_cloze: ScoreClozeProto = _default_score_cloze
 
 apply_determinism_hook: ApplyDeterminismProto = _default_apply_determinism
+
+pin_torch_threads: PinTorchThreadsProto = _default_pin_torch_threads
 
 
 __all__ = [

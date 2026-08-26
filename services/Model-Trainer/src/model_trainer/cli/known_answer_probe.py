@@ -32,6 +32,7 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.comparability import RunFingerprint
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 from platform_core.run_record import (
@@ -41,9 +42,14 @@ from platform_core.run_record import (
     encode_run_record,
     run_record,
 )
+from platform_ml.determinism import with_torch_thread_count
 
 from model_trainer.cli import _test_hooks
-from model_trainer.core.run_fingerprint import capture_run_fingerprint, describe_run_fingerprint
+from model_trainer.core.run_fingerprint import (
+    CUDA_DEVICE,
+    capture_run_fingerprint,
+    describe_run_fingerprint,
+)
 from model_trainer.core.services.model.known_answer_probe import (
     PROBE_EXPERIMENT,
     PROBE_LABEL,
@@ -57,6 +63,56 @@ DEVICE_FLAG = "--device"
 OUT_FLAG = "--out"
 
 _FLAGS = (DEVICE_FLAG, OUT_FLAG)
+
+
+PROBE_CPU_THREADS = 1
+"""Thread count a cpu probe pins itself to.
+
+One, because a probe exists to produce the same number twice. A CPU reduction
+splits across threads and sums the partials in completion order, so the count
+IS the arithmetic: measured on this stack, a 4096x4096 matmul at one thread
+and at eight differs in 865,498 of 16,777,216 elements. A probe that inherited
+the node's core count would be a known answer that changes with which machine
+answered it.
+"""
+
+
+def probe_determinism(device: str) -> DeterminismRecord:
+    """Pin whatever governs this device's arithmetic, and report it.
+
+    Device-conditional for the same reason
+    :func:`~model_trainer.core.run_fingerprint.capture_run_fingerprint` reads
+    the card and driver only for cuda: a setting that did not govern a
+    measurement does not belong in its record. No card computed a cpu number,
+    so a cpu record carries none; CUDA kernels do a cuda run's arithmetic and
+    the host thread count does not enter it, so a cuda record carries none.
+
+    A CPU run's thread count is the opposite case -- it IS the arithmetic,
+    because a reduction split across threads sums its partials in completion
+    order -- and until now the probe pinned no thread count at all. Its number
+    therefore depended on the core count of whichever node answered, and
+    nothing in the record said so.
+
+    NOT MEASURED: that a cuda probe is insensitive to the host thread count.
+    The evidence is suggestive rather than controlled -- images v5
+    ``685fd4d4`` and v6 ``1112dbb1``, on A100 and V100, all report
+    6.250983715057373 to the last digit, across nodes whose core counts were
+    not held equal -- but no run has varied the count on cuda and compared.
+    Pinning it there anyway would carry a real cost against no demonstrated
+    benefit: all eight entries in ``known-answers.json`` were registered
+    without a thread count, so adding one to that axis would make every
+    future probe report ``configuration_differs`` against every one of them.
+
+    Args:
+        device: Device the measurement runs on.
+
+    Returns:
+        What was pinned, ready to place in the fingerprint.
+    """
+    applied = _test_hooks.apply_determinism_hook()
+    if device == CUDA_DEVICE:
+        return applied
+    return with_torch_thread_count(applied, _test_hooks.pin_torch_threads(PROBE_CPU_THREADS))
 
 
 def probe_run_record(device: str) -> RunRecord:
@@ -76,8 +132,7 @@ def probe_run_record(device: str) -> RunRecord:
         observation, so a digest over it would restate the number rather than
         add the independent check a digest is for.
     """
-    determinism = _test_hooks.apply_determinism_hook()
-    fingerprint: RunFingerprint = capture_run_fingerprint(device, determinism)
+    fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
 
     loss = probe_forward_loss(device)
 
@@ -134,7 +189,7 @@ def entrypoint() -> None:
     raise SystemExit(main())
 
 
-__all__ = ["entrypoint", "main", "probe_run_record"]
+__all__ = ["entrypoint", "main", "probe_determinism", "probe_run_record"]
 
 
 # Without this, `python -m model_trainer.cli.known_answer_probe` IMPORTS the

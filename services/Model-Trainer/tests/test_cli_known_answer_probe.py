@@ -17,6 +17,7 @@ from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import load_json_str
 from platform_core.known_answer import KnownAnswer, check_known_answer
 from platform_core.run_record import decode_run_record
+from platform_ml.determinism import TORCH_THREAD_SETTING, with_torch_thread_count
 
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import known_answer_probe as probe_cli
@@ -107,7 +108,69 @@ class TestTheRecordItWrites:
         record = probe_cli.probe_run_record("cpu")
         applied: DeterminismRecord = cli_hooks.apply_determinism_hook()
 
-        assert record["fingerprint"]["determinism"] == applied
+        assert record["fingerprint"]["determinism"] == with_torch_thread_count(
+            applied, probe_cli.PROBE_CPU_THREADS
+        )
+
+
+class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
+    """A cpu probe used to pin no thread count and record none.
+
+    Its number therefore depended on the core count of whichever node
+    answered -- a CPU reduction sums its partials in completion order -- and
+    nothing in the record said so. Measured on this stack: a 4096x4096 matmul
+    at one thread and at eight differs in 865,498 of 16,777,216 elements.
+
+    Found from a real artifact. `/pub/wagnera3/probe/v6-cpu-check.json` on
+    HPC3 carries six CUDA settings, no thread count, and a value
+    (6.250983238220215) that differs from every cuda record
+    (6.250983715057373).
+    """
+
+    def test_a_cpu_probe_records_the_thread_count_it_pinned(self) -> None:
+        settings = dict(probe_cli.probe_determinism("cpu")["settings"])
+
+        assert settings[TORCH_THREAD_SETTING] == str(probe_cli.PROBE_CPU_THREADS)
+
+    def test_a_cpu_probe_pins_one_thread_so_the_answer_does_not_move(self) -> None:
+        """A known answer that changes with the node's core count is not one."""
+        assert probe_cli.PROBE_CPU_THREADS == 1
+
+    def test_a_cuda_probe_records_no_thread_count(self) -> None:
+        """NOT cosmetic, and NOT an oversight -- it is what keeps the eight
+        registered answers comparable.
+
+        Every entry in known-answers.json was registered without a thread
+        count. Adding one to the cuda axis would make every future probe
+        report `configuration_differs` against all of them, for a setting no
+        run has shown to affect a cuda result.
+        """
+        assert TORCH_THREAD_SETTING not in dict(probe_cli.probe_determinism("cuda")["settings"])
+
+    def test_the_cuda_record_is_exactly_what_the_stack_pinned(self) -> None:
+        assert probe_cli.probe_determinism("cuda") == cli_hooks.apply_determinism_hook()
+
+    def test_the_two_devices_do_not_produce_the_same_posture(self) -> None:
+        """They ran different arithmetic; their records have to differ."""
+        assert probe_cli.probe_determinism("cpu") != probe_cli.probe_determinism("cuda")
+
+    def test_the_count_recorded_is_the_one_torch_resolved_to(self) -> None:
+        """A request and a resolved value are different facts. torch may clamp
+        to what the machine will give, and only the second describes the run."""
+        resolved: list[int] = []
+
+        def _pin(threads: int) -> int:
+            resolved.append(threads)
+            return threads + 3
+
+        cli_hooks.pin_torch_threads = _pin
+        try:
+            settings = dict(probe_cli.probe_determinism("cpu")["settings"])
+        finally:
+            cli_hooks.pin_torch_threads = cli_hooks._default_pin_torch_threads
+
+        assert resolved == [probe_cli.PROBE_CPU_THREADS]
+        assert settings[TORCH_THREAD_SETTING] == str(probe_cli.PROBE_CPU_THREADS + 3)
 
     def test_main_writes_a_record_that_decodes_back(self, tmp_path: pathlib.Path) -> None:
         assert probe_cli.main(_argv(tmp_path)) == 0
