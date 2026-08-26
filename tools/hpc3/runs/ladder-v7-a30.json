@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "ka-ladder-v7-a30",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 60,
+  "requeue": true,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v7/abl.sif",
+    "sha256": "bf36d17e6a285fe9b88ee4f4d6208bb369d6b0aa73d3f2a5cf2f8030da9ac079",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.probe_ladder --device cuda --out /pub/wagnera3/ladder/v7-a30.json",
+  "artifact": "/pub/wagnera3/ladder/v7-a30.json",
+  "experiment": {
+    "kind": "probe-ladder",
+    "label": "probe-ladder-8xbda2c29a7d65",
+    "card": "A30",
+    "image": "v7"
+  }
+}
