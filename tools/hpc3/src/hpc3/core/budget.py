@@ -111,11 +111,11 @@ def check_projection(
             all.
     """
     projected = project(specs, cluster)
-    if projected["gpu_hours"] > budget["max_gpu_hours"]:
+    if projected["gpu_hours"] > budget["self_imposed_gpu_hours"]:
         raise AppError(
             Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED,
             f"{projected['jobs']} job(s) would use {projected['gpu_hours']:.1f} GPU-hours, "
-            f"over the declared cap of {budget['max_gpu_hours']:.1f}. "
+            f"over the declared cap of {budget['self_imposed_gpu_hours']:.1f}. "
             "Nothing was submitted.",
         )
     return projected
@@ -151,11 +151,11 @@ def check_consumption(
     # non-zero reading means a partition admitted as free is charging -- which
     # was once the only meaning a non-zero figure could have here, and since a
     # workspace may now declare a budget is no longer the only one.
-    if observed["gpu_hours"] > budget["max_gpu_hours"]:
+    if observed["gpu_hours"] > budget["self_imposed_gpu_hours"]:
         raise AppError(
             Hpc3ErrorCode.BUDGET_CONSUMPTION_EXCEEDED,
             f"{observed['jobs']} job(s) have used {observed['gpu_hours']:.1f} GPU-hours, "
-            f"over the declared cap of {budget['max_gpu_hours']:.1f}. "
+            f"over the declared cap of {budget['self_imposed_gpu_hours']:.1f}. "
             "Nothing was cancelled; that is your call.",
         )
     if observed["service_units"] > budget["max_service_units"]:

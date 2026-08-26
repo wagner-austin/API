@@ -47,7 +47,7 @@ class TestDecodeWorkspace:
         assert workspace["root"] == "/pub/w"
         assert workspace["quiet_seconds"] == 1800
         assert workspace["budget"] == {
-            "max_gpu_hours": 100.0,
+            "self_imposed_gpu_hours": 100.0,
             "max_service_units": 0.0,
             "charge_account": "",
         }

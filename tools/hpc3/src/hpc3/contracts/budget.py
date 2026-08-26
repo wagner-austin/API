@@ -9,7 +9,8 @@ cluster enforces, and it is not a reasonable share of a shared machine.
 So the cap is ours to declare and ours to enforce. Two of them, because they
 answer different questions:
 
-* ``max_gpu_hours`` is the courtesy limit. It exists on the free partitions
+* ``self_imposed_gpu_hours`` is the courtesy limit. Nothing grants it and
+  nothing but this package tracks it; it exists on the free partitions
   where nothing else counts.
 * ``max_service_units`` is the spending limit, and it only binds on billing
   partitions -- which is exactly where it matters, since the personal balance
@@ -30,11 +31,23 @@ class Budget(TypedDict):
     """Self-imposed caps on what a run may consume.
 
     Attributes:
-        max_gpu_hours: GPUs multiplied by wall-clock hours, summed over every
-            job. The measure of our share on partitions that bill nothing.
-        max_service_units: Service units, summed over every job. Zero on the
-            free partitions however long they run, so this binds only where
-            spending is real.
+        self_imposed_gpu_hours: GPUs multiplied by wall-clock hours, summed
+            over every job. Nothing grants this and nothing tracks it but us:
+            the free partitions have no GPU-hour allocation to draw down, so
+            this is restraint on a shared machine rather than a balance.
+
+            Named at length for that reason. It was ``max_gpu_hours``,
+            which sat beside ``max_service_units`` and read as its
+            matching half --
+            two allowances, one for GPUs and one for money. It cost real time:
+            an operator was told a GPU job could be paid for out of a
+            service-unit balance that turned out to be a CPU allocation, and
+            the adjacency of the two names is what made that reading natural.
+        max_service_units: Service units, summed over every job. Unlike the
+            line above this one has something behind it -- HPC3 grants an
+            allocation and Slurm charges against it -- so this is a self-cap
+            on spending something real. Zero on the free partitions however
+            long they run, so it binds only where spending happens at all.
         charge_account: The Slurm account a billed job draws from. Empty when
             the workspace does not spend, which is the default posture.
 
@@ -47,7 +60,7 @@ class Budget(TypedDict):
             by the cluster rather than by this package.
     """
 
-    max_gpu_hours: float
+    self_imposed_gpu_hours: float
     max_service_units: float
     charge_account: str
 
@@ -97,7 +110,7 @@ def encode_budget(budget: Budget) -> dict[str, JSONValue]:
         JSON-serialisable mapping carrying every field.
     """
     return {
-        "max_gpu_hours": budget["max_gpu_hours"],
+        "self_imposed_gpu_hours": budget["self_imposed_gpu_hours"],
         "max_service_units": budget["max_service_units"],
         "charge_account": budget["charge_account"],
     }
@@ -119,7 +132,7 @@ def decode_budget(value: JSONValue) -> Budget:
     if not isinstance(value, dict):
         raise JSONTypeError(f"budget must be a JSON object, got {type(value).__name__}")
     return Budget(
-        max_gpu_hours=_require_nonnegative_float(value, "max_gpu_hours"),
+        self_imposed_gpu_hours=_require_nonnegative_float(value, "self_imposed_gpu_hours"),
         max_service_units=_require_nonnegative_float(value, "max_service_units"),
         charge_account=require_str(value, "charge_account"),
     )

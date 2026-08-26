@@ -382,7 +382,7 @@ def budget_document(
         The budget object.
     """
     return {
-        "max_gpu_hours": gpu_hours,
+        "self_imposed_gpu_hours": gpu_hours,
         "max_service_units": units,
         "charge_account": account,
     }

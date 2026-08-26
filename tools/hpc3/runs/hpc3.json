@@ -5,7 +5,7 @@
   "ledger": "ledger.jsonl",
   "quiet_seconds": 1800,
   "budget": {
-    "max_gpu_hours": 0.5,
+    "self_imposed_gpu_hours": 0.5,
     "max_service_units": 0.0,
     "charge_account": ""
   },

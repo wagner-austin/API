@@ -67,7 +67,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     _test_hooks.emit(
         f"budget OK: projected {projected['gpu_hours']:.1f} GPU-hours, "
         f"{projected['service_units']:.1f} SU "
-        f"(caps {budget['max_gpu_hours']:.1f} / {budget['max_service_units']:.1f})"
+        f"(caps {budget['self_imposed_gpu_hours']:.1f} / {budget['max_service_units']:.1f})"
     )
 
     project = stages[0]["project"]

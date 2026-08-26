@@ -125,7 +125,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # would be the most misleading line on the screen.
     _test_hooks.emit(
         f"projected {projected['gpu_hours']:.2f} GPU-hours against a declared cap of "
-        f"{workspace['budget']['max_gpu_hours']:.2f}; "
+        f"{workspace['budget']['self_imposed_gpu_hours']:.2f}; "
         f"spend is measured after the fact, not projected"
     )
     _test_hooks.emit("start estimates are a snapshot of the queue, not a reservation")

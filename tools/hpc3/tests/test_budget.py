@@ -140,7 +140,7 @@ def _budget(gpu_hours: float, units: float) -> Budget:
     """
     return decode_budget(
         {
-            "max_gpu_hours": gpu_hours,
+            "self_imposed_gpu_hours": gpu_hours,
             "max_service_units": units,
             "charge_account": "",
         }
@@ -267,7 +267,7 @@ class TestCheckConsumption:
 class TestBudgetContract:
     def test_a_valid_budget_round_trips(self) -> None:
         payload: dict[str, JSONValue] = {
-            "max_gpu_hours": 60.0,
+            "self_imposed_gpu_hours": 60.0,
             "max_service_units": 100.0,
             "charge_account": "cjmayer_lab",
         }
@@ -280,11 +280,11 @@ class TestBudgetContract:
     def test_a_negative_gpu_hour_cap_is_refused(self) -> None:
         """A negative cap admits everything, which is not what a cap means."""
         with pytest.raises(JSONTypeError):
-            decode_budget({"max_gpu_hours": -1.0, "max_service_units": 0.0})
+            decode_budget({"self_imposed_gpu_hours": -1.0, "max_service_units": 0.0})
 
     def test_a_negative_service_unit_cap_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
-            decode_budget({"max_gpu_hours": 1.0, "max_service_units": -1.0})
+            decode_budget({"self_imposed_gpu_hours": 1.0, "max_service_units": -1.0})
 
     def test_a_zero_budget_admits_nothing_that_uses_anything(self) -> None:
         with pytest.raises(AppError):

@@ -47,7 +47,7 @@ address, the ledger, the budget and each project's resources are written down.
   "root": "/pub/wagnera3",
   "ledger": "ledger.jsonl",
   "quiet_seconds": 1800,
-  "budget": { "max_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
+  "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
   "projects": {
     "abl": {
       "partition": "free-gpu",
