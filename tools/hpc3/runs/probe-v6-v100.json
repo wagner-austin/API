@@ -1,0 +1,28 @@
+{
+  "project": "mi",
+  "name": "ka-probe-v6-v100",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 4,
+  "mem_gb": 16,
+  "minutes": 20,
+  "requeue": false,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v6/abl.sif",
+    "sha256": "1112dbb11706245c5110c59f54b0da5c2dd8d6618ed84aafdc67164cbd024828",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.known_answer_probe --device cuda --out /pub/wagnera3/probe/v6-v100.json",
+  "experiment": {
+    "kind": "known-answer",
+    "label": "gpt2-tiny-L2-d128-h2-v512-len64-seed42",
+    "card": "V100",
+    "image": "v6"
+  }
+}

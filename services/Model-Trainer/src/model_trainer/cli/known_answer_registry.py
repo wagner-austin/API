@@ -48,7 +48,7 @@ from platform_core.known_answer_registry import (
     read_registry,
     write_registry,
 )
-from platform_core.logging import get_logger
+from platform_core.logging import get_logger, setup_logging
 from platform_core.run_record import RunRecord, decode_run_record
 
 _log = get_logger(__name__)
@@ -252,11 +252,27 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def entrypoint() -> None:
-    """Console-script entry point.
+    """Console-script entry point, with logging configured.
+
+    Everything this command reports -- which entry matched, why one did not
+    apply, what was registered -- goes through the logger. Without a handler
+    that is a command which gates an environment and tells the operator
+    nothing, communicating only through an exit code. Measured: the first
+    real registration run printed not one line.
+
+    ``text`` rather than ``json`` because the reader here is a person at a
+    terminal; the cluster entry point configures json for the log collector.
 
     Raises:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
+    setup_logging(
+        level="INFO",
+        format_mode="text",
+        service_name="known-answer-registry",
+        instance_id=None,
+        extra_fields=None,
+    )
     raise SystemExit(main())
 
 
