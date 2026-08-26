@@ -45,6 +45,7 @@ def encode_fleet_bot(bot: FleetBotDict) -> JSONObject:
         "instance": bot["instance"],
         "account": bot["account"],
         "role": bot["role"],
+        "room": bot["room"],
         "pid": bot["pid"],
         "alive": bot["alive"],
         "returncode": bot["returncode"],
