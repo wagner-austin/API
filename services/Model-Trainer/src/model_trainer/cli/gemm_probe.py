@@ -44,9 +44,9 @@ from model_trainer.core.services.model.gemm_probe import gemm_identity
 from model_trainer.core.services.model.gemm_shapes import (
     DIGEST_SUFFIX,
     GEMM_EXPERIMENT,
-    GEMM_SHAPES,
     SUM_SUFFIX,
     gemm_label,
+    probed_shapes,
 )
 
 _log = get_logger(__name__)
@@ -79,7 +79,7 @@ def gemm_run_record(device: str) -> RunRecord:
     fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
 
     observations: list[Observation] = []
-    for name, shape in GEMM_SHAPES.items():
+    for name, shape in probed_shapes():
         digest, total = gemm_identity(shape, device)
         _log.info(
             "gemm %s M%d K%d N%d digest=%.0f sum=%.17g",
@@ -127,7 +127,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     _log.info(
         "%d GEMMs %s -> %s",
-        len(GEMM_SHAPES),
+        len(probed_shapes()),
         describe_run_fingerprint(record["fingerprint"]),
         out,
     )

@@ -125,6 +125,65 @@ GEMM_SHAPES: Final[dict[str, GemmShape]] = {
     },
 }
 
+#: The sweep's output widths, and the reduction lengths crossed against them.
+#:
+#: WHY A SWEEP EXISTS BESIDE THE TABLE ABOVE. That table answers attribution --
+#: which of the LADDER's matmuls carries a rung's difference -- and for that it
+#: must be the ladder's shapes. It cannot answer the other half. Of the 32
+#: shapes the ladder issues, exactly TWO drew the same algorithm on the V100
+#: and the A30, so "does one kernel imply one result" rested on a single
+#: instance, which is an anecdote wearing a claim's clothes.
+#:
+#: A sweep fixes that by not choosing. Every grid point records its kernel and
+#: its output, and whichever cell of the 2x2 a point lands in, it lands there
+#: on its own. Small ``K`` is over-represented deliberately: the two shapes
+#: where the cards already agreed both had ``K=128``, so that is where the
+#: same-kernel cases are expected to come from, and a sweep that skipped it
+#: would have re-created the shortage it exists to fix.
+#:
+#: ``K`` is the summed dimension, which is what split-K partitions, so it is
+#: the axis a device-dependent reduction order enters through. ``M`` moves
+#: because tiling depends on the output width too.
+SWEEP_ROWS: Final[tuple[int, ...]] = (128, 256, 512, 1024, 2048)
+SWEEP_INNERS: Final[tuple[int, ...]] = (128, 256, 512, 1024, 2048, 4096, 8192)
+
+
+#: The name every grid point is labelled under. ONE name for the whole grid,
+#: not one per point: :func:`gemm_label` already appends the dimensions, so a
+#: per-point name encoding them too produced
+#: ``gemm-sweep-M1024-K1024-M1024-K1024-N64`` -- correct and unique, and the
+#: kind of sloppiness that makes a reader distrust the rest of the artifact.
+#: Labels stay unique because the dimensions differ.
+SWEEP_NAME = "sweep"
+
+
+def _sweep() -> tuple[GemmShape, ...]:
+    """Build the grid.
+
+    Generated from two declared lists rather than typed out, which keeps the
+    probe reproducible from the source alone -- the lists ARE the shapes, and
+    nobody has to recover how a hand-written table was assembled.
+
+    Returns:
+        One entry per grid point, in a stable order. A tuple rather than a
+        mapping because every point shares :data:`SWEEP_NAME`; the label, not
+        the key, is what distinguishes them.
+    """
+    return tuple(
+        GemmShape(
+            rows=rows,
+            inner=inner,
+            cols=GEMM_COLS,
+            origin=f"sweep grid point, M={rows} K={inner}",
+        )
+        for rows in SWEEP_ROWS
+        for inner in SWEEP_INNERS
+    )
+
+
+#: The grid.
+GEMM_SWEEP: Final[tuple[GemmShape, ...]] = _sweep()
+
 #: Seed for the operands. One seed for the whole table, generated on the CPU
 #: and moved to the device, so every card multiplies the SAME bits. Generating
 #: on the GPU would use the device RNG and hand different cards different
@@ -158,13 +217,71 @@ def gemm_label(name: str, shape: GemmShape, suffix: str) -> str:
     return f"gemm-{name}-M{shape['rows']}-K{shape['inner']}-N{shape['cols']}|{suffix}"
 
 
+def probed_shapes() -> tuple[tuple[str, GemmShape], ...]:
+    """Every shape one run measures: the ladder's calls, then the sweep.
+
+    Pairs rather than a mapping, because every grid point shares
+    :data:`SWEEP_NAME` and a mapping would collapse them to one. What has to be
+    unique is the LABEL, and that is checked here rather than assumed.
+
+    A shape can legitimately appear in both tables -- the ladder's
+    ``tiny-attn-proj`` is M128/K128, which is also a grid point -- and it is
+    measured under each name rather than deduplicated. That is deliberate: the
+    two labels must carry the same digest, so the overlap is a free check that
+    the result depends on the DIMENSIONS and not on which table asked.
+
+    Returns:
+        ``(name, shape)`` pairs, ladder first then the grid.
+
+    Raises:
+        ValueError: Propagated from :func:`require_unique_labels`.
+    """
+    pairs = [(name, shape) for name, shape in GEMM_SHAPES.items()]
+    pairs += [(SWEEP_NAME, shape) for shape in GEMM_SWEEP]
+    return require_unique_labels(tuple(pairs))
+
+
+def require_unique_labels(
+    pairs: tuple[tuple[str, GemmShape], ...],
+) -> tuple[tuple[str, GemmShape], ...]:
+    """Return the pairs, refusing if any two would share a label.
+
+    A separate function rather than a check inside :func:`probed_shapes`, for
+    the reason :func:`require_reproduced` is one: the declared tables do not
+    collide, so the failing arm is unreachable through them, and an arm no
+    test can drive is an arm nobody has confirmed says what it means.
+
+    Args:
+        pairs: The ``(name, shape)`` pairs to check.
+
+    Returns:
+        ``pairs`` unchanged, once the labels are known distinct.
+
+    Raises:
+        ValueError: If two entries produce one label. That would silently drop
+            an observation -- and ``run_record`` would reject the duplicate
+            name anyway, at a point much further from the cause.
+    """
+    labels = [gemm_label(name, shape, DIGEST_SUFFIX) for name, shape in pairs]
+    duplicated = sorted({label for label in labels if labels.count(label) > 1})
+    if duplicated:
+        raise ValueError(f"two probed shapes share a label: {duplicated}")
+    return pairs
+
+
 __all__ = [
     "DIGEST_SUFFIX",
     "GEMM_COLS",
     "GEMM_EXPERIMENT",
     "GEMM_SEED",
     "GEMM_SHAPES",
+    "GEMM_SWEEP",
     "SUM_SUFFIX",
+    "SWEEP_INNERS",
+    "SWEEP_NAME",
+    "SWEEP_ROWS",
     "GemmShape",
     "gemm_label",
+    "probed_shapes",
+    "require_unique_labels",
 ]

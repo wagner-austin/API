@@ -37,9 +37,15 @@ from model_trainer.core.services.model.gemm_shapes import (
     GEMM_COLS,
     GEMM_EXPERIMENT,
     GEMM_SHAPES,
+    GEMM_SWEEP,
     SUM_SUFFIX,
+    SWEEP_INNERS,
+    SWEEP_NAME,
+    SWEEP_ROWS,
     GemmShape,
     gemm_label,
+    probed_shapes,
+    require_unique_labels,
 )
 
 #: A shape small enough to run many times on a CPU, in the same orientation as
@@ -96,6 +102,67 @@ class TestTheShapeTable:
         widened: GemmShape = {**SMALL, "inner": SMALL["inner"] * 2}
 
         assert gemm_label("x", SMALL, SUM_SUFFIX) != gemm_label("x", widened, SUM_SUFFIX)
+
+
+class TestTheSweepGrid:
+    """The sweep exists because the ladder's shapes could not answer.
+
+    Of the 32 shapes the ladder issues, exactly TWO drew the same algorithm on
+    the V100 and the A30 -- so "same kernel implies same result" rested on one
+    instance. A grid does not choose which cell of the 2x2 a point lands in.
+    """
+
+    def test_it_is_the_full_cross_of_the_declared_lists(self) -> None:
+        assert len(GEMM_SWEEP) == len(SWEEP_ROWS) * len(SWEEP_INNERS)
+
+    def test_every_declared_pair_is_present(self) -> None:
+        present = {(s["rows"], s["inner"]) for s in GEMM_SWEEP}
+
+        assert present == {(r, k) for r in SWEEP_ROWS for k in SWEEP_INNERS}
+
+    def test_it_reaches_the_small_inner_where_the_cards_already_agreed(self) -> None:
+        # Both shapes where the V100 and A30 chose alike had K=128. A sweep
+        # that skipped it would have re-created the shortage it exists to fix.
+        assert 128 in SWEEP_INNERS
+
+    def test_it_spans_more_than_one_order_of_magnitude_in_the_summed_dimension(self) -> None:
+        # K is what split-K partitions, so it is the axis a device-dependent
+        # reduction order enters through; a grid clustered at one K could not
+        # separate "same kernel" from "small enough not to matter".
+        assert max(SWEEP_INNERS) >= 16 * min(SWEEP_INNERS)
+
+    def test_every_probed_shape_gets_its_own_label(self) -> None:
+        # Two entries sharing a label would silently drop an observation --
+        # and `run_record` would reject the duplicate name much further from
+        # the cause. `probed_shapes` refuses first.
+        labels = [gemm_label(n, s, DIGEST_SUFFIX) for n, s in probed_shapes()]
+
+        assert sorted(labels) == sorted(set(labels))
+
+    def test_the_whole_grid_shares_one_name_so_labels_stay_readable(self) -> None:
+        # Per-point names encoding the dimensions produced
+        # `gemm-sweep-M1024-K1024-M1024-K1024-N64`, since gemm_label appends
+        # them anyway. One name for the grid keeps the label honest.
+        assert gemm_label(SWEEP_NAME, GEMM_SWEEP[0], DIGEST_SUFFIX).count("-M") == 1
+
+    def test_probed_shapes_carries_both_tables(self) -> None:
+        assert len(probed_shapes()) == len(GEMM_SHAPES) + len(GEMM_SWEEP)
+
+    def test_the_real_tables_pass_the_label_check(self) -> None:
+        assert require_unique_labels(probed_shapes()) == probed_shapes()
+
+    def test_two_entries_sharing_a_label_are_refused(self) -> None:
+        twin = (("dup", SMALL), ("dup", SMALL))
+
+        with pytest.raises(ValueError, match="share a label"):
+            require_unique_labels(twin)
+
+    def test_one_shape_under_two_names_is_not_a_label_collision(self) -> None:
+        # The overlap the tables deliberately have: same dimensions, different
+        # names, so the labels differ and both survive to be measured.
+        pairs = (("a", SMALL), ("b", SMALL))
+
+        assert require_unique_labels(pairs) == pairs
 
 
 class TestTheOperands:
@@ -210,13 +277,13 @@ class TestTheRecord:
     def test_it_carries_two_observations_per_shape(self) -> None:
         record = gemm_cli.gemm_run_record("cpu")
 
-        assert len(record["observations"]) == 2 * len(GEMM_SHAPES)
+        assert len(record["observations"]) == 2 * len(probed_shapes())
 
     def test_every_observation_is_named_for_its_shape_and_measurement(self) -> None:
         record = gemm_cli.gemm_run_record("cpu")
         expected = sorted(
             gemm_label(n, s, suffix)
-            for n, s in GEMM_SHAPES.items()
+            for n, s in probed_shapes()
             for suffix in (DIGEST_SUFFIX, SUM_SUFFIX)
         )
 
@@ -231,13 +298,41 @@ class TestTheRecord:
         assert by_name[gemm_label(name, shape, DIGEST_SUFFIX)] == digest
         assert by_name[gemm_label(name, shape, SUM_SUFFIX)] == total
 
-    def test_no_two_shapes_produced_the_same_digest(self) -> None:
-        # If they had, the probe would be measuring one thing repeatedly and
-        # every shape would agree across cards for free.
+    def test_distinct_dimensions_produced_distinct_digests(self) -> None:
+        # If they had not, the probe would be measuring one thing repeatedly
+        # and every shape would agree across cards for free.
         record = gemm_cli.gemm_run_record("cpu")
-        digests = [o["value"] for o in record["observations"] if o["name"].endswith(DIGEST_SUFFIX)]
+        by_name = {o["name"]: o["value"] for o in record["observations"]}
+        by_dims = {
+            (s["rows"], s["inner"], s["cols"]): by_name[gemm_label(n, s, DIGEST_SUFFIX)]
+            for n, s in probed_shapes()
+        }
 
-        assert len(set(digests)) == len(digests)
+        assert len(set(by_dims.values())) == len(by_dims)
+
+    def test_one_shape_under_two_names_gives_one_digest(self) -> None:
+        # The ladder table and the sweep grid overlap -- tiny-attn-proj is
+        # M128/K128, which is also a grid point -- and the overlap is measured
+        # twice rather than deduplicated. The two names must agree, which
+        # checks the result depends on the DIMENSIONS and not on which table
+        # asked for them.
+        by_name = {o["name"]: o["value"] for o in gemm_cli.gemm_run_record("cpu")["observations"]}
+
+        seen: dict[tuple[int, int, int], str] = {}
+        overlaps = 0
+        for name, s in probed_shapes():
+            dims = (s["rows"], s["inner"], s["cols"])
+            twin = seen.get(dims)
+            if twin is not None:
+                overlaps += 1
+                assert (
+                    by_name[gemm_label(name, s, DIGEST_SUFFIX)]
+                    == by_name[gemm_label(twin, s, DIGEST_SUFFIX)]
+                )
+            seen[dims] = name
+
+        # The check is worthless if the tables ever stop overlapping.
+        assert overlaps > 0
 
     def test_it_declares_its_own_experiment(self) -> None:
         assert gemm_cli.gemm_run_record("cpu")["experiment"] == GEMM_EXPERIMENT
@@ -259,7 +354,7 @@ class TestTheCommandLine:
         decoded = decode_run_record(load_json_str(_out_path(tmp_path).read_text(encoding="utf-8")))
 
         assert decoded["label"] == gemm_cli.GEMM_LABEL
-        assert len(decoded["observations"]) == 2 * len(GEMM_SHAPES)
+        assert len(decoded["observations"]) == 2 * len(probed_shapes())
 
     def test_main_creates_the_parent_directory(self, tmp_path: pathlib.Path) -> None:
         assert not _out_path(tmp_path).parent.exists()
@@ -311,4 +406,4 @@ class TestTheCommandLine:
         assert excinfo.value.code == 0
 
         decoded = decode_run_record(load_json_str(_out_path(tmp_path).read_text(encoding="utf-8")))
-        assert len(decoded["observations"]) == 2 * len(GEMM_SHAPES)
+        assert len(decoded["observations"]) == 2 * len(probed_shapes())
