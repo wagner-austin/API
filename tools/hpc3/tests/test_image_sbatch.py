@@ -21,6 +21,20 @@ from hpc3.core.image_sbatch import (
 
 _SMOKE = "/opt/env/bin/python -m pkg.probe --device cpu --out /tmp/probe.json"
 
+#: A smoke command carrying quotes, which is what any assertion about a string
+#: looks like. Rendered raw into a double-quoted echo this still PARSES --
+#: bash concatenates the adjacent quoted runs -- and prints the command with
+#: its quotes stripped, so the line naming a failing command is not the
+#: command.
+_QUOTED_SMOKE = "/opt/env/bin/python -c \"assert PROBE_LABEL == 'gpt2-tiny', PROBE_LABEL\""
+
+#: A smoke command whose own double quotes wrap a shell metacharacter. Valid
+#: on the `if` line, where the quotes are the shell's to parse; a hard syntax
+#: error in a raw echo, where those quotes close against the echo's own and
+#: leave `((1,2))` bare. Verified in both directions before being written
+#: down: `bash -n` accepts the if-line rendering and rejects the raw echo.
+_METACHAR_SMOKE = '/opt/env/bin/python -c "print((1,2))"'
+
 
 def _render(smoke_commands: list[str] | None = None) -> str:
     """Render a job with the given smoke commands."""
@@ -138,6 +152,45 @@ class TestSmokeCommands:
         assert "did not succeed inside it" in rendered
         assert "is not in this image" not in rendered
 
+    def test_a_command_carrying_quotes_reaches_the_shell_unaltered(self) -> None:
+        # The `if` line is the one place the command is a COMMAND, so its own
+        # quoting has to survive: shell-quoting it here would hand python the
+        # literal quotes and the assertion would never run.
+        rendered = _render([_QUOTED_SMOKE])
+
+        assert f"    if apptainer exec abl.sif {_QUOTED_SMOKE}; then" in rendered
+
+    def test_the_announcement_actually_prints_the_command_it_ran(self) -> None:
+        # Asserted by RUNNING the echo, not by reading it. Rendered raw the
+        # line is valid shell and prints `python -c assert PROBE_LABEL ==
+        # gpt2-tiny, PROBE_LABEL` -- quotes stripped -- so every substring
+        # assertion on the rendered text passed while the log lied about
+        # which command had failed.
+        rendered = _render([_QUOTED_SMOKE])
+        announce = next(line for line in rendered.splitlines() if line.startswith("    echo '"))
+
+        printed = subprocess.run(
+            ["bash", "-c", announce.strip()],
+            capture_output=True,
+            check=True,
+        ).stdout.decode("utf-8")
+
+        assert printed == f"--- smoke 1/1: {_QUOTED_SMOKE} ---\n"
+
+    def test_the_failure_message_actually_prints_the_command_that_failed(self) -> None:
+        rendered = _render([_QUOTED_SMOKE])
+        failure = next(
+            line for line in rendered.splitlines() if line.strip().startswith("echo 'SMOKE")
+        )
+
+        printed = subprocess.run(
+            ["bash", "-c", failure.strip().removesuffix(" >&2")],
+            capture_output=True,
+            check=True,
+        ).stdout.decode("utf-8")
+
+        assert printed == f"SMOKE COMMAND 1 FAILED: {_QUOTED_SMOKE}\n"
+
     def test_declaring_none_says_so_rather_than_rendering_nothing(self) -> None:
         # Silence would read as a renderer that forgot, not as a spec that
         # asserts no behaviour.
@@ -186,6 +239,20 @@ class TestItIsRunnableShell:
 
     def test_a_job_with_smoke_commands_parses(self) -> None:
         result = self._parse(_render([_SMOKE, "/opt/env/bin/python -c pass"]))
+
+        assert result.returncode == 0, result.stderr.decode("utf-8")
+
+    def test_a_job_whose_smoke_command_carries_quotes_parses(self) -> None:
+        result = self._parse(_render([_QUOTED_SMOKE]))
+
+        assert result.returncode == 0, result.stderr.decode("utf-8")
+
+    def test_a_job_whose_smoke_command_carries_a_metacharacter_parses(self) -> None:
+        # Rendered raw this one is a hard syntax error, not merely a wrong
+        # message: the command's own quotes close against the echo's and
+        # `((1,2))` lands bare, so bash rejects the whole script. A build job
+        # that will not parse fails at its first line having built nothing.
+        result = self._parse(_render([_METACHAR_SMOKE]))
 
         assert result.returncode == 0, result.stderr.decode("utf-8")
 

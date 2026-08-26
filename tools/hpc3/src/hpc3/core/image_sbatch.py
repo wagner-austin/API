@@ -25,6 +25,8 @@ for one queues behind jobs that do.
 
 from __future__ import annotations
 
+import shlex
+
 from hpc3.core.image_exec import APPTAINER_MODULE
 from hpc3.core.image_layout import SELFCHECK_NAME, SPEC_DIR
 
@@ -127,6 +129,23 @@ def _smoke_checks(image_name: str, commands: list[str]) -> list[str]:
     The failure message names the command and says it failed. It deliberately
     does not diagnose: the previous hand-written version guessed a cause,
     printed it as fact, and was wrong.
+
+    THE COMMAND APPEARS TWICE, AND ONLY ONE OF THEM MAY BE RAW. On the ``if``
+    line it is a command and the shell must parse its own quoting; in the two
+    ``echo`` lines it is TEXT, and interpolating it raw dropped a command's
+    quotes inside a quoted string. Two measured consequences, neither of
+    which a substring assertion on the rendered text can see:
+
+    * The announcement lies about what ran. Rendered raw,
+      ``echo "--- smoke 1/1: python -c "assert L == 'gpt2-tiny'" ---"`` is
+      valid shell -- bash concatenates the adjacent quoted runs -- and prints
+      ``python -c assert L == gpt2-tiny``. The quotes are gone, so the line
+      naming the failing command is not the command.
+    * A command carrying a shell metacharacter outside its own quotes breaks
+      the script outright. ``bash -n`` on the raw rendering of one containing
+      ``$(...)`` fails with "syntax error near unexpected token".
+
+    So the echoes shell-quote it and the ``if`` line does not.
     """
     if not commands:
         return [
@@ -136,14 +155,16 @@ def _smoke_checks(image_name: str, commands: list[str]) -> list[str]:
         ]
     lines: list[str] = []
     for index, command in enumerate(commands, start=1):
+        announce = shlex.quote(f"--- smoke {index}/{len(commands)}: {command} ---")
+        failure = shlex.quote(f"SMOKE COMMAND {index} FAILED: {command}")
         lines.extend(
             [
                 "if [ $rc -eq 0 ]; then",
-                f'    echo "--- smoke {index}/{len(commands)}: {command} ---"',
+                f"    echo {announce}",
                 f"    if apptainer exec {image_name} {command}; then",
                 f'        echo "smoke {index} OK"',
                 "    else",
-                f'        echo "SMOKE COMMAND {index} FAILED: {command}" >&2',
+                f"        echo {failure} >&2",
                 '        echo "the image built and self-checked; this command '
                 'did not succeed inside it" >&2',
                 "        rc=5",
