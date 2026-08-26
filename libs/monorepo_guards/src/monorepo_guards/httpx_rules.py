@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
+from monorepo_guards.util import parse_source
 
 
 class HttpxRule:
@@ -83,7 +84,7 @@ class HttpxRule:
         for path in files:
             if not self._should_check(path):
                 continue
-            tree = ast.parse(path.read_text(encoding="utf-8", errors="strict"), filename=str(path))
+            tree = parse_source(path)
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     out.extend(self._check_import_node(path, node))

@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
+from monorepo_guards.util import parse_source
 
 
 def _declares_hook_api(tree: ast.AST) -> bool:
@@ -252,7 +253,7 @@ class NullableHookRule:
         """
         out: list[Violation] = []
         for path in files:
-            tree = ast.parse(path.read_text(encoding="utf-8", errors="strict"), filename=str(path))
+            tree = parse_source(path)
             if not _is_hooks_module(path, tree):
                 continue
             out.extend(self._scan(path, tree))
@@ -345,7 +346,7 @@ class HookDispatchRule:
         """
         out: list[Violation] = []
         for path in files:
-            tree = ast.parse(path.read_text(encoding="utf-8", errors="strict"), filename=str(path))
+            tree = parse_source(path)
             for node in ast.walk(tree):
                 if isinstance(node, ast.If):
                     hook = self._dispatch_target(node)

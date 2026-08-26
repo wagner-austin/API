@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
+from monorepo_guards.util import parse_source
 
 
 class ConfigHelpersRule:
@@ -56,13 +57,14 @@ class ConfigHelpersRule:
             if self._is_allowed(path):
                 continue
 
+            # The read and the parse are reported apart because they fail for
+            # different reasons and want different fixes: a file that is not
+            # there is a caller passing a bad path, and a file that is there
+            # and will not parse is a defect in the tree being checked.
             try:
-                text = path.read_text(encoding="utf-8", errors="strict")
+                tree = parse_source(path)
             except OSError as exc:
                 raise RuntimeError(f"Failed to read {path}: {exc}") from exc
-
-            try:
-                tree = ast.parse(text, filename=str(path))
             except SyntaxError as exc:
                 raise RuntimeError(f"Failed to parse {path}: {exc}") from exc
 

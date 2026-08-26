@@ -48,6 +48,7 @@ import ast
 from pathlib import Path
 
 from monorepo_guards import Violation
+from monorepo_guards.util import parse_source
 
 
 def _is_type_spelled(name: str) -> bool:
@@ -147,7 +148,7 @@ class PassthroughRule:
             # Read and parse without a guard: a source file that cannot be
             # read or parsed is a real problem in the tree being checked, and
             # a syntax error must not silently exempt a file from this rule.
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            tree = parse_source(path)
             type_names = self._bound_type_names(tree)
             for statement in tree.body:
                 if isinstance(statement, ast.Assign):

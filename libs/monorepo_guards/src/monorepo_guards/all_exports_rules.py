@@ -30,7 +30,7 @@ import ast
 from pathlib import Path
 
 from monorepo_guards import Violation
-from monorepo_guards.util import read_lines
+from monorepo_guards.util import parse_source
 
 _PACKAGE_INIT = "__init__.py"
 
@@ -163,9 +163,8 @@ class AllExportsRule:
         """
         out: list[Violation] = []
         for path in files:
-            source = "\n".join(read_lines(path))
             try:
-                tree = ast.parse(source, filename=str(path))
+                tree = parse_source(path)
             except SyntaxError as exc:
                 raise RuntimeError(f"failed to parse {path}: {exc}") from exc
             out.extend(self._check_file(path, tree))

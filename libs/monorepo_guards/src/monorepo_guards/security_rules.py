@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
+from monorepo_guards.util import parse_source
 
 
 class SecurityRule:
@@ -69,9 +70,7 @@ class SecurityRule:
             if not self._should_check(path):
                 continue
             try:
-                tree = ast.parse(
-                    path.read_text(encoding="utf-8", errors="strict"), filename=str(path)
-                )
+                tree = parse_source(path)
             except SyntaxError as exc:
                 raise RuntimeError(f"failed to parse {path}: {exc}") from exc
             for node in ast.walk(tree):

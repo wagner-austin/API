@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
+from monorepo_guards.util import parse_source
 
 
 class EnvRule:
@@ -77,8 +78,7 @@ class EnvRule:
         for path in files:
             if self._is_allowed(path):
                 continue
-            lines = path.read_text(encoding="utf-8", errors="strict").splitlines()
-            tree = ast.parse("\n".join(lines), filename=str(path))
+            tree = parse_source(path)
             for node in ast.walk(tree):
                 out.extend(self._scan_node(path, node))
         return out

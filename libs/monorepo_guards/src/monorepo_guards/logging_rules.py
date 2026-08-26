@@ -5,25 +5,24 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
-from monorepo_guards.util import read_lines
+from monorepo_guards.util import parse_source, read_lines
 
 
-def _parse_module(source: str, path: Path) -> ast.Module:
+def _parse_module(path: Path) -> ast.Module:
     """Parse a module once for every check in this rule to read.
 
     Args:
-        source: The module's full text.
         path: The file, used in the parse-failure message.
 
     Returns:
-        Its parse tree.
+        Its parse tree, shared with every other rule in the run.
 
     Raises:
         RuntimeError: If the module cannot be parsed. A guard that silently
             skipped an unparsable file would report it as clean.
     """
     try:
-        return ast.parse(source, filename=str(path))
+        return parse_source(path)
     except SyntaxError as exc:
         raise RuntimeError(f"failed to parse {path}: {exc}") from exc
 
@@ -245,7 +244,7 @@ class LoggingRule:
             # Parsed once; every check below reads the tree rather than the
             # text, so none of them can mistake a mention for the thing.
             lines = read_lines(path)
-            tree = _parse_module("\n".join(lines), path)
+            tree = _parse_module(path)
 
             module_aliases, func_aliases, import_violations = self._extract_logging_aliases(
                 path, tree

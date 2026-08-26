@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 from monorepo_guards import Rule, Violation
-from monorepo_guards.util import read_lines
+from monorepo_guards.util import parse_source, read_lines
 
 
 class StandardizationRule(Rule):
@@ -85,7 +85,7 @@ class StandardizationRule(Rule):
             is_service_src = "/services/" in as_posix and "/src/" in as_posix
             is_client_src = "/clients/" in as_posix and "/src/" in as_posix
             enforce_request_id = (is_service_src or is_client_src) and "/tests/" not in as_posix
-            if enforce_request_id and self._needs_request_id_middleware(path, text):
+            if enforce_request_id and self._needs_request_id_middleware(path):
                 out.append(
                     Violation(
                         file=path,
@@ -108,9 +108,9 @@ class StandardizationRule(Rule):
             and self._PLATFORM_CORE_PATH not in as_posix
         )
 
-    def _needs_request_id_middleware(self, path: Path, text: str) -> bool:
+    def _needs_request_id_middleware(self, path: Path) -> bool:
         try:
-            tree = ast.parse(text)
+            tree = parse_source(path)
         except SyntaxError as exc:
             raise RuntimeError(f"failed to parse {path.as_posix()}: {exc}") from exc
 

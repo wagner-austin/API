@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from monorepo_guards import Violation
+from monorepo_guards.util import parse_source, read_source
 
 
 class IsolationContext(TypedDict):
@@ -456,10 +457,13 @@ class MonkeyPatchBanRule:
                 # Read and parse without a guard: a conftest that cannot be
                 # read or parsed is a real problem in the tree being checked,
                 # and should surface rather than be silently skipped.
-                conftest_tree = ast.parse(
-                    conftest.read_text(encoding="utf-8"),
-                    filename=str(conftest),
-                )
+                #
+                # `parse_source` also stops this being quadratic. Every test
+                # file walks its ancestors, so before it was cached the one
+                # conftest governing covenant-radar-api's 200 test files was
+                # parsed 212 times in a single run -- which is why this was
+                # the slowest rule of the thirty-one.
+                conftest_tree = parse_source(conftest)
                 restored.update(self._collect_restored_attrs(conftest_tree))
                 containers.update(self._collect_reset_containers(conftest_tree))
         return {
@@ -484,8 +488,8 @@ class MonkeyPatchBanRule:
             # or parsed is a real problem in the tree being checked. Silently
             # skipping it meant a file with a syntax error was also silently
             # exempt from this rule.
-            source = path.read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=str(path))
+            source = read_source(path)
+            tree = parse_source(path)
             lines = source.splitlines()
             module_aliases = self._collect_module_aliases(tree)
             isolation = self._isolation_for(path, tree)
