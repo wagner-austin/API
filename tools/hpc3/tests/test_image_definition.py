@@ -39,6 +39,7 @@ def _spec(**overrides: JSONValue) -> ImageSpec:
         "wheels": ["model_trainer_server-0.1.0-py3-none-any.whl"],
         "expected_versions": {"torch": "2.6.0+cu124"},
         "required_symbols": [{"module": "model_trainer", "attribute": "__file__"}],
+        "smoke_commands": [],
         "labels": {"org.corvis.captured": "2026-08-25"},
     }
     base.update(overrides)

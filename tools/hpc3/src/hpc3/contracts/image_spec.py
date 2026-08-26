@@ -64,10 +64,15 @@ class ImageSpec(TypedDict):
             wheels in ``requirements``, so this does not need to be a CUDA
             base image and should not be one.
         env_prefix: Absolute POSIX directory receiving the virtualenv, inside
-            the image. Never under a host-bound path: HPC3 auto-binds
-            ``/pub``, so an env at ``/pub/...`` would be shadowed at runtime
-            by the host filesystem and the image's own interpreter would
-            disappear behind it.
+            the image. Never under a host-bound path. HPC3 does NOT auto-bind
+            ``/pub`` -- that claim was here and is false; ``/pub`` is a host
+            symlink to ``/dfs6b/pub`` and does not exist inside a container
+            at all, which is why a job that needs it must declare the bind.
+            The rule stands for the other reason: a job DOES bind its data
+            roots, and an env under one of them would be shadowed at runtime
+            by the host directory mounted over it, so the image's own
+            interpreter would disappear behind the copy it was meant to
+            replace.
         git_commit: Commit the wheels were built from. Written into the image
             so the trainer can stamp it into every manifest.
         extra_index_urls: Additional package indexes, in order. Present
@@ -79,6 +84,20 @@ class ImageSpec(TypedDict):
         expected_versions: Package name to exact version the built image must
             report. Checked inside the image, at build time.
         required_symbols: Attributes that must exist in the built image.
+        smoke_commands: Commands run INSIDE the built image after the
+            self-check, each of which must exit 0. Importing a symbol is not
+            computing with it: v5 carried a probe whose module-level entry
+            point silently did nothing, and every symbol assertion passed.
+            Declared even when empty, so "this image asserts no behaviour" is
+            a recorded decision rather than an omission.
+
+            They run with NO binds, because at build time the image is the
+            only thing that exists -- there is no job, no data root and
+            nothing declaring what to mount. A command that writes must
+            therefore write inside the container (``/tmp``). Reaching for a
+            host path here fails with a read-only filesystem error that names
+            the path and not the cause, which is exactly how the first
+            rendered build job failed.
         labels: Free-form metadata recorded on the image.
     """
 
@@ -90,6 +109,7 @@ class ImageSpec(TypedDict):
     wheels: list[str]
     expected_versions: dict[str, str]
     required_symbols: list[SymbolCheck]
+    smoke_commands: list[str]
     labels: dict[str, str]
 
 
@@ -366,6 +386,7 @@ def encode_image_spec(spec: ImageSpec) -> JSONObject:
         "wheels": list(spec["wheels"]),
         "expected_versions": dict(spec["expected_versions"]),
         "required_symbols": [encode_symbol_check(c) for c in spec["required_symbols"]],
+        "smoke_commands": list(spec["smoke_commands"]),
         "labels": dict(spec["labels"]),
     }
 
@@ -398,6 +419,7 @@ def decode_image_spec(value: JSONValue) -> ImageSpec:
         wheels=_require_bare_filenames(obj, "wheels"),
         expected_versions=_require_str_map(obj, "expected_versions", allow_empty=False),
         required_symbols=_require_symbol_checks(obj, "required_symbols"),
+        smoke_commands=_require_str_list(obj, "smoke_commands"),
         labels=_require_str_map(obj, "labels", allow_empty=True),
     )
 

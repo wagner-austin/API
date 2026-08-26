@@ -31,10 +31,14 @@ COMMIT_NAME = "GIT_COMMIT"
 DEFINITION_NAME = "image.def"
 """Rendered Apptainer definition, named so the build script can find it."""
 
+SBATCH_NAME = "build.sbatch"
+"""Rendered Slurm job that runs the build on a compute node."""
+
 __all__ = [
     "COMMIT_NAME",
     "DEFINITION_NAME",
     "REQUIREMENTS_NAME",
+    "SBATCH_NAME",
     "SELFCHECK_NAME",
     "SPEC_DIR",
     "WHEEL_DIR",

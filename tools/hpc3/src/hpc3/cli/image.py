@@ -36,8 +36,10 @@ from hpc3.core.image_definition import render_definition, render_requirements
 from hpc3.core.image_layout import (
     DEFINITION_NAME,
     REQUIREMENTS_NAME,
+    SBATCH_NAME,
     SELFCHECK_NAME,
 )
+from hpc3.core.image_sbatch import render_build_sbatch
 from hpc3.core.image_selfcheck import render_selfcheck
 
 BUILD_SCRIPT_NAME = "build.sh"
@@ -45,7 +47,15 @@ BUILD_SCRIPT_NAME = "build.sh"
 _SPEC_FLAG = "--spec"
 _OUT_DIR_FLAG = "--out-dir"
 _IMAGE_NAME_FLAG = "--image-name"
-_FLAGS = (_SPEC_FLAG, _OUT_DIR_FLAG, _IMAGE_NAME_FLAG)
+_JOB_NAME_FLAG = "--job-name"
+_IMAGE_DIR_FLAG = "--image-dir"
+_FLAGS = (
+    _SPEC_FLAG,
+    _OUT_DIR_FLAG,
+    _IMAGE_NAME_FLAG,
+    _JOB_NAME_FLAG,
+    _IMAGE_DIR_FLAG,
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -56,7 +66,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             the process arguments.
 
     Returns:
-        Exit code 0 when all four files were written.
+        Exit code 0 when every file was written.
 
     Raises:
         ValueError: If a required flag is missing or an argument is unknown.
@@ -75,6 +85,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     spec_path = pathlib.Path(cli_args.require_flag(parsed, _SPEC_FLAG))
     out_dir = pathlib.Path(cli_args.require_flag(parsed, _OUT_DIR_FLAG))
     image_name = cli_args.require_flag(parsed, _IMAGE_NAME_FLAG)
+    job_name = cli_args.require_flag(parsed, _JOB_NAME_FLAG)
+    image_dir = cli_args.require_flag(parsed, _IMAGE_DIR_FLAG)
 
     raw = core_hooks.read_bytes(spec_path).decode("utf-8")
     spec = decode_image_spec(load_json_str(raw))
@@ -85,6 +97,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         (REQUIREMENTS_NAME, render_requirements(spec)),
         (SELFCHECK_NAME, render_selfcheck(spec)),
         (BUILD_SCRIPT_NAME, render_build_script(spec, image_name=image_name)),
+        (
+            SBATCH_NAME,
+            render_build_sbatch(
+                image_name=image_name,
+                job_name=job_name,
+                image_dir=image_dir,
+                env_prefix=spec["env_prefix"],
+                smoke_commands=spec["smoke_commands"],
+            ),
+        ),
     )
     for name, text in rendered:
         core_hooks.write_text(out_dir / name, text)

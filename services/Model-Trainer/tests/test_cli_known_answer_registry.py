@@ -116,6 +116,45 @@ class TestDiscrimination:
         assert "does not treat a card change as a move" in failures[0]
 
 
+class TestParseTolerance:
+    """The argument is validated before conversion, so conversion cannot fail."""
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [("0", 0.0), ("0.0", 0.0), ("1e-9", 1e-9), ("1E-9", 1e-9), ("2.5e+3", 2500.0)],
+    )
+    def test_it_accepts_a_non_negative_number(self, raw: str, expected: float) -> None:
+        assert registry_cli.parse_tolerance(raw) == expected
+
+    @pytest.mark.parametrize(
+        "raw",
+        ["loose", "", "1e", ".5", "5.", "1,0", "nan", "inf", " 1", "1 "],
+        ids=[
+            "word",
+            "empty",
+            "bare-exp",
+            "no-int",
+            "no-frac",
+            "comma",
+            "nan",
+            "inf",
+            "lead",
+            "trail",
+        ],
+    )
+    def test_it_refuses_anything_else(self, raw: str) -> None:
+        with pytest.raises(ValueError, match="non-negative number"):
+            registry_cli.parse_tolerance(raw)
+
+    @pytest.mark.parametrize("raw", ["-1", "-0.5", "-1e-9"])
+    def test_it_refuses_a_negative_tolerance_at_the_boundary(self, raw: str) -> None:
+        # A negative tolerance admits no value at all, so an answer carrying
+        # one could only ever report a deviation -- it would read as a broken
+        # image rather than a broken answer.
+        with pytest.raises(ValueError, match="non-negative number"):
+            registry_cli.parse_tolerance(raw)
+
+
 class TestGate:
     """Checking a record against what is registered."""
 

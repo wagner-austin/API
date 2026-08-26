@@ -55,6 +55,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "wheels": ["model_trainer_server-0.1.0-py3-none-any.whl"],
         "expected_versions": {"torch": "2.6.0+cu124"},
         "required_symbols": [{"module": "model_trainer.cluster.preflight", "attribute": "check"}],
+        "smoke_commands": [],
         "labels": {"org.corvis.captured": "2026-08-25"},
     }
     base.update(overrides)
@@ -79,6 +80,7 @@ class TestRoundTrip:
             "labels",
             "required_symbols",
             "requirements",
+            "smoke_commands",
             "wheels",
         ]
 

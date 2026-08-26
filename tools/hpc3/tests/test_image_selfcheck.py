@@ -43,6 +43,7 @@ def _spec(**overrides: JSONValue) -> ImageSpec:
         "wheels": ["w-0.1.0-py3-none-any.whl"],
         "expected_versions": {_PACKAGE: "1.2.3"},
         "required_symbols": [{"module": _PACKAGE, "attribute": "required_symbol"}],
+        "smoke_commands": [],
         "labels": {},
     }
     base.update(overrides)

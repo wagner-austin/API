@@ -14,7 +14,12 @@ import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
 from hpc3.cli import image as image_cli
-from hpc3.core.image_layout import DEFINITION_NAME, REQUIREMENTS_NAME, SELFCHECK_NAME
+from hpc3.core.image_layout import (
+    DEFINITION_NAME,
+    REQUIREMENTS_NAME,
+    SBATCH_NAME,
+    SELFCHECK_NAME,
+)
 
 _COMMIT = "d11efacd231ef92426eaf92483c33a8504bd770f"
 
@@ -39,6 +44,7 @@ def _payload(**overrides: JSONValue) -> dict[str, JSONValue]:
         "required_symbols": [
             {"module": "model_trainer.cluster.preflight", "attribute": "check_corpus_certified"}
         ],
+        "smoke_commands": [],
         "labels": {"org.corvis.captured": "2026-08-25"},
     }
     base.update(overrides)
@@ -60,6 +66,35 @@ def _write_spec(tmp_path: pathlib.Path, payload: JSONValue) -> pathlib.Path:
     return path
 
 
+JOB_NAME = "img.abl-sif-test"
+IMAGE_DIR = "/pub/wagnera3/images/test"
+
+
+def _argv(spec_path: pathlib.Path, out_dir: pathlib.Path) -> list[str]:
+    """Build a complete command line for the renderer.
+
+    Args:
+        spec_path: The spec document to render from.
+        out_dir: Directory the rendered files are written to.
+
+    Returns:
+        Every required flag, so a new one is added in a single place rather
+        than in each of the call sites that previously spelled the list out.
+    """
+    return [
+        "--spec",
+        str(spec_path),
+        "--out-dir",
+        str(out_dir),
+        "--image-name",
+        "abl.sif",
+        "--job-name",
+        JOB_NAME,
+        "--image-dir",
+        IMAGE_DIR,
+    ]
+
+
 def _render(tmp_path: pathlib.Path, payload: JSONValue) -> pathlib.Path:
     """Run the CLI and return the output directory.
 
@@ -72,37 +107,26 @@ def _render(tmp_path: pathlib.Path, payload: JSONValue) -> pathlib.Path:
     """
     spec_path = _write_spec(tmp_path, payload)
     out_dir = tmp_path / "build"
-    assert (
-        image_cli.main(
-            [
-                "--spec",
-                str(spec_path),
-                "--out-dir",
-                str(out_dir),
-                "--image-name",
-                "abl.sif",
-            ]
-        )
-        == 0
-    )
+    assert image_cli.main(_argv(spec_path, out_dir)) == 0
     return out_dir
 
 
 class TestItWritesEveryFile:
-    """Four artifacts, one document."""
+    """Five artifacts, one document."""
 
-    def test_all_four_files_are_written(self, tmp_path: pathlib.Path, emitted: list[str]) -> None:
+    def test_every_file_is_written(self, tmp_path: pathlib.Path, emitted: list[str]) -> None:
         out_dir = _render(tmp_path, _payload())
         written = sorted(p.name for p in out_dir.iterdir())
         assert written == sorted(
             [
                 DEFINITION_NAME,
                 REQUIREMENTS_NAME,
+                SBATCH_NAME,
                 image_cli.BUILD_SCRIPT_NAME,
                 SELFCHECK_NAME,
             ]
         )
-        assert len(emitted) == 6
+        assert len(emitted) == 7
 
     def test_it_creates_a_missing_output_directory(
         self, tmp_path: pathlib.Path, emitted: list[str]
@@ -163,18 +187,14 @@ class TestItRefusesRatherThanRenders:
         spec_path = _write_spec(tmp_path, _payload(requirements=["torch"]))
         out_dir = tmp_path / "build"
         with pytest.raises(JSONTypeError, match="must pin an exact version"):
-            _ = image_cli.main(
-                ["--spec", str(spec_path), "--out-dir", str(out_dir), "--image-name", "abl.sif"]
-            )
+            _ = image_cli.main(_argv(spec_path, out_dir))
         assert not out_dir.exists()
 
     def test_a_bind_mounted_env_prefix_writes_nothing(self, tmp_path: pathlib.Path) -> None:
         spec_path = _write_spec(tmp_path, _payload(env_prefix="/pub/wagnera3/envs/abl"))
         out_dir = tmp_path / "build"
         with pytest.raises(JSONTypeError, match="bind-mounts over"):
-            _ = image_cli.main(
-                ["--spec", str(spec_path), "--out-dir", str(out_dir), "--image-name", "abl.sif"]
-            )
+            _ = image_cli.main(_argv(spec_path, out_dir))
         assert not out_dir.exists()
 
     def test_a_missing_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
@@ -210,15 +230,7 @@ class TestEntrypoint:
     ) -> None:
         spec_path = _write_spec(tmp_path, _payload())
         out_dir = tmp_path / "build"
-        argv[:] = [
-            "prog",
-            "--spec",
-            str(spec_path),
-            "--out-dir",
-            str(out_dir),
-            "--image-name",
-            "abl.sif",
-        ]
+        argv[:] = ["prog", *_argv(spec_path, out_dir)]
 
         with pytest.raises(SystemExit) as excinfo:
             image_cli.entrypoint()
@@ -231,15 +243,7 @@ class TestEntrypoint:
         """A contract refusal is a refusal, not a crash: status 2, no files."""
         spec_path = _write_spec(tmp_path, _payload(requirements=["torch"]))
         out_dir = tmp_path / "build"
-        argv[:] = [
-            "prog",
-            "--spec",
-            str(spec_path),
-            "--out-dir",
-            str(out_dir),
-            "--image-name",
-            "abl.sif",
-        ]
+        argv[:] = ["prog", *_argv(spec_path, out_dir)]
 
         with pytest.raises(SystemExit) as excinfo:
             image_cli.entrypoint()

@@ -30,6 +30,7 @@ and cannot be recovered.
 from __future__ import annotations
 
 import pathlib
+import re
 import sys
 from collections.abc import Sequence
 
@@ -71,6 +72,43 @@ _CONTROL_CARD = "SYNTHETIC CONTROL CARD"
 
 # The drift a bit-exact entry must reject.
 _CONTROL_DRIFT = 1e-9
+
+# A non-negative decimal, with or without an exponent. No leading sign: the
+# contract rejects a negative tolerance, and refusing it at the boundary is
+# cheaper than decoding one and refusing it later.
+_TOLERANCE_PATTERN = re.compile(r"[0-9]+(?:\.[0-9]+)?(?:[eE][-+]?[0-9]+)?")
+
+
+def parse_tolerance(raw: str) -> float:
+    """Validate a tolerance argument and convert it.
+
+    The input is checked against the accepted shape FIRST, so the conversion
+    that follows cannot fail. Wrapping ``float()`` in a try/except would
+    convert a caller mistake into a caught exception and re-raise it, which
+    is the same outcome by a route that hides where the failure is decided.
+    A validated string has one behaviour and it is visible here.
+
+    The pattern admits no leading sign, which enforces the contract's other
+    rule at the boundary: a negative tolerance admits no value at all, so an
+    answer carrying one can only ever report a deviation and would read as a
+    broken image rather than a broken answer.
+
+    Args:
+        raw: The argument as typed, e.g. ``"0"`` or ``"1e-9"``.
+
+    Returns:
+        The tolerance.
+
+    Raises:
+        ValueError: If ``raw`` is not a non-negative decimal, with or without
+            an exponent. The message shows what was given, because the usual
+            cause is a shell mangling the value rather than a typo.
+    """
+    if _TOLERANCE_PATTERN.fullmatch(raw) is None:
+        raise ValueError(
+            f"{TOLERANCE_FLAG} must be a non-negative number such as '0' or '1e-9', got {raw!r}"
+        )
+    return float(raw)
 
 
 def load_record(path: pathlib.Path) -> RunRecord:
@@ -243,11 +281,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if mode == GATE_MODE:
         return run_gate(registry_path, record)
 
-    raw_tolerance = cli_args.require_flag(parsed, TOLERANCE_FLAG)
-    try:
-        tolerance = float(raw_tolerance)
-    except ValueError as exc:
-        raise ValueError(f"{TOLERANCE_FLAG} must be a number, got {raw_tolerance!r}") from exc
+    tolerance = parse_tolerance(cli_args.require_flag(parsed, TOLERANCE_FLAG))
     return run_register(registry_path, record, tolerance)
 
 
@@ -281,6 +315,7 @@ __all__ = [
     "entrypoint",
     "load_record",
     "main",
+    "parse_tolerance",
     "run_gate",
     "run_register",
 ]

@@ -161,6 +161,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         # asserts, rather than a second list that drifts from the first.
         expected_versions=dict(config["pinned_packages"]),
         required_symbols=symbols,
+        # Empty, and not because emptiness is a sensible default. Capture
+        # reads what an environment CONTAINS; a smoke command states what the
+        # image must be able to DO, which is a decision about the experiment
+        # and cannot be probed off a package list. Writing a guess here would
+        # put an assertion into an image that no author chose.
+        smoke_commands=[],
         labels={
             "org.corvis.project": project_name,
             "org.corvis.env-source": config["env_path"],

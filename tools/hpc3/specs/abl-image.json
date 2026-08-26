@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "368ad680374eb806d79e997fc46cc309f6539469",
+  "git_commit": "2c8eea3570a42883cb00f5269703eb9b9753327f",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -123,6 +123,9 @@
       "module": "model_trainer.cli.known_answer_probe",
       "attribute": "probe_run_record"
     }
+  ],
+  "smoke_commands": [
+    "/opt/env/bin/python -m model_trainer.cli.known_answer_probe --device cpu --out /tmp/probe.json"
   ],
   "labels": {
     "org.corvis.project": "mi",
