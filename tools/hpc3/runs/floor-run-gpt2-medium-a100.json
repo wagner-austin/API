@@ -2,6 +2,7 @@
   "project": "floor",
   "name": "floor-gpt2-medium-a100-v4",
   "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 modeltrainer-score-baseline --model gpt2-medium --items /pub/wagnera3/floor/cloze-items-80f9732a.jsonl --device cuda --max-seq-len 512 --experiment extraction-eval --label gpt2-medium-floor-2627items --out /pub/wagnera3/floor/results/gpt2-medium-floor-a100-v4.json --outcomes /pub/wagnera3/floor/results/gpt2-medium-outcomes-a100-v4.json",
+  "artifact": "/pub/wagnera3/floor/results/gpt2-medium-floor-a100-v4.json",
   "experiment": {
     "measurement": "gpt2-medium-cloze-floor",
     "items": "80f9732af6507fe65d8ece9042b12f3631c8452421ed37bcfc6b72b331ef379a",

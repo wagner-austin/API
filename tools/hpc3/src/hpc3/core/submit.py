@@ -128,6 +128,12 @@ def submit(
             log_dir=log_dir,
             deterministic=spec["deterministic"],
             experiment=spec["experiment"],
+            # The launcher is the only party that knows this: an image cannot
+            # compute its own digest from inside itself. Empty for a run out
+            # of a directory environment, which differs from every real digest
+            # rather than matching any of them.
+            image_digest="" if spec["image"] is None else spec["image"]["sha256"],
+            artifact=spec["artifact"],
         ),
     )
     audit.job_submitted(spec, host=host, job_id=job_id, cluster=cluster)

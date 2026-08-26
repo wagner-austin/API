@@ -40,7 +40,7 @@ from hpc3.contracts.workspace import (
     workspace_cluster,
 )
 
-RUN_IDENTITY_FIELDS = ("project", "name", "command", "experiment", "depends_on")
+RUN_IDENTITY_FIELDS = ("project", "name", "command", "experiment", "depends_on", "artifact")
 """What only a run can say. Never inherited, never optional.
 
 ``experiment`` is here rather than among the project defaults because what a
@@ -169,6 +169,10 @@ def resolve_run(workspace: Workspace, value: JSONValue) -> JobSpec:
     merged["command"] = document.get("command")
     merged["experiment"] = document.get("experiment")
     merged["depends_on"] = document.get("depends_on")
+    # Where this run was told to write its result. Only a run can say this --
+    # the project defaults cannot, because two runs of one project write to
+    # two different files, which is the whole reason the ledger needs it.
+    merged["artifact"] = document.get("artifact")
     return decode_job_spec(merged, workspace_cluster(workspace))
 
 

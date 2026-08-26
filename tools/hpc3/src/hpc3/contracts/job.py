@@ -145,6 +145,7 @@ class JobSpec(TypedDict):
     deterministic: bool
     experiment: dict[str, str]
     command: str
+    artifact: str | None
 
 
 def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
@@ -164,6 +165,53 @@ def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
     if value == "":
         raise JSONTypeError(f"Field '{key}' must not be empty")
     return value
+
+
+def require_artifact_in_command(obj: dict[str, JSONValue], command: str) -> str | None:
+    """Read the declared artifact path, and refuse one the command never writes.
+
+    The ledger is an index: job -> image -> artifact. A declaration nobody
+    checks turns that into a confident wrong answer -- a reader follows the
+    path, finds nothing, and cannot tell whether the run failed, wrote
+    somewhere else, or was never going to write at all.
+
+    The check is deliberately a substring test rather than a parse. This
+    contract does not know any payload's flags, and it should not: the claim
+    being verified is only that the path the ledger will publish is a path
+    this command mentions. That catches the failure that actually happens --
+    an output path edited in one place and not the other -- without pretending
+    to understand what the command does with it.
+
+    Args:
+        obj: The run document being decoded.
+        command: The command this run will execute, already validated.
+
+    Returns:
+        The declared path, or None when the run declares no artifact. None is
+        a legitimate answer: a smoke test and a staging job produce nothing
+        durable, and forcing them to name a file would put a fiction in the
+        index.
+
+    Raises:
+        JSONTypeError: If ``artifact`` is present but is not a non-empty
+            string, or names a path its own command does not contain.
+    """
+    artifact = obj.get("artifact")
+    if artifact is None:
+        return None
+    if not isinstance(artifact, str):
+        raise JSONTypeError(
+            f"Field 'artifact' must be a string or null, got {type(artifact).__name__}"
+        )
+    if artifact == "":
+        raise JSONTypeError("Field 'artifact' must name a path or be null, not an empty string")
+    if artifact not in command:
+        raise JSONTypeError(
+            f"Field 'artifact' names {artifact!r}, which does not appear in this run's "
+            "command. The ledger publishes this path as where the result will be, so a "
+            "declaration the command does not honour would index a file nobody writes."
+        )
+    return artifact
 
 
 def _require_env_path(obj: dict[str, JSONValue], image: ImageReference | None) -> str:
@@ -375,6 +423,7 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
         "requeue": spec["requeue"],
         "checkpoint_steps": spec["checkpoint_steps"],
         "depends_on": encode_dependency(spec["depends_on"]),
+        "artifact": spec["artifact"],
         "image": encode_image_reference(spec["image"]),
         "env_path": spec["env_path"],
         "pinned_packages": encode_pinned_packages(spec["pinned_packages"]),
@@ -424,6 +473,7 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
     _check_preemption_protection(cluster, partition, minutes, requeue, checkpoint_steps)
 
     image = decode_image_reference(value.get("image"), "image")
+    command = _require_nonempty_str(value, "command")
 
     return JobSpec(
         project=require_project(value, "project"),
@@ -441,7 +491,8 @@ def decode_job_spec(value: JSONValue, cluster: ClusterFacts) -> JobSpec:
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
         deterministic=require_bool(value, "deterministic"),
         experiment=require_experiment(value, "experiment"),
-        command=_require_nonempty_str(value, "command"),
+        command=command,
+        artifact=require_artifact_in_command(value, command),
     )
 
 
@@ -451,4 +502,5 @@ __all__ = [
     "JobSpec",
     "decode_job_spec",
     "encode_job_spec",
+    "require_artifact_in_command",
 ]

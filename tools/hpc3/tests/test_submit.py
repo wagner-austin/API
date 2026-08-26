@@ -188,6 +188,8 @@ class TestSubmitRecordsTheJob:
                 log_dir="/pub/wagnera3/logs",
                 deterministic=False,
                 experiment={"arm": "B", "seed": "42"},
+                image_digest="",
+                artifact=None,
             )
         ]
 

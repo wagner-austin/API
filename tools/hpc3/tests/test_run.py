@@ -100,6 +100,7 @@ class TestResolveRun:
             "depends_on": None,
             "experiment": {"arm": "B", "seed": "42"},
             "command": "python train.py --arm B",
+            "artifact": None,
         }
 
     def test_changing_a_project_default_changes_every_run(self) -> None:

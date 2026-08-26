@@ -63,6 +63,29 @@ class LedgerEntry(TypedDict):
             the job; this one says which result it produced, which is the
             question asked months later when an outcome file needs tracing
             back to the run that made it.
+        image_digest: Content digest of the image the payload was launched
+            in, or empty for a run out of a directory environment. Recorded
+            because the LEDGER is the index and the launcher is the only
+            party that knows this: an image cannot compute its own digest
+            from inside itself, so the digest exists here and in the job's
+            ``--comment`` and nowhere else durable. Without it a reader can
+            find which job produced a result and cannot say which software
+            produced it, which is half an answer.
+
+            Empty string rather than absent for a directory run, matching
+            :data:`~platform_core.comparability.NO_VALUE`: it differs from
+            every real digest rather than matching any of them.
+        artifact: Where the run was TOLD to write its manifest, or None when
+            it declares none. Request-side by construction, and that is the
+            point of it living here: this ledger records what was asked for,
+            while the manifest at that path records what happened. A reader
+            follows job -> image -> artifact and then reads the fact.
+
+            It is not taken on trust. ``decode_job_spec`` refuses a run whose
+            declared artifact does not appear in its own command, because a
+            declaration that drifts from the command points the index at a
+            file nobody writes -- which is worse than no index, being a
+            confident wrong answer.
     """
 
     job_id: str
@@ -74,6 +97,8 @@ class LedgerEntry(TypedDict):
     log_dir: str
     deterministic: bool
     experiment: dict[str, str]
+    image_digest: str
+    artifact: str | None
 
 
 def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
@@ -97,6 +122,67 @@ def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
     return value
 
 
+def _optional_str_or_empty(obj: dict[str, JSONValue], key: str) -> str:
+    """Read a field that may be absent from a row written before it existed.
+
+    The ledger is APPEND-ONLY and the live one on the cluster has rows going
+    back before this field. Requiring it would make `hpc3-triage` and
+    `hpc3-trace` fail to read the history they exist to read -- and reading
+    history is not comparing, the same reasoning that lets a training
+    manifest decode without a fingerprint.
+
+    Absence yields the empty string, which is what a directory run records
+    too. Both mean "no image digest here", which is the honest reading of
+    each.
+
+    Args:
+        obj: Object being decoded.
+        key: Field name.
+
+    Returns:
+        The value, or the empty string when absent or null.
+
+    Raises:
+        JSONTypeError: If the field is present, not null, and not a string.
+            Present-but-mistyped is a corrupted row, not an old one.
+    """
+    value = obj.get(key)
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise JSONTypeError(f"Field '{key}' must be a string or null, got {type(value).__name__}")
+    return value
+
+
+def _optional_nonempty_str(obj: dict[str, JSONValue], key: str) -> str | None:
+    """Read a field that may be null but must not be an empty string.
+
+    Null and empty are different claims and only one is meaningful here.
+    Null says the run declares no artifact. An empty string would say it
+    declares one and then names nowhere, which is a record that reads as an
+    answer and is not one.
+
+    Args:
+        obj: Object being decoded.
+        key: Field name.
+
+    Returns:
+        The value, or None when the field is absent or explicitly null.
+
+    Raises:
+        JSONTypeError: If the field is present, not null, and not a non-empty
+            string.
+    """
+    value = obj.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise JSONTypeError(f"Field '{key}' must be a string or null, got {type(value).__name__}")
+    if value == "":
+        raise JSONTypeError(f"Field '{key}' must name a path or be null, not an empty string")
+    return value
+
+
 def encode_ledger_entry(entry: LedgerEntry) -> dict[str, JSONValue]:
     """Encode a ledger entry to a JSON object.
 
@@ -116,6 +202,8 @@ def encode_ledger_entry(entry: LedgerEntry) -> dict[str, JSONValue]:
         "log_dir": entry["log_dir"],
         "deterministic": entry["deterministic"],
         "experiment": encode_experiment(entry["experiment"]),
+        "image_digest": entry["image_digest"],
+        "artifact": entry["artifact"],
     }
 
 
@@ -150,6 +238,8 @@ def decode_ledger_entry(value: JSONValue, cluster: ClusterFacts) -> LedgerEntry:
         log_dir=_require_nonempty_str(value, "log_dir"),
         deterministic=require_bool(value, "deterministic"),
         experiment=require_experiment(value, "experiment"),
+        image_digest=_optional_str_or_empty(value, "image_digest"),
+        artifact=_optional_nonempty_str(value, "artifact"),
     )
 
 

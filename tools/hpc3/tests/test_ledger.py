@@ -113,8 +113,81 @@ class TestLedgerEntryContract:
             "log_dir": "/pub/wagnera3/logs",
             "deterministic": False,
             "experiment": {"arm": "B", "seed": "42"},
+            "image_digest": "sha256:" + "ab" * 32,
+            "artifact": "/pub/wagnera3/floor/results/run.json",
         }
         assert encode_ledger_entry(decode_ledger_entry(payload)) == payload
+
+    @staticmethod
+    def _row() -> dict[str, JSONValue]:
+        """A ledger row carrying only the fields that predate the index.
+
+        Returns:
+            The row, ready to extend with whatever a case is testing.
+        """
+        return {
+            "job_id": "101",
+            "project": "abl",
+            "name": "abl.arm-b-42",
+            "host": "hpc3",
+            "partition": "free-gpu",
+            "submitted_at": "2026-08-22T16:00:00+00:00",
+            "log_dir": "/pub/wagnera3/logs",
+            "deterministic": False,
+            "experiment": {"arm": "B", "seed": "42"},
+        }
+
+    def test_a_row_written_before_the_index_fields_existed_still_reads(self) -> None:
+        """The ledger is APPEND-ONLY and the live one predates both fields.
+
+        Requiring them would make `hpc3-triage` and `hpc3-trace` fail to read
+        the history they exist to read. Reading history is not comparing --
+        the same reasoning that lets a training manifest decode without a
+        fingerprint.
+        """
+        old_row: dict[str, JSONValue] = {
+            "job_id": "101",
+            "project": "abl",
+            "name": "abl.arm-b-42",
+            "host": "hpc3",
+            "partition": "free-gpu",
+            "submitted_at": "2026-08-22T16:00:00+00:00",
+            "log_dir": "/pub/wagnera3/logs",
+            "deterministic": False,
+            "experiment": {"arm": "B", "seed": "42"},
+        }
+
+        entry = decode_ledger_entry(old_row)
+
+        assert entry["image_digest"] == ""
+        assert entry["artifact"] is None
+
+    def test_a_mistyped_image_digest_is_a_corrupted_row_not_an_old_one(self) -> None:
+        """Absent is history; present-and-wrong is corruption, and they differ."""
+        with pytest.raises(JSONTypeError, match="must be a string or null"):
+            decode_ledger_entry({**self._row(), "image_digest": 7})
+
+    def test_a_mistyped_artifact_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must be a string or null"):
+            decode_ledger_entry({**self._row(), "artifact": 7})
+
+    def test_an_artifact_naming_nowhere_is_refused(self) -> None:
+        """Null says "declares none"; empty says "declares one, names nowhere"."""
+        with pytest.raises(JSONTypeError, match="not an empty string"):
+            decode_ledger_entry(
+                {
+                    "job_id": "101",
+                    "project": "abl",
+                    "name": "abl.arm-b-42",
+                    "host": "hpc3",
+                    "partition": "free-gpu",
+                    "submitted_at": "2026-08-22T16:00:00+00:00",
+                    "log_dir": "/pub/wagnera3/logs",
+                    "deterministic": False,
+                    "experiment": {"arm": "B", "seed": "42"},
+                    "artifact": "",
+                }
+            )
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):

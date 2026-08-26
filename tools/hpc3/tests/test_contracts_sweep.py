@@ -48,6 +48,7 @@ def _base(**overrides: JSONValue) -> dict[str, JSONValue]:
         "depends_on": None,
         "experiment": {"rung": "774M"},
         "command": "python train.py",
+        "artifact": None,
     }
     base.update(overrides)
     return base
@@ -62,7 +63,10 @@ def _members(count: int) -> list[JSONValue]:
     Returns:
         Member payloads, suffixed by index.
     """
-    return [{"suffix": f"s{i}", "command": f"python train.py --seed {i}"} for i in range(count)]
+    return [
+        {"suffix": f"s{i}", "command": f"python train.py --seed {i}", "artifact": None}
+        for i in range(count)
+    ]
 
 
 def _sweep(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -219,7 +223,26 @@ class TestMemberValidation:
 
     def test_a_valid_member_decodes(self) -> None:
         member = decode_sweep_member({"suffix": "s0", "command": "python x.py"})
-        assert member == {"suffix": "s0", "command": "python x.py"}
+        assert member == {"suffix": "s0", "command": "python x.py", "artifact": None}
+
+    def test_a_member_declaring_an_artifact_its_command_writes_is_kept(self) -> None:
+        """Per member, because six arms writing one path are five lost results."""
+        member = decode_sweep_member(
+            {"suffix": "s0", "command": "python x.py --out /r/s0.json", "artifact": "/r/s0.json"}
+        )
+
+        assert member["artifact"] == "/r/s0.json"
+
+    def test_a_member_whose_artifact_its_command_never_writes_is_refused(self) -> None:
+        """The suffix edited in one place and not the other -- the real failure."""
+        with pytest.raises(JSONTypeError, match="does not appear in this run's command"):
+            decode_sweep_member(
+                {
+                    "suffix": "s1",
+                    "command": "python x.py --out /r/s0.json",
+                    "artifact": "/r/s1.json",
+                }
+            )
 
 
 class TestSweepValidation:

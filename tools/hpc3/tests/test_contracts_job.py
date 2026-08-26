@@ -47,6 +47,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "depends_on": None,
         "experiment": {"arm": "B", "seed": "42"},
         "command": "python train.py",
+        "artifact": None,
     }
     base.update(overrides)
     return base
@@ -60,6 +61,7 @@ class TestValidSpec:
     def test_decode_returns_every_field(self) -> None:
         decoded = decode_job_spec(_spec())
         assert sorted(decoded.keys()) == [
+            "artifact",
             "checkpoint_steps",
             "command",
             "cpus",
@@ -77,6 +79,37 @@ class TestValidSpec:
             "project",
             "requeue",
         ]
+
+
+class TestTheDeclaredArtifactIsCheckedAgainstItsOwnCommand:
+    """The ledger publishes this path, so a declaration nobody checks turns
+    the index into a confident wrong answer -- a reader follows it, finds
+    nothing, and cannot tell failure from misdeclaration."""
+
+    def test_a_path_the_command_writes_is_kept(self) -> None:
+        spec = decode_job_spec(
+            _spec(command="score --out /r/a.json", artifact="/r/a.json"),
+        )
+
+        assert spec["artifact"] == "/r/a.json"
+
+    def test_a_path_the_command_never_mentions_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="does not appear in this run's command"):
+            decode_job_spec(_spec(command="score --out /r/a.json", artifact="/r/b.json"))
+
+    def test_declaring_none_is_allowed_because_some_runs_write_nothing(self) -> None:
+        """A smoke test produces nothing durable; naming a file would be a
+        fiction in the index."""
+        assert decode_job_spec(_spec(artifact=None))["artifact"] is None
+
+    def test_a_non_string_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must be a string or null"):
+            decode_job_spec(_spec(artifact=7))
+
+    def test_an_empty_string_is_refused_rather_than_read_as_none(self) -> None:
+        """Null declares no artifact; empty declares one and names nowhere."""
+        with pytest.raises(JSONTypeError, match="not an empty string"):
+            decode_job_spec(_spec(artifact=""))
 
 
 class TestRuleGpuMustBeNamed:

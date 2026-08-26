@@ -26,7 +26,12 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from hpc3.contracts.cluster import ClusterFacts, gpu_count, partition_facts
-from hpc3.contracts.job import JobSpec, decode_job_spec, encode_job_spec
+from hpc3.contracts.job import (
+    JobSpec,
+    decode_job_spec,
+    encode_job_spec,
+    require_artifact_in_command,
+)
 
 
 class SweepMember(TypedDict):
@@ -38,10 +43,16 @@ class SweepMember(TypedDict):
             filenames and two jobs sharing one would interleave into the
             same file.
         command: Payload for this member, replacing the template's.
+        artifact: Where this member was told to write its result, or None.
+            Per member rather than per sweep, for the same reason the command
+            is: six arms writing to one path are five results nobody can
+            read. Checked against this member's OWN command, so a suffix
+            edited in the command and not the path fails here.
     """
 
     suffix: str
     command: str
+    artifact: str | None
 
 
 class SweepSpec(TypedDict):
@@ -94,6 +105,7 @@ def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
             # cannot tell apart, which is the failure this field exists for.
             experiment={**spec["base"]["experiment"], "member": member["suffix"]},
             command=member["command"],
+            artifact=member["artifact"],
         )
         for member in spec["members"]
     ]
@@ -137,7 +149,12 @@ def decode_sweep_member(value: JSONValue) -> SweepMember:
     suffix = _require_nonempty_str(value, "suffix")
     if "/" in suffix or "\\" in suffix:
         raise JSONTypeError(f"Field 'suffix' must not contain a path separator, got {suffix!r}")
-    return SweepMember(suffix=suffix, command=_require_nonempty_str(value, "command"))
+    command = _require_nonempty_str(value, "command")
+    return SweepMember(
+        suffix=suffix,
+        command=command,
+        artifact=require_artifact_in_command(value, command),
+    )
 
 
 def _check_ceilings(cluster: ClusterFacts, base: JobSpec, count: int) -> None:
@@ -207,7 +224,12 @@ def encode_sweep_spec(spec: SweepSpec) -> dict[str, JSONValue]:
         JSON-serialisable mapping carrying every field.
     """
     members: list[JSONValue] = [
-        {"suffix": member["suffix"], "command": member["command"]} for member in spec["members"]
+        {
+            "suffix": member["suffix"],
+            "command": member["command"],
+            "artifact": member["artifact"],
+        }
+        for member in spec["members"]
     ]
     return {"base": encode_job_spec(spec["base"]), "members": members}
 
