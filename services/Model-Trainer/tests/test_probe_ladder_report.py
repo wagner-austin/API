@@ -209,6 +209,113 @@ class TestFindingTheThreshold:
             report_cli.rung_agreement(self._agreement(break_at=None), "gigantic")
 
 
+class TestTheConfigurationSection:
+    """Whether the runs differ only in card is computed, not left to the eye."""
+
+    def _named(self, *records: tuple[str, RunRecord]) -> tuple[tuple[str, RunRecord], ...]:
+        """Pair records with filenames for the report."""
+        return records
+
+    def test_the_first_run_is_the_reference(self) -> None:
+        lines = report_cli.configuration_lines(
+            self._named(
+                ("v100.json", full_ladder("Tesla V100")),
+                ("a100.json", full_ladder("NVIDIA A100 80GB PCIe")),
+            )
+        )
+
+        assert lines[0] == "  [0] v100.json  (reference)"
+
+    def test_a_card_difference_is_named_as_the_axis_it_is(self) -> None:
+        lines = report_cli.configuration_lines(
+            self._named(
+                ("v100.json", full_ladder("Tesla V100")),
+                ("a100.json", full_ladder("NVIDIA A100 80GB PCIe")),
+            )
+        )
+
+        assert lines[1] == "  [1] a100.json  differs on: gpu_model"
+
+    def test_two_runs_on_one_configuration_say_so(self) -> None:
+        # Not a silent empty list. "These are the same configuration" is a
+        # fact worth reading -- it means the comparison is a repeat, not a
+        # cross-card measurement.
+        lines = report_cli.configuration_lines(
+            self._named(
+                ("first.json", full_ladder("Tesla V100")),
+                ("second.json", full_ladder("Tesla V100")),
+            )
+        )
+
+        assert lines[1] == "  [1] second.json  differs on: identical to the reference"
+
+    def test_a_differing_image_is_called_out_and_not_merely_listed(self) -> None:
+        # THE case this section exists for: the local 3090 Ti runs carry no
+        # image digest, and dropped into a directory of cluster records they
+        # would produce a confident-looking cross-card answer that confounds
+        # image with card.
+        elsewhere = ladder_record("NVIDIA GeForce RTX 3090 Ti", {"tiny": GATE_VALUE})
+        moved: RunRecord = {
+            **elsewhere,
+            "fingerprint": RunFingerprint(
+                image_digest="",
+                gpu_model=elsewhere["fingerprint"]["gpu_model"],
+                driver_version=elsewhere["fingerprint"]["driver_version"],
+                determinism=PINNED,
+            ),
+        }
+        lines = report_cli.configuration_lines(
+            self._named(("v100.json", full_ladder("Tesla V100")), ("local.json", moved))
+        )
+
+        assert "image_digest" in lines[1]
+        assert any("do not all share one image_digest" in line for line in lines)
+
+    def test_a_card_difference_alone_raises_no_warning(self) -> None:
+        # The warning has to stay rare or it stops being read. A different
+        # card is the POINT of the measurement, not a confound.
+        lines = report_cli.configuration_lines(
+            self._named(
+                ("v100.json", full_ladder("Tesla V100")),
+                ("a100.json", full_ladder("NVIDIA A100 80GB PCIe")),
+            )
+        )
+
+        assert not any(line.strip().startswith("!!") for line in lines)
+
+    def test_one_confounded_axis_is_reported_once_however_many_runs_carry_it(self) -> None:
+        stray = ladder_record("NVIDIA A30", {"tiny": GATE_VALUE})
+        moved: RunRecord = {
+            **stray,
+            "fingerprint": RunFingerprint(
+                image_digest="sha256:different",
+                gpu_model=stray["fingerprint"]["gpu_model"],
+                driver_version=stray["fingerprint"]["driver_version"],
+                determinism=PINNED,
+            ),
+        }
+        lines = report_cli.configuration_lines(
+            self._named(
+                ("v100.json", full_ladder("Tesla V100")),
+                ("a.json", moved),
+                ("b.json", moved),
+            )
+        )
+
+        assert sum("do not all share one image_digest" in line for line in lines) == 1
+
+    def test_the_section_appears_in_the_report(self) -> None:
+        lines = report_cli.report_lines(
+            (
+                ("v100.json", full_ladder("Tesla V100")),
+                ("a100.json", full_ladder("NVIDIA A100 80GB PCIe")),
+            )
+        )
+
+        assert "configuration" in lines
+        assert "  [1] a100.json  differs on: gpu_model" in lines
+
+
 class TestTheReport:
     def _lines(self, *, break_at: str | None) -> tuple[str, ...]:
         """Render a two-card report."""

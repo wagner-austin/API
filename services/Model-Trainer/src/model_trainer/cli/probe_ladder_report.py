@@ -12,11 +12,20 @@ is added: a reader who finds it cannot tell whether it covers three cards or
 five. The records are the durable artifact; this is a view of them, and
 re-running it is cheap.
 
-WHAT IT DOES NOT DO. It does not check that the runs differ only on the axis
-under study. The caller submitted them and knows; the fingerprints are
-printed in full so a reader can see for themselves, and a set that differs in
-image digest as well as card is a set whose disagreement means nothing. The
-header exists to make that visible rather than to be believed.
+WHY IT COMPUTES THE CONFIGURATION DIFFERENCES RATHER THAN PRINTING
+FINGERPRINTS AND TRUSTING THE READER. An earlier revision did the latter, on
+the reasoning that the caller submitted the runs and knows what they are.
+That is the same shape as every defect this apparatus exists to catch: a
+check a person has to remember to perform by eye is not a check. So each run
+is differenced against the first with
+:func:`~platform_core.comparability.find_differences` and the axes are named.
+
+A difference on :const:`CONFOUNDING_AXES` is called out rather than listed,
+because it does not qualify the reading -- it destroys it. Two runs in
+different images that disagree at a rung have told you nothing about cards.
+The command still prints the whole report: refusing would hide the numbers
+from someone who has a reason to look at them, and a warning they cannot
+miss does the job without deciding for them.
 """
 
 from __future__ import annotations
@@ -26,6 +35,7 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
+from platform_core.comparability import find_differences
 from platform_core.json_utils import load_json_str
 from platform_core.logging import get_logger, setup_logging
 from platform_core.run_record import (
@@ -55,6 +65,15 @@ _FLAGS = (DIR_FLAG,)
 #: anything shorter would print two differing values identically -- which is
 #: the exact mistake this command exists to prevent.
 VALUE_DIGITS = 17
+
+#: Fingerprint axes whose difference makes a cross-card reading meaningless
+#: rather than merely qualified. Two runs in different images that disagree at
+#: a rung have not told you anything about their cards -- the image is the
+#: variable the whole apparatus pins so that the card can be the one that
+#: moves. Determinism is deliberately absent: it is a nested record whose
+#: differences the per-axis listing already names, and a change to it is a
+#: finding rather than a confound.
+CONFOUNDING_AXES = ("image_digest",)
 
 
 def read_ladder_records(directory: pathlib.Path) -> tuple[tuple[str, RunRecord], ...]:
@@ -133,6 +152,38 @@ def first_disagreement(agreement: RunAgreement, axis: ProbeAxis) -> str | None:
     return None
 
 
+def configuration_lines(named_records: tuple[tuple[str, RunRecord], ...]) -> tuple[str, ...]:
+    """Report how each run's configuration differs from the first.
+
+    The first run is the reference simply because a set needs one; which run
+    holds the position does not change which axes are named.
+
+    Args:
+        named_records: ``(filename, record)`` pairs, in report order.
+
+    Returns:
+        One line per run, plus a warning line for every confounding axis found
+        anywhere in the set.
+    """
+    reference = named_records[0][1]["fingerprint"]
+    lines = [f"  [0] {named_records[0][0]}  (reference)"]
+    confounded: list[str] = []
+
+    for index, (name, record) in enumerate(named_records[1:], start=1):
+        differences = find_differences(reference, record["fingerprint"])
+        axes = [d["axis"] for d in differences]
+        described = ", ".join(axes) if axes else "identical to the reference"
+        lines.append(f"  [{index}] {name}  differs on: {described}")
+        confounded.extend(axis for axis in axes if axis in CONFOUNDING_AXES)
+
+    for axis in sorted(set(confounded)):
+        lines.append(f"  !! these runs do not all share one {axis}. A disagreement between")
+        lines.append(
+            "     them is not a fact about the cards, and this report cannot separate them."
+        )
+    return tuple(lines)
+
+
 def _rung_line(rung: str, entry: ObservationAgreement | None) -> str:
     """Render one rung's row.
 
@@ -172,6 +223,9 @@ def report_lines(named_records: tuple[tuple[str, RunRecord], ...]) -> tuple[str,
         f"  [{index}] {name}  {describe_run_fingerprint(record['fingerprint'])}"
         for index, (name, record) in enumerate(named_records)
     ]
+    lines.append("")
+    lines.append("configuration")
+    lines += list(configuration_lines(named_records))
 
     for axis in PROBE_AXES:
         lines.append("")
@@ -233,7 +287,9 @@ def entrypoint() -> None:
 
 
 __all__ = [
+    "CONFOUNDING_AXES",
     "VALUE_DIGITS",
+    "configuration_lines",
     "entrypoint",
     "first_disagreement",
     "main",
