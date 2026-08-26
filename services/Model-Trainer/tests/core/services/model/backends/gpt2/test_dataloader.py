@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 
 import torch
 
@@ -8,20 +8,35 @@ from model_trainer.core.services.training.dataloader import DataLoader
 
 
 class _Ds:
+    """A dataset shaped like the one the loader actually accepts.
+
+    ``_Indexable`` requires ``__getitem__`` to return an (input, target)
+    pair, which is what every real dataset here yields and what torch's
+    ``default_collate`` needs in order to stack a batch. This fake returned a
+    bare tensor, so it did not satisfy the protocol it was being passed as.
+    """
+
     def __init__(self: _Ds, n: int) -> None:
         self._n = n
 
     def __len__(self: _Ds) -> int:
         return self._n
 
-    def __getitem__(self: _Ds, idx: int) -> torch.Tensor:
-        return torch.tensor(idx, dtype=torch.long)
+    def __getitem__(self: _Ds, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        item = torch.tensor(idx, dtype=torch.long)
+        return item, item
 
 
-def _collect_sizes(it: Generator[torch.Tensor, None, None]) -> list[int]:
+def _collect_sizes(it: Generator[Sequence[torch.Tensor], None, None]) -> list[int]:
+    """Return the batch dimension of each batch the loader yields.
+
+    ``default_collate`` turns a batch of 2-tuples into a two-element sequence
+    of stacked tensors, so the batch size is read off the first element
+    rather than off the batch itself.
+    """
     out: list[int] = []
     for batch in it:
-        out.append(int(batch.size(0)))
+        out.append(int(batch[0].size(0)))
     return out
 
 

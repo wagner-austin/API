@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 import pytest
+from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
@@ -501,7 +502,11 @@ class TestDefaultCreateTrainer:
             progress=None,
             service_name="test-service",
             wandb_publisher=None,
-            determinism=None,
+            # "Deliberately not pinned" is a posture, not an absence, and the
+            # parameter is not optional -- a run that records nothing cannot
+            # afterwards say what it ran under. UNPINNED_STACK is what the
+            # record carries when setup_env declines to pin.
+            determinism=determinism_record(UNPINNED_STACK, {}),
         )
 
         # Verify trainer has expected methods
