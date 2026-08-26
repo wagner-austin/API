@@ -472,28 +472,6 @@ def decode_google_credentials_file(data: JSONObject) -> GoogleCredentialsFile:
     )
 
 
-# GoogleTokenResponse is now an alias to the centralized OAuthTokenResponse.
-# Kept for backward compatibility with existing code.
-GoogleTokenResponse = OAuthTokenResponse
-
-
-def decode_google_token_response(data: JSONObject) -> GoogleTokenResponse:
-    """Decode Google token response with validation.
-
-    This is an alias to decode_oauth_token_response for backward compatibility.
-
-    Args:
-        data: JSON object to decode.
-
-    Returns:
-        Validated GoogleTokenResponse (same as OAuthTokenResponse).
-
-    Raises:
-        JSONTypeError: If required fields are missing or invalid.
-    """
-    return decode_oauth_token_response(data)
-
-
 __all__ = [
     "DEFAULT_REMINDERS",
     "CalendarAccessRole",
@@ -506,7 +484,6 @@ __all__ = [
     "EventStatus",
     "GoogleCredentialsFile",
     "GoogleInstalledCredentials",
-    "GoogleTokenResponse",
     "OAuthCredentials",
     "OAuthTokenResponse",
     "OAuthTokens",
@@ -520,7 +497,6 @@ __all__ = [
     "decode_event_datetime",
     "decode_event_reminders",
     "decode_google_credentials_file",
-    "decode_google_token_response",
     "decode_oauth_credentials",
     "decode_oauth_token_response",
     "decode_oauth_tokens",

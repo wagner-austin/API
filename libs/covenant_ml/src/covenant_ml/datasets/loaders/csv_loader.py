@@ -21,8 +21,6 @@ from covenant_ml.datasets.loaders._parsing import (
     encode_categorical_value,
     encode_label,
     find_column_index,
-    is_numeric_value,
-    is_simple_numeric,
     parse_numeric_value,
 )
 from covenant_ml.datasets.loaders.chunked_csv_reader import read_csv_with_progress
@@ -210,29 +208,6 @@ class CSVLoader:
         save_to_cache(dataset, cache_dir, progress_callback)
 
         return dataset
-
-    # Expose shared utilities as instance methods for backward compatibility with tests
-    def _is_numeric_value(self, value: str) -> bool:
-        """Check if a string value can be parsed as a float.
-
-        Args:
-            value: Stripped string value to check.
-
-        Returns:
-            True if value is numeric, False if categorical.
-        """
-        return is_numeric_value(value)
-
-    def _is_simple_numeric(self, value: str) -> bool:
-        """Check if a string is a simple numeric value (integer or decimal).
-
-        Args:
-            value: String to check (no sign prefix, no scientific notation).
-
-        Returns:
-            True if value is a simple numeric format.
-        """
-        return is_simple_numeric(value)
 
 
 def _encode_rows(

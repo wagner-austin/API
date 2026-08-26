@@ -107,7 +107,6 @@ def decode_wrapped_generate(doc: JSONValue) -> GenerateRequest:
 
 __all__ = [
     "GenerateRequest",
-    "LastFmGenerate",
     "decode_apple_credentials",
     "decode_apple_store",
     "decode_spotify_credentials",
@@ -116,9 +115,6 @@ __all__ = [
     "is_full_lastfm_credentials",
     "to_full_lastfm_credentials",
 ]
-
-# Back-compat alias for clearer naming at call sites
-LastFmGenerate = GenerateRequest
 
 
 class _TokenRef(TypedDict):

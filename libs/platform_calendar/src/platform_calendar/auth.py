@@ -38,7 +38,7 @@ from platform_calendar.testing import hooks
 from platform_calendar.types import (
     OAuthCredentials,
     OAuthTokens,
-    decode_google_token_response,
+    decode_oauth_token_response,
 )
 
 # =============================================================================
@@ -136,7 +136,7 @@ def exchange_code_for_tokens(
         msg = f"Token exchange failed: {error_desc}"
         raise AppError(CalendarErrorCode.AUTH_FAILED, msg, http_status=401)
 
-    token_response = decode_google_token_response(data)
+    token_response = decode_oauth_token_response(data)
     current_time = hooks.current_time()
     expires_at = current_time + token_response["expires_in"]
 
@@ -208,7 +208,7 @@ def refresh_access_token(
         msg = f"Token refresh failed: {error_desc}"
         raise AppError(CalendarErrorCode.TOKEN_EXPIRED, msg, http_status=401)
 
-    token_response = decode_google_token_response(data)
+    token_response = decode_oauth_token_response(data)
     current_time = hooks.current_time()
     expires_at = current_time + token_response["expires_in"]
 

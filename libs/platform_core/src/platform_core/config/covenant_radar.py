@@ -60,7 +60,6 @@ class CovenantRadarAppConfig(TypedDict, total=True):
     data_root: str
     models_root: str
     logs_root: str
-    active_model_path: str
     ml_backend: MLBackend
     active_model_path_xgb: str
     active_model_path_mlp: str
@@ -117,7 +116,9 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         APP_ENV: Application environment (dev/prod, default: dev)
         LOGGING__LEVEL: Log level (default: INFO)
         REDIS__ENABLED: Enable Redis (default: true)
-        REDIS__URL or REDIS_URL: Redis connection URL (default: redis://redis:6379/0)
+        REDIS_URL: Redis connection URL (default: redis://redis:6379/0). The
+            name this service's own compose file and .env set; there is no
+            second spelling to fall back to.
         RQ__QUEUE_NAME: RQ queue name (default: covenant)
         RQ__JOB_TIMEOUT_SEC: Job timeout in seconds (default: 3600)
         RQ__RESULT_TTL_SEC: Result TTL in seconds (default: 86400)
@@ -155,14 +156,9 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         "level": level,
     }
 
-    # Support both REDIS__URL and REDIS_URL for compatibility
-    redis_url = _parse_str("REDIS__URL", "")
-    if not redis_url:
-        redis_url = _parse_str("REDIS_URL", "redis://redis:6379/0")
-
     redis_cfg: CovenantRadarRedisConfig = {
         "enabled": _parse_bool("REDIS__ENABLED", True),
-        "url": redis_url,
+        "url": _parse_str("REDIS_URL", "redis://redis:6379/0"),
     }
 
     rq_cfg: CovenantRadarRQConfig = {
@@ -177,14 +173,10 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
     active_model_path_xgb = _parse_str("APP__ACTIVE_MODEL_PATH_XGB", "/data/models/active_xgb.ubj")
     active_model_path_mlp = _parse_str("APP__ACTIVE_MODEL_PATH_MLP", "/data/models/active_mlp.pt")
 
-    # Resolve active_model_path based on backend for backward compatibility
-    active_model_path = active_model_path_xgb if ml_backend == "xgboost" else active_model_path_mlp
-
     app_cfg: CovenantRadarAppConfig = {
         "data_root": _parse_str("APP__DATA_ROOT", "/data"),
         "models_root": _parse_str("APP__MODELS_ROOT", "/data/models"),
         "logs_root": _parse_str("APP__LOGS_ROOT", "/data/logs"),
-        "active_model_path": active_model_path,
         "ml_backend": ml_backend,
         "active_model_path_xgb": active_model_path_xgb,
         "active_model_path_mlp": active_model_path_mlp,

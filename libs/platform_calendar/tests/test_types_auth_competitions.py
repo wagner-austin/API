@@ -12,7 +12,6 @@ from platform_calendar.types import (
     TrackedCompetition,
     decode_competitions_file,
     decode_google_credentials_file,
-    decode_google_token_response,
     decode_oauth_credentials,
     decode_oauth_tokens,
     decode_tracked_competition,
@@ -276,26 +275,3 @@ class TestGoogleCredentialsFile:
         }
         with pytest.raises(JSONTypeError, match="must be a string"):
             decode_google_credentials_file(data)
-
-
-class TestGoogleTokenResponse:
-    def test_decode_google_token_response(self) -> None:
-        data: JSONObject = {
-            "access_token": "access123",
-            "refresh_token": "refresh456",
-            "expires_in": 3600,
-            "token_type": "Bearer",
-        }
-        resp = decode_google_token_response(data)
-        assert resp["access_token"] == "access123"
-        assert resp["refresh_token"] == "refresh456"
-        assert resp["expires_in"] == 3600
-
-    def test_decode_google_token_response_no_refresh(self) -> None:
-        data: JSONObject = {
-            "access_token": "access123",
-            "expires_in": 3600,
-            "token_type": "Bearer",
-        }
-        resp = decode_google_token_response(data)
-        assert resp["refresh_token"] is None

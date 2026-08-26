@@ -23,11 +23,9 @@ def test_load_covenant_radar_settings_success() -> None:
     assert settings["app"]["models_root"] == "/data/models"
     assert settings["app"]["logs_root"] == "/data/logs"
     assert settings["app"]["data_root"] == "/data"
-    # Backend defaults to xgboost, so active_model_path resolves to XGB path
     assert settings["app"]["ml_backend"] == "xgboost"
     assert settings["app"]["active_model_path_xgb"] == "/data/models/active_xgb.ubj"
     assert settings["app"]["active_model_path_mlp"] == "/data/models/active_mlp.pt"
-    assert settings["app"]["active_model_path"] == "/data/models/active_xgb.ubj"
     assert settings["rq"]["queue_name"] == "covenant"
     assert settings["logging"]["level"] == "INFO"
     assert settings["app_env"] == "dev"
@@ -85,8 +83,6 @@ def test_load_covenant_radar_settings_custom_app_config() -> None:
     assert settings["app"]["logs_root"] == "/custom/logs"
     assert settings["app"]["active_model_path_xgb"] == "/custom/models/my_xgb.ubj"
     assert settings["app"]["active_model_path_mlp"] == "/custom/models/my_mlp.pt"
-    # Default backend is xgboost, so active_model_path resolves to XGB path
-    assert settings["app"]["active_model_path"] == "/custom/models/my_xgb.ubj"
 
 
 def test_load_covenant_radar_settings_custom_rq_config() -> None:
@@ -107,16 +103,23 @@ def test_load_covenant_radar_settings_custom_rq_config() -> None:
     assert settings["rq"]["failure_ttl_sec"] == 1209600
 
 
-def test_load_covenant_radar_settings_prefers_redis__url() -> None:
-    """Test REDIS__URL takes precedence over REDIS_URL."""
+def test_load_covenant_radar_settings_reads_only_the_name_deployment_sets() -> None:
+    """One spelling, and it is the one in this service's compose and .env.
+
+    The dual read preferred `REDIS__URL` and fell back to `REDIS_URL`.
+    Nothing in the repository sets `REDIS__URL` for this service --
+    `services/covenant-radar-api/docker-compose.yml` and its `.env` both set
+    `REDIS_URL` -- so the preferred branch was the dead one and the fallback
+    was the only path ever taken.
+    """
     env = make_fake_env()
-    env.set("REDIS__URL", "redis://from-double-underscore:6379/0")
-    env.set("REDIS_URL", "redis://from-single-underscore:6379/0")
+    env.set("REDIS__URL", "redis://a-name-nothing-sets:6379/0")
+    env.set("REDIS_URL", "redis://what-compose-actually-sets:6379/0")
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
 
     settings = load_covenant_radar_settings()
 
-    assert settings["redis"]["url"] == "redis://from-double-underscore:6379/0"
+    assert settings["redis"]["url"] == "redis://what-compose-actually-sets:6379/0"
 
 
 def test_load_covenant_radar_settings_prod_env() -> None:
@@ -180,8 +183,6 @@ def test_load_covenant_radar_settings_mlp_backend() -> None:
     settings = load_covenant_radar_settings()
 
     assert settings["app"]["ml_backend"] == "mlp"
-    # active_model_path should resolve to MLP path when backend is mlp
-    assert settings["app"]["active_model_path"] == "/data/models/active_mlp.pt"
     assert settings["app"]["active_model_path_xgb"] == "/data/models/active_xgb.ubj"
     assert settings["app"]["active_model_path_mlp"] == "/data/models/active_mlp.pt"
 
@@ -196,8 +197,6 @@ def test_load_covenant_radar_settings_lstm_backend() -> None:
     settings = load_covenant_radar_settings()
 
     assert settings["app"]["ml_backend"] == "lstm"
-    # active_model_path resolves to MLP path for non-xgboost backends (legacy behavior)
-    assert settings["app"]["active_model_path"] == "/data/models/active_mlp.pt"
 
 
 def test_load_covenant_radar_settings_lightgbm_backend() -> None:
@@ -210,8 +209,6 @@ def test_load_covenant_radar_settings_lightgbm_backend() -> None:
     settings = load_covenant_radar_settings()
 
     assert settings["app"]["ml_backend"] == "lightgbm"
-    # active_model_path resolves to MLP path for non-xgboost backends (legacy behavior)
-    assert settings["app"]["active_model_path"] == "/data/models/active_mlp.pt"
 
 
 def test_load_covenant_radar_settings_invalid_backend_raises() -> None:

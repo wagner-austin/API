@@ -525,61 +525,6 @@ class TestCSVLoader:
         assert result["meta"]["n_samples"] == 5
 
 
-class TestCSVLoaderNumericDetection:
-    """Tests for numeric value detection edge cases."""
-
-    def test_is_numeric_value_empty_string(self) -> None:
-        """Empty string after sign stripping returns False."""
-        loader = CSVLoader()
-        # "-" alone after stripping sign becomes empty
-        assert loader._is_numeric_value("-") is False
-        assert loader._is_numeric_value("+") is False
-
-    def test_is_numeric_value_multiple_decimals(self) -> None:
-        """Multiple decimal points returns False."""
-        loader = CSVLoader()
-        assert loader._is_numeric_value("1.2.3") is False
-
-    def test_is_numeric_value_non_digit_parts(self) -> None:
-        """Non-digit characters in parts returns False."""
-        loader = CSVLoader()
-        assert loader._is_numeric_value("1.2a") is False
-        assert loader._is_numeric_value("abc") is False
-
-    def test_is_numeric_value_scientific_invalid_multiple_e(self) -> None:
-        """Multiple 'e' in scientific notation returns False."""
-        loader = CSVLoader()
-        assert loader._is_numeric_value("1e2e3") is False
-
-    def test_is_numeric_value_scientific_invalid_mantissa(self) -> None:
-        """Invalid mantissa in scientific notation returns False."""
-        loader = CSVLoader()
-        assert loader._is_numeric_value("abce5") is False
-
-    def test_is_numeric_value_scientific_invalid_exponent(self) -> None:
-        """Invalid exponent in scientific notation returns False."""
-        loader = CSVLoader()
-        assert loader._is_numeric_value("1eabc") is False
-        assert loader._is_numeric_value("1e") is False
-
-    def test_is_simple_numeric_empty_value(self) -> None:
-        """Empty value returns False."""
-        loader = CSVLoader()
-        assert loader._is_simple_numeric("") is False
-
-    def test_is_simple_numeric_only_decimal(self) -> None:
-        """Single decimal point with no digits returns False."""
-        loader = CSVLoader()
-        assert loader._is_simple_numeric(".") is False
-
-    def test_is_simple_numeric_valid_decimal(self) -> None:
-        """Valid decimal numbers return True."""
-        loader = CSVLoader()
-        assert loader._is_simple_numeric("1.5") is True
-        assert loader._is_simple_numeric(".5") is True
-        assert loader._is_simple_numeric("1.") is True
-
-
 class TestCreateCSVLoader:
     """Tests for create_csv_loader factory."""
 

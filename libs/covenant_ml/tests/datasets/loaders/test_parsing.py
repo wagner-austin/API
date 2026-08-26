@@ -196,6 +196,25 @@ class TestIsNumericValue:
         assert is_numeric_value("-") is False
         assert is_numeric_value("+") is False
 
+    def test_multiple_decimal_points_is_not_numeric(self) -> None:
+        """A version string must not read as a measurement."""
+        assert is_numeric_value("1.2.3") is False
+
+    def test_a_digit_glued_to_letters_is_not_numeric(self) -> None:
+        """Unit suffixes are the common case: `1.2a` is a value and a unit."""
+        assert is_numeric_value("1.2a") is False
+
+    def test_repeated_exponent_marker_is_not_numeric(self) -> None:
+        assert is_numeric_value("1e2e3") is False
+
+    def test_a_non_numeric_mantissa_is_not_numeric(self) -> None:
+        """`abce5` splits on 'e' into two halves that look like the shape."""
+        assert is_numeric_value("abce5") is False
+
+    def test_a_non_numeric_or_absent_exponent_is_not_numeric(self) -> None:
+        assert is_numeric_value("1eabc") is False
+        assert is_numeric_value("1e") is False
+
 
 class TestIsSimpleNumeric:
     """Tests for is_simple_numeric function."""
@@ -228,6 +247,11 @@ class TestIsSimpleNumeric:
         """Non-digit characters are not simple numeric."""
         assert is_simple_numeric("abc") is False
         assert is_simple_numeric("1a2") is False
+
+    def test_a_lone_decimal_point_is_not_simple_numeric(self) -> None:
+        """`.5` and `5.` are both valid, so the split alone is not enough --
+        one side must still carry a digit."""
+        assert is_simple_numeric(".") is False
 
 
 class TestEncodeLabel:

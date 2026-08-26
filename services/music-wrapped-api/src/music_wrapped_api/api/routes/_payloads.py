@@ -19,7 +19,7 @@ from music_wrapped_api import _test_hooks
 from ._decoders import (
     AppleGenerateFull,
     AppleGenerateToken,
-    LastFmGenerate,
+    GenerateRequest,
     SpotifyGenerateFull,
     SpotifyGenerateToken,
     YouTubeGenerateFull,
@@ -32,7 +32,7 @@ from ._decoders import (
 )
 
 
-def _payload_lastfm(req_l: LastFmGenerate, *, redis_url: str) -> dict[str, JSONValue]:
+def _payload_lastfm(req_l: GenerateRequest, *, redis_url: str) -> dict[str, JSONValue]:
     creds_in: _LastFmCredsFull | _LastFmCredsSessionOnly = req_l["credentials"]
     if is_full_lastfm_credentials(creds_in):
         raw = dict(creds_in)
