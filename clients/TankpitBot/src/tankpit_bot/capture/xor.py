@@ -41,19 +41,6 @@ class XorStaticKeyUnavailableError(CodecError):
     """
 
 
-class XorBodyTooLongError(CodecError):
-    """Raised when a body's ciphered span outruns the session table.
-
-    The table's length IS the frame bound: the key is 1000 bytes and
-    the largest ciphered span the real server has ever sent is 931
-    (archive sweep over 282,783 received bodies). A longer body did
-    not come from the wire — it is a foreign or corrupt capture — and
-    the cipher used to signal that with a bare :class:`IndexError`
-    thrown from the middle of its inner loop, which said nothing about
-    what had gone wrong ([[session-state-deglobalisation]]).
-    """
-
-
 def require_static_key() -> str:
     """Return the process-wide static key, reading it once.
 
@@ -147,7 +134,15 @@ def decode_base64_safe(payload: str) -> bytes | None:
 
 
 def xor_decode_body(body: bytes, xor_table: bytes, offset: int = 0) -> bytes:
-    """XOR decode a message body.
+    """XOR decode a message body, wrapping the table for long spans.
+
+    The wrap is the measured cipher law, not a tolerance: the real
+    client's decode is ``l[ja] ^= B[ja % pa]`` ([[xor-cipher]], tpclient.js
+    case 46), so the server may send bodies longer than the 1000-byte
+    table. A span-length guard here crashed artax live on 2026-08-26
+    when a busy practice room grew a 0x5A map frame to 1051 ciphered
+    bytes — past the previous 931-byte archive maximum the guard had
+    mistaken for a protocol bound.
 
     Args:
         body: Raw message body bytes.
@@ -156,25 +151,16 @@ def xor_decode_body(body: bytes, xor_table: bytes, offset: int = 0) -> bytes:
 
     Returns:
         Decoded bytes.
-
-    Raises:
-        XorBodyTooLongError: If the ciphered span outruns the table.
     """
     span = len(body) - offset
-    if span > len(xor_table):
-        raise XorBodyTooLongError(
-            f"ciphered span is {span} bytes over a {len(xor_table)}-byte table; "
-            "the real server's largest observed body is 931 bytes (282,783 "
-            "sampled), so this frame did not come from the wire"
-        )
+    table_len = len(xor_table)
     decoded = bytearray(span)
     for i in range(span):
-        decoded[i] = body[i + offset] ^ xor_table[i]
+        decoded[i] = body[i + offset] ^ xor_table[i % table_len]
     return bytes(decoded)
 
 
 __all__ = [
-    "XorBodyTooLongError",
     "XorStaticKeyUnavailableError",
     "build_session_xor_table",
     "decode_base64_safe",
