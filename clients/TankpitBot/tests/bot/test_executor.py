@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from tankpit_bot.bot.ai.scoring_types import make_behavior_score
-from tankpit_bot.bot.ai.types import make_initial_ai_state
+from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.executor import (
     _format_desired_equipment,
@@ -34,7 +36,7 @@ from tests.bot._executor_support import (
     _store_tank,
     _WorldOnlyBot,
 )
-from tests.conftest import FakeEnv
+from tests.conftest import FakeEnv, FakeFileSystem
 
 
 class TestApplyEquipment:
@@ -119,6 +121,48 @@ class TestExecute:
         execute(bot, decision, _make_snapshot())
         # Equipment toggles (disable 1, 2, 3, 4) + move command
         assert len(fake_cdp._sent_methods) == 5
+
+    def test_decision_line_carries_owner_and_lock_provenance(
+        self, fake_env: FakeEnv, fake_fs: FakeFileSystem
+    ) -> None:
+        """The emitted decision names the durable owner and the held lock.
+
+        The 2026-08-26 return-fire/solvency collision took three
+        artifacts to triangulate because the line only named the
+        PROPOSER (a collect-owned tick emits HUNT-scored diverts).
+        The owner and lock now ride every decision, text and fields.
+        """
+        from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_str
+
+        from tankpit_bot import _test_hooks as core_hooks
+        from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+
+        artifacts = configure_bot_runtime_logging("20260826-000001")
+        bot, _fake_cdp = _make_bot(fake_env)
+        owned = AIStateDict(
+            **{
+                **make_initial_ai_state(),
+                "mode": "COLLECT",
+                "mode_state": "SEARCH",
+                "combat_target_id": 77,
+            }
+        )
+        decision = make_tick_decision(
+            command=make_move_command(100, 200),
+            behavior=make_behavior_score("HUNT", 800, 100, 200, "opportunity_shot"),
+            updated_ai_state=owned,
+            desired_equipment=[],
+        )
+        execute(bot, decision, _make_snapshot())
+
+        lines = core_hooks.read_text(Path(artifacts["latest_events_path"])).splitlines()
+        records = [narrow_json_to_dict(load_json_str(line)) for line in lines if line.strip()]
+        decision_records = [r for r in records if r.get("behavior_mode") == "HUNT"]
+        assert len(decision_records) == 1
+        record = decision_records[0]
+        assert record["owner_mode"] == "COLLECT"
+        assert record["held_lock_id"] == 77
+        assert require_str(record, "message").endswith("owner=COLLECT lock=77")
 
     def test_execute_hold_records_no_decision(self, fake_env: FakeEnv) -> None:
         """A hold decision produces no ledger decision record."""

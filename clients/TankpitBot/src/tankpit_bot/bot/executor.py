@@ -465,8 +465,15 @@ def execute(
 
     behavior = decision["behavior"]
     command = decision["command"]
+    # Provenance rides every decision line (operator commission
+    # 2026-08-26, after the return-fire/solvency collision): the
+    # behavior's mode is the PROPOSER (a collect-owned tick can emit a
+    # HUNT-scored divert), so the durable owner and the held lock from
+    # the decision's own updated state are printed beside it — the two
+    # facts that took three artifacts to triangulate live.
+    updated_state = decision["updated_ai_state"]
     emit_ai(
-        "%s score=%d target=(%d,%d) cmd=%s equip=%s reason=%s",
+        "%s score=%d target=(%d,%d) cmd=%s equip=%s reason=%s owner=%s lock=%d",
         behavior["mode"],
         behavior["score"],
         behavior["target_x"],
@@ -474,6 +481,8 @@ def execute(
         command["cmd_type"],
         _format_desired_equipment(decision["desired_equipment"]),
         render_reason(behavior),
+        updated_state["mode"],
+        updated_state["combat_target_id"],
         behavior_mode=behavior["mode"],
         behavior_score=behavior["score"],
         combat_target_x=behavior["target_x"],
@@ -481,6 +490,8 @@ def execute(
         combat_target_id=behavior["target_id"],
         command_type=command["cmd_type"],
         behavior_reason=render_reason(behavior),
+        owner_mode=updated_state["mode"],
+        held_lock_id=updated_state["combat_target_id"],
     )
 
     ledger_kind = _LEDGER_KIND_BY_CMD_TYPE.get(command["cmd_type"])
