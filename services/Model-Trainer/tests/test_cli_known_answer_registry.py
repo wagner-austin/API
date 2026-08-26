@@ -301,7 +301,7 @@ class TestTheCommandLine:
             registry_cli.main(self._cmd(tmp_path, "clobber"))
 
     def test_a_non_numeric_tolerance_is_refused(self, tmp_path: pathlib.Path) -> None:
-        with pytest.raises(ValueError, match="must be a number"):
+        with pytest.raises(ValueError, match="must be a non-negative number such as"):
             registry_cli.main(self._cmd(tmp_path, "register", "--tolerance", "loose"))
 
     def test_register_without_a_tolerance_is_refused(self, tmp_path: pathlib.Path) -> None:

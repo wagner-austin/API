@@ -448,16 +448,30 @@ def emit_completed_metrics(
     r: RedisStrProto,
     run_id: str,
     user_id: int,
-    test_loss: float,
-    test_ppl: float,
+    final_loss: float,
+    final_ppl: float,
+    held_out: bool,
     artifact_path: str,
 ) -> None:
-    """Emit trainer completed metrics event at job completion."""
+    """Emit trainer completed metrics event at job completion.
+
+    Args:
+        r: Redis handle to publish through.
+        run_id: Run these figures belong to.
+        user_id: Who to notify.
+        final_loss: Loss at the end of training.
+        final_ppl: Perplexity at the end of training.
+        held_out: Whether those figures were measured on data the model did
+            not train on. The caller knows and this function cannot, so it is
+            passed rather than guessed.
+        artifact_path: Where the trained model was written.
+    """
     ev = make_completed_metrics_event(
         job_id=run_id,
         user_id=user_id,
-        test_loss=float(test_loss),
-        test_ppl=float(test_ppl),
+        final_loss=float(final_loss),
+        final_ppl=float(final_ppl),
+        held_out=held_out,
         artifact_path=artifact_path,
     )
     publish_metrics(r, encode_trainer_metrics_event(ev))

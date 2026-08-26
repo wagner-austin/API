@@ -113,7 +113,7 @@ def test_emit_metrics_helpers_publish() -> None:
         samples_per_sec=100.0,
     )
     job_utils.emit_completed_metrics(
-        r, run_id, 123, test_loss=0.9, test_ppl=1.5, artifact_path="/a"
+        r, run_id, 123, final_loss=0.9, final_ppl=1.5, held_out=True, artifact_path="/a"
     )
     r.assert_only_called({"publish"})
 

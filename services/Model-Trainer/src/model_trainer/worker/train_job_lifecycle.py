@@ -261,7 +261,11 @@ def _handle_post_save_or_cancel(
     _ = cleanup_service.cleanup_run_artifacts(run_id, out_dir)
 
     ctx.publish_completed(file_id, file_bytes)
-    # Use test metrics if available, fallback to train metrics
+    # Held-out figures when the run produced them, training figures otherwise
+    # -- and the event carries WHICH, because it used to carry only the number
+    # under a field named `test_loss` and the Discord embed printed it as
+    # "Test Loss" for runs that never held anything out.
+    held_out = result["test_loss"] is not None and result["test_perplexity"] is not None
     final_loss = result["test_loss"] if result["test_loss"] is not None else result["loss"]
     final_ppl = (
         result["test_perplexity"] if result["test_perplexity"] is not None else result["perplexity"]
@@ -272,5 +276,6 @@ def _handle_post_save_or_cancel(
         user_id,
         final_loss,
         final_ppl,
+        held_out,
         out_dir,
     )

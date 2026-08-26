@@ -116,8 +116,9 @@ def test_roundtrip_completed_metrics_event() -> None:
     event = make_completed_metrics_event(
         job_id="run-4",
         user_id=13,
-        test_loss=0.456,
-        test_ppl=1.578,
+        final_loss=0.456,
+        final_ppl=1.578,
+        held_out=True,
         artifact_path="/path/to/model",
     )
     decoded = _roundtrip(event)
@@ -125,8 +126,33 @@ def test_roundtrip_completed_metrics_event() -> None:
     assert is_completed_metrics(decoded)
     assert not is_config(decoded)
     assert not is_progress_metrics(decoded)
-    assert decoded["test_loss"] == 0.456
-    assert decoded["test_ppl"] == 1.578
+    assert decoded["final_loss"] == 0.456
+    assert decoded["final_ppl"] == 1.578
+    assert decoded["held_out"] is True
+
+
+def test_a_run_without_a_test_split_survives_the_round_trip_saying_so() -> None:
+    """The figures are the training ones and the event says which they are.
+
+    Before `held_out` existed the publisher substituted training loss into a
+    field named `test_loss`, and nothing between there and the Discord embed
+    could tell. This asserts the substitution is now declared rather than
+    silent.
+    """
+    event = make_completed_metrics_event(
+        job_id="run-5",
+        user_id=13,
+        final_loss=2.5,
+        final_ppl=12.18,
+        held_out=False,
+        artifact_path="/path/to/model",
+    )
+
+    decoded = _roundtrip(event)
+
+    assert is_completed_metrics(decoded)
+    assert decoded["held_out"] is False
+    assert decoded["final_loss"] == 2.5
 
 
 def test_decode_config_event_with_int_learning_rate() -> None:
@@ -170,12 +196,12 @@ def test_decode_progress_metrics_with_optional_val_metrics() -> None:
 def test_decode_completed_metrics_with_int_values() -> None:
     payload = (
         '{"type": "trainer.metrics.completed.v1", "job_id": "r", "user_id": 1, '
-        '"test_loss": 1, "test_ppl": 2, "artifact_path": "/a"}'
+        '"final_loss": 1, "final_ppl": 2, "held_out": true, "artifact_path": "/a"}'
     )
     decoded = decode_trainer_metrics_event(payload)
     assert is_completed_metrics(decoded)
-    assert decoded["test_loss"] == 1.0
-    assert decoded["test_ppl"] == 2.0
+    assert decoded["final_loss"] == 1.0
+    assert decoded["final_ppl"] == 2.0
 
 
 @pytest.mark.parametrize(
@@ -205,12 +231,17 @@ def test_decode_completed_metrics_with_int_values() -> None:
         ),
         (
             '{"type": "trainer.metrics.completed.v1", "job_id": "j", "user_id": 1}',
-            "Missing required field 'test_loss'",
+            "Missing required field 'final_loss'",
         ),
         (
             '{"type": "trainer.metrics.completed.v1", "job_id": "j", "user_id": 1, '
-            '"test_loss": 1, "test_ppl": "x", "artifact_path": "/a"}',
-            "Field 'test_ppl' must be a number",
+            '"final_loss": 1, "final_ppl": "x", "held_out": true, "artifact_path": "/a"}',
+            "Field 'final_ppl' must be a number",
+        ),
+        (
+            '{"type": "trainer.metrics.completed.v1", "job_id": "j", "user_id": 1, '
+            '"final_loss": 1, "final_ppl": 2, "artifact_path": "/a"}',
+            "Missing required field 'held_out'",
         ),
     ],
 )

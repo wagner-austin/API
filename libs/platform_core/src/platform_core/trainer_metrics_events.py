@@ -8,6 +8,7 @@ from .json_utils import (
     dump_json_str,
     load_json_str,
     narrow_json_to_dict,
+    require_bool,
     require_float,
     require_int,
     require_str,
@@ -60,13 +61,38 @@ class TrainerProgressMetricsV1(TypedDict):
 
 
 class TrainerCompletedMetricsV1(TypedDict):
-    """Training completion metrics event published at job completion."""
+    """Training completion metrics event published at job completion.
+
+    The loss fields were called ``test_loss`` and ``test_ppl`` and carried the
+    TRAINING loss whenever a run had no held-out split -- the publisher fell
+    back with ``result["test_loss"] if ... is not None else result["loss"]``
+    and nothing downstream could tell. The Discord embed rendered that number
+    under the label "Test Loss", so a run that never held anything out
+    reported a generalisation figure to a person.
+
+    So the fields say ``final`` -- which is true of both -- and ``held_out``
+    says which kind of number it is. It is required rather than defaulted:
+    a default would answer the question for a publisher that never asked it,
+    which is how the first version came to lie.
+
+    Attributes:
+        type: Discriminator.
+        job_id: Run this reports on.
+        user_id: Who to notify.
+        final_loss: Loss at the end of training.
+        final_ppl: Perplexity at the end of training.
+        held_out: True when the figures come from data the model did not
+            train on, False when they are the training figures because the
+            run had no test split.
+        artifact_path: Where the trained model was written.
+    """
 
     type: Literal["trainer.metrics.completed.v1"]
     job_id: str
     user_id: int
-    test_loss: float
-    test_ppl: float
+    final_loss: float
+    final_ppl: float
+    held_out: bool
     artifact_path: str
 
 
@@ -173,17 +199,33 @@ def make_completed_metrics_event(
     *,
     job_id: str,
     user_id: int,
-    test_loss: float,
-    test_ppl: float,
+    final_loss: float,
+    final_ppl: float,
+    held_out: bool,
     artifact_path: str,
 ) -> TrainerCompletedMetricsV1:
-    """Create a training completion metrics event."""
+    """Create a training completion metrics event.
+
+    Args:
+        job_id: Run this reports on.
+        user_id: Who to notify.
+        final_loss: Loss at the end of training.
+        final_ppl: Perplexity at the end of training.
+        held_out: Whether those figures were measured on data the model did
+            not train on. Keyword-only and required, so a caller substituting
+            training figures has to say so.
+        artifact_path: Where the trained model was written.
+
+    Returns:
+        The event, ready to encode.
+    """
     return {
         "type": "trainer.metrics.completed.v1",
         "job_id": job_id,
         "user_id": user_id,
-        "test_loss": test_loss,
-        "test_ppl": test_ppl,
+        "final_loss": final_loss,
+        "final_ppl": final_ppl,
+        "held_out": held_out,
         "artifact_path": artifact_path,
     }
 
@@ -257,15 +299,17 @@ def _decode_progress_metrics_event(
 def _decode_completed_metrics_event(
     decoded: JSONObject, job_id: str, user_id: int
 ) -> TrainerCompletedMetricsV1:
-    test_loss = require_float(decoded, "test_loss")
-    test_ppl = require_float(decoded, "test_ppl")
+    final_loss = require_float(decoded, "final_loss")
+    final_ppl = require_float(decoded, "final_ppl")
+    held_out = require_bool(decoded, "held_out")
     artifact_path = require_str(decoded, "artifact_path")
     return {
         "type": "trainer.metrics.completed.v1",
         "job_id": job_id,
         "user_id": user_id,
-        "test_loss": test_loss,
-        "test_ppl": test_ppl,
+        "final_loss": final_loss,
+        "final_ppl": final_ppl,
+        "held_out": held_out,
         "artifact_path": artifact_path,
     }
 

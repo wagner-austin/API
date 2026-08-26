@@ -74,11 +74,19 @@ def _add_progress_section(embed: _Embed, config: TrainingConfig, prog: Progress)
 def _add_final_section(embed: _Embed, final: FinalMetrics | None) -> None:
     if final is None:
         return
+    # The label follows the event's own `held_out` flag rather than being
+    # hardcoded. It used to read "Test Loss" unconditionally, while the
+    # publisher substituted the TRAINING loss for any run without a test
+    # split -- so a run that held nothing out reported a generalisation
+    # figure to a person, in a Discord message, with two decimal places.
+    kind = "Test" if final["held_out"] else "Train"
     bits: list[str] = [
-        f"**Test Loss:** `{final['test_loss']:.4f}`",
-        f"**Test PPL:** `{final['test_ppl']:.2f}`",
+        f"**{kind} Loss:** `{final['final_loss']:.4f}`",
+        f"**{kind} PPL:** `{final['final_ppl']:.2f}`",
         f"**Artifact:** `{final['artifact_path']}`",
     ]
+    if not final["held_out"]:
+        bits.append("_No held-out split: these are training figures._")
     _add_field(embed, name="Results", value="\n".join(bits), inline=False)
 
 

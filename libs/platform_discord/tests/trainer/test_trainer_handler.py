@@ -67,8 +67,9 @@ def test_decode_completed_event() -> None:
     ev = make_completed_metrics_event(
         job_id="run-3",
         user_id=11,
-        test_loss=0.456,
-        test_ppl=1.578,
+        final_loss=0.456,
+        final_ppl=1.578,
+        held_out=True,
         artifact_path="/path/to/model",
     )
     payload = encode_trainer_metrics_event(ev)
@@ -163,8 +164,9 @@ def test_handle_completed_event() -> None:
     ev = make_completed_metrics_event(
         job_id="h-3",
         user_id=3,
-        test_loss=0.5,
-        test_ppl=1.2,
+        final_loss=0.5,
+        final_ppl=1.2,
+        held_out=True,
         artifact_path="/out",
     )
     result = handle_trainer_event(rt, ev)

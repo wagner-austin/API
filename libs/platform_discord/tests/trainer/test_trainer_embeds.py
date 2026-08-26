@@ -42,13 +42,23 @@ def _base_progress() -> Progress:
     }
 
 
-def _base_final() -> FinalMetrics:
+def _base_final(*, held_out: bool = True) -> FinalMetrics:
+    """Build a completion event.
+
+    Args:
+        held_out: Whether the figures were measured on data the model did not
+            train on.
+
+    Returns:
+        The event.
+    """
     return {
         "type": "trainer.metrics.completed.v1",
         "job_id": "test-job",
         "user_id": 1,
-        "test_loss": 0.8,
-        "test_ppl": 2.23,
+        "final_loss": 0.8,
+        "final_ppl": 2.23,
+        "held_out": held_out,
         "artifact_path": "/x",
     }
 
@@ -88,6 +98,53 @@ def test_trainer_build_starting_training_completed_failed() -> None:
     d4 = e4.to_dict()
     names4 = [f["name"] for f in d4.get("fields", [])]
     assert "System Error" in names4
+
+
+def _results_value(final: FinalMetrics) -> str:
+    """Render a completed embed and return its Results field.
+
+    Args:
+        final: Completion event to render.
+
+    Returns:
+        The text a person would read in Discord.
+    """
+    embed = build_training_embed(
+        request_id="r", config=_base_config(), status="completed", final=final
+    )
+    fields = embed.to_dict().get("fields", [])
+    return next(f["value"] for f in fields if f["name"] == "Results")
+
+
+class TestTheResultsLabelMatchesTheNumber:
+    """The embed said "Test Loss" for runs that held nothing out.
+
+    `train_job_lifecycle` substituted training loss whenever `test_loss` was
+    None, into an event field named `test_loss`, and this embed printed it
+    under a label a person reads as generalisation. Both halves are now
+    asserted here, because the publisher-side fix is invisible from Discord
+    and this is the surface where it was wrong.
+    """
+
+    def test_held_out_figures_are_labelled_test(self) -> None:
+        value = _results_value(_base_final(held_out=True))
+        assert "**Test Loss:** `0.8000`" in value
+        assert "**Test PPL:** `2.23`" in value
+        assert "Train Loss" not in value
+
+    def test_training_figures_are_labelled_train(self) -> None:
+        value = _results_value(_base_final(held_out=False))
+        assert "**Train Loss:** `0.8000`" in value
+        assert "**Train PPL:** `2.23`" in value
+        assert "Test Loss" not in value
+
+    def test_training_figures_say_why_there_is_no_test_number(self) -> None:
+        """A relabel alone reads as a different metric, not a missing one."""
+        value = _results_value(_base_final(held_out=False))
+        assert "_No held-out split: these are training figures._" in value
+
+    def test_held_out_figures_carry_no_such_caveat(self) -> None:
+        assert "held-out split" not in _results_value(_base_final(held_out=True))
 
 
 def test_trainer_completed_with_no_final_adds_no_results() -> None:

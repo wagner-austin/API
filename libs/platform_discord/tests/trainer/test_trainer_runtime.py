@@ -68,16 +68,18 @@ def _make_progress(
 def _make_final(
     job_id: str = "r",
     user_id: int = 1,
-    test_loss: float = 0.5,
-    test_ppl: float = 1.2,
+    final_loss: float = 0.5,
+    final_ppl: float = 1.2,
+    held_out: bool = True,
     artifact_path: str = "/x",
 ) -> FinalMetrics:
     return {
         "type": "trainer.metrics.completed.v1",
         "job_id": job_id,
         "user_id": user_id,
-        "test_loss": test_loss,
-        "test_ppl": test_ppl,
+        "final_loss": final_loss,
+        "final_ppl": final_ppl,
+        "held_out": held_out,
         "artifact_path": artifact_path,
     }
 
@@ -124,7 +126,7 @@ def test_trainer_progress_without_prior_config_triggers_fallback() -> None:
 def test_trainer_completed_without_prior_config_triggers_fallback() -> None:
     rt = _rt()
     a = on_completed(
-        rt, _make_final(job_id="ry", user_id=4, test_loss=0.9, test_ppl=1.8, artifact_path="/y")
+        rt, _make_final(job_id="ry", user_id=4, final_loss=0.9, final_ppl=1.8, artifact_path="/y")
     )
     assert a["request_id"] == "ry"
 
