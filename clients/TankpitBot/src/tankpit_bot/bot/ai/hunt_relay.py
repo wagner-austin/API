@@ -133,7 +133,7 @@ def relay_toward_unaffordable_enemy(
         ctx.killed,
         ctx.terrain,
         ctx.timestamp_ms,
-        ctx.config["map_open_cooldown_ms"],
+        ctx.config["map_intel_horizon_ms"],
         engagement_reserve_fuel=(
             ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
         ),
@@ -222,7 +222,7 @@ def stale_human_needs_map_refresh(ctx: DecideCtx) -> bool:
         ctx.killed,
         ctx.terrain,
         ctx.timestamp_ms,
-        ctx.config["map_open_cooldown_ms"],
+        ctx.config["map_intel_horizon_ms"],
         engagement_reserve_fuel=(
             ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
         ),
@@ -264,7 +264,7 @@ def human_pursuit_travel_target(ctx: DecideCtx) -> EnemyThreatDict | None:
         ctx.killed,
         ctx.terrain,
         ctx.timestamp_ms,
-        ctx.config["map_open_cooldown_ms"],
+        ctx.config["map_intel_horizon_ms"],
         engagement_reserve_fuel=(
             ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
         ),

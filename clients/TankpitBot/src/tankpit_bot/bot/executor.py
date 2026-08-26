@@ -338,6 +338,19 @@ def _dispatch_teleport_command(
     never share a tick: this tick opens the map, and the next tick's
     decision re-dispatches the teleport against a confirmed-open map.
 
+    Re-measured 2026-08-26 (arterial, probe strategy
+    ``immediate_after_map_open``, two rounds minutes apart): round 1
+    landed 10/10 with zero timeouts; round 2 dropped 7/10 (round 2's
+    session also took 30 s to initial sync vs round 1's 8 s). The
+    drop race is REAL and session-variable — likely server-load
+    dependent — so the burst optimization that round 1 justified was
+    reverted the same night before it shipped. The defer's price is
+    one ~2 s tick per teleport (median 1.94 s open→teleport across
+    the 490 teleports of marathon bot-20260825-212920); a burst under
+    round-2 conditions would have cost 7 s of stall per 10 teleports
+    instead. Do not retry without a probe showing the drop retired
+    across MULTIPLE sessions.
+
     Args:
         bot: Bot instance for sending commands.
         command: The teleport command.

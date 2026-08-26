@@ -150,7 +150,7 @@ def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
         is_self=False,
         is_bot=False,
         damage_state=0,
-        timestamp_ms=90000,
+        timestamp_ms=85000,
         last_wire_seen_ms=90000,
         last_position_update_ms=90000,
         last_viewport_observation_ms=80000,

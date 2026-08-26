@@ -109,7 +109,7 @@ class TestConsentGates:
             killed={},
             terrain=None,
             now_ms=100000,
-            map_open_cooldown_ms=5000,
+            map_intel_horizon_ms=5000,
             engagement_reserve_fuel=650,
         )
 
@@ -129,7 +129,7 @@ class TestConsentGates:
             killed={},
             terrain=None,
             now_ms=100000,
-            map_open_cooldown_ms=5000,
+            map_intel_horizon_ms=5000,
             engagement_reserve_fuel=650,
         )
 

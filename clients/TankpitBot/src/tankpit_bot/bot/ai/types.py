@@ -35,6 +35,17 @@ class AIConfigDict(TypedDict):
         action_stall_timeout_ms: Milliseconds to wait before abandoning a stuck move/pickup.
         kill_cooldown_ms: Milliseconds to ignore a killed tank (avoid targeting corpse).
         map_open_cooldown_ms: Minimum milliseconds between map open commands.
+        map_intel_horizon_ms: How long map-sourced knowledge (tank
+            positions from a MAP_DATA snapshot) stays actionable for
+            acquisition, pursuit, greeting, and the no-viable-targets
+            gate. Split from ``map_open_cooldown_ms`` 2026-08-26: one
+            constant served as both the re-open cooldown AND the
+            freshness bar, but map answers measure 2-6 s of latency
+            (bot-20260825-212920, 560 answers), so a 5 s freshness
+            bar declared snapshots stale almost on arrival — a sixth
+            of that marathon went to 559 map opens re-asking the same
+            question. 12 s = cooldown + worst common answer latency +
+            one decision tick; practice bots barely move in 12 s.
         patrol_waypoints: Circuit of waypoints for PATROL behavior.
         dual_break_threshold: Emergency restock threshold for combat
             reserves. Applies to dual shots and homing shots only;
@@ -92,6 +103,7 @@ class AIConfigDict(TypedDict):
     action_stall_timeout_ms: int
     kill_cooldown_ms: int
     map_open_cooldown_ms: int
+    map_intel_horizon_ms: int
     patrol_waypoints: list[tuple[int, int]]
     dual_break_threshold: int
     radar_break_threshold: int
@@ -117,6 +129,7 @@ def make_default_ai_config() -> AIConfigDict:
         action_stall_timeout_ms=10000,
         kill_cooldown_ms=30000,
         map_open_cooldown_ms=5000,
+        map_intel_horizon_ms=12000,
         patrol_waypoints=[(64, 64), (192, 64), (192, 192), (64, 192)],
         dual_break_threshold=4,
         radar_break_threshold=5,

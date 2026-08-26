@@ -374,9 +374,9 @@ def target_position_is_fresh(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
 
     Returns:
         True when the target's most recent observation is within
-        ``map_open_cooldown_ms`` of the current tick.
+        ``map_intel_horizon_ms`` of the current tick.
     """
-    return ctx.timestamp_ms - target["timestamp_ms"] < ctx.config["map_open_cooldown_ms"]
+    return ctx.timestamp_ms - target["timestamp_ms"] < ctx.config["map_intel_horizon_ms"]
 
 
 RADAR_SPEND_REVEAL_FLOOR_TILES = 32

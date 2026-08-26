@@ -36,7 +36,7 @@ def _stale_human_ctx(ws: WorldService, *, last_map_open_ms: int) -> DecideCtx:
         Decision context at timestamp 100000.
     """
     tanks: dict[str, TankStateDict] = {
-        "60": make_map_known_enemy(x=130, y=100, name="Austin", timestamp_ms=90000),
+        "60": make_map_known_enemy(x=130, y=100, name="Austin", timestamp_ms=85000),
     }
     # Human combat requires consent (contract 2026-07-30); without it the
     # rejection reason is "human_not_consented" and staleness is never

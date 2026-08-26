@@ -289,10 +289,40 @@ class TestThreatsInRange:
 class TestFindAcquisitionTarget:
     """Tests for ``find_acquisition_target`` (loose, map-fresh acquisition)."""
 
+    def test_accepts_candidate_between_cooldown_and_horizon(self) -> None:
+        """8 s-old map intel is acquirable under the 12 s horizon.
+
+        The 2026-08-26 split: `map_open_cooldown_ms` (5 s, re-open
+        pacing) no longer doubles as the freshness bar. Map answers
+        measure 2-6 s of latency, so under the old single constant an
+        8 s-old snapshot was already "stale" and forced re-open churn
+        (559 opens, a sixth of marathon bot-20260825-212920). Under
+        `map_intel_horizon_ms` the same intel still names a target.
+        """
+        tank = _tank("10", x=105, y=100, team=1)
+        tank["timestamp_ms"] = 92000  # 8 s old at now=100000
+        world = _world({"10": tank})
+
+        result = find_acquisition_target(
+            WorldService(),
+            world,
+            _self_at(),
+            blocked={},
+            killed={},
+            terrain=None,
+            now_ms=100000,
+            map_intel_horizon_ms=12000,
+            engagement_reserve_fuel=650,
+        )
+
+        if result is None:
+            raise AssertionError("expected 8s-old intel to remain acquirable")
+        assert result["tank_id"] == 10
+
     def test_picks_nearest_map_known_enemy(self) -> None:
         """Acquisition picks the closest enemy with a fresh map observation."""
         tank = _tank("10", x=105, y=100, team=1)
-        # Map-fresh: timestamp_ms within map_open_cooldown_ms.
+        # Map-fresh: timestamp_ms within map_intel_horizon_ms.
         tank["timestamp_ms"] = 100000
         world = _world({"10": tank})
 
@@ -304,7 +334,7 @@ class TestFindAcquisitionTarget:
             killed={},
             terrain=None,
             now_ms=100000,
-            map_open_cooldown_ms=5000,
+            map_intel_horizon_ms=5000,
             engagement_reserve_fuel=650,
         )
 
@@ -316,7 +346,7 @@ class TestFindAcquisitionTarget:
         """A tank whose timestamp is older than the cooldown is filtered out.
 
         Covers the loose-freshness gate at ``threats.py::find_acquisition_target``
-        where ``now_ms - tank["timestamp_ms"] >= map_open_cooldown_ms`` skips
+        where ``now_ms - tank["timestamp_ms"] >= map_intel_horizon_ms`` skips
         the tank. Without this, the bot would teleport at a position that may
         already be stale by minutes -- which is the gate analyze_threats was
         tightened to prevent for firing (see [[bot-behavior-contract]] §5
@@ -335,7 +365,7 @@ class TestFindAcquisitionTarget:
             killed={},
             terrain=None,
             now_ms=100000,
-            map_open_cooldown_ms=5000,
+            map_intel_horizon_ms=5000,
             engagement_reserve_fuel=650,
         )
 
@@ -371,7 +401,7 @@ class TestFindAcquisitionTarget:
             killed={},
             terrain=terrain,
             now_ms=100000,
-            map_open_cooldown_ms=5000,
+            map_intel_horizon_ms=5000,
             engagement_reserve_fuel=650,
         )
 
@@ -400,7 +430,7 @@ class TestFindAcquisitionTarget:
             killed={},
             terrain=terrain,
             now_ms=100000,
-            map_open_cooldown_ms=5000,
+            map_intel_horizon_ms=5000,
             engagement_reserve_fuel=650,
         )
 
@@ -418,7 +448,7 @@ class TestFindAcquisitionTarget:
             killed={},
             terrain=None,
             now_ms=100000,
-            map_open_cooldown_ms=5000,
+            map_intel_horizon_ms=5000,
             engagement_reserve_fuel=650,
         )
 
@@ -445,7 +475,7 @@ class TestFindAcquisitionTarget:
             killed={},
             terrain=None,
             now_ms=100000,
-            map_open_cooldown_ms=5000,
+            map_intel_horizon_ms=5000,
             engagement_reserve_fuel=650,
         )
 
@@ -474,7 +504,7 @@ class TestFindAcquisitionTarget:
             killed={},
             terrain=None,
             now_ms=100000,
-            map_open_cooldown_ms=5000,
+            map_intel_horizon_ms=5000,
             engagement_reserve_fuel=660,
         )
 

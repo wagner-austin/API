@@ -88,7 +88,7 @@ class TestDecideTeleportToFarTarget:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=94000,
+                timestamp_ms=85000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=94000,
                 last_viewport_observation_ms=100000,

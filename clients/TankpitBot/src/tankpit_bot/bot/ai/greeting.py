@@ -72,7 +72,7 @@ def _nearest_ungreeted_viewport_human(
             continue
         if str(tank["tank_id"]) in state["greeted_tank_ids"]:
             continue
-        if ctx.timestamp_ms - tank["timestamp_ms"] > ctx.config["map_open_cooldown_ms"]:
+        if ctx.timestamp_ms - tank["timestamp_ms"] > ctx.config["map_intel_horizon_ms"]:
             continue
         dist = abs(tank["x"] - sx) + abs(tank["y"] - sy)
         if target_id == -1 or dist < best_dist:

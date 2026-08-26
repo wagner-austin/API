@@ -140,7 +140,7 @@ def decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
        stale).
     3. **Loose (map-fresh) acquisition.** When no viewport-confirmed
        threat exists, look at every enemy whose ``timestamp_ms`` is
-       within ``map_open_cooldown_ms`` (i.e. seen in a recent map
+       within ``map_intel_horizon_ms`` (i.e. seen in a recent map
        snapshot), gated on end-to-end affordability (teleport cost +
        kill budget + fuel-low reserve). Teleport at the nearest
        affordable one. ``SCAN_ON_LANDING`` handles viewport
@@ -282,7 +282,7 @@ def _unvisited_unconsented_human(
             continue
         if human_combat_consented(ctx.ws, tank["tank_id"]):
             continue
-        if ctx.timestamp_ms - tank["timestamp_ms"] > ctx.config["map_open_cooldown_ms"]:
+        if ctx.timestamp_ms - tank["timestamp_ms"] > ctx.config["map_intel_horizon_ms"]:
             continue
         dist = manhattan_distance(sx, sy, tank["x"], tank["y"])
         if candidate is None or dist < best_dist:
@@ -421,7 +421,7 @@ def _decide_hunt_acquire_fresh(
         ctx.killed,
         ctx.terrain,
         ctx.timestamp_ms,
-        ctx.config["map_open_cooldown_ms"],
+        ctx.config["map_intel_horizon_ms"],
         engagement_reserve_fuel=(
             ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
         ),
@@ -439,7 +439,7 @@ def _decide_hunt_acquire_fresh(
     # no data, so "I asked 2 s ago" was read as "I heard 2 s ago"
     # while all 27 practice bots sat rejected as stale_map_data.
     map_age_ms = ctx.timestamp_ms - ctx.ws.map_data_ingested_ms
-    if ctx.ws.map_data_ingested_ms > 0 and map_age_ms <= ctx.config["map_open_cooldown_ms"]:
+    if ctx.ws.map_data_ingested_ms > 0 and map_age_ms <= ctx.config["map_intel_horizon_ms"]:
         relay = relay_toward_unaffordable_enemy(ctx, ai_state)
         if relay is not None:
             return relay

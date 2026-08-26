@@ -94,6 +94,7 @@ class TestAIState:
             action_stall_timeout_ms=config["action_stall_timeout_ms"],
             kill_cooldown_ms=config["kill_cooldown_ms"],
             map_open_cooldown_ms=config["map_open_cooldown_ms"],
+            map_intel_horizon_ms=config["map_intel_horizon_ms"],
             dual_break_threshold=config["dual_break_threshold"],
             radar_break_threshold=config["radar_break_threshold"],
             engagement_fuel_budget=config["engagement_fuel_budget"],
@@ -414,6 +415,7 @@ class TestAIConfig:
             "action_stall_timeout_ms": 10000,
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
+            "map_intel_horizon_ms": 12000,
             "dual_break_threshold": 4,
             "patrol_waypoints": "not_a_list",
         }
@@ -431,6 +433,7 @@ class TestAIConfig:
             "action_stall_timeout_ms": 10000,
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
+            "map_intel_horizon_ms": 12000,
             "dual_break_threshold": 4,
             "patrol_waypoints": [[1, 2, 3]],
         }
@@ -448,6 +451,7 @@ class TestAIConfig:
             "action_stall_timeout_ms": 10000,
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
+            "map_intel_horizon_ms": 12000,
             "dual_break_threshold": 4,
             "patrol_waypoints": [["a", "b"]],
         }

@@ -41,7 +41,7 @@ def _acquisition_rejection_reason(
     killed: dict[str, int],
     terrain: TerrainMapProtocol | None,
     now_ms: int,
-    map_open_cooldown_ms: int,
+    map_intel_horizon_ms: int,
     engagement_reserve_fuel: int,
     human_min_rank: int,
     human_max_rank: int,
@@ -55,7 +55,7 @@ def _acquisition_rejection_reason(
         killed: Tank IDs on kill cooldown.
         terrain: Terrain map for the stand-off landing check.
         now_ms: Current tick timestamp.
-        map_open_cooldown_ms: Freshness window for map-known positions.
+        map_intel_horizon_ms: Freshness window for map-known positions.
         engagement_reserve_fuel: Fuel that must remain after the
             approach teleport.
 
@@ -92,7 +92,7 @@ def _acquisition_rejection_reason(
         return "killed_cooldown"
     if str(tank["tank_id"]) in blocked:
         return "blocked"
-    if now_ms - tank["timestamp_ms"] >= map_open_cooldown_ms:
+    if now_ms - tank["timestamp_ms"] >= map_intel_horizon_ms:
         return "stale_map_data"
     if not has_standoff_landing(tank["x"], tank["y"], terrain):
         return "no_standoff_landing"
@@ -115,7 +115,7 @@ def find_acquisition_target(
     killed: dict[str, int],
     terrain: TerrainMapProtocol | None,
     now_ms: int,
-    map_open_cooldown_ms: int,
+    map_intel_horizon_ms: int,
     *,
     engagement_reserve_fuel: int,
     priority_target_name: str = "",
@@ -141,7 +141,7 @@ def find_acquisition_target(
     Filters: enemy team, alive, position not (0,0), not on
     ``killed`` or ``blocked`` lists, has a passable stand-off
     landing within shot range, ``timestamp_ms`` within
-    ``map_open_cooldown_ms``, and **affordable end-to-end**: current
+    ``map_intel_horizon_ms``, and **affordable end-to-end**: current
     fuel must cover the approach teleport plus
     ``engagement_reserve_fuel`` (a realistic kill cost plus the
     fuel-low reserve). The user contract (2026-07-02) is that the bot
@@ -157,7 +157,7 @@ def find_acquisition_target(
         killed: Tank IDs on kill cooldown.
         terrain: Terrain map for the stand-off landing check.
         now_ms: Current tick timestamp.
-        map_open_cooldown_ms: Freshness window for map-known positions.
+        map_intel_horizon_ms: Freshness window for map-known positions.
         engagement_reserve_fuel: Fuel that must remain after the
             approach teleport (kill budget + fuel-low reserve).
 
@@ -188,7 +188,7 @@ def find_acquisition_target(
             killed,
             terrain,
             now_ms,
-            map_open_cooldown_ms,
+            map_intel_horizon_ms,
             engagement_reserve_fuel,
             human_min_rank,
             human_max_rank,
@@ -233,7 +233,7 @@ def stale_human_exists(
     killed: dict[str, int],
     terrain: TerrainMapProtocol | None,
     now_ms: int,
-    map_open_cooldown_ms: int,
+    map_intel_horizon_ms: int,
     *,
     engagement_reserve_fuel: int,
     human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
@@ -244,7 +244,7 @@ def stale_human_exists(
     The freshness asymmetry that hid Yuppler (run 2026-07-29 21:19):
     practice bots move and shoot constantly, so the wire keeps them
     permanently map-fresh; a QUIET human generates no wire traffic and
-    goes stale ``map_open_cooldown_ms`` after every map open. With a
+    goes stale ``map_intel_horizon_ms`` after every map open. With a
     wire-fresh bot always available, acquisition never needed another
     map open and the human stayed invisible outside 5-second windows.
     The acquire path uses this predicate to force a map refresh before
@@ -262,7 +262,7 @@ def stale_human_exists(
         killed: Tank IDs on kill cooldown.
         terrain: Terrain map for the stand-off landing check.
         now_ms: Current tick timestamp.
-        map_open_cooldown_ms: Freshness window for map-known positions.
+        map_intel_horizon_ms: Freshness window for map-known positions.
         engagement_reserve_fuel: Fuel that must remain after the
             approach teleport.
 
@@ -283,7 +283,7 @@ def stale_human_exists(
             killed,
             terrain,
             now_ms,
-            map_open_cooldown_ms,
+            map_intel_horizon_ms,
             engagement_reserve_fuel,
             human_min_rank,
             human_max_rank,
@@ -301,7 +301,7 @@ def find_relay_travel_target(
     killed: dict[str, int],
     terrain: TerrainMapProtocol | None,
     now_ms: int,
-    map_open_cooldown_ms: int,
+    map_intel_horizon_ms: int,
     *,
     engagement_reserve_fuel: int,
     priority_target_name: str = "",
@@ -328,7 +328,7 @@ def find_relay_travel_target(
         killed: Tank IDs on kill cooldown.
         terrain: Terrain map for the stand-off landing check.
         now_ms: Current tick timestamp.
-        map_open_cooldown_ms: Freshness window for map-known positions.
+        map_intel_horizon_ms: Freshness window for map-known positions.
         engagement_reserve_fuel: Fuel that must remain after the
             approach teleport (kill budget + fuel-low reserve).
 
@@ -352,7 +352,7 @@ def find_relay_travel_target(
             killed,
             terrain,
             now_ms,
-            map_open_cooldown_ms,
+            map_intel_horizon_ms,
             engagement_reserve_fuel,
             human_min_rank,
             human_max_rank,
