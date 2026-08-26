@@ -135,3 +135,13 @@ def entrypoint() -> None:
 
 
 __all__ = ["entrypoint", "main", "probe_run_record"]
+
+
+# Without this, `python -m model_trainer.cli.known_answer_probe` IMPORTS the
+# module, runs nothing, and exits 0. Measured: HPC3 jobs 55595084 and 55595086
+# each "succeeded" in six seconds having written no record and no stderr, and
+# only the absent output file said so. A silent no-op that reports success is
+# worse than a crash, and a console script alone does not cover it because a
+# job document may name the module rather than the script.
+if __name__ == "__main__":
+    entrypoint()

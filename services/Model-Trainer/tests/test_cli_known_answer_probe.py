@@ -8,6 +8,7 @@ what it actually returned.
 from __future__ import annotations
 
 import pathlib
+import runpy
 import sys
 
 import pytest
@@ -213,3 +214,27 @@ class TestTheCommandLine:
     def test_an_unknown_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--seed"):
             probe_cli.main([*_argv(tmp_path), "--seed", "1"])
+
+    def test_running_the_module_as_main_actually_probes(self, tmp_path: pathlib.Path) -> None:
+        # The regression this exists for: without the __main__ guard,
+        # `python -m model_trainer.cli.known_answer_probe` imported the module,
+        # ran nothing and exited 0. HPC3 jobs 55595084 and 55595086 each
+        # "succeeded" in six seconds having written no record and no stderr.
+        # Asserting the guard's presence would not have caught it either --
+        # only executing the module as __main__ and demanding the output does.
+        module_name = "model_trainer.cli.known_answer_probe"
+        saved_argv = sys.argv
+        saved_module = sys.modules.pop(module_name, None)
+        sys.argv = ["modeltrainer-known-answer-probe", *_argv(tmp_path)]
+        try:
+            with pytest.raises(SystemExit) as excinfo:
+                runpy.run_module(module_name, run_name="__main__", alter_sys=False)
+        finally:
+            sys.argv = saved_argv
+            if saved_module is not None:
+                sys.modules[module_name] = saved_module
+
+        assert excinfo.value.code == 0
+
+        decoded = decode_run_record(load_json_str(_out_path(tmp_path).read_text(encoding="utf-8")))
+        assert decoded["label"] == PROBE_LABEL
