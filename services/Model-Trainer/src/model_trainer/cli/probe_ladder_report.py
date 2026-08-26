@@ -26,6 +26,14 @@ different images that disagree at a rung have told you nothing about cards.
 The command still prints the whole report: refusing would hide the numbers
 from someone who has a reason to look at them, and a warning they cannot
 miss does the job without deciding for them.
+
+AN AXIS NOBODY RECORDED IS REPORTED SEPARATELY, because differencing cannot
+see it. Two runs that each failed to record an image digest have EQUAL
+digests as far as :func:`find_differences` is concerned, and the report read
+"identical to the reference" for a pair that had no idea what they ran in.
+:func:`~platform_core.known_answer_registry.incomplete_axes` already names
+empty axes for the registry, which refuses to store an entry carrying one;
+the same call answers it here.
 """
 
 from __future__ import annotations
@@ -37,6 +45,7 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.comparability import find_differences
 from platform_core.json_utils import load_json_str
+from platform_core.known_answer_registry import incomplete_axes
 from platform_core.logging import get_logger, setup_logging
 from platform_core.run_record import (
     ObservationAgreement,
@@ -175,6 +184,26 @@ def configuration_lines(named_records: tuple[tuple[str, RunRecord], ...]) -> tup
         described = ", ".join(axes) if axes else "identical to the reference"
         lines.append(f"  [{index}] {name}  differs on: {described}")
         confounded.extend(axis for axis in axes if axis in CONFOUNDING_AXES)
+
+    # An axis nobody recorded compares EQUAL to the same gap in another run,
+    # so two runs that each failed to record their image read as "identical
+    # configuration". They are not; they are two runs that cannot say. The
+    # empty axis has to be named separately from the differing ones, because
+    # the difference machinery is structurally unable to see it.
+    for index, (name, record) in enumerate(named_records):
+        empty = incomplete_axes(record["fingerprint"])
+        if empty:
+            lines.append(
+                f"  !! [{index}] {name} recorded no {', '.join(empty)}. An unrecorded axis"
+            )
+            lines.append(
+                "     matches every other unrecorded one, so agreement here is not evidence."
+            )
+            # NOT added to `confounded`. That warning reads "these runs do not
+            # all share one X", which is false here -- they share the absence.
+            # The line above already says the true thing. A set where only SOME
+            # runs recorded the axis reaches `confounded` through the
+            # differencing loop, because empty differs from non-empty there.
 
     for axis in sorted(set(confounded)):
         lines.append(f"  !! these runs do not all share one {axis}. A disagreement between")

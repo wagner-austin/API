@@ -304,6 +304,66 @@ class TestTheConfigurationSection:
 
         assert sum("do not all share one image_digest" in line for line in lines) == 1
 
+    def test_a_pair_that_each_recorded_no_image_is_not_called_identical_and_left_there(
+        self,
+    ) -> None:
+        # The hole differencing is structurally unable to see: an unrecorded
+        # axis compares EQUAL to the same gap in another run, so two runs that
+        # each failed to record their image read as one configuration. The
+        # local 3090 Ti ladder pair is exactly this shape.
+        local: RunRecord = {
+            **ladder_record("NVIDIA GeForce RTX 3090 Ti", {"tiny": GATE_VALUE}),
+            "fingerprint": RunFingerprint(
+                image_digest="",
+                gpu_model="NVIDIA GeForce RTX 3090 Ti",
+                driver_version="591.86",
+                determinism=PINNED,
+            ),
+        }
+        lines = report_cli.configuration_lines(
+            self._named(("run1.json", local), ("run2.json", local))
+        )
+
+        # Still reported as matching on every recorded axis, which is true...
+        assert lines[1] == "  [1] run2.json  differs on: identical to the reference"
+        # ...and the gap that makes that reading worthless is named for BOTH.
+        assert sum("recorded no image_digest" in line for line in lines) == 2
+        # NOT the "do not all share one image_digest" warning: they DO share
+        # it, both being absent. Saying otherwise would be a second, false
+        # claim stacked on a true one.
+        assert not any("do not all share" in line for line in lines)
+
+    def test_one_run_recording_an_image_and_another_not_is_a_real_difference(self) -> None:
+        # The case the empty-axis path must NOT swallow: empty against
+        # non-empty is a genuine disagreement and the differencing loop sees
+        # it, so this set gets both warnings and deserves them.
+        unknown: RunRecord = {
+            **ladder_record("NVIDIA GeForce RTX 3090 Ti", {"tiny": GATE_VALUE}),
+            "fingerprint": RunFingerprint(
+                image_digest="",
+                gpu_model="NVIDIA GeForce RTX 3090 Ti",
+                driver_version="591.86",
+                determinism=PINNED,
+            ),
+        }
+        lines = report_cli.configuration_lines(
+            self._named(("v100.json", full_ladder("Tesla V100")), ("local.json", unknown))
+        )
+
+        assert "image_digest" in lines[1]
+        assert any("recorded no image_digest" in line for line in lines)
+        assert any("do not all share one image_digest" in line for line in lines)
+
+    def test_a_fully_recorded_pair_raises_no_unrecorded_warning(self) -> None:
+        lines = report_cli.configuration_lines(
+            self._named(
+                ("v100.json", full_ladder("Tesla V100")),
+                ("a100.json", full_ladder("NVIDIA A100 80GB PCIe")),
+            )
+        )
+
+        assert not any("recorded no" in line for line in lines)
+
     def test_the_section_appears_in_the_report(self) -> None:
         lines = report_cli.report_lines(
             (
