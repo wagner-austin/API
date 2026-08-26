@@ -38,6 +38,8 @@ def _entry(**overrides: str) -> LedgerEntry:
         "log_dir": "/pub/wagnera3/logs",
         "deterministic": False,
         "experiment": {"arm": "B", "seed": "42"},
+        "image_digest": None,
+        "artifact": None,
     }
     base.update(overrides)
     return decode_ledger_entry(base)
@@ -120,7 +122,7 @@ class TestLedgerEntryContract:
 
     @staticmethod
     def _row() -> dict[str, JSONValue]:
-        """A ledger row carrying only the fields that predate the index.
+        """A valid ledger row, index fields explicitly unrecorded.
 
         Returns:
             The row, ready to extend with whatever a case is testing.
@@ -135,32 +137,43 @@ class TestLedgerEntryContract:
             "log_dir": "/pub/wagnera3/logs",
             "deterministic": False,
             "experiment": {"arm": "B", "seed": "42"},
+            "image_digest": None,
+            "artifact": None,
         }
 
-    def test_a_row_written_before_the_index_fields_existed_still_reads(self) -> None:
-        """The ledger is APPEND-ONLY and the live one predates both fields.
+    def test_a_row_omitting_an_index_field_is_refused(self) -> None:
+        """Tolerating absence was the shim; the 122 historical rows were
+        backfilled to explicit null instead.
 
-        Requiring them would make `hpc3-triage` and `hpc3-trace` fail to read
-        the history they exist to read. Reading history is not comparing --
-        the same reasoning that lets a training manifest decode without a
-        fingerprint.
+        A reader that accepts absence accepts it forever, including from a
+        writer that forgets the field tomorrow -- and those rows would decode
+        as "unknown" silently. The backfill happened once and is in git; the
+        tolerance would have been permanent.
         """
-        old_row: dict[str, JSONValue] = {
-            "job_id": "101",
-            "project": "abl",
-            "name": "abl.arm-b-42",
-            "host": "hpc3",
-            "partition": "free-gpu",
-            "submitted_at": "2026-08-22T16:00:00+00:00",
-            "log_dir": "/pub/wagnera3/logs",
-            "deterministic": False,
-            "experiment": {"arm": "B", "seed": "42"},
-        }
+        for key in ("image_digest", "artifact"):
+            broken = dict(self._row())
+            broken.update({"image_digest": None, "artifact": None})
+            del broken[key]
+            with pytest.raises(JSONTypeError, match=f"Field '{key}' is required"):
+                decode_ledger_entry(broken)
 
-        entry = decode_ledger_entry(old_row)
+    def test_the_message_says_what_to_write_instead(self) -> None:
+        """A required field nobody knows the value of needs an escape that is
+        not "leave it out"."""
+        broken = dict(self._row())
+        del broken["artifact"]
+        with pytest.raises(JSONTypeError, match="write null"):
+            decode_ledger_entry(broken)
 
-        assert entry["image_digest"] == ""
-        assert entry["artifact"] is None
+    def test_an_unrecorded_image_is_not_the_same_as_no_image(self) -> None:
+        """Three states, because rows named `...-v4` demonstrably ran inside
+        an image and record nothing. Collapsing null into "" would make every
+        one of them assert it ran bare."""
+        unrecorded = decode_ledger_entry({**self._row(), "image_digest": None, "artifact": None})
+        directory = decode_ledger_entry({**self._row(), "image_digest": "", "artifact": None})
+
+        assert unrecorded["image_digest"] is None
+        assert directory["image_digest"] == ""
 
     def test_a_mistyped_image_digest_is_a_corrupted_row_not_an_old_one(self) -> None:
         """Absent is history; present-and-wrong is corruption, and they differ."""
@@ -172,22 +185,9 @@ class TestLedgerEntryContract:
             decode_ledger_entry({**self._row(), "artifact": 7})
 
     def test_an_artifact_naming_nowhere_is_refused(self) -> None:
-        """Null says "declares none"; empty says "declares one, names nowhere"."""
+        """Null says "names none"; empty says "names one, and it is nowhere"."""
         with pytest.raises(JSONTypeError, match="not an empty string"):
-            decode_ledger_entry(
-                {
-                    "job_id": "101",
-                    "project": "abl",
-                    "name": "abl.arm-b-42",
-                    "host": "hpc3",
-                    "partition": "free-gpu",
-                    "submitted_at": "2026-08-22T16:00:00+00:00",
-                    "log_dir": "/pub/wagnera3/logs",
-                    "deterministic": False,
-                    "experiment": {"arm": "B", "seed": "42"},
-                    "artifact": "",
-                }
-            )
+            decode_ledger_entry({**self._row(), "artifact": ""})
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
@@ -196,52 +196,17 @@ class TestLedgerEntryContract:
     def test_a_partition_this_cluster_lacks_is_refused(self) -> None:
         """A ledger written for another machine must not read as ours."""
         with pytest.raises(AppError) as excinfo:
-            decode_ledger_entry(
-                {
-                    "job_id": "1",
-                    "project": "abl",
-                    "name": "abl.n",
-                    "host": "h",
-                    "partition": "turbo",
-                    "submitted_at": "t",
-                    "log_dir": "/l",
-                    "deterministic": False,
-                    "experiment": {"arm": "B"},
-                }
-            )
+            decode_ledger_entry({**self._row(), "partition": "turbo"})
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_UNKNOWN
 
     def test_a_malformed_project_is_refused(self) -> None:
         """The project is what makes the row legible among 102 users' jobs."""
         with pytest.raises(JSONTypeError):
-            decode_ledger_entry(
-                {
-                    "job_id": "1",
-                    "project": "Abl/v2",
-                    "name": "abl.n",
-                    "host": "h",
-                    "partition": "free-gpu",
-                    "submitted_at": "t",
-                    "log_dir": "/l",
-                    "deterministic": False,
-                    "experiment": {"arm": "B"},
-                }
-            )
+            decode_ledger_entry({**self._row(), "project": "Abl/v2"})
 
     def test_every_field_must_be_present_and_non_empty(self) -> None:
-        full: dict[str, JSONValue] = {
-            "job_id": "1",
-            "project": "abl",
-            "name": "abl.n",
-            "host": "h",
-            "partition": "free-gpu",
-            "submitted_at": "t",
-            "log_dir": "/l",
-            "deterministic": False,
-            "experiment": {"arm": "B"},
-        }
         for key in ("job_id", "project", "name", "host", "submitted_at", "log_dir"):
-            broken = dict(full)
+            broken = dict(self._row())
             broken[key] = ""
             with pytest.raises(JSONTypeError):
                 decode_ledger_entry(broken)

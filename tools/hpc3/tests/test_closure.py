@@ -21,7 +21,7 @@ from hpc3.contracts.status import JobStatus
 from hpc3.core import ledger
 from hpc3.core.triage import closures_for, open_entries, unaccounted_jobs
 from tests.against_hpc3 import decode_job_status, decode_ledger_entry
-from tests.conftest import write_file
+from tests.conftest import ledger_row, write_file
 
 _AT = "2026-08-22T16:00:00+00:00"
 
@@ -36,17 +36,7 @@ def _entry(job_id: str) -> LedgerEntry:
         A validated entry.
     """
     return decode_ledger_entry(
-        {
-            "job_id": job_id,
-            "project": "abl",
-            "name": f"abl.arm-{job_id}",
-            "host": "hpc3",
-            "partition": "free-gpu",
-            "submitted_at": _AT,
-            "log_dir": "/pub/logs",
-            "deterministic": False,
-            "experiment": {"arm": "B"},
-        }
+        ledger_row(job_id=job_id, name=f"abl.arm-{job_id}", submitted_at=_AT)
     )
 
 

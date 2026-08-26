@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
-from platform_core.json_utils import JSONValue
 
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.core.logs import age_command, log_ages, log_path, parse_ages
 from tests.against_hpc3 import decode_ledger_entry
-from tests.conftest import FakeRun
+from tests.conftest import FakeRun, ledger_row
 
 
 def _entry(job_id: str, name: str = "abl.arm-b-42") -> LedgerEntry:
@@ -27,18 +26,7 @@ def _entry(job_id: str, name: str = "abl.arm-b-42") -> LedgerEntry:
     Returns:
         A validated entry.
     """
-    base: dict[str, JSONValue] = {
-        "job_id": job_id,
-        "project": "abl",
-        "name": name,
-        "host": "hpc3",
-        "partition": "free-gpu",
-        "submitted_at": "2026-08-22T16:00:00+00:00",
-        "log_dir": "/pub/logs",
-        "deterministic": False,
-        "experiment": {"arm": "B"},
-    }
-    return decode_ledger_entry(base)
+    return decode_ledger_entry(ledger_row(job_id=job_id, name=name))
 
 
 class TestLogPath:

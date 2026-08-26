@@ -28,13 +28,22 @@ _ARM_B = "07ab4976" + "a" * 56
 _ARM_C = "4c91fbc1" + "b" * 56
 
 
-def _entry(job_id: str, name: str, experiment: dict[str, JSONValue]) -> dict[str, JSONValue]:
+def _entry(
+    job_id: str,
+    name: str,
+    experiment: dict[str, JSONValue],
+    image_digest: JSONValue = None,
+    artifact: JSONValue = None,
+) -> dict[str, JSONValue]:
     """Build a ledger record.
 
     Args:
         job_id: Job id.
         name: Qualified job name.
         experiment: The run's identity record.
+        image_digest: Digest of the image, ``""`` for a directory run, or
+            None for a row that does not record it.
+        artifact: Where the run was told to write its result, or None.
 
     Returns:
         The record.
@@ -49,6 +58,8 @@ def _entry(job_id: str, name: str, experiment: dict[str, JSONValue]) -> dict[str
         "log_dir": "/pub/w/abl/logs",
         "deterministic": False,
         "experiment": experiment,
+        "image_digest": image_digest,
+        "artifact": artifact,
     }
 
 
@@ -115,13 +126,73 @@ class TestTraceByJobId:
         args = _args(tmp_path, _entry("55519937", "abl.armB-s42", {"corpus": _ARM_B}))
         assert trace_cli.main([*args, "--job", "55519937"]) == 0
         assert emitted[1] == f"  corpus={_ARM_B}"
-        assert emitted[2] == "  logs /pub/w/abl/logs"
+        assert emitted[4] == "  logs /pub/w/abl/logs"
 
     def test_an_unrecorded_job_exits_non_zero(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
         args = _args(tmp_path, _entry("101", "abl.a", {"corpus": _ARM_B}))
         assert trace_cli.main([*args, "--job", "999"]) == 1
+
+
+class TestTraceWalksTheIndex:
+    """The index was recorded for a fortnight and rendered nowhere.
+
+    `submit` wrote `image_digest` and `artifact` into every row from commit
+    98a10957, and no command printed either -- so the ledger held the answer
+    to "which software produced this, and where did it go" and the only tool
+    that asks that question printed the log directory instead. Measured
+    2026-08-26 against live row 55597016, which carried both fields.
+    """
+
+    _DIGEST = "df841c661b9ed41a2213aec1470e2c347723be05785b15cef05d6f301cb791be"
+
+    def test_it_walks_job_to_image_to_artifact(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        args = _args(
+            tmp_path,
+            _entry(
+                "55597016",
+                "floor.floor-gpt2-a100-v4",
+                {"corpus": _ARM_B},
+                image_digest=self._DIGEST,
+                artifact="/pub/wagnera3/floor/results/gpt2-floor-a100-v4.json",
+            ),
+        )
+        assert trace_cli.main([*args, "--job", "55597016"]) == 0
+        assert emitted[2] == f"  image {self._DIGEST}"
+        assert emitted[3] == "  artifact /pub/wagnera3/floor/results/gpt2-floor-a100-v4.json"
+
+    def test_a_directory_run_reports_no_image_as_a_fact(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        args = _args(tmp_path, _entry("101", "abl.a", {"corpus": _ARM_B}, image_digest=""))
+        assert trace_cli.main([*args, "--job", "101"]) == 0
+        assert emitted[2] == "  image none (directory environment)"
+
+    def test_a_row_predating_the_field_does_not_read_as_no_image(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """`floor.floor-gpt2-a100-v4` at row 55591687 ran inside the v4 image
+        and records nothing. Rendering that as "none" would state the
+        opposite of what happened."""
+        args = _args(tmp_path, _entry("101", "abl.a", {"corpus": _ARM_B}, image_digest=None))
+        assert trace_cli.main([*args, "--job", "101"]) == 0
+        assert emitted[2] == (
+            "  image unrecorded -- this row predates the field, do not read it as none"
+        )
+
+    def test_an_undeclared_artifact_says_so_rather_than_going_quiet(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """124 of 125 live rows are in this state; a missing line would read
+        as a clean record instead of an index with nothing in it."""
+        args = _args(tmp_path, _entry("101", "abl.a", {"corpus": _ARM_B}, artifact=None))
+        assert trace_cli.main([*args, "--job", "101"]) == 0
+        assert emitted[3] == (
+            "  artifact not declared -- this row cannot say where the result went"
+        )
 
 
 class TestTraceArguments:

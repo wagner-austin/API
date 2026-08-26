@@ -327,6 +327,40 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
     return config
 
 
+def ledger_row(**overrides: JSONValue) -> dict[str, JSONValue]:
+    """Build one raw ledger record, before decoding.
+
+    One builder rather than the four near-identical private ones this
+    replaced. Those forked the moment the entry grew a field: making
+    ``image_digest`` required broke 25 tests across four files that each
+    spelled the same row out by hand, and every one of them had to be edited
+    to say the same new thing.
+
+    Args:
+        **overrides: Fields to replace in the valid baseline.
+
+    Returns:
+        A record ``decode_ledger_entry`` accepts, with both index fields
+        explicitly null -- the state of a row that does not record them.
+
+    """
+    row: dict[str, JSONValue] = {
+        "job_id": "101",
+        "project": "abl",
+        "name": "abl.arm-b-42",
+        "host": "hpc3",
+        "partition": "free-gpu",
+        "submitted_at": "2026-08-22T16:00:00+00:00",
+        "log_dir": "/pub/logs",
+        "deterministic": False,
+        "experiment": {"arm": "B"},
+        "image_digest": None,
+        "artifact": None,
+    }
+    row.update(overrides)
+    return row
+
+
 def budget_document(*, gpu_hours: float = 100.0, units: float = 1000.0) -> dict[str, JSONValue]:
     """Build a budget for a workspace document.
 

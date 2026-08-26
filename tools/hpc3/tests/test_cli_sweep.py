@@ -18,6 +18,7 @@ from tests.conftest import (
     FakeRun,
     budget_document,
     gpus,
+    ledger_row,
     project_config,
     workspace_document,
     write_file,
@@ -202,20 +203,7 @@ class TestTriageCli:
         """
         write_file(
             tmp_path / "ledger.jsonl",
-            dump_json_str(
-                {
-                    "job_id": job_id,
-                    "project": "abl",
-                    "name": "abl.arm",
-                    "host": "hpc3",
-                    "partition": "free-gpu",
-                    "submitted_at": "2026-08-22T16:00:00+00:00",
-                    "log_dir": "/pub/logs",
-                    "deterministic": False,
-                    "experiment": {"arm": "B"},
-                }
-            ).encode("utf-8")
-            + b"\n",
+            dump_json_str(ledger_row(job_id=job_id, name="abl.arm")).encode("utf-8") + b"\n",
         )
 
     def test_an_empty_ledger_is_clean(
@@ -310,19 +298,7 @@ class TestTriageCli:
         write_file(
             tmp_path / "ledger.jsonl",
             b"".join(
-                dump_json_str(
-                    {
-                        "job_id": job_id,
-                        "project": "abl",
-                        "name": f"abl.arm-{job_id}",
-                        "host": "hpc3",
-                        "partition": "free-gpu",
-                        "submitted_at": "2026-08-22T16:00:00+00:00",
-                        "log_dir": "/pub/logs",
-                        "deterministic": False,
-                        "experiment": {"arm": "B"},
-                    }
-                ).encode("utf-8")
+                dump_json_str(ledger_row(job_id=job_id, name=f"abl.arm-{job_id}")).encode("utf-8")
                 + b"\n"
                 for job_id in ("101", "102")
             ),

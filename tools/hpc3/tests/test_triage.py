@@ -17,6 +17,7 @@ from hpc3.contracts.status import JobStatus
 from hpc3.core.squeue import parse_squeue_output, parse_squeue_row, squeue_command
 from hpc3.core.triage import blocked_jobs, live_entries, silent_jobs, unaccounted_jobs
 from tests.against_hpc3 import decode_job_status, decode_ledger_entry
+from tests.conftest import ledger_row
 
 
 def _entry(job_id: str, name: str = "arm") -> LedgerEntry:
@@ -29,19 +30,7 @@ def _entry(job_id: str, name: str = "arm") -> LedgerEntry:
     Returns:
         A validated entry.
     """
-    return decode_ledger_entry(
-        {
-            "job_id": job_id,
-            "project": "abl",
-            "name": name,
-            "host": "hpc3",
-            "partition": "free-gpu",
-            "submitted_at": "2026-08-22T16:00:00+00:00",
-            "log_dir": "/pub/logs",
-            "deterministic": False,
-            "experiment": {"arm": "B"},
-        }
-    )
+    return decode_ledger_entry(ledger_row(job_id=job_id, name=name))
 
 
 def _status(job_id: str, state: str, **overrides: JSONValue) -> JobStatus:

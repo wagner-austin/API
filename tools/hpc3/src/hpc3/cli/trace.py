@@ -60,6 +60,44 @@ def _select(entries: Sequence[LedgerEntry], parsed: dict[str, str]) -> list[Ledg
     return [entry for entry in entries if matches(entry["experiment"], needle)]
 
 
+def describe_image(digest: str | None) -> str:
+    """Say which software produced a run, including when the row cannot.
+
+    Args:
+        digest: The recorded digest, ``""`` for a directory run, or None for
+            a row written before the field existed.
+
+    Returns:
+        A line naming the image, or naming which of the two kinds of absence
+        this is. They are reported differently on purpose: "ran outside any
+        image" is an answer and "this row does not record it" is not, and a
+        reader that saw one string for both would take the second for the
+        first.
+    """
+    if digest is None:
+        return "image unrecorded -- this row predates the field, do not read it as none"
+    if digest == "":
+        return "image none (directory environment)"
+    return f"image {digest}"
+
+
+def describe_artifact(artifact: str | None) -> str:
+    """Say where the run was told to write its result.
+
+    Args:
+        artifact: The declared path, or None when the row names none.
+
+    Returns:
+        A line naming the path, or saying plainly that the row does not.
+        Saying so is the point: an index whose artifact column is unset is
+        the state that cannot answer "which file holds the answer", and it
+        must be visible rather than rendered as a missing line.
+    """
+    if artifact is None:
+        return "artifact not declared -- this row cannot say where the result went"
+    return f"artifact {artifact}"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Report which recorded runs match a job id or an identity value.
 
@@ -89,6 +127,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     for entry in found:
         _test_hooks.emit(f"{entry['job_id']} {entry['name']} submitted {entry['submitted_at']}")
         _test_hooks.emit(f"  {format_experiment(entry['experiment'])}")
+        _test_hooks.emit(f"  {describe_image(entry['image_digest'])}")
+        _test_hooks.emit(f"  {describe_artifact(entry['artifact'])}")
         _test_hooks.emit(f"  logs {entry['log_dir']}")
 
     if found == []:
