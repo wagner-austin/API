@@ -26,6 +26,7 @@ def _report() -> FleetReportDict:
     return FleetReportDict(
         instance="arterial",
         team=2,
+        room="6",
         tank_id=2731,
         role="gatherer",
         x=100,

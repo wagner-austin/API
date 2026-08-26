@@ -118,12 +118,12 @@ __CARD_CSS__
 <div class="panel">
 <table>
   <thead><tr>
-    <th>name</th><th>account</th><th>role</th><th>status</th><th>limits</th>
+    <th>name</th><th>account</th><th>role</th><th>room</th><th>status</th><th>limits</th>
     <th>kills</th><th>deaths</th><th>hit/miss</th><th>dmg +/-</th>
     <th>tp</th><th>0-radar</th><th>inv start&rarr;now</th>
     <th>rank</th><th>time</th><th>actions</th>
   </tr></thead>
-  <tbody id="rows"><tr><td colspan="15" class="empty">loading…</td></tr></tbody>
+  <tbody id="rows"><tr><td colspan="16" class="empty">loading…</td></tr></tbody>
 </table>
 </div>
 <form id="spawn">
@@ -136,6 +136,9 @@ __CARD_CSS__
       <option value="gatherer">gatherer</option>
     </select>
     <div class="hint">gatherer never hunts</div></div>
+  <div class="field wide"><label for="room">Room</label>
+    <input id="room" type="text" placeholder="Practice">
+    <div class="hint">lobby room name; empty = Practice</div></div>
   <div class="field num"><label for="kills">Stop after kills</label>
     <input id="kills" type="number" min="0" value="20">
     <div class="hint">0 = play until stopped</div></div>
@@ -237,6 +240,7 @@ function row(bot) {
   tr.innerHTML =
     "<td>" + bot.instance + "</td><td>" + (bot.account || "default") + "</td>" +
     "<td>" + bot.role + "</td>" +
+    "<td>" + (bot.room || "Practice") + "</td>" +
     "<td>" + status + "</td><td>" + limits + "</td>" +
     "<td>" + (s.available ? s.kills : "") + "</td>" +
     "<td>" + (s.available ? s.deaths : "") + "</td>" +
@@ -293,7 +297,7 @@ async function poll() {
   tbody.replaceChildren();
   if (!names.length) {
     tbody.innerHTML =
-      '<tr><td colspan="15" class="empty">no bots yet — launch one below</td></tr>';
+      '<tr><td colspan="16" class="empty">no bots yet — launch one below</td></tr>';
   }
   for (const name of names) tbody.appendChild(row(registry[name]));
   const running = names.filter((n) => registry[n].alive).length;
@@ -326,6 +330,7 @@ document.getElementById("spawn").addEventListener("submit", async (event) => {
     body: JSON.stringify({
       account: document.getElementById("account").value,
       role: document.getElementById("role").value,
+      room: document.getElementById("room").value,
       kills: Number(document.getElementById("kills").value) || 0,
       seconds: Number(document.getElementById("seconds").value) || 0,
     }),

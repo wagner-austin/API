@@ -52,6 +52,8 @@ class FleetBotDict(TypedDict):
             (empty means the accounts.json default).
         role: Resolved :data:`~tankpit_bot.fleetshare.types.FleetRole`
             the child was spawned with ([[fleet-coordination]]).
+        room: ``TANKPIT_ROOM`` the child was spawned with (empty means
+            the default Practice room).
         pid: Child process id.
         alive: Whether the process is still running at report time.
         returncode: Exit code once dead; ``None`` while alive.
@@ -63,12 +65,53 @@ class FleetBotDict(TypedDict):
     instance: str
     account: str
     role: FleetRole
+    room: str
     pid: int
     alive: bool
     returncode: int | None
     kills: int
     seconds: int
     started_ms: int
+
+
+def _child_environment(
+    instance: str,
+    kills: int,
+    seconds: int,
+    resolved_role: str,
+    account: str,
+    room: str,
+) -> dict[str, str]:
+    """Build one child's spawn environment.
+
+    ``TANKPIT_ROLE`` is always explicit: the child inherits the
+    manager's whole environment, and a role lingering there must never
+    silently re-role the entire fleet. Empty account and room omit
+    their selectors so the child keeps its defaults (accounts.json
+    default; the Practice room).
+
+    Args:
+        instance: Validated instance name.
+        kills: Kill bound.
+        seconds: Seconds bound.
+        resolved_role: Resolved fleet role.
+        account: Account selector ("" = default).
+        room: Room selector ("" = default).
+
+    Returns:
+        Environment overrides for the spawned child.
+    """
+    env = {
+        "TANKPIT_BOT_INSTANCE": instance,
+        "TANKPIT_BOT_SESSION_KILLS": str(kills),
+        "TANKPIT_BOT_SESSION_SECONDS": str(seconds),
+        "TANKPIT_ROLE": resolved_role,
+    }
+    if account:
+        env["TANKPIT_ACCOUNT"] = account
+    if room:
+        env["TANKPIT_ROOM"] = room
+    return env
 
 
 class _ManagedBot:
@@ -80,6 +123,7 @@ class _ManagedBot:
         instance: str,
         account: str,
         role: FleetRole,
+        room: str,
         kills: int,
         seconds: int,
         started_ms: int,
@@ -91,6 +135,7 @@ class _ManagedBot:
             instance: Validated instance name.
             account: Account selector the child received.
             role: Resolved fleet role the child received.
+            room: Room selector the child received ("" = default).
             kills: Kill bound the child received.
             seconds: Seconds bound the child received.
             started_ms: Wall-clock spawn time.
@@ -99,6 +144,7 @@ class _ManagedBot:
         self.instance = instance
         self.account = account
         self.role = role
+        self.room = room
         self.kills = kills
         self.seconds = seconds
         self.started_ms = started_ms
@@ -115,6 +161,7 @@ class _ManagedBot:
             instance=self.instance,
             account=self.account,
             role=self.role,
+            room=self.room,
             pid=self.process.pid,
             alive=returncode is None,
             returncode=returncode,
@@ -207,6 +254,7 @@ class FleetManager:
         kills: int,
         seconds: int,
         role: str = "",
+        room: str = "",
     ) -> FleetBotDict:
         """Spawn one bot child process under an instance namespace.
 
@@ -218,6 +266,10 @@ class FleetManager:
                 accounts.json default.
             kills: Kill bound (0 unbounded).
             seconds: Seconds bound (0 unbounded).
+            room: ``TANKPIT_ROOM`` selector; empty keeps the child's
+                default (Practice). Cross-room fleets stay safe: the
+                knowledge exchange merges same-room reports only
+                (2026-08-26).
             role: Fleet role selector; empty means fighter — the full
                 doctrine is the primary configuration, a gatherer is
                 an explicit operator choice ([[fleet-coordination]]).
@@ -267,22 +319,14 @@ class FleetManager:
             raise FleetError(
                 f"instance {instance!r} is already running (pid {existing.process.pid})"
             )
-        env = {
-            "TANKPIT_BOT_INSTANCE": instance,
-            "TANKPIT_BOT_SESSION_KILLS": str(kills),
-            "TANKPIT_BOT_SESSION_SECONDS": str(seconds),
-            # Always explicit: the child inherits the manager's whole
-            # environment, and a TANKPIT_ROLE lingering there must
-            # never silently re-role the entire fleet.
-            "TANKPIT_ROLE": resolved_role,
-        }
-        if account:
-            env["TANKPIT_ACCOUNT"] = account
-        process = service_hooks.spawn_bot_process(env)
+        process = service_hooks.spawn_bot_process(
+            _child_environment(instance, kills, seconds, resolved_role, account, room)
+        )
         bot = _ManagedBot(
             instance=instance,
             account=account,
             role=resolved_role,
+            room=room,
             kills=kills,
             seconds=seconds,
             started_ms=top_hooks.get_current_time_ms(),

@@ -54,14 +54,14 @@ def encode_fleet_bot(bot: FleetBotDict) -> JSONObject:
     }
 
 
-def parse_spawn_request(body: bytes) -> tuple[str, str, int, int, str]:
+def parse_spawn_request(body: bytes) -> tuple[str, str, int, int, str, str]:
     """Parse the ``POST /bots`` body.
 
     Args:
         body: Raw request body.
 
     Returns:
-        ``(instance, account, kills, seconds, role)``.
+        ``(instance, account, kills, seconds, role, room)``.
 
     Raises:
         JSONTypeError: Malformed JSON or wrong field types.
@@ -72,7 +72,8 @@ def parse_spawn_request(body: bytes) -> tuple[str, str, int, int, str]:
     kills = narrow_json_to_int(data.get("kills", 0))
     seconds = narrow_json_to_int(data.get("seconds", 0))
     role = narrow_json_to_str(data.get("role", ""))
-    return instance, account, kills, seconds, role
+    room = narrow_json_to_str(data.get("room", ""))
+    return instance, account, kills, seconds, role, room
 
 
 def _json_response(payload: JSONObject, status: int = 200) -> web.Response:
@@ -196,13 +197,16 @@ def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:
     async def spawn_bot(request: web.Request) -> web.Response:
         """``POST /bots`` — spawn one instance."""
         try:
-            instance, account, kills, seconds, role = parse_spawn_request(await request.read())
+            instance, account, kills, seconds, role, room = parse_spawn_request(
+                await request.read()
+            )
             row = manager.spawn(
                 instance=instance,
                 account=account,
                 kills=kills,
                 seconds=seconds,
                 role=role,
+                room=room,
             )
         except (JSONTypeError, ValueError) as error:
             log.warning("Fleet: rejected spawn request (400): %s", error)

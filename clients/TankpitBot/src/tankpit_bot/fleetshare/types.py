@@ -128,6 +128,11 @@ class FleetReportDict(TypedDict):
             sole-bot namespace).
         team: The reporter's team — receivers merge SAME-TEAM reports
             only (knowledge sharing is an alliance, [[fleet-coordination]]).
+        room: The room id the reporter is playing in — receivers
+            merge SAME-ROOM reports only (coordinates are per-field;
+            a Desert sighting merged into a Practice belief set is
+            poison, found 2026-08-26 when the first cross-room recon
+            launched).
         tank_id: The reporter's own tank id, so receivers never merge
             a sighting of themselves or the reporter as an "enemy".
         role: The reporter's :data:`FleetRole`.
@@ -159,6 +164,7 @@ class FleetReportDict(TypedDict):
 
     instance: str
     team: int
+    room: str
     tank_id: int
     role: FleetRole
     x: int

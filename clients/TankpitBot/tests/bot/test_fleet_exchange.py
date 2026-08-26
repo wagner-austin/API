@@ -25,6 +25,7 @@ from tests.conftest import FakeEnv, FakeFileSystem
 
 def _entered_bot(ws: WorldService) -> Bot:
     """Build a bot whose session has an established self (team 2)."""
+    ws.set_selected_room("6")
     ws.update_world_state_from_position(100, 100)
     ws.world_state = WorldStateDict(
         **{
@@ -63,6 +64,7 @@ def test_exchange_publishes_and_merges_a_sibling(
     sibling = FleetReportDict(
         instance="artax",
         team=2,
+        room="6",
         tank_id=1301,
         role="fighter",
         x=90,

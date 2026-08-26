@@ -148,6 +148,31 @@ def test_spawn_without_account_omits_the_selector(spawner: _FakeSpawner) -> None
     assert "TANKPIT_ACCOUNT" not in spawner.envs[0]
 
 
+def test_spawn_with_a_room_sets_the_selector(spawner: _FakeSpawner) -> None:
+    """A named room reaches the child as TANKPIT_ROOM and rides the row.
+
+    The 2026-08-26 Desert recon was hand-spawned because the manager
+    had no room parameter; cross-room fleets are safe because the
+    knowledge exchange merges same-room reports only.
+    """
+    manager = FleetManager()
+
+    row = manager.spawn(instance="alpha", account="", kills=0, seconds=0, room="World (Desert)")
+
+    assert spawner.envs[0]["TANKPIT_ROOM"] == "World (Desert)"
+    assert row["room"] == "World (Desert)"
+
+
+def test_spawn_without_a_room_omits_the_selector(spawner: _FakeSpawner) -> None:
+    """An empty room keeps the child's default (Practice)."""
+    manager = FleetManager()
+
+    row = manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+
+    assert "TANKPIT_ROOM" not in spawner.envs[0]
+    assert row["room"] == ""
+
+
 def test_spawn_rejects_invalid_instance_names(spawner: _FakeSpawner) -> None:
     """Path characters and uppercase never reach the filesystem layer."""
     manager = FleetManager()

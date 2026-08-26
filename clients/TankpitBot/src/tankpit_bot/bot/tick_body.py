@@ -274,7 +274,7 @@ def _exchange_fleet_knowledge(bot: Bot) -> None:
     if report is None:
         return
     write_fleet_report(report)
-    reports = read_team_reports(instance, report["team"], now_ms)
+    reports = read_team_reports(instance, report["team"], report["room"], now_ms)
     summary = merge_fleet_reports(
         bot.world,
         reports,

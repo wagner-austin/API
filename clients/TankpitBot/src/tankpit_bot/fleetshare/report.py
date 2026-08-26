@@ -212,10 +212,15 @@ def build_fleet_report(
     self_state = ws.world_state["self_state"]
     if self_state is None or self_state["tank_id"] == 0:
         return None
+    if ws.selected_room is None:
+        # No room, no shareable coordinates -- pre-join ticks offer
+        # nothing (same contract as the no-self return above).
+        return None
     own_team = self_state["team"]
     return FleetReportDict(
         instance=instance,
         team=own_team,
+        room=ws.selected_room,
         tank_id=self_state["tank_id"],
         role=role,
         x=self_state["x"],

@@ -39,6 +39,7 @@ def _report(
     instance: str,
     *,
     team: int = 2,
+    room: str = "6",
     tank_id: int = 1301,
     written_ms: int = _NOW - 1000,
     engaged_target_id: int = -1,
@@ -51,6 +52,7 @@ def _report(
     return FleetReportDict(
         instance=instance,
         team=team,
+        room=room,
         tank_id=tank_id,
         role="fighter",
         x=90,
@@ -96,8 +98,11 @@ class TestReadTeamReports:
         _write(fake_fs, _report("arterial", tank_id=2731))
         _write(fake_fs, _report("old", written_ms=_NOW - FLEET_REPORT_TTL_MS - 1))
         _write(fake_fs, _report("enemyteam", team=0))
+        # Same team, different ROOM: a Desert sibling's coordinates are
+        # poison in a Practice belief set (2026-08-26) -- excluded.
+        _write(fake_fs, _report("desertscout", room="7"))
 
-        reports = read_team_reports("arterial", 2, _NOW)
+        reports = read_team_reports("arterial", 2, "6", _NOW)
 
         assert [report["instance"] for report in reports] == ["artax"]
 
@@ -105,7 +110,7 @@ class TestReadTeamReports:
         """A sole-namespace bot ('') is a sibling to a named instance."""
         _write(fake_fs, _report(""))
 
-        reports = read_team_reports("arterial", 2, _NOW)
+        reports = read_team_reports("arterial", 2, "6", _NOW)
 
         assert len(reports) == 1
         assert reports[0]["instance"] == ""
@@ -114,7 +119,7 @@ class TestReadTeamReports:
         """The sole-namespace bot never reads its own report back."""
         _write(fake_fs, _report(""))
 
-        assert read_team_reports("", 2, _NOW) == []
+        assert read_team_reports("", 2, "6", _NOW) == []
 
     def test_read_retries_through_the_windows_replace_window(self, fake_fs: FakeFileSystem) -> None:
         """One PermissionError mid-swap: the immediate retry lands.
@@ -136,7 +141,7 @@ class TestReadTeamReports:
 
         _test_hooks.read_text = swap_window_read
         try:
-            reports = read_team_reports("arterial", 2, _NOW)
+            reports = read_team_reports("arterial", 2, "6", _NOW)
         finally:
             _test_hooks.read_text = real_read
 
@@ -154,7 +159,7 @@ class TestReadTeamReports:
         _test_hooks.read_text = denied_read
         try:
             with pytest.raises(PermissionError):
-                read_team_reports("arterial", 2, _NOW)
+                read_team_reports("arterial", 2, "6", _NOW)
         finally:
             _test_hooks.read_text = real_read
 
@@ -342,7 +347,7 @@ class TestClockDomainGuard:
         versa) and must never pass as fresh."""
         _write(fake_fs, _report("artax", written_ms=_NOW + 5000))
 
-        assert read_team_reports("arterial", 2, _NOW) == []
+        assert read_team_reports("arterial", 2, "6", _NOW) == []
 
 
 class TestSharedScanCoverage:
@@ -384,7 +389,7 @@ class TestStaleSchemaArtifacts:
             dump_json_str({"written_ms": _NOW - FLEET_REPORT_TTL_MS - 1}),
         )
 
-        assert read_team_reports("arterial", 2, _NOW) == []
+        assert read_team_reports("arterial", 2, "6", _NOW) == []
 
     def test_fresh_invalid_report_still_raises(self, fake_fs: FakeFileSystem) -> None:
         """A live mixed-schema fleet is a genuine bug and says so."""
@@ -397,7 +402,7 @@ class TestStaleSchemaArtifacts:
         )
 
         with pytest.raises(JSONTypeError, match="instance"):
-            read_team_reports("arterial", 2, _NOW)
+            read_team_reports("arterial", 2, "6", _NOW)
 
     def test_non_object_file_raises(self, fake_fs: FakeFileSystem) -> None:
         """A non-object payload names the shape in the error."""
@@ -407,7 +412,7 @@ class TestStaleSchemaArtifacts:
         fake_fs.write_text(bot_run_dir("weird") / FLEET_REPORT_FILENAME, "[1, 2]")
 
         with pytest.raises(JSONTypeError, match="fleet report must be an object"):
-            read_team_reports("arterial", 2, _NOW)
+            read_team_reports("arterial", 2, "6", _NOW)
 
 
 class TestSharedRemovals:

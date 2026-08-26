@@ -96,6 +96,7 @@ def _read_report_text(path: Path) -> str:
 def read_team_reports(
     own_instance: str,
     own_team: int,
+    own_room: str,
     now_ms: int,
 ) -> list[FleetReportDict]:
     """Read the fresh same-team reports of every sibling bot.
@@ -105,6 +106,9 @@ def read_team_reports(
             namespace) — its own report file is skipped.
         own_team: This bot's team; other teams' reports are not merged
             (knowledge sharing is an alliance).
+        own_room: This bot's room id; other rooms' reports are not
+            merged (coordinates are per-field -- a Desert sighting in
+            a Practice belief set is poison, 2026-08-26).
         now_ms: Current wall-clock ms for the freshness bound.
 
     Returns:
@@ -143,6 +147,8 @@ def read_team_reports(
             continue
         report = decode_fleet_report(parsed)
         if report["team"] != own_team:
+            continue
+        if report["room"] != own_room:
             continue
         reports.append(report)
     return reports

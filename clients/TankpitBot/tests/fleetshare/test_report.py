@@ -32,6 +32,7 @@ def _world_service(
 ) -> WorldService:
     """Build a session with an established self at (100,100), team 2."""
     ws = WorldService()
+    ws.set_selected_room("6")
     ws.update_world_state_from_position(100, 100)
     ws.world_state = WorldStateDict(
         **{
@@ -259,3 +260,18 @@ class TestReportFreshnessBounds:
         assert [(r["x"], r["y"], r["removed_ms"]) for r in report["removed"]] == [
             (70, 80, _NOW - 1000)
         ]
+
+
+def test_no_selected_room_offers_nothing() -> None:
+    """Before a room is joined there are no shareable coordinates.
+
+    The room field is hard-required in the schema (coordinates are
+    per-field), so a pre-join tick offers nothing -- the same
+    contract as the no-self return.
+    """
+    ws = _world_service()
+    ws.selected_room = None
+
+    report = build_fleet_report(ws, instance="a", role="fighter", engaged_target_id=-1, now_ms=1)
+
+    assert report is None

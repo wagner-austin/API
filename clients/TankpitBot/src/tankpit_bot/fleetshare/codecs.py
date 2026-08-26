@@ -227,6 +227,7 @@ def encode_fleet_report(report: FleetReportDict) -> JSONObject:
     return {
         "instance": report["instance"],
         "team": report["team"],
+        "room": report["room"],
         "tank_id": report["tank_id"],
         "role": report["role"],
         "x": report["x"],
@@ -284,6 +285,7 @@ def decode_fleet_report(data: JSONValue) -> FleetReportDict:
     return FleetReportDict(
         instance=require_str(data, "instance"),
         team=require_int(data, "team"),
+        room=require_str(data, "room"),
         tank_id=require_int(data, "tank_id"),
         role=require_fleet_role(data, "role"),
         x=require_int(data, "x"),
