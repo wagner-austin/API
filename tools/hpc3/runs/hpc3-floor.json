@@ -6,12 +6,16 @@
   "quiet_seconds": 600,
   "budget": {
     "max_gpu_hours": 1.0,
-    "max_service_units": 0.0
+    "max_service_units": 0.0,
+    "charge_account": ""
   },
   "projects": {
     "floor": {
       "partition": "free-gpu",
-      "gpu": { "model": "A100", "count": 1 },
+      "gpu": {
+        "model": "A100",
+        "count": 1
+      },
       "cpus": 8,
       "mem_gb": 32,
       "minutes": 60,
@@ -20,7 +24,9 @@
       "image": {
         "path": "/pub/wagnera3/images/v4/abl.sif",
         "sha256": "df841c661b9ed41a2213aec1470e2c347723be05785b15cef05d6f301cb791be",
-        "binds": ["/pub/wagnera3"]
+        "binds": [
+          "/pub/wagnera3"
+        ]
       },
       "env_path": "/opt/env",
       "pinned_packages": {

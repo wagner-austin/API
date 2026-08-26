@@ -53,6 +53,7 @@ def submit_sweep(
     ledger_path: pathlib.Path,
     submitted_at: str,
     cluster: ClusterFacts,
+    charge_account: str,
 ) -> list[SubmittedMember]:
     """Submit every member of a sweep.
 
@@ -90,6 +91,7 @@ def submit_sweep(
             ledger_path=ledger_path,
             submitted_at=submitted_at,
             cluster=cluster,
+            charge_account=charge_account,
         )
         label = qualified_name(member_spec["project"], member_spec["name"])
         submitted.append(SubmittedMember(label, job_id))

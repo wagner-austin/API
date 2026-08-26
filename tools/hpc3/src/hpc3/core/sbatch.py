@@ -250,7 +250,7 @@ def _code_provenance_export(spec: JobSpec) -> str:
     return f"export GIT_COMMIT=\"$({reader} 2>/dev/null || echo '')\""
 
 
-def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
+def render_sbatch(spec: JobSpec, *, log_dir: str, charge_account: str) -> str:
     """Render a validated job spec into a batch script.
 
     Args:
@@ -259,6 +259,12 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
             rendered script relies on was enforced there, so nothing is
             re-checked here.
         log_dir: Absolute directory on the cluster for stdout and stderr.
+        charge_account: The Slurm account to bill, or empty for none. Emitted
+            only when non-empty: a billed partition refuses a job that names
+            no account ("please specify charge account"), and a FREE partition
+            on this cluster refuses one that names an account it is not
+            associated with, so neither an always-on nor an always-off
+            directive is correct.
 
     Returns:
         The complete script text, LF-terminated. Written with LF regardless of
@@ -281,6 +287,7 @@ def render_sbatch(spec: JobSpec, *, log_dir: str) -> str:
         # ledger is for.
         f"#SBATCH --comment {job_comment(spec)}",
         f"#SBATCH -p {spec['partition']}",
+        *([] if charge_account == "" else [f"#SBATCH --account={charge_account}"]),
         # No --gres line at all for a CPU-only job. An empty or zero-valued
         # one is not the same thing: `--gres=gpu:0` is a GPU request for none,
         # which Slurm may still route to a GPU partition's accounting.

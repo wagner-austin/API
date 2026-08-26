@@ -43,6 +43,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "deterministic": False,
         "experiment": {"arm": "B"},
         "command": "python train.py",
+        "artifact": None,
     }
     base.update(overrides)
     return decode_job_spec(base)

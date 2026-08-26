@@ -80,6 +80,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ledger_path=pathlib.Path(workspace["ledger"]),
         submitted_at=_test_hooks.now_iso(),
         cluster=cluster,
+        charge_account=workspace["budget"]["charge_account"],
     )
 
     for position, (member, stage) in enumerate(zip(submitted, stages, strict=True)):

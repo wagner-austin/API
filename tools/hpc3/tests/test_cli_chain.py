@@ -40,7 +40,7 @@ def _payload(**overrides: JSONValue) -> dict[str, JSONValue]:
         "name": "pipeline",
         "experiment": {"sample": "batch7"},
         "stages": [
-            {"suffix": "extract", "command": "python extract.py"},
+            {"suffix": "extract", "command": "python extract.py", "artifact": None},
             {"suffix": "evaluate", "command": "python evaluate.py", "minutes": 45},
         ],
     }

@@ -208,23 +208,21 @@ class TestMemberValidation:
 
     def test_an_empty_suffix_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
-            decode_sweep_member({"suffix": "", "command": "x"})
+            decode_sweep_member({"suffix": "", "command": "x", "artifact": None})
 
     def test_an_empty_command_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
-            decode_sweep_member({"suffix": "s0", "command": ""})
+            decode_sweep_member({"suffix": "s0", "command": "", "artifact": None})
 
     def test_a_slashed_suffix_is_refused(self) -> None:
         """The suffix reaches a log filename; a separator would escape it."""
         with pytest.raises(JSONTypeError):
-            decode_sweep_member({"suffix": "a/b", "command": "x"})
+            decode_sweep_member({"suffix": "a/b", "command": "x", "artifact": None})
         with pytest.raises(JSONTypeError):
-            decode_sweep_member({"suffix": "a\\b", "command": "x"})
+            decode_sweep_member({"suffix": "a\\b", "command": "x", "artifact": None})
 
     def test_a_valid_member_decodes(self) -> None:
-        member = decode_sweep_member(
-            {"suffix": "s0", "command": "python x.py", "artifact": None}
-        )
+        member = decode_sweep_member({"suffix": "s0", "command": "python x.py", "artifact": None})
         assert member == {"suffix": "s0", "command": "python x.py", "artifact": None}
 
     def test_a_member_that_never_mentions_an_artifact_is_refused(self) -> None:
@@ -275,8 +273,8 @@ class TestSweepValidation:
     def test_a_repeated_suffix_is_refused(self) -> None:
         """Two jobs sharing a name interleave into one log file."""
         duplicate: list[JSONValue] = [
-            {"suffix": "s0", "command": "a"},
-            {"suffix": "s0", "command": "b"},
+            {"suffix": "s0", "command": "a", "artifact": None},
+            {"suffix": "s0", "command": "b", "artifact": None},
         ]
         with pytest.raises(JSONTypeError):
             decode_sweep_spec(_sweep(members=duplicate))

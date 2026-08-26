@@ -30,6 +30,7 @@ def _run_payload(**overrides: JSONValue) -> dict[str, JSONValue]:
         "project": "abl",
         "name": "arm-b-42",
         "command": "python train.py",
+        "artifact": None,
         "experiment": {"arm": "B"},
     }
     document.update(overrides)
@@ -100,7 +101,8 @@ class TestPreflightCli:
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
         members: list[JSONValue] = [
-            {"suffix": f"s{i}", "command": f"python t.py --seed {i}"} for i in range(3)
+            {"suffix": f"s{i}", "command": f"python t.py --seed {i}", "artifact": None}
+            for i in range(3)
         ]
         _write(
             tmp_path / "doc.json",
@@ -125,7 +127,7 @@ class TestPreflightCli:
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
         members: list[JSONValue] = [
-            {"suffix": f"s{i}", "command": "python t.py"} for i in range(25)
+            {"suffix": f"s{i}", "command": "python t.py", "artifact": None} for i in range(25)
         ]
         _write(
             tmp_path / "doc.json",

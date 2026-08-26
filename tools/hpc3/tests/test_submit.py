@@ -55,6 +55,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "deterministic": False,
         "experiment": {"arm": "B", "seed": "42"},
         "command": "python train.py",
+        "artifact": None,
     }
     base.update(overrides)
     return decode_job_spec(base)
@@ -77,6 +78,7 @@ def _submit(tmp_path: pathlib.Path) -> str:
         ledger_path=tmp_path / "ledger.jsonl",
         submitted_at=_AT,
         cluster=cluster(),
+        charge_account="",
     )
 
 

@@ -42,10 +42,12 @@ def _sweep(count: int = 3, **overrides: JSONValue) -> SweepSpec:
         "deterministic": False,
         "experiment": {"rung": "774M"},
         "command": "python train.py",
+        "artifact": None,
     }
     base.update(overrides)
     members: list[JSONValue] = [
-        {"suffix": f"s{i}", "command": f"python train.py --seed {i}"} for i in range(count)
+        {"suffix": f"s{i}", "command": f"python train.py --seed {i}", "artifact": None}
+        for i in range(count)
     ]
     return decode_sweep_spec({"base": base, "members": members})
 
@@ -80,6 +82,7 @@ def _run(spec: SweepSpec, tmp_path: pathlib.Path) -> list[str]:
             ledger_path=tmp_path / "ledger.jsonl",
             submitted_at=_AT,
             cluster=cluster(),
+            charge_account="",
         )
     ]
 
@@ -109,6 +112,7 @@ class TestSubmitSweep:
             ledger_path=tmp_path / "ledger.jsonl",
             submitted_at=_AT,
             cluster=cluster(),
+            charge_account="",
         )
         assert [m.name for m in members] == ["abl.rung-s0", "abl.rung-s1", "abl.rung-s2"]
 

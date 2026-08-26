@@ -52,6 +52,7 @@ def submit_chain(
     ledger_path: pathlib.Path,
     submitted_at: str,
     cluster: ClusterFacts,
+    charge_account: str,
 ) -> list[SubmittedMember]:
     """Submit every stage of a chain, in order, each waiting on the last.
 
@@ -91,6 +92,7 @@ def submit_chain(
             ledger_path=ledger_path,
             submitted_at=submitted_at,
             cluster=cluster,
+            charge_account=charge_account,
         )
         submitted.append(SubmittedMember(qualified_name(stage["project"], stage["name"]), job_id))
         previous = job_id

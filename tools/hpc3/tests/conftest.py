@@ -361,17 +361,31 @@ def ledger_row(**overrides: JSONValue) -> dict[str, JSONValue]:
     return row
 
 
-def budget_document(*, gpu_hours: float = 100.0, units: float = 1000.0) -> dict[str, JSONValue]:
+def budget_document(
+    *, gpu_hours: float = 100.0, units: float = 0.0, account: str = ""
+) -> dict[str, JSONValue]:
     """Build a budget for a workspace document.
 
     Args:
         gpu_hours: GPU-hour cap.
-        units: Service-unit cap.
+        account: Slurm account to bill. Empty by default, pairing with the
+            zero cap: a workspace that cannot spend has nothing to spend from.
+        units: Service-unit cap. Defaults to zero, which is the free-work-only
+            posture and what a workspace has until someone raises it
+            deliberately. It defaulted to 1000 while service units were never
+            projected and the number could not affect an outcome; now that a
+            declared budget is what admits a billed partition, a generous
+            default would quietly make every test workspace one that can
+            spend.
 
     Returns:
         The budget object.
     """
-    return {"max_gpu_hours": gpu_hours, "max_service_units": units}
+    return {
+        "max_gpu_hours": gpu_hours,
+        "max_service_units": units,
+        "charge_account": account,
+    }
 
 
 def workspace_document(**overrides: JSONValue) -> dict[str, JSONValue]:

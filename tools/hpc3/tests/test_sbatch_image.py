@@ -17,8 +17,22 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
 
+from hpc3.contracts.job import JobSpec
 from hpc3.core.sbatch import job_comment, render_sbatch
 from tests._sbatch_support import IMAGE, LOG_DIR, SIF, spec
+
+
+def _render(job: JobSpec) -> str:
+    """Render a job with no charge account, which is the free posture.
+
+    Args:
+        job: The spec to render.
+
+    Returns:
+        The batch script text.
+    """
+    return render_sbatch(job, log_dir=LOG_DIR, charge_account="")
+
 
 _DIGEST = "9ed4e27fd0d8207de3f84e833b98e0cf7e6ab09af66726849ca1cf023326cd51"
 
@@ -39,17 +53,17 @@ def _image(**overrides: JSONValue) -> JSONValue:
 
 class TestThePayloadRunsThroughApptainer:
     def test_the_image_is_the_argument_apptainer_receives(self) -> None:
-        script = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR)
+        script = _render(spec(image=IMAGE, env_path="/opt/env"))
         assert f'    "{SIF}" \\' in script.splitlines()
 
     def test_the_apptainer_module_is_loaded(self) -> None:
         """`which apptainer` returns nothing on HPC3 until the module loads."""
-        script = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR)
+        script = _render(spec(image=IMAGE, env_path="/opt/env"))
         assert "module load apptainer/1.4.5" in script.splitlines()
 
     def test_path_is_set_inside_the_container(self) -> None:
         """env_path names a container directory once an image is present."""
-        script = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR)
+        script = _render(spec(image=IMAGE, env_path="/opt/env"))
         assert '    env PATH="/opt/env/bin:$PATH" \\' in script.splitlines()
 
     def test_an_image_run_refuses_a_host_bound_env_path(self) -> None:
@@ -60,12 +74,12 @@ class TestThePayloadRunsThroughApptainer:
             _ = spec(image=IMAGE)
 
     def test_a_host_run_loads_no_module_and_calls_no_apptainer(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert "module load apptainer/1.4.5" not in script
         assert "apptainer exec" not in script
 
     def test_a_host_run_exports_path_directly(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR).splitlines()
+        script = _render(spec()).splitlines()
         assert 'export PATH="/pub/wagnera3/envs/abl-pinned/bin:$PATH"' in script
 
 
@@ -78,23 +92,23 @@ class TestTheDataIsBoundWhereThePayloadExpectsIt:
     """
 
     def test_a_bind_is_mounted_at_its_own_path(self) -> None:
-        script = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR)
+        script = _render(spec(image=IMAGE, env_path="/opt/env"))
         assert '    --bind "/pub/wagnera3:/pub/wagnera3" \\' in script.splitlines()
 
     def test_every_declared_bind_is_emitted(self) -> None:
         image = _image(binds=["/pub/wagnera3", "/dfs7/scratch"])
-        script = render_sbatch(spec(image=image, env_path="/opt/env"), log_dir=LOG_DIR)
+        script = _render(spec(image=image, env_path="/opt/env"))
         assert script.count("--bind") == 2
 
     def test_the_binds_precede_the_image(self) -> None:
         """apptainer reads options before the image argument."""
-        script = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR).splitlines()
+        script = _render(spec(image=IMAGE, env_path="/opt/env")).splitlines()
         bind = script.index('    --bind "/pub/wagnera3:/pub/wagnera3" \\')
         assert bind < script.index(f'    "{SIF}" \\')
 
     def test_an_image_with_no_binds_emits_none(self) -> None:
         """A self-contained computation needs nothing mounted."""
-        script = render_sbatch(spec(image=_image(binds=[]), env_path="/opt/env"), log_dir=LOG_DIR)
+        script = _render(spec(image=_image(binds=[]), env_path="/opt/env"))
         assert "--bind" not in script
 
 
@@ -110,38 +124,37 @@ class TestTheGpuIsReachableFromInsideTheImage:
     """
 
     def test_a_gpu_job_in_an_image_binds_the_hosts_driver(self) -> None:
-        script = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR)
+        script = _render(spec(image=IMAGE, env_path="/opt/env"))
         assert "    --nv \\" in script.splitlines()
 
     def test_the_driver_flag_precedes_the_image(self) -> None:
-        script = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR).splitlines()
+        script = _render(spec(image=IMAGE, env_path="/opt/env")).splitlines()
         assert script.index("    --nv \\") < script.index(f'    "{SIF}" \\')
 
     def test_a_cpu_job_in_an_image_asks_for_no_driver(self) -> None:
         """--nv on a node with no driver is an error, not a no-op."""
-        script = render_sbatch(
+        script = _render(
             spec(image=IMAGE, env_path="/opt/env", gpu=None, partition="free"),
-            log_dir=LOG_DIR,
         )
         assert "--nv" not in script
 
     def test_a_host_gpu_run_has_no_driver_flag_to_pass(self) -> None:
         """There is no container between the payload and the driver."""
-        assert "--nv" not in render_sbatch(spec(), log_dir=LOG_DIR)
+        assert "--nv" not in _render(spec())
 
 
 class TestTheRunCanSayWhichEnvironmentProducedIt:
     def test_the_commit_stamp_is_read_from_inside_the_image(self) -> None:
         """A bare `cat` would look on the host, find nothing, and export empty
         -- reporting an image that does know its commit as unstamped."""
-        script = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR)
+        script = _render(spec(image=IMAGE, env_path="/opt/env"))
         assert (
             'export GIT_COMMIT="$(apptainer exec "/pub/wagnera3/images/abl.sif" '
             "cat /opt/env/GIT_COMMIT 2>/dev/null || echo '')\"" in script.splitlines()
         )
 
     def test_the_module_loads_before_the_stamp_is_read(self) -> None:
-        lines = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR).splitlines()
+        lines = _render(spec(image=IMAGE, env_path="/opt/env")).splitlines()
         stamp = next(i for i, line in enumerate(lines) if line.startswith("export GIT_COMMIT="))
         assert lines.index("module load apptainer/1.4.5") < stamp
 
@@ -151,15 +164,15 @@ class TestTheRunCanSayWhichEnvironmentProducedIt:
         An image cannot compute its own digest from inside itself, so the
         launcher -- which pins it in the spec -- is where it comes from.
         """
-        script = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR)
+        script = _render(spec(image=IMAGE, env_path="/opt/env"))
         assert f'export IMAGE_DIGEST="{_DIGEST}"' in script.splitlines()
 
     def test_a_host_run_exports_no_digest(self) -> None:
         """Unset reads as unknown, which is true: there is no image."""
-        assert "IMAGE_DIGEST" not in render_sbatch(spec(), log_dir=LOG_DIR)
+        assert "IMAGE_DIGEST" not in _render(spec())
 
     def test_the_digest_is_exported_before_the_payload(self) -> None:
-        lines = render_sbatch(spec(image=IMAGE, env_path="/opt/env"), log_dir=LOG_DIR).splitlines()
+        lines = _render(spec(image=IMAGE, env_path="/opt/env")).splitlines()
         export = next(i for i, line in enumerate(lines) if line.startswith("export IMAGE_DIGEST="))
         payload = next(i for i, line in enumerate(lines) if line.startswith("apptainer exec"))
         assert export < payload

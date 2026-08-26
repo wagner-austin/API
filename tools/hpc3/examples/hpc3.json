@@ -6,12 +6,16 @@
   "quiet_seconds": 1800,
   "budget": {
     "max_gpu_hours": 120.0,
-    "max_service_units": 0.0
+    "max_service_units": 0.0,
+    "charge_account": ""
   },
   "projects": {
     "abl": {
       "partition": "free-gpu",
-      "gpu": { "model": "A100", "count": 1 },
+      "gpu": {
+        "model": "A100",
+        "count": 1
+      },
       "cpus": 8,
       "mem_gb": 96,
       "minutes": 720,

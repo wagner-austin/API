@@ -205,7 +205,13 @@ def _dependency_hint(spec: JobSpec, output: str) -> str:
 
 
 def preflight(
-    spec: JobSpec, *, host: str, script_dir: str, log_dir: str, cluster: ClusterFacts
+    spec: JobSpec,
+    *,
+    host: str,
+    script_dir: str,
+    log_dir: str,
+    cluster: ClusterFacts,
+    charge_account: str,
 ) -> PreflightResult:
     """Validate a job against the live scheduler without running it.
 
@@ -219,6 +225,10 @@ def preflight(
         host: SSH destination.
         script_dir: Absolute cluster directory to hold the batch script.
         log_dir: Absolute cluster directory the script will name for output.
+        charge_account: Slurm account to bill, or empty for none. Carried
+            because the script the scheduler tests must be the script that
+            later runs -- a preflight that omitted the directive would pass
+            a job the real submission is refused for.
         cluster: The cluster the workspace selected. The scheduler's echoed
             partition is checked against it, so a workspace pointed at the
             wrong machine fails here rather than after the job is queued.
@@ -243,7 +253,7 @@ def preflight(
 
     remote.make_directory(host, script_dir)
     remote.make_directory(host, log_dir)
-    script = sbatch.render_sbatch(spec, log_dir=log_dir)
+    script = sbatch.render_sbatch(spec, log_dir=log_dir, charge_account=charge_account)
     label = qualified_name(spec["project"], spec["name"])
     script_path = f"{script_dir}/{label}.sbatch"
     remote.put_bytes(host, script_path, script.encode("utf-8"))

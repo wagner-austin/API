@@ -74,6 +74,7 @@ def submit(
     ledger_path: pathlib.Path,
     submitted_at: str,
     cluster: ClusterFacts,
+    charge_account: str,
 ) -> str:
     """Render, upload and submit a job, recording it locally first.
 
@@ -110,7 +111,14 @@ def submit(
     # then queues that same uploaded file. Making it a prefix of submit rather
     # than a sibling command means there is no path to the cluster that
     # bypasses validation, and no second upload to drift from the first.
-    preflight.preflight(spec, host=host, script_dir=script_dir, log_dir=log_dir, cluster=cluster)
+    preflight.preflight(
+        spec,
+        host=host,
+        script_dir=script_dir,
+        log_dir=log_dir,
+        cluster=cluster,
+        charge_account=charge_account,
+    )
 
     label = qualified_name(spec["project"], spec["name"])
     output = remote.run_remote(host, f"cd {script_dir} && sbatch {label}.sbatch")

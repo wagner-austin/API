@@ -234,7 +234,9 @@ def encode_sweep_spec(spec: SweepSpec) -> dict[str, JSONValue]:
     return {"base": encode_job_spec(spec["base"]), "members": members}
 
 
-def decode_sweep_spec(value: JSONValue, cluster: ClusterFacts) -> SweepSpec:
+def decode_sweep_spec(
+    value: JSONValue, cluster: ClusterFacts, *, max_service_units: float
+) -> SweepSpec:
     """Decode and validate a JSON value into a sweep spec.
 
     Args:
@@ -255,7 +257,7 @@ def decode_sweep_spec(value: JSONValue, cluster: ClusterFacts) -> SweepSpec:
     if not isinstance(value, dict):
         raise JSONTypeError(f"sweep spec must be a JSON object, got {type(value).__name__}")
 
-    base = decode_job_spec(value.get("base"), cluster)
+    base = decode_job_spec(value.get("base"), cluster, max_service_units=max_service_units)
 
     raw = require_list(value, "members")
     if raw == []:

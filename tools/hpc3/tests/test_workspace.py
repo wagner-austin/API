@@ -46,7 +46,11 @@ class TestDecodeWorkspace:
         assert workspace["host"] == "hpc3"
         assert workspace["root"] == "/pub/w"
         assert workspace["quiet_seconds"] == 1800
-        assert workspace["budget"] == {"max_gpu_hours": 100.0, "max_service_units": 1000.0}
+        assert workspace["budget"] == {
+            "max_gpu_hours": 100.0,
+            "max_service_units": 0.0,
+            "charge_account": "",
+        }
         assert sorted(workspace["projects"]) == ["abl"]
 
     def test_a_relative_ledger_resolves_against_the_document(self) -> None:

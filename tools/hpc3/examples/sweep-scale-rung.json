@@ -10,19 +10,23 @@
   "members": [
     {
       "suffix": "armB-s0",
-      "command": "python -u train.py --arm B --seed 0 --model gpt2-large"
+      "command": "python -u train.py --arm B --seed 0 --model gpt2-large",
+      "artifact": null
     },
     {
       "suffix": "armB-s1",
-      "command": "python -u train.py --arm B --seed 1 --model gpt2-large"
+      "command": "python -u train.py --arm B --seed 1 --model gpt2-large",
+      "artifact": null
     },
     {
       "suffix": "armC-s0",
-      "command": "python -u train.py --arm C --seed 0 --model gpt2-large"
+      "command": "python -u train.py --arm C --seed 0 --model gpt2-large",
+      "artifact": null
     },
     {
       "suffix": "armC-s1",
-      "command": "python -u train.py --arm C --seed 1 --model gpt2-large"
+      "command": "python -u train.py --arm C --seed 1 --model gpt2-large",
+      "artifact": null
     }
   ]
 }

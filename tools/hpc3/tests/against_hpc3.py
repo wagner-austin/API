@@ -51,7 +51,13 @@ from hpc3.core.status import parse_sacct_row as _parse_sacct_row
 
 
 def decode_job_spec(value: JSONValue) -> JobSpec:
-    """Decode a job spec against HPC3.
+    """Decode a job spec against HPC3, with no service-unit budget declared.
+
+    Binds ``max_service_units=0.0``, which is the free-work-only posture and
+    what nearly every test is about. A test that needs the billed path calls
+    the production function directly and says so, the same way
+    ``test_cluster.py`` calls it directly to prove the rules follow a
+    cluster's numbers rather than HPC3's.
 
     Args:
         value: The value to decode.
@@ -59,7 +65,7 @@ def decode_job_spec(value: JSONValue) -> JobSpec:
     Returns:
         The validated spec.
     """
-    return _decode_job_spec(value, HPC3)
+    return _decode_job_spec(value, HPC3, max_service_units=0.0)
 
 
 def decode_job_status(value: JSONValue) -> JobStatus:
@@ -107,7 +113,7 @@ def decode_sweep_spec(value: JSONValue) -> SweepSpec:
     Returns:
         The validated sweep.
     """
-    return _decode_sweep_spec(value, HPC3)
+    return _decode_sweep_spec(value, HPC3, max_service_units=0.0)
 
 
 def decode_project_config(value: JSONValue) -> ProjectConfig:

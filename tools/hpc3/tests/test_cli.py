@@ -21,6 +21,7 @@ from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 from hpc3.cli import stage as stage_cli
 from hpc3.cli import submit as submit_cli
 from hpc3.cli import watch as watch_cli
+from hpc3.clusters.hpc3 import HPC3
 from tests.against_hpc3 import decode_job_status, read_ledger
 from tests.conftest import (
     FakeRun,
@@ -66,6 +67,7 @@ def _run_payload(**overrides: JSONValue) -> dict[str, JSONValue]:
         "project": "abl",
         "name": "arm-b-42",
         "command": "python train.py",
+        "artifact": None,
         "experiment": {"arm": "B", "seed": "42"},
     }
     document.update(overrides)
@@ -236,6 +238,21 @@ class TestStageCli:
     def test_a_missing_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--source-dir is required"):
             stage_cli.main(["--config", _config(tmp_path), "--manifest", str(tmp_path / "m.json")])
+
+
+class TestTheCostLabel:
+    """The summary line an operator reads immediately before a job starts."""
+
+    def test_a_free_partition_says_free(self) -> None:
+        assert submit_cli._cost_label(HPC3, "free-gpu", "") == "free"
+
+    def test_a_billed_partition_names_the_account_being_charged(self) -> None:
+        # This line said "free" unconditionally until a declared budget
+        # admitted billed partitions. A summary that calls a charged job free
+        # is the last thing read before it starts costing.
+        label = submit_cli._cost_label(HPC3, "gpu32", "wagnera3")
+
+        assert label == "BILLED to wagnera3"
 
 
 class TestSubmitCli:

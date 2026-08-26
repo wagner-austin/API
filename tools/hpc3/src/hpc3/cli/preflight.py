@@ -30,6 +30,7 @@ from hpc3.contracts.run import resolve_run, resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import Workspace, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
+from hpc3.core.budget import check_projection
 from hpc3.core.preflight import preflight
 
 _FLAGS = (_config.CONFIG_FLAG, "--run", "--sweep")
@@ -79,9 +80,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     Raises:
         ValueError: If a required flag is missing, an argument is unknown, or
             neither/both of ``--run`` and ``--sweep`` were given.
-        AppError: On the first spec the scheduler refuses, the first missing
-            environment, or an unreadable verdict. Nothing is caught: a job
-            that would not run must not preflight clean.
+        AppError: On a projection that exceeds the declared budget, the
+            first spec the scheduler refuses, the first missing environment,
+            or an unreadable verdict. Nothing is caught: a job that would not
+            run, or could not be paid for, must not preflight clean.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
@@ -90,6 +92,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     root = workspace["root"]
 
     specs = _load_specs(workspace, parsed)
+
+    # Preflight answers "would the scheduler admit this". Until 2026-08-26 it
+    # did not also answer "and can we afford it", which was survivable only
+    # while every admissible partition was free. A workspace may now declare a
+    # service-unit budget, so a spec can be schedulable and unaffordable at
+    # once -- and preflight is the step whose whole purpose is to find that out
+    # before anything is queued.
+    projected = check_projection(workspace["budget"], specs, cluster)
+
     for spec in specs:
         project = spec["project"]
         result = preflight(
@@ -98,6 +109,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             script_dir=script_dir(root, project),
             log_dir=log_dir(root, project),
             cluster=cluster,
+            charge_account=workspace["budget"]["charge_account"],
         )
         _test_hooks.emit(
             f"OK {qualified_name(project, spec['name'])}: "
@@ -106,6 +118,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{result['partition']})"
         )
     _test_hooks.emit(f"{len(specs)} spec(s) would be admitted; nothing was queued")
+    # GPU-hours only, and the service-unit figure is deliberately not printed
+    # beside it: it is structurally zero before submission (Slurm computes the
+    # billing number from TRESBillingWeights and reports it only in
+    # accounting), so showing "0.0 service units" for a job about to charge
+    # would be the most misleading line on the screen.
+    _test_hooks.emit(
+        f"projected {projected['gpu_hours']:.2f} GPU-hours against a declared cap of "
+        f"{workspace['budget']['max_gpu_hours']:.2f}; "
+        f"spend is measured after the fact, not projected"
+    )
     _test_hooks.emit("start estimates are a snapshot of the queue, not a reservation")
     return 0
 

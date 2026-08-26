@@ -50,6 +50,7 @@ def _run(**overrides: JSONValue) -> dict[str, JSONValue]:
         "project": "abl",
         "name": "armB-s42",
         "command": "python train.py --arm B",
+        "artifact": None,
         "experiment": {"arm": "B", "seed": "42"},
     }
     document.update(overrides)
@@ -67,7 +68,8 @@ def _sweep(count: int = 3, **overrides: JSONValue) -> dict[str, JSONValue]:
         The document.
     """
     members: list[JSONValue] = [
-        {"suffix": f"s{i}", "command": f"python train.py --seed {i}"} for i in range(count)
+        {"suffix": f"s{i}", "command": f"python train.py --seed {i}", "artifact": None}
+        for i in range(count)
     ]
     document: dict[str, JSONValue] = {
         "project": "abl",
@@ -278,8 +280,8 @@ class TestResolveSweep:
     def test_a_repeated_suffix_is_refused(self) -> None:
         """Two jobs sharing a name would interleave into one log file."""
         members: list[JSONValue] = [
-            {"suffix": "s0", "command": "python a.py"},
-            {"suffix": "s0", "command": "python b.py"},
+            {"suffix": "s0", "command": "python a.py", "artifact": None},
+            {"suffix": "s0", "command": "python b.py", "artifact": None},
         ]
         with pytest.raises(JSONTypeError, match="must not repeat a suffix"):
             resolve_sweep(_workspace(), _sweep(members=members))

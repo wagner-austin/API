@@ -11,8 +11,10 @@ import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 
+from hpc3.clusters.hpc3 import HPC3
 from hpc3.contracts.budget import Budget, decode_budget, encode_budget, encode_consumption
 from hpc3.contracts.job import JobSpec
+from hpc3.contracts.job import decode_job_spec as _decode_job_spec
 from hpc3.contracts.status import JobStatus
 from tests.against_hpc3 import (
     check_consumption,
@@ -49,9 +51,57 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "deterministic": False,
         "experiment": {"arm": "B"},
         "command": "python train.py",
+        "artifact": None,
     }
     base.update(overrides)
     return decode_job_spec(base)
+
+
+def _billed_document(**overrides: JSONValue) -> dict[str, JSONValue]:
+    """Build a run document targeting a partition that charges.
+
+    Args:
+        **overrides: Fields to replace.
+
+    Returns:
+        The document, undecoded -- so a test can choose which budget to
+        decode it against, which is the whole variable under test here.
+    """
+    base: dict[str, JSONValue] = {
+        "project": "abl",
+        "name": "billed",
+        "partition": "gpu32",
+        "gpu": gpus("L40S"),
+        "cpus": 4,
+        "mem_gb": 16,
+        "minutes": 20,
+        "requeue": False,
+        "checkpoint_steps": 0,
+        "env_path": "/pub/envs/abl",
+        "pinned_packages": {},
+        "deterministic": False,
+        "experiment": {"arm": "B"},
+        "command": "python train.py",
+        "artifact": None,
+    }
+    base.update(overrides)
+    return base
+
+
+def _billed_spec(**overrides: JSONValue) -> JobSpec:
+    """Decode a billed spec against a workspace that has declared a budget.
+
+    A funded workspace is required to get past the decode-time partition
+    rule at all, which is the rule this fixture exists to be on the other
+    side of.
+
+    Args:
+        **overrides: Fields to replace.
+
+    Returns:
+        A validated spec on a billed partition.
+    """
+    return _decode_job_spec(_billed_document(**overrides), HPC3, max_service_units=1000.0)
 
 
 def _status(**overrides: JSONValue) -> JobStatus:
@@ -88,7 +138,13 @@ def _budget(gpu_hours: float, units: float) -> Budget:
     Returns:
         A validated budget.
     """
-    return decode_budget({"max_gpu_hours": gpu_hours, "max_service_units": units})
+    return decode_budget(
+        {
+            "max_gpu_hours": gpu_hours,
+            "max_service_units": units,
+            "charge_account": "",
+        }
+    )
 
 
 class TestProjection:
@@ -104,12 +160,14 @@ class TestProjection:
         assert projected["gpu_hours"] == 10.0
         assert projected["service_units"] == 0.0
 
-    def test_a_projection_can_never_carry_spend(self) -> None:
-        """Structural, not a simplification: every spec that reaches here has
-        passed a decoder that refuses billing partitions, so there is no
-        submittable job whose projected spend is above zero. Asserted rather
-        than assumed, because the moment a billing partition became reachable
-        this would be the test that noticed."""
+    def test_free_partitions_still_carry_no_spend(self) -> None:
+        """This used to claim that NO submittable job could project a spend,
+        and said it was asserted rather than assumed so that it would be the
+        test that noticed if a billing partition ever became reachable. One
+        did, on 2026-08-26, when a declared service-unit budget started
+        admitting them -- so the claim is narrowed to what still holds: a free
+        partition's usage factor is zero, so its projected spend is too. The
+        broader case is covered by the billed tests below."""
         specs = [
             _spec(partition="free-gpu32", gpu=gpus("L40S"), cpus=11),
             _spec(partition="free", gpu=None, cpus=64),
@@ -149,45 +207,39 @@ class TestCheckProjection:
         assert excinfo.value.code is Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED
         assert "Nothing was submitted" in excinfo.value.message
 
-    def test_a_zero_service_unit_cap_admits_every_submittable_job(self) -> None:
-        """The cap the workspace actually carries. Nothing this package will
-        submit can breach it, which is the point rather than a gap -- the
-        same cap is live against OBSERVED usage, where a non-zero reading
-        would mean a partition believed free is charging."""
+    def test_a_free_partition_projects_no_service_units(self) -> None:
+        """A free partition has a zero usage factor, so the product is zero and
+        a workspace with no budget can still submit there."""
         specs = [_spec(partition="free-gpu32", gpu=gpus("L40S"), cpus=11)]
         assert check_projection(_budget(1000.0, 0.0), specs)["service_units"] == 0.0
 
-    def test_the_free_ceiling_would_admit_what_a_budget_refuses(self) -> None:
-        """24 GPUs for 3 days is inside every cluster limit and is 1,728 GPU-hours."""
-        flood = [_spec(minutes=4320) for _ in range(24)]
-        assert project(flood)["gpu_hours"] == 1728.0
-        with pytest.raises(AppError):
-            check_projection(_budget(100.0, 0.0), flood)
+    def test_a_billed_partition_still_projects_no_service_units(self) -> None:
+        """Not an oversight: Slurm's billing figure is computed from
+        per-GPU-model TRESBillingWeights and reported only in accounting, so
+        it does not exist before submission. Multiplying by usage_factor alone
+        would understate an L40S job 32-fold, and a cap enforced on that would
+        admit far more than it claims to. The pre-submission control is the
+        decode-time partition rule; the spend itself is measured in
+        check_consumption."""
+        projected = project([_billed_spec(minutes=20)])
 
+        assert projected["service_units"] == 0.0
+        assert projected["gpu_hours"] == pytest.approx(20 / 60)
 
-class TestObservation:
-    def test_it_totals_gpu_hours_across_jobs(self) -> None:
-        observed = observe([_status(), _status(job_id="2", gpu_count=2)])
-        assert observed["gpu_hours"] == 3.0
-        assert observed["jobs"] == 2
+    def test_a_billed_spec_is_admitted_once_a_budget_is_declared(self) -> None:
+        # The rule this whole change exists for: the same document that a
+        # zero-budget workspace refuses, a funded one accepts.
+        projected = check_projection(_budget(1000.0, 50.0), [_billed_spec(minutes=20)])
 
-    def test_free_partition_jobs_observe_zero_spend(self) -> None:
-        assert observe([_status()])["service_units"] == 0.0
+        assert projected["jobs"] == 1
 
-    def test_a_job_on_a_billing_partition_observes_real_spend(self) -> None:
-        """Observation is not restricted to what this package would submit.
-        Accounting reports whatever ran under the account, including a job
-        submitted by hand -- and this is the surface that would reveal a
-        partition recorded as free that is not."""
-        observed = observe([_status(partition="gpu", billing_tres=11)])
-        assert observed["service_units"] == 11.0
+    def test_an_unfunded_workspace_cannot_even_decode_a_billed_spec(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            _decode_job_spec(_billed_document(), HPC3, max_service_units=0.0)
 
-    def test_a_pending_job_holds_nothing(self) -> None:
-        pending = _status(state="PENDING", elapsed_seconds=0, gpu_count=0, node_list="")
-        assert observe([pending])["gpu_hours"] == 0.0
-
-    def test_no_jobs_observe_nothing(self) -> None:
-        assert observe([]) == {"gpu_hours": 0.0, "service_units": 0.0, "jobs": 0}
+        assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS
+        assert "budget of 0" in excinfo.value.message
+        assert "free-gpu32" in excinfo.value.message
 
 
 class TestCheckConsumption:
@@ -214,7 +266,11 @@ class TestCheckConsumption:
 
 class TestBudgetContract:
     def test_a_valid_budget_round_trips(self) -> None:
-        payload: dict[str, JSONValue] = {"max_gpu_hours": 60.0, "max_service_units": 100.0}
+        payload: dict[str, JSONValue] = {
+            "max_gpu_hours": 60.0,
+            "max_service_units": 100.0,
+            "charge_account": "cjmayer_lab",
+        }
         assert encode_budget(decode_budget(payload)) == payload
 
     def test_a_non_object_is_refused(self) -> None:

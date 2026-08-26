@@ -43,7 +43,11 @@ def _stage(**overrides: JSONValue) -> dict[str, JSONValue]:
     Returns:
         A stage document.
     """
-    base: dict[str, JSONValue] = {"suffix": "one", "command": "python one.py"}
+    base: dict[str, JSONValue] = {
+        "suffix": "one",
+        "command": "python one.py",
+        "artifact": None,
+    }
     base.update(overrides)
     return base
 
@@ -171,7 +175,7 @@ class TestChainRefusals:
             ]
         }
         with pytest.raises(JSONTypeError, match="declares 'depends_on'"):
-            decode_chain_spec(payload, HPC3)
+            decode_chain_spec(payload, HPC3, max_service_units=0.0)
 
     def test_two_stages_sharing_a_suffix_are_refused(self) -> None:
         document = _document(stages=[_stage(), _stage()])
@@ -211,18 +215,18 @@ class TestChainRefusals:
 
     def test_a_non_object_chain_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
-            decode_chain_spec([1, 2], HPC3)
+            decode_chain_spec([1, 2], HPC3, max_service_units=0.0)
 
     def test_a_missing_stage_list_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="'stages'"):
-            decode_chain_spec({}, HPC3)
+            decode_chain_spec({}, HPC3, max_service_units=0.0)
 
 
 class TestEncodeChain:
     def test_a_chain_round_trips_through_its_stages(self) -> None:
         spec = resolve_chain(_workspace(), _document())
         encoded = encode_chain_spec(spec)
-        assert decode_chain_spec(encoded, HPC3) == spec
+        assert decode_chain_spec(encoded, HPC3, max_service_units=0.0) == spec
 
 
 class TestSubmitChain:
@@ -244,6 +248,7 @@ class TestSubmitChain:
             ledger_path=tmp_path / "ledger.jsonl",
             submitted_at=_AT,
             cluster=cluster(),
+            charge_account="",
         )
         return [member.job_id for member in submitted]
 

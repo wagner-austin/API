@@ -22,7 +22,7 @@ discovered afterwards.
 
 from __future__ import annotations
 
-from platform_core.json_utils import JSONTypeError, JSONValue, require_float
+from platform_core.json_utils import JSONTypeError, JSONValue, require_float, require_str
 from typing_extensions import TypedDict
 
 
@@ -35,10 +35,21 @@ class Budget(TypedDict):
         max_service_units: Service units, summed over every job. Zero on the
             free partitions however long they run, so this binds only where
             spending is real.
+        charge_account: The Slurm account a billed job draws from. Empty when
+            the workspace does not spend, which is the default posture.
+
+            Part of the budget rather than a separate workspace field because
+            it is the same declaration: a cap without an account names no
+            money, and an account without a cap is an unbounded one. Slurm
+            enforces the pairing too -- a billed partition refuses a job that
+            names no account, with "please specify charge account", so a
+            workspace that raised its cap and stopped there would be refused
+            by the cluster rather than by this package.
     """
 
     max_gpu_hours: float
     max_service_units: float
+    charge_account: str
 
 
 class Consumption(TypedDict):
@@ -88,6 +99,7 @@ def encode_budget(budget: Budget) -> dict[str, JSONValue]:
     return {
         "max_gpu_hours": budget["max_gpu_hours"],
         "max_service_units": budget["max_service_units"],
+        "charge_account": budget["charge_account"],
     }
 
 
@@ -109,6 +121,7 @@ def decode_budget(value: JSONValue) -> Budget:
     return Budget(
         max_gpu_hours=_require_nonnegative_float(value, "max_gpu_hours"),
         max_service_units=_require_nonnegative_float(value, "max_service_units"),
+        charge_account=require_str(value, "charge_account"),
     )
 
 

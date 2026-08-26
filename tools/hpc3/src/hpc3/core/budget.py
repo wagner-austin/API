@@ -32,19 +32,27 @@ def project(specs: Sequence[JobSpec], cluster: ClusterFacts) -> Consumption:
         cluster: The cluster whose measured usage factors apply.
 
     Returns:
-        Projected consumption. Service units are always zero and that is
-        structural, not a simplification: every spec here has passed
-        :func:`~hpc3.contracts.job.decode_job_spec`, which refuses any
-        partition with a non-zero usage factor. Multiplying by a factor that
-        is provably zero, and then comparing the product against a cap, would
-        be a check that cannot fail -- and a check that cannot fail still
-        reads as protection.
+        Projected consumption. GPU-hours are real; service units are always
+        zero, and that is a limit of what can be known before submission
+        rather than an assumption about what will be spent.
 
-        The service-unit cap is enforced against OBSERVED usage instead, where
-        it is a real tripwire: a non-zero reading there means a partition this
-        package believes is free is not. That has happened once already --
-        ``free-gpu32`` was recorded as billing for a day when it does not --
-        so the direction it guards is worth guarding.
+        A job's charge is ``usage_factor * billing_tres * hours``, and
+        ``billing_tres`` is a number SLURM COMPUTES from the partition's
+        ``TRESBillingWeights`` and reports in accounting. It is an output of
+        having run, not an input this package holds: the weights are
+        per-GPU-model (on HPC3, 32 for an L40S and 64 for an RTX6000 on the
+        same partition) and are not among the facts the cluster module
+        records. Multiplying by ``usage_factor`` alone would understate an
+        L40S job by 32x, and a cap enforced against that figure would read as
+        protection while admitting thirty-two times what it claims to allow.
+
+        So the pre-submission control over spending is not a projected total.
+        It is :func:`~hpc3.contracts.job.decode_job_spec` refusing a billed
+        partition outright unless the workspace has declared a service-unit
+        budget, and :func:`check_consumption` enforcing the size of the spend
+        against what Slurm actually charged. Recording the weights here would
+        make a projected total possible and is the obvious next step; it is
+        not taken on a guess about their values.
     """
     projected_gpu_hours = 0.0
     for spec in specs:
@@ -95,10 +103,12 @@ def check_projection(
             submitted, which is the whole point: a flood that has started is
             no longer a budget question.
 
-            The service-unit cap is not checked here -- see :func:`project`
-            for why it cannot be exceeded by anything this package will
-            submit. :func:`check_consumption` enforces it against what
-            actually ran.
+            The service-unit cap is NOT checked here -- see :func:`project`
+            for why a projected charge cannot be computed from what is known
+            before submission. :func:`check_consumption` enforces it against
+            what Slurm actually billed, and the decode-time partition rule is
+            what stops an unfunded workspace reaching a billed partition at
+            all.
     """
     projected = project(specs, cluster)
     if projected["gpu_hours"] > budget["max_gpu_hours"]:
@@ -133,10 +143,14 @@ def check_consumption(
             overrun cannot be scrolled past.
     """
     observed = observe(statuses, cluster)
-    # Unlike the projection, BOTH caps are live here. A non-zero service-unit
-    # reading means a partition this package admitted as free is charging,
-    # which is a wrong fact in the cluster module rather than an overspend by
-    # the operator -- and the only place that can ever surface.
+    # Both caps are live here; only the GPU-hour one is checked in the
+    # projection. This is therefore the ONLY place a spend is ever measured
+    # against its cap, because Slurm's billing figure does not exist until a
+    # job has run. It also catches a job that outran its requested wall clock
+    # and a requeue that paid twice. And when the declared cap is zero, a
+    # non-zero reading means a partition admitted as free is charging -- which
+    # was once the only meaning a non-zero figure could have here, and since a
+    # workspace may now declare a budget is no longer the only one.
     if observed["gpu_hours"] > budget["max_gpu_hours"]:
         raise AppError(
             Hpc3ErrorCode.BUDGET_CONSUMPTION_EXCEEDED,

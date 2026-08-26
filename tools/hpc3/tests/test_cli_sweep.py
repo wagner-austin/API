@@ -37,7 +37,8 @@ def _payload(count: int = 3, **overrides: JSONValue) -> dict[str, JSONValue]:
         The document.
     """
     members: list[JSONValue] = [
-        {"suffix": f"s{i}", "command": f"python train.py --seed {i}"} for i in range(count)
+        {"suffix": f"s{i}", "command": f"python train.py --seed {i}", "artifact": None}
+        for i in range(count)
     ]
     document: dict[str, JSONValue] = {
         "project": "abl",
@@ -223,6 +224,7 @@ class TestTriageCli:
                     "project": "abl",
                     "name": "arm-b-42",
                     "command": "python train.py",
+                    "artifact": None,
                     "experiment": {"arm": "B"},
                 }
             ).encode("utf-8"),

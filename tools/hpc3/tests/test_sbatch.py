@@ -30,6 +30,18 @@ from tests._sbatch_support import LOG_DIR, spec
 from tests.conftest import gpus
 
 
+def _render(job: JobSpec) -> str:
+    """Render a job with no charge account, which is the free posture.
+
+    Args:
+        job: The spec to render.
+
+    Returns:
+        The batch script text.
+    """
+    return render_sbatch(job, log_dir=LOG_DIR, charge_account="")
+
+
 class TestFormatWalltime:
     def test_under_an_hour(self) -> None:
         assert format_walltime(30) == "00:30:00"
@@ -53,12 +65,12 @@ class TestFormatWalltime:
 class TestRenderSbatch:
     def test_the_gpu_model_always_reaches_the_gres_line(self) -> None:
         """No code path emits a bare gpu:N -- the spec cannot express one."""
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert "#SBATCH --gres=gpu:A100:1" in script
         assert "--gres=gpu:1" not in script
 
     def test_every_resource_directive_is_present(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert "#SBATCH -J abl.arm-b-42" in script
         assert "#SBATCH -p free-gpu" in script
         assert "#SBATCH -c 8" in script
@@ -66,36 +78,36 @@ class TestRenderSbatch:
         assert "#SBATCH -t 00:30:00" in script
 
     def test_log_paths_carry_the_job_id_pattern(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert f"#SBATCH -o {LOG_DIR}/abl.arm-b-42-%j.out" in script
         assert f"#SBATCH -e {LOG_DIR}/abl.arm-b-42-%j.err" in script
 
     def test_requeue_is_absent_when_not_requested(self) -> None:
-        assert "--requeue" not in render_sbatch(spec(), log_dir=LOG_DIR)
+        assert "--requeue" not in _render(spec())
 
     def test_requeue_appears_when_the_spec_carries_it(self) -> None:
         job = spec(minutes=600, requeue=True, checkpoint_steps=50)
-        assert "#SBATCH --requeue" in render_sbatch(job, log_dir=LOG_DIR)
+        assert "#SBATCH --requeue" in _render(job)
 
     def test_the_script_starts_with_a_login_shell_shebang(self) -> None:
-        assert render_sbatch(spec(), log_dir=LOG_DIR).startswith("#!/bin/bash -l\n")
+        assert _render(spec()).startswith("#!/bin/bash -l\n")
 
     def test_it_ends_with_a_newline_and_uses_lf_only(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert script.endswith("\n")
         assert "\r" not in script
 
     def test_the_payload_command_is_present_verbatim(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert "python train.py --seed 42" in script
 
     def test_the_environment_is_put_on_path(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert 'export PATH="/pub/wagnera3/envs/abl-pinned/bin:$PATH"' in script
 
     def test_the_checkpoint_interval_reaches_the_payload(self) -> None:
         job = spec(minutes=600, requeue=True, checkpoint_steps=50)
-        assert 'export HPC3_CHECKPOINT_STEPS="50"' in render_sbatch(job, log_dir=LOG_DIR)
+        assert 'export HPC3_CHECKPOINT_STEPS="50"' in _render(job)
 
     def test_it_does_not_set_e_so_the_payload_status_survives(self) -> None:
         """`set -e` would let a failed run exit zero through this wrapper.
@@ -104,14 +116,14 @@ class TestRenderSbatch:
         the rendered comment explains why `set -e` is absent, and a naive
         substring check finds that explanation and fails on it.
         """
-        lines = render_sbatch(spec(), log_dir=LOG_DIR).splitlines()
+        lines = _render(spec()).splitlines()
         directives = [line.strip() for line in lines if not line.lstrip().startswith("#")]
         assert "set -u" in directives
         assert "set -e" not in directives
         assert not any(line.startswith("set -e") for line in directives)
 
     def test_it_propagates_the_payload_exit_code(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert "rc=$?" in script
         assert script.rstrip("\n").endswith("exit $rc")
 
@@ -125,7 +137,7 @@ class TestJobIsSelfDescribing:
     """
 
     def test_the_job_name_is_prefixed_by_its_project(self) -> None:
-        assert "#SBATCH -J abl.arm-b-42" in render_sbatch(spec(), log_dir=LOG_DIR)
+        assert "#SBATCH -J abl.arm-b-42" in _render(spec())
 
     def test_the_comment_carries_project_hardware_environment_and_experiment(self) -> None:
         assert job_comment(spec()) == (
@@ -140,7 +152,7 @@ class TestJobIsSelfDescribing:
 
     def test_a_queue_row_says_which_experiment_it_is(self) -> None:
         """So a row found in squeue answers the question without a ledger."""
-        script = render_sbatch(spec(experiment={"corpus": "07ab4976"}), log_dir=LOG_DIR)
+        script = _render(spec(experiment={"corpus": "07ab4976"}))
         assert "exp=corpus=07ab4976" in script
 
     def test_the_comment_holds_no_space(self) -> None:
@@ -148,7 +160,7 @@ class TestJobIsSelfDescribing:
         assert " " not in job_comment(spec())
 
     def test_the_comment_reaches_the_script_as_one_directive(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         prefix = "#SBATCH --comment"
         comment_lines = [line for line in script.splitlines() if line.startswith(prefix)]
         assert comment_lines == [f"#SBATCH --comment {job_comment(spec())}"]
@@ -158,13 +170,13 @@ class TestJobIsSelfDescribing:
 
     def test_the_payload_can_read_its_own_project_and_label(self) -> None:
         """A training script writing checkpoints needs to name them something."""
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert 'export HPC3_PROJECT="abl"' in script
         assert 'export HPC3_JOB_NAME="abl.arm-b-42"' in script
 
     def test_two_projects_cannot_produce_the_same_label(self) -> None:
-        mine = render_sbatch(spec(), log_dir=LOG_DIR)
-        theirs = render_sbatch(spec(project="sirius"), log_dir=LOG_DIR)
+        mine = _render(spec())
+        theirs = _render(spec(project="sirius"))
         assert "#SBATCH -J abl.arm-b-42" in mine
         assert "#SBATCH -J sirius.arm-b-42" in theirs
 
@@ -180,7 +192,7 @@ class TestDeterminismIsDeclaredBeforeTheProcessStarts:
     """
 
     def test_a_deterministic_run_carries_the_cublas_workspace(self) -> None:
-        script = render_sbatch(spec(deterministic=True), log_dir=LOG_DIR)
+        script = _render(spec(deterministic=True))
         assert f'export {CUBLAS_WORKSPACE_ENV_VAR}="{CUBLAS_DETERMINISTIC_WORKSPACE}"' in script
 
     def test_the_workspace_value_is_the_shared_one_not_a_copy(self) -> None:
@@ -190,15 +202,13 @@ class TestDeterminismIsDeclaredBeforeTheProcessStarts:
         assert CUBLAS_DETERMINISTIC_WORKSPACE == ":4096:8"
 
     def test_a_nondeterministic_run_does_not_carry_it(self) -> None:
-        assert CUBLAS_WORKSPACE_ENV_VAR not in render_sbatch(spec(), log_dir=LOG_DIR)
+        assert CUBLAS_WORKSPACE_ENV_VAR not in _render(spec())
 
     def test_the_posture_is_exported_either_way(self) -> None:
         """Absent is a state, not a message. A payload inferring determinism
         from a missing variable would silently train the other record."""
-        assert f'export {DETERMINISM_ENV_VAR}="0"' in render_sbatch(spec(), log_dir=LOG_DIR)
-        assert f'export {DETERMINISM_ENV_VAR}="1"' in render_sbatch(
-            spec(deterministic=True), log_dir=LOG_DIR
-        )
+        assert f'export {DETERMINISM_ENV_VAR}="0"' in _render(spec())
+        assert f'export {DETERMINISM_ENV_VAR}="1"' in _render(spec(deterministic=True))
 
     def test_what_the_script_exports_is_what_the_trainer_reads_back(self) -> None:
         """The two halves joined, against the trainer's own reader rather than
@@ -211,7 +221,7 @@ class TestDeterminismIsDeclaredBeforeTheProcessStarts:
         deterministic anyway.
         """
         for deterministic, expected in ((True, True), (False, False)):
-            script = render_sbatch(spec(deterministic=deterministic), log_dir=LOG_DIR)
+            script = _render(spec(deterministic=deterministic))
             exported = {
                 line.removeprefix("export ").split("=", 1)[0]: line.split("=", 1)[1].strip('"')
                 for line in script.splitlines()
@@ -221,7 +231,7 @@ class TestDeterminismIsDeclaredBeforeTheProcessStarts:
 
     def test_it_is_exported_before_the_payload_runs(self) -> None:
         """After CUDA starts the variable is accepted and ignored."""
-        script = render_sbatch(spec(deterministic=True), log_dir=LOG_DIR)
+        script = _render(spec(deterministic=True))
         lines = script.splitlines()
         exported = next(i for i, line in enumerate(lines) if CUBLAS_WORKSPACE_ENV_VAR in line)
         payload = next(i for i, line in enumerate(lines) if line == "python train.py --seed 42")
@@ -247,16 +257,16 @@ class TestCpuOnlyJobs:
         return spec(partition="free", gpu=None, command="sirius --input /pub/data")
 
     def test_no_gres_line_is_emitted_at_all(self) -> None:
-        script = render_sbatch(self._cpu(), log_dir=LOG_DIR)
+        script = _render(self._cpu())
         assert "--gres" not in script
 
     def test_nvidia_smi_is_not_called_on_a_node_without_it(self) -> None:
-        script = render_sbatch(self._cpu(), log_dir=LOG_DIR)
+        script = _render(self._cpu())
         assert "nvidia-smi" not in script
 
     def test_the_log_still_says_what_hardware_it_got(self) -> None:
         """Silence would read as a truncated header, not as a CPU job."""
-        script = render_sbatch(self._cpu(), log_dir=LOG_DIR)
+        script = _render(self._cpu())
         assert 'echo "gpu       cpu-only"' in script
 
     def test_the_comment_says_cpu_only_rather_than_going_blank(self) -> None:
@@ -267,7 +277,7 @@ class TestCpuOnlyJobs:
 
     def test_the_payload_and_exit_handling_are_unchanged(self) -> None:
         """A CPU job is a normal job; only the hardware lines differ."""
-        script = render_sbatch(self._cpu(), log_dir=LOG_DIR)
+        script = _render(self._cpu())
         assert "sirius --input /pub/data" in script
         assert "#SBATCH -p free" in script
         assert "#SBATCH -c 8" in script
@@ -275,7 +285,7 @@ class TestCpuOnlyJobs:
 
     def test_a_gpu_job_on_the_same_cluster_still_gets_its_gres(self) -> None:
         """The CPU path must not be reachable by a job that asked for a GPU."""
-        assert "#SBATCH --gres=gpu:A100:1" in render_sbatch(spec(), log_dir=LOG_DIR)
+        assert "#SBATCH --gres=gpu:A100:1" in _render(spec())
 
 
 class TestDependencyIsNeverEmittedWithoutItsSafetyPairing:
@@ -297,17 +307,13 @@ class TestDependencyIsNeverEmittedWithoutItsSafetyPairing:
         return spec(depends_on={"kind": "afterok", "job_ids": ["55519937"]})
 
     def test_the_dependency_reaches_the_script(self) -> None:
-        assert "#SBATCH --dependency=afterok:55519937" in render_sbatch(
-            self._waiting(), log_dir=LOG_DIR
-        )
+        assert "#SBATCH --dependency=afterok:55519937" in _render(self._waiting())
 
     def test_the_kill_flag_is_emitted_with_it(self) -> None:
-        assert "#SBATCH --kill-on-invalid-dep=yes" in render_sbatch(
-            self._waiting(), log_dir=LOG_DIR
-        )
+        assert "#SBATCH --kill-on-invalid-dep=yes" in _render(self._waiting())
 
     def test_neither_appears_when_the_job_waits_on_nothing(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert "--dependency" not in script
         assert "--kill-on-invalid-dep" not in script
 
@@ -316,16 +322,16 @@ class TestDependencyIsNeverEmittedWithoutItsSafetyPairing:
         there. Asserted as a relation over both specs rather than as two
         separate absences."""
         for job in (spec(), self._waiting()):
-            script = render_sbatch(job, log_dir=LOG_DIR)
+            script = _render(job)
             assert ("--kill-on-invalid-dep" in script) == ("--dependency" in script)
 
     def test_several_ids_render_colon_joined(self) -> None:
         job = spec(depends_on={"kind": "afterany", "job_ids": ["1", "2"]})
-        assert "#SBATCH --dependency=afterany:1:2" in render_sbatch(job, log_dir=LOG_DIR)
+        assert "#SBATCH --dependency=afterany:1:2" in _render(job)
 
     def test_the_wait_is_a_directive_not_a_body_line(self) -> None:
         """A `#SBATCH` line after the first command is ignored by Slurm."""
-        lines = render_sbatch(self._waiting(), log_dir=LOG_DIR).splitlines()
+        lines = _render(self._waiting()).splitlines()
         dependency = next(i for i, line in enumerate(lines) if "--dependency" in line)
         first_body = next(i for i, line in enumerate(lines) if line == "set -u")
         assert dependency < first_body
@@ -338,22 +344,22 @@ class TestResumeSurface:
     """
 
     def test_the_restart_count_is_exported_from_slurms_own_variable(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert 'export HPC3_RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"' in script
 
     def test_it_defaults_to_zero_on_a_first_run(self) -> None:
         """The ':-0' is what makes a first run readable, not an unset variable
         under `set -u`."""
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert ":-0}" in script
 
     def test_the_restart_count_is_echoed_into_the_job_log(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert 'echo "restart   ${HPC3_RESTART_COUNT}"' in script
 
     def test_a_protected_run_carries_both_requeue_and_the_count(self) -> None:
         job = spec(minutes=600, requeue=True, checkpoint_steps=50)
-        script = render_sbatch(job, log_dir=LOG_DIR)
+        script = _render(job)
         assert "#SBATCH --requeue" in script
         assert "HPC3_RESTART_COUNT" in script
         assert 'export HPC3_CHECKPOINT_STEPS="50"' in script
@@ -370,7 +376,7 @@ class TestCodeProvenance:
     """
 
     def test_the_commit_is_exported_from_a_stamp_inside_the_environment(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert (
             'export GIT_COMMIT="$(cat /pub/wagnera3/envs/abl-pinned/GIT_COMMIT '
             "2>/dev/null || echo '')\"" in script
@@ -380,16 +386,16 @@ class TestCodeProvenance:
         """A submitter's HEAD moves on every edit; the env changes only when a
         wheel is installed. Recording the former as the latter is the
         lock-versus-manifest failure one layer down."""
-        script = render_sbatch(spec(env_path="/pub/wagnera3/envs/other"), log_dir=LOG_DIR)
+        script = _render(spec(env_path="/pub/wagnera3/envs/other"))
         assert "/pub/wagnera3/envs/other/GIT_COMMIT" in script
         assert "/pub/wagnera3/envs/abl-pinned/GIT_COMMIT" not in script
 
     def test_the_commit_is_echoed_into_the_job_log(self) -> None:
-        script = render_sbatch(spec(), log_dir=LOG_DIR)
+        script = _render(spec())
         assert 'echo "commit    ${GIT_COMMIT:-<unstamped>}"' in script
 
     def test_the_export_is_set_before_the_payload_runs(self) -> None:
-        lines = render_sbatch(spec(), log_dir=LOG_DIR).splitlines()
+        lines = _render(spec()).splitlines()
         export = next(i for i, line in enumerate(lines) if line.startswith("export GIT_COMMIT="))
         payload = next(i for i, line in enumerate(lines) if line == "python train.py --seed 42")
         assert export < payload

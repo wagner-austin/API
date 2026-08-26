@@ -107,6 +107,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "deterministic": False,
         "experiment": {"arm": "B"},
         "command": "python train.py",
+        "artifact": None,
     }
     base.update(overrides)
     return base
@@ -256,58 +257,68 @@ class TestTheRulesFollowTheCluster:
     """
 
     def test_a_spec_valid_on_the_other_cluster_decodes(self) -> None:
-        assert decode_job_spec(_spec(), OTHER)["partition"] == "scavenge"
+        assert decode_job_spec(_spec(), OTHER, max_service_units=0.0)["partition"] == "scavenge"
 
     def test_an_hpc3_partition_is_unknown_on_the_other_cluster(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(partition="free-gpu", gpu=gpus("A100")), OTHER)
+            decode_job_spec(
+                _spec(partition="free-gpu", gpu=gpus("A100")), OTHER, max_service_units=0.0
+            )
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_UNKNOWN
 
     def test_an_hpc3_gpu_is_unknown_on_the_other_cluster(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(gpu=gpus("A100")), OTHER)
+            decode_job_spec(_spec(gpu=gpus("A100")), OTHER, max_service_units=0.0)
         assert excinfo.value.code is Hpc3ErrorCode.GPU_TYPE_UNPINNED
 
     def test_the_other_clusters_shorter_walltime_ceiling_binds(self) -> None:
         """4 hours there; the same 10-hour job fits HPC3's 72."""
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(minutes=600), OTHER)
+            decode_job_spec(_spec(minutes=600), OTHER, max_service_units=0.0)
         assert excinfo.value.code is Hpc3ErrorCode.TIME_LIMIT_EXCEEDS_PARTITION
 
     def test_its_preemptible_partition_still_demands_protection(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(minutes=200), OTHER)
+            decode_job_spec(_spec(minutes=200), OTHER, max_service_units=0.0)
         assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
 
     def test_a_free_non_preemptible_partition_needs_no_protection(self) -> None:
         """Unreachable on HPC3, where every free partition preempts. Without a
         cluster shaped like this one the early return in the protection rule
         would have no test that is not also a billing job."""
-        decoded = decode_job_spec(_spec(partition="serial", gpu=None, minutes=110), OTHER)
+        decoded = decode_job_spec(
+            _spec(partition="serial", gpu=None, minutes=110), OTHER, max_service_units=0.0
+        )
         assert decoded["requeue"] is False
 
     def test_its_billing_partition_is_refused_at_a_half_rate_too(self) -> None:
         """0.5 is neither free nor full price, and the rule is "above zero"
         rather than "equal to one"."""
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(partition="batch", gpu=gpus("H100")), OTHER)
+            decode_job_spec(
+                _spec(partition="batch", gpu=gpus("H100")), OTHER, max_service_units=0.0
+            )
         assert excinfo.value.code is Hpc3ErrorCode.PARTITION_BILLS
         assert "0.5" in excinfo.value.message
 
     def test_its_job_ceiling_can_bind_before_its_core_ceiling(self) -> None:
         """4 single-core members is 4 cores against a 12-core cap, and 4 jobs
         against a 3-job cap. Only the job ceiling can refuse this."""
-        members: list[JSONValue] = [{"suffix": f"s{i}", "command": "python t.py"} for i in range(4)]
+        members: list[JSONValue] = [
+            {"suffix": f"s{i}", "command": "python t.py", "artifact": None} for i in range(4)
+        ]
         base = _spec(partition="serial", gpu=None, cpus=1)
         with pytest.raises(AppError) as excinfo:
-            decode_sweep_spec({"base": base, "members": members}, OTHER)
+            decode_sweep_spec({"base": base, "members": members}, OTHER, max_service_units=0.0)
         assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_JOB_CEILING
 
     def test_its_much_lower_sweep_ceiling_binds(self) -> None:
         """Three members fit HPC3's 24 GPUs and not this cluster's 1."""
-        members: list[JSONValue] = [{"suffix": f"s{i}", "command": "python t.py"} for i in range(3)]
+        members: list[JSONValue] = [
+            {"suffix": f"s{i}", "command": "python t.py", "artifact": None} for i in range(3)
+        ]
         with pytest.raises(AppError) as excinfo:
-            decode_sweep_spec({"base": _spec(), "members": members}, OTHER)
+            decode_sweep_spec({"base": _spec(), "members": members}, OTHER, max_service_units=0.0)
         assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING
 
     def test_a_fractional_usage_factor_is_applied_rather_than_rounded(self) -> None:

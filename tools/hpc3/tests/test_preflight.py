@@ -12,10 +12,30 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.contracts.job import JobSpec
-from hpc3.contracts.preflight import encode_preflight_result
+from hpc3.contracts.preflight import PreflightResult, encode_preflight_result
 from hpc3.core.preflight import check_env_path, preflight
 from tests.against_hpc3 import decode_job_spec, decode_preflight_result, parse_test_only
 from tests.conftest import ABL_PINNED_DISTRIBUTIONS, FakeRun, cluster, gpus
+
+
+def _run_preflight(job: JobSpec) -> PreflightResult:
+    """Preflight against the standard fake host, charging nothing.
+
+    Args:
+        job: The spec to check.
+
+    Returns:
+        The scheduler's verdict.
+    """
+    return preflight(
+        job,
+        host="hpc3",
+        script_dir="/j",
+        log_dir="/l",
+        cluster=cluster(),
+        charge_account="",
+    )
+
 
 _REAL_LINE = (
     "sbatch: Job 55516995 to start at 2026-08-22T03:23:00 a using 4 processors "
@@ -47,6 +67,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "deterministic": False,
         "experiment": {"arm": "B"},
         "command": "python train.py",
+        "artifact": None,
     }
     base.update(overrides)
     return decode_job_spec(base)
@@ -230,6 +251,7 @@ class TestADependencyRefusalIsTranslated:
                 script_dir="/j",
                 log_dir="/l",
                 cluster=cluster(),
+                charge_account="",
             )
         assert excinfo.value.code is Hpc3ErrorCode.PREFLIGHT_REJECTED
         assert "afterok 55533519" in excinfo.value.message
@@ -239,7 +261,12 @@ class TestADependencyRefusalIsTranslated:
         self._refuse(fake_run, "Job dependency problem")
         with pytest.raises(AppError) as excinfo:
             preflight(
-                self._waiting(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster()
+                self._waiting(),
+                host="hpc3",
+                script_dir="/j",
+                log_dir="/l",
+                cluster=cluster(),
+                charge_account="",
             )
         assert "afterok 55533519" in excinfo.value.message
 
@@ -249,7 +276,12 @@ class TestADependencyRefusalIsTranslated:
         self._refuse(fake_run, "Job dependency problem")
         with pytest.raises(AppError) as excinfo:
             preflight(
-                self._waiting(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster()
+                self._waiting(),
+                host="hpc3",
+                script_dir="/j",
+                log_dir="/l",
+                cluster=cluster(),
+                charge_account="",
             )
         assert "Job dependency problem" in excinfo.value.message
 
@@ -259,14 +291,19 @@ class TestADependencyRefusalIsTranslated:
         self._refuse(fake_run, "Invalid account")
         with pytest.raises(AppError) as excinfo:
             preflight(
-                self._waiting(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster()
+                self._waiting(),
+                host="hpc3",
+                script_dir="/j",
+                log_dir="/l",
+                cluster=cluster(),
+                charge_account="",
             )
         assert "waits on" not in excinfo.value.message
 
     def test_a_job_with_no_dependency_gets_no_hint(self, fake_run: FakeRun) -> None:
         self._refuse(fake_run, "Requested operation is presently disabled")
         with pytest.raises(AppError) as excinfo:
-            preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+            _run_preflight(_spec())
         assert "waits on" not in excinfo.value.message
 
 
@@ -275,7 +312,7 @@ class TestPreflight:
         fake_run.add("test -d", stdout="PRESENT\n")
         fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
 
-        result = preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+        result = _run_preflight(_spec())
 
         assert result["partition"] == "free-gpu"
         assert result["processors"] == 4
@@ -284,7 +321,7 @@ class TestPreflight:
         """A reconstruction from flags could pass while the real script fails."""
         fake_run.add("test -d", stdout="PRESENT\n")
         fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
-        preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+        _run_preflight(_spec())
 
         commands = fake_run.commands()
         assert "cat > '/j/abl.arm-b-42.sbatch'" in commands
@@ -293,7 +330,7 @@ class TestPreflight:
     def test_nothing_is_queued(self, fake_run: FakeRun) -> None:
         fake_run.add("test -d", stdout="PRESENT\n")
         fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
-        preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+        _run_preflight(_spec())
 
         real_submits = [c for c in fake_run.commands() if "sbatch " in c and "--test-only" not in c]
         assert real_submits == []
@@ -301,7 +338,7 @@ class TestPreflight:
     def test_a_missing_env_stops_before_the_scheduler_is_asked(self, fake_run: FakeRun) -> None:
         fake_run.add("test -d", stdout="ABSENT\n")
         with pytest.raises(AppError) as excinfo:
-            preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+            _run_preflight(_spec())
         assert excinfo.value.code is Hpc3ErrorCode.ENV_PATH_MISSING
         assert not any("--test-only" in c for c in fake_run.commands())
 
@@ -312,7 +349,7 @@ class TestPreflight:
             stdout="allocation failure: Invalid account or account/partition\nrc=1\n",
         )
         with pytest.raises(AppError) as excinfo:
-            preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+            _run_preflight(_spec())
         assert excinfo.value.code is Hpc3ErrorCode.PREFLIGHT_REJECTED
         assert "Invalid account" in excinfo.value.message
 
@@ -330,7 +367,7 @@ class TestPreflightChecksEnvironmentIdentity:
         fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
 
         spec = _spec(pinned_packages={"torch": "2.6.0+cu124", "transformers": "4.46.3"})
-        result = preflight(spec, host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+        result = _run_preflight(spec)
         assert result["partition"] == "free-gpu"
 
     def test_the_wrong_environment_stops_before_the_scheduler_is_asked(
@@ -342,7 +379,7 @@ class TestPreflightChecksEnvironmentIdentity:
 
         spec = _spec(pinned_packages={"transformers": "4.46.3"})
         with pytest.raises(AppError) as excinfo:
-            preflight(spec, host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+            _run_preflight(spec)
 
         assert excinfo.value.code is Hpc3ErrorCode.ENV_PACKAGE_MISMATCH
         assert not any("--test-only" in c for c in fake_run.commands())
@@ -353,7 +390,7 @@ class TestPreflightChecksEnvironmentIdentity:
         fake_run.add("test -d", stdout="PRESENT\n")
         fake_run.add("--test-only", stdout=_REAL_LINE + "\nrc=0\n")
 
-        preflight(_spec(), host="hpc3", script_dir="/j", log_dir="/l", cluster=cluster())
+        _run_preflight(_spec())
         assert not any("importlib.metadata" in c for c in fake_run.commands())
 
 

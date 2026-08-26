@@ -202,11 +202,12 @@ class TestExampleRun:
     def test_a_run_states_only_what_is_specific_to_it(self) -> None:
         """The README's central claim, checked against the real file.
 
-        Four fields: three saying what to run, and one saying what the run
-        IS so the result can be traced back to it. Everything else -- the
+        Five fields: three saying what to run, one saying what the run IS
+        so the result can be traced back to it, and one naming where the
+        result lands so the ledger can index it. Everything else -- the
         partition, the GPU, the cores, the environment -- is inherited.
         """
-        assert _fields("run-arm-b.json") == ["command", "experiment", "name", "project"]
+        assert _fields("run-arm-b.json") == ["artifact", "command", "experiment", "name", "project"]
 
 
 class TestExampleChain:

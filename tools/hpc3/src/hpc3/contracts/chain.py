@@ -51,7 +51,9 @@ class ChainSpec(TypedDict):
     stages: list[JobSpec]
 
 
-def decode_chain_spec(value: JSONValue, cluster: ClusterFacts) -> ChainSpec:
+def decode_chain_spec(
+    value: JSONValue, cluster: ClusterFacts, *, max_service_units: float
+) -> ChainSpec:
     """Decode and validate a JSON value into a chain.
 
     Args:
@@ -89,7 +91,7 @@ def decode_chain_spec(value: JSONValue, cluster: ClusterFacts) -> ChainSpec:
                 "dependencies from the ids Slurm issues, so this would be replaced."
             )
 
-    stages = [decode_job_spec(item, cluster) for item in raw]
+    stages = [decode_job_spec(item, cluster, max_service_units=max_service_units) for item in raw]
 
     names = [stage["name"] for stage in stages]
     if len(set(names)) != len(names):

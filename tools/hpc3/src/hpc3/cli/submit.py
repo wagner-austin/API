@@ -25,7 +25,7 @@ from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
 from hpc3.cli import _config, _fatal, _test_hooks
-from hpc3.contracts.cluster import describe_gpu_request
+from hpc3.contracts.cluster import ClusterFacts, describe_gpu_request, partition_bills
 from hpc3.contracts.layout import log_dir, qualified_name, script_dir
 from hpc3.contracts.run import resolve_run
 from hpc3.contracts.workspace import workspace_cluster
@@ -34,6 +34,25 @@ from hpc3.core.budget import check_projection
 from hpc3.core.submit import submit
 
 _FLAGS = (_config.CONFIG_FLAG, "--run")
+
+
+def _cost_label(cluster: ClusterFacts, partition: str, charge_account: str) -> str:
+    """Describe what a submission to this partition costs.
+
+    Args:
+        cluster: The cluster whose measured usage factors apply.
+        partition: The partition being submitted to.
+        charge_account: The account that would be billed.
+
+    Returns:
+        ``"free"`` on a zero-usage-factor partition, otherwise the account the
+        charge lands on. The summary line used to say "free" unconditionally,
+        which was true of everything this package could submit until a
+        declared budget admitted billed partitions.
+    """
+    if not partition_bills(cluster, partition):
+        return "free"
+    return f"BILLED to {charge_account}"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -81,11 +100,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         ledger_path=pathlib.Path(workspace["ledger"]),
         submitted_at=_test_hooks.now_iso(),
         cluster=cluster,
+        charge_account=workspace["budget"]["charge_account"],
     )
 
     _test_hooks.emit(f"submitted {job_id} {qualified_name(project, spec['name'])}")
     _test_hooks.emit(
-        f"  {describe_gpu_request(spec['gpu'])} on {spec['partition']} (free), "
+        # Was the literal "(free)". That was true of everything this package
+        # could submit until a declared budget admitted billed partitions, and
+        # a summary that calls a charged job free is the last line an operator
+        # reads before it starts costing.
+        f"  {describe_gpu_request(spec['gpu'])} on {spec['partition']} "
+        f"({_cost_label(cluster, spec['partition'], workspace['budget']['charge_account'])}), "
         f"{spec['cpus']} cpu, {spec['mem_gb']}G, {spec['minutes']} min"
     )
     _test_hooks.emit(f"  logs {log_dir(root, project)}")

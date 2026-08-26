@@ -65,11 +65,18 @@ merged with those. That is expressible and not yet needed, and a field that
 half-works is worse than one that is not there.
 """
 
-STAGE_IDENTITY_FIELDS = ("suffix", "command")
+STAGE_IDENTITY_FIELDS = ("suffix", "command", "artifact")
 """What one stage says for itself, on top of anything it overrides.
 
 No ``name``: a stage is named by the chain plus its suffix, so the two stages
 of one pipeline sort together in ``squeue`` and share a log directory prefix.
+
+``artifact`` IS here, for the reason :class:`~hpc3.contracts.sweep.SweepMember`
+carries its own: two stages of one pipeline write two different results, and a
+chain that named one path for all of them would leave every stage but the last
+unreadable. It was absent when the field was introduced, which made every chain
+stage undecodable -- the merged document could not supply what the job contract
+required and the stage was not allowed to say it.
 """
 """The sweep equivalent; the command comes from each member instead.
 
@@ -173,7 +180,11 @@ def resolve_run(workspace: Workspace, value: JSONValue) -> JobSpec:
     # the project defaults cannot, because two runs of one project write to
     # two different files, which is the whole reason the ledger needs it.
     merged["artifact"] = document.get("artifact")
-    return decode_job_spec(merged, workspace_cluster(workspace))
+    return decode_job_spec(
+        merged,
+        workspace_cluster(workspace),
+        max_service_units=workspace["budget"]["max_service_units"],
+    )
 
 
 def resolve_sweep(workspace: Workspace, value: JSONValue) -> SweepSpec:
@@ -208,6 +219,11 @@ def resolve_sweep(workspace: Workspace, value: JSONValue) -> SweepSpec:
     base["name"] = document.get("name")
     base["experiment"] = document.get("experiment")
     base["depends_on"] = document.get("depends_on")
+    # None, always. The template exists to be validated, not submitted:
+    # `expand_sweep` builds each job from the MEMBER's artifact, because six
+    # arms writing to one path are five results nobody can read. A value here
+    # would be silently discarded, which is worse than declaring none.
+    base["artifact"] = None
 
     members = require_list(document, "members")
     if members == []:
@@ -215,7 +231,11 @@ def resolve_sweep(workspace: Workspace, value: JSONValue) -> SweepSpec:
     first = members[0]
     base["command"] = first.get("command") if isinstance(first, dict) else None
 
-    return decode_sweep_spec({"base": base, "members": members}, workspace_cluster(workspace))
+    return decode_sweep_spec(
+        {"base": base, "members": members},
+        workspace_cluster(workspace),
+        max_service_units=workspace["budget"]["max_service_units"],
+    )
 
 
 def _resolve_stage(
@@ -260,6 +280,9 @@ def _resolve_stage(
 
     merged["name"] = f"{chain.get('name')}-{suffix}"
     merged["command"] = document.get("command")
+    # Per stage, like the command. The job contract requires the field, and a
+    # stage that cannot state one cannot be decoded at all.
+    merged["artifact"] = document.get("artifact")
     # The chain's experiment plus this stage's own label, so two stages of one
     # pipeline are two distinguishable rows in the ledger rather than two
     # records claiming to be the same thing.
@@ -300,7 +323,11 @@ def resolve_chain(workspace: Workspace, value: JSONValue) -> ChainSpec:
     resolved: list[JSONValue] = [
         _resolve_stage(stage, document, defaults, project) for stage in stages
     ]
-    return decode_chain_spec({"stages": resolved}, workspace_cluster(workspace))
+    return decode_chain_spec(
+        {"stages": resolved},
+        workspace_cluster(workspace),
+        max_service_units=workspace["budget"]["max_service_units"],
+    )
 
 
 __all__ = [
