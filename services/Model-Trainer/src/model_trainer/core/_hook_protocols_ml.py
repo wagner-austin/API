@@ -38,6 +38,31 @@ class ApplyDeterminismProto(Protocol):
         ...
 
 
+class PinTorchThreadsProto(Protocol):
+    """Protocol for the torch intra-op thread pin.
+
+    Separate from :class:`ApplyDeterminismProto` because it is a different
+    lever with a different failure mode. The determinism settings are torch
+    state and take whenever they are written; the thread count used to be
+    pinned through ``OMP_NUM_THREADS``/``MKL_NUM_THREADS``, which a BLAS
+    reads when it LOADS -- so a worker that set them after importing torch
+    set nothing. ``torch.set_num_threads`` is a runtime call and does take.
+    """
+
+    def __call__(self, threads: int) -> int:
+        """Pin the intra-op thread count and report what the process has.
+
+        Args:
+            threads: The count to request.
+
+        Returns:
+            The count torch reports AFTERWARDS, read back rather than
+            assumed. A request and a resolved value are different facts, and
+            only the second describes the run.
+        """
+        ...
+
+
 class CudaIsAvailableProto(Protocol):
     """Protocol for cuda_is_available hook."""
 

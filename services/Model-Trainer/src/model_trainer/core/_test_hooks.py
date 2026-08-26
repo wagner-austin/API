@@ -112,6 +112,7 @@ from model_trainer.core._hook_protocols_ml import (
     LoadTokenizerProto,
     LoadWandbModuleProto,
     ModelDirProto,
+    PinTorchThreadsProto,
     SampleTokenProto,
     SplitCorpusProto,
     SpmDecodeIdsProto,
@@ -162,6 +163,36 @@ def _default_apply_determinism() -> DeterminismRecord:
     )
 
 
+def _default_pin_torch_threads(threads: int) -> int:
+    """Production torch thread pin - used as default hook.
+
+    REPLACES AN INERT PIN. Both workers used to write OMP_NUM_THREADS and
+    MKL_NUM_THREADS through os.putenv from inside the job function. A BLAS
+    reads those when it LOADS, and torch is imported long before any job
+    runs, so the write reached nothing. Measured on this stack: pinning to
+    one thread before importing numpy and pinning after it produce different
+    bytes from the same matmul, reproducibly.
+
+    ``torch.set_num_threads`` is a runtime call rather than a load-time
+    variable, so it takes whenever it is made. The count is read back
+    afterwards because a request and a resolved value are different facts --
+    torch may clamp -- and only the resolved one describes the run.
+
+    Imported inside the function so that merely importing this module does
+    not pull torch into a process that only wanted a Redis handle.
+
+    Args:
+        threads: The intra-op thread count to request.
+
+    Returns:
+        The count torch reports after the call.
+    """
+    import torch
+
+    torch.set_num_threads(threads)
+    return int(torch.get_num_threads())
+
+
 def _default_gpu_max_memory_allocated() -> int:
     """Production torch.cuda.max_memory_allocated - used as default hook."""
     if not cuda_is_available():
@@ -200,6 +231,8 @@ load_tokenizer_for_training: LoadTokenizerProto = _default_load_tokenizer_for_tr
 httpx_client_factory: HttpxClientFactoryProto = _default_httpx_client_factory
 
 apply_determinism_hook: ApplyDeterminismProto = _default_apply_determinism
+
+pin_torch_threads: PinTorchThreadsProto = _default_pin_torch_threads
 
 cuda_is_available: CudaIsAvailableProto = _default_cuda_is_available
 

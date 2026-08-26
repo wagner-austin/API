@@ -37,7 +37,6 @@ from model_trainer.core.compute.device_selector import (
     resolve_precision,
 )
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.compute import LocalCPUProvider
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import TrainRequestPayload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
@@ -270,10 +269,17 @@ def setup_env(settings: Settings) -> tuple[int, DeterminismRecord]:
             under a posture nobody can name.
     """
     threads_cfg = settings["app"]["threads"]
-    threads = threads_cfg if threads_cfg and threads_cfg > 0 else max(1, int(os.cpu_count() or 1))
-    env = LocalCPUProvider(threads_count=threads).env()
-    for k, v in env.items():
-        __import__("os").putenv(k, v)
+    requested = threads_cfg if threads_cfg and threads_cfg > 0 else max(1, int(os.cpu_count() or 1))
+    # A RUNTIME CALL, NOT AN ENVIRONMENT VARIABLE. This used to putenv
+    # OMP_NUM_THREADS and MKL_NUM_THREADS, which a BLAS reads when it LOADS --
+    # and torch is imported long before any job runs, so the write reached
+    # nothing. Measured on this stack: pinning to one thread before importing
+    # numpy and pinning after it produce different bytes from the same matmul,
+    # reproducibly. `torch.set_num_threads` takes whenever it is called.
+    #
+    # The count is READ BACK rather than assumed. A request and a resolved
+    # value are different facts and only the second describes the run.
+    threads = _test_hooks.pin_torch_threads(requested)
     __import__("os").putenv("TOKENIZERS_PARALLELISM", "1")
 
     if not determinism_requested(_optional_env_str(DETERMINISM_ENV_VAR)):

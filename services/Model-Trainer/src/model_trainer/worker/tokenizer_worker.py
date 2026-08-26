@@ -8,7 +8,6 @@ from platform_workers.redis import RedisStrProto
 
 from ..core import _test_hooks
 from ..core.config.settings import Settings
-from ..core.contracts.compute import LocalCPUProvider
 from ..core.contracts.queue import TokenizerTrainPayload
 from ..core.contracts.tokenizer import TokenizerTrainConfig, TokenizerTrainStats
 from ..core.infra.paths import tokenizer_dir
@@ -35,12 +34,12 @@ def process_tokenizer_train_job(payload: TokenizerTrainPayload) -> None:
     r = _redis_client(settings)
     tok_id = payload["tokenizer_id"]
     r.set(f"tokenizer:{tok_id}:status", "running")
-    # Apply local CPU compute environment
+    # Apply local CPU compute environment. Pinned through torch's runtime
+    # call rather than OMP_NUM_THREADS/MKL_NUM_THREADS, which a BLAS reads
+    # when it loads and which this job therefore set far too late to matter.
     threads_cfg = settings["app"]["threads"]
-    threads = threads_cfg if threads_cfg and threads_cfg > 0 else max(1, int(os.cpu_count() or 1))
-    env = LocalCPUProvider(threads_count=threads).env()
-    for k, v in env.items():
-        __import__("os").putenv(k, v)
+    requested = threads_cfg if threads_cfg and threads_cfg > 0 else max(1, int(os.cpu_count() or 1))
+    _test_hooks.pin_torch_threads(requested)
     # Disable tokenizer internal parallelism for stable CPU usage
     __import__("os").putenv("TOKENIZERS_PARALLELISM", "1")
 
