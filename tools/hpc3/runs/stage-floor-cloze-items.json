@@ -1,0 +1,20 @@
+{
+  "destination": "/pub/wagnera3/floor",
+  "provenance": {
+    "item_set": "extraction-eval cloze items, 2627 four-way items",
+    "purpose": "the item set every published arm accuracy is scored against; staged so the gpt2 floor can be re-measured on an A100 rather than assumed to carry over from the 3090 Ti",
+    "source_artifact": "~/PROJECTS/wiki/tools/extraction-eval/runs/cloze-items-80f9732a.jsonl.gz",
+    "staged_form": "the gzip decompressed; the digest below is of the uncompressed bytes, which is what the scorer reads and what baselines.txt publishes",
+    "published_record": "wiki tools/extraction-eval/runs/baselines.txt names this digest for both the gpt2 and gpt2-medium floors",
+    "expected_from": "that same baselines.txt is what --expect-from must point at; it is the published record, not a file emitted beside these bytes",
+    "scored_by": "modeltrainer-score-baseline, in-process, no API/redis/RQ",
+    "note": "score the whole set, never a prefix -- items are emitted in sorted page-slug order, so the set is not homogeneous along its own ordering"
+  },
+  "files": [
+    {
+      "name": "cloze-items-80f9732a.jsonl",
+      "sha256": "80f9732af6507fe65d8ece9042b12f3631c8452421ed37bcfc6b72b331ef379a",
+      "size_bytes": 1195216
+    }
+  ]
+}

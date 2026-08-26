@@ -371,16 +371,34 @@ class TestTheCommittedSpec:
         raw = load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8"))
         assert encode_image_spec(decode_image_spec(raw)) == raw
 
-    def test_it_asserts_both_shipped_fixes(self) -> None:
-        """The two symbols this image exists to carry.
+    def test_it_asserts_every_symbol_this_image_exists_to_carry(self) -> None:
+        """The symbols whose absence means a stale wheel was baked in.
 
-        Their absence in a built image means a stale wheel was baked in, and
-        the whole point of the self-check is that the build discovers that
-        rather than a queued job.
+        Asserted as an EXACT set, and on the (module, attribute) pair rather
+        than the attribute alone. Exact, because adding a required symbol
+        widens what the build refuses and should be a reviewed act rather
+        than something a spec edit does quietly. Paired, because ``main`` is
+        a name half this repository exports -- an attribute-only assertion
+        would be satisfied by the wrong module's ``main`` and report the
+        image carrying a scorer it does not have.
+
+        The first two are the fixes the image was originally built to carry.
+        The third is ``modeltrainer-score-baseline``, added 2026-08-25: the
+        v2 image did not have it, which is why the A100 floor could not be
+        measured until v3 was built.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
-        attributes = sorted(check["attribute"] for check in spec["required_symbols"])
-        assert attributes == ["_TrainerCheckpoints", "check_corpus_certified"]
+        symbols = sorted(
+            (check["module"], check["attribute"]) for check in spec["required_symbols"]
+        )
+        assert symbols == [
+            ("model_trainer.cli.score_baseline", "main"),
+            ("model_trainer.cluster.preflight", "check_corpus_certified"),
+            (
+                "model_trainer.core.services.training.base_trainer_checkpoints",
+                "_TrainerCheckpoints",
+            ),
+        ]
 
     def test_its_environment_survives_the_cluster_bind_mounts(self) -> None:
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))

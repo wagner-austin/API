@@ -27,8 +27,9 @@ from collections.abc import Mapping
 
 from platform_core.errors import AppError, Hpc3ErrorCode
 
+from hpc3.contracts.image import ImageReference
 from hpc3.contracts.pins import normalise_name
-from hpc3.core import remote
+from hpc3.core import image_exec, remote
 
 _PROBE_SOURCE = (
     "import importlib.metadata as m;"
@@ -130,14 +131,28 @@ def check_pins(installed: Mapping[str, str], pinned: Mapping[str, str], *, env_p
             )
 
 
-def verify_env_packages(host: str, env_path: str, pinned: Mapping[str, str]) -> None:
+def verify_env_packages(
+    host: str,
+    env_path: str,
+    pinned: Mapping[str, str],
+    *,
+    image: ImageReference | None,
+) -> None:
     """Ask an environment what it contains and hold it to the project's pins.
+
+    ``image`` is keyword-only and has NO default. A default of None would let
+    a call site probe the host for a container environment by omission, and
+    the answer would be an empty listing read as "torch is missing" -- a
+    confident, wrong diagnosis of the image rather than of the probe.
 
     Args:
         host: SSH destination.
-        env_path: Absolute path to the environment on the cluster.
+        env_path: Absolute path to the environment, on the cluster for a host
+            run and inside the image for an image run.
         pinned: Required versions, keyed by normalised name. Empty means the
             project declared no pins, and no round trip is made.
+        image: The image the environment lives inside, or None when it is a
+            cluster directory.
 
     Raises:
         AppError: With ``ENV_PROBE_UNREADABLE`` if the environment's answer
@@ -146,7 +161,10 @@ def verify_env_packages(host: str, env_path: str, pinned: Mapping[str, str]) -> 
     """
     if pinned == {}:
         return
-    output = remote.run_remote(host, probe_command(env_path))
+    command = probe_command(env_path)
+    if image is not None:
+        command = image_exec.run_inside_image(image, command)
+    output = remote.run_remote(host, command)
     check_pins(parse_installed(output), pinned, env_path=env_path)
 
 

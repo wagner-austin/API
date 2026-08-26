@@ -181,6 +181,52 @@ class TestExperimentContract:
         assert format_experiment({"seed": "42", "arm": "B"}) == "arm=B seed=42"
 
 
+class TestWhitespaceIsRefusedBeforeItReachesSlurm:
+    """`comment_fragment` always REQUIRED this and nothing ever CHECKED it.
+
+    Its docstring says the pairs are joined with commas "because Slurm takes
+    the comment as a single token" -- correct, and stated where no input
+    passes through. A run declaring `established_on: "NVIDIA GeForce RTX
+    3090 Ti"` rendered
+
+        #SBATCH --comment project=floor;...;exp=established_on=NVIDIA GeForce...
+
+    unquoted, and Slurm refused the whole script with `Invalid directive
+    found in batch script: GeForce` -- naming neither the field, nor the run,
+    nor the comment, after an SSH round trip. Measured 2026-08-25 preflighting
+    the A100 floor run.
+    """
+
+    def test_a_space_in_a_value_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="whitespace in a value"):
+            require_experiment({"e": {"card": "NVIDIA GeForce RTX 3090 Ti"}}, "e")
+
+    def test_a_space_in_a_name_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="whitespace in a name"):
+            require_experiment({"e": {"base model": "gpt2"}}, "e")
+
+    def test_a_tab_is_refused_as_readily_as_a_space(self) -> None:
+        """A tab renders identically to a space and breaks identically."""
+        with pytest.raises(JSONTypeError, match="whitespace in a value"):
+            require_experiment({"e": {"card": "A100\t40GB"}}, "e")
+
+    def test_a_newline_is_refused(self) -> None:
+        """A newline would end the directive and start a shell line."""
+        with pytest.raises(JSONTypeError, match="whitespace in a value"):
+            require_experiment({"e": {"note": "line\nbreak"}}, "e")
+
+    def test_the_message_says_what_to_do_instead(self) -> None:
+        """The cluster's own error names a random word; this must not."""
+        with pytest.raises(JSONTypeError) as excinfo:
+            require_experiment({"e": {"card": "RTX 3090"}}, "e")
+        assert "underscore or a hyphen" in str(excinfo.value)
+
+    def test_the_separators_the_record_uses_are_still_allowed(self) -> None:
+        """Only whitespace is refused; a value is still free-form otherwise."""
+        decoded = require_experiment({"e": {"card": "NVIDIA_GeForce_RTX_3090_Ti"}}, "e")
+        assert decoded == {"card": "NVIDIA_GeForce_RTX_3090_Ti"}
+
+
 class TestMatches:
     def test_an_exact_value_matches(self) -> None:
         assert matches({"corpus": _ARM_B}, _ARM_B) is True

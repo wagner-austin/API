@@ -52,6 +52,31 @@ def _spec(**overrides: JSONValue) -> JobSpec:
     return decode_job_spec(base)
 
 
+def _image_spec(**overrides: JSONValue) -> JobSpec:
+    """Build a decoded job spec whose environment lives inside an image.
+
+    The env_path is the container path /opt/env, which is the whole point:
+    it exists nowhere on the cluster filesystem, so a probe that asks the
+    host gets a confident wrong answer rather than an error.
+
+    Args:
+        **overrides: Fields to replace.
+
+    Returns:
+        A validated spec carrying an image reference.
+    """
+    base: dict[str, JSONValue] = {
+        "env_path": "/opt/env",
+        "image": {
+            "path": "/pub/wagnera3/images/v3/abl.sif",
+            "sha256": "3bd2e694857821c383c5e90b1c23b63c706ece20069a6bf34431512ef1c041d4",
+            "binds": ["/pub/wagnera3"],
+        },
+    }
+    base.update(overrides)
+    return _spec(**base)
+
+
 class TestParseTestOnly:
     def test_it_parses_the_measured_line(self) -> None:
         result = parse_test_only(_REAL_LINE + "\n")
@@ -121,6 +146,51 @@ class TestCheckEnvPath:
             check_env_path("hpc3", _spec())
         assert excinfo.value.code is Hpc3ErrorCode.ENV_PATH_MISSING
         assert "/pub/wagnera3/envs/abl-pinned/bin" in excinfo.value.message
+
+    def test_a_host_check_says_it_looked_on_the_host(self, fake_run: FakeRun) -> None:
+        fake_run.add("test -d", stdout="ABSENT\n")
+        with pytest.raises(AppError) as excinfo:
+            check_env_path("hpc3", _spec())
+        assert "does not exist on hpc3." in excinfo.value.message
+
+
+class TestCheckEnvPathInsideAnImage:
+    """The env of an image job exists only in the sif, so the probe must go there.
+
+    Before this, `check_env_path` probed the host unconditionally. A project
+    that adopted an image declares `env_path: /opt/env`, which exists nowhere
+    on the cluster filesystem, so EVERY image job was refused
+    ENV_PATH_MISSING for a directory that was never supposed to be on the
+    host -- and the message sent the reader to look there.
+    """
+
+    def test_the_probe_runs_inside_the_image(self, fake_run: FakeRun) -> None:
+        fake_run.add("test -d", stdout="PRESENT\n")
+        assert check_env_path("hpc3", _image_spec()) == "/opt/env/bin"
+        sent = fake_run.calls[0].remote_command
+        assert sent.startswith("module load apptainer/1.4.5 && apptainer exec ")
+        assert '"/pub/wagnera3/images/v3/abl.sif"' in sent
+
+    def test_the_probe_carries_the_images_binds(self, fake_run: FakeRun) -> None:
+        """Same binds as the payload, or preflight verifies a different world."""
+        fake_run.add("test -d", stdout="PRESENT\n")
+        check_env_path("hpc3", _image_spec())
+        assert '--bind "/pub/wagnera3:/pub/wagnera3"' in fake_run.calls[0].remote_command
+
+    def test_an_absent_env_inside_an_image_is_still_refused(self, fake_run: FakeRun) -> None:
+        fake_run.add("test -d", stdout="ABSENT\n")
+        with pytest.raises(AppError) as excinfo:
+            check_env_path("hpc3", _image_spec())
+        assert excinfo.value.code is Hpc3ErrorCode.ENV_PATH_MISSING
+
+    def test_the_message_names_the_image_not_the_host(self, fake_run: FakeRun) -> None:
+        """ "does not exist on hpc3" is true of a container path and useless."""
+        fake_run.add("test -d", stdout="ABSENT\n")
+        with pytest.raises(AppError) as excinfo:
+            check_env_path("hpc3", _image_spec())
+        assert "/opt/env/bin does not exist inside /pub/wagnera3/images/v3/abl.sif." in (
+            excinfo.value.message
+        )
 
 
 class TestADependencyRefusalIsTranslated:

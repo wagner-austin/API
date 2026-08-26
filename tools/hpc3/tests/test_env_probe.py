@@ -16,6 +16,7 @@ import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 
+from hpc3.contracts.image import ImageReference
 from hpc3.contracts.pins import encode_pinned_packages, normalise_name, require_pinned_packages
 from hpc3.core.env_probe import (
     check_pins,
@@ -29,6 +30,18 @@ _UNPINNED_ENV = "torch==2.11.0+cu128\ntransformers==5.15.1\nnumpy==2.3.1\n"
 """What ``/pub/wagnera3/envs/abl`` reports -- the environment one typo away."""
 
 _ABL_PINS = {"torch": "2.6.0+cu124", "transformers": "4.46.3"}
+
+_IMAGE = ImageReference(
+    path="/pub/wagnera3/images/v3/abl.sif",
+    sha256="3bd2e694857821c383c5e90b1c23b63c706ece20069a6bf34431512ef1c041d4",
+    binds=["/pub/wagnera3"],
+)
+"""The v3 ablation image, whose environment is at the container path /opt/env.
+
+A real reference rather than a placeholder: /opt/env is exactly the shape
+that exists nowhere on the cluster filesystem, which is the case a host
+probe answers wrongly rather than not at all.
+"""
 
 
 class TestNormaliseName:
@@ -134,18 +147,40 @@ class TestCheckPins:
 class TestVerifyEnvPackages:
     def test_no_pins_makes_no_remote_call(self, fake_run: FakeRun) -> None:
         """A project with a compiled payload should not pay for a round trip."""
-        verify_env_packages("hpc3", "/e", {})
+        verify_env_packages("hpc3", "/e", {}, image=None)
         assert fake_run.calls == []
 
     def test_pins_are_checked_against_the_live_environment(self, fake_run: FakeRun) -> None:
         fake_run.add("importlib.metadata", stdout=ABL_PINNED_DISTRIBUTIONS)
-        verify_env_packages("hpc3", "/pub/envs/abl-pinned", _ABL_PINS)
+        verify_env_packages("hpc3", "/pub/envs/abl-pinned", _ABL_PINS, image=None)
         assert len(fake_run.calls) == 1
 
     def test_the_wrong_environment_is_refused(self, fake_run: FakeRun) -> None:
         fake_run.add("importlib.metadata", stdout=_UNPINNED_ENV)
         with pytest.raises(AppError) as excinfo:
-            verify_env_packages("hpc3", "/pub/envs/abl", _ABL_PINS)
+            verify_env_packages("hpc3", "/pub/envs/abl", _ABL_PINS, image=None)
+        assert excinfo.value.code is Hpc3ErrorCode.ENV_PACKAGE_MISMATCH
+
+    def test_an_images_pins_are_read_from_inside_the_image(self, fake_run: FakeRun) -> None:
+        """The environment being pinned lives in the sif, not on the cluster.
+
+        Probing the host for a container path returns an empty listing, which
+        `check_pins` reads as "torch is not installed" -- a confident and
+        wrong diagnosis of the image, produced by asking the wrong machine.
+        """
+        fake_run.add("importlib.metadata", stdout=ABL_PINNED_DISTRIBUTIONS)
+        verify_env_packages("hpc3", "/opt/env", _ABL_PINS, image=_IMAGE)
+        sent = fake_run.calls[0].remote_command
+        assert sent.startswith("module load apptainer/1.4.5 && apptainer exec ")
+        assert '--bind "/pub/wagnera3:/pub/wagnera3"' in sent
+        assert '"/pub/wagnera3/images/v3/abl.sif"' in sent
+        assert "/opt/env/bin/python" in sent
+
+    def test_an_images_wrong_environment_is_still_refused(self, fake_run: FakeRun) -> None:
+        """Running the probe in the right place does not soften its verdict."""
+        fake_run.add("importlib.metadata", stdout=_UNPINNED_ENV)
+        with pytest.raises(AppError) as excinfo:
+            verify_env_packages("hpc3", "/opt/env", _ABL_PINS, image=_IMAGE)
         assert excinfo.value.code is Hpc3ErrorCode.ENV_PACKAGE_MISMATCH
 
 

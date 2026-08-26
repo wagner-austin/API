@@ -26,7 +26,7 @@ from hpc3.contracts.dependency import describe_dependency
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.preflight import PreflightResult, decode_preflight_result
-from hpc3.core import env_probe, remote, sbatch
+from hpc3.core import env_probe, image_exec, remote, sbatch
 
 _START_ANCHOR = " to start at "
 _USING_ANCHOR = " using "
@@ -35,7 +35,7 @@ _PARTITION_ANCHOR = " in partition "
 
 
 def check_env_path(host: str, spec: JobSpec) -> str:
-    """Verify the job's Python environment exists on the cluster.
+    """Verify the job's Python environment exists where the job will look.
 
     Returns the verified path rather than None, matching the rest of this
     package: ``read_and_verify`` returns the bytes it verified and
@@ -43,9 +43,16 @@ def check_env_path(host: str, spec: JobSpec) -> str:
     can only be tested by asserting it did not raise, which asserts almost
     nothing.
 
+    THE PROBE FOLLOWS THE JOB. For a host run ``env_path`` is a cluster
+    directory and the probe runs on the cluster. For an image run it is a
+    CONTAINER path -- ``/opt/env`` exists only inside the ``.sif`` and
+    nowhere on the cluster filesystem -- so probing the host would refuse
+    every image job for a directory that was never meant to be there.
+
     Args:
         host: SSH destination.
-        spec: The spec whose ``env_path`` is checked.
+        spec: The spec whose ``env_path`` is checked, inside its ``image``
+            when it declares one.
 
     Returns:
         The verified interpreter directory, ``<env_path>/bin``.
@@ -55,15 +62,21 @@ def check_env_path(host: str, spec: JobSpec) -> str:
             :attr:`~platform_core.errors.Hpc3ErrorCode.ENV_PATH_MISSING` if
             the directory is absent. Checked as ``<env_path>/bin`` rather
             than the root, because an empty directory of the right name would
-            otherwise pass and then fail at the first interpreter lookup.
+            otherwise pass and then fail at the first interpreter lookup. The
+            message names the filesystem that was actually searched, so a
+            reader is not sent to look on the host for a container path.
     """
     bin_dir = f"{spec['env_path']}/bin"
+    image = spec["image"]
     probe = f"test -d '{bin_dir}' && echo PRESENT || echo ABSENT"
+    if image is not None:
+        probe = image_exec.run_inside_image(image, probe)
     if remote.run_remote(host, probe).strip() != "PRESENT":
         raise AppError(
             Hpc3ErrorCode.ENV_PATH_MISSING,
-            f"{bin_dir} does not exist on {host}. The job would start, "
-            "fail on its first import, and return the node having learned nothing.",
+            f"{bin_dir} does not exist {image_exec.describe_location(image, host)}. "
+            "The job would start, fail on its first import, and return the node "
+            "having learned nothing.",
         )
     return bin_dir
 
@@ -224,7 +237,9 @@ def preflight(
     check_env_path(host, spec)
     # Existence, then identity. The path check catches a typo; this catches
     # the more expensive mistake of a real environment that is the wrong one.
-    env_probe.verify_env_packages(host, spec["env_path"], spec["pinned_packages"])
+    env_probe.verify_env_packages(
+        host, spec["env_path"], spec["pinned_packages"], image=spec["image"]
+    )
 
     remote.make_directory(host, script_dir)
     remote.make_directory(host, log_dir)

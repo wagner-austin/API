@@ -30,6 +30,7 @@ from hpc3.contracts.dependency import dependency_argument
 from hpc3.contracts.experiment import comment_fragment
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
+from hpc3.core.image_exec import APPTAINER_MODULE, bind_arguments, gpu_arguments
 
 MINUTES_PER_HOUR = 60
 MINUTES_PER_DAY = 1440
@@ -120,9 +121,6 @@ def _determinism_exports(spec: JobSpec) -> list[str]:
     ]
 
 
-APPTAINER_MODULE = "apptainer/1.4.5"
-
-
 def _image_digest_export(spec: JobSpec) -> list[str]:
     """Build the line that tells the payload which image it is running in.
 
@@ -198,11 +196,15 @@ def _payload_lines(spec: JobSpec) -> list[str]:
     if image is None:
         return [f'export PATH="{env_bin}:$PATH"', "", spec["command"]]
     lines = ["apptainer exec \\"]
-    # Each bind mounted at its own path, so a payload's absolute paths mean
-    # the same thing inside and out. Without these the job starts and finds
-    # nothing: /pub on HPC3 is a symlink to /dfs6b/pub, and apptainer carries
-    # the BeeGFS mounts but not the symlink.
-    lines.extend(f'    --bind "{path}:{path}" \\' for path in image["binds"])
+    # A container carries CUDA but not the DRIVER, which lives in the host
+    # kernel. Without --nv a GPU job starts on a node with a working card and
+    # dies reporting "Found no NVIDIA driver on your system" -- one line below
+    # a prologue that printed the card, because the prologue ran outside.
+    lines.extend(f"    {argument} \\" for argument in gpu_arguments(spec["gpu"]))
+    # Binds come from image_exec so this and the preflight probe cannot drift
+    # into mounting different directories -- a preflight that verified an
+    # environment the job then could not reach would be worse than none.
+    lines.extend(f"    {argument} \\" for argument in bind_arguments(image))
     lines.extend(
         [
             f'    "{image["path"]}" \\',

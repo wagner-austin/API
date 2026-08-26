@@ -52,6 +52,18 @@ def require_experiment(obj: dict[str, JSONValue], key: str) -> dict[str, str]:
             holds a non-string, empty key or empty value. Required because a
             run that cannot say what it is produces a result nobody can trace
             back to it, and that is discovered months later.
+
+            Also if a name or value contains whitespace. :func:`comment_fragment`
+            has always documented that requirement -- it joins with commas
+            "because Slurm takes the comment as a single token" -- and until
+            2026-08-25 nothing enforced it. A value with a space renders an
+            unquoted ``#SBATCH --comment`` that Slurm parses as a directive
+            followed by garbage, and it refuses the whole script naming the
+            word after the space: ``Invalid directive found in batch script:
+            GeForce``. That names neither the field, the run, nor the
+            comment, and it arrives after an SSH round trip rather than
+            locally. Checked here so the same requirement is one rule instead
+            of a docstring and a cluster-side surprise.
     """
     raw = obj.get(key)
     if not isinstance(raw, dict):
@@ -73,6 +85,15 @@ def require_experiment(obj: dict[str, JSONValue], key: str) -> dict[str, str]:
             raise JSONTypeError(
                 f"Field '{key}' must not hold an empty name or value; got {name!r}: {detail!r}"
             )
+        for token, what in ((name, "name"), (detail, "value")):
+            if any(character.isspace() for character in token):
+                raise JSONTypeError(
+                    f"Field '{key}' must not hold whitespace in a {what}; got {token!r}. "
+                    "The identity record goes into `sbatch --comment`, which Slurm reads "
+                    "as a single token: a space there makes it parse the rest of the line "
+                    "as another directive and refuse the script. Use an underscore or a "
+                    "hyphen, and put prose in the stage manifest's provenance instead."
+                )
         experiment[name] = detail
     return experiment
 
