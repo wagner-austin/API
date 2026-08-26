@@ -4786,3 +4786,14 @@ Gate: 6,206 tests, 100.00%. The 30-minute progress beats of kill-run 2 (Artax, f
 **Also landed:** the Windows `knowledge.json` read race (bounded 3-attempt retry through the `os.replace` swap window — the crash that killed arterial at 03:01) and the sim-seam flake root cause: `test_maroon_recovery_seam` + `test_landing_refusal_seam` ran on wall-clock, so a loaded gate (24 xdist workers beside two live Chromes) stretched inter-tick gaps past real stall budgets; both now drive the documented `SeamClock` discipline the soak tests already used. Gate: **6,218 tests, 100.00%**.
 
 **Same-night correction (first live hour).** The rung's `-1` exclusion re-fought solvency-broken fights: artax broke from red-8 (projected fuel 318 < floor 354) and the rung answered red-8's continuing fire with six more shots, fuel 851→686 — a break-restock tick HOLDS the lock, and `refuel_for_hunt` routes it through the collect gates where the rung saw "recent attacker in view." The exclusion is now the held lock (`combat_target_id`): the broken-from enemy belongs to the resume machinery, a second attacker still draws fire, and the no-lock Yuppler shape is unchanged. Pinned both ways; fleet cycled onto the fix within the hour. The find was the monitor watching for the doctrine's first live receipts — the receipt itself exposed the collision.
+
+---
+## [2026-08-26] analyzability | Decision provenance and the engagement ledger ship
+
+The two builds commissioned from the collision post-mortem ("ensure it's easy to analyze and improve"):
+
+**Decision provenance.** Every decision line now ends with `owner=<mode> lock=<id>` (structured: `owner_mode`, `held_lock_id`). The proposer mode and the durable owner genuinely diverge — a collect-owned tick emits HUNT-scored diverts — and that divergence is exactly what took three artifacts to triangulate during the collision. One field, printed always.
+
+**The engagement ledger (`tankpit-engagements`, in `make analyze`).** One row per enemy from the events artifact: shots (wire-grounded), breaks, outcome (kill / killed_us / open), time-to-kill, and the fuel damage trade both ways from the session damage book. Ally stray hits and never-fought attackers render as informational rows but never flag. Headline flag = the collision signature: an engagement that lost the damage trade after a solvency break. Validation: run against the PRE-fix crashed session it flags purple-9 (4 breaks, trade −45) — the bug we found by luck and monitor, now found by report. Bonus finds in the same pass: artax beat Yuppler 1530–0, and took 180 fuel of friendly fire from Arterial.
+
+Gate: 6,231 tests, 100.00%. Provenance reaches the live pair at their next natural cycle; the ledger works on any archived run today.
