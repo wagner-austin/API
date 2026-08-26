@@ -124,6 +124,20 @@ PROBE_SHAPES: Final[dict[str, ProbeShape]] = {
 #: about the shapes and is worth failing a test over -- the suite checks each
 #: axis against :data:`PROBE_SHAPES` field by field, so a rung that quietly
 #: moved two axes at once cannot sit here describing itself as one.
+#:
+#: ONE FIELD IS NOT ONE ARCHITECTURAL DIMENSION, and the size axis is where
+#: that bites. ``model_size`` names three coupled numbers in
+#: :data:`GPT2_MODEL_SIZES` -- ``medium`` to ``large`` moves hidden size
+#: 1024->1280, layers 24->36 AND heads 16->20 together. So a break on this
+#: axis locates the threshold on the size ladder and does NOT say whether
+#: depth, width or head count carried it across.
+#:
+#: Separating them would need rungs the shared size table does not contain,
+#: and adding probe-only dimensions is exactly what this module refuses: the
+#: probe builds through the same constructor the gpt2 backend trains, so a
+#: shape that exists only here would be a second definition free to drift
+#: from the one anything else runs. The sequence-length axis has no such
+#: problem, because ``sequence_len`` is one number.
 PROBE_AXES: Final[tuple[ProbeAxis, ...]] = (
     {"name": "model-size", "rungs": ("tiny", "small", "medium", "large", "xl")},
     {"name": "sequence-length", "rungs": ("tiny", "tiny-len128", "tiny-len256", "tiny-len512")},
