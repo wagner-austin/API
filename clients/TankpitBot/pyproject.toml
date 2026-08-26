@@ -60,6 +60,7 @@ tankpit-entity-map = "tankpit_bot.diagnostics.entity_map:main"
 tankpit-stats = "tankpit_bot.diagnostics.session_stats:main"
 tankpit-run-audit = "tankpit_bot.diagnostics.run_audit:main"
 tankpit-fight = "tankpit_bot.diagnostics.fight_report:main"
+tankpit-engagements = "tankpit_bot.diagnostics.engagement_ledger:main"
 tankpit-forage-economy = "tankpit_bot.diagnostics.forage_economy:main"
 
 [tool.poetry.group.dev.dependencies]
