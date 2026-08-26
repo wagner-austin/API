@@ -130,6 +130,34 @@ def _items_file(tmp_path: pathlib.Path) -> pathlib.Path:
     return path
 
 
+def _record_path(tmp_path: pathlib.Path) -> pathlib.Path:
+    """Where a run's record lands.
+
+    Named rather than read back off the end of the argv list: two output
+    flags now follow each other, and a positional read would silently start
+    naming the other one.
+
+    Args:
+        tmp_path: The test's temporary directory.
+
+    Returns:
+        The record path.
+    """
+    return tmp_path / "out" / "record.json"
+
+
+def _outcomes_path(tmp_path: pathlib.Path) -> pathlib.Path:
+    """Where a run's per-item outcomes land.
+
+    Args:
+        tmp_path: The test's temporary directory.
+
+    Returns:
+        The outcomes path.
+    """
+    return tmp_path / "out" / "outcomes.json"
+
+
 def _cpu_argv(tmp_path: pathlib.Path) -> list[str]:
     return [
         "--model",
@@ -145,7 +173,9 @@ def _cpu_argv(tmp_path: pathlib.Path) -> list[str]:
         "--label",
         "gpt2-baseline",
         "--out",
-        str(tmp_path / "out" / "record.json"),
+        str(_record_path(tmp_path)),
+        "--outcomes",
+        str(_outcomes_path(tmp_path)),
     ]
 
 
@@ -158,7 +188,7 @@ def test_determinism_is_pinned_before_the_model_loads(tmp_path: pathlib.Path) ->
     recorder = _Recorder()
     _install(recorder)
 
-    score_baseline.score(
+    _ = score_baseline.score_with_outcomes(
         hub_model_id="gpt2",
         items_path=_items_file(tmp_path),
         device="cpu",
@@ -176,7 +206,7 @@ def test_the_record_carries_the_four_numbers_and_the_configuration(
 ) -> None:
     _install(_Recorder())
 
-    record = score_baseline.score(
+    record, _ = score_baseline.score_with_outcomes(
         hub_model_id="gpt2",
         items_path=_items_file(tmp_path),
         device="cpu",
@@ -201,7 +231,7 @@ def test_the_record_carries_the_four_numbers_and_the_configuration(
 def test_a_cpu_run_records_no_card_rather_than_a_wrong_one(tmp_path: pathlib.Path) -> None:
     _install(_Recorder())
 
-    record = score_baseline.score(
+    record, _ = score_baseline.score_with_outcomes(
         hub_model_id="gpt2",
         items_path=_items_file(tmp_path),
         device="cpu",
@@ -230,6 +260,63 @@ def test_the_digest_is_stable_for_the_same_outcomes() -> None:
     assert score_baseline.outcomes_digest(outcomes) == score_baseline.outcomes_digest(outcomes)
 
 
+class TestTheDigestIdentifiesTheDecisionsNotTheArithmetic:
+    """Measured 2026-08-25, first cross-card comparison this project ran.
+
+    gpt2 on the same 2,627 items scored 1374 correct on both a 3090 Ti and an
+    A100 80GB -- accuracy identical to all fifteen digits -- and the digests
+    differed, because `scores` were in them. They are raw negative
+    log-likelihoods, so they differ in their low bits between two cards
+    whatever the answers were. A digest that always differs across hardware
+    cannot distinguish "these runs disagreed about an item" from "these runs
+    agreed completely on different cards", so it answers nothing.
+    """
+
+    def test_the_same_decisions_digest_the_same_on_different_arithmetic(self) -> None:
+        card = [ClozeItemOutcome(item_id="a", correct=True, scores=[1.0, 2.0])]
+        other_card = [ClozeItemOutcome(item_id="a", correct=True, scores=[1.0000000000000002, 2.0])]
+
+        assert score_baseline.outcomes_digest(card) == score_baseline.outcomes_digest(other_card)
+
+    def test_a_different_item_being_right_still_changes_it(self) -> None:
+        """The property the digest exists for survives dropping the scores."""
+        left = [
+            ClozeItemOutcome(item_id="a", correct=True, scores=[1.0, 2.0]),
+            ClozeItemOutcome(item_id="b", correct=False, scores=[2.0, 1.0]),
+        ]
+        right = [
+            ClozeItemOutcome(item_id="a", correct=False, scores=[1.0, 2.0]),
+            ClozeItemOutcome(item_id="b", correct=True, scores=[2.0, 1.0]),
+        ]
+
+        assert left[0]["correct"] is not right[0]["correct"]
+        assert score_baseline.outcomes_digest(left) != score_baseline.outcomes_digest(right)
+
+    def test_the_same_decisions_in_a_different_order_are_a_difference(self) -> None:
+        """One item set is scored in one order; a reordering is itself news."""
+        forward = [
+            ClozeItemOutcome(item_id="a", correct=True, scores=[1.0]),
+            ClozeItemOutcome(item_id="b", correct=False, scores=[1.0]),
+        ]
+        backward = list(reversed(forward))
+
+        assert score_baseline.outcomes_digest(forward) != score_baseline.outcomes_digest(backward)
+
+    def test_the_scores_are_kept_where_a_diagnosis_can_reach_them(self) -> None:
+        """Excluded from the digest is not discarded.
+
+        ClozeItemOutcome says it is carried "so that two arms scored on the
+        same item set can be compared item by item", and the scorer reduced
+        it to one digest and dropped it -- so when the A100 digest differed
+        there was no way to ask which items moved.
+        """
+        outcomes = [ClozeItemOutcome(item_id="a", correct=True, scores=[1.5, 2.5])]
+
+        assert load_json_str(score_baseline.encode_outcomes(outcomes)) == [
+            {"item_id": "a", "correct": True, "scores": [1.5, 2.5]}
+        ]
+
+
 @pytest.mark.usefixtures("restore_hooks")
 def test_main_writes_a_record_that_decodes(tmp_path: pathlib.Path) -> None:
     _install(_Recorder())
@@ -237,7 +324,7 @@ def test_main_writes_a_record_that_decodes(tmp_path: pathlib.Path) -> None:
 
     assert score_baseline.main(argv) == 0
 
-    written = pathlib.Path(argv[-1])
+    written = _record_path(tmp_path)
     decoded = decode_run_record(narrow_json_to_dict(load_json_str(written.read_text("utf-8"))))
     assert decoded["label"] == "gpt2-baseline"
     assert decoded["observations"][0]["name"] == "cloze_accuracy"
@@ -251,7 +338,39 @@ def test_main_creates_the_output_directory(tmp_path: pathlib.Path) -> None:
 
     score_baseline.main(argv)
 
-    assert pathlib.Path(argv[-1]).parent.is_dir()
+    assert _record_path(tmp_path).parent.is_dir()
+
+
+@pytest.mark.usefixtures("restore_hooks")
+def test_main_writes_every_per_item_outcome_beside_the_record(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The record says WHETHER two runs agreed; this says about what.
+
+    Required rather than optional: a flag nobody remembers to pass is not
+    there on the run that turns out to need it, which is what happened to the
+    first A100 floor -- its digest differed from the 3090 Ti's and the
+    outcomes to explain it had already been thrown away.
+    """
+    _install(_Recorder())
+
+    assert score_baseline.main(_cpu_argv(tmp_path)) == 0
+
+    written = load_json_str(_outcomes_path(tmp_path).read_text(encoding="utf-8"))
+    assert written == [
+        {"item_id": "a::0", "correct": True, "scores": [1.0, 2.0, 3.0, 4.0]},
+        {"item_id": "a::1", "correct": False, "scores": [1.0, 2.0, 3.0, 4.0]},
+    ]
+
+
+@pytest.mark.usefixtures("restore_hooks")
+def test_main_creates_the_outcomes_directory_too(tmp_path: pathlib.Path) -> None:
+    """A staged job has created neither path."""
+    _install(_Recorder())
+
+    score_baseline.main(_cpu_argv(tmp_path))
+
+    assert _outcomes_path(tmp_path).parent.is_dir()
 
 
 @pytest.mark.usefixtures("restore_hooks")

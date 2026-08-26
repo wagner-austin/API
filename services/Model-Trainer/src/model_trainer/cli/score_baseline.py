@@ -46,6 +46,7 @@ MAX_SEQ_LEN_FLAG = "--max-seq-len"
 EXPERIMENT_FLAG = "--experiment"
 LABEL_FLAG = "--label"
 OUT_FLAG = "--out"
+OUTCOMES_FLAG = "--outcomes"
 
 _FLAGS = (
     MODEL_FLAG,
@@ -55,28 +56,65 @@ _FLAGS = (
     EXPERIMENT_FLAG,
     LABEL_FLAG,
     OUT_FLAG,
+    OUTCOMES_FLAG,
 )
 
 
 def outcomes_digest(outcomes: Sequence[ClozeItemOutcome]) -> str:
-    """Digest the per-item outcomes so two runs can be checked bit-for-bit.
+    """Digest WHICH ITEMS were answered correctly, and nothing else.
 
-    The record carries named scalars, which is what gets subtracted, but two
-    runs agreeing on an accuracy can still disagree on which items they got
-    right. Hashing the encoded outcomes catches that without the comparing
-    layer having to understand a single item.
+    Two runs agreeing on an accuracy can still disagree on which items they
+    got right, and the aggregate cannot tell you. This digest is what
+    distinguishes them.
+
+    IT DELIBERATELY EXCLUDES ``scores``. They were included until 2026-08-25,
+    and the first cross-card comparison showed why that was wrong: gpt2 on
+    the same 2,627 items scored 1374 correct on both a 3090 Ti and an A100
+    80GB -- accuracy identical to all fifteen digits -- and the digests
+    differed. ``scores`` are raw negative log-likelihoods, so they differ in
+    their low bits between two cards whatever the answers were. A digest over
+    them therefore ALWAYS differs across hardware, which means it cannot
+    distinguish "these runs disagreed about an item" from "these runs agreed
+    completely and one of them ran on a different card". A check that fires
+    on every comparison carries no information.
+
+    The decisions are the measurement; the scores are how it got there. The
+    scores are not discarded -- ``main`` writes every outcome, scores
+    included, beside the record, which is where an item-by-item diagnosis
+    belongs.
 
     Args:
-        outcomes: The encoded per-item outcomes, in scoring order.
+        outcomes: The per-item outcomes, in scoring order.
 
     Returns:
-        ``sha256:`` followed by the hex digest of their canonical JSON.
+        ``sha256:`` followed by the hex digest of the canonical JSON of
+        ``[item_id, correct]`` pairs, in scoring order. Order is preserved
+        rather than sorted: two runs over one item set score it in the same
+        order, and a reordering is itself a difference worth catching.
     """
-    canonical = dump_json_str([encode_cloze_item_outcome(o) for o in outcomes])
+    canonical = dump_json_str([[o["item_id"], o["correct"]] for o in outcomes])
     return f"sha256:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
 
 
-def score(
+def encode_outcomes(outcomes: Sequence[ClozeItemOutcome]) -> str:
+    """Render every per-item outcome, scores included, for a later diagnosis.
+
+    ``ClozeItemOutcome`` documents itself as carried "so that two arms scored
+    on the same item set can be compared item by item" -- and the scorer
+    reduced them to one digest and dropped them, so that comparison was not
+    possible for anything it produced. When the A100 floor's digest differed
+    from the 3090 Ti's, there was no way to ask which items moved.
+
+    Args:
+        outcomes: The per-item outcomes, in scoring order.
+
+    Returns:
+        Canonical JSON of the encoded outcomes.
+    """
+    return dump_json_str([encode_cloze_item_outcome(o) for o in outcomes])
+
+
+def score_with_outcomes(
     *,
     hub_model_id: str,
     items_path: pathlib.Path,
@@ -84,7 +122,7 @@ def score(
     max_seq_len: int,
     experiment: str,
     label: str,
-) -> RunRecord:
+) -> tuple[RunRecord, str]:
     """Pin determinism, score the model, and record what it ran on.
 
     Determinism is pinned FIRST, before the model is loaded, because
@@ -101,8 +139,14 @@ def score(
         label: Which measurement within it.
 
     Returns:
-        The run record: accuracy, correct, total and chance as observations,
-        the fingerprint, and a digest of the per-item outcomes.
+        The run record -- accuracy, correct, total and chance as
+        observations, the fingerprint, and a digest of which items were
+        answered correctly -- and the encoded outcomes beside it.
+
+        The outcomes are returned rather than reduced away because the digest
+        answers "did these two runs decide the same things" and nothing else.
+        When the answer is no, the next question is which items moved, and
+        only the outcomes can answer that.
     """
     determinism = _test_hooks.apply_determinism_hook()
     fingerprint: RunFingerprint = capture_run_fingerprint(device, determinism)
@@ -113,7 +157,7 @@ def score(
         items=items, model=model, device=device, max_seq_len=max_seq_len
     )
 
-    return run_record(
+    record = run_record(
         experiment=experiment,
         label=label,
         fingerprint=fingerprint,
@@ -125,6 +169,7 @@ def score(
         ),
         payload_digest=outcomes_digest(result["outcomes"]),
     )
+    return record, encode_outcomes(result["outcomes"])
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -135,7 +180,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             the process arguments.
 
     Returns:
-        0 once the record is written.
+        0 once the record and its outcomes are written.
 
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value, a
@@ -151,7 +196,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not raw_len.isdigit() or int(raw_len) == 0:
         raise ValueError(f"{MAX_SEQ_LEN_FLAG} must be a positive integer, got {raw_len!r}")
 
-    record = score(
+    record, outcomes = score_with_outcomes(
         hub_model_id=cli_args.require_flag(parsed, MODEL_FLAG),
         items_path=pathlib.Path(cli_args.require_flag(parsed, ITEMS_FLAG)),
         device=cli_args.require_flag(parsed, DEVICE_FLAG),
@@ -164,13 +209,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
 
+    # Required rather than optional. The per-item outcomes are the only thing
+    # that can say WHICH items two runs disagreed about, and a flag nobody
+    # remembers to pass is not there on the run that turns out to need it --
+    # which is exactly what happened to the first A100 floor.
+    outcomes_path = pathlib.Path(cli_args.require_flag(parsed, OUTCOMES_FLAG))
+    outcomes_path.parent.mkdir(parents=True, exist_ok=True)
+    outcomes_path.write_text(outcomes, encoding="utf-8")
+
     _log.info(
-        "baseline scored experiment=%s label=%s accuracy=%.6f %s -> %s",
+        "baseline scored experiment=%s label=%s accuracy=%.6f %s -> %s outcomes %s",
         record["experiment"],
         record["label"],
         record["observations"][0]["value"],
         describe_run_fingerprint(record["fingerprint"]),
         out,
+        outcomes_path,
     )
     return 0
 
@@ -187,4 +241,10 @@ def entrypoint() -> None:
     raise SystemExit(main())
 
 
-__all__ = ["entrypoint", "main", "outcomes_digest", "score"]
+__all__ = [
+    "encode_outcomes",
+    "entrypoint",
+    "main",
+    "outcomes_digest",
+    "score_with_outcomes",
+]
