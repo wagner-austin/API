@@ -386,6 +386,13 @@ class TestTheCommittedSpec:
         The third is ``modeltrainer-score-baseline``, added 2026-08-25: the
         v2 image did not have it, which is why the A100 floor could not be
         measured until v3 was built.
+
+        The fourth is ``score_with_outcomes``, and it is here because ``main``
+        cannot do its job alone. ``main`` existed in v3 too, so a v4 built
+        against a STALE wheel would carry it, pass the self-check, and then
+        fail on the cluster with an unknown ``--outcomes`` flag. A required
+        symbol only detects a stale wheel if it names something the new code
+        introduced.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
         symbols = sorted(
@@ -393,6 +400,7 @@ class TestTheCommittedSpec:
         )
         assert symbols == [
             ("model_trainer.cli.score_baseline", "main"),
+            ("model_trainer.cli.score_baseline", "score_with_outcomes"),
             ("model_trainer.cluster.preflight", "check_corpus_certified"),
             (
                 "model_trainer.core.services.training.base_trainer_checkpoints",

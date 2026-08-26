@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "445a4aac9920129dfba128afc93a431ec216f93e",
+  "git_commit": "057b19d6b00718151a6ab120f68cbb476f69e7db",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -110,6 +110,10 @@
     {
       "module": "model_trainer.cli.score_baseline",
       "attribute": "main"
+    },
+    {
+      "module": "model_trainer.cli.score_baseline",
+      "attribute": "score_with_outcomes"
     }
   ],
   "labels": {
