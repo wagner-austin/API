@@ -232,7 +232,7 @@ class TestTheRenderedRungSection:
 
         assert lines == (
             "rung tiny",
-            "  loss distinct=1  6.25 6.25",
+            "  loss distinct=1 runs=0,1  6.25 6.25",
             f"  {len(GRAPH)} tensors traced by every run, 0 differ",
             "  -> every traced tensor is bit-identical across these runs",
         )
@@ -243,7 +243,8 @@ class TestTheRenderedRungSection:
         lines = report_cli.rung_lines(agreement, "tiny")
 
         assert lines[3] == (
-            "  -> first difference at step 4: Conv1D.transformer.h.0.attn.c_proj (input #0)"
+            "  -> first difference at step 4: "
+            "Conv1D.transformer.h.0.attn.c_proj (input #0), runs=0|1"
         )
 
     def test_it_counts_what_was_traced_and_what_differed(self) -> None:
@@ -261,7 +262,7 @@ class TestTheRenderedRungSection:
 
         lines = report_cli.rung_lines(agreement, "tiny")
 
-        assert lines[1] == "  loss distinct=2  6.250983715057373 6.2509841918945312"
+        assert lines[1] == "  loss distinct=2 runs=0|1  6.250983715057373 6.2509841918945312"
 
     def test_it_stops_listing_after_the_first_few(self) -> None:
         long_graph = agreement_of(trace_record("A30"), trace_record("A100", diverge_from=0))
@@ -294,6 +295,40 @@ class TestTheRenderedRungSection:
         lines = report_cli.rung_lines(agreement_of(full, without_loss), "tiny")
 
         assert lines[1] == "  loss not reported by every run"
+
+
+class TestSayingWhichRunsAgreed:
+    def test_every_run_agreeing_is_one_group(self) -> None:
+        assert report_cli.agreement_groups((1.0, 1.0, 1.0)) == "0,1,2"
+
+    def test_the_odd_run_out_is_named_by_index(self) -> None:
+        assert report_cli.agreement_groups((1.0, 2.0, 1.0)) == "0,2|1"
+
+    def test_a_leading_odd_run_still_reads_left_to_right(self) -> None:
+        # Groups are ordered by FIRST APPEARANCE, not by size, so run 0 is
+        # always in the first group and the rendering does not silently
+        # reorder the runs the header just listed.
+        assert report_cli.agreement_groups((2.0, 1.0, 1.0)) == "0|1,2"
+
+    def test_three_different_values_are_three_groups(self) -> None:
+        assert report_cli.agreement_groups((1.0, 2.0, 3.0)) == "0|1|2"
+
+    def test_two_runs_are_rendered_as_a_pair(self) -> None:
+        assert report_cli.agreement_groups((1.0, 2.0)) == "0|1"
+
+    def test_it_appears_on_the_first_difference_line(self) -> None:
+        # Which card is alone is the finding: the earlier ladder work showed
+        # the odd card MOVES between rungs and conditions, and a bare count
+        # cannot show that.
+        agreement = agreement_of(
+            trace_record("V100"),
+            trace_record("A30", diverge_from=4),
+            trace_record("A100", diverge_from=4),
+        )
+
+        lines = report_cli.rung_lines(agreement, "tiny")
+
+        assert lines[3].endswith("(input #0), runs=0|1,2")
 
 
 class TestSayingWhichConditionARunUsed:

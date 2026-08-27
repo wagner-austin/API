@@ -145,6 +145,36 @@ def divergences(
     return tuple(pair for pair in digests if pair[1]["distinct"] > 1)
 
 
+def agreement_groups(values: tuple[float, ...]) -> str:
+    """Say which runs agreed with which, by run index.
+
+    ``distinct=2`` over three runs says two agree and one does not. It does
+    NOT say WHICH, and which is the entire finding: the earlier ladder work
+    established that the odd card MOVES between rungs and between conditions
+    -- the V100 is alone at ``xl`` by default and the A30 is alone at ``xl``
+    with split-K removed. A count cannot show that and a column of 48-bit
+    digests is unreadable, so this renders the partition instead.
+
+    Args:
+        values: One observation's value from each run, in run order.
+
+    Returns:
+        Run indices grouped by shared value, groups ordered by first
+        appearance and joined by ``|`` -- e.g. ``"0,2|1"`` for three runs
+        where the second one is the odd one out.
+    """
+    groups: list[list[int]] = []
+    seen: dict[float, int] = {}
+    for index, value in enumerate(values):
+        at = seen.get(value)
+        if at is None:
+            seen[value] = len(groups)
+            groups.append([index])
+        else:
+            groups[at].append(index)
+    return "|".join(",".join(str(index) for index in group) for group in groups)
+
+
 def _tensor_line(name: TraceName, entry: ObservationAgreement) -> str:
     """Render one traced tensor's row.
 
@@ -153,13 +183,13 @@ def _tensor_line(name: TraceName, entry: ObservationAgreement) -> str:
         entry: Its agreement across the runs.
 
     Returns:
-        A single line naming the step, the module and how many distinct
-        values the runs produced.
+        A single line naming the step, the module, how many distinct values
+        the runs produced and which runs shared which.
     """
     return (
         f"    step {name['step']:>5}  {name['kind']:<3} "
         f"{name['module_class']}.{name['path']}#{name['index']}  "
-        f"distinct={entry['distinct']}"
+        f"distinct={entry['distinct']} runs={agreement_groups(entry['values'])}"
     )
 
 
@@ -178,7 +208,8 @@ def _loss_line(agreement: RunAgreement, rung: str) -> str:
     for entry in agreement["shared"]:
         if entry["name"] == wanted:
             values = " ".join(f"{value:.{VALUE_DIGITS}g}" for value in entry["values"])
-            return f"  loss distinct={entry['distinct']}  {values}"
+            groups = agreement_groups(entry["values"])
+            return f"  loss distinct={entry['distinct']} runs={groups}  {values}"
     return "  loss not reported by every run"
 
 
@@ -210,7 +241,8 @@ def rung_lines(agreement: RunAgreement, rung: str) -> tuple[str, ...]:
     first, first_entry = differing[0]
     lines.append(
         f"  -> first difference at step {first['step']}: "
-        f"{first['module_class']}.{first['path']} ({first['kind']}put #{first['index']})"
+        f"{first['module_class']}.{first['path']} ({first['kind']}put #{first['index']}), "
+        f"runs={agreement_groups(first_entry['values'])}"
     )
     lines.append(f"  first {min(len(differing), FOLLOWING_SHOWN + 1)} differing tensors:")
     lines.append(_tensor_line(first, first_entry))
@@ -331,6 +363,7 @@ def entrypoint() -> None:
 
 __all__ = [
     "FOLLOWING_SHOWN",
+    "agreement_groups",
     "describe_condition",
     "divergences",
     "entrypoint",
