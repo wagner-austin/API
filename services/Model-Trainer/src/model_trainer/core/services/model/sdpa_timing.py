@@ -1,36 +1,24 @@
-"""Time an attention call under one backend, and say what it cost in memory.
+"""Time one attention call under one backend, and say what it cost in memory.
 
 The price of the correctness result in :mod:`sdpa_probe`: pinning
 ``SDPBackend.MATH`` makes attention bit-identical across a V100, an A30 and
-an A100, and this measures what that costs.
+an A100, and this measures what that costs PER CALL. What a whole forward
+pass costs is :mod:`forward_cost`, and the two share
+:mod:`timing_harness` precisely so that the two numbers can be read against
+each other.
 
 WHY MEMORY IS MEASURED AND NOT ONLY TIME. The math path materialises the full
 ``[batch, heads, seq, seq]`` score matrix; the fused kernel does not. That is
 a QUALITATIVE difference, not a constant factor, and a table of seconds would
 report it as "slower" right up to the point where it stops fitting on the
 card at all. Peak allocation is recorded beside every timing, and an
-out-of-memory is recorded as a result rather than raised -- it is the
-strongest cost statement available.
-
-WHY THE TIMING CONSTANTS COME FROM :mod:`gemm_timing`. Same cluster, same
-question, same reasons: a CUDA launch is asynchronous so every measurement
-brackets a synchronise; calls are issued in batches so launch overhead does
-not swamp the small shapes; and the median of several batches is reported
-because a shared node schedules other work. Restating them here would let two
-benchmarks on one page drift into being measured differently.
+out-of-memory is recorded as a result rather than raised.
 """
 
 from __future__ import annotations
 
-import statistics
-import time
-from collections.abc import Callable
-from contextlib import AbstractContextManager
-from types import TracebackType
-
 import torch
-from torch.nn.attention import SDPBackend, sdpa_kernel
-from typing_extensions import TypedDict
+from torch.nn.attention import SDPBackend
 
 from model_trainer.core.services.model.gemm_timing import (
     BATCHES,
@@ -40,70 +28,12 @@ from model_trainer.core.services.model.gemm_timing import (
 )
 from model_trainer.core.services.model.sdpa_probe import sdpa_output
 from model_trainer.core.services.model.sdpa_shapes import SDPA_SEED, SdpaCostShape
-
-#: What a cpu run reports for peak device memory. Zero, because the allocator
-#: being measured is CUDA's and a cpu run does not use it -- recorded rather
-#: than omitted so a cpu record has the same shape as a cuda one.
-NO_PEAK = 0.0
-
-
-class SdpaCost(TypedDict):
-    """What one attention call cost under one backend.
-
-    Attributes:
-        seconds: Median seconds per call.
-        spread: Slowest batch minus fastest, in seconds per call.
-        peak_bytes: Peak CUDA bytes allocated across the timed run.
-    """
-
-    seconds: float
-    spread: float
-    peak_bytes: float
-
-
-def _no_peak_to_reset() -> None:
-    """Reset the peak counter of a device that keeps none."""
-
-
-def _no_peak() -> float:
-    """Report the peak allocation of a device that keeps none.
-
-    Returns:
-        :data:`NO_PEAK`.
-    """
-    return NO_PEAK
-
-
-def peak_resetter(device: str) -> Callable[[], None]:
-    """Choose how to clear a device's peak-allocation counter.
-
-    Returns the callable rather than calling it, for the reason
-    :func:`~gemm_timing.synchroniser` does: both arms are then reachable
-    without a GPU, because a test can assert the cuda arm by identity.
-
-    Args:
-        device: The device about to be timed.
-
-    Returns:
-        A callable that resets the peak counter.
-    """
-    if device == "cpu":
-        return _no_peak_to_reset
-    return torch.cuda.reset_peak_memory_stats
-
-
-def peak_reader(device: str) -> Callable[[], float]:
-    """Choose how to read a device's peak allocation.
-
-    Args:
-        device: The device that was timed.
-
-    Returns:
-        A callable returning peak bytes allocated since the last reset.
-    """
-    if device == "cpu":
-        return _no_peak
-    return torch.cuda.max_memory_allocated
+from model_trainer.core.services.model.timing_harness import (
+    MeasuredCost,
+    backend_context,
+    time_calls,
+    timed_or_unfitted,
+)
 
 
 def cost_operands(
@@ -151,85 +81,7 @@ def cost_operands(
     )
 
 
-class _Unrestricted(AbstractContextManager[None]):
-    """A context that restricts nothing.
-
-    Written out rather than using :func:`contextlib.nullcontext`, whose type
-    this package's mypy settings resolve to Any. It exists so the UNFORCED
-    arm of the benchmark is wrapped in a context too -- see
-    :func:`backend_context` for the 20% bias that asymmetry caused.
-    """
-
-    def __enter__(self) -> None:
-        """Enter, restricting nothing."""
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        """Leave, having restricted nothing and swallowing nothing."""
-
-
-def backend_context(backend: SDPBackend | None) -> AbstractContextManager[None]:
-    """Restrict the dispatcher for the duration of a whole timed run.
-
-    ENTERED ONCE, NOT PER CALL, AND THAT IS A CORRECTNESS FIX RATHER THAN A
-    TIDINESS ONE. An earlier revision forced the backend inside the timing
-    loop, so the pinned arm paid a context enter and exit on every call and
-    the unforced arm paid nothing. Measured on an RTX 3090 Ti, 2026-08-27:
-    27.8 us per call, which is **20% of the whole measurement** at batch 1
-    and 64 tokens, -1.5% at batch 8 and 512, and 0.1% at batch 8 and 2048.
-    That bias sat exactly where the ladder's rungs are, and it would have
-    been published as the cost of the kernel.
-
-    The unforced arm now enters a null context, so both arms are wrapped
-    identically and the only difference between them is which kernels the
-    dispatcher may choose.
-
-    Args:
-        backend: The backend to force, or None to let the dispatcher choose.
-
-    Returns:
-        A context manager restricting the dispatcher, or one that does
-        nothing.
-    """
-    if backend is None:
-        return _Unrestricted()
-    # Bound to a typed name before returning: `sdpa_kernel` gives back a
-    # context manager whose type parameter is Any, which this package forbids.
-    restricted: AbstractContextManager[None] = sdpa_kernel([backend])
-    return restricted
-
-
-def timed_or_unfitted(run: Callable[[], SdpaCost]) -> SdpaCost | None:
-    """Run a measurement, reporting an out-of-memory as a result.
-
-    Separated from :func:`measure_sdpa` so both arms are reachable: a card
-    large enough to run the suite would never take the second one, and an arm
-    no test can reach is an arm nobody has checked says what it means. A test
-    supplies a callable that raises the real exception; nothing is faked.
-
-    Args:
-        run: The measurement to attempt.
-
-    Returns:
-        Its result, or None when the device ran out of memory. "This
-        configuration does not fit" is the strongest cost statement available
-        and is a measurement, not a failure of one.
-    """
-    try:
-        return run()
-    except torch.cuda.OutOfMemoryError:
-        # The sweep continues to the next shape, so the allocator is handed
-        # its blocks back rather than left holding them for a configuration
-        # that has already been abandoned.
-        torch.cuda.empty_cache()
-        return None
-
-
-def measure_sdpa(shape: SdpaCostShape, device: str, backend: SDPBackend | None) -> SdpaCost:
+def measure_sdpa(shape: SdpaCostShape, device: str, backend: SDPBackend | None) -> MeasuredCost:
     """Time one attention call and read its peak allocation.
 
     Args:
@@ -242,40 +94,22 @@ def measure_sdpa(shape: SdpaCostShape, device: str, backend: SDPBackend | None) 
 
     Raises:
         torch.cuda.OutOfMemoryError: When the device cannot hold the call.
-            Caught by :func:`timed_or_unfitted`, which is the only caller.
+            Caught by :func:`~timing_harness.timed_or_unfitted`.
         RuntimeError: When the forced backend has no kernel for this call.
-            Not caught here: this benchmark prices a backend the selection
-            probe already showed to run on every card, so a refusal would
-            mean it is pricing something else and must be loud.
+            Not caught: this benchmark prices a backend the selection probe
+            already showed to run on every card, so a refusal would mean it
+            is pricing something else and must be loud.
     """
-    wait = synchroniser(device)
-    reset_peak = peak_resetter(device)
-    read_peak = peak_reader(device)
-
     query, key, value = cost_operands(shape, device)
-    reset_peak()
 
-    per_call: list[float] = []
+    def run() -> None:
+        sdpa_output(query, key, value)
+
     with backend_context(backend):
-        for _ in range(WARMUP):
-            sdpa_output(query, key, value)
-        wait()
-
-        for _ in range(BATCHES):
-            start = time.perf_counter()
-            for _ in range(INNER):
-                sdpa_output(query, key, value)
-            wait()
-            per_call.append((time.perf_counter() - start) / INNER)
-
-    return SdpaCost(
-        seconds=statistics.median(per_call),
-        spread=max(per_call) - min(per_call),
-        peak_bytes=float(read_peak()),
-    )
+        return time_calls(run, synchroniser(device), device, WARMUP, INNER, BATCHES)
 
 
-def time_sdpa(shape: SdpaCostShape, device: str, backend: SDPBackend | None) -> SdpaCost | None:
+def time_sdpa(shape: SdpaCostShape, device: str, backend: SDPBackend | None) -> MeasuredCost | None:
     """Measure seconds per call and peak memory for one attention call.
 
     Args:
@@ -291,20 +125,14 @@ def time_sdpa(shape: SdpaCostShape, device: str, backend: SDPBackend | None) -> 
             out-of-memory nor a no-kernel refusal.
     """
 
-    def run() -> SdpaCost:
+    def run() -> MeasuredCost:
         return measure_sdpa(shape, device, backend)
 
     return timed_or_unfitted(run)
 
 
 __all__ = [
-    "NO_PEAK",
-    "SdpaCost",
-    "backend_context",
     "cost_operands",
     "measure_sdpa",
-    "peak_reader",
-    "peak_resetter",
     "time_sdpa",
-    "timed_or_unfitted",
 ]

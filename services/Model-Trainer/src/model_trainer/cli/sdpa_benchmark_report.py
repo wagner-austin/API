@@ -31,17 +31,16 @@ from platform_core.run_record import RunRecord
 from model_trainer.cli.record_reports import read_run_records
 from model_trainer.cli.sdpa_benchmark import PINNED_KEY
 from model_trainer.core.run_fingerprint import describe_run_fingerprint
-from model_trainer.core.services.model.sdpa_shapes import (
+from model_trainer.core.services.model.cost_labels import (
     DEFAULT_KEY,
     FITTED_SUFFIX,
     PEAK_SUFFIX,
     SECONDS_SUFFIX,
     SPREAD_SUFFIX,
     TRUE_VALUE,
-    SdpaCostShape,
-    cost_label,
-    cost_shapes,
+    labelled,
 )
+from model_trainer.core.services.model.sdpa_shapes import cost_prefix, cost_shapes
 
 _log = get_logger(__name__)
 
@@ -81,44 +80,44 @@ def _values(record: RunRecord) -> dict[str, float]:
     return {o["name"]: o["value"] for o in record["observations"]}
 
 
-def fitted(values: dict[str, float], shape: SdpaCostShape, backend: str) -> bool:
-    """Say whether one call fitted in memory under one backend.
+def fitted(values: dict[str, float], prefix: str, backend: str) -> bool:
+    """Say whether one piece of work fitted in memory under one backend.
 
     Args:
         values: The record's observations by name.
-        shape: The call.
+        prefix: What was measured.
         backend: Which backend.
 
     Returns:
-        True when it fitted. A record that does not mention the shape reads
-        as not fitted, which is conservative: it keeps a ratio from being
-        printed for something that may never have run.
+        True when it fitted. A record that does not mention it reads as not
+        fitted, which is conservative: it keeps a ratio from being printed
+        for something that may never have run.
     """
-    return values.get(cost_label(shape, backend, FITTED_SUFFIX)) == TRUE_VALUE
+    return values.get(labelled(prefix, backend, FITTED_SUFFIX)) == TRUE_VALUE
 
 
-def slowdown(values: dict[str, float], shape: SdpaCostShape) -> str:
-    """Render how much slower pinning the math backend made one call.
+def slowdown(values: dict[str, float], prefix: str) -> str:
+    """Render how much slower pinning the math backend made one measurement.
 
     Args:
         values: The record's observations by name.
-        shape: The call.
+        prefix: What was measured.
 
     Returns:
-        A multiplier, or one of :data:`DID_NOT_FIT`, :data:`NOISY` or
-        :data:`BELOW_FLOOR`.
+        A multiplier, or one of :data:`DID_NOT_FIT`, :data:`INCOMPLETE`,
+        :data:`NOISY` or :data:`BELOW_FLOOR`.
     """
-    if not fitted(values, shape, PINNED_KEY):
+    if not fitted(values, prefix, PINNED_KEY):
         return DID_NOT_FIT
-    base = values.get(cost_label(shape, DEFAULT_KEY, SECONDS_SUFFIX))
-    pinned = values.get(cost_label(shape, PINNED_KEY, SECONDS_SUFFIX))
+    base = values.get(labelled(prefix, DEFAULT_KEY, SECONDS_SUFFIX))
+    pinned = values.get(labelled(prefix, PINNED_KEY, SECONDS_SUFFIX))
     if base is None or pinned is None:
         # Distinct from DID NOT FIT, which is a fact about the card. This is
         # a record that says a call fitted and then carries no timing for it,
         # which is a fact about the record.
         return INCOMPLETE
-    for seconds, suffix in ((base, DEFAULT_KEY), (pinned, PINNED_KEY)):
-        spread = values.get(cost_label(shape, suffix, SPREAD_SUFFIX))
+    for seconds, arm in ((base, DEFAULT_KEY), (pinned, PINNED_KEY)):
+        spread = values.get(labelled(prefix, arm, SPREAD_SUFFIX))
         if spread is not None and seconds > 0.0 and spread / seconds > NOISE_LIMIT:
             return NOISY
     if base < OVERHEAD_FLOOR and pinned < OVERHEAD_FLOOR:
@@ -126,20 +125,20 @@ def slowdown(values: dict[str, float], shape: SdpaCostShape) -> str:
     return f"{pinned / base:.1f}x"
 
 
-def memory_growth(values: dict[str, float], shape: SdpaCostShape) -> str:
+def memory_growth(values: dict[str, float], prefix: str) -> str:
     """Render how much more memory pinning the math backend needed.
 
     Args:
         values: The record's observations by name.
-        shape: The call.
+        prefix: What was measured.
 
     Returns:
         A multiplier and the pinned peak in MiB, or :data:`DID_NOT_FIT`.
     """
-    if not fitted(values, shape, PINNED_KEY):
+    if not fitted(values, prefix, PINNED_KEY):
         return DID_NOT_FIT
-    base = values.get(cost_label(shape, DEFAULT_KEY, PEAK_SUFFIX))
-    pinned = values.get(cost_label(shape, PINNED_KEY, PEAK_SUFFIX))
+    base = values.get(labelled(prefix, DEFAULT_KEY, PEAK_SUFFIX))
+    pinned = values.get(labelled(prefix, PINNED_KEY, PEAK_SUFFIX))
     if base is None or pinned is None or base <= 0.0:
         return "not recorded"
     return f"{pinned / base:.1f}x ({pinned / 2**20:.0f} MiB)"
@@ -161,9 +160,10 @@ def report_lines(named_records: tuple[tuple[str, RunRecord], ...]) -> tuple[str,
         lines.append(f"[{index}] {name}  {describe_run_fingerprint(record['fingerprint'])}")
         lines.append(f"  {'shape':<22} {'batch':>5} {'seq':>5} {'slower':>12}   memory")
         for shape in cost_shapes():
+            prefix = cost_prefix(shape)
             lines.append(
                 f"  {shape['name']:<22} {shape['batch']:>5} {shape['sequence_len']:>5} "
-                f"{slowdown(values, shape):>12}   {memory_growth(values, shape)}"
+                f"{slowdown(values, prefix):>12}   {memory_growth(values, prefix)}"
             )
         lines.append("")
     return tuple(lines)

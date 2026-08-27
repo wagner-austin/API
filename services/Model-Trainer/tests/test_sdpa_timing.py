@@ -49,17 +49,20 @@ from model_trainer.core.services.model.sdpa_shapes import (
     TRUE_VALUE,
     SdpaCostShape,
     cost_label,
+    cost_prefix,
     cost_shapes,
 )
 from model_trainer.core.services.model.sdpa_timing import (
-    NO_PEAK,
-    SdpaCost,
-    backend_context,
     cost_operands,
     measure_sdpa,
+    time_sdpa,
+)
+from model_trainer.core.services.model.timing_harness import (
+    NO_PEAK,
+    MeasuredCost,
+    backend_context,
     peak_reader,
     peak_resetter,
-    time_sdpa,
     timed_or_unfitted,
 )
 
@@ -219,15 +222,15 @@ class TestRunningOutOfMemory:
     def test_it_is_reported_as_a_result_not_raised(self) -> None:
         # A real torch exception from a test-supplied callable: the arm under
         # test is production code, and nothing is faked.
-        def out_of_memory() -> SdpaCost:
+        def out_of_memory() -> MeasuredCost:
             raise torch.cuda.OutOfMemoryError("CUDA out of memory")
 
         assert timed_or_unfitted(out_of_memory) is None
 
     def test_a_measurement_that_fits_passes_through(self) -> None:
-        wanted = SdpaCost(seconds=1.0, spread=0.5, peak_bytes=2.0)
+        wanted = MeasuredCost(seconds=1.0, spread=0.5, peak_bytes=2.0)
 
-        def fits() -> SdpaCost:
+        def fits() -> MeasuredCost:
             return wanted
 
         assert timed_or_unfitted(fits) == wanted
@@ -235,7 +238,7 @@ class TestRunningOutOfMemory:
     def test_any_other_failure_propagates(self) -> None:
         # An unrelated error recorded as "this did not fit" would be a false
         # fact about the card's memory.
-        def broken() -> SdpaCost:
+        def broken() -> MeasuredCost:
             raise RuntimeError("something else entirely")
 
         with pytest.raises(RuntimeError, match="something else entirely"):
@@ -244,9 +247,9 @@ class TestRunningOutOfMemory:
 
 class TestWhatOneRecordCarries:
     def test_a_fitted_call_reports_four_numbers(self) -> None:
-        cost = SdpaCost(seconds=1.5, spread=0.25, peak_bytes=1024.0)
+        cost = MeasuredCost(seconds=1.5, spread=0.25, peak_bytes=1024.0)
 
-        names = [o["name"] for o in bench_cli.cost_observations(TINY, "math", cost)]
+        names = [o["name"] for o in bench_cli.cost_observations(cost_prefix(TINY), "math", cost)]
 
         assert names == [
             cost_label(TINY, "math", FITTED_SUFFIX),
@@ -256,7 +259,7 @@ class TestWhatOneRecordCarries:
         ]
 
     def test_a_call_that_did_not_fit_reports_only_that(self) -> None:
-        observations = bench_cli.cost_observations(TINY, "math", None)
+        observations = bench_cli.cost_observations(cost_prefix(TINY), "math", None)
 
         assert observations == (
             Observation(name=cost_label(TINY, "math", FITTED_SUFFIX), value=FALSE_VALUE),
@@ -330,18 +333,21 @@ class TestTheReport:
     def test_a_clean_pair_becomes_a_multiplier(self) -> None:
         values = {o["name"]: o["value"] for o in cost_record("A100")["observations"]}
 
-        assert report_cli.slowdown(values, cost_shapes()[0]) == "4.0x"
+        assert report_cli.slowdown(values, cost_prefix(cost_shapes()[0])) == "4.0x"
 
     def test_memory_growth_carries_the_pinned_peak(self) -> None:
         values = {o["name"]: o["value"] for o in cost_record("A100")["observations"]}
 
-        assert report_cli.memory_growth(values, cost_shapes()[0]) == "34.0x (0 MiB)"
+        assert report_cli.memory_growth(values, cost_prefix(cost_shapes()[0])) == "34.0x (0 MiB)"
 
     def test_not_fitting_is_named_rather_than_divided(self) -> None:
         values = {o["name"]: o["value"] for o in cost_record("V100", fits=False)["observations"]}
 
-        assert report_cli.slowdown(values, cost_shapes()[0]) == report_cli.DID_NOT_FIT
-        assert report_cli.memory_growth(values, cost_shapes()[0]) == report_cli.DID_NOT_FIT
+        assert report_cli.slowdown(values, cost_prefix(cost_shapes()[0])) == report_cli.DID_NOT_FIT
+        assert (
+            report_cli.memory_growth(values, cost_prefix(cost_shapes()[0]))
+            == report_cli.DID_NOT_FIT
+        )
 
     def test_a_noisy_measurement_is_not_divided(self) -> None:
         # The split-K benchmark learned this from a run with 54%, 85% and 90%
@@ -349,7 +355,7 @@ class TestTheReport:
         # compared with another one.
         values = {o["name"]: o["value"] for o in cost_record("A30", spread=0.9)["observations"]}
 
-        assert report_cli.slowdown(values, cost_shapes()[0]) == report_cli.NOISY
+        assert report_cli.slowdown(values, cost_prefix(cost_shapes()[0])) == report_cli.NOISY
 
     def test_two_measurements_under_the_launch_floor_are_not_divided(self) -> None:
         values = {
@@ -357,7 +363,7 @@ class TestTheReport:
             for o in cost_record("A100", base_seconds=1e-6, pinned_seconds=9e-6)["observations"]
         }
 
-        assert report_cli.slowdown(values, cost_shapes()[0]) == report_cli.BELOW_FLOOR
+        assert report_cli.slowdown(values, cost_prefix(cost_shapes()[0])) == report_cli.BELOW_FLOOR
 
     def test_the_floor_is_the_slowest_card_measured_on_this_cluster(self) -> None:
         # 136 us on the V100, the largest of the three, so "clears the floor"
@@ -373,7 +379,7 @@ class TestTheReport:
         wanted = cost_label(shape, "math", SECONDS_SUFFIX)
         values = {o["name"]: o["value"] for o in full["observations"] if o["name"] != wanted}
 
-        assert report_cli.slowdown(values, shape) == report_cli.INCOMPLETE
+        assert report_cli.slowdown(values, cost_prefix(shape)) == report_cli.INCOMPLETE
         assert report_cli.INCOMPLETE != report_cli.DID_NOT_FIT
 
     def test_a_record_missing_the_shape_reads_as_not_fitted(self) -> None:
@@ -386,13 +392,13 @@ class TestTheReport:
         )
         values = {o["name"]: o["value"] for o in empty["observations"]}
 
-        assert not report_cli.fitted(values, cost_shapes()[0], "math")
-        assert report_cli.slowdown(values, cost_shapes()[0]) == report_cli.DID_NOT_FIT
+        assert not report_cli.fitted(values, cost_prefix(cost_shapes()[0]), "math")
+        assert report_cli.slowdown(values, cost_prefix(cost_shapes()[0])) == report_cli.DID_NOT_FIT
 
     def test_an_unrecorded_base_peak_is_said_rather_than_divided_by_zero(self) -> None:
         values = {o["name"]: o["value"] for o in cost_record("A30", base_peak=0.0)["observations"]}
 
-        assert report_cli.memory_growth(values, cost_shapes()[0]) == "not recorded"
+        assert report_cli.memory_growth(values, cost_prefix(cost_shapes()[0])) == "not recorded"
 
     def test_the_report_heads_each_run_with_its_card(self) -> None:
         lines = report_cli.report_lines((("v100.json", cost_record("Tesla V100")),))

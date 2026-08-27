@@ -38,6 +38,16 @@ from typing import Final
 
 from typing_extensions import TypedDict
 
+from model_trainer.core.services.model.cost_labels import (
+    DEFAULT_KEY,
+    FALSE_VALUE,
+    FITTED_SUFFIX,
+    PEAK_SUFFIX,
+    SECONDS_SUFFIX,
+    SPREAD_SUFFIX,
+    TRUE_VALUE,
+    labelled,
+)
 from model_trainer.core.services.model.model_sizes import GPT2_MODEL_SIZES
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 
@@ -178,6 +188,18 @@ def cost_shapes() -> tuple[SdpaCostShape, ...]:
     return grid + ladder
 
 
+def cost_prefix(shape: SdpaCostShape) -> str:
+    """Name one timed call, without saying which measurement.
+
+    Args:
+        shape: The call.
+
+    Returns:
+        e.g. ``cost-grid-b8-s2048-h12-d64``.
+    """
+    return f"cost-{shape['name']}-h{shape['heads']}-d{shape['head_dim']}"
+
+
 def cost_label(shape: SdpaCostShape, backend: str, suffix: str) -> str:
     """Name one timing of one call.
 
@@ -189,34 +211,12 @@ def cost_label(shape: SdpaCostShape, backend: str, suffix: str) -> str:
     Returns:
         e.g. ``cost-grid-b8-s2048-h12-d64|math|seconds``.
     """
-    return f"cost-{shape['name']}-h{shape['heads']}-d{shape['head_dim']}|{backend}|{suffix}"
+    return labelled(cost_prefix(shape), backend, suffix)
 
 
 #: Distinct from the selection experiment. "Which kernel ran" and "what it
 #: cost" are different questions and their records must not be differenced.
 SDPA_COST_EXPERIMENT = "sdpa-backend-cost"
-
-#: Suffix for the observation carrying seconds per call.
-SECONDS_SUFFIX = "seconds"
-
-#: Suffix for the slowest-minus-fastest batch, in seconds per call. Carried
-#: beside every median because a median with an enormous spread is a number
-#: that must not be compared with another one.
-SPREAD_SUFFIX = "spread"
-
-#: Suffix for peak CUDA bytes allocated during the timed run.
-PEAK_SUFFIX = "peak_bytes"
-
-#: Suffix for whether the call fitted in memory at all. An out-of-memory is
-#: not a failed measurement here -- it is the strongest cost result there is,
-#: so it is recorded rather than raised.
-FITTED_SUFFIX = "fitted"
-
-
-#: The unforced call -- what the dispatcher chose on its own. Named like a
-#: backend so it sits in the same column as the forced runs, because the
-#: whole reading is "which forced digest equals this one".
-DEFAULT_KEY = "default"
 
 #: Backends to force, one at a time. ``ERROR`` and ``OVERRIDEABLE`` are
 #: deliberately absent: neither is a kernel a call can land on.
@@ -240,10 +240,6 @@ AVAILABLE_SUFFIX = "available"
 #: This is torch's OPINION, recorded beside the measurement so the two can be
 #: checked against each other rather than one standing in for the other.
 ELIGIBLE_SUFFIX = "eligible"
-
-#: How a boolean is carried in a record, which holds only numbers.
-TRUE_VALUE = 1.0
-FALSE_VALUE = 0.0
 
 
 def sdpa_label(shape: SdpaShape, backend: str, suffix: str) -> str:
@@ -293,6 +289,7 @@ __all__ = [
     "SdpaCostShape",
     "SdpaShape",
     "cost_label",
+    "cost_prefix",
     "cost_shapes",
     "sdpa_label",
     "sdpa_shape_for",

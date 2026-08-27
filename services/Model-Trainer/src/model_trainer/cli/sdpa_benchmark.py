@@ -42,20 +42,20 @@ from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
     describe_run_fingerprint,
 )
-from model_trainer.core.services.model.sdpa_probe import BACKENDS
-from model_trainer.core.services.model.sdpa_shapes import (
+from model_trainer.core.services.model.cost_labels import (
     DEFAULT_KEY,
     FALSE_VALUE,
     FITTED_SUFFIX,
     PEAK_SUFFIX,
-    SDPA_COST_EXPERIMENT,
     SECONDS_SUFFIX,
     SPREAD_SUFFIX,
     TRUE_VALUE,
-    SdpaCostShape,
-    cost_label,
+    labelled,
 )
-from model_trainer.core.services.model.sdpa_timing import SdpaCost, time_sdpa
+from model_trainer.core.services.model.sdpa_probe import BACKENDS
+from model_trainer.core.services.model.sdpa_shapes import SDPA_COST_EXPERIMENT, cost_prefix
+from model_trainer.core.services.model.sdpa_timing import time_sdpa
+from model_trainer.core.services.model.timing_harness import MeasuredCost
 
 _log = get_logger(__name__)
 
@@ -74,9 +74,9 @@ PINNED_KEY = "math"
 
 
 def cost_observations(
-    shape: SdpaCostShape, backend: str, cost: SdpaCost | None
+    prefix: str, backend: str, cost: MeasuredCost | None
 ) -> tuple[Observation, ...]:
-    """Name what one timed call produced.
+    """Name what one timed measurement produced.
 
     A call that did not fit contributes its ``fitted`` row and no timings.
     The asymmetry is deliberate and matches the selection probe: an absent
@@ -85,24 +85,24 @@ def cost_observations(
     rather than hidden behind a sentinel that compares equal to nothing.
 
     Args:
-        shape: The call.
-        backend: Which backend it ran under.
+        prefix: What was measured, including its dimensions.
+        backend: Which arm it ran under.
         cost: What it cost, or None when it did not fit.
 
     Returns:
         The observations.
     """
     fitted = Observation(
-        name=cost_label(shape, backend, FITTED_SUFFIX),
+        name=labelled(prefix, backend, FITTED_SUFFIX),
         value=FALSE_VALUE if cost is None else TRUE_VALUE,
     )
     if cost is None:
         return (fitted,)
     return (
         fitted,
-        Observation(name=cost_label(shape, backend, SECONDS_SUFFIX), value=cost["seconds"]),
-        Observation(name=cost_label(shape, backend, SPREAD_SUFFIX), value=cost["spread"]),
-        Observation(name=cost_label(shape, backend, PEAK_SUFFIX), value=cost["peak_bytes"]),
+        Observation(name=labelled(prefix, backend, SECONDS_SUFFIX), value=cost["seconds"]),
+        Observation(name=labelled(prefix, backend, SPREAD_SUFFIX), value=cost["spread"]),
+        Observation(name=labelled(prefix, backend, PEAK_SUFFIX), value=cost["peak_bytes"]),
     )
 
 
@@ -144,7 +144,7 @@ def benchmark_run_record(device: str) -> RunRecord:
                 f"(spread {cost['spread'] * 1e3:.4f}) "
                 f"peak {cost['peak_bytes'] / 2**20:.1f} MiB",
             )
-            observations.extend(cost_observations(shape, key, cost))
+            observations.extend(cost_observations(cost_prefix(shape), key, cost))
 
     return run_record(
         experiment=SDPA_COST_EXPERIMENT,

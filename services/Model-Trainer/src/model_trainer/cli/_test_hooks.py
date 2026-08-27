@@ -19,6 +19,7 @@ from platform_core.determinism_record import DeterminismRecord
 from model_trainer.core._hook_protocols_ml import PinTorchThreadsProto
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem
 from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.services.model.forward_cost import FORWARD_SHAPES, ForwardCostShape
 
 # Safe at module scope where the others are not: `probe_shapes` is a table of
 # TypedDicts and a label formatter, and imports no torch. That separation is
@@ -122,6 +123,29 @@ def _default_cost_shapes() -> tuple[SdpaCostShape, ...]:
         The batch-by-length grid, then the ladder's own calls.
     """
     return cost_shapes()
+
+
+class ForwardShapesProto(Protocol):
+    """Protocol for the forward passes the end-to-end benchmark times.
+
+    Behind a hook for the same reason the other sweeps are, and the reason
+    bites hardest here: the declared rows build models up to 774 million
+    parameters and run them over a 50,257-token vocabulary. On a test
+    runner's CPU that is not slow, it is unusable.
+    """
+
+    def __call__(self) -> tuple[ForwardCostShape, ...]:
+        """Return the passes to time, in order."""
+        ...
+
+
+def _default_forward_shapes() -> tuple[ForwardCostShape, ...]:
+    """Production forward sweep - used as default hook.
+
+    Returns:
+        Every declared row, in table order.
+    """
+    return FORWARD_SHAPES
 
 
 class EnvCublasltWorkspaceProto(Protocol):
@@ -346,6 +370,8 @@ env_cublaslt_workspace: EnvCublasltWorkspaceProto = _default_env_cublaslt_worksp
 
 cost_shapes_hook: CostShapesProto = _default_cost_shapes
 
+forward_shapes: ForwardShapesProto = _default_forward_shapes
+
 run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
 
 benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
@@ -356,6 +382,7 @@ __all__ = [
     "BenchmarkShapesProto",
     "CostShapesProto",
     "EnvCublasltWorkspaceProto",
+    "ForwardShapesProto",
     "LadderShapesProto",
     "LoadHubModelProto",
     "RunBenchmarkChildProto",
@@ -365,6 +392,7 @@ __all__ = [
     "benchmark_shapes",
     "cost_shapes_hook",
     "env_cublaslt_workspace",
+    "forward_shapes",
     "ladder_shapes",
     "load_hub_model",
     "pin_torch_threads",
