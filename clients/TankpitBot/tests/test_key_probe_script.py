@@ -113,15 +113,11 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
 
     assert key_probe_script.main() == 0
     assert factory_calls == ["factory"]
-    assert captured == [
-        "https://tankpit.com/play",
-        "key_probe.json",
-        False,
-        False,
-        DEFAULT_KEYS,
-        10000,
-        1500,
-    ]
+    assert captured[0] == "https://tankpit.com/play"
+    output = str(captured[1])
+    assert output.startswith("runs/probe/key-")
+    assert output.endswith(".json")
+    assert captured[2:] == [False, False, DEFAULT_KEYS, 10000, 1500]
     assert callable(core_hooks.sync_playwright)
 
 

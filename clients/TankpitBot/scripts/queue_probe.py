@@ -11,6 +11,7 @@ from tankpit_bot.action_lab.queue_probe import (
     run_queue_probe,
 )
 from tankpit_bot.action_lab.queue_probe_types import QueueProbeSessionDict
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -46,7 +47,8 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("queue")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("queue", stamp)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
@@ -56,7 +58,9 @@ def main() -> int:
     initial_sync_timeout_ms = _parse_optional_int_arg(argv, "--initial-sync-timeout-ms")
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
-    output_path = _test_hooks.get_env("TANKPIT_QUEUE_PROBE_OUTPUT") or "queue_probe.json"
+    output_path = _test_hooks.get_env("TANKPIT_QUEUE_PROBE_OUTPUT") or (
+        f"runs/probe/queue-{stamp}.json"
+    )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     prefer_account = _parse_bool_env(_test_hooks.get_env("TANKPIT_PREFER_ACCOUNT"))
     env_initial_sync_timeout_ms = int(

@@ -207,14 +207,11 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
     assert combat_probe.main() == 0
     assert logging_levels == ["INFO"]
     assert factory_calls == ["factory"]
-    assert captured == [
-        "https://tankpit.com/play",
-        "combat_probe.json",
-        False,
-        False,
-        3,
-        20,
-    ]
+    assert captured[0] == "https://tankpit.com/play"
+    output = str(captured[1])
+    assert output.startswith("runs/probe/combat-")
+    assert output.endswith(".json")
+    assert captured[2:] == [False, False, 3, 20]
     assert callable(core_hooks.sync_playwright)
 
 

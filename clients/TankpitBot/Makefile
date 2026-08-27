@@ -188,7 +188,7 @@ enemy-teleport-probe-nearest: install
 bot-watch: install
 	@Write-Host ""
 	@Write-Host "==> bot-watch (1 enemy teleport + 10 min heartbeat dwell)" -ForegroundColor Cyan
-	$$env:TANKPIT_ENEMY_TELEPORT_SETTLE_MS = "600000"; $$env:TANKPIT_ENEMY_TELEPORT_HEARTBEAT_MS = "1500"; $$env:TANKPIT_ENEMY_TELEPORT_PROBE_OUTPUT = "bot_watch_probe.json"; poetry run tankpit-enemy-teleport-probe --max-attempts 1 --acquisition-strategy map_open
+	$$env:TANKPIT_ENEMY_TELEPORT_SETTLE_MS = "600000"; $$env:TANKPIT_ENEMY_TELEPORT_HEARTBEAT_MS = "1500"; $$env:TANKPIT_ENEMY_TELEPORT_PROBE_OUTPUT = "runs/probe/bot_watch_probe.json"; poetry run tankpit-enemy-teleport-probe --max-attempts 1 --acquisition-strategy map_open
 
 respawn-watch: install
 	@Write-Host ""
@@ -251,14 +251,14 @@ combat-probe: install
 	poetry run tankpit-combat-probe --max-engagements 3 --max-shots 20
 
 # Measures the server's shot serve rate: one burst per spacing, served
-# shots counted from 0x49 ammo snapshots. Writes cadence_probe.json.
+# shots counted from 0x49 ammo snapshots. Writes runs/probe/cadence-<stamp>.json.
 cadence-probe: install
 	@Write-Host ""
 	@Write-Host "==> cadence-probe (bursts at 2000/1000/500/250 ms)" -ForegroundColor Cyan
 	poetry run tankpit-cadence-probe --spacings 2000,1000,500,250 --shots 6
 
 # Does a move cost the queued shot? Alternating shoot-only and
-# shoot+move beats on the 2 s serve grid. Writes weave_probe.json.
+# shoot+move beats on the 2 s serve grid. Writes runs/probe/weave-<stamp>.json.
 weave-probe: install
 	@Write-Host ""
 	@Write-Host "==> weave-probe (8 beats, even beats also move)" -ForegroundColor Cyan
@@ -266,7 +266,7 @@ weave-probe: install
 
 # Diagnoses wire-presence vs JS-truth divergence. Fires one shot at the
 # closest enemy, then samples per-tank belief at 1Hz for 120s. Writes
-# enemy_tracking_probe.json. Override duration with
+# runs/probe/enemy-tracking-<stamp>.json. Override duration with
 # `make track TRACK_SAMPLE_DURATION_MS=60000`.
 TRACK_SAMPLE_DURATION_MS ?= 120000
 TRACK_SAMPLE_INTERVAL_MS ?= 1000

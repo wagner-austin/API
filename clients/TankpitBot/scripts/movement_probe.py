@@ -13,6 +13,7 @@ from tankpit_bot.action_lab import (
     parse_targets_arg,
     run_movement_probe,
 )
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -59,7 +60,8 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("movement")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("movement", stamp)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
@@ -73,7 +75,9 @@ def main() -> int:
     queue_map_open_during_move = _has_flag(argv, "--queue-map-open")
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
-    output_path = _test_hooks.get_env("TANKPIT_MOVEMENT_PROBE_OUTPUT") or "movement_probe.json"
+    output_path = _test_hooks.get_env("TANKPIT_MOVEMENT_PROBE_OUTPUT") or (
+        f"runs/probe/movement-{stamp}.json"
+    )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     prefer_account = _parse_bool_env(_test_hooks.get_env("TANKPIT_PREFER_ACCOUNT"))
     env_max_targets = int(_test_hooks.get_env("TANKPIT_MOVEMENT_MAX_TARGETS") or "3")

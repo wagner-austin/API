@@ -187,14 +187,11 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
 
     assert weave_probe.main() == 0
     assert factory_calls == ["factory"]
-    assert captured == [
-        "https://tankpit.com/play",
-        "weave_probe.json",
-        False,
-        False,
-        8,
-        1,
-    ]
+    assert captured[0] == "https://tankpit.com/play"
+    output = str(captured[1])
+    assert output.startswith("runs/probe/weave-")
+    assert output.endswith(".json")
+    assert captured[2:] == [False, False, 8, 1]
     assert callable(core_hooks.sync_playwright)
 
 

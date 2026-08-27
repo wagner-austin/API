@@ -16,6 +16,7 @@ from tankpit_bot.action_lab import (
     parse_targets_arg,
     run_teleport_probe,
 )
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -139,7 +140,8 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("teleport")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("teleport", stamp)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
@@ -153,7 +155,9 @@ def main() -> int:
     teleport_strategy_arg = _parse_optional_strategy_arg(argv)
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
-    output_path = _test_hooks.get_env("TANKPIT_TELEPORT_PROBE_OUTPUT") or "teleport_probe.json"
+    output_path = _test_hooks.get_env("TANKPIT_TELEPORT_PROBE_OUTPUT") or (
+        f"runs/probe/teleport-{stamp}.json"
+    )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     prefer_account = _parse_bool_env(_test_hooks.get_env("TANKPIT_PREFER_ACCOUNT"))
     teleport_strategy = _parse_teleport_strategy(

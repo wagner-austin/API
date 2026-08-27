@@ -11,6 +11,7 @@ from tankpit_bot.action_lab.weave_probe import (
     run_weave_probe,
 )
 from tankpit_bot.action_lab.weave_probe_types import WeaveProbeSessionDict
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -59,7 +60,8 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("weave")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("weave", stamp)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
@@ -69,7 +71,9 @@ def main() -> int:
     bursts = _parse_int_arg(argv, "--bursts")
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
-    output_path = _test_hooks.get_env("TANKPIT_WEAVE_PROBE_OUTPUT") or "weave_probe.json"
+    output_path = _test_hooks.get_env("TANKPIT_WEAVE_PROBE_OUTPUT") or (
+        f"runs/probe/weave-{stamp}.json"
+    )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     prefer_account = _parse_bool_env(_test_hooks.get_env("TANKPIT_PREFER_ACCOUNT"))
 

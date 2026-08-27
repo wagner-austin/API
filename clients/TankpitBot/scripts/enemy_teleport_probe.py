@@ -13,6 +13,7 @@ from tankpit_bot.action_lab import (
     format_enemy_teleport_probe_summary,
     run_enemy_teleport_probe,
 )
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -63,7 +64,8 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("enemy_teleport")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("enemy_teleport", stamp)
     configure_probe_runtime_logging("enemy_teleport")
 
     if _test_hooks.sync_playwright is None:
@@ -76,7 +78,8 @@ def main() -> int:
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
     output_path = (
-        _test_hooks.get_env("TANKPIT_ENEMY_TELEPORT_PROBE_OUTPUT") or "enemy_teleport_probe.json"
+        _test_hooks.get_env("TANKPIT_ENEMY_TELEPORT_PROBE_OUTPUT")
+        or f"runs/probe/enemy-teleport-{stamp}.json"
     )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     prefer_account = _parse_bool_env(_test_hooks.get_env("TANKPIT_PREFER_ACCOUNT"))

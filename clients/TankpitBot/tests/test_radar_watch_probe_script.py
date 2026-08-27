@@ -120,16 +120,11 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
 
     assert radar_watch_script.main() == 0
     assert factory_calls == ["factory"]
-    assert captured == [
-        "https://tankpit.com/play",
-        "radar_watch_probe.json",
-        False,
-        True,
-        1800000,
-        15000,
-        30000,
-        10000,
-    ]
+    assert captured[0] == "https://tankpit.com/play"
+    output = str(captured[1])
+    assert output.startswith("runs/probe/radar-watch-")
+    assert output.endswith(".json")
+    assert captured[2:] == [False, True, 1800000, 15000, 30000, 10000]
     assert callable(core_hooks.sync_playwright)
 
 

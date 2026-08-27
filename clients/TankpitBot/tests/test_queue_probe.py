@@ -241,14 +241,11 @@ class TestMainDefaultArgs:
         queue_probe_script.run_queue_probe = _fake_run
         assert queue_probe_script.main() == 0
         assert logging_levels == ["INFO"]
-        assert captured == [
-            "https://tankpit.com/play",
-            "queue_probe.json",
-            False,
-            False,
-            10000,
-            5000,
-        ]
+        assert captured[0] == "https://tankpit.com/play"
+        output = str(captured[1])
+        assert output.startswith("runs/probe/queue-")
+        assert output.endswith(".json")
+        assert captured[2:] == [False, False, 10000, 5000]
 
 
 class TestMainEnvOverrides:

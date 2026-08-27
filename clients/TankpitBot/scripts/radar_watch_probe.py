@@ -10,6 +10,7 @@ from tankpit_bot.action_lab.radar_watch import (
     format_radar_watch_summary,
     run_radar_watch_probe,
 )
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -31,13 +32,16 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("radar_watch")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("radar_watch", stamp)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
-    output_path = _test_hooks.get_env("TANKPIT_RADAR_WATCH_OUTPUT") or "radar_watch_probe.json"
+    output_path = _test_hooks.get_env("TANKPIT_RADAR_WATCH_OUTPUT") or (
+        f"runs/probe/radar-watch-{stamp}.json"
+    )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     duration_ms = int(_test_hooks.get_env("TANKPIT_RADAR_WATCH_DURATION_MS") or "1800000")
     scan_interval_ms = int(_test_hooks.get_env("TANKPIT_RADAR_WATCH_SCAN_INTERVAL_MS") or "15000")

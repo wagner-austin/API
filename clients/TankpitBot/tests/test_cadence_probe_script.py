@@ -200,14 +200,11 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
     assert cadence_probe.main() == 0
     assert logging_levels == ["INFO"]
     assert factory_calls == ["factory"]
-    assert captured == [
-        "https://tankpit.com/play",
-        "cadence_probe.json",
-        False,
-        False,
-        (2000, 1000, 500, 250),
-        6,
-    ]
+    assert captured[0] == "https://tankpit.com/play"
+    output = str(captured[1])
+    assert output.startswith("runs/probe/cadence-")
+    assert output.endswith(".json")
+    assert captured[2:] == [False, False, (2000, 1000, 500, 250), 6]
     assert callable(core_hooks.sync_playwright)
 
 

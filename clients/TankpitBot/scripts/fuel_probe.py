@@ -7,6 +7,7 @@ from platform_core.logging import get_logger
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks
 from tankpit_bot.action_lab import FuelProbeSessionDict, format_fuel_probe_summary, run_fuel_probe
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -38,7 +39,8 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("fuel")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("fuel", stamp)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
@@ -49,7 +51,9 @@ def main() -> int:
     initial_sync_timeout_ms = _parse_optional_int_arg(argv, "--initial-sync-timeout-ms")
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
-    output_path = _test_hooks.get_env("TANKPIT_FUEL_PROBE_OUTPUT") or "fuel_probe.json"
+    output_path = _test_hooks.get_env("TANKPIT_FUEL_PROBE_OUTPUT") or (
+        f"runs/probe/fuel-{stamp}.json"
+    )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     prefer_account = _parse_bool_env(_test_hooks.get_env("TANKPIT_PREFER_ACCOUNT"))
     env_target_pickups = _test_hooks.get_env("TANKPIT_FUEL_PROBE_TARGET_PICKUPS")

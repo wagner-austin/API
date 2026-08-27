@@ -9,6 +9,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.action_lab.enemy_tracking import run_enemy_tracking_probe
 from tankpit_bot.action_lab.enemy_tracking_records import format_enemy_tracking_probe_summary
 from tankpit_bot.action_lab.enemy_tracking_types import EnemyTrackingProbeSessionDict
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -35,7 +36,8 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("enemy_tracking")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("enemy_tracking", stamp)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
@@ -46,7 +48,8 @@ def main() -> int:
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
     output_path = (
-        _test_hooks.get_env("TANKPIT_ENEMY_TRACKING_PROBE_OUTPUT") or "enemy_tracking_probe.json"
+        _test_hooks.get_env("TANKPIT_ENEMY_TRACKING_PROBE_OUTPUT")
+        or f"runs/probe/enemy-tracking-{stamp}.json"
     )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     prefer_account = _parse_bool_env(_test_hooks.get_env("TANKPIT_PREFER_ACCOUNT"))

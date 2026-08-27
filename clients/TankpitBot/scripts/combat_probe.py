@@ -11,6 +11,7 @@ from tankpit_bot.action_lab.combat_probe import (
     run_combat_probe,
 )
 from tankpit_bot.action_lab.combat_probe_types import CombatProbeSessionDict
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -37,7 +38,8 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("combat")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("combat", stamp)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
@@ -47,7 +49,9 @@ def main() -> int:
     max_shots = _parse_optional_int_arg(argv, "--max-shots")
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
-    output_path = _test_hooks.get_env("TANKPIT_COMBAT_PROBE_OUTPUT") or "combat_probe.json"
+    output_path = _test_hooks.get_env("TANKPIT_COMBAT_PROBE_OUTPUT") or (
+        f"runs/probe/combat-{stamp}.json"
+    )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     prefer_account = _parse_bool_env(
         _test_hooks.get_env("TANKPIT_PREFER_ACCOUNT"),
