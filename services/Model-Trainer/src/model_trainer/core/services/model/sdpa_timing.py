@@ -25,9 +25,11 @@ from __future__ import annotations
 import statistics
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager
+from types import TracebackType
 
 import torch
-from torch.nn.attention import SDPBackend
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from typing_extensions import TypedDict
 
 from model_trainer.core.services.model.gemm_timing import (
@@ -36,7 +38,7 @@ from model_trainer.core.services.model.gemm_timing import (
     WARMUP,
     synchroniser,
 )
-from model_trainer.core.services.model.sdpa_probe import forced_sdpa_output, sdpa_output
+from model_trainer.core.services.model.sdpa_probe import sdpa_output
 from model_trainer.core.services.model.sdpa_shapes import SDPA_SEED, SdpaCostShape
 
 #: What a cpu run reports for peak device memory. Zero, because the allocator
@@ -149,21 +151,56 @@ def cost_operands(
     )
 
 
-def _run_once(
-    query: torch.Tensor, key: torch.Tensor, value: torch.Tensor, backend: SDPBackend | None
-) -> None:
-    """Issue one attention call, forced or not, discarding its output.
+class _Unrestricted(AbstractContextManager[None]):
+    """A context that restricts nothing.
+
+    Written out rather than using :func:`contextlib.nullcontext`, whose type
+    this package's mypy settings resolve to Any. It exists so the UNFORCED
+    arm of the benchmark is wrapped in a context too -- see
+    :func:`backend_context` for the 20% bias that asymmetry caused.
+    """
+
+    def __enter__(self) -> None:
+        """Enter, restricting nothing."""
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Leave, having restricted nothing and swallowing nothing."""
+
+
+def backend_context(backend: SDPBackend | None) -> AbstractContextManager[None]:
+    """Restrict the dispatcher for the duration of a whole timed run.
+
+    ENTERED ONCE, NOT PER CALL, AND THAT IS A CORRECTNESS FIX RATHER THAN A
+    TIDINESS ONE. An earlier revision forced the backend inside the timing
+    loop, so the pinned arm paid a context enter and exit on every call and
+    the unforced arm paid nothing. Measured on an RTX 3090 Ti, 2026-08-27:
+    27.8 us per call, which is **20% of the whole measurement** at batch 1
+    and 64 tokens, -1.5% at batch 8 and 512, and 0.1% at batch 8 and 2048.
+    That bias sat exactly where the ladder's rungs are, and it would have
+    been published as the cost of the kernel.
+
+    The unforced arm now enters a null context, so both arms are wrapped
+    identically and the only difference between them is which kernels the
+    dispatcher may choose.
 
     Args:
-        query: Query tensor.
-        key: Key tensor.
-        value: Value tensor.
         backend: The backend to force, or None to let the dispatcher choose.
+
+    Returns:
+        A context manager restricting the dispatcher, or one that does
+        nothing.
     """
     if backend is None:
-        sdpa_output(query, key, value)
-    else:
-        forced_sdpa_output(query, key, value, backend)
+        return _Unrestricted()
+    # Bound to a typed name before returning: `sdpa_kernel` gives back a
+    # context manager whose type parameter is Any, which this package forbids.
+    restricted: AbstractContextManager[None] = sdpa_kernel([backend])
+    return restricted
 
 
 def timed_or_unfitted(run: Callable[[], SdpaCost]) -> SdpaCost | None:
@@ -206,9 +243,10 @@ def measure_sdpa(shape: SdpaCostShape, device: str, backend: SDPBackend | None) 
     Raises:
         torch.cuda.OutOfMemoryError: When the device cannot hold the call.
             Caught by :func:`timed_or_unfitted`, which is the only caller.
-        RuntimeError: Propagated from
-            :func:`~sdpa_probe.forced_sdpa_output` for a failure that is
-            neither an out-of-memory nor a no-kernel refusal.
+        RuntimeError: When the forced backend has no kernel for this call.
+            Not caught here: this benchmark prices a backend the selection
+            probe already showed to run on every card, so a refusal would
+            mean it is pricing something else and must be loud.
     """
     wait = synchroniser(device)
     reset_peak = peak_resetter(device)
@@ -216,17 +254,19 @@ def measure_sdpa(shape: SdpaCostShape, device: str, backend: SDPBackend | None) 
 
     query, key, value = cost_operands(shape, device)
     reset_peak()
-    for _ in range(WARMUP):
-        _run_once(query, key, value, backend)
-    wait()
 
     per_call: list[float] = []
-    for _ in range(BATCHES):
-        start = time.perf_counter()
-        for _ in range(INNER):
-            _run_once(query, key, value, backend)
+    with backend_context(backend):
+        for _ in range(WARMUP):
+            sdpa_output(query, key, value)
         wait()
-        per_call.append((time.perf_counter() - start) / INNER)
+
+        for _ in range(BATCHES):
+            start = time.perf_counter()
+            for _ in range(INNER):
+                sdpa_output(query, key, value)
+            wait()
+            per_call.append((time.perf_counter() - start) / INNER)
 
     return SdpaCost(
         seconds=statistics.median(per_call),
@@ -260,6 +300,7 @@ def time_sdpa(shape: SdpaCostShape, device: str, backend: SDPBackend | None) -> 
 __all__ = [
     "NO_PEAK",
     "SdpaCost",
+    "backend_context",
     "cost_operands",
     "measure_sdpa",
     "peak_reader",

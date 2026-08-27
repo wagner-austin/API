@@ -35,6 +35,7 @@ from torch.nn.attention import SDPBackend
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import sdpa_benchmark as bench_cli
 from model_trainer.cli import sdpa_benchmark_report as report_cli
+from model_trainer.core.services.model.sdpa_probe import forced_sdpa_output, sdpa_output
 from model_trainer.core.services.model.sdpa_shapes import (
     COST_BATCHES,
     COST_LENGTHS,
@@ -53,6 +54,7 @@ from model_trainer.core.services.model.sdpa_shapes import (
 from model_trainer.core.services.model.sdpa_timing import (
     NO_PEAK,
     SdpaCost,
+    backend_context,
     cost_operands,
     measure_sdpa,
     peak_reader,
@@ -153,6 +155,43 @@ class TestThePeakCounters:
         peak_resetter("cpu")()
 
         assert peak_reader("cpu")() == NO_PEAK
+
+
+class TestTheBackendContext:
+    def test_forcing_a_backend_restricts_the_dispatcher(self) -> None:
+        # The context is what makes the pinned arm pinned, so it has to
+        # produce what forcing that backend per call produces -- otherwise
+        # the benchmark would be timing a different kernel than the
+        # selection probe measured.
+        query, key, value = cost_operands(TINY, "cpu")
+        per_call = forced_sdpa_output(query, key, value, SDPBackend.MATH)
+        with backend_context(SDPBackend.MATH):
+            under_context = sdpa_output(query, key, value)
+
+        if per_call is None:
+            raise AssertionError("forcing math on cpu must produce a result")
+        assert torch.equal(per_call, under_context)
+
+    def test_the_unforced_arm_is_wrapped_too(self) -> None:
+        # Both arms enter a context so the enter-and-exit cost is paid on
+        # both sides. An earlier revision forced the backend INSIDE the
+        # timing loop, which put 27.8 us per call on the pinned arm alone --
+        # 20% of the whole measurement at batch 1 and 64 tokens, right where
+        # the ladder's rungs are.
+        query, key, value = cost_operands(TINY, "cpu")
+
+        with backend_context(None):
+            plain = sdpa_output(query, key, value)
+
+        assert torch.equal(plain, sdpa_output(query, key, value))
+
+    def test_a_null_context_does_not_restrict_anything(self) -> None:
+        # Under the null context the fused backends are still permitted, so
+        # a cpu call that would refuse under a forced fused backend does not.
+        query, key, value = cost_operands(TINY, "cpu")
+
+        with backend_context(None):
+            assert sdpa_output(query, key, value).shape == (1, 2, 16, 8)
 
 
 class TestMeasuring:
