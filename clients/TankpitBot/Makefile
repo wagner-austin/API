@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe track bot run service fleet analyze analyze-timing queue-probe download-fields decode analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service fleet analyze analyze-timing queue-probe download-fields decode analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -44,6 +44,7 @@ help:
 	@Write-Host "  make equipment-probe             3 equipment pickups via 9 attempts"
 	@Write-Host "  make combat-probe                3 combat engagements, 20 shots each"
 	@Write-Host "  make cadence-probe               server shot-serve rate at 4 spacings"
+	@Write-Host "  make weave-probe                 does a move cost the queued shot?"
 	@Write-Host "  make track                       enemy tracking probe (wire vs JS truth)"
 	@Write-Host "  make bot                         live HFSM bot"
 	@Write-Host "  make run                         5-min timed session + scorecard"
@@ -255,6 +256,13 @@ cadence-probe: install
 	@Write-Host ""
 	@Write-Host "==> cadence-probe (bursts at 2000/1000/500/250 ms)" -ForegroundColor Cyan
 	poetry run tankpit-cadence-probe --spacings 2000,1000,500,250 --shots 6
+
+# Does a move cost the queued shot? Alternating shoot-only and
+# shoot+move beats on the 2 s serve grid. Writes weave_probe.json.
+weave-probe: install
+	@Write-Host ""
+	@Write-Host "==> weave-probe (8 beats, even beats also move)" -ForegroundColor Cyan
+	poetry run tankpit-weave-probe --beats 8 --bursts 1
 
 # Diagnoses wire-presence vs JS-truth divergence. Fires one shot at the
 # closest enemy, then samples per-tank belief at 1Hz for 120s. Writes
