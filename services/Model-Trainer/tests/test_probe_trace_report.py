@@ -37,6 +37,7 @@ from model_trainer.core.services.model.trace_plan import (
     DIGEST_SUFFIX,
     SUM_SUFFIX,
     TRACE_EXPERIMENT,
+    TRACE_RUNGS,
     WORKSPACE_NAME,
     WORKSPACE_UNSET,
     TraceName,
@@ -198,14 +199,34 @@ class TestFindingTheDivergence:
 
 
 class TestNamingTheRungsARecordCovers:
-    def test_it_orders_them_by_the_step_each_one_starts_at(self) -> None:
-        # Not alphabetically. A record sorts its observations by name, and
-        # "large" sorts before "tiny", so reading name order would report the
-        # rungs in an order nothing ran them in.
-        pair = ("tiny", "xl")
+    def test_it_orders_them_as_the_trace_declares_them(self) -> None:
+        # Not alphabetically. A record sorts its observations by name, so
+        # name order would print "large, medium, tiny, xl" and bury the
+        # contrast the rung set was chosen for. The step counter cannot
+        # supply the order either: every rung gets a fresh trace and so
+        # starts at step zero.
+        rungs = ("tiny", "medium", "large", "xl")
+        agreement = agreement_of(
+            trace_record("A30", rungs=rungs), trace_record("A100", rungs=rungs)
+        )
+
+        assert report_cli.traced_rungs(agreement) == TRACE_RUNGS
+
+    def test_a_subset_keeps_the_declared_order(self) -> None:
+        pair = ("xl", "tiny")
         agreement = agreement_of(trace_record("A30", rungs=pair), trace_record("A100", rungs=pair))
 
         assert report_cli.traced_rungs(agreement) == ("tiny", "xl")
+
+    def test_a_rung_the_declaration_does_not_know_is_listed_not_dropped(self) -> None:
+        # A record from a trace whose rung set has since changed still gets
+        # reported, after the declared ones.
+        rungs = ("tiny", "small")
+        agreement = agreement_of(
+            trace_record("A30", rungs=rungs), trace_record("A100", rungs=rungs)
+        )
+
+        assert report_cli.traced_rungs(agreement) == ("tiny", "small")
 
     def test_a_record_with_no_traced_tensors_names_no_rungs(self) -> None:
         empty = run_record(

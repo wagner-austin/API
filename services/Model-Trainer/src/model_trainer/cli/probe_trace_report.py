@@ -47,6 +47,7 @@ from model_trainer.cli.record_reports import (
 from model_trainer.core.run_fingerprint import describe_run_fingerprint
 from model_trainer.core.services.model.trace_plan import (
     DIGEST_SUFFIX,
+    TRACE_RUNGS,
     WORKSPACE_NAME,
     TraceName,
     describe_workspace,
@@ -251,31 +252,35 @@ def rung_lines(agreement: RunAgreement, rung: str) -> tuple[str, ...]:
 
 
 def traced_rungs(agreement: RunAgreement) -> tuple[str, ...]:
-    """Name every rung the runs share, in the order they were traced.
+    """Name every rung the runs share, in the declared order.
 
-    Read from the observations rather than from
+    WHICH rungs is read from the observations rather than from
     :data:`~model_trainer.core.services.model.trace_plan.TRACE_RUNGS`, so a
     report over records written by an older trace names what those records
     actually contain instead of silently reporting nothing for a rung they
-    never walked.
+    never walked. Only the ORDER comes from the declaration.
+
+    The step counter cannot supply the order: each rung gets a fresh trace,
+    so every rung's first step is zero and sorting by it degenerates to
+    alphabetical -- which would print ``large, medium, tiny, xl`` and bury
+    the contrast the rung set was chosen for. A rung the declaration does
+    not know is listed after the declared ones, alphabetically, rather than
+    dropped.
 
     Args:
         agreement: The computed agreement.
 
     Returns:
-        The rung names, ordered by the first step each one traced.
-
+        The rung names: declared ones first in declaration order, then any
+        others in name order.
     """
-    first_step: dict[str, int] = {}
-    for entry in agreement["shared"]:
-        parsed = parse_trace_name(entry["name"])
-        if parsed is None:
-            continue
-        seen = first_step.get(parsed["rung"])
-        if seen is None or parsed["step"] < seen:
-            first_step[parsed["rung"]] = parsed["step"]
-    ordered = sorted((step, rung) for rung, step in first_step.items())
-    return tuple(rung for _, rung in ordered)
+    found = {
+        parsed["rung"]
+        for parsed in (parse_trace_name(entry["name"]) for entry in agreement["shared"])
+        if parsed is not None
+    }
+    declared = tuple(rung for rung in TRACE_RUNGS if rung in found)
+    return declared + tuple(sorted(found - set(declared)))
 
 
 def report_lines(named_records: tuple[tuple[str, RunRecord], ...]) -> tuple[str, ...]:
