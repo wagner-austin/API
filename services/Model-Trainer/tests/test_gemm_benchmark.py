@@ -14,6 +14,7 @@ the most damaging way this could be wrong.
 
 from __future__ import annotations
 
+import itertools
 import pathlib
 
 import pytest
@@ -32,8 +33,11 @@ from model_trainer.cli import gemm_benchmark as bench
 from model_trainer.core.run_fingerprint import capture_run_fingerprint
 from model_trainer.core.services.model.gemm_shapes import (
     BATCH_COLS,
+    CROSSOVER_COLS,
+    CROSSOVER_SOURCES,
     GEMM_BATCHED,
     GEMM_COLS,
+    GEMM_CROSSOVER,
     GEMM_SHAPES,
     GemmShape,
     probed_shapes,
@@ -365,9 +369,50 @@ class TestTheBatchedTable:
         assert set(dict(GEMM_BATCHED)) & set(GEMM_SHAPES) == set()
 
     def test_the_benchmark_times_both_regimes(self) -> None:
-        assert len(timed_shapes()) == len(GEMM_SHAPES) + len(GEMM_BATCHED)
+        assert len(timed_shapes()) >= len(GEMM_SHAPES) + len(GEMM_BATCHED)
 
     def test_the_sweep_grid_is_not_timed(self) -> None:
         # The sweep answers a question about VALUES, not speed; timing
         # thirty-five more shapes would cost minutes and say nothing.
         assert len(timed_shapes()) < len(probed_shapes())
+
+
+class TestTheCrossoverSweep:
+    """Two points said the cost depends on batch size. They cannot say where.
+
+    +20% to +85% at one short sequence and 0-13% at N=4096 establishes that
+    the regime matters and leaves the number someone sizing a real job needs
+    entirely open. Doubling between the two turns two points into eight.
+    """
+
+    def test_it_spans_both_regimes_already_measured(self) -> None:
+        # A sweep that stopped short of either end could not be joined to the
+        # measurements it exists to connect.
+        assert min(CROSSOVER_COLS) == GEMM_COLS
+        assert max(CROSSOVER_COLS) == BATCH_COLS
+
+    def test_it_doubles_all_the_way_across(self) -> None:
+        ratios = {b / a for a, b in itertools.pairwise(CROSSOVER_COLS)}
+
+        assert ratios == {2.0}
+
+    def test_it_sweeps_only_calls_that_had_a_cost_to_lose(self) -> None:
+        # The attention projections were at or below zero at N=64; sweeping
+        # them would double the runtime to watch numbers that started flat.
+        assert all(name in GEMM_SHAPES for name in CROSSOVER_SOURCES)
+        assert all("mlp" in name for name in CROSSOVER_SOURCES)
+
+    def test_every_source_is_swept_at_every_batch_size(self) -> None:
+        assert len(GEMM_CROSSOVER) == len(CROSSOVER_SOURCES) * len(CROSSOVER_COLS)
+
+    def test_a_swept_call_keeps_its_source_dimensions(self) -> None:
+        # Only the batch moves. A sweep that also changed M or K would be
+        # measuring a different matmul at each point.
+        for name in CROSSOVER_SOURCES:
+            src = GEMM_SHAPES[name]
+            swept = [s for n, s in GEMM_CROSSOVER if n == f"crossover-{name}"]
+            assert {(s["rows"], s["inner"]) for s in swept} == {(src["rows"], src["inner"])}
+            assert sorted(s["cols"] for s in swept) == sorted(CROSSOVER_COLS)
+
+    def test_the_benchmark_times_the_sweep(self) -> None:
+        assert len(timed_shapes()) == len(GEMM_SHAPES) + len(GEMM_BATCHED) + len(GEMM_CROSSOVER)

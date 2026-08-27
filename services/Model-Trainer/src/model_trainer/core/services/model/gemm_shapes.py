@@ -231,6 +231,53 @@ def _batched() -> tuple[tuple[str, GemmShape], ...]:
 #: The ladder's calls at a real batch size.
 GEMM_BATCHED: Final[tuple[tuple[str, GemmShape], ...]] = _batched()
 
+#: Batch sizes swept between the two regimes already measured.
+#:
+#: WHY. Disabling split-K costs +20% to +85% at ``GEMM_COLS`` and 0-13% at
+#: :data:`BATCH_COLS`, and those are the only two points anyone has. That is
+#: enough to say the cost depends on batch size and not enough to say WHERE it
+#: goes away -- which is the number someone sizing a real job actually needs.
+#: Doubling from one to the other turns two points into eight.
+CROSSOVER_COLS: Final[tuple[int, ...]] = (64, 128, 256, 512, 1024, 2048, 4096)
+
+#: Which calls to sweep. The three MLP projections, because they are the only
+#: shapes whose cost at ``GEMM_COLS`` cleared the per-call overhead floor and
+#: so the only ones with a cost to lose. Sweeping the attention projections
+#: too would double the runtime to watch numbers that started at zero.
+CROSSOVER_SOURCES: Final[tuple[str, ...]] = (
+    "medium-mlp-proj",
+    "large-mlp-proj",
+    "xl-mlp-proj",
+)
+
+
+def _crossover() -> tuple[tuple[str, GemmShape], ...]:
+    """Build the batch-size sweep.
+
+    Returns:
+        ``(name, shape)`` pairs, one per source call per batch size. Each
+        source keeps ONE name across the sweep; the labels differ because the
+        batch dimension does, which is the same reason the grid shares
+        :data:`SWEEP_NAME`.
+    """
+    return tuple(
+        (
+            f"crossover-{name}",
+            GemmShape(
+                rows=GEMM_SHAPES[name]["rows"],
+                inner=GEMM_SHAPES[name]["inner"],
+                cols=cols,
+                origin=f"{name} swept to a {cols}-row batch",
+            ),
+        )
+        for name in CROSSOVER_SOURCES
+        for cols in CROSSOVER_COLS
+    )
+
+
+#: The batch-size sweep.
+GEMM_CROSSOVER: Final[tuple[tuple[str, GemmShape], ...]] = _crossover()
+
 #: Seed for the operands. One seed for the whole table, generated on the CPU
 #: and moved to the device, so every card multiplies the SAME bits. Generating
 #: on the GPU would use the device RNG and hand different cards different
@@ -309,6 +356,7 @@ def timed_shapes() -> tuple[tuple[str, GemmShape], ...]:
     """
     pairs = [(name, shape) for name, shape in GEMM_SHAPES.items()]
     pairs += list(GEMM_BATCHED)
+    pairs += list(GEMM_CROSSOVER)
     return require_unique_labels(tuple(pairs))
 
 
@@ -342,9 +390,12 @@ def require_unique_labels(
 
 __all__ = [
     "BATCH_COLS",
+    "CROSSOVER_COLS",
+    "CROSSOVER_SOURCES",
     "DIGEST_SUFFIX",
     "GEMM_BATCHED",
     "GEMM_COLS",
+    "GEMM_CROSSOVER",
     "GEMM_EXPERIMENT",
     "GEMM_SEED",
     "GEMM_SHAPES",
