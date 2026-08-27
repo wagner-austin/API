@@ -19,7 +19,6 @@ import runpy
 import sys
 
 import pytest
-from platform_core.comparability import RunFingerprint
 from platform_core.determinism_record import TRUE, determinism_record
 from platform_core.json_utils import dump_json_str
 from platform_core.run_record import (
@@ -30,6 +29,7 @@ from platform_core.run_record import (
     encode_run_record,
     run_record,
 )
+from platform_core.testing import sample_run_fingerprint
 
 from model_trainer.cli import probe_ladder
 from model_trainer.cli import probe_ladder_report as report_cli
@@ -64,7 +64,7 @@ def ladder_record(gpu: str, values: dict[str, float]) -> RunRecord:
     return run_record(
         experiment=probe_ladder.LADDER_EXPERIMENT,
         label=probe_ladder.ladder_label(tuple(label_of(rung) for rung in values)),
-        fingerprint=RunFingerprint(
+        fingerprint=sample_run_fingerprint(
             image_digest="sha256:1112dbb1",
             gpu_model=gpu,
             driver_version="580.82.07",
@@ -257,7 +257,7 @@ class TestTheConfigurationSection:
         elsewhere = ladder_record("NVIDIA GeForce RTX 3090 Ti", {"tiny": GATE_VALUE})
         moved: RunRecord = {
             **elsewhere,
-            "fingerprint": RunFingerprint(
+            "fingerprint": sample_run_fingerprint(
                 image_digest="",
                 gpu_model=elsewhere["fingerprint"]["gpu_model"],
                 driver_version=elsewhere["fingerprint"]["driver_version"],
@@ -287,7 +287,7 @@ class TestTheConfigurationSection:
         stray = ladder_record("NVIDIA A30", {"tiny": GATE_VALUE})
         moved: RunRecord = {
             **stray,
-            "fingerprint": RunFingerprint(
+            "fingerprint": sample_run_fingerprint(
                 image_digest="sha256:different",
                 gpu_model=stray["fingerprint"]["gpu_model"],
                 driver_version=stray["fingerprint"]["driver_version"],
@@ -313,7 +313,7 @@ class TestTheConfigurationSection:
         # local 3090 Ti ladder pair is exactly this shape.
         local: RunRecord = {
             **ladder_record("NVIDIA GeForce RTX 3090 Ti", {"tiny": GATE_VALUE}),
-            "fingerprint": RunFingerprint(
+            "fingerprint": sample_run_fingerprint(
                 image_digest="",
                 gpu_model="NVIDIA GeForce RTX 3090 Ti",
                 driver_version="591.86",
@@ -339,7 +339,7 @@ class TestTheConfigurationSection:
         # it, so this set gets both warnings and deserves them.
         unknown: RunRecord = {
             **ladder_record("NVIDIA GeForce RTX 3090 Ti", {"tiny": GATE_VALUE}),
-            "fingerprint": RunFingerprint(
+            "fingerprint": sample_run_fingerprint(
                 image_digest="",
                 gpu_model="NVIDIA GeForce RTX 3090 Ti",
                 driver_version="591.86",

@@ -12,11 +12,11 @@ import runpy
 import sys
 
 import pytest
-from platform_core.comparability import RunFingerprint
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import load_json_str
 from platform_core.known_answer import KnownAnswer, check_known_answer
 from platform_core.run_record import decode_run_record
+from platform_core.testing import sample_run_fingerprint
 from platform_ml.determinism import TORCH_THREAD_SETTING, with_torch_thread_count
 
 from model_trainer.cli import _test_hooks as cli_hooks
@@ -269,11 +269,17 @@ class TestTheGateItFeeds:
         record = probe_cli.probe_run_record("cpu")
         observed = record["observations"][0]["value"]
         known = self._answer(observed, 0.0)
-        moved = RunFingerprint(
+        # Every axis but the card is copied from the record, because the
+        # question is what a CARD CHANGE does. Letting the builder default
+        # the host and package axes would move three axes and prove nothing
+        # about any of them.
+        moved = sample_run_fingerprint(
             image_digest=record["fingerprint"]["image_digest"],
             gpu_model="NVIDIA A100 80GB PCIe",
             driver_version=record["fingerprint"]["driver_version"],
             determinism=record["fingerprint"]["determinism"],
+            host=record["fingerprint"]["host"],
+            packages=record["fingerprint"]["packages"],
         )
 
         outcome = check_known_answer(known, moved, observed)

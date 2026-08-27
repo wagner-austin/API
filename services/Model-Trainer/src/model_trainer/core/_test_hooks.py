@@ -29,7 +29,9 @@ from model_trainer.core._hook_defaults import (
     _default_env_image_digest,
     _default_freeze_embeddings,
     _default_get_directory_size_bytes,
+    _default_host_probe,
     _default_httpx_client_factory,
+    _default_installed_version,
     _default_load_gpt2_model,
     _default_load_prepared_gpt2_from_handle,
     _default_load_settings,
@@ -76,7 +78,9 @@ from model_trainer.core._hook_protocols import (
     GetDirectorySizeBytesProto,
     GpuMaxMemoryAllocatedProto,
     GpuResetPeakMemoryStatsProto,
+    HostProbeProto,
     HttpxClientFactoryProto,
+    InstalledVersionProto,
     KVStoreFactoryProto,
     LoadSettingsProto,
     OsScandirProto,
@@ -245,6 +249,10 @@ env_git_commit: EnvGitCommitProto = _default_env_git_commit
 env_image_digest: EnvImageDigestProto = _default_env_image_digest
 
 pkg_version: PkgVersionProto = _default_pkg_version
+
+host_probe: HostProbeProto = _default_host_probe
+
+installed_version: InstalledVersionProto = _default_installed_version
 
 model_dir: ModelDirProto = _default_model_dir
 

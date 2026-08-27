@@ -13,6 +13,7 @@ from typing import Protocol
 import httpx
 import torch
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.environment_record import HostProbe
 from platform_core.json_utils import _JSONInputValue as JSONInputValue
 from platform_workers.redis import (
     RedisStrProto,
@@ -52,6 +53,49 @@ class PkgVersionProto(Protocol):
 
     def __call__(self, name: str) -> str:
         """Get package version by name."""
+        ...
+
+
+class HostProbeProto(Protocol):
+    """Protocol for the host_probe hook.
+
+    Separate from :class:`PkgVersionProto` because it answers a different
+    question: which MACHINE, rather than which libraries.
+    """
+
+    def __call__(self) -> HostProbe:
+        """Build the probe that reads this machine's identity.
+
+        Returns:
+            The probe, whose fields become the fingerprint's host axis.
+        """
+        ...
+
+
+class InstalledVersionProto(Protocol):
+    """Protocol for the installed_version hook.
+
+    DISTINCT FROM :class:`PkgVersionProto` AND THAT IS DELIBERATE, not a fork.
+    ``pkg_version`` answers "what shall I write in a human-readable manifest"
+    and returns ``"unknown"`` for a library that is not installed. A
+    fingerprint axis cannot accept that: ``"unknown"`` is a non-empty string,
+    so it would pass every validator and then compare EQUAL to any other run
+    that also could not find the library, reporting two different
+    environments as one. This hook propagates instead.
+    """
+
+    def __call__(self, distribution: str) -> str:
+        """Read one distribution's resolved version.
+
+        Args:
+            distribution: The distribution name.
+
+        Returns:
+            Its installed version.
+
+        Raises:
+            PackageNotFoundError: When the distribution is not installed.
+        """
         ...
 
 

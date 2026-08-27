@@ -25,6 +25,7 @@ from platform_core.json_utils import (
     narrow_json_to_list,
     narrow_json_to_str,
 )
+from platform_core.testing import SAMPLE_HOST, SAMPLE_PACKAGES
 
 from covenant_ml.benchmarking.regression_quality import (
     RegressionBenchConfig,
@@ -93,6 +94,8 @@ def _discard_env(name: str, value: str) -> None:
 _FINGERPRINT = cpu_run_fingerprint(
     apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
     {"IMAGE_DIGEST": "sha256:" + "ef" * 32}.get,
+    SAMPLE_HOST,
+    SAMPLE_PACKAGES,
 )
 """The configuration these benchmarks claim to run under.
 

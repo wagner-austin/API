@@ -34,27 +34,7 @@ from model_trainer.orchestrators.conversation_orchestrator import ConversationOr
 from model_trainer.orchestrators.inference_orchestrator import InferenceOrchestrator
 from model_trainer.orchestrators.tokenizer_orchestrator import TokenizerOrchestrator
 from model_trainer.orchestrators.training_orchestrator import TrainingOrchestrator
-
-# What a completed cloze record must carry beside the number: the
-# configuration it was produced under. An accuracy without one cannot be
-# compared with any other measurement, because a disagreement is
-# indistinguishable from a working image scored on a different card.
-_FINGERPRINT: JSONValue = {
-    "image_digest": "sha256:abc",
-    "gpu_model": "NVIDIA GeForce RTX 3090 Ti",
-    "driver_version": "591.86",
-    "determinism": {
-        "stack": "torch",
-        "settings": {
-            "deterministic_algorithms": "true",
-            "cublas_workspace_config": ":4096:8",
-            "matmul_tf32": "false",
-            "cudnn_tf32": "false",
-            "cudnn_deterministic": "true",
-            "cudnn_benchmark": "false",
-        },
-    },
-}
+from tests._cloze_fingerprint_support import CLOZE_FINGERPRINT
 
 
 def _install_fakes() -> FakeQueue:
@@ -138,7 +118,7 @@ class TestClozeOrchestrator:
             "correct": 6,
             "accuracy": 0.75,
             "chance": 0.25,
-            "fingerprint": _FINGERPRINT,
+            "fingerprint": CLOZE_FINGERPRINT,
         }
         redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
         out = orch.get_cloze("run123", "req123")
@@ -161,7 +141,7 @@ class TestClozeOrchestrator:
                 {"item_id": "a", "correct": True, "scores": [1.0, 2.0]},
                 {"item_id": "b", "correct": False, "scores": [2.0, 1.0]},
             ],
-            "fingerprint": _FINGERPRINT,
+            "fingerprint": CLOZE_FINGERPRINT,
         }
         redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
         out = orch.get_cloze("run123", "req123")
@@ -217,7 +197,7 @@ class TestClozeOrchestrator:
             "correct": 6,
             "accuracy": 0.75,
             "chance": 0.25,
-            "fingerprint": _FINGERPRINT,
+            "fingerprint": CLOZE_FINGERPRINT,
         }
         redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
 
@@ -334,7 +314,7 @@ class TestClozeRoutes:
             "correct": 3,
             "accuracy": 0.75,
             "chance": 0.25,
-            "fingerprint": _FINGERPRINT,
+            "fingerprint": CLOZE_FINGERPRINT,
         }
         redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
         res = client.get("/runs/run123/cloze/req123", headers={"X-API-Key": "test-key"})
@@ -356,7 +336,7 @@ class TestClozeRoutes:
             "accuracy": 1.0,
             "chance": 0.25,
             "outcomes": [{"item_id": "page::1", "correct": True, "scores": [1.0, 3.0]}],
-            "fingerprint": _FINGERPRINT,
+            "fingerprint": CLOZE_FINGERPRINT,
         }
         redis.set(cloze_key("run123", "req123"), dump_json_str(cache))
         res = client.get("/runs/run123/cloze/req123", headers={"X-API-Key": "test-key"})
@@ -492,7 +472,7 @@ class TestBaselineClozeOrchestrator:
             "correct": 1374,
             "accuracy": 0.523,
             "chance": 0.25,
-            "fingerprint": _FINGERPRINT,
+            "fingerprint": CLOZE_FINGERPRINT,
         }
         redis.set(baseline_cloze_key("gpt2", "file-1"), dump_json_str(cache))
 
@@ -578,7 +558,7 @@ class TestBaselineClozeRoutes:
             "accuracy": 0.523,
             "chance": 0.25,
             "outcomes": [{"item_id": "page::1", "correct": True, "scores": [1.0, 3.0]}],
-            "fingerprint": _FINGERPRINT,
+            "fingerprint": CLOZE_FINGERPRINT,
         }
         redis.set(baseline_cloze_key("gpt2", "file-1"), dump_json_str(cache))
 

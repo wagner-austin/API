@@ -21,6 +21,7 @@ from platform_core.known_answer import (
     describe_known_answer_outcome,
     encode_known_answer,
 )
+from platform_core.testing import sample_run_fingerprint
 
 PINNED = determinism_record(
     "torch",
@@ -39,7 +40,7 @@ def fingerprint(
     *, image: str = "sha256:aaaa", gpu: str = "NVIDIA GeForce RTX 3090 Ti"
 ) -> RunFingerprint:
     """Build a fingerprint, defaulting to the local card fully pinned."""
-    return RunFingerprint(
+    return sample_run_fingerprint(
         image_digest=image,
         gpu_model=gpu,
         driver_version="550.90.07",

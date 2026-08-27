@@ -156,6 +156,12 @@ def discrimination_failures(entry: KnownAnswer) -> tuple[str, ...]:
             gpu_model=_CONTROL_CARD,
             driver_version=fingerprint["driver_version"],
             determinism=fingerprint["determinism"],
+            # Every axis but the card is copied from the entry, because the
+            # control asks what a CARD CHANGE does. Substituting a sample
+            # host or an empty package list here would make the control pass
+            # on three differences and prove nothing about any of them.
+            host=fingerprint["host"],
+            packages=fingerprint["packages"],
         ),
         expected,
     )

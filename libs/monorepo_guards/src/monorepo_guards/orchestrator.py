@@ -30,6 +30,7 @@ from monorepo_guards.passthrough_rules import PassthroughRule
 from monorepo_guards.pattern_rules import PatternRule
 from monorepo_guards.redis_rules import RedisRule
 from monorepo_guards.request_context_rules import RequestContextRule
+from monorepo_guards.run_fingerprint_rules import RunFingerprintLiteralRule
 from monorepo_guards.rust_rules import (
     RustCargoLintRule,
     RustCoverageRule,
@@ -80,6 +81,7 @@ def _run_with_config(config: GuardConfig) -> int:
         MLTestQualityRule(),
         CapabilityDerivationRule(),
         FakeRedisRule(),
+        RunFingerprintLiteralRule(),
         FileSizeRule(),
         GuardShimRule(),
         MockBanRule(),

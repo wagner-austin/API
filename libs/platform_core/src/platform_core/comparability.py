@@ -49,6 +49,16 @@ from platform_core.determinism_record import (
     encode_determinism_record,
     render_determinism_record,
 )
+from platform_core.environment_record import (
+    HostRecord,
+    PackageVersion,
+    decode_host_record,
+    decode_package_versions,
+    encode_host_record,
+    encode_package_versions,
+    render_host_record,
+    render_package_versions,
+)
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -56,6 +66,7 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
     require_dict,
     require_float,
+    require_list,
     require_str,
 )
 
@@ -78,12 +89,26 @@ class RunFingerprint(TypedDict):
         determinism: What numerical determinism was actually in force, from
             whatever pinner the run's stack uses, e.g.
             :func:`platform_ml.determinism.apply_determinism` for torch.
+        host: The machine, from
+            :func:`~platform_core.environment_record.capture_host_record`.
+            Present because the three axes above are ALL
+            :const:`NO_VALUE` for research that pulls no torch and runs out
+            of a directory environment, so two such runs on two different
+            boxes used to produce identical fingerprints.
+        packages: The resolved versions of the libraries whose arithmetic
+            decides this run's numbers, from
+            :func:`~platform_core.environment_record.capture_package_versions`.
+            The software axis for a run with no image, and a sharper one than
+            the digest even for a run with one: a digest says two runs used
+            different images, this says which library changed.
     """
 
     image_digest: str
     gpu_model: str
     driver_version: str
     determinism: DeterminismRecord
+    host: HostRecord
+    packages: tuple[PackageVersion, ...]
 
 
 IMAGE_DIGEST_ENV_VAR = "IMAGE_DIGEST"
@@ -131,7 +156,10 @@ def image_digest_from_env(get_env: Callable[[str], str | None]) -> str:
 
 
 def cpu_run_fingerprint(
-    determinism: DeterminismRecord, get_env: Callable[[str], str | None]
+    determinism: DeterminismRecord,
+    get_env: Callable[[str], str | None],
+    host: HostRecord,
+    packages: tuple[PackageVersion, ...],
 ) -> RunFingerprint:
     """Describe the configuration of a run that uses no GPU.
 
@@ -146,12 +174,24 @@ def cpu_run_fingerprint(
     omitted. A cpu run genuinely has no card, and saying so is what stops it
     comparing equal to a cuda run of the same code.
 
+    THE HOST AND PACKAGE AXES ARE REQUIRED HERE AND THAT IS THE POINT. Before
+    they existed this function could return a fingerprint whose every axis was
+    :const:`NO_VALUE` except the determinism settings, so two runs of one
+    gradient-boosting benchmark on two different machines compared as
+    identically configured. They are parameters rather than captured inside
+    because capture reads the process and its installed metadata, and a
+    describing function that reads the world cannot be tested without one.
+
     Args:
         determinism: What was actually pinned, from
             :func:`~platform_core.determinism_cpu.apply_cpu_determinism`.
             Passed in rather than applied here: pinning writes process-global
             state and belongs to the job, while this only describes.
         get_env: Reader for a process environment variable.
+        host: The machine, from
+            :func:`~platform_core.environment_record.capture_host_record`.
+        packages: The resolved library versions, from
+            :func:`~platform_core.environment_record.capture_package_versions`.
 
     Returns:
         The fingerprint, comparable against any other by
@@ -162,6 +202,8 @@ def cpu_run_fingerprint(
         gpu_model=NO_VALUE,
         driver_version=NO_VALUE,
         determinism=determinism,
+        host=host,
+        packages=packages,
     )
 
 
@@ -253,6 +295,8 @@ _AXIS_READERS: Mapping[str, Callable[[RunFingerprint], str]] = {
     "gpu_model": lambda f: f["gpu_model"],
     "driver_version": lambda f: f["driver_version"],
     "determinism": lambda f: render_determinism_record(f["determinism"]),
+    "host": lambda f: render_host_record(f["host"]),
+    "packages": lambda f: render_package_versions(f["packages"]),
 }
 
 #: The axes a run's numbers depend on, in the order a verdict reports them.
@@ -412,6 +456,8 @@ def encode_run_fingerprint(fingerprint: RunFingerprint) -> JSONObject:
         "gpu_model": fingerprint["gpu_model"],
         "driver_version": fingerprint["driver_version"],
         "determinism": encode_determinism_record(fingerprint["determinism"]),
+        "host": encode_host_record(fingerprint["host"]),
+        "packages": encode_package_versions(fingerprint["packages"]),
     }
 
 
@@ -438,6 +484,8 @@ def decode_run_fingerprint(value: JSONValue) -> RunFingerprint:
         gpu_model=require_str(obj, "gpu_model"),
         driver_version=require_str(obj, "driver_version"),
         determinism=decode_determinism_record(require_dict(obj, "determinism")),
+        host=decode_host_record(require_dict(obj, "host")),
+        packages=decode_package_versions(require_list(obj, "packages")),
     )
 
 

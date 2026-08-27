@@ -20,7 +20,6 @@ from collections.abc import Generator
 
 import pytest
 import torch
-from platform_core.comparability import RunFingerprint
 from platform_core.determinism_record import TRUE, determinism_record
 from platform_core.json_utils import dump_json_str, load_json_str
 from platform_core.run_record import (
@@ -30,6 +29,7 @@ from platform_core.run_record import (
     encode_run_record,
     run_record,
 )
+from platform_core.testing import sample_run_fingerprint
 from torch.nn.attention import SDPBackend
 
 from model_trainer.cli import _test_hooks as cli_hooks
@@ -318,7 +318,7 @@ def cost_record(
     return run_record(
         experiment=SDPA_COST_EXPERIMENT,
         label=bench_cli.SDPA_COST_LABEL,
-        fingerprint=RunFingerprint(
+        fingerprint=sample_run_fingerprint(
             image_digest="sha256:test",
             gpu_model=gpu,
             driver_version="580.82.07",

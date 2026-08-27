@@ -20,10 +20,20 @@ Usage in tests:
 
 from __future__ import annotations
 
+import os
 import time
 
+from platform_core.environment_record import (
+    HostProbe,
+    VersionReader,
+    stdlib_host_probe,
+)
+from platform_core.environment_record import (
+    installed_version as _installed_version,
+)
+
 from .power import opt_out_of_power_throttling
-from .protocols import MonotonicClockProto, PowerThrottlingOptOutProto
+from .protocols import HostProbeProto, MonotonicClockProto, PowerThrottlingOptOutProto
 
 #: Clock used to bracket each timed fit. Bound to :func:`time.perf_counter`,
 #: the highest-resolution monotonic counter available, so timings are immune
@@ -38,4 +48,32 @@ monotonic_clock: MonotonicClockProto = time.perf_counter
 power_throttling_opt_out: PowerThrottlingOptOutProto = opt_out_of_power_throttling
 
 
-__all__ = ["monotonic_clock", "power_throttling_opt_out"]
+def _default_host_probe() -> HostProbe:
+    """Build the probe that reads this machine.
+
+    ``os.cpu_count`` is injected rather than read inside the probe so the
+    arm that refuses a machine reporting no count stays reachable.
+
+    Returns:
+        The stdlib probe.
+    """
+    return stdlib_host_probe(os.cpu_count)
+
+
+#: Reader for the machine a benchmark ran on. Tests rebind it so a
+#: fingerprint assertion does not depend on whose box ran the suite.
+host_probe: HostProbeProto = _default_host_probe
+
+#: Reader for one distribution's installed version. Propagates on a
+#: missing distribution rather than softening to a sentinel, because a
+#: sentinel is a non-empty string that would compare EQUAL between two
+#: environments that each failed to find the library.
+installed_version: VersionReader = _installed_version
+
+
+__all__ = [
+    "host_probe",
+    "installed_version",
+    "monotonic_clock",
+    "power_throttling_opt_out",
+]

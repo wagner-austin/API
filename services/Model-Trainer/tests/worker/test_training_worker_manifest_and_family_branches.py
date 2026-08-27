@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from platform_core.comparability import encode_run_fingerprint
 from platform_core.determinism_record import (
     FALSE,
     TRUE,
@@ -8,6 +9,7 @@ from platform_core.determinism_record import (
     determinism_record,
 )
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
+from platform_core.testing import sample_run_fingerprint
 
 from model_trainer.worker import manifest
 
@@ -382,15 +384,16 @@ def _fingerprint_json(**overrides: JSONValue) -> dict[str, JSONValue]:
     Returns:
         The JSON object.
     """
-    base: dict[str, JSONValue] = {
-        "image_digest": "sha256:" + "ab" * 32,
-        "gpu_model": "NVIDIA A100 80GB PCIe",
-        "driver_version": "580.82.07",
-        "determinism": {
-            "stack": "torch",
-            "settings": {"cudnn_deterministic": "true", "matmul_tf32": "false"},
-        },
-    }
+    base: dict[str, JSONValue] = encode_run_fingerprint(
+        sample_run_fingerprint(
+            image_digest="sha256:" + "ab" * 32,
+            gpu_model="NVIDIA A100 80GB PCIe",
+            driver_version="580.82.07",
+            determinism=determinism_record(
+                "torch", {"cudnn_deterministic": "true", "matmul_tf32": "false"}
+            ),
+        )
+    )
     base.update(overrides)
     return base
 

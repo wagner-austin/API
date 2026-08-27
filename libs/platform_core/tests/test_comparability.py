@@ -27,6 +27,8 @@ from platform_core.determinism_record import (
     DeterminismRecord,
     determinism_record,
 )
+from platform_core.environment_record import HostRecord, PackageVersion, host_record
+from platform_core.testing import SAMPLE_HOST, SAMPLE_PACKAGES, sample_run_fingerprint
 
 # Spelled as a literal rather than imported: platform_core knows nothing
 # about torch, and a test here reaching into platform_ml for a constant
@@ -47,6 +49,18 @@ DETERMINISTIC = determinism_record(
 
 NONDETERMINISTIC = determinism_record(UNPINNED_STACK, {})
 
+#: A second machine. Differs from :data:`SAMPLE_HOST` only in core count,
+#: which is the case the axis exists for: same OS, same architecture, same
+#: libraries, and a threaded reduction that partitions differently.
+OTHER_HOST = host_record(
+    platform=SAMPLE_HOST["platform"],
+    machine=SAMPLE_HOST["machine"],
+    logical_cores=24,
+)
+
+#: The same libraries with one bumped.
+OTHER_PACKAGES: tuple[PackageVersion, ...] = (PackageVersion(name="numpy", version="2.4.0"),)
+
 
 def fingerprint(
     *,
@@ -54,13 +68,17 @@ def fingerprint(
     gpu: str = "NVIDIA GeForce RTX 3090 Ti",
     driver: str = "550.90.07",
     determinism: DeterminismRecord = DETERMINISTIC,
+    host: HostRecord = SAMPLE_HOST,
+    packages: tuple[PackageVersion, ...] = SAMPLE_PACKAGES,
 ) -> RunFingerprint:
     """Build a fingerprint, defaulting to the local card fully pinned."""
-    return RunFingerprint(
+    return sample_run_fingerprint(
         image_digest=image,
         gpu_model=gpu,
         driver_version=driver,
         determinism=determinism,
+        host=host,
+        packages=packages,
     )
 
 
@@ -234,12 +252,72 @@ def test_differences_are_reported_in_the_declared_axis_order() -> None:
             gpu="NVIDIA A100 80GB PCIe",
             driver="560.1.2",
             determinism=NONDETERMINISTIC,
+            host=OTHER_HOST,
+            packages=OTHER_PACKAGES,
         ),
         (),
     )
 
     assert verdict["kind"] == "uncalibrated"
     assert [d["axis"] for d in verdict["differences"]] == list(COMPARABILITY_AXES)
+
+
+def test_two_machines_running_identical_software_are_not_identical() -> None:
+    # The gap the host axis exists to close. Before it, this pair differed on
+    # nothing a fingerprint recorded -- so a gradient-boosting benchmark run
+    # on two different boxes compared as one configuration, and its numbers
+    # subtracted without complaint.
+    verdict = compare_configurations(fingerprint(), fingerprint(host=OTHER_HOST), ())
+
+    assert verdict["kind"] == "uncalibrated"
+    assert [d["axis"] for d in verdict["differences"]] == ["host"]
+
+
+def test_the_host_difference_names_both_machines() -> None:
+    differences = find_differences(fingerprint(), fingerprint(host=OTHER_HOST))
+
+    assert differences == (
+        AxisDifference(
+            axis="host",
+            left="Linux-5.14.0-x86_64-with-glibc2.34/x86_64/8",
+            right="Linux-5.14.0-x86_64-with-glibc2.34/x86_64/24",
+        ),
+    )
+
+
+def test_a_core_count_change_alone_is_a_difference() -> None:
+    # Same OS, same architecture, same libraries, more cores. A threaded
+    # reduction partitions by the count, so this is the axis and not a
+    # cosmetic one.
+    differences = find_differences(fingerprint(), fingerprint(host=OTHER_HOST))
+
+    assert [d["axis"] for d in differences] == ["host"]
+
+
+def test_a_library_bump_on_one_machine_is_a_difference() -> None:
+    differences = find_differences(fingerprint(), fingerprint(packages=OTHER_PACKAGES))
+
+    assert differences == (
+        AxisDifference(axis="packages", left="numpy=2.3.5", right="numpy=2.4.0"),
+    )
+
+
+def test_a_measured_library_bump_can_be_calibrated_away() -> None:
+    # The reason host and packages are SEPARATE axes: an offset measured for
+    # a numpy bump names only the numpy values, so it applies on any machine.
+    # Folded into one axis its endpoints would carry the CPU too.
+    bump = Calibration(
+        axis="packages",
+        left="numpy=2.3.5",
+        right="numpy=2.4.0",
+        offset=0.02,
+        measured_by="run-1 vs run-2",
+    )
+
+    verdict = compare_configurations(fingerprint(), fingerprint(packages=OTHER_PACKAGES), (bump,))
+
+    assert verdict["kind"] == "offset"
+    assert verdict["offset"] == 0.02
 
 
 def test_a_calibration_on_a_different_axis_does_not_cover_the_difference() -> None:

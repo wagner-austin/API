@@ -20,7 +20,6 @@ import runpy
 import sys
 
 import pytest
-from platform_core.comparability import RunFingerprint
 from platform_core.determinism_record import TRUE, determinism_record
 from platform_core.json_utils import dump_json_str
 from platform_core.run_record import (
@@ -31,6 +30,7 @@ from platform_core.run_record import (
     encode_run_record,
     run_record,
 )
+from platform_core.testing import sample_run_fingerprint
 
 from model_trainer.cli import probe_trace_report as report_cli
 from model_trainer.cli.record_reports import agreement_groups
@@ -122,7 +122,7 @@ def trace_record(
     return run_record(
         experiment=TRACE_EXPERIMENT,
         label=trace_label(rungs),
-        fingerprint=RunFingerprint(
+        fingerprint=sample_run_fingerprint(
             image_digest="sha256:b002cffc",
             gpu_model=gpu,
             driver_version="580.82.07",
@@ -233,7 +233,7 @@ class TestNamingTheRungsARecordCovers:
         empty = run_record(
             experiment=TRACE_EXPERIMENT,
             label=trace_label(("tiny",)),
-            fingerprint=RunFingerprint(
+            fingerprint=sample_run_fingerprint(
                 image_digest="sha256:b002cffc",
                 gpu_model="A30",
                 driver_version="580.82.07",

@@ -17,6 +17,7 @@ from platform_core.run_record import (
     agree_across_runs,
     run_record,
 )
+from platform_core.testing import sample_run_fingerprint
 
 PINNED = determinism_record("torch", {"cudnn_deterministic": TRUE})
 LADDER = "probe-shape-threshold"
@@ -30,7 +31,7 @@ GATE_VALUE = 6.250983715057373
 
 def fingerprint(gpu: str) -> RunFingerprint:
     """Build a fingerprint differing from its siblings only in the card."""
-    return RunFingerprint(
+    return sample_run_fingerprint(
         image_digest="sha256:1112dbb1",
         gpu_model=gpu,
         driver_version="580.82.07",

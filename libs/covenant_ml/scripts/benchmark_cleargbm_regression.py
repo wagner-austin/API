@@ -19,7 +19,6 @@ import sys
 from pathlib import Path
 from typing import Protocol
 
-from platform_core.comparability import cpu_run_fingerprint
 from platform_core.config import config_test_hooks
 from platform_core.determinism_cpu import apply_cpu_determinism
 from platform_core.determinism_env import SINGLE_THREAD
@@ -129,10 +128,16 @@ def main(argv: list[str] | None = None, pin: PinProtocol = _real_pin) -> int:
     # are read when the native library loads, so this has to happen above the
     # covenant_ml import rather than merely before the benchmark call.
     determinism = pin()
+
+    # Imported after the pin, with everything else from covenant_ml: it
+    # reads installed metadata and builds a host record, neither of which
+    # may happen above the line that writes the thread variables.
+    from covenant_ml.benchmarking.provenance import benchmark_fingerprint
+
     # Read through the config layer, not os.environ. Writing a variable a
     # native library requires is a different act from reading configuration,
     # and only the first is this script's business.
-    fingerprint = cpu_run_fingerprint(determinism, config_test_hooks.get_env)
+    fingerprint = benchmark_fingerprint(determinism, config_test_hooks.get_env)
 
     from covenant_ml.benchmarking.regression_quality import (
         RegressionBenchConfig,

@@ -27,10 +27,25 @@ from __future__ import annotations
 
 from platform_core.comparability import RunFingerprint
 from platform_core.determinism_record import DeterminismRecord
+from platform_core.environment_record import (
+    capture_host_record,
+    capture_package_versions,
+)
 
 from model_trainer.core import _test_hooks
 
 CUDA_DEVICE = "cuda"
+
+#: The libraries whose arithmetic decides this service's numbers.
+#:
+#: Not every installed distribution. A fingerprint over all of them would
+#: differ between two runs over a dev-dependency bump that cannot reach a
+#: matmul, and every spurious difference makes a real one harder to see.
+#: These three can: ``torch`` selects the kernels, ``transformers`` decides
+#: which attention path the model takes -- the 2026-08-27 measurement traced
+#: a cross-card divergence to `GPT2SdpaAttention` choosing
+#: `EFFICIENT_ATTENTION` -- and ``numpy`` backs the scoring arithmetic.
+FINGERPRINT_DISTRIBUTIONS: tuple[str, ...] = ("numpy", "torch", "transformers")
 
 # A run that used no GPU has no card and no driver, and the empty string is
 # how RunFingerprint spells that: it compares as a difference against any
@@ -80,6 +95,8 @@ def capture_run_fingerprint(device: str, determinism: DeterminismRecord) -> RunF
         gpu_model=_test_hooks.cuda_device_name() if on_cuda else NO_GPU,
         driver_version=_test_hooks.cuda_driver_version() if on_cuda else NO_GPU,
         determinism=determinism,
+        host=capture_host_record(_test_hooks.host_probe()),
+        packages=capture_package_versions(FINGERPRINT_DISTRIBUTIONS, _test_hooks.installed_version),
     )
 
 
@@ -105,6 +122,7 @@ def describe_run_fingerprint(fingerprint: RunFingerprint) -> str:
 
 __all__ = [
     "CUDA_DEVICE",
+    "FINGERPRINT_DISTRIBUTIONS",
     "NO_GPU",
     "capture_run_fingerprint",
     "describe_run_fingerprint",

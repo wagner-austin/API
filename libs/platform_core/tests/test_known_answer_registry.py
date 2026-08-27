@@ -27,17 +27,18 @@ from platform_core.known_answer_registry import (
     write_registry,
 )
 from platform_core.run_record import Observation, RunRecord, run_record
+from platform_core.testing import sample_run_fingerprint
 
 _PINNED = DeterminismRecord(stack="torch", settings=(("matmul_tf32", "false"),))
 
-_FULL = RunFingerprint(
+_FULL = sample_run_fingerprint(
     image_digest="a" * 64,
     gpu_model="NVIDIA A100 80GB PCIe",
     driver_version="580.82.07",
     determinism=_PINNED,
 )
 
-_OTHER_CARD = RunFingerprint(
+_OTHER_CARD = sample_run_fingerprint(
     image_digest="a" * 64,
     gpu_model="Tesla V100-FHHL-16GB",
     driver_version="580.82.07",
@@ -146,13 +147,15 @@ class TestIncompleteAxes:
         assert incomplete_axes(_FULL) == ()
 
     def test_it_names_every_empty_axis_in_declaration_order(self) -> None:
-        bare = RunFingerprint(image_digest="", gpu_model="", driver_version="", determinism=_PINNED)
+        bare = sample_run_fingerprint(
+            image_digest="", gpu_model="", driver_version="", determinism=_PINNED
+        )
 
         assert incomplete_axes(bare) == ("image_digest", "gpu_model", "driver_version")
 
     @pytest.mark.parametrize("axis", ["image_digest", "gpu_model", "driver_version"])
     def test_it_names_a_single_empty_axis(self, axis: str) -> None:
-        fingerprint = RunFingerprint(
+        fingerprint = sample_run_fingerprint(
             image_digest="" if axis == "image_digest" else "a" * 64,
             gpu_model="" if axis == "gpu_model" else "A100",
             driver_version="" if axis == "driver_version" else "580.82.07",
@@ -205,7 +208,7 @@ class TestEntryFromRecord:
     def test_an_incomplete_fingerprint_is_refused_and_names_the_axes(self) -> None:
         # The real case: a probe whose launcher recorded the card, so
         # driver_version was simply absent.
-        fingerprint = RunFingerprint(
+        fingerprint = sample_run_fingerprint(
             image_digest="a" * 64,
             gpu_model="NVIDIA A100 80GB PCIe",
             driver_version="",

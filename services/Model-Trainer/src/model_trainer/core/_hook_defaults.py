@@ -8,6 +8,11 @@ from pathlib import Path
 
 import httpx
 import torch
+from platform_core.environment_record import (
+    HostProbe,
+    installed_version,
+    stdlib_host_probe,
+)
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import _JSONInputValue as JSONInputValue
 from platform_ml.testing import (
@@ -208,6 +213,44 @@ def _default_env_image_digest() -> str | None:
 
     value = config_test_hooks.get_env("IMAGE_DIGEST")
     return value if value else None
+
+
+def _default_host_probe() -> HostProbe:
+    """Production host_probe - used as default hook.
+
+    ``os.cpu_count`` is passed rather than read inside the probe because a
+    machine that does not report a count must be refusable, and the arm that
+    refuses it has to be reachable without owning such a machine.
+
+    Returns:
+        The stdlib probe, reading this process's real platform, architecture
+        and logical processor count.
+    """
+    import os
+
+    return stdlib_host_probe(os.cpu_count)
+
+
+def _default_installed_version(distribution: str) -> str:
+    """Production installed_version - used as default hook.
+
+    Not :func:`_default_pkg_version`. That one softens a missing distribution
+    to ``"unknown"`` for a human-readable manifest; this one feeds a
+    comparability axis, where ``"unknown"`` would compare equal between two
+    environments that each failed to find the library for different reasons.
+
+    Args:
+        distribution: The distribution name.
+
+    Returns:
+        Its installed version.
+
+    Raises:
+        PackageNotFoundError: When the distribution is not installed.
+            Propagated: a run being fingerprinted against a library it does
+            not have is a caller naming the wrong library.
+    """
+    return installed_version(distribution)
 
 
 def _default_model_dir(settings: Settings, run_id: str) -> Path:

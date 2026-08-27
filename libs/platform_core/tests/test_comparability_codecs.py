@@ -11,7 +11,6 @@ import pytest
 
 from platform_core.comparability import (
     Calibration,
-    RunFingerprint,
     compare_configurations,
     decode_calibration,
     decode_run_fingerprint,
@@ -21,6 +20,7 @@ from platform_core.comparability import (
 )
 from platform_core.determinism_record import FALSE, TRUE, determinism_record
 from platform_core.json_utils import JSONTypeError
+from platform_core.testing import sample_run_fingerprint
 
 # See test_comparability: a literal, because platform_core knows no torch.
 _TORCH = "torch"
@@ -37,7 +37,7 @@ REPORT = determinism_record(
     },
 )
 
-FINGERPRINT = RunFingerprint(
+FINGERPRINT = sample_run_fingerprint(
     image_digest="sha256:aaaa",
     gpu_model="NVIDIA GeForce RTX 3090 Ti",
     driver_version="550.90.07",
@@ -129,7 +129,7 @@ def test_identical_verdict_encodes_to_its_discriminant_alone() -> None:
 
 
 def test_offset_verdict_encodes_its_offset_and_the_measurements_applied() -> None:
-    other = RunFingerprint(
+    other = sample_run_fingerprint(
         image_digest=FINGERPRINT["image_digest"],
         gpu_model="NVIDIA A100 80GB PCIe",
         driver_version=FINGERPRINT["driver_version"],
@@ -152,7 +152,7 @@ def test_offset_verdict_encodes_its_offset_and_the_measurements_applied() -> Non
 
 
 def test_uncalibrated_verdict_encodes_which_axes_lack_a_measurement() -> None:
-    other = RunFingerprint(
+    other = sample_run_fingerprint(
         image_digest="sha256:bbbb",
         gpu_model=FINGERPRINT["gpu_model"],
         driver_version=FINGERPRINT["driver_version"],

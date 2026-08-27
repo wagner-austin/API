@@ -21,6 +21,7 @@ from platform_core.run_record import (
     encode_run_record,
     run_record,
 )
+from platform_core.testing import sample_run_fingerprint
 
 PINNED = determinism_record("torch", {"cudnn_deterministic": TRUE})
 ABLATION = "wiki-corpus-extraction-ablation"
@@ -28,7 +29,7 @@ ABLATION = "wiki-corpus-extraction-ablation"
 
 def fingerprint(*, gpu: str = "NVIDIA GeForce RTX 3090 Ti") -> RunFingerprint:
     """Build a fingerprint, defaulting to the local card fully pinned."""
-    return RunFingerprint(
+    return sample_run_fingerprint(
         image_digest="sha256:aaaa",
         gpu_model=gpu,
         driver_version="591.86",

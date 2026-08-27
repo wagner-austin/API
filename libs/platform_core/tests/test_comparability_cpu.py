@@ -24,6 +24,8 @@ from platform_core.comparability import (
 from platform_core.determinism_cpu import apply_cpu_determinism
 from platform_core.determinism_env import SINGLE_THREAD
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
+from platform_core.environment_record import PackageVersion, host_record
+from platform_core.testing import SAMPLE_HOST, SAMPLE_PACKAGES
 
 _DIGEST = "sha256:" + "ab" * 32
 
@@ -69,7 +71,9 @@ class TestCpuRunFingerprint:
     def test_it_carries_the_image_and_the_pinned_posture(self) -> None:
         determinism = apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED)
 
-        fingerprint = cpu_run_fingerprint(determinism, {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get)
+        fingerprint = cpu_run_fingerprint(
+            determinism, {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get, SAMPLE_HOST, SAMPLE_PACKAGES
+        )
 
         assert fingerprint["image_digest"] == _DIGEST
         assert fingerprint["determinism"] == determinism
@@ -77,7 +81,10 @@ class TestCpuRunFingerprint:
     def test_the_thread_count_is_what_the_posture_records(self) -> None:
         """The axis that decides a cpu run's numbers, in the record."""
         fingerprint = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED), _NO_ENV.get
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
+            _NO_ENV.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
 
         settings = dict(fingerprint["determinism"]["settings"])
@@ -86,7 +93,10 @@ class TestCpuRunFingerprint:
     def test_no_card_is_recorded_as_empty_rather_than_omitted(self) -> None:
         """Empty differs from every real card; an absent axis would not."""
         fingerprint = cpu_run_fingerprint(
-            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED), _NO_ENV.get
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
+            _NO_ENV.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
 
         assert fingerprint["gpu_model"] == NO_VALUE
@@ -95,7 +105,9 @@ class TestCpuRunFingerprint:
             "determinism",
             "driver_version",
             "gpu_model",
+            "host",
             "image_digest",
+            "packages",
         ]
 
 
@@ -106,10 +118,14 @@ class TestItComparesAgainstTheOtherPaths:
         left = cpu_run_fingerprint(
             apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
         right = cpu_run_fingerprint(
             apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
 
         assert compare_configurations(left, right, ())["kind"] == "identical"
@@ -119,10 +135,14 @@ class TestItComparesAgainstTheOtherPaths:
         one = cpu_run_fingerprint(
             apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
         eight = cpu_run_fingerprint(
             apply_cpu_determinism(_discard_env, "8", NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
 
         verdict = compare_configurations(one, eight, ())
@@ -133,10 +153,14 @@ class TestItComparesAgainstTheOtherPaths:
         pinned = cpu_run_fingerprint(
             apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
         unpinned = cpu_run_fingerprint(
             determinism_record(UNPINNED_STACK, {}),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
 
         assert compare_configurations(pinned, unpinned, ())["kind"] == "uncalibrated"
@@ -146,12 +170,66 @@ class TestItComparesAgainstTheOtherPaths:
         here = cpu_run_fingerprint(
             apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: _DIGEST}.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
         there = cpu_run_fingerprint(
             apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
             {IMAGE_DIGEST_ENV_VAR: "sha256:" + "cd" * 32}.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
         )
 
         verdict = compare_configurations(here, there, ())
         assert verdict["kind"] == "uncalibrated"
         assert [d["axis"] for d in verdict["differences"]] == ["image_digest"]
+
+    def test_two_machines_outside_any_image_are_a_difference(self) -> None:
+        """The case this module's docstring named and could not detect.
+
+        No image, so no digest. No card, so no card or driver. The same pin
+        on both, so the determinism records match. Before the host axis every
+        remaining field was equal and the verdict was IDENTICAL -- which is
+        the 24-core cluster node and the 8-core workstation reported as one
+        configuration, exactly as the docstring above says the cleargbm p6
+        sweeps recorded them.
+        """
+        workstation = cpu_run_fingerprint(
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
+            _NO_ENV.get,
+            SAMPLE_HOST,
+            SAMPLE_PACKAGES,
+        )
+        node = cpu_run_fingerprint(
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
+            _NO_ENV.get,
+            host_record(
+                platform=SAMPLE_HOST["platform"],
+                machine=SAMPLE_HOST["machine"],
+                logical_cores=24,
+            ),
+            SAMPLE_PACKAGES,
+        )
+
+        verdict = compare_configurations(workstation, node, ())
+        assert verdict["kind"] == "uncalibrated"
+        assert [d["axis"] for d in verdict["differences"]] == ["host"]
+
+    def test_a_library_bump_outside_any_image_is_a_difference(self) -> None:
+        """The other half: no image digest, so the packages ARE the software axis."""
+        before = cpu_run_fingerprint(
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
+            _NO_ENV.get,
+            SAMPLE_HOST,
+            (PackageVersion(name="numpy", version="2.3.5"),),
+        )
+        after = cpu_run_fingerprint(
+            apply_cpu_determinism(_discard_env, SINGLE_THREAD, NOT_LOADED),
+            _NO_ENV.get,
+            SAMPLE_HOST,
+            (PackageVersion(name="numpy", version="2.4.0"),),
+        )
+
+        verdict = compare_configurations(before, after, ())
+        assert verdict["kind"] == "uncalibrated"
+        assert [d["axis"] for d in verdict["differences"]] == ["packages"]

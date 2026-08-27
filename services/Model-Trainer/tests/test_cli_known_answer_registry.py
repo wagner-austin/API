@@ -17,19 +17,20 @@ from platform_core.json_utils import dump_json_str
 from platform_core.known_answer import KnownAnswer
 from platform_core.known_answer_registry import encode_registry, read_registry
 from platform_core.run_record import Observation, RunRecord, encode_run_record, run_record
+from platform_core.testing import sample_run_fingerprint
 
 from model_trainer.cli import known_answer_registry as registry_cli
 
 _PINNED = DeterminismRecord(stack="torch", settings=(("matmul_tf32", "false"),))
 
-_A100 = RunFingerprint(
+_A100 = sample_run_fingerprint(
     image_digest="a" * 64,
     gpu_model="NVIDIA A100 80GB PCIe",
     driver_version="580.82.07",
     determinism=_PINNED,
 )
 
-_V100 = RunFingerprint(
+_V100 = sample_run_fingerprint(
     image_digest="a" * 64,
     gpu_model="Tesla V100-FHHL-16GB",
     driver_version="580.82.07",
@@ -103,7 +104,7 @@ class TestDiscrimination:
 
     def test_an_entry_that_cannot_see_a_card_change_is_reported(self) -> None:
         # An entry whose own card IS the control card cannot distinguish one.
-        blind = RunFingerprint(
+        blind = sample_run_fingerprint(
             image_digest="a" * 64,
             gpu_model=registry_cli._CONTROL_CARD,
             driver_version="580.82.07",
@@ -236,7 +237,7 @@ class TestRegister:
 
     def test_an_incomplete_fingerprint_is_refused(self, tmp_path: pathlib.Path) -> None:
         path = _write_registry(tmp_path / "k.json")
-        blank_driver = RunFingerprint(
+        blank_driver = sample_run_fingerprint(
             image_digest="a" * 64,
             gpu_model="NVIDIA A100 80GB PCIe",
             driver_version="",

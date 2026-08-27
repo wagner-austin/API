@@ -13,7 +13,6 @@ import runpy
 import sys
 
 import pytest
-from platform_core.comparability import RunFingerprint
 from platform_core.determinism_record import TRUE, determinism_record
 from platform_core.json_utils import dump_json_str, load_json_str
 from platform_core.run_record import (
@@ -24,6 +23,7 @@ from platform_core.run_record import (
     encode_run_record,
     run_record,
 )
+from platform_core.testing import sample_run_fingerprint
 
 from model_trainer.cli import sdpa_probe as probe_cli
 from model_trainer.cli import sdpa_probe_report as report_cli
@@ -101,7 +101,7 @@ def selection_record(
     return run_record(
         experiment=SDPA_EXPERIMENT,
         label=probe_cli.SDPA_LABEL,
-        fingerprint=RunFingerprint(
+        fingerprint=sample_run_fingerprint(
             image_digest="sha256:a274e4ee",
             gpu_model=gpu,
             driver_version="580.82.07",

@@ -16,6 +16,7 @@ from typing import NamedTuple, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_core.environment_record import HostProbe
 
 from .types import BenchmarkModelName
 
@@ -41,6 +42,22 @@ class DataSplit(NamedTuple):
     y_val: NDArray[np.int64]
     x_test: NDArray[np.float64]
     y_test: NDArray[np.int64]
+
+
+class HostProbeProto(Protocol):
+    """Protocol for the hook that builds this run's host probe.
+
+    A factory rather than the probe itself, so a test can state a machine per
+    test rather than for the lifetime of the module binding.
+    """
+
+    def __call__(self) -> HostProbe:
+        """Build the probe that reads this machine's identity.
+
+        Returns:
+            The probe, whose fields become the fingerprint's host axis.
+        """
+        ...
 
 
 class MonotonicClockProto(Protocol):

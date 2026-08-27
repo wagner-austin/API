@@ -18,6 +18,7 @@ from platform_core.comparability import RunFingerprint
 from platform_core.determinism_record import TRUE, UNPINNED_STACK, determinism_record
 from platform_core.json_utils import dump_json_str, narrow_json_to_dict
 from platform_core.json_utils import load_json_str as load_json
+from platform_core.testing import sample_run_fingerprint
 
 from model_trainer.infra.persistence.models import (
     GgufExportManifest,
@@ -29,7 +30,7 @@ from model_trainer.worker.manifest_encoding import encode_training_manifest_full
 
 _PINNED = determinism_record("torch", {"cudnn_deterministic": TRUE})
 
-_FINGERPRINT = RunFingerprint(
+_FINGERPRINT = sample_run_fingerprint(
     image_digest="sha256:" + "cd" * 32,
     gpu_model="NVIDIA A100 80GB PCIe",
     driver_version="580.82.07",
@@ -163,7 +164,7 @@ class TestTheWrittenManifestIsReadable:
 
     def test_an_unpinned_posture_also_survives(self) -> None:
         """A record with no settings must not encode as an empty list."""
-        unpinned = RunFingerprint(
+        unpinned = sample_run_fingerprint(
             image_digest="",
             gpu_model="",
             driver_version="",

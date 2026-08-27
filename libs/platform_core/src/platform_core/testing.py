@@ -5,7 +5,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import NoReturn, Protocol
 
+from platform_core.comparability import RunFingerprint
 from platform_core.config import _test_hooks
+from platform_core.determinism_record import (
+    UNPINNED_STACK,
+    DeterminismRecord,
+    determinism_record,
+)
+from platform_core.environment_record import HostRecord, PackageVersion
 from platform_core.http_client import HttpxAsyncClient, HttpxClient, HttpxResponse, Timeout
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 
@@ -363,10 +370,151 @@ class FakeHttpxModuleSyncOnly:
         object.__setattr__(self, "Client", make_client_ctor(response))
 
 
+# =============================================================================
+# Run-fingerprint Fakes
+# =============================================================================
+
+#: The machine a fingerprint built by :func:`sample_run_fingerprint` reports.
+#:
+#: Stated once here rather than in each consumer's test module. Every repo
+#: that builds a :class:`~platform_core.comparability.RunFingerprint` needs
+#: one, and thirty hand-written copies is how the LAST axis addition became a
+#: thirty-site sweep across three repositories.
+SAMPLE_HOST: HostRecord = HostRecord(
+    platform="Linux-5.14.0-x86_64-with-glibc2.34",
+    machine="x86_64",
+    logical_cores=8,
+)
+
+#: The library versions a fingerprint built by :func:`sample_run_fingerprint`
+#: reports.
+SAMPLE_PACKAGES: tuple[PackageVersion, ...] = (PackageVersion(name="numpy", version="2.3.5"),)
+
+
+def sample_run_fingerprint(
+    *,
+    image_digest: str = "sha256:sample",
+    gpu_model: str = "A100",
+    driver_version: str = "580.82.07",
+    determinism: DeterminismRecord | None = None,
+    host: HostRecord | None = None,
+    packages: tuple[PackageVersion, ...] | None = None,
+) -> RunFingerprint:
+    """Build a fingerprint for a test that is not about the fingerprint.
+
+    THE POINT IS THE DEFAULTS, and specifically that a test which does not
+    care about an axis does not mention it. A fingerprint has six axes and
+    most tests are about one of them; when every test hand-built the whole
+    record, adding an axis meant editing every test that had no opinion about
+    it. A test that IS about an axis passes it and the default never applies.
+
+    Args:
+        image_digest: The image axis.
+        gpu_model: The card axis.
+        driver_version: The driver axis.
+        determinism: The determinism axis, defaulting to a torch run with
+            nothing pinned.
+        host: The machine axis, defaulting to :data:`SAMPLE_HOST`.
+        packages: The library axis, defaulting to :data:`SAMPLE_PACKAGES`.
+
+    Returns:
+        The fingerprint.
+    """
+    return RunFingerprint(
+        image_digest=image_digest,
+        gpu_model=gpu_model,
+        driver_version=driver_version,
+        determinism=(
+            determinism if determinism is not None else determinism_record(UNPINNED_STACK, {})
+        ),
+        host=host if host is not None else SAMPLE_HOST,
+        packages=packages if packages is not None else SAMPLE_PACKAGES,
+    )
+
+
+class FakeHostProbe:
+    """A machine stated rather than owned, for fingerprint tests.
+
+    Every consumer of :class:`~platform_core.comparability.RunFingerprint`
+    needs a host to build one, and a test that read the real machine would
+    assert different values on every developer's box.
+    """
+
+    def __init__(self, *, platform: str, machine: str, logical_cores: int) -> None:
+        """Store the machine this probe reports.
+
+        Args:
+            platform: The operating system, release and build to report.
+            machine: The instruction-set architecture to report.
+            logical_cores: The logical processor count to report.
+        """
+        self._platform = platform
+        self._machine = machine
+        self._logical_cores = logical_cores
+
+    def platform(self) -> str:
+        """Return the stated platform string.
+
+        Returns:
+            The platform this probe was built with.
+        """
+        return self._platform
+
+    def machine(self) -> str:
+        """Return the stated architecture.
+
+        Returns:
+            The architecture this probe was built with.
+        """
+        return self._machine
+
+    def logical_cores(self) -> int:
+        """Return the stated logical processor count.
+
+        Returns:
+            The count this probe was built with.
+        """
+        return self._logical_cores
+
+
+class FakeVersionReader:
+    """Installed versions stated rather than resolved, for fingerprint tests.
+
+    Raises on an unnamed distribution rather than inventing a version: a test
+    that asked for a library it did not state has a mistake in it, and a
+    default would hide the mistake behind a plausible-looking fingerprint.
+    """
+
+    def __init__(self, versions: Mapping[str, str]) -> None:
+        """Store the versions this reader reports.
+
+        Args:
+            versions: Version by distribution name.
+        """
+        self._versions = dict(versions)
+
+    def __call__(self, distribution: str) -> str:
+        """Return the stated version of a distribution.
+
+        Args:
+            distribution: The distribution name.
+
+        Returns:
+            Its stated version.
+
+        Raises:
+            KeyError: When the distribution was not stated.
+        """
+        return self._versions[distribution]
+
+
 __all__ = [
+    "SAMPLE_HOST",
+    "SAMPLE_PACKAGES",
     "AsyncClientCtor",
     "ClientCtor",
     "FakeEnv",
+    "FakeHostProbe",
     "FakeHttpxAsyncClient",
     "FakeHttpxAsyncClientRaises",
     "FakeHttpxClient",
@@ -375,9 +523,11 @@ __all__ = [
     "FakeHttpxModuleSyncOnly",
     "FakeHttpxResponse",
     "FakeTimeout",
+    "FakeVersionReader",
     "TimeoutCtor",
     "make_async_client_ctor",
     "make_client_ctor",
     "make_fake_env",
     "make_timeout_ctor",
+    "sample_run_fingerprint",
 ]
