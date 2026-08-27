@@ -104,6 +104,115 @@ def sdpa_shapes() -> tuple[SdpaShape, ...]:
     return tuple(sdpa_shape_for(rung) for rung in PROBE_SHAPES)
 
 
+#: Sequence lengths the cost sweep walks.
+#:
+#: WHY A SWEEP AND NOT THE LADDER'S SHAPES. The correctness result says
+#: pinning ``MATH`` makes attention card-invariant. Its price is dominated by
+#: ONE axis: the math path materialises the full ``[batch, heads, seq, seq]``
+#: score matrix, which is quadratic in sequence length, where the fused
+#: kernel is not. Quoting a cost at the ladder's own 64 tokens would repeat
+#: the mistake the split-K page had to correct, where a table measured at a
+#: single unrepresentative point became "the cost of reproducibility". The
+#: sweep runs to 4096 so the wall, if there is one, is inside the measured
+#: range rather than past its edge.
+COST_LENGTHS: Final[tuple[int, ...]] = (64, 128, 256, 512, 1024, 2048, 4096)
+
+#: Batches the cost sweep walks. One sequence is the regime the ladder
+#: probes; eight is a plausible training batch, and the memory the math path
+#: needs scales with it.
+COST_BATCHES: Final[tuple[int, ...]] = (1, 8)
+
+#: Heads and width for the cost sweep: gpt2-small's attention, which is the
+#: smallest size anyone trains rather than the smallest the ladder defines.
+COST_HEADS = 12
+COST_HEAD_DIM = 64
+
+
+class SdpaCostShape(TypedDict):
+    """One attention call to time.
+
+    Attributes:
+        name: What to call it in a record.
+        batch: Sequences in the batch.
+        heads: Attention heads.
+        head_dim: Width of one head.
+        sequence_len: Query and key length.
+    """
+
+    name: str
+    batch: int
+    heads: int
+    head_dim: int
+    sequence_len: int
+
+
+def cost_shapes() -> tuple[SdpaCostShape, ...]:
+    """Every attention call the cost sweep times, in order.
+
+    Returns:
+        The batch-by-length grid, then the ladder's own eight calls at batch
+        one -- so the configurations the correctness result covers have a
+        stated price of their own rather than one interpolated from the grid.
+    """
+    grid = tuple(
+        SdpaCostShape(
+            name=f"grid-b{batch}-s{length}",
+            batch=batch,
+            heads=COST_HEADS,
+            head_dim=COST_HEAD_DIM,
+            sequence_len=length,
+        )
+        for batch in COST_BATCHES
+        for length in COST_LENGTHS
+    )
+    ladder = tuple(
+        SdpaCostShape(
+            name=f"rung-{shape['rung']}",
+            batch=1,
+            heads=shape["heads"],
+            head_dim=shape["head_dim"],
+            sequence_len=shape["sequence_len"],
+        )
+        for shape in sdpa_shapes()
+    )
+    return grid + ladder
+
+
+def cost_label(shape: SdpaCostShape, backend: str, suffix: str) -> str:
+    """Name one timing of one call.
+
+    Args:
+        shape: The call.
+        backend: :data:`DEFAULT_KEY` or a key of :data:`BACKEND_KEYS`.
+        suffix: Which measurement.
+
+    Returns:
+        e.g. ``cost-grid-b8-s2048-h12-d64|math|seconds``.
+    """
+    return f"cost-{shape['name']}-h{shape['heads']}-d{shape['head_dim']}|{backend}|{suffix}"
+
+
+#: Distinct from the selection experiment. "Which kernel ran" and "what it
+#: cost" are different questions and their records must not be differenced.
+SDPA_COST_EXPERIMENT = "sdpa-backend-cost"
+
+#: Suffix for the observation carrying seconds per call.
+SECONDS_SUFFIX = "seconds"
+
+#: Suffix for the slowest-minus-fastest batch, in seconds per call. Carried
+#: beside every median because a median with an enormous spread is a number
+#: that must not be compared with another one.
+SPREAD_SUFFIX = "spread"
+
+#: Suffix for peak CUDA bytes allocated during the timed run.
+PEAK_SUFFIX = "peak_bytes"
+
+#: Suffix for whether the call fitted in memory at all. An out-of-memory is
+#: not a failed measurement here -- it is the strongest cost result there is,
+#: so it is recorded rather than raised.
+FITTED_SUFFIX = "fitted"
+
+
 #: The unforced call -- what the dispatcher chose on its own. Named like a
 #: backend so it sits in the same column as the forced runs, because the
 #: whole reading is "which forced digest equals this one".
@@ -164,15 +273,27 @@ def sdpa_label(shape: SdpaShape, backend: str, suffix: str) -> str:
 __all__ = [
     "AVAILABLE_SUFFIX",
     "BACKEND_KEYS",
+    "COST_BATCHES",
+    "COST_HEADS",
+    "COST_HEAD_DIM",
+    "COST_LENGTHS",
     "DEFAULT_KEY",
     "DIGEST_SUFFIX",
     "ELIGIBLE_KEYS",
     "ELIGIBLE_SUFFIX",
     "FALSE_VALUE",
+    "FITTED_SUFFIX",
+    "PEAK_SUFFIX",
+    "SDPA_COST_EXPERIMENT",
     "SDPA_EXPERIMENT",
     "SDPA_SEED",
+    "SECONDS_SUFFIX",
+    "SPREAD_SUFFIX",
     "TRUE_VALUE",
+    "SdpaCostShape",
     "SdpaShape",
+    "cost_label",
+    "cost_shapes",
     "sdpa_label",
     "sdpa_shape_for",
     "sdpa_shapes",

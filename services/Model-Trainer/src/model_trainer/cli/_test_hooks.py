@@ -25,6 +25,7 @@ from model_trainer.core.contracts.model import PreparedLMModel
 # the reason it is its own module -- see its docstring.
 from model_trainer.core.services.model.gemm_shapes import GemmShape, timed_shapes
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES, ProbeShape
+from model_trainer.core.services.model.sdpa_shapes import SdpaCostShape, cost_shapes
 from model_trainer.core.services.model.trace_plan import TRACE_RUNGS
 
 
@@ -96,6 +97,31 @@ class TraceRungsProto(Protocol):
     def __call__(self) -> tuple[str, ...]:
         """Return the rung names to trace, in the order to trace them."""
         ...
+
+
+class CostShapesProto(Protocol):
+    """Protocol for the attention calls the cost sweep times.
+
+    Behind a hook for the same reason the ladder's and the gemm benchmark's
+    tables are, and more urgently: the declared sweep ends at eight sequences
+    of 4096 tokens, where the math path allocates gigabytes and takes tens of
+    milliseconds per call. Timing that on a test runner's CPU would not fail,
+    it would HANG -- which is how a probe-ladder test once had to be killed
+    after ten minutes.
+    """
+
+    def __call__(self) -> tuple[SdpaCostShape, ...]:
+        """Return the calls to time, in order."""
+        ...
+
+
+def _default_cost_shapes() -> tuple[SdpaCostShape, ...]:
+    """Production attention-cost sweep - used as default hook.
+
+    Returns:
+        The batch-by-length grid, then the ladder's own calls.
+    """
+    return cost_shapes()
 
 
 class EnvCublasltWorkspaceProto(Protocol):
@@ -318,6 +344,8 @@ trace_rungs: TraceRungsProto = _default_trace_rungs
 
 env_cublaslt_workspace: EnvCublasltWorkspaceProto = _default_env_cublaslt_workspace
 
+cost_shapes_hook: CostShapesProto = _default_cost_shapes
+
 run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
 
 benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
@@ -326,6 +354,7 @@ benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
 __all__ = [
     "ApplyDeterminismProto",
     "BenchmarkShapesProto",
+    "CostShapesProto",
     "EnvCublasltWorkspaceProto",
     "LadderShapesProto",
     "LoadHubModelProto",
@@ -334,6 +363,7 @@ __all__ = [
     "TraceRungsProto",
     "apply_determinism_hook",
     "benchmark_shapes",
+    "cost_shapes_hook",
     "env_cublaslt_workspace",
     "ladder_shapes",
     "load_hub_model",
