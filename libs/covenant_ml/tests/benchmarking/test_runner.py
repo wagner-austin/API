@@ -11,6 +11,10 @@ from collections.abc import Generator
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from platform_core.comparability import NO_VALUE
+from platform_core.determinism_env import SINGLE_THREAD
+from platform_core.determinism_record import determinism_record
+from platform_core.testing import sample_run_fingerprint
 
 from covenant_ml.benchmarking import _test_hooks
 from covenant_ml.benchmarking.protocols import DataSplit, TrainedModelProto
@@ -25,6 +29,16 @@ from covenant_ml.benchmarking.types import (
     BenchmarkConfig,
     BenchmarkModelName,
     DatasetInfo,
+)
+
+#: A stated configuration, so every manifest these tests build carries the
+#: axes a published one must. Built through the canonical builder rather than
+#: written out, so it cannot fall behind the type.
+_FINGERPRINT = sample_run_fingerprint(
+    image_digest="sha256:" + "ef" * 32,
+    gpu_model=NO_VALUE,
+    driver_version=NO_VALUE,
+    determinism=determinism_record("cpu", {"OMP_NUM_THREADS": SINGLE_THREAD}),
 )
 
 
@@ -292,6 +306,7 @@ def test_power_throttling_is_disabled_once_per_run(
         [42, 43, 44],
         make_config(repeats=1, warmups=0),
         make_dataset_info(),
+        _FINGERPRINT,
     )
     assert recorded_opt_out.calls == 1
 
@@ -308,6 +323,7 @@ def test_a_refused_opt_out_aborts_the_run(stepping_clock: SteppingClock) -> None
                 [42],
                 make_config(repeats=1, warmups=0),
                 make_dataset_info(),
+                _FINGERPRINT,
             )
     finally:
         _test_hooks.power_throttling_opt_out = previous
@@ -330,6 +346,7 @@ def test_no_fit_runs_before_the_opt_out(stepping_clock: SteppingClock) -> None:
                 [42],
                 make_config(repeats=1, warmups=0),
                 make_dataset_info(),
+                _FINGERPRINT,
             )
     finally:
         _test_hooks.power_throttling_opt_out = previous
@@ -391,6 +408,7 @@ def test_run_benchmark_alternates_which_model_goes_first(
         [42, 43, 44],
         make_config(repeats=1, warmups=0),
         make_dataset_info(),
+        _FINGERPRINT,
     )
 
     first_by_seed = {
@@ -418,6 +436,7 @@ def test_run_benchmark_rotates_three_arms_through_every_slot(
         [42, 43, 44],
         make_config(repeats=1, warmups=0),
         make_dataset_info(),
+        _FINGERPRINT,
     )
 
     slots: dict[str, list[int]] = {}
@@ -437,6 +456,7 @@ def test_run_benchmark_requires_at_least_two_arms(stepping_clock: SteppingClock)
             [42],
             make_config(repeats=1, warmups=0),
             make_dataset_info(),
+            _FINGERPRINT,
         )
 
 
@@ -455,6 +475,7 @@ def test_run_benchmark_rejects_two_arms_sharing_a_name(
             [42],
             make_config(repeats=1, warmups=0),
             make_dataset_info(),
+            _FINGERPRINT,
         )
 
 
@@ -467,6 +488,7 @@ def test_run_benchmark_records_both_models_at_every_seed(
         [42, 43],
         make_config(repeats=1, warmups=0),
         make_dataset_info(),
+        _FINGERPRINT,
     )
 
     assert len(manifest["results"]) == 4
@@ -490,6 +512,7 @@ def test_run_benchmark_passes_each_seed_to_the_split_factory(
         [7, 8],
         make_config(repeats=1, warmups=0),
         make_dataset_info(),
+        _FINGERPRINT,
     )
     assert seen == [7, 8]
 
@@ -502,4 +525,5 @@ def test_no_seeds_raises(stepping_clock: SteppingClock) -> None:
             [],
             make_config(),
             make_dataset_info(),
+            _FINGERPRINT,
         )

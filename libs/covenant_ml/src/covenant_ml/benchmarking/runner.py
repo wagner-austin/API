@@ -25,6 +25,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from platform_core.comparability import RunFingerprint
+
 from . import _test_hooks
 from .protocols import DataSplit, SplitFactoryProto, TrainerProto
 from .quality import compute_quality
@@ -106,6 +108,7 @@ def run_benchmark(
     seeds: Sequence[int],
     config: BenchmarkConfig,
     dataset: DatasetInfo,
+    fingerprint: RunFingerprint,
 ) -> BenchmarkManifest:
     """Measure every arm across every seed and assemble the manifest.
 
@@ -116,6 +119,11 @@ def run_benchmark(
         seeds: Seeds to measure, in execution order.
         config: Shared hyperparameters.
         dataset: Identity of the input data.
+        fingerprint: The configuration this measurement runs under, from
+            :func:`~covenant_ml.benchmarking.provenance.benchmark_fingerprint`.
+            Required rather than optional, and load-bearing here above every
+            other manifest: these are TIMINGS, and a fit time is a property
+            of a machine as much as of an algorithm.
 
     Returns:
         The complete manifest for this invocation.
@@ -173,6 +181,7 @@ def run_benchmark(
         "dataset": dataset,
         "seeds": list(seeds),
         "results": results,
+        "fingerprint": fingerprint,
     }
 
 

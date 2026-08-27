@@ -12,6 +12,9 @@ import sys
 from pathlib import Path
 
 import pytest
+from platform_core.determinism_cpu import CPU_STACK, NativeLibrariesAlreadyLoadedError
+from platform_core.determinism_env import BLAS_THREAD_ENV_VARS, SINGLE_THREAD
+from platform_core.determinism_record import DeterminismRecord, determinism_record
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from scripts.benchmark_cleargbm_vs_lightgbm import DEFAULT_CSV, build_parser, main
 
@@ -20,6 +23,22 @@ from covenant_ml.benchmarking.types import (
     BenchmarkManifest,
 )
 from covenant_ml.benchmarking.types_codec import decode_benchmark_manifest
+
+
+def _stand_in_pin() -> DeterminismRecord:
+    """Report the posture a production run would have, without pinning.
+
+    The real pin refuses once numpy is loaded, and this is a numpy suite. The
+    record returned is what `apply_cpu_determinism` produces at one thread, so
+    assertions about the manifest see production's shape.
+
+    Substituting this does not weaken the guarantee: whether the pin REFUSES
+    when it cannot take is asserted by the entry-point test.
+
+    Returns:
+        The single-thread CPU posture.
+    """
+    return determinism_record(CPU_STACK, dict.fromkeys(BLAS_THREAD_ENV_VARS, SINGLE_THREAD))
 
 
 def write_dataset(directory: Path, n_companies: int = 40) -> Path:
@@ -99,7 +118,7 @@ def test_run_measures_every_reference_arm_at_the_requested_seed(tmp_path: Path) 
     """Without ``--variants`` the run is the reference set and nothing else."""
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    exit_code = main([*cli_args(csv_path), "--out", str(out_path)])
+    exit_code = main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
     manifest = read_manifest(out_path)
 
     assert exit_code == 0
@@ -116,7 +135,7 @@ def test_variants_flag_adds_the_leaf_wise_arm(tmp_path: Path) -> None:
     """
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    exit_code = main([*cli_args(csv_path), "--variants", "--out", str(out_path)])
+    exit_code = main([*cli_args(csv_path), "--variants", "--out", str(out_path)], pin=_stand_in_pin)
     manifest = read_manifest(out_path)
 
     assert exit_code == 0
@@ -127,7 +146,7 @@ def test_variants_flag_adds_the_leaf_wise_arm(tmp_path: Path) -> None:
 def test_run_records_exactly_one_leading_model_per_seed(tmp_path: Path) -> None:
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    main([*cli_args(csv_path), "--out", str(out_path)])
+    main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
     manifest = read_manifest(out_path)
 
     leaders = [result for result in manifest["results"] if result["position"] == 0]
@@ -137,7 +156,7 @@ def test_run_records_exactly_one_leading_model_per_seed(tmp_path: Path) -> None:
 def test_run_writes_a_decodable_manifest(tmp_path: Path) -> None:
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "nested" / "manifest.json"
-    exit_code = main([*cli_args(csv_path), "--out", str(out_path)])
+    exit_code = main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
 
     assert exit_code == 0
     assert out_path.is_file()
@@ -152,7 +171,7 @@ def test_run_writes_a_decodable_manifest(tmp_path: Path) -> None:
 def test_run_applies_the_requested_hyperparameters(tmp_path: Path) -> None:
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    main([*cli_args(csv_path), "--out", str(out_path)])
+    main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
     config = read_manifest(out_path)["config"]
 
     assert config["n_estimators"] == 3
@@ -165,21 +184,39 @@ def test_run_applies_the_requested_hyperparameters(tmp_path: Path) -> None:
 
 def test_run_without_out_writes_no_file(tmp_path: Path) -> None:
     csv_path = write_dataset(tmp_path)
-    main(cli_args(csv_path))
+    main(cli_args(csv_path), pin=_stand_in_pin)
     assert list(tmp_path.glob("*.json")) == []
 
 
-def test_module_entrypoint_exits_zero(tmp_path: Path) -> None:
-    """Executing the script as ``__main__`` propagates main's exit code."""
+def test_the_entry_point_refuses_once_numpy_is_loaded(tmp_path: Path) -> None:
+    """Executing the script as ``__main__`` in a numpy process hits the refusal.
+
+    This is the CORRECT outcome and it used to be `SystemExit(0)`. Before
+    2026-08-27 this script pinned nothing, so `__main__` simply ran -- and
+    this is the entry point whose manifests carry the headline TIMING claim,
+    so its fit times were taken at whatever thread count the shell inherited.
+    It now pins first, and the pin refuses when a native numeric library is
+    already loaded rather than reporting a posture the process does not have.
+
+    A test asserting a clean exit here would be asserting that the pin does
+    not work.
+    """
     csv_path = write_dataset(tmp_path)
+    import numpy
+
+    # Loading it IS the precondition, and asserting on it is how that
+    # precondition stays visible rather than looking like a stray import.
+    assert "numpy" in sys.modules
+    assert numpy.__name__ == "numpy"
+
     script = Path(__file__).resolve().parents[2] / "scripts" / "benchmark_cleargbm_vs_lightgbm.py"
     original_argv = sys.argv
     sys.argv = [str(script), *cli_args(csv_path)]
     module_name = "scripts.benchmark_cleargbm_vs_lightgbm"
     if module_name in sys.modules:
         del sys.modules[module_name]
-    with pytest.raises(SystemExit) as exit_info:
-        runpy.run_path(str(script), run_name="__main__")
-    sys.argv = original_argv
-
-    assert exit_info.value.code == 0
+    try:
+        with pytest.raises(NativeLibrariesAlreadyLoadedError):
+            runpy.run_path(str(script), run_name="__main__")
+    finally:
+        sys.argv = original_argv

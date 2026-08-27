@@ -21,6 +21,7 @@ from cleargbm.ensemble import predict_raw
 from cleargbm.ensemble_ranking import train_gradient_boosting_ranking
 from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
+from platform_core.comparability import RunFingerprint, encode_run_fingerprint
 from platform_core.json_utils import JSONValue
 
 from ..metrics import compute_ndcg_at_k
@@ -83,11 +84,22 @@ class RankingManifest(TypedDict):
         config: The shared hyperparameters.
         seeds: Every corpus seed measured.
         results: One record per arm per seed.
+        fingerprint: The configuration these numbers were produced under,
+            from :func:`~covenant_ml.benchmarking.provenance.benchmark_fingerprint`.
+            These arms use no card, so the axis that decides their numbers is
+            the BLAS thread count and the machine it was pinned on; a
+            manifest recording only hyperparameters cannot tell a 24-core
+            cluster node from an 8-core workstation.
+
+            Taken as an argument rather than captured here. Building it reads
+            installed metadata, and this module must remain importable in a
+            process that has not pinned its thread count yet.
     """
 
     config: RankingBenchConfig
     seeds: list[int]
     results: list[RankingArmResult]
+    fingerprint: RunFingerprint
 
 
 class _LGBMRankerProto(Protocol):
@@ -315,12 +327,19 @@ def _cleargbm_config(config: RankingBenchConfig, seed: int) -> GradientBoostingC
 def run_ranking_benchmark(
     config: RankingBenchConfig,
     seeds: list[int],
+    fingerprint: RunFingerprint,
 ) -> RankingManifest:
     """Run both arms across every seed.
 
     Args:
         config: Shared hyperparameters.
         seeds: Corpus seeds to measure.
+        fingerprint: The configuration this measurement runs under, from
+            :func:`~covenant_ml.benchmarking.provenance.benchmark_fingerprint`.
+            Required rather than optional: a manifest that could omit it
+            would omit it, which is how thirty-seven of this project's
+            forty-one published manifests came to carry no environment at
+            all.
 
     Returns:
         The complete manifest.
@@ -373,7 +392,9 @@ def run_ranking_benchmark(
                 quality=RankingQuality(mean_ndcg=_mean_ndcg(config, y_test, lgbm_scores)),
             )
         )
-    return RankingManifest(config=config, seeds=list(seeds), results=results)
+    return RankingManifest(
+        config=config, seeds=list(seeds), results=results, fingerprint=fingerprint
+    )
 
 
 def encode_ranking_manifest(manifest: RankingManifest) -> JSONValue:
@@ -407,6 +428,7 @@ def encode_ranking_manifest(manifest: RankingManifest) -> JSONValue:
             }
             for r in manifest["results"]
         ],
+        "fingerprint": encode_run_fingerprint(manifest["fingerprint"]),
     }
 
 

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict, get_args
 
+from platform_core.comparability import RunFingerprint
+
 # Traceable error codes. Every decode failure carries exactly one of these so
 # a malformed manifest can be triaged from a log line alone.
 ERR_NOT_MAPPING = "CVML-BENCH-001"
@@ -41,7 +43,13 @@ ERR_POWER_THROTTLING = "CVML-BENCH-020"
 #: Bumped to 2 when the harness stopped being a two-model comparison:
 #: ``ran_first: bool`` cannot describe an ordering over three or more arms, so
 #: it became ``position: int``.
-MANIFEST_SCHEMA_VERSION = 2
+#:
+#: Bumped to 3 on 2026-08-27 when the manifest grew ``fingerprint``. A version
+#: 2 document has no environment block, and its decoder must refuse rather
+#: than default one: an absent fingerprint would compare EQUAL to another
+#: absent one, reporting two runs on two machines as one configuration, which
+#: is precisely the defect the field exists to end.
+MANIFEST_SCHEMA_VERSION = 3
 
 #: The arms this benchmark can compare.
 #:
@@ -189,6 +197,20 @@ class BenchmarkManifest(TypedDict, total=True):
         dataset: Identity of the input data.
         seeds: Seeds measured, in execution order.
         results: Every per-model per-seed record.
+        fingerprint: The configuration these numbers were produced under,
+            from :func:`~covenant_ml.benchmarking.provenance.benchmark_fingerprint`.
+
+            THIS IS THE MANIFEST THAT NEEDED IT MOST. Its headline is a
+            TIMING claim against LightGBM, and of everything that moves a fit
+            time the machine moves it most -- yet an inventory on 2026-08-27
+            found 37 of this project's 41 published manifests carrying no
+            environment at all, and no manifest ever carrying a CPU or a core
+            count. A fit time from a 24-core cluster node and one from an
+            8-core workstation were indistinguishable in the file.
+
+            Taken as an argument rather than captured here. Building it reads
+            installed metadata, and this module must remain importable in a
+            process that has not pinned its thread count yet.
     """
 
     schema_version: int
@@ -197,6 +219,7 @@ class BenchmarkManifest(TypedDict, total=True):
     dataset: DatasetInfo
     seeds: list[int]
     results: list[SeedResult]
+    fingerprint: RunFingerprint
 
 
 __all__ = [

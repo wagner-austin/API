@@ -23,6 +23,7 @@ from cleargbm.ensemble_multiclass import (
 )
 from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
+from platform_core.comparability import RunFingerprint, encode_run_fingerprint
 from platform_core.json_utils import JSONValue
 
 from ..metrics import compute_accuracy, compute_multiclass_log_loss
@@ -86,11 +87,22 @@ class MulticlassManifest(TypedDict):
         config: The shared hyperparameters.
         seeds: Every corpus seed measured.
         results: One record per arm per seed.
+        fingerprint: The configuration these numbers were produced under,
+            from :func:`~covenant_ml.benchmarking.provenance.benchmark_fingerprint`.
+            These arms use no card, so the axis that decides their numbers is
+            the BLAS thread count and the machine it was pinned on; a
+            manifest recording only hyperparameters cannot tell a 24-core
+            cluster node from an 8-core workstation.
+
+            Taken as an argument rather than captured here. Building it reads
+            installed metadata, and this module must remain importable in a
+            process that has not pinned its thread count yet.
     """
 
     config: MulticlassBenchConfig
     seeds: list[int]
     results: list[MulticlassArmResult]
+    fingerprint: RunFingerprint
 
 
 class _LGBMMulticlassCtor(Protocol):
@@ -356,12 +368,19 @@ def _measure_lightgbm(
 def run_multiclass_benchmark(
     config: MulticlassBenchConfig,
     seeds: list[int],
+    fingerprint: RunFingerprint,
 ) -> MulticlassManifest:
     """Run both arms across every seed.
 
     Args:
         config: Shared hyperparameters.
         seeds: Corpus seeds to measure.
+        fingerprint: The configuration this measurement runs under, from
+            :func:`~covenant_ml.benchmarking.provenance.benchmark_fingerprint`.
+            Required rather than optional: a manifest that could omit it
+            would omit it, which is how thirty-seven of this project's
+            forty-one published manifests came to carry no environment at
+            all.
 
     Returns:
         The complete manifest.
@@ -372,7 +391,9 @@ def run_multiclass_benchmark(
         x_train, y_train, x_test, y_test = _split(x, y, seed)
         results.append(_measure_cleargbm(config, seed, x_train, y_train, x_test, y_test))
         results.append(_measure_lightgbm(config, seed, x_train, y_train, x_test, y_test))
-    return MulticlassManifest(config=config, seeds=list(seeds), results=results)
+    return MulticlassManifest(
+        config=config, seeds=list(seeds), results=results, fingerprint=fingerprint
+    )
 
 
 def encode_multiclass_manifest(manifest: MulticlassManifest) -> JSONValue:
@@ -408,6 +429,7 @@ def encode_multiclass_manifest(manifest: MulticlassManifest) -> JSONValue:
             }
             for r in manifest["results"]
         ],
+        "fingerprint": encode_run_fingerprint(manifest["fingerprint"]),
     }
 
 

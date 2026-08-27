@@ -12,24 +12,53 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
+from typing import Protocol
 
+from platform_core.config import config_test_hooks
+from platform_core.determinism_cpu import apply_cpu_determinism
+from platform_core.determinism_env import SINGLE_THREAD
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
 
-from covenant_ml.benchmarking import (
-    DEFAULT_REPEATS,
-    DEFAULT_SEEDS,
-    DEFAULT_WARMUPS,
-    encode_benchmark_manifest,
-    load_bankruptcy_dataset,
-    make_baseline_trainers,
-    make_benchmark_config,
-    make_split_factory,
-    make_trainers,
-    render_report,
-    run_benchmark,
-)
+# NOTHING FROM covenant_ml IS IMPORTED AT MODULE SCOPE, and that is a
+# correctness requirement rather than a preference. `covenant_ml/__init__`
+# pulls numpy, the BLAS thread variables are read when numpy loads, and a pin
+# after that point writes variables nobody reads. `apply_cpu_determinism`
+# refuses in that case instead of reporting a posture the run does not have.
+#
+# This entry point pinned NOTHING until 2026-08-27 -- and it is the one whose
+# manifests carry the headline TIMING claim against LightGBM, so its fit times
+# were being taken at whatever thread count the shell happened to inherit.
+# The imports it needs live inside `main`, after the pin.
+
+
+class PinProtocol(Protocol):
+    """Protocol for pinning this process's CPU reduction order."""
+
+    def __call__(self) -> DeterminismRecord:
+        """Pin the thread count and report what was pinned.
+
+        Returns:
+            The posture the process now has.
+        """
+        ...
+
+
+def _real_pin() -> DeterminismRecord:
+    """Pin the BLAS thread count to one and report it.
+
+    Returns:
+        The record naming every thread variable that was set.
+
+    Raises:
+        NativeLibrariesAlreadyLoadedError: When a native numeric library is
+            already imported, so the write cannot take effect.
+    """
+    return apply_cpu_determinism(os.putenv, SINGLE_THREAD)
+
 
 #: Default input, relative to this library's root.
 DEFAULT_CSV = Path("tests") / "data" / "american_bankruptcy.csv"
@@ -48,9 +77,21 @@ def _write(message: str) -> None:
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line parser.
 
+    The three defaults come from ``covenant_ml``, imported INSIDE this
+    function rather than at module scope. Importing them at the top would
+    pull numpy before the pin, which is the exact defect the module comment
+    above describes; this function is only ever called from ``main`` after
+    the pin has taken, so the import is safe here and nowhere else.
+
     Returns:
         The configured parser.
     """
+    from covenant_ml.benchmarking import (
+        DEFAULT_REPEATS,
+        DEFAULT_SEEDS,
+        DEFAULT_WARMUPS,
+    )
+
     default_seeds: list[int] = list(DEFAULT_SEEDS)
     parser = argparse.ArgumentParser(description="Benchmark ClearGBM against LightGBM.")
     parser.add_argument("--csv", type=Path, default=DEFAULT_CSV, help="Input CSV path.")
@@ -91,15 +132,47 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, pin: PinProtocol = _real_pin) -> int:
     """Run the benchmark and report.
 
     Args:
         argv: Command-line arguments. Defaults to ``sys.argv[1:]``.
+        pin: How to pin CPU determinism, defaulting to the real pin. A test
+            supplies a stand-in for one reason only: the real pin refuses
+            once a native numeric library is loaded, and a numpy test suite
+            has numpy loaded before collection begins. Substituting it does
+            NOT excuse this module from being pinnable -- that property is
+            asserted directly, by importing this file and checking nothing
+            numeric arrived with it.
 
     Returns:
         Process exit code.
     """
+    # PIN FIRST, THEN IMPORT. The thread count decides how a BLAS partitions
+    # a reduction, and for THIS benchmark it also decides the fit times that
+    # are its whole output.
+    determinism = pin()
+
+    # Imported after the pin, with everything else from covenant_ml: building
+    # a fingerprint reads installed metadata, which must not happen above the
+    # line that writes the thread variables.
+    from covenant_ml.benchmarking import (
+        encode_benchmark_manifest,
+        load_bankruptcy_dataset,
+        make_baseline_trainers,
+        make_benchmark_config,
+        make_split_factory,
+        make_trainers,
+        render_report,
+        run_benchmark,
+    )
+    from covenant_ml.benchmarking.provenance import benchmark_fingerprint
+
+    # Read through the config layer, not os.environ. Writing a variable a
+    # native library requires is a different act from reading configuration,
+    # and only the first is this script's business.
+    fingerprint = benchmark_fingerprint(determinism, config_test_hooks.get_env)
+
     parsed = build_parser().parse_args(argv)
     # argparse yields untyped attributes; bind each to a typed name once so
     # every use below is precisely typed.
@@ -140,6 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         seeds,
         config,
         dataset.info,
+        fingerprint,
     )
 
     _write(render_report(manifest))

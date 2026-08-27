@@ -21,6 +21,7 @@ import numpy as np
 from cleargbm.ensemble import predict_proba, train_gradient_boosting
 from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
+from platform_core.comparability import RunFingerprint, encode_run_fingerprint
 from platform_core.json_utils import JSONValue
 
 from ..metrics import compute_auc, compute_log_loss
@@ -87,11 +88,25 @@ class GossManifest(TypedDict):
         config: The shared hyperparameters.
         seeds: Every corpus seed measured.
         results: One record per arm per seed.
+        fingerprint: The configuration these numbers were produced under,
+            from :func:`~covenant_ml.benchmarking.provenance.benchmark_fingerprint`.
+            Carried for the reason
+            :class:`~covenant_ml.benchmarking.regression_quality.RegressionManifest`
+            states and this manifest went without: the arms use no card, so
+            the axis that decides their numbers is the BLAS thread count and
+            the machine it was pinned on, and a manifest recording only
+            hyperparameters cannot tell a 24-core cluster node from an
+            8-core workstation.
+
+            Taken as an argument rather than captured here. Building it reads
+            installed metadata, and this module must remain importable in a
+            process that has not pinned its thread count yet.
     """
 
     config: GossBenchConfig
     seeds: list[int]
     results: list[GossArmResult]
+    fingerprint: RunFingerprint
 
 
 class _LGBMGossProto(Protocol):
@@ -295,12 +310,19 @@ def _quality(y_test: NDArray[np.int64], probas: NDArray[np.float64]) -> GossQual
 def run_goss_benchmark(
     config: GossBenchConfig,
     seeds: list[int],
+    fingerprint: RunFingerprint,
 ) -> GossManifest:
     """Run all four arms across every seed.
 
     Args:
         config: Shared hyperparameters.
         seeds: Corpus seeds to measure.
+        fingerprint: The configuration this measurement runs under, from
+            :func:`~covenant_ml.benchmarking.provenance.benchmark_fingerprint`.
+            Required rather than optional: a manifest that could omit it
+            would omit it, which is how thirty-seven of this project's
+            forty-one published manifests came to carry no environment at
+            all.
 
     Returns:
         The complete manifest.
@@ -361,7 +383,7 @@ def run_goss_benchmark(
                     quality=_quality(y_test, positives),
                 )
             )
-    return GossManifest(config=config, seeds=list(seeds), results=results)
+    return GossManifest(config=config, seeds=list(seeds), results=results, fingerprint=fingerprint)
 
 
 def encode_goss_manifest(manifest: GossManifest) -> JSONValue:
@@ -399,6 +421,7 @@ def encode_goss_manifest(manifest: GossManifest) -> JSONValue:
             }
             for r in manifest["results"]
         ],
+        "fingerprint": encode_run_fingerprint(manifest["fingerprint"]),
     }
 
 

@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_core.comparability import NO_VALUE
+from platform_core.determinism_env import SINGLE_THREAD
+from platform_core.determinism_record import determinism_record
 from platform_core.json_utils import (
     dump_json_str,
     load_json_str,
@@ -15,6 +18,7 @@ from platform_core.json_utils import (
     narrow_json_to_list,
     narrow_json_to_str,
 )
+from platform_core.testing import sample_run_fingerprint
 
 from covenant_ml.benchmarking.multiclass_quality import (
     MulticlassBenchConfig,
@@ -38,8 +42,36 @@ def _small_config() -> MulticlassBenchConfig:
     )
 
 
+#: A stated configuration, so every manifest these tests build carries the
+#: axes a published one must. Built through the canonical builder rather than
+#: written out, so it cannot fall behind the type.
+_FINGERPRINT = sample_run_fingerprint(
+    image_digest="sha256:" + "ef" * 32,
+    gpu_model=NO_VALUE,
+    driver_version=NO_VALUE,
+    determinism=determinism_record("cpu", {"OMP_NUM_THREADS": SINGLE_THREAD}),
+)
+
+
 class TestSyntheticCorpus:
     """The corpus is deterministic, class-balanced, and overlapping."""
+
+    def test_the_manifest_says_what_it_ran_on(self) -> None:
+        # Until 2026-08-27 this entry point pinned nothing and recorded
+        # nothing about its environment, so two runs of it on two machines
+        # were indistinguishable in the file.
+        manifest = run_multiclass_benchmark(_small_config(), [42], _FINGERPRINT)
+
+        assert manifest["fingerprint"] == _FINGERPRINT
+
+    def test_the_encoded_manifest_carries_the_configuration(self) -> None:
+        manifest = run_multiclass_benchmark(_small_config(), [42], _FINGERPRINT)
+
+        encoded = narrow_json_to_dict(encode_multiclass_manifest(manifest))
+        fingerprint = narrow_json_to_dict(encoded["fingerprint"])
+        host = narrow_json_to_dict(fingerprint["host"])
+
+        assert host["logical_cores"] == _FINGERPRINT["host"]["logical_cores"]
 
     def test_same_seed_reproduces_the_corpus_exactly(self) -> None:
         """Two generations under one seed are byte-identical."""
@@ -72,7 +104,7 @@ class TestRunMulticlassBenchmark:
 
     def test_both_arms_report_for_every_seed(self) -> None:
         """One record per arm per seed, in seed order."""
-        manifest = run_multiclass_benchmark(_small_config(), [42, 43])
+        manifest = run_multiclass_benchmark(_small_config(), [42, 43], _FINGERPRINT)
         pairs = [(r["model"], r["seed"]) for r in manifest["results"]]
         assert pairs == [
             ("cleargbm", 42),
@@ -89,7 +121,7 @@ class TestRunMulticlassBenchmark:
         """
         import math
 
-        manifest = run_multiclass_benchmark(_small_config(), [42])
+        manifest = run_multiclass_benchmark(_small_config(), [42], _FINGERPRINT)
         for result in manifest["results"]:
             quality = result["quality"]
             assert quality["log_loss"] < math.log(3.0), result["model"]
@@ -97,7 +129,7 @@ class TestRunMulticlassBenchmark:
 
     def test_manifest_encodes_to_json(self) -> None:
         """The encoded manifest round-trips through the JSON codec."""
-        manifest = run_multiclass_benchmark(_small_config(), [42])
+        manifest = run_multiclass_benchmark(_small_config(), [42], _FINGERPRINT)
         encoded = encode_multiclass_manifest(manifest)
         decoded = narrow_json_to_dict(load_json_str(dump_json_str(encoded)))
         config = narrow_json_to_dict(decoded["config"])

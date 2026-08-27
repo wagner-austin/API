@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from platform_core.comparability import decode_run_fingerprint, encode_run_fingerprint
 from platform_core.json_utils import JSONValue
 
 from covenant_ml.benchmarking.types import (
@@ -465,6 +466,7 @@ def encode_benchmark_manifest(manifest: BenchmarkManifest) -> dict[str, JSONValu
         "dataset": encode_dataset_info(manifest["dataset"]),
         "seeds": seeds,
         "results": results,
+        "fingerprint": encode_run_fingerprint(manifest["fingerprint"]),
     }
 
 
@@ -504,6 +506,13 @@ def decode_benchmark_manifest(data: dict[str, JSONValue]) -> BenchmarkManifest:
         "dataset": decode_dataset_info(dataset_raw, "dataset"),
         "seeds": _require_int_list(data.get("seeds"), "seeds"),
         "results": results,
+        # No default and no fallback. An absent fingerprint would decode to
+        # something that compares EQUAL to every other absent one, reporting
+        # two runs on two machines as one configuration -- the exact defect
+        # the field exists to end. A version-2 document is refused above.
+        "fingerprint": decode_run_fingerprint(
+            _require_mapping(data.get("fingerprint"), "fingerprint")
+        ),
     }
 
 

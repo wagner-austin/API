@@ -13,16 +13,51 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
+from typing import Protocol
 
+from platform_core.config import config_test_hooks
+from platform_core.determinism_cpu import apply_cpu_determinism
+from platform_core.determinism_env import SINGLE_THREAD
+from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
 
-from covenant_ml.benchmarking.quantized_quality import (
-    QuantizedBenchConfig,
-    encode_quantized_manifest,
-    run_quantized_benchmark,
-)
+# NOTHING FROM covenant_ml IS IMPORTED AT MODULE SCOPE, and that is a
+# correctness requirement rather than a preference. `covenant_ml/__init__`
+# pulls numpy, the BLAS thread variables are read when numpy loads, and a pin
+# after that point writes variables nobody reads. `apply_cpu_determinism`
+# refuses in that case instead of reporting a posture the run does not have.
+#
+# This entry point pinned NOTHING until 2026-08-27: its numbers were not
+# reproducible against themselves, let alone comparable with another
+# machine's. The imports it needs live inside `main`, after the pin.
+
+
+class PinProtocol(Protocol):
+    """Protocol for pinning this process's CPU reduction order."""
+
+    def __call__(self) -> DeterminismRecord:
+        """Pin the thread count and report what was pinned.
+
+        Returns:
+            The posture the process now has.
+        """
+        ...
+
+
+def _real_pin() -> DeterminismRecord:
+    """Pin the BLAS thread count to one and report it.
+
+    Returns:
+        The record naming every thread variable that was set.
+
+    Raises:
+        NativeLibrariesAlreadyLoadedError: When a native numeric library is
+            already imported, so the write cannot take effect.
+    """
+    return apply_cpu_determinism(os.putenv, SINGLE_THREAD)
 
 
 def _write(message: str) -> None:
@@ -62,15 +97,43 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, pin: PinProtocol = _real_pin) -> int:
     """Run the benchmark and report.
 
     Args:
         argv: Command-line arguments. Defaults to ``sys.argv[1:]``.
+        pin: How to pin CPU determinism, defaulting to the real pin. A test
+            supplies a stand-in for one reason only: the real pin refuses
+            once a native numeric library is loaded, and a numpy test suite
+            has numpy loaded before collection begins. Substituting it does
+            NOT excuse this module from being pinnable -- that property is
+            asserted directly, by importing this file and checking nothing
+            numeric arrived with it.
 
     Returns:
         Process exit code.
     """
+    # PIN FIRST, THEN IMPORT. The thread count decides how a BLAS partitions
+    # a reduction and floating-point addition is not associative, so the count
+    # is an input to every number below -- measured at 865,498 of 16,777,216
+    # matmul elements changing between 1, 8 and 24 threads.
+    determinism = pin()
+
+    # Imported after the pin, with everything else from covenant_ml: it reads
+    # installed metadata and builds a host record, neither of which may
+    # happen above the line that writes the thread variables.
+    from covenant_ml.benchmarking.provenance import benchmark_fingerprint
+    from covenant_ml.benchmarking.quantized_quality import (
+        QuantizedBenchConfig,
+        encode_quantized_manifest,
+        run_quantized_benchmark,
+    )
+
+    # Read through the config layer, not os.environ. Writing a variable a
+    # native library requires is a different act from reading configuration,
+    # and only the first is this script's business.
+    fingerprint = benchmark_fingerprint(determinism, config_test_hooks.get_env)
+
     parsed = build_parser().parse_args(argv)
     # argparse yields untyped attributes; bind each to a typed name once so
     # every use below is precisely typed.
@@ -99,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         f"quantized corpus: {config['n_samples']} rows x {config['n_features']} features, "
         f"{config['quant_bins']} gradient bins, seeds {seeds}\n"
     )
-    manifest = run_quantized_benchmark(config, seeds)
+    manifest = run_quantized_benchmark(config, seeds, fingerprint)
     for result in manifest["results"]:
         quality = result["quality"]
         _write(

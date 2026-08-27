@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from platform_core.comparability import NO_VALUE
+from platform_core.determinism_env import SINGLE_THREAD
+from platform_core.determinism_record import determinism_record
 from platform_core.json_utils import JSONValue
+from platform_core.testing import sample_run_fingerprint
 
 from covenant_ml.benchmarking.types import (
     BENCHMARK_MODEL_NAMES,
@@ -48,6 +52,16 @@ from covenant_ml.benchmarking.types_codec import (
     encode_quality_metrics,
     encode_seed_result,
     encode_timing_summary,
+)
+
+#: A stated configuration, so every manifest these tests build carries the
+#: axes a published one must. Built through the canonical builder rather than
+#: written out, so it cannot fall behind the type.
+_FINGERPRINT = sample_run_fingerprint(
+    image_digest="sha256:" + "ef" * 32,
+    gpu_model=NO_VALUE,
+    driver_version=NO_VALUE,
+    determinism=determinism_record("cpu", {"OMP_NUM_THREADS": SINGLE_THREAD}),
 )
 
 
@@ -150,6 +164,7 @@ def make_manifest() -> BenchmarkManifest:
         "dataset": make_dataset_info(),
         "seeds": [42],
         "results": [make_seed_result(), second],
+        "fingerprint": _FINGERPRINT,
     }
 
 
