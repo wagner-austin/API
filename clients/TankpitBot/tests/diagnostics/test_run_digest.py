@@ -150,6 +150,14 @@ def _full_session_lines() -> list[str]:
         ),
         _event("2026-08-05T00:00:41", "WORLD", "DEACTIVATED: tank=502 killed by 1301"),
         _event(
+            "2026-08-05T00:00:45",
+            "DIAGNOSTIC",
+            "diagnostic_kind=self_promotion",
+            diagnostic_kind="self_promotion",
+            new_rank=5,
+            was_promoted=True,
+        ),
+        _event(
             "2026-08-05T00:06:00",
             "DIAGNOSTIC",
             "COLLECT score=925 cmd=shoot",
@@ -193,6 +201,7 @@ def test_full_session_digest(tmp_path: Path) -> None:
     assert digest["exit_reason"] == "session_complete"
     assert digest["kills"] == 1
     assert digest["deaths"] == 1
+    assert digest["rank_changes"] == ["promoted to captain (rank 5)"]
     assert digest["shots"] == 1
     assert digest["teleports"] == 1
     assert digest["pickups"] == 2
@@ -255,6 +264,28 @@ def test_pre_rename_archives_read_rank_points(tmp_path: Path) -> None:
     )
 
     assert build_run_digest(source)["rank_number"] == 27
+
+
+def test_a_demotion_with_an_unknown_rank_still_lands_in_the_digest(tmp_path: Path) -> None:
+    """Demotions render too, and an out-of-ladder rank falls back to its number."""
+    source = _write_session(
+        tmp_path / "demoted.events.jsonl",
+        [
+            _event(
+                "2026-08-05T00:00:00",
+                "DIAGNOSTIC",
+                "diagnostic_kind=self_promotion",
+                diagnostic_kind="self_promotion",
+                new_rank=42,
+                was_promoted=False,
+            ),
+        ],
+    )
+
+    digest = build_run_digest(source)
+
+    assert digest["rank_changes"] == ["demoted to 42 (rank 42)"]
+    assert "rank       demoted to 42 (rank 42)" in render_run_digest(digest)
 
 
 def test_other_tank_deactivation_is_not_our_death(tmp_path: Path) -> None:

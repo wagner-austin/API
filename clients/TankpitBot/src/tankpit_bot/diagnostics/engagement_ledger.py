@@ -40,6 +40,7 @@ from typing_extensions import TypedDict
 from tankpit_bot import _test_hooks
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.diagnostics.forage_economy import _opt_int, _opt_str, _timestamp_seconds
+from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 log = get_logger(__name__)
@@ -98,6 +99,9 @@ class EngagementLedgerDict(TypedDict):
             we never shot at sort last, by id).
         kills: Rows with outcome ``"kill"``.
         deaths: ``self_deactivated`` records — our own deaths.
+        player_kill_names: Names of human-classified kills — the
+            headline row (a player kill must never sit unnoticed in
+            the table; 2026-08-27, Hypee and pinata did).
         negative_trades: Rows where ``taken_fuel > dealt_fuel``.
         post_break_negative_trades: Negative-trade rows that also
             carry at least one break — the return-fire/solvency
@@ -109,6 +113,7 @@ class EngagementLedgerDict(TypedDict):
     engagements: list[EngagementDict]
     kills: int
     deaths: int
+    player_kill_names: list[str]
     negative_trades: int
     post_break_negative_trades: int
 
@@ -341,12 +346,18 @@ def build_engagement_ledger(source_path: Path) -> EngagementLedgerDict:
     negative = [
         row for row in ordered if row["shots"] > 0 and row["taken_fuel"] > row["dealt_fuel"]
     ]
+    player_kill_names = [
+        row["target_name"]
+        for row in ordered
+        if row["outcome"] == "kill" and is_human_name(row["target_name"])
+    ]
     return EngagementLedgerDict(
         source_path=str(source_path),
         self_id=self_id,
         engagements=ordered,
         kills=sum(1 for row in ordered if row["outcome"] == "kill"),
         deaths=deaths,
+        player_kill_names=player_kill_names,
         negative_trades=len(negative),
         post_break_negative_trades=sum(1 for row in negative if row["breaks"] > 0),
     )
@@ -363,10 +374,11 @@ def _row_line(row: EngagementDict) -> str:
     """
     t2k = f"{row['seconds_to_kill']:.0f}s" if row["seconds_to_kill"] is not None else "-"
     trade = row["dealt_fuel"] - row["taken_fuel"]
+    tag = "  PLAYER" if is_human_name(row["target_name"]) else ""
     return (
         f"{row['target_id']:>5}  {row['target_name']:<14.14}"
         f" {row['shots']:>5}  {row['breaks']:>6}  {row['outcome']:<9}"
-        f" {t2k:>5}  {row['dealt_fuel']:>6}  {row['taken_fuel']:>6}  {trade:>+6}"
+        f" {t2k:>5}  {row['dealt_fuel']:>6}  {row['taken_fuel']:>6}  {trade:>+6}{tag}"
     )
 
 
@@ -387,6 +399,17 @@ def render_engagement_ledger(ledger: EngagementLedgerDict) -> str:
             f"self id: {self_text} | engagements {len(ledger['engagements'])}"
             f" | kills {ledger['kills']} | deaths {ledger['deaths']}"
         ),
+    ]
+    if ledger["player_kill_names"]:
+        # The headline a human operator must never have to dig for
+        # (2026-08-27: the first two player kills, Hypee and pinata,
+        # sat unnoticed in this ledger for hours because nothing
+        # shouted them).
+        lines.append(
+            f"PLAYER KILLS: {len(ledger['player_kill_names'])}"
+            f" -- {', '.join(ledger['player_kill_names'])}"
+        )
+    lines += [
         "   id  name            shots  breaks  outcome     t2k   dealt   taken   trade",
     ]
     lines.extend(_row_line(row) for row in ledger["engagements"])

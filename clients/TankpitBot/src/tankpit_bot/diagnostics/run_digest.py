@@ -27,6 +27,7 @@ from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
 from tankpit_bot.diagnostics.event_stream import load_event_records, run_analyzer_cli
+from tankpit_bot.protocol import RANK_NAMES
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 log = get_logger(__name__)
@@ -101,6 +102,10 @@ class RunDigestDict(TypedDict):
         self_tank_id: Wire id of our own tank (-1 when never identified).
         kills: Kill-registered count.
         deaths: Own deactivations observed.
+        rank_changes: Wire-observed own rank changes, in order (e.g.
+            ``"promoted to captain (rank 5)"``) — the 2026-08-27
+            Captain promotion went unnoticed for a session because
+            nothing surfaced it.
         shots: Shoot dispatches.
         hits: Server-confirmed shot hits (``action_outcome`` hit).
         misses: Server-confirmed shot misses.
@@ -133,6 +138,7 @@ class RunDigestDict(TypedDict):
     self_tank_id: int
     kills: int
     deaths: int
+    rank_changes: list[str]
     shots: int
     hits: int
     misses: int
@@ -337,6 +343,12 @@ def _apply_diagnostic(
         ] += 1
     elif kind == "plan_released":
         release_counts[str(record["fields"].get("reason", ""))] += 1
+    elif kind == "self_promotion":
+        new_rank = _field_int(record, "new_rank")
+        was_promoted = record["fields"].get("was_promoted") is True
+        rank_name = RANK_NAMES[new_rank] if 0 <= new_rank < len(RANK_NAMES) else str(new_rank)
+        verb = "promoted to" if was_promoted else "demoted to"
+        digest["rank_changes"].append(f"{verb} {rank_name} (rank {new_rank})")
     elif kind == "self_deactivated":
         # The one canonical death receipt. The 0x41 and fuel-wrap
         # producers dedup on ``ws.self_deactivated``, so exactly one
@@ -410,6 +422,7 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
         self_tank_id=-1,
         kills=0,
         deaths=0,
+        rank_changes=[],
         shots=0,
         hits=0,
         misses=0,
@@ -492,6 +505,7 @@ def render_run_digest(digest: RunDigestDict) -> str:
         f"exit       {exit_line}",
         f"room       {digest['room_id']}   self tank id {digest['self_tank_id']}",
         f"combat     kills={digest['kills']} deaths={digest['deaths']} shots={digest['shots']}",
+        *([f"rank       {'; '.join(digest['rank_changes'])}"] if digest["rank_changes"] else []),
         f"movement   teleports={digest['teleports']} displaced={digest['displacements']}"
         f" pickups={digest['pickups']}",
     ]

@@ -230,6 +230,42 @@ def test_death_by_a_tank_we_never_fought_books_no_row(fake_fs: FakeFileSystem) -
     assert ledger["engagements"] == []
 
 
+def test_a_player_kill_headlines_the_ledger(fake_fs: FakeFileSystem) -> None:
+    """A human-classified kill lands in the headline, never just the table.
+
+    2026-08-27: the first two player kills (Hypee, pinata) sat
+    unnoticed in the row table for hours; the operator found out via
+    a fuel-cap change. Player kills must shout.
+    """
+    _write_jsonl(
+        fake_fs,
+        _SOURCE,
+        [
+            _self_sample("2026-08-27T09:54:00", 601),
+            _record(
+                "2026-08-27T09:54:10",
+                diagnostic_kind="tank_identity",
+                tank_id=713,
+                name="pinata",
+            ),
+            _shot("2026-08-27T09:54:51", 713),
+            _record(
+                "2026-08-27T09:54:57",
+                diagnostic_kind="tank_deactivated",
+                victim_id=713,
+                killer_id=601,
+            ),
+        ],
+    )
+
+    ledger = build_engagement_ledger(_SOURCE)
+
+    assert ledger["player_kill_names"] == ["pinata"]
+    text = render_engagement_ledger(ledger)
+    assert "PLAYER KILLS: 1 -- pinata" in text
+    assert "PLAYER" in text.split("\n")[-1]
+
+
 def test_fuel_wrap_death_counts_without_killer_attribution(fake_fs: FakeFileSystem) -> None:
     """The Normal-field wrap receipt names no killer: death books, outcome stays open.
 
