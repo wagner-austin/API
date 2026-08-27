@@ -184,6 +184,53 @@ def _sweep() -> tuple[GemmShape, ...]:
 #: The grid.
 GEMM_SWEEP: Final[tuple[GemmShape, ...]] = _sweep()
 
+#: A realistic training batch: eight sequences of 512 tokens flattened, which
+#: is what the batch-times-sequence dimension is in a real step.
+#:
+#: WHY THE BATCHED TABLE EXISTS. Timing at :data:`GEMM_COLS` could not resolve
+#: most shapes. Every matmul call carries a fixed ~100 microseconds of Python
+#: dispatch and kernel launch, and at one 64-token sequence the arithmetic is
+#: a few microseconds -- so the measurement was overhead with a rounding error
+#: of signal on top, and reported the same time for a 128x128 matmul as for a
+#: 1600x6400 one.
+#:
+#: That is not a shape nobody cares about. Split-K is SELECTED on seven of the
+#: eight ladder calls -- measured from the traces; only ``tiny-attn-proj`` at
+#: K=128 draws none, which is what one would expect when there is nothing to
+#: split. So the shapes the first benchmark could not resolve are shapes the
+#: intervention really does change; they were unmeasured, not unaffected.
+#:
+#: Raising the batch fixes the measurement and makes it more honest at the
+#: same time: it is the regime real training runs in, where the arithmetic is
+#: hundreds of microseconds and the fixed overhead is noise instead of the
+#: signal.
+BATCH_COLS = 4096
+
+
+def _batched() -> tuple[tuple[str, GemmShape], ...]:
+    """The ladder's calls at a realistic batch size.
+
+    Returns:
+        ``(name, shape)`` pairs mirroring :data:`GEMM_SHAPES`, at
+        :data:`BATCH_COLS` instead of one short sequence.
+    """
+    return tuple(
+        (
+            f"batched-{name}",
+            GemmShape(
+                rows=shape["rows"],
+                inner=shape["inner"],
+                cols=BATCH_COLS,
+                origin=f"{shape['origin']} -- at a {BATCH_COLS}-row batch",
+            ),
+        )
+        for name, shape in GEMM_SHAPES.items()
+    )
+
+
+#: The ladder's calls at a real batch size.
+GEMM_BATCHED: Final[tuple[tuple[str, GemmShape], ...]] = _batched()
+
 #: Seed for the operands. One seed for the whole table, generated on the CPU
 #: and moved to the device, so every card multiplies the SAME bits. Generating
 #: on the GPU would use the device RNG and hand different cards different
@@ -241,6 +288,30 @@ def probed_shapes() -> tuple[tuple[str, GemmShape], ...]:
     return require_unique_labels(tuple(pairs))
 
 
+def timed_shapes() -> tuple[tuple[str, GemmShape], ...]:
+    """Every shape the split-K cost benchmark times.
+
+    The ladder's calls at one short sequence and again at a real batch. The
+    sweep grid is deliberately absent: it exists to populate the
+    same-kernel/same-output table, which is a question about VALUES, and
+    timing thirty-five more shapes to answer it would cost minutes and say
+    nothing.
+
+    The batched twins carry a different name rather than a different table
+    position, so a record read on its own distinguishes ``large-mlp-proj``
+    from ``batched-large-mlp-proj`` without consulting the dimensions.
+
+    Returns:
+        ``(name, shape)`` pairs, single-sequence first then batched.
+
+    Raises:
+        ValueError: Propagated from :func:`require_unique_labels`.
+    """
+    pairs = [(name, shape) for name, shape in GEMM_SHAPES.items()]
+    pairs += list(GEMM_BATCHED)
+    return require_unique_labels(tuple(pairs))
+
+
 def require_unique_labels(
     pairs: tuple[tuple[str, GemmShape], ...],
 ) -> tuple[tuple[str, GemmShape], ...]:
@@ -270,7 +341,9 @@ def require_unique_labels(
 
 
 __all__ = [
+    "BATCH_COLS",
     "DIGEST_SUFFIX",
+    "GEMM_BATCHED",
     "GEMM_COLS",
     "GEMM_EXPERIMENT",
     "GEMM_SEED",
@@ -284,4 +357,5 @@ __all__ = [
     "gemm_label",
     "probed_shapes",
     "require_unique_labels",
+    "timed_shapes",
 ]

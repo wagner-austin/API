@@ -30,7 +30,15 @@ from platform_core.run_record import (
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import gemm_benchmark as bench
 from model_trainer.core.run_fingerprint import capture_run_fingerprint
-from model_trainer.core.services.model.gemm_shapes import GemmShape, probed_shapes
+from model_trainer.core.services.model.gemm_shapes import (
+    BATCH_COLS,
+    GEMM_BATCHED,
+    GEMM_COLS,
+    GEMM_SHAPES,
+    GemmShape,
+    probed_shapes,
+    timed_shapes,
+)
 from model_trainer.core.services.model.gemm_timing import (
     BATCHES,
     INNER,
@@ -288,6 +296,12 @@ class TestTheCommandLine:
         module_name = "model_trainer.cli.gemm_benchmark"
         saved_argv = sys.argv
         saved_module = sys.modules.pop(module_name, None)
+        # The one-shape table matters here as much as in the other CLI tests,
+        # and this test is where forgetting it hurts most: `runpy` runs the
+        # module in-process, so the real table would time an 84-GFLOP batched
+        # matmul on the test runner's CPU and hang the suite rather than fail
+        # it. It did, once.
+        cli_hooks.benchmark_shapes = _one_shape
         sys.argv = [
             "modeltrainer-gemm-benchmark",
             "--device",
@@ -302,6 +316,7 @@ class TestTheCommandLine:
                 runpy.run_module(module_name, run_name="__main__", alter_sys=False)
         finally:
             sys.argv = saved_argv
+            cli_hooks.benchmark_shapes = cli_hooks._default_benchmark_shapes
             if saved_module is not None:
                 sys.modules[module_name] = saved_module
 
@@ -313,4 +328,46 @@ class TestTheProductionShapeTable:
     def test_the_deployed_benchmark_times_every_probed_shape(self) -> None:
         # What the one-shape fixture would otherwise hide: that the deployed
         # command measures the real table, not the cheap stand-in.
-        assert cli_hooks._default_benchmark_shapes() == probed_shapes()
+        assert cli_hooks._default_benchmark_shapes() == timed_shapes()
+
+
+class TestTheBatchedTable:
+    """Timing at one 64-token sequence could not resolve most shapes.
+
+    Every call carries ~100 microseconds of dispatch and launch, and at one
+    short sequence the arithmetic is a few microseconds -- so the first
+    benchmark reported the same time for a 128x128 matmul as for a
+    1600x6400 one. Those shapes are not unaffected: split-K is SELECTED on
+    seven of the eight, measured from the traces. They were unmeasured.
+    """
+
+    def test_it_mirrors_every_ladder_shape(self) -> None:
+        assert len(GEMM_BATCHED) == len(GEMM_SHAPES)
+
+    def test_it_changes_only_the_batch_dimension(self) -> None:
+        # The point is to time the SAME matmul with more work per call. A
+        # batched twin that also moved M or K would be a different call.
+        by_dims = {(s["rows"], s["inner"]) for _, s in GEMM_BATCHED}
+
+        assert by_dims == {(s["rows"], s["inner"]) for s in GEMM_SHAPES.values()}
+
+    def test_every_batched_shape_uses_the_batch_dimension(self) -> None:
+        assert [s["cols"] for _, s in GEMM_BATCHED] == [BATCH_COLS for _ in GEMM_BATCHED]
+
+    def test_the_batch_is_far_larger_than_one_short_sequence(self) -> None:
+        # It has to buy enough arithmetic to clear the launch-overhead floor;
+        # a modest bump would have left the measurement where it was.
+        assert BATCH_COLS >= 16 * GEMM_COLS
+
+    def test_the_twins_are_named_apart_from_their_originals(self) -> None:
+        # So a record read on its own tells them apart without consulting
+        # dimensions.
+        assert set(dict(GEMM_BATCHED)) & set(GEMM_SHAPES) == set()
+
+    def test_the_benchmark_times_both_regimes(self) -> None:
+        assert len(timed_shapes()) == len(GEMM_SHAPES) + len(GEMM_BATCHED)
+
+    def test_the_sweep_grid_is_not_timed(self) -> None:
+        # The sweep answers a question about VALUES, not speed; timing
+        # thirty-five more shapes would cost minutes and say nothing.
+        assert len(timed_shapes()) < len(probed_shapes())

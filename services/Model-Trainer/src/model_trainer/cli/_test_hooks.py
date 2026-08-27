@@ -23,7 +23,7 @@ from model_trainer.core.contracts.model import PreparedLMModel
 # Safe at module scope where the others are not: `probe_shapes` is a table of
 # TypedDicts and a label formatter, and imports no torch. That separation is
 # the reason it is its own module -- see its docstring.
-from model_trainer.core.services.model.gemm_shapes import GemmShape, probed_shapes
+from model_trainer.core.services.model.gemm_shapes import GemmShape, timed_shapes
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES, ProbeShape
 
 
@@ -101,9 +101,9 @@ def _default_benchmark_shapes() -> tuple[tuple[str, GemmShape], ...]:
     """Production benchmark shape table - used as default hook.
 
     Returns:
-        Every probed shape: the ladder's calls, then the sweep grid.
+        The ladder's calls at one short sequence and again at a real batch.
     """
-    return probed_shapes()
+    return timed_shapes()
 
 
 class RunBenchmarkChildProto(Protocol):
