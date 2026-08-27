@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "eb6a9b200a4b2b5eb5d3fc75b2f1a32237bbb3ea",
+  "git_commit": "a3f99e05089f066336a8a26de031c884d72592d1",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -166,6 +166,22 @@
     {
       "module": "model_trainer.cli.forward_benchmark",
       "attribute": "measure_row"
+    },
+    {
+      "module": "model_trainer.core.services.model.train_cost",
+      "attribute": "run_train_step"
+    },
+    {
+      "module": "model_trainer.core.services.model.train_cost",
+      "attribute": "train_step_setup"
+    },
+    {
+      "module": "model_trainer.cli.train_benchmark",
+      "attribute": "train_run_record"
+    },
+    {
+      "module": "model_trainer.cli.train_benchmark_report",
+      "attribute": "report_lines"
     }
   ],
   "smoke_commands": [
@@ -175,7 +191,8 @@
     "/opt/env/bin/python -m model_trainer.cli.gemm_probe --device cpu --out /tmp/gemm.json",
     "/opt/env/bin/python -m model_trainer.cli.gemm_benchmark --device cpu --out /tmp/bench.json --condition default",
     "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace.json",
-    "/opt/env/bin/python -m model_trainer.cli.sdpa_probe --device cpu --out /tmp/sdpa.json"
+    "/opt/env/bin/python -m model_trainer.cli.sdpa_probe --device cpu --out /tmp/sdpa.json",
+    "/opt/env/bin/python -c \"from model_trainer.core.services.model.train_cost import TRAIN_SHAPES, run_train_step, train_step_setup; row = [s for s in TRAIN_SHAPES if s['name'] == 'gate-tiny-b1-s64'][0]; run_train_step(train_step_setup(row, 'cpu'))\""
   ],
   "labels": {
     "org.corvis.project": "mi",
