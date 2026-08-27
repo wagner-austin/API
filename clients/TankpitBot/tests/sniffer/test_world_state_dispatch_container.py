@@ -441,46 +441,11 @@ class TestDispatchShootEvent:
         assert ws.world_state["tanks"]["517"]["y"] == 147
 
 
-class TestDispatchProtocolDeactivation:
-    """Tests for protocol-path 0x41 Deactivation dispatch.
-
-    0x41 moved out of container into the protocol layer 2026-06-19;
-    dispatch_world_state_update routes the integer msg_type 0x41.
-    """
-
-    def test_dispatch_deactivation_marks_liveness_deactivated(self) -> None:
-        """Dispatch 0x41 marks the victim ``liveness="deactivated"`` and
-        preserves the death tile.
-
-        Replaces the prior ``position-set-to-(0,0)`` sentinel with the
-        explicit liveness state machine introduced 2026-06-20.
-        """
-        from tankpit_bot.protocol import DeactivationDict, TankEntryDict
-
-        ws = WorldService()
-        entry = TankEntryDict(
-            msg_type=0x28, team=0, tank_id=900, rank=0, damage_state=0, score=0, x=100, y=100
-        )
-        dispatch_world_state_update(ws, entry)
-
-        msg = DeactivationDict(
-            msg_type=0x41,
-            status=0,
-            victim_id=900,
-            promo_eligible=True,
-            killer_id=1,
-            is_mine_kill=False,
-        )
-        dispatch_world_state_update(ws, msg)
-
-        tank = ws.world_state["tanks"]["900"]
-        assert tank["liveness"] == "deactivated"
-        assert tank["x"] == 100
-        assert tank["y"] == 100
-
-    # Container deactivation_death dispatch test deleted 2026-06-20 after
-    # the container DeactivationDeath decoder was removed. Tank
-    # deactivation flows through 0x41 Deactivation on the protocol path.
+# TestDispatchProtocolDeactivation moved to
+# test_world_state_dispatch_deactivation.py 2026-08-26 (file-size split).
+# Container deactivation_death dispatch test deleted 2026-06-20 after
+# the container DeactivationDeath decoder was removed. Tank
+# deactivation flows through 0x41 Deactivation on the protocol path.
 
 
 class TestIncrementContainerFailedPickups:

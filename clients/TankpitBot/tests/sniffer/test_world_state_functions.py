@@ -88,13 +88,15 @@ class TestFuelUpdate:
         assert state["self_state"]["fuel"] == 50
 
     def test_fuel_underflow_is_the_self_death_receipt(self) -> None:
-        """A u16-wrapped reading books a self-death and ingests zero.
+        """A u16-wrapped reading raises the SAME flag the 0x41 path does.
 
-        Arterial's two main-map deaths (2026-08-26 18:42:01 and
-        18:45:58, readings 65475 and 65530) were invisible: no 0x41
-        deactivation arrives for self on a Normal field, and the
-        belief ingested 65k fuel as if it were a pickup. The wrap IS
-        the deactivation receipt.
+        Arterial's three main-map deaths (2026-08-26 18:37:41,
+        18:42:01, 18:45:58; readings 65460/65475/65530): the wrap
+        lands one message BEFORE the 0x41 self-receipt, and the old
+        code ingested it as a +65k pickup, polluting the fuel book.
+        The wrap is the earlier redundant receipt: it books the death
+        through the existing 2026-07-30 respawn contract
+        (``self_deactivated``) and never reaches the pickup ledger.
         """
         from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
@@ -108,8 +110,46 @@ class TestFuelUpdate:
         if state is None:
             raise AssertionError("self_state should not be None")
         assert state["fuel"] == 0
+        assert ws.self_deactivated is True
         # The garbage reading never reaches the fuel book as a pickup.
         assert ws.fuel_book["last_fuel"] != 65475
+
+    def test_repeat_corpse_sync_does_not_book_a_second_death(self) -> None:
+        """The same death's wrapped readings raise the flag only once."""
+        from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
+
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(ws, 29)
+        update_world_state_from_fuel_total(ws, 65475)
+        assert ws.self_deactivated is True
+
+        ws.self_deactivated = False
+
+        # A late corpse sync AFTER the tick loop consumed the flag and
+        # dropped self_state must not re-book: without self_state there
+        # is no live tank to kill.
+        ws.world_state["self_state"] = None
+        update_world_state_from_fuel_total(ws, 65530)
+        assert ws.self_deactivated is False
+
+    def test_wrapped_reading_with_death_already_flagged_books_nothing(self) -> None:
+        """A wrap arriving in the same batch as the 0x41 stays one death."""
+        from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
+
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(ws, 29)
+        ws.self_deactivated = True
+
+        update_world_state_from_fuel_total(ws, 65482)
+
+        state = ws.world_state["self_state"]
+        if state is None:
+            raise AssertionError("self_state should not be None")
+        # The already-flagged branch swallows the reading whole: no
+        # fuel ingest, no second receipt.
+        assert state["fuel"] == 29
 
     def test_update_world_state_from_fuel_total_no_self_state(self) -> None:
         """Test fuel total does nothing when self_state is None."""

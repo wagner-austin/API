@@ -135,7 +135,19 @@ def _full_session_lines() -> list[str]:
         _event("2026-08-05T00:00:24", "WIRE", "pickup_equipment"),
         _event("2026-08-05T00:00:30", "WIRE", "shoot(100,100,id=501)"),
         _event("2026-08-05T00:00:31", "AI", "kill registered (tank_id=501)"),
-        _event("2026-08-05T00:00:40", "WORLD", "DEACTIVATED: tank=1301 killed by 501"),
+        # Our own death arrives ONLY as the self_deactivated
+        # diagnostic (0x41 origin here; the Normal-field fuel-wrap
+        # emits the same kind). The old free-text DEACTIVATED regex
+        # matched neither producer and read 0 through arterial's two
+        # 2026-08-26 deaths.
+        _event(
+            "2026-08-05T00:00:40",
+            "DIAGNOSTIC",
+            "diagnostic_kind=self_deactivated",
+            diagnostic_kind="self_deactivated",
+            origin="protocol_0x41",
+            killer_id=501,
+        ),
         _event("2026-08-05T00:00:41", "WORLD", "DEACTIVATED: tank=502 killed by 1301"),
         _event(
             "2026-08-05T00:06:00",

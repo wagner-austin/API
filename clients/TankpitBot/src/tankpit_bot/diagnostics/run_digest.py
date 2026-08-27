@@ -37,7 +37,6 @@ _CLEARANCE_CONVERT_WINDOW_S = 10
 _SHOOT_WIRE = re.compile(r"^shoot\(")
 _TELEPORT_WIRE = re.compile(r"^teleport\(")
 _PICKUP_WIRE = re.compile(r"^pickup_(fuel|equipment)")
-_DEACTIVATED = re.compile(r"^DEACTIVATED: tank=(\d+) killed by (\d+)")
 
 
 class DisplacementRowDict(TypedDict):
@@ -282,6 +281,40 @@ def _apply_combat_diagnostic(
         digest["damage_taken"] = taken_value
 
 
+def _apply_session_diagnostic(
+    record: RuntimeEventRecordDict,
+    digest: RunDigestDict,
+    kind: str,
+) -> None:
+    """Fold one session-lifecycle DIAGNOSTIC into the digest.
+
+    Args:
+        record: The event record (carries ``diagnostic_kind``).
+        digest: Digest under construction.
+        kind: The record's ``diagnostic_kind``.
+    """
+    if kind == "session_room_joined":
+        digest["room_id"] = str(record["fields"].get("room_id", ""))
+    elif kind == "tank_identity" and digest["self_tank_id"] == -1:
+        digest["self_tank_id"] = _field_int(record, "tank_id")
+    elif kind == "session_account_stats":
+        digest["rank_name"] = str(record["fields"].get("rank_name", ""))
+        # Archives before 2026-08-05 spell the countdown rank
+        # "rank_points" (the mislabel the rename fixed); the artifact
+        # is immutable so the reader takes either.
+        rank_key = "rank_number" if "rank_number" in record["fields"] else "rank_points"
+        digest["rank_number"] = _field_int(record, rank_key)
+        digest["promotion_points"] = _field_int(record, "promotion_points")
+    elif kind == "inventory_sample":
+        inventory = _inventory_row(record)
+        if not digest["inventory_first"]:
+            digest["inventory_first"] = inventory
+        digest["inventory_last"] = inventory
+    elif kind == "session_scorecard":
+        digest["clean_exit"] = True
+        digest["exit_reason"] = str(record["fields"].get("exit_reason", ""))
+
+
 def _apply_diagnostic(
     record: RuntimeEventRecordDict,
     digest: RunDigestDict,
@@ -296,36 +329,26 @@ def _apply_diagnostic(
         displacement_counts: Per-request-tile displacement tallies.
         release_counts: Per-reason ``plan_released`` tallies.
     """
-    kind = record["fields"].get("diagnostic_kind")
-    if kind == "session_room_joined":
-        digest["room_id"] = str(record["fields"].get("room_id", ""))
-    elif kind == "tank_identity" and digest["self_tank_id"] == -1:
-        digest["self_tank_id"] = _field_int(record, "tank_id")
-    elif kind == "teleport_displacement":
+    kind = str(record["fields"].get("diagnostic_kind", ""))
+    if kind == "teleport_displacement":
         digest["displacements"] += 1
         displacement_counts[
             (_field_int(record, "requested_x"), _field_int(record, "requested_y"))
         ] += 1
     elif kind == "plan_released":
         release_counts[str(record["fields"].get("reason", ""))] += 1
-    elif kind == "session_account_stats":
-        digest["rank_name"] = str(record["fields"].get("rank_name", ""))
-        # Archives before 2026-08-05 spell the countdown rank
-        # "rank_points" (the mislabel the rename fixed); the artifact
-        # is immutable so the reader takes either.
-        rank_key = "rank_number" if "rank_number" in record["fields"] else "rank_points"
-        digest["rank_number"] = _field_int(record, rank_key)
-        digest["promotion_points"] = _field_int(record, "promotion_points")
-    elif kind == "inventory_sample":
-        inventory = _inventory_row(record)
-        if not digest["inventory_first"]:
-            digest["inventory_first"] = inventory
-        digest["inventory_last"] = inventory
+    elif kind == "self_deactivated":
+        # The one canonical death receipt. The 0x41 and fuel-wrap
+        # producers dedup on ``ws.self_deactivated``, so exactly one
+        # record lands per death. The old ``DEACTIVATED: tank=N
+        # killed by M`` regex was dead code: no production path ever
+        # logged that line with the self id, so deaths read 0 through
+        # arterial's three 2026-08-26 main-map deaths.
+        digest["deaths"] += 1
     elif kind in ("action_outcome", "damage_ledger"):
-        _apply_combat_diagnostic(record, digest, str(kind))
-    elif kind == "session_scorecard":
-        digest["clean_exit"] = True
-        digest["exit_reason"] = str(record["fields"].get("exit_reason", ""))
+        _apply_combat_diagnostic(record, digest, kind)
+    else:
+        _apply_session_diagnostic(record, digest, kind)
 
 
 def _apply_wire(
@@ -436,10 +459,6 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
         elif "kill registered" in message:
             digest["kills"] += 1
             _bucket(digest["timeline"], start_s, t_s)["kills"] += 1
-        else:
-            deactivated = _DEACTIVATED.match(message)
-            if deactivated and int(deactivated.group(1)) == digest["self_tank_id"]:
-                digest["deaths"] += 1
 
     if radar_pending:
         digest["zero_yield_radars"] += 1

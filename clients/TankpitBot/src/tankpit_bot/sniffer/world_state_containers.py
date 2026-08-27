@@ -50,26 +50,33 @@ def update_world_state_from_fuel_total(
         ws.world_state["self_state"]["fuel"] if ws.world_state["self_state"] is not None else 0
     )
     if fuel_total > _FUEL_DEATH_UNDERFLOW:
-        # The u16 death signature (arterial's two main-map deaths,
-        # 2026-08-26 18:42:01 and 18:45:58: readings 65475 and 65530):
-        # a killing blow drives fuel THROUGH zero and the wire's
-        # unsigned field wraps. Both deaths were invisible — no 0x41
-        # deactivation arrives for self on a Normal field, the digest
-        # counted nothing, and the belief happily ingested 65k fuel.
-        # This IS the deactivation receipt: book it loudly, ingest
-        # zero, and skip the accounting that would misread the wrap
-        # as a pickup.
+        # The u16 death signature: a killing blow drives fuel THROUGH
+        # zero and the wire's unsigned field wraps (arterial's three
+        # 2026-08-26 main-map deaths read 65460/65475/65530). The 0x41
+        # self-receipt DOES arrive on Normal fields — one message
+        # AFTER the wrap, in the same drain batch — so this branch's
+        # jobs are (1) never ingest the wrap as a +65k pickup (it
+        # polluted the fuel book and stamped record_own_gain three
+        # times that run) and (2) book the death through the SAME
+        # ``self_deactivated`` flag the 0x41 path raises, as the
+        # earlier-arriving redundant receipt. Both producers dedup on
+        # the flag: one death, one receipt, whichever lands first. A
+        # repeat corpse sync (self already dropped, or death already
+        # flagged) books nothing twice.
         self_state = ws.world_state["self_state"]
-        self_id = self_state["tank_id"] if self_state is not None else 0
+        if self_state is None or ws.self_deactivated:
+            return
+        ws.self_deactivated = True
         emit_world(
             "DEACTIVATED: tank=%d SELF killed (fuel through zero, raw u16 %d, prev %d)",
-            self_id,
+            self_state["tank_id"],
             fuel_total,
             old_fuel,
         )
         emit_diagnostic(
             diagnostic_kind="self_deactivated",
-            tank_id=self_id,
+            origin="fuel_underflow",
+            tank_id=self_state["tank_id"],
             raw_reading=fuel_total,
             prev_fuel=old_fuel,
         )

@@ -282,14 +282,19 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
                 # decoder blind spot fixed 2026-07-19). Record the
                 # fact; the tick loop owns the session-exit decision
                 # (dispatch also runs under replay/analysis, which
-                # must not throw mid-stream).
-                ws.self_deactivated = True
-                emit_diagnostic(
-                    diagnostic_kind="self_deactivated",
-                    origin="protocol_0x41",
-                    killer_id=kid,
-                )
-                log.info("SELF DEACTIVATED: killed by %d", kid)
+                # must not throw mid-stream). The u16 fuel-wrap
+                # receipt lands FIRST in the same drain batch
+                # (arterial 2026-08-26 18:37:41: wrap, then 0x41 one
+                # message later), so an already-raised flag means this
+                # death is booked — one death, one receipt.
+                if not ws.self_deactivated:
+                    ws.self_deactivated = True
+                    emit_diagnostic(
+                        diagnostic_kind="self_deactivated",
+                        origin="protocol_0x41",
+                        killer_id=kid,
+                    )
+                    log.info("SELF DEACTIVATED: killed by %d", kid)
                 return True
             mark_tank_killed(ws, vid, kid)
             ws.world_state = deactivate_tank(ws.world_state, vid, browser.get_current_time_ms())

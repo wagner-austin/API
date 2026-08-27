@@ -113,10 +113,14 @@ def _collision_rows() -> list[dict[str, str | int | float | bool]]:
             killer_id=91,
         ),
         _shot("2026-08-26T04:00:40", 70),
+        # Our own death arrives as self_deactivated, never as a
+        # tank_deactivated with victim=self (dispatch routes self to
+        # the other branch — the old victim-is-us handling here was
+        # dead code fed only by a fixture production never writes).
         _record(
             "2026-08-26T04:00:42",
-            diagnostic_kind="tank_deactivated",
-            victim_id=601,
+            diagnostic_kind="self_deactivated",
+            origin="protocol_0x41",
             killer_id=70,
         ),
         _record(
@@ -213,8 +217,8 @@ def test_death_by_a_tank_we_never_fought_books_no_row(fake_fs: FakeFileSystem) -
             _self_sample("2026-08-26T04:00:00", 601),
             _record(
                 "2026-08-26T04:00:01",
-                diagnostic_kind="tank_deactivated",
-                victim_id=601,
+                diagnostic_kind="self_deactivated",
+                origin="protocol_0x41",
                 killer_id=999,
             ),
         ],
@@ -224,6 +228,36 @@ def test_death_by_a_tank_we_never_fought_books_no_row(fake_fs: FakeFileSystem) -
 
     assert ledger["deaths"] == 1
     assert ledger["engagements"] == []
+
+
+def test_fuel_wrap_death_counts_without_killer_attribution(fake_fs: FakeFileSystem) -> None:
+    """The Normal-field wrap receipt names no killer: death books, outcome stays open.
+
+    Arterial's two 2026-08-26 main-map deaths arrived exactly this way
+    — no 0x41 for self, so the u16 fuel-wrap receipt carries no
+    killer_id. The fight row stays honest ("open") instead of guessing.
+    """
+    _write_jsonl(
+        fake_fs,
+        _SOURCE,
+        [
+            _self_sample("2026-08-26T04:00:00", 601),
+            _shot("2026-08-26T04:00:05", 70),
+            _record(
+                "2026-08-26T04:00:10",
+                diagnostic_kind="self_deactivated",
+                origin="fuel_underflow",
+                tank_id=601,
+                raw_reading=65475,
+                prev_fuel=146,
+            ),
+        ],
+    )
+
+    ledger = build_engagement_ledger(_SOURCE)
+
+    assert ledger["deaths"] == 1
+    assert ledger["engagements"][0]["outcome"] == "open"
 
 
 def test_kill_of_a_ledger_only_row_has_no_time_to_kill(fake_fs: FakeFileSystem) -> None:

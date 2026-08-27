@@ -14,8 +14,10 @@ flagged row: an engagement with breaks and a negative damage trade.
 Sources, all wire- or diagnostic-grounded, from the events artifact:
 
 * ``WIRE shoot(x,y,id=N)`` lines — per-target shot dispatches.
-* ``tank_deactivated`` diagnostics — kills (killer is us) and deaths
-  (victim is us).
+* ``tank_deactivated`` diagnostics — kills (killer is us; dispatch
+  never emits this kind for our own death).
+* ``self_deactivated`` diagnostics — our own deaths, from either
+  receipt (protocol 0x41, or the Normal-field u16 fuel-wrap).
 * ``engagement_break`` diagnostics — solvency/fire breaks per target.
 * ``self_alignment_sample`` diagnostics — our own wire id.
 * ``tank_identity`` diagnostics — id-to-name resolution.
@@ -95,7 +97,7 @@ class EngagementLedgerDict(TypedDict):
         engagements: One row per enemy, ordered by first shot (rows
             we never shot at sort last, by id).
         kills: Rows with outcome ``"kill"``.
-        deaths: ``tank_deactivated`` records where the victim is us.
+        deaths: ``self_deactivated`` records — our own deaths.
         negative_trades: Rows where ``taken_fuel > dealt_fuel``.
         post_break_negative_trades: Negative-trade rows that also
             carry at least one break — the return-fire/solvency
@@ -213,8 +215,14 @@ def _consume_deactivation(
     fields: dict[str, str | int | float | bool],
     self_id: int | None,
     record: RuntimeEventRecordDict,
-) -> int:
+) -> None:
     """Book one ``tank_deactivated`` diagnostic into the rows.
+
+    Only OTHER tanks' deactivations arrive on this kind — dispatch
+    routes our own death to ``self_deactivated`` before this record
+    is ever emitted, so a victim-is-us branch here would be dead
+    code (and was, until 2026-08-26: deaths read 0 through both of
+    arterial's main-map deaths).
 
     Args:
         rows: Engagement rows keyed by enemy id.
@@ -222,25 +230,37 @@ def _consume_deactivation(
         self_id: Our wire id, or ``None`` while unknown (attribution
             is then impossible and the record books nothing).
         record: The full record (timestamp source for time-to-kill).
-
-    Returns:
-        ``1`` when the deactivation is our own death, else ``0``.
     """
     victim_id = _opt_int(fields, "victim_id")
     killer_id = _opt_int(fields, "killer_id")
     if victim_id is None or killer_id is None or self_id is None:
-        return 0
-    if victim_id == self_id:
-        if killer_id in rows:
-            rows[killer_id]["outcome"] = "killed_us"
-        return 1
+        return
     if killer_id == self_id and victim_id in rows:
         row = rows[victim_id]
         row["outcome"] = "kill"
         first = row["first_shot_s"]
         if first is not None:
             row["seconds_to_kill"] = _timestamp_seconds(record) - first
-    return 0
+
+
+def _consume_self_death(
+    rows: dict[int, EngagementDict],
+    fields: dict[str, str | int | float | bool],
+) -> None:
+    """Book our own ``self_deactivated`` receipt's killer, when named.
+
+    The 0x41 receipt carries ``killer_id``; the fuel-wrap receipt
+    (which lands first when both arrive, and wins the dedup) cannot
+    name the killer, so those deaths count without an outcome
+    attribution — honest, not inferred.
+
+    Args:
+        rows: Engagement rows keyed by enemy id.
+        fields: The self-death record's structured payload.
+    """
+    killer_id = _opt_int(fields, "killer_id")
+    if killer_id is not None and killer_id in rows:
+        rows[killer_id]["outcome"] = "killed_us"
 
 
 def _resolve_names(rows: dict[int, EngagementDict], records: list[RuntimeEventRecordDict]) -> None:
@@ -302,7 +322,10 @@ def build_engagement_ledger(source_path: Path) -> EngagementLedgerDict:
         elif kind == "engagement_break":
             _consume_break(rows, fields)
         elif kind == "tank_deactivated":
-            deaths += _consume_deactivation(rows, fields, self_id, record)
+            _consume_deactivation(rows, fields, self_id, record)
+        elif kind == "self_deactivated":
+            deaths += 1
+            _consume_self_death(rows, fields)
         elif kind == "damage_ledger":
             dealt = _opt_str(fields, "dealt")
             taken = _opt_str(fields, "taken")
