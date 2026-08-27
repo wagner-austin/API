@@ -27,10 +27,10 @@ from model_trainer.cli import gemm_probe as gemm_cli
 from model_trainer.core.services.model.gemm_probe import (
     DIGEST_BYTES,
     describe_output,
+    gemm_description,
     gemm_identity,
     gemm_operands,
     gemm_output,
-    require_reproduced,
 )
 from model_trainer.core.services.model.gemm_shapes import (
     DIGEST_SUFFIX,
@@ -250,24 +250,14 @@ class TestTheDigest:
 
 
 class TestTheReproducibilityGuard:
-    def test_two_identical_runs_pass_and_return_the_first(self) -> None:
-        out = gemm_output(SMALL, "cpu")
+    # The guard itself moved to `tensor_digest`, where the sdpa probe also
+    # uses it; its two directions are exercised there. What stays here is
+    # the part specific to a GEMM: that the refusal names the call.
+    def test_the_description_names_the_dimensions(self) -> None:
+        assert gemm_description(SMALL) == "a GEMM M8xK16xN4"
 
-        assert require_reproduced(out, out.clone(), SMALL, "cpu") is out
-
-    def test_two_differing_runs_are_refused_by_name(self) -> None:
-        out = gemm_output(SMALL, "cpu")
-        other = out.clone()
-        other[0][0] = torch.nextafter(other[0][0], torch.tensor(float("inf")))
-
-        with pytest.raises(RuntimeError, match="did not reproduce itself on cpu"):
-            require_reproduced(out, other, SMALL, "cpu")
-
-    def test_the_refusal_names_the_shape(self) -> None:
-        other = gemm_output(SMALL, "cpu") + 1.0
-
-        with pytest.raises(RuntimeError, match=r"M8xK16xN4"):
-            require_reproduced(gemm_output(SMALL, "cpu"), other, SMALL, "cpu")
+    def test_two_shapes_do_not_share_a_description(self) -> None:
+        assert gemm_description(SMALL) != gemm_description({**SMALL, "inner": SMALL["inner"] * 2})
 
     def test_a_real_cpu_call_reproduces_itself(self) -> None:
         assert gemm_identity(SMALL, "cpu") == gemm_identity(SMALL, "cpu")

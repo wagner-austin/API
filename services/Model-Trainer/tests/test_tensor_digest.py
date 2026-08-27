@@ -29,6 +29,7 @@ from model_trainer.core.services.model.tensor_digest import (
     DIGEST_BYTES,
     describe_tensor,
     fold_digest,
+    require_reproduced,
 )
 
 
@@ -158,6 +159,35 @@ class TestDescribingAnIntegralTensor:
         wide = ints([7, -7])
 
         assert describe_tensor(narrow) == describe_tensor(wide)
+
+
+class TestTheReproducibilityGuard:
+    # Both directions are reachable here and nowhere else: the arithmetic
+    # under study is deterministic within a device, so the failing arm cannot
+    # be reached by running it -- an arm no test can reach is an arm nobody
+    # has checked says what it means.
+    def test_two_identical_runs_pass_and_return_the_first(self) -> None:
+        tensor = floats([1.0, 2.0, 3.0])
+
+        assert require_reproduced(tensor, tensor.clone(), "a GEMM", "cpu") is tensor
+
+    def test_a_last_bit_difference_is_enough_to_refuse(self) -> None:
+        tensor = floats([1.0, 2.0, 3.0])
+        nudged = tensor.clone()
+        nudged[0] = torch.nextafter(nudged[0], torch.tensor(float("inf")))
+
+        with pytest.raises(RuntimeError, match="did not reproduce itself on cpu"):
+            require_reproduced(tensor, nudged, "a GEMM", "cpu")
+
+    def test_the_refusal_names_what_was_run_and_where(self) -> None:
+        tensor = floats([1.0])
+
+        with pytest.raises(RuntimeError, match=r"attention h2 s64 did not reproduce"):
+            require_reproduced(tensor, floats([2.0]), "attention h2 s64", "cuda")
+
+    def test_the_refusal_says_why_it_matters(self) -> None:
+        with pytest.raises(RuntimeError, match="nothing measured across cards would mean"):
+            require_reproduced(floats([1.0]), floats([2.0]), "a GEMM", "cpu")
 
 
 class TestRefusals:

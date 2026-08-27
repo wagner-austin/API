@@ -138,6 +138,41 @@ def _describe_integral(flat: torch.Tensor) -> tuple[float, float]:
     return fold_digest(hasher.digest()), math.fsum(partials)
 
 
+def require_reproduced(
+    first: torch.Tensor, second: torch.Tensor, what: str, device: str
+) -> torch.Tensor:
+    """Return one of two runs of a computation, refusing if they differ.
+
+    Every cross-card measurement here rests on a device reproducing itself.
+    If it does not, nothing measured ACROSS cards means anything, so the run
+    stops rather than recording a number whose own device cannot repeat it.
+
+    A separate function rather than a branch inside each caller, because it is
+    the one part a test can exercise in BOTH directions: the arithmetic under
+    study is deterministic within a device, so the failing arm cannot be
+    reached by running it -- and an arm no test can reach is an arm nobody has
+    checked says what it means.
+
+    Args:
+        first: The first run's output.
+        second: The second run's.
+        what: What was run, for the message, e.g. ``"a GEMM M64xK128xN64"``.
+        device: Where it ran, for the message.
+
+    Returns:
+        ``first``, once the two are known to agree.
+
+    Raises:
+        RuntimeError: If they differ.
+    """
+    if not torch.equal(first, second):
+        raise RuntimeError(
+            f"{what} did not reproduce itself on {device}; "
+            "nothing measured across cards would mean anything"
+        )
+    return first
+
+
 def describe_tensor(tensor: torch.Tensor) -> tuple[float, float]:
     """Reduce a tensor to its identity and its magnitude.
 
@@ -184,4 +219,5 @@ __all__ = [
     "DIGEST_BYTES",
     "describe_tensor",
     "fold_digest",
+    "require_reproduced",
 ]

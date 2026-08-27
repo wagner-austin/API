@@ -30,7 +30,11 @@ import struct
 import torch
 
 from model_trainer.core.services.model.gemm_shapes import GEMM_SEED, GemmShape
-from model_trainer.core.services.model.tensor_digest import DIGEST_BYTES, fold_digest
+from model_trainer.core.services.model.tensor_digest import (
+    DIGEST_BYTES,
+    fold_digest,
+    require_reproduced,
+)
 
 
 def gemm_operands(shape: GemmShape, device: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -94,38 +98,16 @@ def _output_bytes(output: torch.Tensor) -> bytes:
     return struct.pack(f"<{len(values)}f", *values)
 
 
-def require_reproduced(
-    first: torch.Tensor, second: torch.Tensor, shape: GemmShape, device: str
-) -> torch.Tensor:
-    """Return one of two runs of a call, refusing if they differ.
-
-    A separate function rather than a branch inside :func:`gemm_identity`,
-    because it is the one part of this module a test can exercise in both
-    directions. A CPU GEMM is deterministic, so the failing arm cannot be
-    reached by running one -- and an arm no test can reach is an arm nobody
-    has checked says what it means.
+def gemm_description(shape: GemmShape) -> str:
+    """Name one call, for a self-reproduction failure message.
 
     Args:
-        first: The first run's output.
-        second: The second run's.
-        shape: The call, for the message.
-        device: Where it ran, for the message.
+        shape: The call.
 
     Returns:
-        ``first``, once the two are known to agree.
-
-    Raises:
-        RuntimeError: If they differ. Within one device and one process this
-            must be exact; if it is not, nothing measured ACROSS cards means
-            anything, so the run stops rather than recording a number whose
-            own device cannot reproduce it.
+        e.g. ``a GEMM M1024xK4096xN64``.
     """
-    if not torch.equal(first, second):
-        raise RuntimeError(
-            f"a GEMM M{shape['rows']}xK{shape['inner']}xN{shape['cols']} did not "
-            f"reproduce itself on {device}; nothing measured across cards would mean anything"
-        )
-    return first
+    return f"a GEMM M{shape['rows']}xK{shape['inner']}xN{shape['cols']}"
 
 
 def describe_output(output: torch.Tensor) -> tuple[float, float]:
@@ -156,19 +138,20 @@ def gemm_identity(shape: GemmShape, device: str) -> tuple[float, float]:
         ``(folded digest, float64 sum)`` of the output.
 
     Raises:
-        RuntimeError: Propagated from :func:`require_reproduced` when the same
-            call on the same device produced two different tensors.
+        RuntimeError: Propagated from
+            :func:`~tensor_digest.require_reproduced` when the same call on
+            the same device produced two different tensors.
     """
     first = gemm_output(shape, device).cpu()
     second = gemm_output(shape, device).cpu()
-    return describe_output(require_reproduced(first, second, shape, device))
+    return describe_output(require_reproduced(first, second, gemm_description(shape), device))
 
 
 __all__ = [
     "DIGEST_BYTES",
     "describe_output",
+    "gemm_description",
     "gemm_identity",
     "gemm_operands",
     "gemm_output",
-    "require_reproduced",
 ]
