@@ -145,6 +145,21 @@ def test_gatherer_role_never_returns_fire() -> None:
     assert collect_return_fire(ctx, ctx.base) is None
 
 
+def test_a_holding_break_latch_silences_return_fire() -> None:
+    """Escape ticks are inviolable: no divert while the latch holds.
+
+    Arterial's first main-map death (2026-08-26 18:41): seven
+    consecutive break-escape ticks were spent shooting a second
+    attacker through this rung while two shooters crossfired
+    135/tick — fuel 666 to 146 without moving a tile. Escaping IS
+    the survival doctrine; nothing outranks it.
+    """
+    ctx = _ctx(tanks={str(_ATTACKER_ID): _attacker(103, 100)})
+    latched = AIStateDict(**{**ctx.base, "break_escape_until_fuel": 800})
+
+    assert collect_return_fire(ctx, latched) is None
+
+
 def test_no_recent_attacker_means_no_return_fire() -> None:
     """Without a confirmed hit in the window the rung declines."""
     ctx = _ctx(tanks={str(_ATTACKER_ID): _attacker(103, 100)}, hits=0)

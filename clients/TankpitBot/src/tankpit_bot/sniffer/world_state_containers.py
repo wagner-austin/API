@@ -26,6 +26,12 @@ from tankpit_bot.state import (
 log = get_logger(__name__)
 
 
+_FUEL_DEATH_UNDERFLOW = 60_000
+"""Readings above this are u16-wrapped negatives — the self-death
+signature. The deepest legal tank is a general's 1800; nothing real
+approaches 60k."""
+
+
 def update_world_state_from_fuel_total(
     ws: WorldService,
     fuel_total: int,
@@ -43,6 +49,32 @@ def update_world_state_from_fuel_total(
     old_fuel = (
         ws.world_state["self_state"]["fuel"] if ws.world_state["self_state"] is not None else 0
     )
+    if fuel_total > _FUEL_DEATH_UNDERFLOW:
+        # The u16 death signature (arterial's two main-map deaths,
+        # 2026-08-26 18:42:01 and 18:45:58: readings 65475 and 65530):
+        # a killing blow drives fuel THROUGH zero and the wire's
+        # unsigned field wraps. Both deaths were invisible — no 0x41
+        # deactivation arrives for self on a Normal field, the digest
+        # counted nothing, and the belief happily ingested 65k fuel.
+        # This IS the deactivation receipt: book it loudly, ingest
+        # zero, and skip the accounting that would misread the wrap
+        # as a pickup.
+        self_state = ws.world_state["self_state"]
+        self_id = self_state["tank_id"] if self_state is not None else 0
+        emit_world(
+            "DEACTIVATED: tank=%d SELF killed (fuel through zero, raw u16 %d, prev %d)",
+            self_id,
+            fuel_total,
+            old_fuel,
+        )
+        emit_diagnostic(
+            diagnostic_kind="self_deactivated",
+            tank_id=self_id,
+            raw_reading=fuel_total,
+            prev_fuel=old_fuel,
+        )
+        ws.world_state = set_self_fuel(ws.world_state, 0, ts, fact_source)
+        return
     ws.world_state = set_self_fuel(ws.world_state, fuel_total, ts, fact_source)
     delta = fuel_total - old_fuel
     emit_world("Fuel: %d -> %d (%+d)", old_fuel, fuel_total, delta)

@@ -273,6 +273,14 @@ def collect_return_fire(ctx: DecideCtx, base_state: AIStateDict) -> TickDecision
     """
     if ctx.config["role"] == "gatherer":
         return None
+    if base_state["break_escape_until_fuel"] > 0:
+        # A holding break latch means the tick BELONGS to the escape
+        # (arterial's first main-map death, 2026-08-26 18:41: seven
+        # consecutive escape ticks spent shooting a second attacker
+        # through this rung while Blue Killer and orange-8 crossfired
+        # 135/tick — fuel 666 to 146 without moving a tile). Escaping
+        # IS the survival doctrine; no divert outranks it.
+        return None
     if ctx.fuel <= ctx.config["fuel_low_threshold"] or weapon_reserves_below_break(ctx):
         return None
     if not recent_attacker_ids(ctx):

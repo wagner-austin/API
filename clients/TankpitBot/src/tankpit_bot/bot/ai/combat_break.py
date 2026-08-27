@@ -40,9 +40,18 @@ from tankpit_bot.protocol.naming import is_human_name
 INCOMING_RATE_WINDOW_MS = 10_000
 """Trailing window for the measured incoming-damage rate."""
 
-_MIN_SUSTAIN_HITS = 3
+_MIN_SUSTAIN_HITS = 1
 """Confirmed hits the window must hold before the rate counts at all.
-One lucky enemy volley (1-2 hits) never triggers a break."""
+
+Was 3 ("one lucky volley never triggers a break") until arterial's
+second main-map death (2026-08-26 18:45): Blue Killer's SPACED fire
+(-90 every 4-12 s) kept the 10 s window at 2 hits, the rate counted
+as zero, the projection saw own costs only, and the bot traded from
+952 to 132 fuel across seventeen shots without a single break. The
+premature-flee concern the floor served is already carried by the
+projection math itself — a single 45-fuel hit moves the projection
+by ~4/tick and breaks nothing healthy — so every confirmed hit now
+counts toward the measured rate."""
 
 _ESCAPE_LATENCY_TICKS = 2
 """Actions between deciding to leave and the teleport leaving:

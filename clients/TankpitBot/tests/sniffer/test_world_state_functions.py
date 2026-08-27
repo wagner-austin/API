@@ -87,6 +87,30 @@ class TestFuelUpdate:
             raise AssertionError("self_state should not be None")
         assert state["self_state"]["fuel"] == 50
 
+    def test_fuel_underflow_is_the_self_death_receipt(self) -> None:
+        """A u16-wrapped reading books a self-death and ingests zero.
+
+        Arterial's two main-map deaths (2026-08-26 18:42:01 and
+        18:45:58, readings 65475 and 65530) were invisible: no 0x41
+        deactivation arrives for self on a Normal field, and the
+        belief ingested 65k fuel as if it were a pickup. The wrap IS
+        the deactivation receipt.
+        """
+        from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
+
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(ws, 29)
+
+        update_world_state_from_fuel_total(ws, 65475)
+
+        state = ws.world_state["self_state"]
+        if state is None:
+            raise AssertionError("self_state should not be None")
+        assert state["fuel"] == 0
+        # The garbage reading never reaches the fuel book as a pickup.
+        assert ws.fuel_book["last_fuel"] != 65475
+
     def test_update_world_state_from_fuel_total_no_self_state(self) -> None:
         """Test fuel total does nothing when self_state is None."""
         from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total

@@ -95,11 +95,40 @@ def test_quiet_fight_never_breaks_even_at_low_fuel() -> None:
     assert assessment["break_engagement"] is False
 
 
-def test_a_two_hit_spike_is_not_sustained_fire() -> None:
-    """Below the 3-hit floor the rate is discarded entirely."""
+def test_spaced_hits_count_toward_the_measured_rate() -> None:
+    """Two spaced hits in the window feed the projection.
+
+    The retired 3-hit floor made SPACED sustained fire invisible:
+    arterial's second main-map death (2026-08-26 18:45, Blue Killer)
+    traded 952 fuel to 132 across seventeen shots without one break
+    because -90 every 4-12 s kept the window at 2 hits and the rate
+    counted zero. Every confirmed hit now counts; a single light hit
+    still breaks nothing healthy (the projection math is the guard).
+    """
     assessment = assess_engagement_break(_ctx(fuel=500), _threat(damage_state=3), 2, 180)
-    assert assessment["incoming_rate_per_tick"] == 0
-    assert assessment["break_engagement"] is False
+    assert assessment["incoming_rate_per_tick"] == 36
+    assert assessment["projected_fuel_at_kill"] == 500 - 13 * (20 + 36)
+    assert assessment["break_engagement"] is True
+
+
+def test_blue_killer_regression_breaks_below_the_human_band() -> None:
+    """The second-death shape breaks once below half capacity.
+
+    At 952 the human attrition band correctly holds (fuel above half
+    the rank-2 fixture's 1200 capacity); at 560 — below the band —
+    the now-counted spaced rate breaks the fight with escape still
+    cheap. Live, the rate blindness held the fight to 132 and death.
+    """
+    holding = assess_engagement_break(
+        _ctx(fuel=952), _threat(damage_state=3, name="Blue Killer"), 2, 180
+    )
+    assert holding["incoming_rate_per_tick"] == 36
+    assert holding["break_engagement"] is False
+
+    breaking = assess_engagement_break(
+        _ctx(fuel=560), _threat(damage_state=3, name="Blue Killer"), 2, 180
+    )
+    assert breaking["break_engagement"] is True
 
 
 def test_human_fight_holds_above_half_capacity() -> None:
