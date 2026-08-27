@@ -30,11 +30,22 @@ the model.
 
 WHICH RUNGS, AND WHY THESE FOUR. :data:`TRACE_RUNGS` is a contrast, not a
 sample. ``tiny`` is the rung that removing split-K BREAKS, and the one eight
-registered known answers are keyed on. ``xl`` is the rung it fails to fix.
-``large`` is the rung it does fix, so a mechanism proposed for the other two
-has to explain why it does not fire here. ``medium`` never disagrees under
-either condition and is the negative control: a trace that finds a divergence
-there has found a problem with the instrument.
+registered known answers are keyed on. ``xl`` is the rung it fails to fix --
+though what it does there is relocate the disagreement rather than leave it
+alone, since the odd card is the V100 by default and the A30 with split-K
+removed. ``large`` is the rung it DOES fix, so a mechanism proposed for the
+other two has to explain why it does not fire here. ``medium`` is the rung
+whose LOSS agrees on all three cards under both conditions.
+
+``medium`` is emphatically NOT a control that must show no divergence. The
+isolated-matmul work already found six of eight shapes producing three
+different tensors on three cards INCLUDING at rungs whose reported loss is
+bit-identical -- so tensors diverging inside a rung whose loss agrees is the
+expected case, not an instrument fault. What ``medium`` is for is the
+opposite reading: if its internals diverge and its loss does not, that
+carries the "a reported threshold is where an existing disagreement grows
+past one float32 ULP" result up from a single matmul to a whole model, on a
+rung where the loss cannot show it.
 
 Rungs are named rather than shapes restated, so a reshaped rung in
 :data:`~model_trainer.core.services.model.probe_shapes.PROBE_SHAPES` changes

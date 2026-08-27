@@ -117,8 +117,9 @@ class TestTheDeclaredRungs:
 
     def test_it_declares_the_four_the_contrast_needs(self) -> None:
         # tiny is broken by removing split-K, xl is not fixed by it, large IS
-        # fixed by it, and medium never moves. Dropping any one of the four
-        # would leave a mechanism unfalsifiable, so the set is asserted whole.
+        # fixed by it, and medium's loss agrees throughout. Dropping any one
+        # of the four would leave a mechanism unfalsifiable, so the set is
+        # asserted whole rather than by length.
         assert TRACE_RUNGS == ("tiny", "medium", "large", "xl")
 
     def test_no_rung_is_traced_twice(self) -> None:
