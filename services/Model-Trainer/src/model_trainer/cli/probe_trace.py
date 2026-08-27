@@ -54,7 +54,10 @@ from model_trainer.core.services.model.trace_plan import (
     DIGEST_SUFFIX,
     SUM_SUFFIX,
     TRACE_EXPERIMENT,
+    WORKSPACE_NAME,
+    WORKSPACE_UNSET,
     TraceName,
+    describe_workspace,
     trace_label,
     trace_loss_name,
     trace_tensor_name,
@@ -94,6 +97,38 @@ def tensor_observations(rung: str, traced: tuple[TracedTensor, ...]) -> tuple[Ob
     return tuple(observations)
 
 
+def workspace_observation() -> Observation:
+    """Record which split-K condition this process is running under.
+
+    Read here rather than left to the filename, because the whole experiment
+    is a contrast between two values of one variable and a record that cannot
+    name its own arm is a record whose arm someone has to remember. See
+    :data:`~model_trainer.core.services.model.trace_plan.WORKSPACE_NAME` for
+    why this is an observation and not a fingerprint axis.
+
+    Returns:
+        The observation: the size in bytes, or
+        :data:`~model_trainer.core.services.model.trace_plan.WORKSPACE_UNSET`
+        when the variable is not set.
+
+    Raises:
+        ValueError: If the variable is set to something that is not an
+            integer. Recording it as "unset" would be a lie and recording
+            nothing would leave the arm unnamed, so the run stops instead --
+            before spending a GPU on a measurement whose condition it cannot
+            report.
+    """
+    raw = _test_hooks.env_cublaslt_workspace()
+    if raw is None:
+        return Observation(name=WORKSPACE_NAME, value=WORKSPACE_UNSET)
+    if not raw.lstrip("-").isdigit():
+        raise ValueError(
+            f"CUBLASLT_WORKSPACE_SIZE is {raw!r}, which is not an integer; "
+            "this trace could not say which condition it ran under"
+        )
+    return Observation(name=WORKSPACE_NAME, value=float(int(raw)))
+
+
 def trace_run_record(device: str, rungs: tuple[str, ...]) -> RunRecord:
     """Pin determinism, trace every rung, and record what they ran on.
 
@@ -123,9 +158,13 @@ def trace_run_record(device: str, rungs: tuple[str, ...]) -> RunRecord:
     label = trace_label(rungs)
     shapes = tuple((rung, require_probe_shape(rung)) for rung in rungs)
 
+    # Read BEFORE anything computes. A trace that cannot name its own arm is
+    # worth nothing, so finding that out must not cost a GPU-hour first.
+    workspace = workspace_observation()
+
     fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
 
-    observations: list[Observation] = []
+    observations: list[Observation] = [workspace]
     for rung, shape in shapes:
         traced, loss = traced_forward(device, shape)
         # Logged per rung rather than only at the end: the large rungs take
@@ -168,11 +207,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
 
+    workspace = next(o for o in record["observations"] if o["name"] == WORKSPACE_NAME)
     _log.info(
-        "trace %s over %d observations %s -> %s",
+        "trace %s over %d observations %s cublaslt_workspace=%s -> %s",
         record["label"],
         len(record["observations"]),
         describe_run_fingerprint(record["fingerprint"]),
+        describe_workspace(workspace["value"]),
         out,
     )
     return 0
@@ -197,7 +238,13 @@ def entrypoint() -> None:
     raise SystemExit(main())
 
 
-__all__ = ["entrypoint", "main", "tensor_observations", "trace_run_record"]
+__all__ = [
+    "entrypoint",
+    "main",
+    "tensor_observations",
+    "trace_run_record",
+    "workspace_observation",
+]
 
 
 # Without this, `python -m model_trainer.cli.probe_trace` IMPORTS the module,

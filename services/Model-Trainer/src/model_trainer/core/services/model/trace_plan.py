@@ -87,6 +87,37 @@ SUM_SUFFIX = "sum"
 #: be read.
 LOSS_NAME = "loss"
 
+#: What the split-K condition is called in a record.
+#:
+#: WHY THIS EXISTS AT ALL, which is worth the paragraph. The condition under
+#: study is ``CUBLASLT_WORKSPACE_SIZE``, and NOTHING in a
+#: :class:`~platform_core.comparability.RunFingerprint` carries it -- the
+#: determinism record holds ``CUBLAS_WORKSPACE_CONFIG``, a different
+#: variable. So two runs differing ONLY in the variable the experiment
+#: manipulates have byte-identical fingerprints, and
+#: :func:`~platform_core.comparability.find_differences` reports them as
+#: "identical configuration". The six ladder records from 2026-08-27 have
+#: exactly that defect: which condition produced which is recoverable only
+#: from the filename and the run document beside it, which is a check a
+#: person has to remember to perform by eye.
+#:
+#: WHY AN OBSERVATION RATHER THAN A FINGERPRINT AXIS. Adding an axis changes
+#: every fingerprint ever written, and all eight entries in the deployed
+#: known-answer registry would then report ``configuration_differs`` against
+#: every future probe -- the same cost
+#: :func:`~model_trainer.cli.known_answer_probe.probe_determinism` declines
+#: to pay for a thread count. An observation is free, is compared by
+#: :func:`~platform_core.run_record.agree_across_runs` like any other number,
+#: and makes a record say what it ran under.
+WORKSPACE_NAME = "cublaslt_workspace_size"
+
+#: The value :data:`WORKSPACE_NAME` carries when the variable is not set.
+#:
+#: A negative workspace size is not a setting cuBLASLt can be given, so this
+#: cannot collide with a real one -- and in particular it cannot be confused
+#: with ``0``, which is the whole intervention.
+WORKSPACE_UNSET = -1.0
+
 #: Zero-padding for the execution counter. A record sorts its observations by
 #: name, so the counter has to sort as text in the order it ran -- five digits
 #: covers 100,000 hook calls, and the largest rung here makes about 1,200.
@@ -219,6 +250,23 @@ def trace_label(rungs: tuple[str, ...]) -> str:
     return f"forward-trace-{len(rungs)}x{digest[:12]}"
 
 
+def describe_workspace(value: float) -> str:
+    """Render the split-K condition a record ran under, for a log line.
+
+    Args:
+        value: The recorded :data:`WORKSPACE_NAME` observation.
+
+    Returns:
+        ``"unset"`` for :data:`WORKSPACE_UNSET`, otherwise the size. An
+        absent setting renders as a word rather than as a negative number,
+        because ``-1`` in a report reads as a fault instead of as the
+        absence it records.
+    """
+    if value == WORKSPACE_UNSET:
+        return "unset"
+    return f"{value:.0f}"
+
+
 __all__ = [
     "DIGEST_SUFFIX",
     "FIELD_SEPARATOR",
@@ -229,7 +277,10 @@ __all__ = [
     "SUM_SUFFIX",
     "TRACE_EXPERIMENT",
     "TRACE_RUNGS",
+    "WORKSPACE_NAME",
+    "WORKSPACE_UNSET",
     "TraceName",
+    "describe_workspace",
     "parse_trace_name",
     "trace_label",
     "trace_loss_name",

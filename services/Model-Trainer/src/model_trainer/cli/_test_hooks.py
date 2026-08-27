@@ -98,6 +98,38 @@ class TraceRungsProto(Protocol):
         ...
 
 
+class EnvCublasltWorkspaceProto(Protocol):
+    """Protocol for reading the split-K condition out of the environment.
+
+    Behind a hook because it reads process-global configuration a test must
+    be able to set both ways without a real cuBLASLt, and because reading it
+    is the only way a record can say which condition produced it -- see
+    :data:`~model_trainer.core.services.model.trace_plan.WORKSPACE_NAME`.
+    """
+
+    def __call__(self) -> str | None:
+        """Return ``CUBLASLT_WORKSPACE_SIZE``, or None when it is not set."""
+        ...
+
+
+def _default_env_cublaslt_workspace() -> str | None:
+    """Production reader for the split-K condition - used as default hook.
+
+    Goes through ``config_test_hooks.get_env`` rather than ``os.environ``,
+    which is the read this monorepo's env guard exists to stop.
+
+    Returns:
+        The variable's value, or None when unset or empty. Empty is treated
+        as unset because cuBLASLt itself ignores an empty value, and a record
+        claiming a condition its library did not apply would be worse than
+        one saying it does not know.
+    """
+    from platform_core.config import config_test_hooks
+
+    value = config_test_hooks.get_env("CUBLASLT_WORKSPACE_SIZE")
+    return value if value else None
+
+
 def _default_trace_rungs() -> tuple[str, ...]:
     """Production trace rungs - used as default hook.
 
@@ -284,6 +316,8 @@ ladder_shapes: LadderShapesProto = _default_ladder_shapes
 
 trace_rungs: TraceRungsProto = _default_trace_rungs
 
+env_cublaslt_workspace: EnvCublasltWorkspaceProto = _default_env_cublaslt_workspace
+
 run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
 
 benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
@@ -292,6 +326,7 @@ benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
 __all__ = [
     "ApplyDeterminismProto",
     "BenchmarkShapesProto",
+    "EnvCublasltWorkspaceProto",
     "LadderShapesProto",
     "LoadHubModelProto",
     "RunBenchmarkChildProto",
@@ -299,6 +334,7 @@ __all__ = [
     "TraceRungsProto",
     "apply_determinism_hook",
     "benchmark_shapes",
+    "env_cublaslt_workspace",
     "ladder_shapes",
     "load_hub_model",
     "pin_torch_threads",

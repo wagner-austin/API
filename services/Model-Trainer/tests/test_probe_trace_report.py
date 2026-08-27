@@ -37,6 +37,8 @@ from model_trainer.core.services.model.trace_plan import (
     DIGEST_SUFFIX,
     SUM_SUFFIX,
     TRACE_EXPERIMENT,
+    WORKSPACE_NAME,
+    WORKSPACE_UNSET,
     TraceName,
     trace_label,
     trace_loss_name,
@@ -81,6 +83,7 @@ def trace_record(
     diverge_from: int | None = None,
     loss: float = 6.25,
     steps: int = len(GRAPH),
+    workspace: float | None = WORKSPACE_UNSET,
 ) -> RunRecord:
     """Build a trace record for one card.
 
@@ -93,11 +96,16 @@ def trace_record(
             leaves every digest shared.
         loss: The loss every rung reports.
         steps: How many of the stand-in graph's boundaries to record.
+        workspace: The split-K condition to record, or None to omit it --
+            which is what a record written before the trace recorded the
+            condition looks like.
 
     Returns:
         The record.
     """
     observations: list[Observation] = []
+    if workspace is not None:
+        observations.append(Observation(name=WORKSPACE_NAME, value=workspace))
     for rung in rungs:
         for step in range(steps):
             nudge = 1.0 if diverge_from is not None and step >= diverge_from else 0.0
@@ -288,6 +296,20 @@ class TestTheRenderedRungSection:
         assert lines[1] == "  loss not reported by every run"
 
 
+class TestSayingWhichConditionARunUsed:
+    def test_an_unset_workspace_reads_as_unset(self) -> None:
+        assert report_cli.describe_condition(trace_record("A30")) == "unset"
+
+    def test_the_intervention_reads_as_zero(self) -> None:
+        assert report_cli.describe_condition(trace_record("A30", workspace=0.0)) == "0"
+
+    def test_a_record_that_never_recorded_it_says_so_rather_than_guessing(self) -> None:
+        # "did not set the variable" and "cannot say whether it set the
+        # variable" are different facts, and only one is a measurement. The
+        # six ladder records from 2026-08-27 are the second kind.
+        assert report_cli.describe_condition(trace_record("A30", workspace=None)) == "NOT RECORDED"
+
+
 class TestTheWholeReport:
     def test_it_heads_with_the_run_count_and_each_card(self) -> None:
         lines = report_cli.report_lines(
@@ -297,6 +319,30 @@ class TestTheWholeReport:
         assert lines[0] == f"2 runs, experiment {TRACE_EXPERIMENT}"
         assert "NVIDIA A30" in lines[1]
         assert "A100 80GB" in lines[2]
+
+    def test_each_run_line_names_the_condition_it_ran_under(self) -> None:
+        # Nothing in a RunFingerprint carries CUBLASLT_WORKSPACE_SIZE, so
+        # these two runs difference as "identical configuration" despite
+        # differing in the one variable under study. This line is the only
+        # place the report can say which arm each run is.
+        lines = report_cli.report_lines(
+            (
+                ("default.json", trace_record("A30")),
+                ("nosplitk.json", trace_record("A30", workspace=0.0)),
+            )
+        )
+
+        assert lines[1].endswith("cublaslt_workspace=unset")
+        assert lines[2].endswith("cublaslt_workspace=0")
+
+    def test_the_condition_is_compared_like_any_other_observation(self) -> None:
+        # It is an observation, so two runs under different arms disagree on
+        # it -- which means a set of records that were supposed to share an
+        # arm and did not is visible rather than assumed.
+        agreement = agreement_of(trace_record("A30"), trace_record("A100", workspace=0.0))
+        entries = [e for e in agreement["shared"] if e["name"] == WORKSPACE_NAME]
+
+        assert [e["distinct"] for e in entries] == [2]
 
     def test_it_warns_when_the_runs_did_not_share_an_image(self) -> None:
         other = trace_record("A100")

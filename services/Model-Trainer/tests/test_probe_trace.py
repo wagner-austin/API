@@ -33,6 +33,8 @@ from model_trainer.core.services.model.trace_plan import (
     SUM_SUFFIX,
     TRACE_EXPERIMENT,
     TRACE_RUNGS,
+    WORKSPACE_NAME,
+    WORKSPACE_UNSET,
     parse_trace_name,
     trace_label,
     trace_loss_name,
@@ -63,6 +65,26 @@ def _cheap_trace() -> Generator[None, None, None]:
 cheap_trace = pytest.fixture(_cheap_trace)
 
 
+def _no_workspace() -> Generator[None, None, None]:
+    """Pin the split-K condition to "not set" for the duration of one test.
+
+    Pinned rather than inherited: a test runner that happened to have
+    ``CUBLASLT_WORKSPACE_SIZE`` exported would otherwise change what these
+    tests assert, which is the opposite of what a test is for.
+
+    Yields:
+        Nothing; the condition is pinned for the body of the test.
+    """
+    cli_hooks.env_cublaslt_workspace = lambda: None
+    try:
+        yield
+    finally:
+        cli_hooks.env_cublaslt_workspace = cli_hooks._default_env_cublaslt_workspace
+
+
+no_workspace = pytest.fixture(_no_workspace)
+
+
 def _out_path(tmp_path: pathlib.Path) -> pathlib.Path:
     """Return the record path used by the CLI tests."""
     return tmp_path / "records" / "trace.json"
@@ -89,11 +111,13 @@ class TestWhatOneRecordCarries:
 
         assert values[trace_loss_name("tiny")] == probe_forward_loss("cpu", PROBE_SHAPES["tiny"])
 
-    def test_every_observation_names_the_rung_it_came_from(self) -> None:
+    def test_every_measurement_names_the_rung_it_came_from(self, no_workspace: None) -> None:
+        # Everything except the one RECORD-level observation, which describes
+        # the process rather than any rung and so carries no rung prefix.
         record = probe_trace.trace_run_record("cpu", CHEAP)
         names = [o["name"] for o in record["observations"]]
 
-        assert [name for name in names if not name.startswith("tiny|")] == []
+        assert [name for name in names if not name.startswith("tiny|")] == [WORKSPACE_NAME]
 
     def test_the_observations_come_back_in_execution_order(self) -> None:
         record = probe_trace.trace_run_record("cpu", CHEAP)
@@ -138,6 +162,80 @@ class TestWhatOneRecordCarries:
         # registering whichever observation happened to sort first.
         with pytest.raises(ValueError, match="exactly one observation"):
             entry_from_record(probe_trace.trace_run_record("cpu", CHEAP), 0.0)
+
+
+class TestRecordingTheSplitKCondition:
+    def test_an_unset_variable_records_the_sentinel(self, no_workspace: None) -> None:
+        assert probe_trace.workspace_observation() == {
+            "name": WORKSPACE_NAME,
+            "value": WORKSPACE_UNSET,
+        }
+
+    def test_the_production_reader_returns_what_the_environment_holds(self) -> None:
+        from platform_core.config import config_test_hooks
+
+        original = config_test_hooks.get_env
+
+        def _fake_get_env(key: str) -> str | None:
+            return "0" if key == "CUBLASLT_WORKSPACE_SIZE" else None
+
+        config_test_hooks.get_env = _fake_get_env
+        try:
+            assert cli_hooks._default_env_cublaslt_workspace() == "0"
+        finally:
+            config_test_hooks.get_env = original
+
+    def test_the_production_reader_treats_an_empty_variable_as_unset(self) -> None:
+        # cuBLASLt ignores an empty value, so a record claiming a condition
+        # its library did not apply would be worse than one saying nothing.
+        # The rule lives in the reader, which is where it is exercised.
+        from platform_core.config import config_test_hooks
+
+        original = config_test_hooks.get_env
+
+        def _empty_get_env(key: str) -> str | None:
+            return "" if key == "CUBLASLT_WORKSPACE_SIZE" else None
+
+        config_test_hooks.get_env = _empty_get_env
+        try:
+            assert cli_hooks._default_env_cublaslt_workspace() is None
+        finally:
+            config_test_hooks.get_env = original
+
+    def test_the_intervention_records_as_zero_not_as_unset(self) -> None:
+        # The whole experiment is zero versus unset. If these collapsed to
+        # one value the record could not name its own arm.
+        cli_hooks.env_cublaslt_workspace = lambda: "0"
+        try:
+            assert probe_trace.workspace_observation()["value"] == 0.0
+        finally:
+            cli_hooks.env_cublaslt_workspace = cli_hooks._default_env_cublaslt_workspace
+
+        assert WORKSPACE_UNSET != 0.0
+
+    def test_a_size_is_recorded_as_the_number_it_is(self) -> None:
+        cli_hooks.env_cublaslt_workspace = lambda: "4194304"
+        try:
+            assert probe_trace.workspace_observation()["value"] == 4194304.0
+        finally:
+            cli_hooks.env_cublaslt_workspace = cli_hooks._default_env_cublaslt_workspace
+
+    def test_a_non_integer_stops_the_run_before_it_spends_a_gpu(self) -> None:
+        cli_hooks.env_cublaslt_workspace = lambda: "lots"
+        try:
+            with pytest.raises(ValueError, match="which is not an integer"):
+                probe_trace.trace_run_record("cpu", CHEAP)
+        finally:
+            cli_hooks.env_cublaslt_workspace = cli_hooks._default_env_cublaslt_workspace
+
+    def test_the_record_carries_the_condition_beside_the_tensors(self, no_workspace: None) -> None:
+        record = probe_trace.trace_run_record("cpu", CHEAP)
+        named = {o["name"]: o["value"] for o in record["observations"]}
+
+        assert named[WORKSPACE_NAME] == WORKSPACE_UNSET
+
+    def test_the_condition_is_not_mistaken_for_a_traced_tensor(self) -> None:
+        assert parse_trace_name(WORKSPACE_NAME) is None
 
 
 class TestNamingTracedTensors:

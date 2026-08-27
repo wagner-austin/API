@@ -47,7 +47,9 @@ from model_trainer.cli.record_reports import (
 from model_trainer.core.run_fingerprint import describe_run_fingerprint
 from model_trainer.core.services.model.trace_plan import (
     DIGEST_SUFFIX,
+    WORKSPACE_NAME,
     TraceName,
+    describe_workspace,
     parse_trace_name,
     trace_loss_name,
 )
@@ -63,6 +65,30 @@ _FLAGS = (DIR_FLAG,)
 #: one module or spread immediately, which is the difference between "one
 #: kernel disagrees" and "the residual stream diverged".
 FOLLOWING_SHOWN = 5
+
+
+def describe_condition(record: RunRecord) -> str:
+    """Say which split-K condition one record ran under.
+
+    The fingerprint cannot answer this -- nothing in it carries
+    ``CUBLASLT_WORKSPACE_SIZE``, so two runs differing only in the variable
+    the experiment manipulates difference as identical. The trace records it
+    as an observation instead, and this reads it back.
+
+    Args:
+        record: One trace record.
+
+    Returns:
+        The condition, or ``"NOT RECORDED"`` for a record written before the
+        trace recorded it. Named loudly rather than rendered as "unset",
+        because "this run did not set the variable" and "this run cannot say
+        whether it set the variable" are different facts and only one of them
+        is a measurement.
+    """
+    for observation in record["observations"]:
+        if observation["name"] == WORKSPACE_NAME:
+            return describe_workspace(observation["value"])
+    return "NOT RECORDED"
 
 
 def _execution_order(pair: tuple[TraceName, ObservationAgreement]) -> tuple[int, int]:
@@ -240,7 +266,8 @@ def report_lines(named_records: tuple[tuple[str, RunRecord], ...]) -> tuple[str,
 
     lines = [f"{agreement['runs']} runs, experiment {agreement['experiment']}"]
     lines += [
-        f"  [{index}] {name}  {describe_run_fingerprint(record['fingerprint'])}"
+        f"  [{index}] {name}  {describe_run_fingerprint(record['fingerprint'])} "
+        f"cublaslt_workspace={describe_condition(record)}"
         for index, (name, record) in enumerate(named_records)
     ]
     lines.append("")
@@ -304,6 +331,7 @@ def entrypoint() -> None:
 
 __all__ = [
     "FOLLOWING_SHOWN",
+    "describe_condition",
     "divergences",
     "entrypoint",
     "main",
