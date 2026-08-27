@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "gemm-v8-v100-nosplitk",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 30,
+  "requeue": true,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v8/abl.sif",
+    "sha256": "8852d03a8c6993c48660d12f1e1d25314c39c427402b6354d9b8165b83d4a870",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "CUBLASLT_WORKSPACE_SIZE=0 python -m model_trainer.cli.gemm_probe --device cuda --out /pub/wagnera3/gemm/v8-v100-nosplitk.json",
+  "artifact": "/pub/wagnera3/gemm/v8-v100-nosplitk.json",
+  "experiment": {
+    "kind": "gemm-attribution",
+    "card": "V100",
+    "image": "v8",
+    "trace": "nosplitk"
+  }
+}
