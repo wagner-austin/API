@@ -22,15 +22,31 @@ class TorchStateValue(Protocol):
 
 
 class ParameterLike(Protocol):
-    """Protocol for model parameters (tensors with gradients)."""
+    """Protocol for model parameters (tensors with gradients).
+
+    ``grad`` and ``detach`` are declared because the docstring's parenthetical
+    is the whole point of the type: a protocol that could describe a parameter
+    but not read its gradient or take a value snapshot of it cannot express
+    "this step changed the weights", which is the only way to tell a training
+    step from a forward pass that returns a loss.
+    """
 
     @property
     def shape(self) -> torch.Size:
         """Return the shape of the parameter tensor."""
         ...
 
+    @property
+    def grad(self) -> torch.Tensor | None:
+        """Return the accumulated gradient, or None before any backward."""
+        ...
+
     def numel(self) -> int:
         """Return total number of elements in the parameter tensor."""
+        ...
+
+    def detach(self) -> torch.Tensor:
+        """Return the same storage, off the autograd graph."""
         ...
 
 
@@ -226,6 +242,17 @@ class TracedModuleProto(Protocol):
 
     def register_forward_pre_hook(self, hook: ForwardPreHookProto, /) -> HookHandleProto:
         """Call ``hook`` before this module computes, until the handle is removed."""
+        ...
+
+    @property
+    def training(self) -> bool:
+        """Whether the module is in training mode.
+
+        Declared here rather than on :class:`LMModelProto`, which can already
+        CALL ``train()`` and ``eval()`` but has no way to read back which one
+        took effect. It belongs to the module surface, and putting it there
+        spares every fake language model in the suite a flag it never sets.
+        """
         ...
 
 

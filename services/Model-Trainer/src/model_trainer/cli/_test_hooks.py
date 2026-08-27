@@ -28,6 +28,7 @@ from model_trainer.core.services.model.gemm_shapes import GemmShape, timed_shape
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES, ProbeShape
 from model_trainer.core.services.model.sdpa_shapes import SdpaCostShape, cost_shapes
 from model_trainer.core.services.model.trace_plan import TRACE_RUNGS
+from model_trainer.core.services.model.train_cost import TRAIN_SHAPES
 
 
 class LoadHubModelProto(Protocol):
@@ -146,6 +147,28 @@ def _default_forward_shapes() -> tuple[ForwardCostShape, ...]:
         Every declared row, in table order.
     """
     return FORWARD_SHAPES
+
+
+class TrainShapesProto(Protocol):
+    """Protocol for the training steps the step benchmark times.
+
+    Behind a hook for the same reason every other sweep is, and hardest here:
+    a training step holds parameters, gradients and two AdamW moments, so the
+    declared rows need about twelve gigabytes before a single activation.
+    """
+
+    def __call__(self) -> tuple[ForwardCostShape, ...]:
+        """Return the steps to time, in order."""
+        ...
+
+
+def _default_train_shapes() -> tuple[ForwardCostShape, ...]:
+    """Production training sweep - used as default hook.
+
+    Returns:
+        Every declared row, in table order.
+    """
+    return TRAIN_SHAPES
 
 
 class EnvCublasltWorkspaceProto(Protocol):
@@ -372,6 +395,8 @@ cost_shapes_hook: CostShapesProto = _default_cost_shapes
 
 forward_shapes: ForwardShapesProto = _default_forward_shapes
 
+train_shapes: TrainShapesProto = _default_train_shapes
+
 run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
 
 benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
@@ -388,6 +413,7 @@ __all__ = [
     "RunBenchmarkChildProto",
     "ScoreClozeProto",
     "TraceRungsProto",
+    "TrainShapesProto",
     "apply_determinism_hook",
     "benchmark_shapes",
     "cost_shapes_hook",
@@ -399,4 +425,5 @@ __all__ = [
     "run_benchmark_child",
     "score_cloze",
     "trace_rungs",
+    "train_shapes",
 ]
