@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "203078b81cf895d9b317bae3e969655f85c53a04",
+  "git_commit": "6c520a60764a37449124f2e41b55f97a5a1cdeed",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -134,6 +134,10 @@
     {
       "module": "model_trainer.cli.probe_trace_report",
       "attribute": "report_lines"
+    },
+    {
+      "module": "model_trainer.cli.probe_trace",
+      "attribute": "workspace_observation"
     }
   ],
   "smoke_commands": [
