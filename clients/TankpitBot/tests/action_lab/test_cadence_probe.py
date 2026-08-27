@@ -353,34 +353,57 @@ def test_execute_rejects_a_non_positive_burst_budget() -> None:
         )
 
 
-def test_execute_runs_one_burst_per_spacing_excluding_used_targets() -> None:
-    """Each spacing bursts a fresh target; used ids are excluded."""
+def test_execute_runs_one_burst_per_spacing_reusing_targets() -> None:
+    """Each spacing bursts whatever target acquisition finds — repeats allowed.
+
+    Unlike the accuracy probe there is no used-target exclusion: the
+    2026-08-26 21:29 run starved on a one-NPC room because the
+    exclusion was inherited, and re-bursting the same enemy is what
+    keeps the spacings comparable anyway.
+    """
     probe = _ExecuteCadenceHarness()
-    probe.acquisitions = [_enemy(), _enemy(901)]
+    probe.acquisitions = [_enemy(), _enemy()]
 
     session = _execute(probe, (2000, 1000))
 
     assert [b["spacing_ms"] for b in session["bursts"]] == [2000, 1000]
-    assert probe.excluded_ids_log == [frozenset(), frozenset({_ENEMY_ID})]
+    assert probe.excluded_ids_log == [frozenset(), frozenset()]
     assert session["shots_per_burst"] == 6
     assert session["capture_session_path"] == ""
 
 
-def test_a_failed_acquisition_skips_its_spacing_only() -> None:
-    """A no-target spacing is skipped; later spacings still run."""
+def test_a_failed_acquisition_is_retried_within_its_spacing() -> None:
+    """A transient miss retries; the spacing still gets its burst.
+
+    The first live run (2026-08-26 21:24) burned all four spacings on
+    transient acquisition misses — three fresh-enemy filters and one
+    teleport timeout — without firing a shot. Each spacing now gets
+    three attempts.
+    """
     probe = _ExecuteCadenceHarness()
     probe.acquisitions = [None, _enemy()]
+
+    session = _execute(probe, (1000,))
+
+    assert [b["spacing_ms"] for b in session["bursts"]] == [1000]
+    assert probe.excluded_ids_log == [frozenset(), frozenset()]
+
+
+def test_an_exhausted_spacing_is_skipped_and_later_spacings_run() -> None:
+    """Three misses skip the spacing; the next spacing still runs."""
+    probe = _ExecuteCadenceHarness()
+    probe.acquisitions = [None, None, None, _enemy()]
 
     session = _execute(probe, (1000, 500))
 
     assert [b["spacing_ms"] for b in session["bursts"]] == [500]
-    assert probe.excluded_ids_log == [frozenset(), frozenset()]
+    assert len(probe.excluded_ids_log) == 4
 
 
 def test_a_session_with_no_targets_completes_empty() -> None:
     """Every acquisition failing yields an honest empty session."""
     probe = _ExecuteCadenceHarness()
-    probe.acquisitions = [None, None]
+    probe.acquisitions = [None, None, None, None, None, None]
 
     session = _execute(probe, (2000, 1000))
 

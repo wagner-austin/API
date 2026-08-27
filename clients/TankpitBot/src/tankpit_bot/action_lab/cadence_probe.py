@@ -43,6 +43,11 @@ _SETTLE_MS = 4000.0
 #: new bursts once fuel cannot absorb a full burst of return fire.
 _MIN_BURST_FUEL = 400
 
+#: Acquisition is flaky by nature (fresh-enemy filter, teleport
+#: drift): the first live run burned all four spacings on transient
+#: misses. Each spacing gets this many attempts before it is skipped.
+_ACQUISITION_ATTEMPTS = 3
+
 
 def _read_fresh_ammo(probe: CombatProbe) -> tuple[int, int]:
     """Return server-refreshed (dual, homing) counts.
@@ -183,7 +188,6 @@ class CadenceProbe(CombatProbe):
             context: ProbeCommandReadyContextDict,
         ) -> CadenceProbeSessionDict:
             bursts: list[CadenceBurstDict] = []
-            targeted_ids: set[int] = set()
             for spacing_ms in spacings_ms:
                 fuel = self._require_self_state()["fuel"]
                 if fuel < _MIN_BURST_FUEL:
@@ -193,15 +197,31 @@ class CadenceProbe(CombatProbe):
                         _MIN_BURST_FUEL,
                     )
                     break
-                enemy = self._acquire_adjacent_enemy(
-                    acquisition_timeout_ms=acquisition_timeout_ms,
-                    teleport_timeout_ms=teleport_timeout_ms,
-                    excluded_ids=frozenset(targeted_ids),
-                )
+                enemy = None
+                for attempt in range(_ACQUISITION_ATTEMPTS):
+                    # No used-target exclusion (unlike the accuracy
+                    # probe): re-bursting the same enemy keeps the
+                    # spacings comparable, and the first live run
+                    # starved on a one-NPC room because the exclusion
+                    # was inherited (2026-08-26 21:29 — spacing 2000
+                    # fired 6/6 at red-8, then every later spacing
+                    # found "no enemy").
+                    enemy = self._acquire_adjacent_enemy(
+                        acquisition_timeout_ms=acquisition_timeout_ms,
+                        teleport_timeout_ms=teleport_timeout_ms,
+                        excluded_ids=frozenset(),
+                    )
+                    if enemy is not None:
+                        break
+                    log.warning(
+                        "CADENCE: acquisition attempt %d/%d failed for spacing %dms",
+                        attempt + 1,
+                        _ACQUISITION_ATTEMPTS,
+                        spacing_ms,
+                    )
                 if enemy is None:
                     log.warning("CADENCE: no target for spacing %dms", spacing_ms)
                     continue
-                targeted_ids.add(enemy["tank_id"])
                 bursts.append(self._fire_burst(enemy, spacing_ms, shots_per_burst))
             first_started = None
             if bursts and bursts[0]["shots"]:

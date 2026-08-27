@@ -4861,3 +4861,23 @@ User-ordered double-check of the Blue Killer fixes ("make sure we aren't duplica
 **Fixes (lift, not fork).** One canonical receipt: `self_deactivated`. The wrap detector now raises the SAME `ws.self_deactivated` flag the 0x41 path uses (handing off to the existing respawn contract instead of a parallel fuel-0 path), both producers dedup on the flag (wrap lands first and wins; the 0x41 books nothing twice), and both consumers count that one diagnostic — the dead regex and the dead victim=self branch are deleted. Replay validation over the untouched death artifact: digest and ledger both now read **deaths=3** (previously 0). Ledger also shows the trade truth: 8,325 fuel dealt to Blue Killer vs 4,050 taken — we out-damaged him and died anyway, because he refuels and we hit zero. Fix A verified against the real path: the escape-tick shots went `continue_break_escape → refuel → collect_return_fire → opportunity_shot_decision`, exactly the rung the latch veto now silences; the pursuit/close diverts are latch-gated at phase entry and unreachable.
 
 **How these bugs were missed, on the record:** (1) consumer-shaped fixtures — a test that fabricates the producer's record proves nothing about the pipeline; (2) the sim server sends the self 0x41 (that contract IS sim-tested end-to-end) but never models spaced human fire, crossfire during escape, or the wrap-before-0x41 ordering — the practice-room-solo blind spot again; (3) the autopsy inferred "no 0x41" from `deaths=0` in the digest instead of grepping the artifact for the diagnostic that was sitting there. Gate: 6,261 tests, 100.00%. Operator ruling recorded: **no blocking of humans who kill us** — blocked players can still attack, so blocking only disarms us; the defense is the solvency machinery plus fleet response.
+
+## [2026-08-26] measurement | The server serves ~1 shot per second — twice our combat cadence
+
+User question driving the night: "we should be able to improve the bot dps?" Two measurements answered it.
+
+**How the humans play vs how the bot plays** (artifact analysis, brrruh fight 19:12-19:42, teleport charges excluded): the bot dispatched 117 shots at brrruh in 31 minutes (~4 min of trigger time; 87% of the fight went to breaks/restocks/chases), firing strictly on the 2 s tick when engaged. brrruh landed ~278 clicks (~9/min, 534 dmg/min) with **continuous pressure — he refueled ~9 times without ever stopping shooting**, and out-landed us roughly 2:1. His weapon mix (87 duals vs 191 single-class hits on us) is the movement law in action: a shot at a mid-move tank downgrades dual(90) → homing(45) ([[weapon-selection]]), so **dodging halves incoming per-shot damage** — he weaves constantly, we trade from a standstill and eat full duals.
+
+**The fire-cadence probe** (`make cadence-probe`, new: bursts at fixed spacings, served shots counted from server-refreshed 0x49 ammo snapshots — the per-shot ammo ledger; acquisition lifted from the combat probe, no used-target exclusion). Live runs as Arterial on Practice vs red-8:
+
+| spacing | dispatched | served |
+|---|---|---|
+| 2000 ms | 6 | **6/6** |
+| 500 ms | 6 | **3/6** |
+| 250 ms | 6 | **2/6** |
+
+All three fit one law: **the server serves ~1 shot per second** (500 ms → every other shot; 250 ms → ~every fourth; the burst windows give T≈1.0-1.3 s per served shot). Fuel bill confirms only served shots are charged (-10 each; swallowed dispatches are free). One 250 ms shot served as a homing (target moved). The 1000 ms burst was blocked by the probe's 400-fuel exposure floor (Arterial's practice tank drained to 338); expectation under the law is 6/6 — unverified.
+
+**Implication: our combat loop fires at HALF the server's serve rate.** Doubling in-fight cadence to ~1 shot/s doubles DPS (45→90 fuel/s) and halves every "needs N fuel" human projection — the difference between brrruh-class stalemates and finishable fights. DPS levers ranked: (1) 1 s fire cadence in combat, (2) dodge-weave while trading (halves incoming, breaks the projections the other way), (3) fight-while-refueling like the humans do, (4) mines + fuel denial. None implemented yet — measurement first, per the crack-before-code rule.
+
+Operational notes: Yuppler's accounts.json credentials no longer authenticate ("Invalid username or password") — pool is effectively Artax + Arterial until the operator refreshes it. A probe launched with .env defaults tried to log in as Artax WHILE artax farmed Desert (login failed harmlessly, farm untouched) — probes must always pin TANKPIT_ACCOUNT to an idle account. Artax passed 90 kills on Desert during the measurement, zero deaths.
