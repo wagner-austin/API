@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "2c8eea3570a42883cb00f5269703eb9b9753327f",
+  "git_commit": "203078b81cf895d9b317bae3e969655f85c53a04",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -122,10 +122,27 @@
     {
       "module": "model_trainer.cli.known_answer_probe",
       "attribute": "probe_run_record"
+    },
+    {
+      "module": "model_trainer.core.services.model.forward_trace",
+      "attribute": "traced_forward"
+    },
+    {
+      "module": "model_trainer.cli.probe_trace",
+      "attribute": "trace_run_record"
+    },
+    {
+      "module": "model_trainer.cli.probe_trace_report",
+      "attribute": "report_lines"
     }
   ],
   "smoke_commands": [
-    "/opt/env/bin/python -m model_trainer.cli.known_answer_probe --device cpu --out /tmp/probe.json"
+    "/opt/env/bin/python -m model_trainer.cli.known_answer_probe --device cpu --out /tmp/probe.json",
+    "/opt/env/bin/python -m model_trainer.cli.probe_ladder --device cpu --out /tmp/ladder.json",
+    "/opt/env/bin/python -c \"from model_trainer.core.services.model.probe_shapes import PROBE_LABEL as L; assert L == 'gpt2-tiny-L2-d128-h2-v512-len64-seed42', L\"",
+    "/opt/env/bin/python -m model_trainer.cli.gemm_probe --device cpu --out /tmp/gemm.json",
+    "/opt/env/bin/python -m model_trainer.cli.gemm_benchmark --device cpu --out /tmp/bench.json --condition default",
+    "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace.json"
   ],
   "labels": {
     "org.corvis.project": "mi",
