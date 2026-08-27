@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "sdpa-v15-v100-nosplitk",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 32,
+  "minutes": 30,
+  "requeue": true,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v15/abl.sif",
+    "sha256": "f88776e179ffbc11c7ae5d0ad222f9f2035bde14416b87830e27f0349f5396ee",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "CUBLASLT_WORKSPACE_SIZE=0 python -m model_trainer.cli.sdpa_probe --device cuda --out /pub/wagnera3/sdpa/v15/v100-nosplitk.json",
+  "artifact": "/pub/wagnera3/sdpa/v15/v100-nosplitk.json",
+  "experiment": {
+    "kind": "sdpa-backend-selection",
+    "card": "V100",
+    "image": "v15",
+    "splitk": "nosplitk"
+  }
+}
