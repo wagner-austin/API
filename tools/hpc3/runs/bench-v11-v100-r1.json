@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "bench-v11-v100-r1",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 30,
+  "requeue": true,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v11/abl.sif",
+    "sha256": "9a0ee78d900ebdad6f578b0dd925b23cccd37cc84be3491d72335d87598dcfb4",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.gemm_benchmark --device cuda --out /pub/wagnera3/bench/v11-v100-r1.json",
+  "artifact": "/pub/wagnera3/bench/v11-v100-r1.json",
+  "experiment": {
+    "kind": "gemm-splitk-cost",
+    "card": "V100",
+    "image": "v11",
+    "repeat": "r1"
+  }
+}
