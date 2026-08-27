@@ -41,6 +41,7 @@ from platform_core.run_record import (
 
 from model_trainer.cli.record_reports import (
     VALUE_DIGITS,
+    agreement_groups,
     configuration_lines,
     read_run_records,
 )
@@ -144,36 +145,6 @@ def divergences(
         The differing ones, in the same order.
     """
     return tuple(pair for pair in digests if pair[1]["distinct"] > 1)
-
-
-def agreement_groups(values: tuple[float, ...]) -> str:
-    """Say which runs agreed with which, by run index.
-
-    ``distinct=2`` over three runs says two agree and one does not. It does
-    NOT say WHICH, and which is the entire finding: the earlier ladder work
-    established that the odd card MOVES between rungs and between conditions
-    -- the V100 is alone at ``xl`` by default and the A30 is alone at ``xl``
-    with split-K removed. A count cannot show that and a column of 48-bit
-    digests is unreadable, so this renders the partition instead.
-
-    Args:
-        values: One observation's value from each run, in run order.
-
-    Returns:
-        Run indices grouped by shared value, groups ordered by first
-        appearance and joined by ``|`` -- e.g. ``"0,2|1"`` for three runs
-        where the second one is the odd one out.
-    """
-    groups: list[list[int]] = []
-    seen: dict[float, int] = {}
-    for index, value in enumerate(values):
-        at = seen.get(value)
-        if at is None:
-            seen[value] = len(groups)
-            groups.append([index])
-        else:
-            groups[at].append(index)
-    return "|".join(",".join(str(index) for index in group) for group in groups)
 
 
 def _tensor_line(name: TraceName, entry: ObservationAgreement) -> str:
@@ -368,7 +339,6 @@ def entrypoint() -> None:
 
 __all__ = [
     "FOLLOWING_SHOWN",
-    "agreement_groups",
     "describe_condition",
     "divergences",
     "entrypoint",

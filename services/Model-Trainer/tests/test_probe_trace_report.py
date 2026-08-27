@@ -33,6 +33,7 @@ from platform_core.run_record import (
 )
 
 from model_trainer.cli import probe_trace_report as report_cli
+from model_trainer.cli.record_reports import agreement_groups
 from model_trainer.core.services.model.trace_plan import (
     DIGEST_SUFFIX,
     SUM_SUFFIX,
@@ -320,22 +321,22 @@ class TestTheRenderedRungSection:
 
 class TestSayingWhichRunsAgreed:
     def test_every_run_agreeing_is_one_group(self) -> None:
-        assert report_cli.agreement_groups((1.0, 1.0, 1.0)) == "0,1,2"
+        assert agreement_groups((1.0, 1.0, 1.0)) == "0,1,2"
 
     def test_the_odd_run_out_is_named_by_index(self) -> None:
-        assert report_cli.agreement_groups((1.0, 2.0, 1.0)) == "0,2|1"
+        assert agreement_groups((1.0, 2.0, 1.0)) == "0,2|1"
 
     def test_a_leading_odd_run_still_reads_left_to_right(self) -> None:
         # Groups are ordered by FIRST APPEARANCE, not by size, so run 0 is
         # always in the first group and the rendering does not silently
         # reorder the runs the header just listed.
-        assert report_cli.agreement_groups((2.0, 1.0, 1.0)) == "0|1,2"
+        assert agreement_groups((2.0, 1.0, 1.0)) == "0|1,2"
 
     def test_three_different_values_are_three_groups(self) -> None:
-        assert report_cli.agreement_groups((1.0, 2.0, 3.0)) == "0|1|2"
+        assert agreement_groups((1.0, 2.0, 3.0)) == "0|1|2"
 
     def test_two_runs_are_rendered_as_a_pair(self) -> None:
-        assert report_cli.agreement_groups((1.0, 2.0)) == "0|1"
+        assert agreement_groups((1.0, 2.0)) == "0|1"
 
     def test_it_appears_on_the_first_difference_line(self) -> None:
         # Which card is alone is the finding: the earlier ladder work showed

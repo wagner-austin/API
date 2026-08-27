@@ -28,7 +28,11 @@ from platform_core import cli_args
 from platform_core.logging import get_logger, setup_logging
 from platform_core.run_record import RunRecord
 
-from model_trainer.cli.record_reports import configuration_lines, read_run_records
+from model_trainer.cli.record_reports import (
+    agreement_groups,
+    configuration_lines,
+    read_run_records,
+)
 from model_trainer.core.run_fingerprint import describe_run_fingerprint
 from model_trainer.core.services.model.sdpa_shapes import (
     AVAILABLE_SUFFIX,
@@ -121,6 +125,31 @@ def disagreements(record: RunRecord, shape: SdpaShape) -> tuple[str, ...]:
     return tuple(out)
 
 
+def output_agreement(named_records: tuple[tuple[str, RunRecord], ...], shape: SdpaShape) -> str:
+    """Say which cards produced the same attention output.
+
+    The bridge back to the forward trace, and the reason this report is not
+    just a selection table. Two cards selecting the SAME backend and still
+    disagreeing bitwise is a different finding from two cards selecting
+    different backends, and a selection table alone cannot tell them apart.
+
+    Args:
+        named_records: ``(filename, record)`` pairs, in report order.
+        shape: The call to read.
+
+    Returns:
+        Run indices grouped by shared digest, or ``"not reported"`` when some
+        run did not carry this shape.
+    """
+    values: list[float] = []
+    for _, record in named_records:
+        digest = _values(record).get(sdpa_label(shape, DEFAULT_KEY, DIGEST_SUFFIX))
+        if digest is None:
+            return "not reported"
+        values.append(digest)
+    return agreement_groups(tuple(values))
+
+
 def shape_lines(
     named_records: tuple[tuple[str, RunRecord], ...], shape: SdpaShape
 ) -> tuple[str, ...]:
@@ -131,12 +160,15 @@ def shape_lines(
         shape: The call to report.
 
     Returns:
-        Its lines: the selection per card, then any torch-versus-reality
-        disagreements.
+        Its lines: the selection per card, which cards' outputs agree, then
+        any torch-versus-reality disagreements.
     """
     label = f"{shape['rung']:<12} h{shape['heads']:<3} s{shape['sequence_len']:<4}"
     picks = [describe_selection(selection_for(record, shape)) for _, record in named_records]
-    lines = [f"  {label} {'  '.join(f'[{i}] {p:<12}' for i, p in enumerate(picks))}"]
+    lines = [
+        f"  {label} {'  '.join(f'[{i}] {p:<12}' for i, p in enumerate(picks))}"
+        f" outputs={output_agreement(named_records, shape)}"
+    ]
 
     for index, (name, record) in enumerate(named_records):
         for phrase in disagreements(record, shape):
@@ -223,6 +255,7 @@ __all__ = [
     "disagreements",
     "entrypoint",
     "main",
+    "output_agreement",
     "report_lines",
     "selection_for",
     "shape_lines",

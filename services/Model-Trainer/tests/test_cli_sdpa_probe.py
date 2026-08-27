@@ -290,6 +290,51 @@ class TestTheReport:
 
         assert any("!! [1] v100.json" in line for line in lines)
 
+    def test_it_says_which_cards_produced_the_same_output(self) -> None:
+        # Two cards selecting the SAME backend and still disagreeing bitwise
+        # is a different finding from two cards selecting different ones, and
+        # a selection table alone cannot tell them apart.
+        agreeing = (
+            ("a100.json", selection_record("A100")),
+            ("a30.json", selection_record("A30")),
+        )
+
+        assert report_cli.output_agreement(agreeing, TINY) == "0,1"
+
+    def test_differing_outputs_name_the_odd_run(self) -> None:
+        odd = selection_record("V100")
+        for observation in odd["observations"]:
+            if observation["name"] == sdpa_label(TINY, DEFAULT_KEY, DIGEST_SUFFIX):
+                observation["value"] = 999.0
+
+        pairs = (
+            ("a100.json", selection_record("A100")),
+            ("a30.json", selection_record("A30")),
+            ("v100.json", odd),
+        )
+
+        assert report_cli.output_agreement(pairs, TINY) == "0,1|2"
+
+    def test_a_run_missing_the_shape_is_said_rather_than_grouped(self) -> None:
+        empty = run_record(
+            experiment=SDPA_EXPERIMENT,
+            label=probe_cli.SDPA_LABEL,
+            fingerprint=selection_record("A30")["fingerprint"],
+            observations=(Observation(name="cublaslt_workspace_size", value=-1.0),),
+            payload_digest="",
+        )
+        pairs = (("a100.json", selection_record("A100")), ("a30.json", empty))
+
+        assert report_cli.output_agreement(pairs, TINY) == "not reported"
+
+    def test_the_row_carries_the_output_agreement(self) -> None:
+        lines = report_cli.shape_lines(
+            (("a100.json", selection_record("A100")), ("a30.json", selection_record("A30"))),
+            TINY,
+        )
+
+        assert lines[0].endswith("outputs=0,1")
+
     def test_one_run_alone_is_refused(self) -> None:
         with pytest.raises(ValueError, match="at least two runs"):
             report_cli.report_lines((("a100.json", selection_record("A100")),))

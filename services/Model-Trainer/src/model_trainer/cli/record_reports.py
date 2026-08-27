@@ -39,6 +39,35 @@ VALUE_DIGITS = 17
 CONFOUNDING_AXES = ("image_digest",)
 
 
+def agreement_groups(values: tuple[float, ...]) -> str:
+    """Say which runs agreed with which, by run index.
+
+    ``distinct=2`` over three runs says two agree and one does not. It does
+    NOT say WHICH, and which is repeatedly the finding: the ladder work
+    established that the odd card MOVES between rungs and between conditions.
+    A count cannot show that and a column of 48-bit digests is unreadable, so
+    this renders the partition instead.
+
+    Args:
+        values: One observation's value from each run, in run order.
+
+    Returns:
+        Run indices grouped by shared value, groups ordered by first
+        appearance and joined by ``|`` -- e.g. ``"0,2|1"`` for three runs
+        where the second one is the odd one out.
+    """
+    groups: list[list[int]] = []
+    seen: dict[float, int] = {}
+    for index, value in enumerate(values):
+        at = seen.get(value)
+        if at is None:
+            seen[value] = len(groups)
+            groups.append([index])
+        else:
+            groups[at].append(index)
+    return "|".join(",".join(str(index) for index in group) for group in groups)
+
+
 def read_run_records(directory: pathlib.Path) -> tuple[tuple[str, RunRecord], ...]:
     """Read every record in a directory, in filename order.
 
@@ -124,6 +153,7 @@ def configuration_lines(named_records: tuple[tuple[str, RunRecord], ...]) -> tup
 __all__ = [
     "CONFOUNDING_AXES",
     "VALUE_DIGITS",
+    "agreement_groups",
     "configuration_lines",
     "read_run_records",
 ]
