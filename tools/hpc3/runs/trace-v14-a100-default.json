@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "trace-v14-a100-default",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 45,
+  "requeue": true,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v14/abl.sif",
+    "sha256": "a274e4eed56a6b38fd4207e5f10078036b1c83798b6f5438d3a188e487d4b670",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.probe_trace --device cuda --out /pub/wagnera3/trace/v14/a100-default.json",
+  "artifact": "/pub/wagnera3/trace/v14/a100-default.json",
+  "experiment": {
+    "kind": "forward-trace-splitk",
+    "card": "A100",
+    "image": "v14",
+    "splitk": "default"
+  }
+}

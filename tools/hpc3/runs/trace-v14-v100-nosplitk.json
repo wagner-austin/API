@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "trace-v14-v100-nosplitk",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 45,
+  "requeue": true,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v14/abl.sif",
+    "sha256": "a274e4eed56a6b38fd4207e5f10078036b1c83798b6f5438d3a188e487d4b670",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "CUBLASLT_WORKSPACE_SIZE=0 python -m model_trainer.cli.probe_trace --device cuda --out /pub/wagnera3/trace/v14/v100-nosplitk.json",
+  "artifact": "/pub/wagnera3/trace/v14/v100-nosplitk.json",
+  "experiment": {
+    "kind": "forward-trace-splitk",
+    "card": "V100",
+    "image": "v14",
+    "splitk": "nosplitk"
+  }
+}
