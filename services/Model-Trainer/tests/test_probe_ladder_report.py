@@ -121,7 +121,7 @@ class TestReadingRecords:
             {"v100": full_ladder("Tesla V100"), "a100": full_ladder("NVIDIA A100 80GB PCIe")},
         )
 
-        named = report_cli.read_ladder_records(directory)
+        named = report_cli.read_run_records(directory)
 
         assert [name for name, _ in named] == ["a100.json", "v100.json"]
         assert [record["fingerprint"]["gpu_model"] for _, record in named] == [
@@ -131,13 +131,13 @@ class TestReadingRecords:
 
     def test_a_missing_directory_is_refused_by_name(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(FileNotFoundError, match="no such directory"):
-            report_cli.read_ladder_records(tmp_path / "absent")
+            report_cli.read_run_records(tmp_path / "absent")
 
     def test_a_directory_holding_no_records_is_refused(self, tmp_path: pathlib.Path) -> None:
         (tmp_path / "empty").mkdir()
 
         with pytest.raises(FileNotFoundError, match=r"no \.json records"):
-            report_cli.read_ladder_records(tmp_path / "empty")
+            report_cli.read_run_records(tmp_path / "empty")
 
 
 class TestFindingTheThreshold:

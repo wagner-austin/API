@@ -25,6 +25,7 @@ from model_trainer.core.contracts.model import PreparedLMModel
 # the reason it is its own module -- see its docstring.
 from model_trainer.core.services.model.gemm_shapes import GemmShape, timed_shapes
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES, ProbeShape
+from model_trainer.core.services.model.trace_plan import TRACE_RUNGS
 
 
 class LoadHubModelProto(Protocol):
@@ -81,6 +82,30 @@ class LadderShapesProto(Protocol):
     def __call__(self) -> Mapping[str, ProbeShape]:
         """Return the rungs to walk, in the order to walk them."""
         ...
+
+
+class TraceRungsProto(Protocol):
+    """Protocol for the rungs the forward trace walks.
+
+    Behind a hook for the same reason the ladder's shapes are: the declared
+    set ends at a 1.5-billion-parameter model, and tracing it digests about a
+    hundred and seventy million floats. Tests install one tiny rung and walk
+    every line; the cluster walks the real four.
+    """
+
+    def __call__(self) -> tuple[str, ...]:
+        """Return the rung names to trace, in the order to trace them."""
+        ...
+
+
+def _default_trace_rungs() -> tuple[str, ...]:
+    """Production trace rungs - used as default hook.
+
+    Returns:
+        The declared contrast: the rung split-K removal breaks, the one it
+        fails to fix, the one it fixes, and the one that never moves.
+    """
+    return TRACE_RUNGS
 
 
 class BenchmarkShapesProto(Protocol):
@@ -257,6 +282,8 @@ pin_torch_threads: PinTorchThreadsProto = _default_pin_torch_threads
 
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
 
+trace_rungs: TraceRungsProto = _default_trace_rungs
+
 run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
 
 benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
@@ -269,6 +296,7 @@ __all__ = [
     "LoadHubModelProto",
     "RunBenchmarkChildProto",
     "ScoreClozeProto",
+    "TraceRungsProto",
     "apply_determinism_hook",
     "benchmark_shapes",
     "ladder_shapes",
@@ -276,4 +304,5 @@ __all__ = [
     "pin_torch_threads",
     "run_benchmark_child",
     "score_cloze",
+    "trace_rungs",
 ]

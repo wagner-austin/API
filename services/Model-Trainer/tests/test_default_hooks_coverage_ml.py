@@ -426,11 +426,14 @@ def test_default_load_peft_model(tmp_path: Path, settings_factory: _SettingsFact
         _default_load_full_model,
     )
 
-    base_model = _default_load_full_model(str(base_model_dir))
+    # A separate name from `base_model`: the constructor returns the traced
+    # protocol and the loader returns the plain one, so reusing the name would
+    # narrow the variable to the constructor's type and then reject the load.
+    reloaded_model = _default_load_full_model(str(base_model_dir))
 
     # Create and save PEFT adapter
     peft_model = _default_create_peft_model(
-        base_model,
+        reloaded_model,
         r=4,
         lora_alpha=8,
         lora_dropout=0.0,

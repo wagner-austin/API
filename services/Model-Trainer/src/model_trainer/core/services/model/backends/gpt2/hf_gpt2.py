@@ -12,7 +12,7 @@ from typing import Protocol
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 
 from model_trainer.core.services.model.model_sizes import GPT2_MODEL_SIZES as MODEL_SIZES
-from model_trainer.core.types import LMModelProto
+from model_trainer.core.types import LMModelProto, TracedLMModelProto
 
 
 class GPT2ConfigProto(Protocol):
@@ -44,9 +44,15 @@ class _GPT2ConfigCtorProto(Protocol):
 
 
 class _GPT2LMHeadModelCtorProto(Protocol):
-    """Protocol for GPT2LMHeadModel constructor returning LMModelProto."""
+    """Protocol for GPT2LMHeadModel constructor.
 
-    def __call__(self, config: GPT2ConfigProto) -> LMModelProto: ...
+    Returns the TRACED protocol rather than the plain one. A GPT2LMHeadModel
+    is a torch module and has always had a module graph; declaring it here is
+    what lets the forward trace reach it without a cast. Callers wanting only
+    :class:`LMModelProto` are unaffected -- this is a subtype of it.
+    """
+
+    def __call__(self, config: GPT2ConfigProto) -> TracedLMModelProto: ...
 
 
 class _GPT2LMHeadModelLoaderProto(Protocol):
@@ -124,7 +130,7 @@ def create_gpt2_model(
     vocab_size: int,
     max_seq_len: int,
     model_size: str,
-) -> LMModelProto:
+) -> TracedLMModelProto:
     """Create a new GPT2LMHeadModel with the specified configuration.
 
     Args:
@@ -133,7 +139,9 @@ def create_gpt2_model(
         model_size: One of "tiny", "small", "medium", "large", "xl".
 
     Returns:
-        A newly initialized GPT2LMHeadModel conforming to LMModelProto.
+        A newly initialized GPT2LMHeadModel. Typed as TracedLMModelProto,
+        which is LMModelProto plus the module graph a forward trace hooks;
+        every existing caller reads it as the former.
 
     Raises:
         AppError: If model_size is not a valid size key. Propagated from

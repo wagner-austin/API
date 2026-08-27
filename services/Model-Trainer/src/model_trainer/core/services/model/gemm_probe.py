@@ -12,6 +12,14 @@ what :func:`~platform_core.run_record.agree_across_runs` already tests. The
 sum is recorded beside it to say how LARGE a difference is once the digest
 says there is one; alone it would be the weaker check, and alone it is not
 used.
+
+THE FOLD ITSELF LIVES IN :mod:`tensor_digest`, which the forward trace also
+uses. A second spelling of it here would let the two drift, and a digest
+recorded by one could then not be read against a digest recorded by the
+other. What does NOT come from there is the SUM: this module sums the whole
+output in float64 in one torch call, while the trace sums in fixed chunks
+because its tensors are far larger. Adopting the chunked sum here would
+change every gemm sum already recorded, so it keeps its own.
 """
 
 from __future__ import annotations
@@ -22,25 +30,7 @@ import struct
 import torch
 
 from model_trainer.core.services.model.gemm_shapes import GEMM_SEED, GemmShape
-
-#: How many bytes of the digest fold into the observation. Six bytes is 48
-#: bits, comfortably inside float64's exact-integer range (2**53); taking
-#: seven would start rounding and two different tensors could then record the
-#: same number, which is the one failure this observation must not have.
-DIGEST_BYTES = 6
-
-
-def _fold_digest(payload: bytes) -> float:
-    """Reduce bytes to a float that changes whenever they do.
-
-    Args:
-        payload: The bytes to identify.
-
-    Returns:
-        The first :data:`DIGEST_BYTES` of the SHA-256, as an exact float.
-    """
-    digest = hashlib.sha256(payload).digest()
-    return float(int.from_bytes(digest[:DIGEST_BYTES], "big"))
+from model_trainer.core.services.model.tensor_digest import DIGEST_BYTES, fold_digest
 
 
 def gemm_operands(shape: GemmShape, device: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -149,7 +139,10 @@ def describe_output(output: torch.Tensor) -> tuple[float, float]:
         reduction cannot itself differ between devices -- the only
         device-dependent step must be the matmul.
     """
-    return _fold_digest(_output_bytes(output)), float(output.double().sum().item())
+    return (
+        fold_digest(hashlib.sha256(_output_bytes(output)).digest()),
+        float(output.double().sum().item()),
+    )
 
 
 def gemm_identity(shape: GemmShape, device: str) -> tuple[float, float]:

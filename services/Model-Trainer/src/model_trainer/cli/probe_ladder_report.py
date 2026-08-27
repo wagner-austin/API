@@ -12,28 +12,12 @@ is added: a reader who finds it cannot tell whether it covers three cards or
 five. The records are the durable artifact; this is a view of them, and
 re-running it is cheap.
 
-WHY IT COMPUTES THE CONFIGURATION DIFFERENCES RATHER THAN PRINTING
-FINGERPRINTS AND TRUSTING THE READER. An earlier revision did the latter, on
-the reasoning that the caller submitted the runs and knows what they are.
-That is the same shape as every defect this apparatus exists to catch: a
-check a person has to remember to perform by eye is not a check. So each run
-is differenced against the first with
-:func:`~platform_core.comparability.find_differences` and the axes are named.
-
-A difference on :const:`CONFOUNDING_AXES` is called out rather than listed,
-because it does not qualify the reading -- it destroys it. Two runs in
-different images that disagree at a rung have told you nothing about cards.
-The command still prints the whole report: refusing would hide the numbers
-from someone who has a reason to look at them, and a warning they cannot
-miss does the job without deciding for them.
-
-AN AXIS NOBODY RECORDED IS REPORTED SEPARATELY, because differencing cannot
-see it. Two runs that each failed to record an image digest have EQUAL
-digests as far as :func:`find_differences` is concerned, and the report read
-"identical to the reference" for a pair that had no idea what they ran in.
-:func:`~platform_core.known_answer_registry.incomplete_axes` already names
-empty axes for the registry, which refuses to store an entry carrying one;
-the same call answers it here.
+THE CONFIGURATION DIFFERENCES ARE COMPUTED RATHER THAN PRINTED FOR THE READER
+TO CHECK, and a difference on a confounding axis is called out rather than
+listed -- both live in :mod:`record_reports`, which the forward-trace report
+shares. The command still prints the whole report when an axis is confounded:
+refusing would hide the numbers from someone who has a reason to look at them,
+and a warning they cannot miss does the job without deciding for them.
 """
 
 from __future__ import annotations
@@ -43,18 +27,20 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
-from platform_core.comparability import find_differences
-from platform_core.json_utils import load_json_str
-from platform_core.known_answer_registry import incomplete_axes
 from platform_core.logging import get_logger, setup_logging
 from platform_core.run_record import (
     ObservationAgreement,
     RunAgreement,
     RunRecord,
     agree_across_runs,
-    decode_run_record,
 )
 
+from model_trainer.cli.record_reports import (
+    CONFOUNDING_AXES,
+    VALUE_DIGITS,
+    configuration_lines,
+    read_run_records,
+)
 from model_trainer.core.run_fingerprint import describe_run_fingerprint
 from model_trainer.core.services.model.probe_shapes import (
     PROBE_AXES,
@@ -68,51 +54,6 @@ _log = get_logger(__name__)
 DIR_FLAG = "--dir"
 
 _FLAGS = (DIR_FLAG,)
-
-#: Digits used when printing a probe value. Seventeen significant digits is
-#: what it takes to write an IEEE double so it reads back unchanged, and
-#: anything shorter would print two differing values identically -- which is
-#: the exact mistake this command exists to prevent.
-VALUE_DIGITS = 17
-
-#: Fingerprint axes whose difference makes a cross-card reading meaningless
-#: rather than merely qualified. Two runs in different images that disagree at
-#: a rung have not told you anything about their cards -- the image is the
-#: variable the whole apparatus pins so that the card can be the one that
-#: moves. Determinism is deliberately absent: it is a nested record whose
-#: differences the per-axis listing already names, and a change to it is a
-#: finding rather than a confound.
-CONFOUNDING_AXES = ("image_digest",)
-
-
-def read_ladder_records(directory: pathlib.Path) -> tuple[tuple[str, RunRecord], ...]:
-    """Read every record in a directory, in filename order.
-
-    Every ``.json`` file is read and decoded. Nothing is skipped on the way:
-    a file that does not decode fails the command, because a directory of
-    ladder records with one unreadable member is a directory whose agreement
-    result would silently cover fewer cards than the reader thinks.
-
-    Args:
-        directory: Directory holding one ladder record per run.
-
-    Returns:
-        ``(filename, record)`` pairs, sorted by filename so the value columns
-        are in the same order every time this is run.
-
-    Raises:
-        FileNotFoundError: If the directory does not exist, or holds no
-            ``.json`` file at all.
-    """
-    if not directory.is_dir():
-        raise FileNotFoundError(f"no such directory: {directory}")
-    paths = sorted(directory.glob("*.json"))
-    if not paths:
-        raise FileNotFoundError(f"no .json records in {directory}")
-    return tuple(
-        (path.name, decode_run_record(load_json_str(path.read_text(encoding="utf-8"))))
-        for path in paths
-    )
 
 
 def rung_agreement(agreement: RunAgreement, rung: str) -> ObservationAgreement | None:
@@ -159,58 +100,6 @@ def first_disagreement(agreement: RunAgreement, axis: ProbeAxis) -> str | None:
         if entry is not None and entry["distinct"] > 1:
             return rung
     return None
-
-
-def configuration_lines(named_records: tuple[tuple[str, RunRecord], ...]) -> tuple[str, ...]:
-    """Report how each run's configuration differs from the first.
-
-    The first run is the reference simply because a set needs one; which run
-    holds the position does not change which axes are named.
-
-    Args:
-        named_records: ``(filename, record)`` pairs, in report order.
-
-    Returns:
-        One line per run, plus a warning line for every confounding axis found
-        anywhere in the set.
-    """
-    reference = named_records[0][1]["fingerprint"]
-    lines = [f"  [0] {named_records[0][0]}  (reference)"]
-    confounded: list[str] = []
-
-    for index, (name, record) in enumerate(named_records[1:], start=1):
-        differences = find_differences(reference, record["fingerprint"])
-        axes = [d["axis"] for d in differences]
-        described = ", ".join(axes) if axes else "identical to the reference"
-        lines.append(f"  [{index}] {name}  differs on: {described}")
-        confounded.extend(axis for axis in axes if axis in CONFOUNDING_AXES)
-
-    # An axis nobody recorded compares EQUAL to the same gap in another run,
-    # so two runs that each failed to record their image read as "identical
-    # configuration". They are not; they are two runs that cannot say. The
-    # empty axis has to be named separately from the differing ones, because
-    # the difference machinery is structurally unable to see it.
-    for index, (name, record) in enumerate(named_records):
-        empty = incomplete_axes(record["fingerprint"])
-        if empty:
-            lines.append(
-                f"  !! [{index}] {name} recorded no {', '.join(empty)}. An unrecorded axis"
-            )
-            lines.append(
-                "     matches every other unrecorded one, so agreement here is not evidence."
-            )
-            # NOT added to `confounded`. That warning reads "these runs do not
-            # all share one X", which is false here -- they share the absence.
-            # The line above already says the true thing. A set where only SOME
-            # runs recorded the axis reaches `confounded` through the
-            # differencing loop, because empty differs from non-empty there.
-
-    for axis in sorted(set(confounded)):
-        lines.append(f"  !! these runs do not all share one {axis}. A disagreement between")
-        lines.append(
-            "     them is not a fact about the cards, and this report cannot separate them."
-        )
-    return tuple(lines)
 
 
 def _rung_line(rung: str, entry: ObservationAgreement | None) -> str:
@@ -293,7 +182,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
 
-    named_records = read_ladder_records(pathlib.Path(cli_args.require_flag(parsed, DIR_FLAG)))
+    named_records = read_run_records(pathlib.Path(cli_args.require_flag(parsed, DIR_FLAG)))
     for line in report_lines(named_records):
         _log.info("%s", line)
     return 0
@@ -322,7 +211,7 @@ __all__ = [
     "entrypoint",
     "first_disagreement",
     "main",
-    "read_ladder_records",
+    "read_run_records",
     "report_lines",
     "rung_agreement",
 ]
