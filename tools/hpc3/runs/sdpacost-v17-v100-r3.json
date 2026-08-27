@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "sdpacost-v17-v100-r3",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 32,
+  "minutes": 40,
+  "requeue": true,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v17/abl.sif",
+    "sha256": "75a2dd3838b3cd93c368df2187ffc1a22bed2a6fd1f0dae8a9a2dfa25f3e52dd",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.sdpa_benchmark --device cuda --out /pub/wagnera3/sdpacost/v17/v100-r3.json",
+  "artifact": "/pub/wagnera3/sdpacost/v17/v100-r3.json",
+  "experiment": {
+    "kind": "sdpa-backend-cost",
+    "card": "V100",
+    "image": "v17",
+    "repeat": "3"
+  }
+}
