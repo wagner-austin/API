@@ -42,7 +42,7 @@ from tankpit_bot.action_lab.types import (
     TeleportPageSnapshotDict,
     TeleportTargetDict,
 )
-from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     SelfStateDict,
@@ -283,21 +283,55 @@ class _ExecuteHarness(
         self.engagement_results: list[CombatEngagementDict | None] = []
         self.excluded_ids_log: list[frozenset[int]] = []
         self._call_count = 0
+        self._scripted_engagement: CombatEngagementDict | None = None
 
-    def _acquire_and_engage(
+    def _acquire_adjacent_enemy(
         self,
         *,
         acquisition_timeout_ms: int,
         teleport_timeout_ms: int,
-        max_shots: int,
         excluded_ids: frozenset[int],
-    ) -> CombatEngagementDict | None:
-        """Return the next scripted engagement, logging the exclusions."""
-        _ = (acquisition_timeout_ms, teleport_timeout_ms, max_shots)
+    ) -> EnemyThreatDict | None:
+        """Advance the script, logging the exclusions.
+
+        A ``None`` script slot plays a failed acquisition; otherwise
+        the slot's target id becomes the threat handed to the (also
+        scripted) engagement step — the same two-seam composition the
+        production loop runs.
+        """
+        _ = (acquisition_timeout_ms, teleport_timeout_ms)
         self.excluded_ids_log.append(excluded_ids)
         result = self.engagement_results[self._call_count]
         self._call_count += 1
-        return result
+        self._scripted_engagement = result
+        if result is None:
+            return None
+        return make_enemy_threat(
+            tank_id=result["target_id"],
+            x=result["initial_target_x"],
+            y=result["initial_target_y"],
+            distance=result["initial_distance"],
+            damage_state=3,
+            rank=1,
+            team=2,
+            name=result["target_name"],
+            is_bot=True,
+            timestamp_ms=0,
+            last_wire_seen_ms=0,
+            last_position_update_ms=0,
+        )
+
+    def _engage_single_target(
+        self,
+        target: EnemyThreatDict,
+        max_shots: int,
+    ) -> CombatEngagementDict:
+        """Return the scripted engagement for the acquired threat."""
+        _ = (target, max_shots)
+        scripted = self._scripted_engagement
+        if scripted is None:
+            raise AssertionError("engage reached without a scripted engagement")
+        return scripted
 
 
 class _FakeCombatProbe(CombatProbe):
@@ -368,6 +402,34 @@ _combat_module_import = __import__(
 combat_module: _CombatModuleProtocol = _combat_module_import
 
 
+def stub_initial_sync() -> None:
+    """Resolve the bootstrap's initial world sync at a fixed spawn."""
+
+    def _wait_initial(
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
+        started_ms: int,
+        timeout_ms: int,
+    ) -> tuple[int, SelfStateDict]:
+        _ = (page, provider, started_ms, timeout_ms)
+        return (
+            1200,
+            make_self_state(
+                tank_id=1,
+                x=100,
+                y=100,
+                team=2,
+                rank=1,
+                fuel=900,
+                leaderboard_position=5,
+            ),
+        )
+
+    from tankpit_bot.action_lab import _test_hooks as action_hooks
+
+    action_hooks.wait_for_initial_self_state = _wait_initial
+
+
 def require_engagement(result: CombatEngagementDict | None) -> CombatEngagementDict:
     """Return the engagement, failing loudly when the probe gave up.
 
@@ -375,7 +437,7 @@ def require_engagement(result: CombatEngagementDict | None) -> CombatEngagementD
     its mere existence, which proves nothing about what happened.
 
     Args:
-        result: What ``_acquire_and_engage`` returned.
+        result: What the acquire-then-engage cycle returned.
 
     Returns:
         The engagement.

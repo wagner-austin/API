@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service fleet analyze analyze-timing queue-probe download-fields decode analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe track bot run service fleet analyze analyze-timing queue-probe download-fields decode analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -43,6 +43,7 @@ help:
 	@Write-Host "  make fuel-drill                  fill tank to 1100 (long-running)"
 	@Write-Host "  make equipment-probe             3 equipment pickups via 9 attempts"
 	@Write-Host "  make combat-probe                3 combat engagements, 20 shots each"
+	@Write-Host "  make cadence-probe               server shot-serve rate at 4 spacings"
 	@Write-Host "  make track                       enemy tracking probe (wire vs JS truth)"
 	@Write-Host "  make bot                         live HFSM bot"
 	@Write-Host "  make run                         5-min timed session + scorecard"
@@ -247,6 +248,13 @@ combat-probe: install
 	@Write-Host ""
 	@Write-Host "==> combat-probe (3 engagements, 20 shots each)" -ForegroundColor Cyan
 	poetry run tankpit-combat-probe --max-engagements 3 --max-shots 20
+
+# Measures the server's shot serve rate: one burst per spacing, served
+# shots counted from 0x49 ammo snapshots. Writes cadence_probe.json.
+cadence-probe: install
+	@Write-Host ""
+	@Write-Host "==> cadence-probe (bursts at 2000/1000/500/250 ms)" -ForegroundColor Cyan
+	poetry run tankpit-cadence-probe --spacings 2000,1000,500,250 --shots 6
 
 # Diagnoses wire-presence vs JS-truth divergence. Fires one shot at the
 # closest enemy, then samples per-tank belief at 1Hz for 120s. Writes

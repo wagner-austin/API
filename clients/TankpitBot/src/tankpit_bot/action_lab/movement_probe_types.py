@@ -8,6 +8,7 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    require_bool,
     require_int,
     require_list,
     require_str,
@@ -90,14 +91,6 @@ def _require_optional_int(data: JSONObject, field: str) -> int | None:
         return None
     if isinstance(raw, bool) or not isinstance(raw, int):
         raise JSONTypeError(f"Field '{field}' must be an integer or null")
-    return raw
-
-
-def _require_bool_field(data: JSONObject, field: str) -> bool:
-    """Return a required boolean field."""
-    raw = data.get(field)
-    if not isinstance(raw, bool):
-        raise JSONTypeError(f"Field '{field}' must be a boolean")
     return raw
 
 
@@ -250,7 +243,7 @@ def decode_movement_probe_session(data: JSONObject) -> MovementProbeSessionDict:
         startup_timing=decode_teleport_startup_timing(startup_timing_raw),
         move_timeout_ms=require_int(data, "move_timeout_ms"),
         settle_delay_ms=require_int(data, "settle_delay_ms"),
-        queue_map_open_during_move=_require_bool_field(data, "queue_map_open_during_move"),
+        queue_map_open_during_move=require_bool(data, "queue_map_open_during_move"),
         map_open_delay_ms=require_int(data, "map_open_delay_ms"),
         targets=_decode_targets(data.get("targets")),
         attempts=_decode_attempts(data.get("attempts")),

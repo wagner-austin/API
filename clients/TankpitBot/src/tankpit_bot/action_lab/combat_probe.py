@@ -277,15 +277,24 @@ class CombatProbe(ProbeBase):
             final_distance=final_dist,
         )
 
-    def _acquire_and_engage(
+    def _acquire_adjacent_enemy(
         self,
         *,
         acquisition_timeout_ms: int,
         teleport_timeout_ms: int,
-        max_shots: int,
         excluded_ids: frozenset[int],
-    ) -> CombatEngagementDict | None:
-        """Open map, teleport to enemy, then engage."""
+    ) -> EnemyThreatDict | None:
+        """Open map, pick a fresh enemy, and teleport adjacent to it.
+
+        Shared by the accuracy engagement loop and the fire-cadence
+        probe — the acquisition mechanics are identical; only what
+        happens after landing differs.
+
+        Returns:
+            The still-visible enemy after landing, or ``None`` when
+            any acquisition step (sync, target, landing, teleport,
+            visibility) fails.
+        """
         page = self._require_page()
         cdp = self._cdp
         if cdp is None:
@@ -396,7 +405,7 @@ class CombatProbe(ProbeBase):
                 ),
             )
 
-        return self._engage_single_target(current, max_shots)
+        return current
 
     def execute_probe(
         self,
@@ -422,13 +431,13 @@ class CombatProbe(ProbeBase):
                     i + 1,
                     max_engagements,
                 )
-                result = self._acquire_and_engage(
+                enemy = self._acquire_adjacent_enemy(
                     acquisition_timeout_ms=acquisition_timeout_ms,
                     teleport_timeout_ms=teleport_timeout_ms,
-                    max_shots=max_shots_per_engagement,
                     excluded_ids=frozenset(targeted_ids),
                 )
-                if result is not None:
+                if enemy is not None:
+                    result = self._engage_single_target(enemy, max_shots_per_engagement)
                     engagements.append(result)
                     targeted_ids.add(result["target_id"])
             first_started = None

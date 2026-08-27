@@ -8,6 +8,7 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    require_bool,
     require_int,
     require_list,
     require_str,
@@ -199,25 +200,6 @@ def _require_optional_int(data: JSONObject, field: str) -> int | None:
     return raw
 
 
-def _require_bool_field(data: JSONObject, field: str) -> bool:
-    """Return a required boolean field from a JSON object.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to validate.
-
-    Returns:
-        Boolean value.
-
-    Raises:
-        JSONTypeError: If the field is not a boolean.
-    """
-    raw = data.get(field)
-    if not isinstance(raw, bool):
-        raise JSONTypeError(f"Field '{field}' must be a boolean")
-    return raw
-
-
 def _require_acquisition_strategy(
     data: JSONObject,
     field: str,
@@ -366,10 +348,10 @@ def decode_enemy_teleport_attempt_result(data: JSONObject) -> EnemyTeleportAttem
         world_timestamp_after=require_int(data, "world_timestamp_after"),
         enemy=_decode_optional_enemy(data, "enemy"),
         landing_target=_decode_optional_target(data, "landing_target"),
-        landed_signal_received=_require_bool_field(data, "landed_signal_received"),
+        landed_signal_received=require_bool(data, "landed_signal_received"),
         landed_x=_require_optional_int(data, "landed_x"),
         landed_y=_require_optional_int(data, "landed_y"),
-        enemy_still_visible=_require_bool_field(data, "enemy_still_visible"),
+        enemy_still_visible=require_bool(data, "enemy_still_visible"),
         enemy_distance_after=_require_optional_int(data, "enemy_distance_after"),
         enemy_x_after=_require_optional_int(data, "enemy_x_after"),
         enemy_y_after=_require_optional_int(data, "enemy_y_after"),

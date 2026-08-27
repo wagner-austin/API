@@ -1,8 +1,10 @@
 """Tests for combat-probe acquisition, session execution, and run wiring.
 
-``_acquire_and_engage`` is driven with the acquisition and teleport
-phases stubbed at module scope, so each of its five give-up paths and
-both landing outcomes are reached without a browser. The session-level
+``_acquire_adjacent_enemy`` (composed with ``_engage_single_target``,
+exactly as ``execute_probe``'s loop runs them) is driven with the
+acquisition and teleport phases stubbed at module scope, so each of
+its five give-up paths and both landing outcomes are reached without
+a browser. The session-level
 tests cover ``execute_probe``'s engagement loop and the
 ``run_combat_probe`` factory-and-save wiring.
 """
@@ -25,6 +27,7 @@ from tests.action_lab._combat_probe_harness import (
     combat_module,
     require_engagement,
     require_threat,
+    stub_initial_sync,
 )
 from tests.action_lab._replay_browser import RecordedChromiumSession
 from tests.action_lab._replay_page import ClockAdvancingPage, ReplayClock
@@ -55,7 +58,7 @@ from tankpit_bot.action_lab.types import (
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.state import SelfStateDict, WorldStateDict, make_self_state
+from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.state.types import make_tank_state
 
 _SnapshotPhase = Literal[
@@ -246,32 +249,6 @@ def _stub_landing(x: int, y: int) -> None:
     combat_module.choose_combat_landing_tile = _landing
 
 
-def _stub_initial_sync() -> None:
-    """Resolve the bootstrap's initial world sync at a fixed spawn."""
-
-    def _wait_initial(
-        page: action_session.WaitPageProtocol,
-        provider: action_session.BufferedWorldStateProviderProtocol,
-        started_ms: int,
-        timeout_ms: int,
-    ) -> tuple[int, SelfStateDict]:
-        _ = (page, provider, started_ms, timeout_ms)
-        return (
-            1200,
-            make_self_state(
-                tank_id=1,
-                x=100,
-                y=100,
-                team=2,
-                rank=1,
-                fuel=900,
-                leaderboard_position=5,
-            ),
-        )
-
-    action_hooks.wait_for_initial_self_state = _wait_initial
-
-
 class _ScriptedEngageHarness(_ProbeHarness):
     """Probe recording which targets reached the engagement stage."""
 
@@ -293,12 +270,14 @@ class _ScriptedEngageHarness(_ProbeHarness):
 
 def _acquire(probe: _ProbeHarness) -> CombatEngagementDict | None:
     """Run one acquisition-and-engage cycle with the standard bounds."""
-    return probe._acquire_and_engage(
+    enemy = probe._acquire_adjacent_enemy(
         acquisition_timeout_ms=5000,
         teleport_timeout_ms=10000,
-        max_shots=2,
         excluded_ids=frozenset(),
     )
+    if enemy is None:
+        return None
+    return probe._engage_single_target(enemy, 2)
 
 
 def test_acquire_raises_without_a_cdp_session() -> None:
@@ -510,7 +489,7 @@ def test_execute_probe_runs_every_engagement_and_excludes_hit_targets() -> None:
     ]
     recorded = RecordedChromiumSession.from_capture_path(probe, harness._CAPTURE_PATH)
     core_hooks.sync_playwright = recorded.sync_playwright_factory
-    _stub_initial_sync()
+    stub_initial_sync()
 
     session = probe.execute_probe(
         max_engagements=3,
@@ -534,7 +513,7 @@ def test_execute_probe_tolerates_engagements_without_shots() -> None:
     probe.engagement_results = [_engagement(11)]
     recorded = RecordedChromiumSession.from_capture_path(probe, harness._CAPTURE_PATH)
     core_hooks.sync_playwright = recorded.sync_playwright_factory
-    _stub_initial_sync()
+    stub_initial_sync()
 
     session = probe.execute_probe(
         max_engagements=1,

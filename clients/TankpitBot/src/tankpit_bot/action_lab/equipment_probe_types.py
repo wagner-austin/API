@@ -14,6 +14,7 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    require_bool,
     require_int,
     require_list,
     require_str,
@@ -124,25 +125,6 @@ def _require_optional_int(data: JSONObject, field: str) -> int | None:
         return None
     if isinstance(raw, bool) or not isinstance(raw, int):
         raise JSONTypeError(f"Field '{field}' must be an integer or null")
-    return raw
-
-
-def _require_bool_field(data: JSONObject, field: str) -> bool:
-    """Return a required boolean field.
-
-    Args:
-        data: JSON object being decoded.
-        field: Field name to read.
-
-    Returns:
-        Boolean value.
-
-    Raises:
-        JSONTypeError: If the field is missing or not a boolean.
-    """
-    raw = data.get(field)
-    if not isinstance(raw, bool):
-        raise JSONTypeError(f"Field '{field}' must be a boolean")
     return raw
 
 
@@ -323,7 +305,7 @@ def decode_equipment_probe_attempt_result(
         completion_timestamp_ms=require_int(data, "completion_timestamp_ms"),
         inventory_count_before=require_int(data, "inventory_count_before"),
         inventory_count_after=_require_optional_int(data, "inventory_count_after"),
-        landed_signal_received=_require_bool_field(data, "landed_signal_received"),
+        landed_signal_received=require_bool(data, "landed_signal_received"),
         landed_x=_require_optional_int(data, "landed_x"),
         landed_y=_require_optional_int(data, "landed_y"),
         equipment_target_x=_require_optional_int(data, "equipment_target_x"),

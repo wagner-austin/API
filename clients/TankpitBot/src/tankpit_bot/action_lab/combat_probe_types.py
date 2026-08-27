@@ -8,6 +8,7 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    require_bool,
     require_int,
     require_list,
     require_str,
@@ -201,25 +202,6 @@ def _require_optional_int(data: JSONObject, field: str) -> int | None:
     return raw
 
 
-def _require_bool_field(data: JSONObject, field: str) -> bool:
-    """Return a required boolean field from a JSON object.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to validate.
-
-    Returns:
-        Boolean value.
-
-    Raises:
-        JSONTypeError: If the field is not a boolean.
-    """
-    raw = data.get(field)
-    if not isinstance(raw, bool):
-        raise JSONTypeError(f"Field '{field}' must be a boolean")
-    return raw
-
-
 def decode_combat_shot_result(data: JSONObject) -> CombatShotResultDict:
     """Decode a combat shot result from JSON with validation.
 
@@ -271,8 +253,8 @@ def decode_combat_engagement(data: JSONObject) -> CombatEngagementDict:
         total_hits=require_int(data, "total_hits"),
         total_misses=require_int(data, "total_misses"),
         total_timeouts=require_int(data, "total_timeouts"),
-        kill_confirmed=_require_bool_field(data, "kill_confirmed"),
-        target_fled=_require_bool_field(data, "target_fled"),
+        kill_confirmed=require_bool(data, "kill_confirmed"),
+        target_fled=require_bool(data, "target_fled"),
         final_target_x=require_int(data, "final_target_x"),
         final_target_y=require_int(data, "final_target_y"),
         final_distance=require_int(data, "final_distance"),

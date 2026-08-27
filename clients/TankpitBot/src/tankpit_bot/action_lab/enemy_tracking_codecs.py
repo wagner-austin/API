@@ -10,6 +10,7 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    require_bool,
     require_int,
     require_list,
     require_str,
@@ -178,25 +179,6 @@ def encode_enemy_tracking_probe_session(
     }
 
 
-def _require_bool_field(data: JSONObject, field: str) -> bool:
-    """Return a required boolean field from a JSON object.
-
-    Args:
-        data: JSON object to inspect.
-        field: Field name to validate.
-
-    Returns:
-        Boolean value.
-
-    Raises:
-        JSONTypeError: If the field is missing or not a boolean.
-    """
-    raw = data.get(field)
-    if not isinstance(raw, bool):
-        raise JSONTypeError(f"Field '{field}' must be a boolean")
-    return raw
-
-
 def _require_fields_map(
     data: JSONObject,
     field: str,
@@ -233,7 +215,7 @@ def decode_our_tank_belief(data: JSONObject) -> OurTankBeliefDict:
     """
     return OurTankBeliefDict(
         tank_id=require_int(data, "tank_id"),
-        present=_require_bool_field(data, "present"),
+        present=require_bool(data, "present"),
         x=require_int(data, "x"),
         y=require_int(data, "y"),
         liveness=require_str(data, "liveness"),
@@ -241,8 +223,8 @@ def decode_our_tank_belief(data: JSONObject) -> OurTankBeliefDict:
         last_position_update_ms=require_int(data, "last_position_update_ms"),
         wire_age_ms=require_int(data, "wire_age_ms"),
         position_age_ms=require_int(data, "position_age_ms"),
-        is_in_threats=_require_bool_field(data, "is_in_threats"),
-        would_locked_target_return=_require_bool_field(data, "would_locked_target_return"),
+        is_in_threats=require_bool(data, "is_in_threats"),
+        would_locked_target_return=require_bool(data, "would_locked_target_return"),
         locked_target_source=require_str(data, "locked_target_source"),
     )
 
@@ -260,7 +242,7 @@ def decode_js_tank_belief(data: JSONObject) -> JSTankBeliefDict:
         JSONTypeError: If any required field is missing or invalid.
     """
     return JSTankBeliefDict(
-        present=_require_bool_field(data, "present"),
+        present=require_bool(data, "present"),
         fields=_require_fields_map(data, "fields"),
     )
 

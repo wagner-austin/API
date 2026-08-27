@@ -8,6 +8,7 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    require_bool,
     require_int,
     require_list,
     require_str,
@@ -178,14 +179,6 @@ def _require_optional_int(data: JSONObject, field: str) -> int | None:
     return raw
 
 
-def _require_bool_field(data: JSONObject, field: str) -> bool:
-    """Return a required boolean field."""
-    raw = data.get(field)
-    if not isinstance(raw, bool):
-        raise JSONTypeError(f"Field '{field}' must be a boolean")
-    return raw
-
-
 def _decode_phase_overlaps(raw: JSONValue) -> list[ActionPhaseOverlapDict]:
     """Decode a list of action-phase overlap diagnostics."""
     result: list[ActionPhaseOverlapDict] = []
@@ -300,7 +293,7 @@ def decode_fuel_probe_attempt_result(data: JSONObject) -> FuelProbeAttemptResult
         completion_timestamp_ms=require_int(data, "completion_timestamp_ms"),
         fuel_before=require_int(data, "fuel_before"),
         fuel_after=_require_optional_int(data, "fuel_after"),
-        landed_signal_received=_require_bool_field(data, "landed_signal_received"),
+        landed_signal_received=require_bool(data, "landed_signal_received"),
         landed_x=_require_optional_int(data, "landed_x"),
         landed_y=_require_optional_int(data, "landed_y"),
         fuel_target_x=_require_optional_int(data, "fuel_target_x"),
