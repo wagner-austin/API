@@ -23,6 +23,7 @@ from model_trainer.core.contracts.model import PreparedLMModel
 # Safe at module scope where the others are not: `probe_shapes` is a table of
 # TypedDicts and a label formatter, and imports no torch. That separation is
 # the reason it is its own module -- see its docstring.
+from model_trainer.core.services.model.gemm_shapes import GemmShape, probed_shapes
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES, ProbeShape
 
 
@@ -80,6 +81,74 @@ class LadderShapesProto(Protocol):
     def __call__(self) -> Mapping[str, ProbeShape]:
         """Return the rungs to walk, in the order to walk them."""
         ...
+
+
+class BenchmarkShapesProto(Protocol):
+    """Protocol for the shape table the split-K benchmark times.
+
+    Behind a hook for the same reason the ladder's is: the real table is a GPU
+    measurement. Timing is deliberately repetitive -- warmup plus several
+    batches of many calls each -- so walking all 43 shapes on a test runner's
+    CPU spent minutes producing numbers nobody will read.
+    """
+
+    def __call__(self) -> tuple[tuple[str, GemmShape], ...]:
+        """Return the shapes to time, in order."""
+        ...
+
+
+def _default_benchmark_shapes() -> tuple[tuple[str, GemmShape], ...]:
+    """Production benchmark shape table - used as default hook.
+
+    Returns:
+        Every probed shape: the ladder's calls, then the sweep grid.
+    """
+    return probed_shapes()
+
+
+class RunBenchmarkChildProto(Protocol):
+    """Protocol for spawning the benchmark's second-condition process.
+
+    Behind a hook because the child is a real subprocess that needs a GPU and
+    several seconds of timing. A test can drive the parent's plumbing --
+    including the refusal when the child comes back with the wrong
+    condition -- without paying for either.
+    """
+
+    def __call__(self, argv: list[str], variable: str, value: str, /) -> int:
+        """Run the child with one variable set, and return its exit code."""
+        ...
+
+
+def _default_run_benchmark_child(argv: list[str], variable: str, value: str, /) -> int:
+    """Production child spawner - used as default hook.
+
+    ``os.putenv`` and an INHERITED environment, rather than building a full
+    mapping to hand ``subprocess``. Two reasons, and the first is the monorepo
+    rule: reading ``os.environ`` to assemble that mapping is the config read
+    the env guard exists to stop, while ``putenv`` is a write -- the same
+    distinction ``core/_test_hooks`` already relies on to set
+    ``CUBLAS_WORKSPACE_CONFIG``. The second is that putenv reaches the real
+    process environment, which is what a child inherits and what cuBLASLt's
+    own getenv reads.
+
+    Args:
+        argv: The command line to run.
+        variable: The variable to set for the child.
+        value: What to set it to. This is the whole reason the child exists:
+            ``CUBLASLT_WORKSPACE_SIZE`` is read once when the cuBLASLt handle
+            is created, so a process that already has one cannot change
+            condition -- measured, two calls with it set between them both
+            still used split-K.
+
+    Returns:
+        The child's exit code.
+    """
+    import os
+    import subprocess
+
+    os.putenv(variable, value)
+    return subprocess.run(argv, check=False).returncode
 
 
 def _default_ladder_shapes() -> Mapping[str, ProbeShape]:
@@ -188,15 +257,23 @@ pin_torch_threads: PinTorchThreadsProto = _default_pin_torch_threads
 
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
 
+run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
+
+benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
+
 
 __all__ = [
     "ApplyDeterminismProto",
+    "BenchmarkShapesProto",
     "LadderShapesProto",
     "LoadHubModelProto",
+    "RunBenchmarkChildProto",
     "ScoreClozeProto",
     "apply_determinism_hook",
+    "benchmark_shapes",
     "ladder_shapes",
     "load_hub_model",
     "pin_torch_threads",
+    "run_benchmark_child",
     "score_cloze",
 ]
