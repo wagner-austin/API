@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "92d890295e2b154c9b3028028f853ede12bb4627",
+  "git_commit": "c425210bcee2890f75f1e1032176fddc8ebb79fa",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -154,6 +154,10 @@
     {
       "module": "model_trainer.cli.sdpa_benchmark",
       "attribute": "benchmark_run_record"
+    },
+    {
+      "module": "model_trainer.core.services.model.sdpa_timing",
+      "attribute": "backend_context"
     }
   ],
   "smoke_commands": [
