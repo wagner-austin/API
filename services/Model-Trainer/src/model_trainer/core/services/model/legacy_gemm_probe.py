@@ -41,11 +41,9 @@ from typing import Final
 import torch
 from typing_extensions import TypedDict
 
-from model_trainer.core.services.model.gemm_probe import (
-    describe_output,
-    gemm_operands,
-)
+from model_trainer.core.services.model.gemm_probe import gemm_operands
 from model_trainer.core.services.model.gemm_shapes import GEMM_COLS, GemmShape
+from model_trainer.core.services.model.tensor_digest import describe_tensor
 
 #: The output projections of the ladder's four rungs, in cuBLASLt's
 #: orientation.
@@ -138,7 +136,7 @@ def arm_identity(shape: GemmShape, device: str) -> tuple[tuple[float, float], ..
         ``((legacy_digest, legacy_sum), (epilogue_digest, epilogue_sum))``.
     """
     outputs = arm_outputs(shape, device)
-    return (describe_output(outputs["legacy"]), describe_output(outputs["epilogue"]))
+    return (describe_tensor(outputs["legacy"]), describe_tensor(outputs["epilogue"]))
 
 
 __all__ = [

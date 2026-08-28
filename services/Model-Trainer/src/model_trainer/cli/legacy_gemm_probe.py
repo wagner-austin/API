@@ -53,7 +53,6 @@ from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
     describe_run_fingerprint,
 )
-from model_trainer.core.services.model.gemm_probe import describe_output
 from model_trainer.core.services.model.gemm_shapes import DIGEST_SUFFIX, SUM_SUFFIX
 from model_trainer.core.services.model.legacy_gemm_probe import (
     EPILOGUE_ARM,
@@ -62,6 +61,7 @@ from model_trainer.core.services.model.legacy_gemm_probe import (
     arm_outputs,
     arms_agree,
 )
+from model_trainer.core.services.model.tensor_digest import describe_tensor
 
 _log = get_logger(__name__)
 
@@ -122,7 +122,7 @@ def legacy_run_record(device: str) -> RunRecord:
         same = arms_agree(outputs)
 
         for arm, tensor in ((LEGACY_ARM, outputs["legacy"]), (EPILOGUE_ARM, outputs["epilogue"])):
-            digest, total = describe_output(tensor)
+            digest, total = describe_tensor(tensor)
             observations.append(
                 Observation(name=arm_label(origin, arm, DIGEST_SUFFIX), value=digest)
             )

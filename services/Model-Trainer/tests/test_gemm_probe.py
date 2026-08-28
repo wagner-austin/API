@@ -13,6 +13,7 @@ rather than recorded.
 
 from __future__ import annotations
 
+import math
 import pathlib
 import runpy
 import sys
@@ -26,7 +27,6 @@ from platform_core.run_record import NO_PAYLOAD, decode_run_record
 from model_trainer.cli import gemm_probe as gemm_cli
 from model_trainer.core.services.model.gemm_probe import (
     DIGEST_BYTES,
-    describe_output,
     gemm_description,
     gemm_identity,
     gemm_operands,
@@ -47,6 +47,7 @@ from model_trainer.core.services.model.gemm_shapes import (
     probed_shapes,
     require_unique_labels,
 )
+from model_trainer.core.services.model.tensor_digest import describe_tensor
 
 #: A shape small enough to run many times on a CPU, in the same orientation as
 #: the real ones.
@@ -211,7 +212,7 @@ class TestTheDigest:
     def test_it_is_stable_for_one_tensor(self) -> None:
         out = gemm_output(SMALL, "cpu")
 
-        assert describe_output(out) == describe_output(out)
+        assert describe_tensor(out) == describe_tensor(out)
 
     def test_a_single_last_bit_change_changes_it(self) -> None:
         # The whole reason the digest is recorded rather than only the sum.
@@ -219,7 +220,7 @@ class TestTheDigest:
         nudged = out.clone()
         nudged[0][0] = torch.nextafter(nudged[0][0], torch.tensor(float("inf")))
 
-        assert describe_output(out)[0] != describe_output(nudged)[0]
+        assert describe_tensor(out)[0] != describe_tensor(nudged)[0]
 
     def test_it_catches_a_change_a_sum_cannot(self) -> None:
         # Two elements moved by +d and -d leave the sum EXACTLY untouched.
@@ -230,23 +231,48 @@ class TestTheDigest:
         swapped[0][1] -= 1.0
 
         assert float(swapped.sum()) == float(out.sum())
-        assert describe_output(out.float())[0] != describe_output(swapped.float())[0]
+        assert describe_tensor(out.float())[0] != describe_tensor(swapped.float())[0]
 
     def test_the_folded_digest_is_an_exactly_representable_integer(self) -> None:
         # Taking more bytes would start rounding, and two different tensors
         # could then record the same number -- the one failure this
         # observation must not have.
-        digest, _ = describe_output(gemm_output(SMALL, "cpu"))
+        digest, _ = describe_tensor(gemm_output(SMALL, "cpu"))
 
         assert digest == float(int(digest))
         # 2**48, written out: six bytes of digest.
         assert 0.0 <= digest < 281474976710656.0
         assert DIGEST_BYTES == 6
 
-    def test_the_sum_is_reported_beside_it(self) -> None:
-        out = gemm_output(SMALL, "cpu")
+    def test_the_sum_is_a_host_reduction_rather_than_a_device_one(self) -> None:
+        """The assertion that used to sit here ENCODED A BUG.
 
-        assert describe_output(out)[1] == float(out.double().sum().item())
+        It read ``describe_tensor(out)[1] == float(out.double().sum().item())``
+        -- pinning the sum to a torch reduction on the tensor's own device.
+        On a CPU-only runner that passes trivially, so it locked the defect in
+        rather than catching it, and the docstring beside it claimed the
+        opposite: "Summed in float64 on the CPU so the reduction cannot itself
+        differ between devices".
+
+        Measured 2026-08-27 on an RTX 3090 Ti: for one 64x50257 output, the
+        device reduction gave 13927.145996611645 and the host reduction
+        13927.145996611649 -- from BIT-IDENTICAL bytes, confirmed by
+        ``torch.equal`` and by an identical digest. Every cross-card ``|sum``
+        observation was therefore reporting the device's reduction ORDER, not
+        its data, and two cards agreeing bit-for-bit could record different
+        sums.
+
+        The fix was to delete the duplicate and use ``describe_tensor``, which
+        moves to the host and uses ``math.fsum``. This asserts the property
+        that matters and that a CPU runner CAN see: the sum is exact, so it
+        equals the exact sum of the values, which a device reduction tree is
+        not obliged to give.
+        """
+        out = gemm_output(SMALL, "cpu")
+        _, total = describe_tensor(out)
+        values: list[float] = out.flatten().tolist()
+
+        assert total == math.fsum(values)
 
 
 class TestTheReproducibilityGuard:

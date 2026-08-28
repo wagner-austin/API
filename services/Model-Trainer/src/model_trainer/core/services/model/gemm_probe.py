@@ -24,15 +24,12 @@ change every gemm sum already recorded, so it keeps its own.
 
 from __future__ import annotations
 
-import hashlib
-import struct
-
 import torch
 
 from model_trainer.core.services.model.gemm_shapes import GEMM_SEED, GemmShape
 from model_trainer.core.services.model.tensor_digest import (
     DIGEST_BYTES,
-    fold_digest,
+    describe_tensor,
     require_reproduced,
 )
 
@@ -78,26 +75,6 @@ def gemm_output(shape: GemmShape, device: str) -> torch.Tensor:
     return torch.addmm(bias, x, w)
 
 
-def _output_bytes(output: torch.Tensor) -> bytes:
-    """Render a float32 tensor as its raw bytes.
-
-    Goes through a Python list rather than ``.numpy()``, which returns an
-    untyped array this package's mypy settings reject. The round trip is
-    exact: widening float32 to float64 loses nothing, and packing a value
-    that came from a float32 back into one is the identity. (A NaN payload
-    is the exception, and a NaN here would be a finding rather than a
-    measurement.)
-
-    Args:
-        output: The tensor to render, on the CPU.
-
-    Returns:
-        Its float32 bytes, little-endian.
-    """
-    values: list[float] = output.contiguous().flatten().tolist()
-    return struct.pack(f"<{len(values)}f", *values)
-
-
 def gemm_description(shape: GemmShape) -> str:
     """Name one call, for a self-reproduction failure message.
 
@@ -108,23 +85,6 @@ def gemm_description(shape: GemmShape) -> str:
         e.g. ``a GEMM M1024xK4096xN64``.
     """
     return f"a GEMM M{shape['rows']}xK{shape['inner']}xN{shape['cols']}"
-
-
-def describe_output(output: torch.Tensor) -> tuple[float, float]:
-    """Reduce an output tensor to its identity and its magnitude.
-
-    Args:
-        output: The GEMM result, on the CPU.
-
-    Returns:
-        ``(folded digest, float64 sum)``. Summed in float64 on the CPU so the
-        reduction cannot itself differ between devices -- the only
-        device-dependent step must be the matmul.
-    """
-    return (
-        fold_digest(hashlib.sha256(_output_bytes(output)).digest()),
-        float(output.double().sum().item()),
-    )
 
 
 def gemm_identity(shape: GemmShape, device: str) -> tuple[float, float]:
@@ -144,12 +104,11 @@ def gemm_identity(shape: GemmShape, device: str) -> tuple[float, float]:
     """
     first = gemm_output(shape, device).cpu()
     second = gemm_output(shape, device).cpu()
-    return describe_output(require_reproduced(first, second, gemm_description(shape), device))
+    return describe_tensor(require_reproduced(first, second, gemm_description(shape), device))
 
 
 __all__ = [
     "DIGEST_BYTES",
-    "describe_output",
     "gemm_description",
     "gemm_identity",
     "gemm_operands",
