@@ -172,6 +172,12 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         self.failed_move_targets: dict[str, int] = {}
         self.landing_refusals: dict[str, int] = {}
         self.displacement_tombstones: dict[str, int] = {}
+        # Equipment atlas ([[equipment-system]] hotspot law): the
+        # current field's corpus-mined hotspot rows, loaded once by
+        # the first atlas hop plan; and the session's visit
+        # tombstones (hopped-to or seen-empty hotspots, TTL'd).
+        self.equipment_atlas: list[tuple[int, int, int]] | None = None
+        self.atlas_visited: dict[str, int] = {}
         self.movement_rejections: list[int] = []
         # The canonical account-identity model ([[tank-registry]] rank
         # number; state/types/self_account.py) — session-stable "who

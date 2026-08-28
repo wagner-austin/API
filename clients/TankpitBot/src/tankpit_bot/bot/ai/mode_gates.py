@@ -9,6 +9,7 @@ is :mod:`tankpit_bot.bot.ai.mode_controller`.
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.tactics import combat_radar_min
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.protocol.naming import is_human_name
 
@@ -222,28 +223,6 @@ def should_enter_hunt(ctx: DecideCtx) -> bool:
     return ctx.fuel >= hunt_fuel_floor(ctx) and hunt_entry_permitted(ctx)
 
 
-def combat_radar_min(rank: int) -> int:
-    """Return the minimum extra-radar count for HUNT-entry readiness.
-
-    This is bot POLICY, not game physics — it lives here with its only
-    consumer, not in :mod:`tankpit_bot.physics`. User contract
-    (2026-07-06): weapons must be at cap for HUNT entry, but extra
-    radars are permitted up to 5 below cap because scan coverage
-    during the fight consumes them faster than the between-kill
-    restock can top them up. The floor is
-    ``inventory_capacity(rank) - 5``.
-
-    Args:
-        rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
-
-    Returns:
-        Minimum extra-radar count below which HUNT entry is refused:
-        15 at recruit, 20 at private, 25 at corporal, ..., 55 at
-        general.
-    """
-    return inventory_capacity(rank) - 5
-
-
 def hunt_entry_permitted(ctx: DecideCtx) -> bool:
     """Return True when the bot's inventory permits entering HUNT.
 
@@ -315,7 +294,6 @@ def should_exit_hunt(ctx: DecideCtx) -> bool:
 
 
 __all__ = [
-    "combat_radar_min",
     "held_human_combat_lock",
     "human_fight_resume_fuel_floor",
     "human_fight_resume_permitted",

@@ -100,7 +100,9 @@ class DecideCtx:
         self.mode_state = ai_state["mode_state"]
         self.mode_started_ms = ai_state["mode_started_ms"]
         self.fuel: int = self_state["fuel"]
-        self.equip: list[int] = compute_equipment(self.fuel, inventory)
+        self.equip: list[int] = compute_equipment(
+            self.mode, self.fuel, inventory, self_state["rank"]
+        )
 
         self.killed: dict[str, int] = expire_kills(
             ai_state["killed_tank_ids"],
@@ -254,21 +256,25 @@ def locked_resource_target(
 # =============================================================================
 
 
-def compute_equipment(fuel: int, inventory: InventoryState) -> list[int]:
+def compute_equipment(mode: str, fuel: int, inventory: InventoryState, rank: int) -> list[int]:
     """Compute desired equipment as sorted list.
 
     Args:
+        mode: Current AI behavior mode (drives the radar hoard rule).
         fuel: Current fuel level.
         inventory: Current inventory state.
+        rank: Wire rank (sets the radar hunt bar).
 
     Returns:
         Sorted list of equipment slot numbers to enable.
     """
     desired = compute_desired_equipment(
-        "HUNT",
+        mode,
         fuel,
         dual_shots_count=inventory["dual_shots"]["count"],
         homing_shots_count=inventory["homing_shots"]["count"],
+        extra_radars_count=inventory["extra_radars"]["count"],
+        rank=rank,
     )
     return sorted(desired)
 

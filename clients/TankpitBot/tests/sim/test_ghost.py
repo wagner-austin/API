@@ -177,6 +177,10 @@ def test_ghost_session_replays_the_recording_end_to_end(fake_fs: FakeFileSystem)
 
     capture_text = _fight_capture()
     fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
+    # The ghost replay drives the production collect cascade, whose
+    # atlas hop reads the committed hotspot data; the sim world has
+    # no mined atlas, so it reads empty.
+    fake_fs.write_text(Path("data/equipment_atlas.json"), "{}")
     fake_fs.write_text(Path("runs/ghost-input.capture_session.json"), capture_text)
     _test_hooks.load_terrain_map = lambda gif_path: InMemoryTerrainMap()
     exit_code = main(

@@ -324,6 +324,13 @@ digest:
 	@Write-Host "==> digest (latest run)" -ForegroundColor Cyan
 	poetry run tankpit-run-digest runs/bot/latest.events.jsonl
 
+# Rebuild the committed per-field equipment atlas from the archived
+# corpus (data/equipment_atlas.json); rerun after new farm sessions.
+equipment-atlas:
+	@Write-Host ""
+	@Write-Host "==> equipment-atlas (rebuild data/equipment_atlas.json from runs/bot)" -ForegroundColor Cyan
+	poetry run tankpit-equipment-atlas runs/bot
+
 # Diff every archived run's analyzers against its own wire receipts
 # (kill/death recounts, beat discipline, radar book, tombstone
 # re-aims). Exit 1 when any run is flagged.

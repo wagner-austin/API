@@ -365,7 +365,7 @@ def test_make_hold_decision_produces_hold_command_and_unset_state() -> None:
     )
 
     decision = make_hold_decision(
-        state, timestamp_ms=15000, fuel=900, inventory=_make_hold_inventory()
+        state, timestamp_ms=15000, fuel=900, inventory=_make_hold_inventory(), rank=1
     )
 
     assert decision["command"]["cmd_type"] == "hold"
@@ -398,6 +398,7 @@ def test_make_hold_decision_drops_empty_weapon_stocks_from_the_loadout() -> None
         timestamp_ms=15000,
         fuel=900,
         inventory=_make_hold_inventory(dual_count=0, homing_count=0),
+        rank=1,
     )
 
     assert decision["desired_equipment"] == [5]

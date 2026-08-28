@@ -29,6 +29,7 @@ from tankpit_bot.bot.ai.combat_opportunity import collect_return_fire
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
 )
+from tankpit_bot.bot.ai.equipment_atlas import plan_atlas_equipment_hop
 from tankpit_bot.bot.ai.equipment_search import describe_container_search
 from tankpit_bot.bot.ai.forage import plan_forage_search
 from tankpit_bot.bot.ai.quad_sweep import plan_quad_sweep
@@ -143,12 +144,23 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     if pursuit_decision is not None:
         return pursuit_decision
 
+    # Equipment atlas hop ([[equipment-system]] hotspot law,
+    # 2026-08-28): when nothing believed collectible remains in
+    # reach, teleport to corpus-proven equipment ground instead of
+    # buying blind reveals -- the landing's own viewport shows
+    # whatever sits there.
+    atlas_decision = plan_atlas_equipment_hop(ctx, base_state)
+    if atlas_decision is not None:
+        return atlas_decision
+
     # Quad sweep ([[quad-sweep-doctrine]], reordered 2026-08-13, HUD
     # flags 8/9/14): recon runs only when every collection branch
     # above declined -- known stock preempts scanning structurally.
     # A mid-sweep reveal is collected next tick; the movement aborts
     # the sweep's remainder via the anchor latch, making the sweep an
-    # incremental scan-until-found.
+    # incremental scan-until-found. Since 2026-08-28 it is also
+    # hoard-gated: below the radar hunt bar it declines outright and
+    # the atlas hop above is the discovery strategy.
     sweep_decision = plan_quad_sweep(ctx, base_state)
     if sweep_decision is not None:
         return sweep_decision
