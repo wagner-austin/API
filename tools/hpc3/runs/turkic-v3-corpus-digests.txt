@@ -1,0 +1,40 @@
+# Certified corpus digests: Turkic char-LSTM corpora v3 (rebuild_2026-08)
+#
+# THIS IS THE CORPUS THE PAPER REPORTS. overleaf-tu-paper's
+# LM_MI_LSA_template.tex states 11,658,775 characters with Uzbek binding;
+# this manifest declares the same budget and every language's chars_written
+# matches its file exactly.
+#
+# Three generations exist and only this one matches the live paper:
+#   corpora_clean_2026-02   10,215,670  Uyghur binding
+#   corpora_clean           12,642,807  Uzbek binding
+#   corpora_clean_v3        11,658,775  Uzbek binding   <- paper, and recent training
+#
+# turkic-transliteration/docs/tu-proceedings-datasets-section.tex still
+# describes the 2026-02 build. That draft section is stale relative to the
+# paper it feeds.
+#
+# Verified before staging: character counts against the v3
+# cleaning_manifest.json, written by the cleaning run itself. All seven exact.
+#
+# REPRODUCIBILITY, STATED PLAINLY. v3's manifest records eight rule digests.
+# Seven .rules files still match turkic-transliteration exactly. symbol_map
+# matches NEITHER version in that repository's history, in any line-ending
+# form, so v3 cannot be rebuilt byte-for-byte from what is in version control.
+# The paper's claim that "the corpora in Table 2 can be rebuilt from source"
+# does not hold today for that one input.
+#
+# The known-risky map change -- merging U+02A6 into t-U0361-s for Kyrgyz,
+# 2026-08-12 -- is NOT the discrepancy: zero U+02A6 in v3's Kyrgyz file,
+# 19,421 merged forms.
+#
+# This record anchors the corpus from here. It cannot retroactively verify
+# what trained the models already reported; those bytes were never hashed.
+#
+e3dbdaa758d2b3db97012ebde1c78ac1b07335edc659d76e7dd345a1ed0fb33e  oscar_az_ipa.txt
+dff6e3e4aed891c721d48a17858b3c3f6734f7ea352d249d887a0b46a0d5aaff  oscar_fi_ipa.txt
+90f484f2ece7cae97b87d62bcdbfe82851ae72c18b51574634a65af661b91748  oscar_kk_ipa.txt
+2bfc012b9135940bae1521dacf32fa9e0e78b0ef4567fd85bffa3e0e613ed890  oscar_ky_ipa.txt
+19049664c3dd7cdeb875c1de0882fd6ff8a69baff9cd44fe82fffd3449da69ff  oscar_tr_ipa.txt
+63cd9a8dda95952c2adc74c54cd5bbeb6add18852ca5be1260c025b558fddc93  oscar_ug_ipa.txt
+35d3d502ffdefa5b18f2e7d19445c7b3b865931faade5dfa77746066ba041255  oscar_uz_ipa.txt

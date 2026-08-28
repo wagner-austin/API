@@ -72,8 +72,6 @@ untracked — it is state, not configuration).
   re-run is checked against an established value rather than merely recorded.
 - **Scale:** 7 ledger rows.
 
----
-
 ### `turkic-lstm` — character-level LSTM for Turkic languages
 
 - **Repo:** `~/PROJECTS/LSTM` (separate Poetry project; depends on
@@ -113,43 +111,53 @@ untracked — it is state, not configuration).
   records exactly which `platform_core` computed a run's fingerprint.
 
   Now provisioned and verified: checkout, environment (`torch 2.5.1+cu124`,
-  `numpy 2.4.6`), and corpora staged with cluster-side digest verification
-  against `runs/turkic-base-corpus-digests.txt`. All seven sweep members
-  preflight clean, 84 GPU-hours projected against a declared 84-hour cap.
+  `numpy 2.4.6`), and the v3 corpora staged with cluster-side digest
+  verification against `runs/turkic-v3-corpus-digests.txt`. All seven sweep
+  members preflight clean, 84 GPU-hours against a declared 84-hour cap.
   `slurm/train_base.sub` is deleted rather than kept beside the new path.
 - **The sweep pins the card to an A100.** The hpc3 contract refuses a generic
   `--gres=gpu:1`, so the array job's "whatever is free" placement is gone.
   That trades queue time for arms whose numbers can be subtracted from each
   other, which is the whole point of the exercise.
-- **Corpus caveat, and it is the sharper of the two open questions.** The
-  sweep trains from `corpora_clean`, the base corpora `train_base.sub` named.
-  Recent local training (`train_v3.log`) used
-  `rebuild_2026-08/corpora_clean_v3` instead, which stages separately to
-  `/pub/wagnera3/mi/corpora`. Pointing the sweep at v3 is a one-line change
-  per member — but it is a research decision, and the two sets differ in
-  provenance as well as content:
+- **Corpus: `rebuild_2026-08/corpora_clean_v3`, and getting there was the
+  sharpest lesson of the day.** The sweep first trained from `corpora_clean`,
+  because `slurm/train_base.sub` named it. That was wrong. There are THREE
+  generations, and the directory names say nothing about which is current:
 
-  | | `corpora_clean` (base) | `corpora_clean_v3` |
-  |---|---|---|
-  | equalized char budget | 12,642,807 | 11,658,775 |
-  | records cleaning params | yes | yes |
-  | records **which rules built it** | **no** | yes (8 digests) |
+  | directory | budget | binding | status |
+  |---|---|---|---|
+  | `corpora_clean_2026-02/` | 10,215,670 | Uyghur | superseded |
+  | `corpora_clean/` | 12,642,807 | Uzbek | superseded |
+  | `rebuild_2026-08/corpora_clean_v3/` | **11,658,775** | **Uzbek** | **current** |
 
-  Neither repository stores corpora — `~/PROJECTS/turkic-transliteration` is
-  the *engine* (`src/turkic_translit/rules/*.rules` plus the cleaner); its
-  `data/` is empty. The corpora are the engine's output, and live in LSTM.
+  `overleaf-tu-paper/LM_MI_LSA_template.tex` states 11,658,775 with Uzbek
+  binding — v3, and `train_v3.log` used it too. Meanwhile
+  `turkic-transliteration/docs/tu-proceedings-datasets-section.tex` still
+  describes the 2026-02 build; that draft section is stale relative to the
+  paper it feeds, and now carries a banner saying so.
 
-  Checked 2026-08-28 against the engine as it stands: v3's seven `.rules`
-  digests still match exactly, and its `symbol_map` digest matches **neither**
-  version in that repo's history, in any line-ending form. So **v3 is not
-  byte-reproducible from what is in version control**, and the base set
-  records nothing to reproduce from at all.
+  Fixed: the sweep points at v3, v3 is staged and digest-verified on the
+  cluster, and the base copy staged in error was removed. `LSTM/CORPORA.md`
+  is the marker that would have prevented the mistake and now exists.
 
-  The known-risky map change — merging the `U+02A6` ligature for Kyrgyz,
-  committed 2026-08-12 with the note that "corpora published before then
-  carry it" — is *not* the discrepancy. Both Kyrgyz files were checked
-  directly: zero `U+02A6` in either, 19,374 merged forms in the base set and
-  19,421 in v3.
+- **No generation is byte-reproducible from version control.** v3 records
+  eight rule digests; the seven `*.rules` still match `turkic-transliteration`
+  exactly, but `symbol_map` matches **neither** version in that repo's
+  history, in any line-ending form. `corpora_clean/` records no rule digests
+  at all. The 2026-02 set was built by a script the draft itself says "is not
+  in either repository", using a classifier never wired into the released
+  package. The paper's claim that the corpora "can be rebuilt from source"
+  does not hold today for `symbol_map` — one file.
+
+  The obvious suspect was checked and cleared: the 2026-08-12 `U+02A6`
+  ligature merge landed before every corpus here. Zero `U+02A6` in any
+  Kyrgyz file; 19,421 merged forms in v3.
+
+- **Corpora come from the engine, not a corpus repo.**
+  `~/PROJECTS/turkic-transliteration` holds `src/turkic_translit/rules/*.rules`
+  and the cleaner; its `data/` is empty. The corpora are its output and live
+  in LSTM.
+
 - **Nothing in the ledger yet.** Preflight admits; no job has been submitted.
 
 ---
