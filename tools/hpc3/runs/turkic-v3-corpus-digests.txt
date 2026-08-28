@@ -17,12 +17,23 @@
 # Verified before staging: character counts against the v3
 # cleaning_manifest.json, written by the cleaning run itself. All seven exact.
 #
-# REPRODUCIBILITY, STATED PLAINLY. v3's manifest records eight rule digests.
-# Seven .rules files still match turkic-transliteration exactly. symbol_map
-# matches NEITHER version in that repository's history, in any line-ending
-# form, so v3 cannot be rebuilt byte-for-byte from what is in version control.
-# The paper's claim that "the corpora in Table 2 can be rebuilt from source"
-# does not hold today for that one input.
+# RULES PROVENANCE. v3's manifest records eight digests and ALL EIGHT match
+# turkic-transliteration as it stands today: seven *_ipa.rules by file
+# digest, and symbol_map by TABLE digest.
+#
+# symbol_map is not the SHA-256 of symbol_map.csv. corpus/clean.py hashes the
+# parsed rows re-encoded as JSON:
+#
+#   encoded = json.dumps([encode_symbol_rule(r) for r in rules], ensure_ascii=False)
+#   fingerprint["symbol_map"] = sha256(encoded.encode("utf-8")).hexdigest()
+#
+# Its seven siblings ARE file digests, so hashing the CSV and concluding the
+# map drifted is a mistake someone will make -- it was made on 2026-08-28 and
+# written into this file before being caught. Reproduce with read_symbol_map():
+# 18 rows currently hash to 9a3b98c8..., which is what v3 records.
+#
+# corpora_clean (the base set) records NO rule digests at all, which is the
+# real provenance gap among the three generations.
 #
 # The known-risky map change -- merging U+02A6 into t-U0361-s for Kyrgyz,
 # 2026-08-12 -- is NOT the discrepancy: zero U+02A6 in v3's Kyrgyz file,

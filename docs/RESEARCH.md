@@ -140,14 +140,21 @@ untracked — it is state, not configuration).
   cluster, and the base copy staged in error was removed. `LSTM/CORPORA.md`
   is the marker that would have prevented the mistake and now exists.
 
-- **No generation is byte-reproducible from version control.** v3 records
-  eight rule digests; the seven `*.rules` still match `turkic-transliteration`
-  exactly, but `symbol_map` matches **neither** version in that repo's
-  history, in any line-ending form. `corpora_clean/` records no rule digests
-  at all. The 2026-02 set was built by a script the draft itself says "is not
-  in either repository", using a classifier never wired into the released
-  package. The paper's claim that the corpora "can be rebuilt from source"
-  does not hold today for `symbol_map` — one file.
+- **v3's transliteration inputs are fully accounted for.** Its manifest
+  records eight digests and all eight match `turkic-transliteration` today:
+  seven `*_ipa.rules` by file digest, and `symbol_map` by TABLE digest —
+  `corpus/clean.py` hashes the parsed rows re-encoded as JSON, not the CSV.
+  Its seven siblings are file digests, so comparing the CSV's hash and
+  concluding the map drifted is a mistake someone will make. It was made
+  here on 2026-08-28 and asserted in three places before being caught.
+  Reproduce with `read_symbol_map()`: 18 rows, `9a3b98c8…`.
+
+  `corpora_clean/` records no rule digests at all — that is the real gap of
+  the three. For `corpora_clean_2026-02/`, the draft section states that the
+  producing script "is not in either repository" and used a classifier never
+  wired into the released package; that is the author's open item, concerns
+  raw-corpus filtering upstream of cleaning, and is **not established** to
+  apply to `corpora_raw_v3`.
 
   The obvious suspect was checked and cleared: the 2026-08-12 `U+02A6`
   ligature merge landed before every corpus here. Zero `U+02A6` in any

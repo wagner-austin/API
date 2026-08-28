@@ -7,7 +7,7 @@
     "equalized_char_budget": "11,658,775 characters, Uzbek binding",
     "matches_publication": "overleaf-tu-paper/LM_MI_LSA_template.tex states 11,658,775 with Uzbek binding, and every language's chars_written matches its file exactly. This is the corpus the paper reports.",
     "supersedes": "corpora_clean (12,642,807, Uzbek) and corpora_clean_2026-02 (10,215,670, Uyghur). The 2026-02 set is what turkic-transliteration/docs/tu-proceedings-datasets-section.tex still describes -- that draft section is stale relative to the live paper.",
-    "rules_fingerprint_status": "v3's cleaning_manifest.json records eight digests. Seven .rules files still match turkic-transliteration exactly; symbol_map matches NEITHER version in that repo's history, so v3 is not byte-reproducible from version control today."
+    "rules_fingerprint_status": "v3's cleaning_manifest.json records eight digests and all eight match turkic-transliteration today: seven *_ipa.rules by file digest, and symbol_map by TABLE digest -- clean.py hashes the parsed rows re-encoded as JSON, not the CSV. Hashing the CSV instead and concluding the map drifted is a mistake made here on 2026-08-28; reproduce with read_symbol_map(), 18 rows, 9a3b98c8..."
   },
   "files": [
     {
