@@ -4,11 +4,6 @@
   "root": "/pub/wagnera3",
   "ledger": "ledger.jsonl",
   "quiet_seconds": 1800,
-  "budget": {
-    "self_imposed_gpu_hours": 120.0,
-    "max_service_units": 0.0,
-    "charge_account": ""
-  },
   "projects": {
     "abl": {
       "partition": "free-gpu",
@@ -26,7 +21,12 @@
         "torch": "2.6.0+cu124",
         "transformers": "4.46.3"
       },
-      "deterministic": true
+      "deterministic": true,
+      "budget": {
+        "self_imposed_gpu_hours": 120.0,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      }
     },
     "sirius": {
       "partition": "free",
@@ -38,7 +38,12 @@
       "checkpoint_steps": 1,
       "env_path": "/pub/wagnera3/envs/sirius",
       "pinned_packages": {},
-      "deterministic": false
+      "deterministic": false,
+      "budget": {
+        "self_imposed_gpu_hours": 120.0,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      }
     }
   }
 }

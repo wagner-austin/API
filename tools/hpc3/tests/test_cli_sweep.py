@@ -130,7 +130,12 @@ class TestSweepCli:
     ) -> None:
         _write(tmp_path / "s.json", _payload())
         with pytest.raises(AppError) as excinfo:
-            sweep_cli.main(_args(tmp_path, budget=budget_document(gpu_hours=1.0)))
+            sweep_cli.main(
+                _args(
+                    tmp_path,
+                    projects={"abl": project_config(budget=budget_document(gpu_hours=1.0))},
+                )
+            )
         assert excinfo.value.code is Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED
         assert fake_run.calls == []
         assert emitted == []

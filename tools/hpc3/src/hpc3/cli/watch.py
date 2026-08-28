@@ -22,8 +22,9 @@ from platform_core import cli_args
 
 from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.cluster import ClusterFacts
+from hpc3.contracts.layout import project_of
 from hpc3.contracts.status import JobState, JobStatus, gpu_hours, is_terminal, service_units
-from hpc3.contracts.workspace import workspace_cluster
+from hpc3.contracts.workspace import Workspace, workspace_cluster
 from hpc3.core.budget import check_consumption
 from hpc3.core.remote import run_remote
 from hpc3.core.status import parse_sacct_output, sacct_command
@@ -52,6 +53,42 @@ def format_status(status: JobStatus, cluster: ClusterFacts) -> str:
         f"{status['state']} {status['elapsed_seconds']}s "
         f"{service_units(status, cluster):.4f} SU on {status['partition']} @ {node}"
     )
+
+
+def _budget_groups(
+    rows: Sequence[JobStatus], workspace: Workspace
+) -> tuple[list[tuple[str, list[JobStatus]]], list[JobStatus]]:
+    """Split accounting rows by the project whose cap governs each one.
+
+    Watch is handed job IDs rather than run documents, so before caps became
+    per-project this command applied the workspace's single cap to whatever
+    it was shown. That was the defect: a workspace declaring 0.5 GPU-hours
+    would fail an ``mi`` job submitted under a declared 12.0, and the same
+    workspace pointed at a small job would pass one submitted under a cap it
+    had already exceeded. Neither reading was about the job.
+
+    The project comes from the job's own name, which ``qualified_name``
+    guarantees is ``<project>.<name>``; accounting already carries it because
+    the prefix exists to make a shared ``squeue`` self-describing.
+
+    Args:
+        rows: Accounting rows, in the order ``sacct`` returned them.
+        workspace: The decoded workspace, for the declared project table.
+
+    Returns:
+        The rows grouped under each declared project in name order, and the
+        rows belonging to no declared project.
+    """
+    declared = workspace["projects"]
+    grouped: dict[str, list[JobStatus]] = {}
+    unclaimed: list[JobStatus] = []
+    for status in rows:
+        project = project_of(status["name"])
+        if project is None or project not in declared:
+            unclaimed.append(status)
+            continue
+        grouped.setdefault(project, []).append(status)
+    return sorted(grouped.items()), unclaimed
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -109,11 +146,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         _test_hooks.emit(f"NOT FOUND {','.join(missing)}")
 
     # Checked last: an overrun raises, and the rows above are worth seeing
-    # whether or not it does. The cap comes from the workspace rather than a
-    # flag, so the ceiling this command enforces is the same one the
-    # submitting command projected against.
-    check_consumption(workspace["budget"], rows, cluster)
-    _test_hooks.emit("budget OK")
+    # whether or not it does. Each group is checked against ITS OWN project's
+    # cap, so the ceiling this command enforces is the same one the submitting
+    # command projected against -- which was the claim this comment made while
+    # a single workspace cap was applied to every job it was shown.
+    grouped, unclaimed = _budget_groups(rows, workspace)
+    if unclaimed != []:
+        # Reported, never silently skipped and never checked against someone
+        # else's cap. A job this workspace did not submit has no declared
+        # budget, and saying so is the honest reading.
+        ids = ",".join(status["job_id"] for status in unclaimed)
+        _test_hooks.emit(f"NO DECLARED BUDGET {ids}")
+    for project, group in grouped:
+        check_consumption(workspace["projects"][project]["budget"], group, cluster)
+        _test_hooks.emit(f"budget OK {project}")
     return 0
 
 

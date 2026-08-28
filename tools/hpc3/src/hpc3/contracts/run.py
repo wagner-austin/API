@@ -171,7 +171,8 @@ def resolve_run(workspace: Workspace, value: JSONValue) -> JobSpec:
     _check_known_fields(document, RUN_IDENTITY_FIELDS)
 
     project = require_project(document, "project")
-    merged = _merged(document, require_project_config(workspace, project), project)
+    defaults = require_project_config(workspace, project)
+    merged = _merged(document, defaults, project)
     merged["name"] = document.get("name")
     merged["command"] = document.get("command")
     merged["experiment"] = document.get("experiment")
@@ -183,7 +184,7 @@ def resolve_run(workspace: Workspace, value: JSONValue) -> JobSpec:
     return decode_job_spec(
         merged,
         workspace_cluster(workspace),
-        max_service_units=workspace["budget"]["max_service_units"],
+        max_service_units=defaults["budget"]["max_service_units"],
     )
 
 
@@ -215,7 +216,8 @@ def resolve_sweep(workspace: Workspace, value: JSONValue) -> SweepSpec:
     _check_known_fields(document, SWEEP_IDENTITY_FIELDS)
 
     project = require_project(document, "project")
-    base = _merged(document, require_project_config(workspace, project), project)
+    defaults = require_project_config(workspace, project)
+    base = _merged(document, defaults, project)
     base["name"] = document.get("name")
     base["experiment"] = document.get("experiment")
     base["depends_on"] = document.get("depends_on")
@@ -234,7 +236,7 @@ def resolve_sweep(workspace: Workspace, value: JSONValue) -> SweepSpec:
     return decode_sweep_spec(
         {"base": base, "members": members},
         workspace_cluster(workspace),
-        max_service_units=workspace["budget"]["max_service_units"],
+        max_service_units=defaults["budget"]["max_service_units"],
     )
 
 
@@ -326,7 +328,7 @@ def resolve_chain(workspace: Workspace, value: JSONValue) -> ChainSpec:
     return decode_chain_spec(
         {"stages": resolved},
         workspace_cluster(workspace),
-        max_service_units=workspace["budget"]["max_service_units"],
+        max_service_units=defaults["budget"]["max_service_units"],
     )
 
 

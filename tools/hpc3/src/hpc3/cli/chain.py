@@ -22,7 +22,7 @@ from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.cluster import describe_gpu_request
 from hpc3.contracts.layout import log_dir, script_dir
 from hpc3.contracts.run import resolve_chain
-from hpc3.contracts.workspace import workspace_cluster
+from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
 from hpc3.core.chain import submit_chain
@@ -62,7 +62,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Stages are sequential in TIME and simultaneous in COMMITMENT: submitting
     # the chain commits every hour of it, and a budget consulted one stage at
     # a time would approve a pipeline it would have refused whole.
-    budget = workspace["budget"]
+    budget = require_project_config(workspace, stages[0]["project"])["budget"]
     projected = check_projection(budget, stages, cluster)
     _test_hooks.emit(
         f"budget OK: projected {projected['gpu_hours']:.1f} GPU-hours, "
@@ -80,7 +80,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ledger_path=pathlib.Path(workspace["ledger"]),
         submitted_at=_test_hooks.now_iso(),
         cluster=cluster,
-        charge_account=workspace["budget"]["charge_account"],
+        charge_account=budget["charge_account"],
     )
 
     for position, (member, stage) in enumerate(zip(submitted, stages, strict=True)):

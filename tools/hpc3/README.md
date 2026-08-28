@@ -38,7 +38,8 @@ Working examples of all three documents are in [`examples/`](examples/).
 ## The workspace
 
 Every command reads one workspace document. It is the only place the cluster's
-address, the ledger, the budget and each project's resources are written down.
+address, the ledger, and each project's resources, caps and account are
+written down.
 
 ```json
 {
@@ -47,7 +48,6 @@ address, the ledger, the budget and each project's resources are written down.
   "root": "/pub/wagnera3",
   "ledger": "ledger.jsonl",
   "quiet_seconds": 1800,
-  "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
   "projects": {
     "abl": {
       "partition": "free-gpu",
@@ -59,7 +59,8 @@ address, the ledger, the budget and each project's resources are written down.
       "checkpoint_steps": 500,
       "env_path": "/pub/wagnera3/envs/abl-pinned",
       "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" },
-      "deterministic": true
+      "deterministic": true,
+      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" }
     },
     "sirius": {
       "partition": "free",
@@ -71,7 +72,8 @@ address, the ledger, the budget and each project's resources are written down.
       "checkpoint_steps": 1,
       "env_path": "/pub/wagnera3/envs/sirius",
       "pinned_packages": {},
-      "deterministic": false
+      "deterministic": false,
+      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" }
     }
   }
 }
@@ -84,10 +86,12 @@ address, the ledger, the budget and each project's resources are written down.
 | `root` | absolute cluster directory; scripts and logs are **derived** from it |
 | `ledger` | local record of every submission; relative paths resolve against this file's directory |
 | `quiet_seconds` | how long a running job may write nothing before triage calls it silent (default 1800) |
-| `budget` | self-imposed caps, checked before submission and again while running |
-| `projects` | resource defaults per body of work |
+| `projects` | resource defaults, caps and charge account per body of work |
+| `projects.<name>.budget` | that project's self-imposed caps, checked before submission and again while running |
 
-**There are no `--host` / `--root` / `--budget` / `--ledger` flags.** That is
+**There are no `--host` / `--root` / `--budget` / `--ledger` flags.** The
+budget is not a flag either; it is read from the project the run names, so
+`hpc3-submit` and `hpc3-watch` reach the same cap for the same job. That is
 deliberate. When they existed, nothing tied `hpc3-triage --ledger` to the
 ledger `hpc3-submit` had written — and pointing them at different paths gives
 you either a clean board while jobs run unwatched, or every job reported as
@@ -108,9 +112,19 @@ environment path:
   "requeue": true, "checkpoint_steps": 200,
   "env_path": "/pub/wagnera3/envs/turkic",
   "pinned_packages": {},
-  "deterministic": false
+  "deterministic": false,
+  "budget": { "self_imposed_gpu_hours": 12.0, "max_service_units": 0.0, "charge_account": "" }
 }
 ```
+
+The `budget` is per project and not optional. It lived on the workspace until
+2026-08-28, which sounds tidier and was not: a cap is the one thing that
+genuinely differs between bodies of work, so the only way to say so was to
+fork the whole document — and three forks were committed, declaring 0.5, 12.0
+and 1.0 GPU-hours over the same ledger. `hpc3-watch` then enforced whichever
+one you happened to pass against whatever job you named. `charge_account`
+moved with the caps for a sharper reason: accounts are per-PI, and a job
+charged to the wrong one spends another lab's allocation.
 
 `"gpu": null` is how a **CPU-only** job is stated, and it is the only way —
 there is no zero-count request, because two spellings of one state is how they

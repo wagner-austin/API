@@ -9,10 +9,12 @@ decoded before anything is sent, so a job that bills without consent, names no
 GPU model, or leaves a long preemptible run unprotected fails locally in
 milliseconds rather than on the cluster in hours.
 
-The host, the root, the ledger and the budget are not flags. They come from
-the workspace, so this command and ``hpc3-triage`` cannot be pointed at
-different ledgers -- which is how a submitted job stops being watched by the
-thing that was supposed to watch it.
+The host, the root, the ledger and the budget are not flags. The first three
+come from the workspace and the budget from the project's own entry in it, so
+this command and ``hpc3-triage`` cannot be pointed at different ledgers --
+which is how a submitted job stops being watched by the thing that was
+supposed to watch it -- and ``hpc3-watch`` enforces the same cap this
+projected against, because both reach it through the job's project.
 """
 
 from __future__ import annotations
@@ -28,7 +30,7 @@ from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.cluster import ClusterFacts, describe_gpu_request, partition_bills
 from hpc3.contracts.layout import log_dir, qualified_name, script_dir
 from hpc3.contracts.run import resolve_run
-from hpc3.contracts.workspace import workspace_cluster
+from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
 from hpc3.core.submit import submit
@@ -82,9 +84,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     raw = core_hooks.read_bytes(run_path).decode("utf-8")
     spec = resolve_run(workspace, load_json_str(raw))
 
-    # The cap is the workspace's, not this invocation's. A per-command budget
-    # is a budget that is whatever the last person typed.
-    check_projection(workspace["budget"], [spec], cluster)
+    # The cap is the project's, not this invocation's. A per-command budget is
+    # a budget that is whatever the last person typed; a per-project one is a
+    # declaration, and it is the same one `hpc3-watch` will enforce against
+    # this job later because both find it the same way.
+    budget = require_project_config(workspace, spec["project"])["budget"]
+    check_projection(budget, [spec], cluster)
 
     # Derived, never passed in: a caller who can choose a log directory is a
     # caller who will eventually choose the wrong one, and that job's output is
@@ -100,7 +105,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ledger_path=pathlib.Path(workspace["ledger"]),
         submitted_at=_test_hooks.now_iso(),
         cluster=cluster,
-        charge_account=workspace["budget"]["charge_account"],
+        charge_account=budget["charge_account"],
     )
 
     _test_hooks.emit(f"submitted {job_id} {qualified_name(project, spec['name'])}")
@@ -110,7 +115,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # a summary that calls a charged job free is the last line an operator
         # reads before it starts costing.
         f"  {describe_gpu_request(spec['gpu'])} on {spec['partition']} "
-        f"({_cost_label(cluster, spec['partition'], workspace['budget']['charge_account'])}), "
+        f"({_cost_label(cluster, spec['partition'], budget['charge_account'])}), "
         f"{spec['cpus']} cpu, {spec['mem_gb']}G, {spec['minutes']} min"
     )
     _test_hooks.emit(f"  logs {log_dir(root, project)}")

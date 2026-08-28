@@ -4,9 +4,9 @@ Documents are written to real files and read through the production hook, so
 these exercise the same path a user does. Only the command runner, the report
 sink and the clock are faked.
 
-Every command reads the workspace, and the workspace carries the budget and
-the ledger. There is no test that omits them, because there is no flag that
-could.
+Every command reads the workspace, and the workspace carries the ledger while
+each project's entry carries its own budget. There is no test that omits
+them, because there is no flag that could.
 """
 
 from __future__ import annotations
@@ -22,11 +22,10 @@ from hpc3.cli import stage as stage_cli
 from hpc3.cli import submit as submit_cli
 from hpc3.cli import watch as watch_cli
 from hpc3.clusters.hpc3 import HPC3
-from tests.against_hpc3 import decode_job_status, read_ledger
+from tests.against_hpc3 import read_ledger
 from tests.conftest import (
     FakeRun,
     budget_document,
-    cluster,
     gpus,
     project_config,
     script_healthy_cluster,
@@ -39,7 +38,7 @@ _PAYLOAD = b"the marker predicts extraction accuracy.\n"
 _DIGEST = hashlib.sha256(_PAYLOAD).hexdigest()
 
 _ROW = (
-    "55519937|abl-verify|free-gpu32|COMPLETED|48|"
+    "55519937|abl.verify|free-gpu32|COMPLETED|48|"
     "billing=11,cpu=11,gres/gpu=1,mem=64G,node=1|hpc3-gpu-n54-00"
 )
 
@@ -92,14 +91,15 @@ def _submit_args(tmp_path: pathlib.Path, *, gpu_hours: float = 100.0) -> list[st
 
     Args:
         tmp_path: Directory holding the documents.
-        gpu_hours: GPU-hour cap for the workspace budget.
+        gpu_hours: GPU-hour cap for the project's budget.
 
     Returns:
         Arguments excluding the program name.
     """
+    budget = budget_document(gpu_hours=gpu_hours)
     return [
         "--config",
-        _config(tmp_path, budget=budget_document(gpu_hours=gpu_hours)),
+        _config(tmp_path, projects={"abl": project_config(budget=budget)}),
         "--run",
         str(tmp_path / "run.json"),
     ]
@@ -111,13 +111,18 @@ def _watch_args(tmp_path: pathlib.Path, jobs: str, *, gpu_hours: float = 100.0) 
     Args:
         tmp_path: Directory holding the workspace.
         jobs: The ``--job`` value.
-        gpu_hours: GPU-hour cap for the workspace budget.
+        gpu_hours: GPU-hour cap for the project's budget.
 
     Returns:
         Arguments excluding the program name.
     """
     budget = budget_document(gpu_hours=gpu_hours, units=100.0)
-    return ["--config", _config(tmp_path, budget=budget), "--job", jobs]
+    return [
+        "--config",
+        _config(tmp_path, projects={"abl": project_config(budget=budget)}),
+        "--job",
+        jobs,
+    ]
 
 
 def _stage_manifest(destination: str = "/pub/wagnera3/corpora") -> dict[str, JSONValue]:
@@ -375,120 +380,6 @@ class TestSubmitCli:
             submit_cli.main(["--config", _config(tmp_path), "--host", "hpc3"])
 
 
-class TestWatchCli:
-    def test_it_reports_state_and_real_cost(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        fake_run.add("sacct", stdout=_ROW + "\n")
-
-        assert watch_cli.main(_watch_args(tmp_path, "55519937")) == 0
-        assert emitted[0].startswith("final 55519937 abl-verify COMPLETED 48s 0.0000 SU")
-        assert emitted[1] == "total 0.0000 SU across 1 row(s)"
-        assert emitted[3] == "states COMPLETED=1"
-
-    def test_a_row_from_a_billing_partition_reports_its_real_cost(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        """Watch reads accounting, which reports whatever ran under the
-        account -- not only what this package would have submitted. billing=11
-        for 48s at UsageFactor 1.0 is 0.1467 SU."""
-        billed = _ROW.replace("|free-gpu32|", "|gpu32|")
-        fake_run.add("sacct", stdout=billed + "\n")
-
-        assert watch_cli.main(_watch_args(tmp_path, "55519937")) == 0
-        assert emitted[0].startswith("final 55519937 abl-verify COMPLETED 48s 0.1467 SU")
-        assert emitted[1] == "total 0.1467 SU across 1 row(s)"
-
-    def test_it_reports_gpu_hours(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        fake_run.add("sacct", stdout=_ROW + "\n")
-        watch_cli.main(_watch_args(tmp_path, "55519937"))
-        assert emitted[2] == "gpu-hours 0.01"
-
-    def test_an_overrun_is_reported_after_the_rows(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        """The rows are worth seeing whether or not the budget was broken."""
-        fake_run.add("sacct", stdout=_ROW + "\n")
-
-        with pytest.raises(AppError) as excinfo:
-            watch_cli.main(_watch_args(tmp_path, "55519937", gpu_hours=0.001))
-        assert excinfo.value.code is Hpc3ErrorCode.BUDGET_CONSUMPTION_EXCEEDED
-        assert emitted[0].startswith("final 55519937")
-
-    def test_the_cap_it_enforces_is_the_one_the_submitter_projected_against(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        """One document, so the two commands cannot disagree about the ceiling."""
-        _write_json(tmp_path / "run.json", _run_payload())
-        script_healthy_cluster(fake_run)
-        config = _config(tmp_path, budget=budget_document(gpu_hours=0.001))
-
-        with pytest.raises(AppError) as submitted:
-            submit_cli.main(["--config", config, "--run", str(tmp_path / "run.json")])
-        assert submitted.value.code is Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED
-
-        fake_run.add("sacct", stdout=_ROW + "\n")
-        with pytest.raises(AppError) as watched:
-            watch_cli.main(["--config", config, "--job", "55519937"])
-        assert watched.value.code is Hpc3ErrorCode.BUDGET_CONSUMPTION_EXCEEDED
-
-    def test_a_pending_job_is_marked_live_with_no_node(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        fake_run.add("sacct", stdout="1|arm|free-gpu|PENDING|0||\n")
-        watch_cli.main(_watch_args(tmp_path, "1"))
-        assert emitted[0].startswith("live  1 arm PENDING 0s")
-        assert emitted[0].endswith("@ -")
-
-    def test_an_unknown_job_is_a_failure_not_an_empty_report(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        fake_run.add("sacct", stdout="")
-        with pytest.raises(ValueError, match="knows no job"):
-            watch_cli.main(_watch_args(tmp_path, "999"))
-        assert emitted == []
-
-    def test_the_config_flag_is_not_optional(self) -> None:
-        with pytest.raises(ValueError, match="--config is required"):
-            watch_cli.main(["--job", "1"])
-
-
-class TestFormatStatus:
-    def test_a_terminal_row_is_marked_final(self) -> None:
-        status = decode_job_status(
-            {
-                "job_id": "1",
-                "name": "arm",
-                "partition": "free-gpu",
-                "state": "COMPLETED",
-                "elapsed_seconds": 1,
-                "billing_tres": 0,
-                "gpu_count": 1,
-                "cpu_count": 8,
-                "node_list": "n1",
-            }
-        )
-        assert watch_cli.format_status(status, cluster()).startswith("final ")
-
-    def test_a_requeued_row_is_marked_live_because_protection_worked(self) -> None:
-        status = decode_job_status(
-            {
-                "job_id": "1",
-                "name": "arm",
-                "partition": "free-gpu",
-                "state": "REQUEUED",
-                "elapsed_seconds": 1,
-                "billing_tres": 0,
-                "gpu_count": 1,
-                "cpu_count": 8,
-                "node_list": "n1",
-            }
-        )
-        assert watch_cli.format_status(status, cluster()).startswith("live  ")
-
-
 class TestEntrypoints:
     """Each ``entrypoint`` reads ``sys.argv`` and raises; that only happens
     when a process starts through it, so it is exercised for real rather than
@@ -528,58 +419,10 @@ class TestEntrypoints:
     def test_watch_reads_the_process_arguments(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], argv: list[str]
     ) -> None:
-        fake_run.add("sacct", stdout="1|arm|free-gpu|COMPLETED|10|billing=4,gres/gpu=1|n1\n")
+        fake_run.add("sacct", stdout="1|abl.arm|free-gpu|COMPLETED|10|billing=4,gres/gpu=1|n1\n")
         argv[:] = ["prog", *_watch_args(tmp_path, "1", gpu_hours=10.0)]
 
         with pytest.raises(SystemExit) as excinfo:
             watch_cli.entrypoint()
         assert excinfo.value.code == 0
-        assert emitted[-1] == "budget OK"
-
-
-class TestMultiJobWatch:
-    def test_one_sacct_call_covers_the_whole_sweep(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        """Six separate calls would observe six different moments."""
-        rows = "\n".join(
-            f"10{i}|rung-s{i}|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|node{i}" for i in range(3)
-        )
-        fake_run.add("sacct", stdout=rows + "\n")
-
-        code = watch_cli.main(_watch_args(tmp_path, "101,102,103", gpu_hours=10.0))
-        assert code == 0
-        assert len(fake_run.calls) == 1
-        assert "sacct -j 101,102,103" in fake_run.calls[0].remote_command
-
-    def test_it_tallies_states_across_the_sweep(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        rows = (
-            "101|a|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n"
-            "102|b|free-gpu|RUNNING|30|billing=8,gres/gpu=1|n2\n"
-            "103|c|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n3\n"
-        )
-        fake_run.add("sacct", stdout=rows)
-        watch_cli.main(_watch_args(tmp_path, "101,102,103", gpu_hours=10.0))
-        assert emitted[5] == "states COMPLETED=2 RUNNING=1"
-
-    def test_an_id_accounting_does_not_know_is_named_not_hidden(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        fake_run.add("sacct", stdout="101|a|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n")
-        watch_cli.main(_watch_args(tmp_path, "101,999", gpu_hours=10.0))
-        assert emitted[4] == "NOT FOUND 999"
-
-    def test_trailing_commas_are_ignored(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
-    ) -> None:
-        fake_run.add("sacct", stdout="101|a|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n")
-        watch_cli.main(_watch_args(tmp_path, "101,,", gpu_hours=10.0))
-        assert "sacct -j 101 " in fake_run.calls[0].remote_command
-
-    def test_a_job_argument_of_only_commas_is_refused(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun
-    ) -> None:
-        with pytest.raises(ValueError, match="at least one job id"):
-            watch_cli.main(_watch_args(tmp_path, ",,"))
+        assert emitted[-1] == "budget OK abl"

@@ -155,7 +155,12 @@ class TestChainCli:
         _healthy(fake_run)
 
         with pytest.raises(AppError) as excinfo:
-            chain_cli.main(_args(tmp_path, budget=budget_document(gpu_hours=1.0)))
+            chain_cli.main(
+                _args(
+                    tmp_path,
+                    projects={"abl": project_config(budget=budget_document(gpu_hours=1.0))},
+                )
+            )
         assert excinfo.value.code is Hpc3ErrorCode.BUDGET_PROJECTION_EXCEEDED
         assert not any("&& sbatch " in command for command in fake_run.commands())
 

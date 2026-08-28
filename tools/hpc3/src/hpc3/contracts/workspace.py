@@ -103,6 +103,33 @@ class ProjectConfig(TypedDict):
             setting form separate records and comparing across them
             reintroduces the confound the controls remove -- so the setting
             has to be part of what a run IS, not a flag someone remembers.
+        budget: This project's own caps and charge account. Per project
+            rather than per workspace, which is where it lived until
+            2026-08-28.
+
+            THE WORKSPACE-LEVEL FIELD DESCRIBED ITSELF AS "shared by every
+            project. One pool, because the machine is one machine", AND THE
+            PRACTICE HAD ALREADY LEFT IT. Three workspace documents were
+            committed, one per project, declaring 0.5, 12.0 and 1.0
+            GPU-hours over the same ledger file -- because a cap is the one
+            thing that genuinely differs per body of work, and a
+            workspace-level field left no way to say so but to fork the
+            document. Nothing detected the fork, and two statements in this
+            package were false while it stood: the sentence above, and
+            ``hpc3-watch``'s claim that "the ceiling this command enforces
+            is the same one the submitting command projected against" --
+            watching an ``mi`` job with the cleargbm document enforced 0.5
+            GPU-hours against work submitted under a declared 12.0.
+
+            ``charge_account`` moves with the caps rather than staying
+            behind, and that is the sharpest half. Accounts are per-PI, and
+            a job charged to the wrong one spends another lab's allocation
+            on work that is not theirs; a single workspace account would
+            have made that a one-character mistake.
+
+            Deliberately NOT in :data:`PROJECT_FIELDS`: a run may override
+            every resource above, and may override none of this. A cap a run
+            can raise is not a cap.
     """
 
     partition: str
@@ -116,6 +143,7 @@ class ProjectConfig(TypedDict):
     env_path: str
     pinned_packages: dict[str, str]
     deterministic: bool
+    budget: Budget
 
 
 class Workspace(TypedDict):
@@ -133,9 +161,10 @@ class Workspace(TypedDict):
             resolved against the config file's own directory -- so a workspace
             can be checked in and used from anywhere without absolute paths.
         quiet_seconds: Staleness threshold triage applies to running jobs.
-        budget: Self-imposed caps, shared by every project. One pool, because
-            the machine is one machine.
-        projects: Resource defaults, keyed by project name.
+        projects: Resource defaults and caps, keyed by project name. The
+            caps live there rather than here; see
+            :attr:`ProjectConfig.budget` for what forking this document
+            three ways cost before they did.
     """
 
     cluster: str
@@ -143,7 +172,6 @@ class Workspace(TypedDict):
     root: str
     ledger: str
     quiet_seconds: int
-    budget: Budget
     projects: dict[str, ProjectConfig]
 
 
@@ -249,6 +277,7 @@ def decode_project_config(value: JSONValue, cluster: ClusterFacts) -> ProjectCon
         env_path=_require_nonempty_str(value, "env_path"),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
         deterministic=require_bool(value, "deterministic"),
+        budget=decode_budget(value.get("budget")),
     )
 
 
@@ -273,6 +302,7 @@ def encode_project_config(config: ProjectConfig) -> dict[str, JSONValue]:
         "env_path": config["env_path"],
         "pinned_packages": encode_pinned_packages(config["pinned_packages"]),
         "deterministic": config["deterministic"],
+        "budget": encode_budget(config["budget"]),
     }
 
 
@@ -354,7 +384,6 @@ def decode_workspace(value: JSONValue, *, config_dir: pathlib.Path) -> Workspace
         root=require_root(_require_nonempty_str(value, "root")),
         ledger=str(config_dir / _require_nonempty_str(value, "ledger")),
         quiet_seconds=quiet_seconds,
-        budget=decode_budget(value.get("budget")),
         projects=_decode_projects(value, cluster),
     )
 
@@ -381,7 +410,6 @@ def encode_workspace(workspace: Workspace) -> dict[str, JSONValue]:
         "root": workspace["root"],
         "ledger": workspace["ledger"],
         "quiet_seconds": workspace["quiet_seconds"],
-        "budget": encode_budget(workspace["budget"]),
         "projects": projects,
     }
 

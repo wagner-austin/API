@@ -322,6 +322,7 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,
+        "budget": budget_document(),
     }
     config.update(overrides)
     return config
@@ -364,7 +365,12 @@ def ledger_row(**overrides: JSONValue) -> dict[str, JSONValue]:
 def budget_document(
     *, gpu_hours: float = 100.0, units: float = 0.0, account: str = ""
 ) -> dict[str, JSONValue]:
-    """Build a budget for a workspace document.
+    """Build a budget for a project's entry in a workspace document.
+
+    Lives on the project rather than the workspace as of 2026-08-28; see
+    :attr:`~hpc3.contracts.workspace.ProjectConfig.budget` for the three
+    forked workspace documents that made the move necessary. Pass it through
+    ``project_config(budget=budget_document(...))``.
 
     Args:
         gpu_hours: GPU-hour cap.
@@ -404,7 +410,6 @@ def workspace_document(**overrides: JSONValue) -> dict[str, JSONValue]:
         "root": "/pub/w",
         "ledger": "ledger.jsonl",
         "quiet_seconds": 1800,
-        "budget": budget_document(),
         "projects": {"abl": project_config()},
     }
     document.update(overrides)

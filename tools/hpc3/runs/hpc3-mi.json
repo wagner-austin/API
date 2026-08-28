@@ -4,11 +4,6 @@
   "root": "/pub/wagnera3",
   "ledger": "ledger.jsonl",
   "quiet_seconds": 1800,
-  "budget": {
-    "self_imposed_gpu_hours": 12.0,
-    "max_service_units": 0.0,
-    "charge_account": ""
-  },
   "projects": {
     "mi": {
       "partition": "free-gpu",
@@ -33,7 +28,12 @@
         "torch": "2.6.0+cu124",
         "transformers": "4.46.3"
       },
-      "deterministic": true
+      "deterministic": true,
+      "budget": {
+        "self_imposed_gpu_hours": 12.0,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      }
     }
   }
 }

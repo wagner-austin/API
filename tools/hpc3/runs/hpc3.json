@@ -4,11 +4,6 @@
   "root": "/pub/wagnera3",
   "ledger": "ledger.jsonl",
   "quiet_seconds": 1800,
-  "budget": {
-    "self_imposed_gpu_hours": 0.5,
-    "max_service_units": 0.0,
-    "charge_account": ""
-  },
   "projects": {
     "cleargbm": {
       "partition": "free",
@@ -24,7 +19,12 @@
         "lightgbm": "4.6.0",
         "xgboost": "3.1.2"
       },
-      "deterministic": true
+      "deterministic": true,
+      "budget": {
+        "self_imposed_gpu_hours": 0.5,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      }
     }
   }
 }

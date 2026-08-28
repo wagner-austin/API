@@ -46,7 +46,7 @@ class TestDecodeWorkspace:
         assert workspace["host"] == "hpc3"
         assert workspace["root"] == "/pub/w"
         assert workspace["quiet_seconds"] == 1800
-        assert workspace["budget"] == {
+        assert workspace["projects"]["abl"]["budget"] == {
             "self_imposed_gpu_hours": 100.0,
             "max_service_units": 0.0,
             "charge_account": "",
@@ -132,8 +132,14 @@ class TestDecodeWorkspace:
 
 class TestDecodeProjectConfig:
     def test_it_reads_every_field(self) -> None:
+        """PROJECT_FIELDS plus the budget, which is decoded and not overridable.
+
+        The gap between the two is the assertion: PROJECT_FIELDS is exactly
+        what a RUN may replace, and a cap a run can replace is not a cap.
+        """
         config = decode_project_config(project_config())
-        assert sorted(config.keys()) == sorted(PROJECT_FIELDS)
+        assert sorted(config.keys()) == sorted([*PROJECT_FIELDS, "budget"])
+        assert "budget" not in PROJECT_FIELDS
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a JSON object"):

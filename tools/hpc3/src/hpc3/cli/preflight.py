@@ -28,7 +28,7 @@ from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import log_dir, qualified_name, script_dir
 from hpc3.contracts.run import resolve_run, resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
-from hpc3.contracts.workspace import Workspace, workspace_cluster
+from hpc3.contracts.workspace import Workspace, require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
 from hpc3.core.preflight import preflight
@@ -99,7 +99,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     # service-unit budget, so a spec can be schedulable and unaffordable at
     # once -- and preflight is the step whose whole purpose is to find that out
     # before anything is queued.
-    projected = check_projection(workspace["budget"], specs, cluster)
+    # One document resolves to one project, so every spec here shares a cap.
+    budget = require_project_config(workspace, specs[0]["project"])["budget"]
+    projected = check_projection(budget, specs, cluster)
 
     for spec in specs:
         project = spec["project"]
@@ -109,7 +111,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             script_dir=script_dir(root, project),
             log_dir=log_dir(root, project),
             cluster=cluster,
-            charge_account=workspace["budget"]["charge_account"],
+            charge_account=budget["charge_account"],
         )
         _test_hooks.emit(
             f"OK {qualified_name(project, spec['name'])}: "
@@ -125,7 +127,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # would be the most misleading line on the screen.
     _test_hooks.emit(
         f"projected {projected['gpu_hours']:.2f} GPU-hours against a declared cap of "
-        f"{workspace['budget']['self_imposed_gpu_hours']:.2f}; "
+        f"{budget['self_imposed_gpu_hours']:.2f}; "
         f"spend is measured after the fact, not projected"
     )
     _test_hooks.emit("start estimates are a snapshot of the queue, not a reservation")

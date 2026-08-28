@@ -79,6 +79,35 @@ def qualified_name(project: str, name: str) -> str:
     return f"{project}.{name}"
 
 
+def project_of(job_name: str) -> str | None:
+    """Recover the project from a job name Slurm reported.
+
+    The inverse of :func:`qualified_name`, and it is exact rather than a
+    guess: a project name may not contain a dot, so the first dot is the
+    separator and nothing else can be.
+
+    Exists because ``hpc3-watch`` is handed job IDs, not run documents, and
+    a cap now belongs to a project rather than to the workspace. Accounting
+    already carries the answer -- the prefix is there precisely so a shared
+    ``squeue`` is self-describing -- so watch reads it rather than
+    re-deriving it from the ledger.
+
+    Args:
+        job_name: The name as ``sacct`` reported it.
+
+    Returns:
+        The project prefix, or None when the name carries none. None means
+        the job was not submitted by this package, which is a real case on a
+        shared cluster and reported rather than raised: a job with no
+        declared project has no declared cap, and saying so is honest where
+        checking it against someone else's cap would not be.
+    """
+    project, separator, _ = job_name.partition(".")
+    if separator == "" or project == "":
+        return None
+    return project
+
+
 def script_dir(root: str, project: str) -> str:
     """Locate a project's batch scripts.
 
@@ -131,6 +160,7 @@ def require_root(parsed_root: str) -> str:
 __all__ = [
     "MAX_PROJECT_LENGTH",
     "log_dir",
+    "project_of",
     "qualified_name",
     "require_project",
     "require_root",
