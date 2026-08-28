@@ -55,9 +55,7 @@ def test_calibrator_low_mem_branch() -> None:
     captured: list[OrchestratorConfig] = []
 
     class _Orch:
-        def __init__(
-            self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
-        ) -> None:
+        def __init__(self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig) -> None:
             _ = runner
             captured.append(config)
 
@@ -144,9 +142,7 @@ def test_calibrator_high_mem_branch() -> None:
     captured: list[OrchestratorConfig] = []
 
     class _Orch:
-        def __init__(
-            self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
-        ) -> None:
+        def __init__(self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig) -> None:
             _ = runner
             captured.append(config)
 
