@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "2d184b68945e9ba9dcfa594d5dad95fe923a0f9f",
+  "git_commit": "ebbe54a0ae9da570e3db1b2d0978b33f4d3f908a",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -198,6 +198,18 @@
     {
       "module": "model_trainer.cli.legacy_gemm_probe",
       "attribute": "legacy_run_record"
+    },
+    {
+      "module": "platform_ml.determinism",
+      "attribute": "remove_cublaslt_split_k"
+    },
+    {
+      "module": "platform_ml.determinism",
+      "attribute": "restrict_attention_to_math"
+    },
+    {
+      "module": "platform_core.determinism_env",
+      "attribute": "CUBLASLT_WORKSPACE_ENV_VAR"
     }
   ],
   "smoke_commands": [
@@ -210,7 +222,9 @@
     "/opt/env/bin/python -m model_trainer.cli.sdpa_probe --device cpu --out /tmp/sdpa.json",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.train_cost import TRAIN_SHAPES, run_train_step, train_step_setup; row = [s for s in TRAIN_SHAPES if s['name'] == 'gate-tiny-b1-s64'][0]; run_train_step(train_step_setup(row, 'cpu'))\"",
     "/opt/env/bin/python -c \"from platform_core.determinism_record import UNPINNED_STACK, determinism_record; from model_trainer.core.run_fingerprint import capture_run_fingerprint; f = capture_run_fingerprint('cpu', determinism_record(UNPINNED_STACK, {})); assert f['host']['logical_cores'] >= 1, f['host']; assert [p['name'] for p in f['packages']] == ['numpy', 'torch', 'transformers'], f['packages']\"",
-    "/opt/env/bin/python -m model_trainer.cli.legacy_gemm_probe --device cpu --out /tmp/lmhead.json"
+    "/opt/env/bin/python -m model_trainer.cli.legacy_gemm_probe --device cpu --out /tmp/lmhead.json",
+    "/opt/env/bin/python -c \"import torch.backends.cuda as c; from model_trainer.core._test_hooks import _default_apply_determinism as pin; s = dict(pin(remove_split_k=True, math_attention=True)['settings']); assert s['cublaslt_split_k'] == 'removed', s; assert s['sdpa_backends'] == 'math', s; assert (c.math_sdp_enabled(), c.flash_sdp_enabled(), c.mem_efficient_sdp_enabled(), c.cudnn_sdp_enabled()) == (True, False, False, False), 'sdp switches did not take'\"",
+    "/opt/env/bin/python -c \"from model_trainer.cli.known_answer_probe import probe_determinism; s = dict(probe_determinism('cpu')['settings']); assert 'cublaslt_split_k' not in s, s; assert 'sdpa_backends' not in s, s\""
   ],
   "labels": {
     "org.corvis.project": "mi",
