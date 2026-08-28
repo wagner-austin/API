@@ -401,16 +401,22 @@ class TestTheCommittedSpec:
         a silent widening, which is the exactness earning its keep: the spec
         grew, and someone had to look.
 
-        THE LOOK WAS SKIPPED AFTER THAT, AND THIS LIST WENT STALE. Images
-        v17 through v21 added nineteen more symbols -- the trace, SDPA,
-        forward-cost, training-step and legacy-GEMM probes, and the two
-        ``environment_record`` captures that commit ``c0ce20b7`` baked in so
-        a fingerprint could carry its host and packages. Each spec edit left
-        this assertion failing and each was committed anyway, so the suite
-        was red on ``main`` and the signal it exists to give was being
-        stepped over rather than read. The list below is the whole of
-        ``specs/abl-image.json`` as of v21; the ritual only works if the
-        failure is answered in the same commit that causes it.
+        THE LOOK WAS SKIPPED AFTER THAT, AND THIS LIST WENT STALE. The spec
+        and this assertion last agreed at six symbols in ``108e3ef4``. They
+        parted at ``d6cd17d7`` -- image v13, the forward trace -- and NINE
+        further spec-growing commits followed without this list moving:
+        v13, v14, v15, v16, v17, v18, v19, v20, v21, ending at twenty-five
+        symbols against six asserted. The additions are the trace, SDPA,
+        forward-cost, training-step and legacy-GEMM probes, plus the two
+        ``environment_record`` captures ``c0ce20b7`` baked in so a run
+        fingerprint could carry its host and packages.
+
+        Every one of those nine commits left this assertion failing and was
+        committed anyway, so ``make check`` in this package was red on
+        ``main`` across nine changes and the signal this test exists to give
+        was being stepped over rather than read. The list below is the whole
+        of ``specs/abl-image.json`` as of v21; the ritual only works if the
+        failure is answered in the commit that causes it.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
         symbols = sorted(
