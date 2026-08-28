@@ -101,34 +101,43 @@ re-confirmed the same day (run -225643 attempt 1). This unlocks the
 [[larder-plan]] harvest atom: teleport ON the container, one pickup
 command, done.[^10]
 
-## Death costs about half the carried inventory (OPERATOR-CONFIRMED 2026-08-28)
+## Death halves every inventory slot, rounding up — and the one mine death wiped it all (WIRE-VERIFIED 2026-08-28)
 
-Found by the first `make corpus-audit` sweep and confirmed by the
-user the same day ("a death causes you to lose half inventory or
-so").[^14] Every radar-book negative drift in the corpus lands on a
-run with deaths, and the inventory samples bracketing arterial's
-three 2026-08-26 deaths (`runs/bot/desert/bot-20260826-182204`) show
-the loss directly:[^13]
+Found by the first `make corpus-audit` sweep, confirmed by the user
+("a death causes you to lose half inventory or so"),[^14] then pinned
+frame-exact by decoding the raw 0x49 inventory snapshots bracketing
+every self 0x41 in the four death-run captures:[^13]
 
-| death | last pre-death sample (armor,dual,missile,homing,radar) | first post-death | pattern |
-|---|---|---|---|
-| 18:37:41 | 45, 9, 45, 37, 24 | 23, 4, 23, 19, 12 | ~half each |
-| 18:42:01 | 40, 33, 40, 39, 38 | 20, 15, 20, 18, 19 | ~half each |
-| 18:45:58 | 35, 35, 35, 35, 29 | 0, 0, 0, 0, 0 | zeroed |
+| capture | death | last 0x49 before (armor,dual,missile,homing,radar) | first 0x49 after | kill type |
+|---|---|---|---|---|
+| desert 18:22 | frame 2609 | 45, 9, 45, 37, 24 | 23, 4, 23, 19, 12 | tank (719) |
+| desert 18:22 | frame 3248 | 40, 33, 40, 39, 38 | 20, 15, 20, 18, 19 | tank (719) |
+| desert 18:22 | frame 3840 | 35, 35, 35, 35, 29 | **0, 0, 0, 0, 0** | **MINE** (team 3) |
+| artax 08:48 | frame 4699 | 25, 25, 25, 25, 24 | 13, 10, 13, 13, 12 | tank (569) |
+| 08-26 00:39 | frame 8114 | 25, 18, 25, 25, 9 | 13, 4, 13, 11, 5 | tank (709) |
+| 08-03 18:09 | frame 4453 | 25, 17, 25, 25, 11 | 13, 7, 13, 12, 6 | tank (2678) |
 
-The law: **each slot loses ~half on death** ("or so" -- the exact
-rounding stays unresolved; shots fired between the last sample and
-the death blur the halving base by a few units). The third death's
-ZERO samples are best read as a respawn re-sync race, not a total
-wipe, given the operator's ruling; a controlled capture with a tight
-sample cadence would settle both loose ends. Consequences: the
-ammo/radar books do not model death loss, so a run with deaths shows
-a matching negative `radar_drift` in the corpus audit (expected, not
-a tracking bug), and dying is even more expensive than the rank loss
-alone -- half the restock walks with you.
+The law, from the slots shooting cannot consume (armor, missile,
+radar — a dual+homing loadout never spends them): **a tank-kill death
+sets every slot to ceil(n/2)** — 45→23, 40→20, 25→13 (x6), 24→12
+(x2), 38→19, 9→5, 11→6, zero exceptions across five deaths. The
+dual/homing columns agree once shots served between the last snapshot
+and the death are allowed. The mine death is DIFFERENT: everything
+went to a genuine zero — rebuilt afterwards purely through 0x67
+pickup gains (0 → +5 homing → +9 armor → ...), so it was no respawn
+re-sync race. One sample cannot yet separate "mine kills wipe
+everything" from "a third death in one session wipes everything";
+the next mine death on a first-death session decides it.
 
-[^13]: `tankpit-corpus-audit` over `runs/bot` 2026-08-28: 436 runs audited, drift flags only on death-runs (artax 08-26 08:48 drift -5 / 1 death; 08-03 18:09 -5 / 1; 08-26 00:39 -3 / 1; desert 08-26 18:22 -60 / 3 deaths) plus two small positive drifts (+2, +7) on 08-13 death-free runs, unexplained and minor. Inventory rows above are verbatim `inventory_sample` diagnostics bracketing each `self_deactivated` receipt.
-[^14]: user (Austin), 2026-08-28 -- "a death causes you to lose half inventory or so", confirming the corpus-audit inference the same day it was recorded.
+Consequences: the ammo/radar books do not model death loss, so a run
+with deaths shows a matching negative `radar_drift` in the corpus
+audit (expected, not a tracking bug); dying costs rank AND half the
+restock — and possibly ALL of it to a mine; and a victim we kill
+respawns half-stocked, so immediate re-pressure after a kill is
+disproportionately favorable.
+
+[^13]: Frame-exact decode 2026-08-28: `decode_session_frames` + `decode_message` over `runs/bot/desert/bot-20260826-182204`, `runs/bot/artax/bot-20260826-084859`, `runs/bot/bot-20260826-003928`, `runs/bot/bot-20260803-180918` capture sessions — for each 0x41 naming the session's own tank (ids 716/601/601/1301), the nearest 0x49 on each side, counts read per `decode_inventory` (`byte & 127`). Mine attribution via the 0x41 killer sentinel (`killer_id_raw >= 65530`, residual = mine team; see [[deactivation-format]]). Corpus context: `tankpit-corpus-audit` over 436 runs put drift flags ONLY on death-runs (-5, -5, -3, -60) plus two minor unexplained +2/+7 on 08-13.
+[^14]: user (Austin), 2026-08-28 -- "a death causes you to lose half inventory or so", confirming the corpus-audit inference the same day; the frame decode then fixed "or so" to ceil(n/2) for tank kills.
 
 ## "Inventory full" wire signal
 
