@@ -302,6 +302,11 @@ so the shapes had to live somewhere neither imports.[^guard]
       "means": "The running ammo account between 0x49 snapshots."
     },
     {
+      "id": "ammo-book-ammodeathcontract",
+      "code": "tankpit_bot.ledger.ammo_book:AmmoDeathContract",
+      "law": "Structural invariants on a booked death penalty."
+    },
+    {
       "id": "ammo-book-ammoshotcontract",
       "code": "tankpit_bot.ledger.ammo_book:AmmoShotContract",
       "law": "Structural invariants on a counted shot echo."
@@ -354,6 +359,11 @@ so the shapes had to live somewhere neither imports.[^guard]
       "id": "ammo-book-make-ammo-book",
       "code": "tankpit_bot.ledger.ammo_book:make_ammo_book",
       "law": "Return an empty ammo book."
+    },
+    {
+      "id": "ammo-book-record-ammo-death",
+      "code": "tankpit_bot.ledger.ammo_book:record_ammo_death",
+      "law": "Apply the death penalty to the book's expectation baseline."
     },
     {
       "id": "ammo-book-record-ammo-enemy-shot",

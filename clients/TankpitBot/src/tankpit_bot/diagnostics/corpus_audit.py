@@ -68,9 +68,10 @@ class RunAuditDict(TypedDict):
             produces zero.
         reaims_within_30s: Teleport aims repeated at a tile that
             displaced within the re-aim window.
-        radar_drift: Final extra-radar count minus the book's
-            prediction (first + gains - extra-consuming dispatches);
-            0 when the inventory tracking is sound.
+        radar_drift: Final extra-radar count minus the running
+            expectation (first sample, plus gains, minus
+            extra-consuming dispatches, death-penalized per the
+            wire-verified halving law); 0 when the tracking is sound.
         physics_divergences: ``physics_divergence`` receipts (the fuel
             book's own residual detector).
         kind_counts: Every diagnostic kind observed, tallied.
@@ -141,10 +142,10 @@ class _WireTruth:
         self.fast_shots = 0
         self.reaims = 0
         self.divergences = 0
-        self.radar_extra_dispatches = 0
-        self.radar_gain = 0
-        self.radar_first = -1
+        self.radar_expected = -1
         self.radar_last = -1
+        self.radar_max_seen = -1
+        self.radar_mismatch = 0
         self.kind_counts: Counter[str] = Counter()
         self._last_shot_s: float | None = None
         self._displaced_at: dict[tuple[int, int], float] = {}
@@ -173,6 +174,17 @@ class _WireTruth:
             return True
         if kind == "self_deactivated":
             self.deaths += 1
+            # Death penalty on the radar expectation (wire-verified:
+            # ceil(n/2) on tank kills, zero on the mine sentinel).
+            # Archives predate the is_mine_kill field; there the
+            # rebased mine-team killer ids 0-3 identify a mine death
+            # (real tank ids sit in the hundreds).
+            if self.radar_expected != -1:
+                killer = fields.get("killer_id")
+                mine = fields.get("is_mine_kill") is True or (
+                    isinstance(killer, int) and 0 <= killer <= 3
+                )
+                self.radar_expected = 0 if mine else (self.radar_expected + 1) // 2
             return True
         if kind == "teleport_displacement":
             key = (
@@ -197,15 +209,42 @@ class _WireTruth:
         if kind == "physics_divergence":
             self.divergences += 1
         elif kind == "radar_dispatch":
-            if require_bool_field(fields, "uses_extra"):
-                self.radar_extra_dispatches += 1
+            if require_bool_field(fields, "uses_extra") and self.radar_expected != -1:
+                self.radar_expected -= 1
         elif kind == "equipment_gain":
-            self.radar_gain += require_int_field(fields, "radar")
+            gained = require_int_field(fields, "radar")
+            if self.radar_expected != -1:
+                # The server clamps gains at the rank cap. Caps live on
+                # the ``20 + 5 * rank`` ladder, so the highest observed
+                # sample rounded UP to the ladder is the cap estimate
+                # (samples are dense -- every count change emits its
+                # own 0x49). A run that sat at cap 25 while gains kept
+                # arriving overcounted +24 before this clamp existed
+                # (artax 2026-08-26 08:48).
+                cap_estimate = max(20, (self.radar_max_seen + 4) // 5 * 5)
+                self.radar_expected = min(
+                    self.radar_expected + gained,
+                    max(cap_estimate, self.radar_expected),
+                )
+                # Gain and sample are emitted atomically by the same
+                # update, but pre-2026-08-28 archives wrote the sample
+                # FIRST -- a run ending on that pair left a stale
+                # +gain mismatch. Recomputing here retro-explains it;
+                # in the fixed order the following sample lands the
+                # same answer.
+                self.radar_mismatch = self.radar_last - self.radar_expected
         elif kind == "inventory_sample":
             radar = require_int_field(fields, "radar")
-            if self.radar_first == -1:
-                self.radar_first = radar
+            if self.radar_expected == -1:
+                self.radar_expected = radar
             self.radar_last = radar
+            self.radar_max_seen = max(self.radar_max_seen, radar)
+            # Drift is evaluated AT samples -- the only moments the
+            # wire states the count -- so trailing dispatches whose
+            # confirming 0x49 never arrived before teardown cannot
+            # fake a drift (artax 08-26 08:48 read +7 from exactly
+            # that end-of-stream skew).
+            self.radar_mismatch = radar - self.radar_expected
 
     def consume(self, record: RuntimeEventRecordDict) -> None:
         """Fold one event record into the tallies.
@@ -225,16 +264,19 @@ class _WireTruth:
             self._last_shot_s = t_s
 
     def radar_drift(self) -> int:
-        """Return the radar book's prediction error.
+        """Return the radar book's prediction error at the last sample.
+
+        The expectation runs event-by-event from the first sample:
+        gains add (cap-clamped at the highest observed count), paid
+        dispatches subtract, and deaths apply the wire-verified
+        penalty (ceil-halved, or zeroed on a mine kill) -- so a
+        death-run no longer fakes a drift.
 
         Returns:
-            Final count minus (first + gains - extra-consuming
-            dispatches), or 0 when the run had no inventory samples.
+            The last sample minus the expectation at that sample, or
+            0 when the run had no inventory samples.
         """
-        if self.radar_first == -1:
-            return 0
-        expected = self.radar_first + self.radar_gain - self.radar_extra_dispatches
-        return self.radar_last - expected
+        return self.radar_mismatch
 
 
 def _collect_flags(audit: RunAuditDict) -> list[str]:

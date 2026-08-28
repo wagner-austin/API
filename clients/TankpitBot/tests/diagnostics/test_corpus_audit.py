@@ -302,6 +302,122 @@ class TestAuditEventsArtifact:
         assert audit["radar_drift"] == 0
         assert audit["flags"] == []
 
+    def test_a_tank_kill_death_halves_the_radar_expectation(self, tmp_path: Path) -> None:
+        """A death-run with sound tracking reads drift 0, not a flag.
+
+        The first sweep flagged every death-run because the linear
+        formula could not model the wire-verified halving law; the
+        wrap-producer's receipt (no killer_id, no mine flag) takes the
+        halving arm too.
+        """
+        source = _write_run(
+            tmp_path / "death.events.jsonl",
+            [
+                _inventory("2026-08-05T00:00:00", 24),
+                _event(
+                    "2026-08-05T00:00:02",
+                    "DIAGNOSTIC",
+                    "diagnostic_kind=self_deactivated",
+                    diagnostic_kind="self_deactivated",
+                    origin="fuel_underflow",
+                ),
+                _inventory("2026-08-05T00:00:04", 12),
+            ],
+        )
+
+        audit = audit_events_artifact(source)
+
+        assert audit["radar_drift"] == 0
+        assert audit["flags"] == []
+
+    def test_a_mine_death_zeroes_the_radar_expectation(self, tmp_path: Path) -> None:
+        """The mine sentinel wipes the expectation; archives without the
+        is_mine_kill field are identified by the rebased team killer id."""
+        source = _write_run(
+            tmp_path / "mine.events.jsonl",
+            [
+                _inventory("2026-08-05T00:00:00", 29),
+                _event(
+                    "2026-08-05T00:00:02",
+                    "DIAGNOSTIC",
+                    "diagnostic_kind=self_deactivated",
+                    diagnostic_kind="self_deactivated",
+                    origin="protocol_0x41",
+                    killer_id=3,
+                ),
+                _inventory("2026-08-05T00:00:04", 0),
+            ],
+        )
+
+        audit = audit_events_artifact(source)
+
+        assert audit["radar_drift"] == 0
+        assert audit["flags"] == []
+
+    def test_activity_before_the_first_sample_feeds_no_expectation(self, tmp_path: Path) -> None:
+        """Gains and paid dispatches before the anchor are unbookable."""
+        source = _write_run(
+            tmp_path / "preanchor.events.jsonl",
+            [
+                _event(
+                    "2026-08-05T00:00:00",
+                    "DIAGNOSTIC",
+                    "diagnostic_kind=equipment_gain",
+                    diagnostic_kind="equipment_gain",
+                    armor=0,
+                    dual=0,
+                    missile=0,
+                    homing=0,
+                    radar=5,
+                ),
+                _event(
+                    "2026-08-05T00:00:02",
+                    "DIAGNOSTIC",
+                    "diagnostic_kind=radar_dispatch",
+                    diagnostic_kind="radar_dispatch",
+                    uses_extra=True,
+                ),
+                _inventory("2026-08-05T00:00:04", 20),
+                _inventory("2026-08-05T00:00:06", 20),
+            ],
+        )
+
+        audit = audit_events_artifact(source)
+
+        assert audit["radar_drift"] == 0
+        assert audit["flags"] == []
+
+    def test_an_archive_ending_on_a_sample_gain_pair_reads_zero(self, tmp_path: Path) -> None:
+        """A pre-reorder archive's trailing gain retro-explains its sample.
+
+        Gain and sample are emitted atomically, but archives before
+        2026-08-28 wrote the sample first -- a run ending on that pair
+        (desert 08-26 15:51 read +3) must not flag.
+        """
+        source = _write_run(
+            tmp_path / "pair-end.events.jsonl",
+            [
+                _inventory("2026-08-05T00:00:00", 20),
+                _inventory("2026-08-05T00:00:02", 23),
+                _event(
+                    "2026-08-05T00:00:02",
+                    "DIAGNOSTIC",
+                    "diagnostic_kind=equipment_gain",
+                    diagnostic_kind="equipment_gain",
+                    armor=0,
+                    dual=0,
+                    missile=0,
+                    homing=0,
+                    radar=3,
+                ),
+            ],
+        )
+
+        audit = audit_events_artifact(source)
+
+        assert audit["radar_drift"] == 0
+        assert audit["flags"] == []
+
     def test_a_run_without_inventory_samples_has_zero_drift(self, tmp_path: Path) -> None:
         """No samples means no book to disagree with."""
         source = _write_run(

@@ -15,6 +15,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
+from tankpit_bot.ledger.ammo_book import record_ammo_death
 from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_NAMES
 from tankpit_bot.protocol.decorations import decoration_names_from_state
 from tankpit_bot.runtime_logging import (
@@ -268,6 +269,7 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
             "msg_type": 0x41,
             "victim_id": int(vid),
             "killer_id": int(kid),
+            "is_mine_kill": bool(is_mine),
         }:
             # 0x41 starts the corpse window. Empirical capture
             # 2026-06-20: 0x58 TankRemove arrives ~22 s later; in
@@ -286,13 +288,19 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
                 # receipt lands FIRST in the same drain batch
                 # (arterial 2026-08-26 18:37:41: wrap, then 0x41 one
                 # message later), so an already-raised flag means this
-                # death is booked — one death, one receipt.
+                # death is booked — one death, one receipt. The ammo
+                # book takes the death penalty here regardless of the
+                # dedup flag: only the 0x41 carries the mine sentinel,
+                # and exactly one self 0x41 arrives per death
+                # (wire-verified halving law, [[equipment-system]]).
+                record_ammo_death(book=ws.ammo_book, mine_kill=is_mine)
                 if not ws.self_deactivated:
                     ws.self_deactivated = True
                     emit_diagnostic(
                         diagnostic_kind="self_deactivated",
                         origin="protocol_0x41",
                         killer_id=kid,
+                        is_mine_kill=is_mine,
                     )
                     log.info("SELF DEACTIVATED: killed by %d", kid)
                 return True

@@ -130,8 +130,21 @@ def update_inventory_from_gain(ws: WorldService, gained: list[int]) -> list[Inve
         List of inventory changes detected.
     """
     record_ammo_gain(book=ws.ammo_book)
+    # Cause before effect in the events stream: the gain diagnostic
+    # lands BEFORE the inventory sample it explains. The old order
+    # (sample first) made every gain look like an unexplained rise for
+    # one event to any stream-order consumer (the corpus audit's
+    # radar expectation oscillated +2..+4 on every pickup).
+    emit_diagnostic(
+        diagnostic_kind="equipment_gain",
+        armor=gained[0],
+        dual=gained[1],
+        missile=gained[2],
+        homing=gained[3],
+        radar=gained[4],
+    )
     old = ws.inventory_state
-    changes = _apply_inventory_state(
+    return _apply_inventory_state(
         ws,
         InventoryState(
             armor_shields=InventoryItem(
@@ -156,15 +169,6 @@ def update_inventory_from_gain(ws: WorldService, gained: list[int]) -> list[Inve
             ),
         ),
     )
-    emit_diagnostic(
-        diagnostic_kind="equipment_gain",
-        armor=gained[0],
-        dual=gained[1],
-        missile=gained[2],
-        homing=gained[3],
-        radar=gained[4],
-    )
-    return changes
 
 
 def update_inventory_from_full_signal(ws: WorldService) -> list[InventoryChange]:

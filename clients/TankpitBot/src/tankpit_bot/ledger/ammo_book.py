@@ -177,6 +177,58 @@ def record_ammo_gain(*, book: AmmoBookDict) -> None:
     book["gains"] += 1
 
 
+class AmmoDeathContract:
+    """Structural invariants on a booked death penalty."""
+
+    @property
+    def name(self) -> str:
+        """Name of the contract."""
+        return "ammo_book_death"
+
+    def check(self, *, book: AmmoBookDict, mine_kill: bool) -> None:
+        """Validate the book before applying the death transform.
+
+        Args:
+            book: The book being updated.
+            mine_kill: The 0x41 mine-sentinel attribution.
+
+        Raises:
+            LedgerInvariantError: If the counter vector is malformed.
+        """
+        require(len(book["shots"]) == 5, LedgerInvariantError, shots=repr(book["shots"]))
+
+
+@enforce_contract(AmmoDeathContract())
+def record_ammo_death(*, book: AmmoBookDict, mine_kill: bool) -> None:
+    """Apply the death penalty to the book's expectation baseline.
+
+    Wire-verified 2026-08-28 across all six corpus deaths
+    ([[equipment-system]]): a tank-kill death sets every slot to
+    ``ceil(n/2)`` (the unconsumable armor/missile/radar slots proved
+    it with zero exceptions), and the one observed mine death zeroed
+    every slot outright (rebuilt afterwards purely via 0x67 gains).
+    Without this transform every death's next 0x49 snapshot read as
+    an infeasible fall and burned a false ammo divergence (three
+    deaths, three divergences, desert 2026-08-26).
+
+    Shots fired before the death in the same interval stay counted:
+    halving the pre-shot baseline is always at least as permissive as
+    the server's halving of the post-shot count, so feasibility is
+    preserved without re-splitting the interval.
+
+    Args:
+        book: The book being updated.
+        mine_kill: True when the 0x41 carried the mine sentinel.
+    """
+    last_counts = book["last_counts"]
+    if last_counts is None:
+        return
+    if mine_kill:
+        book["last_counts"] = [0, 0, 0, 0, 0]
+    else:
+        book["last_counts"] = [(count + 1) // 2 for count in last_counts]
+
+
 @enforce_contract(AmmoSnapshotContract())
 def record_ammo_snapshot(*, book: AmmoBookDict, counts: list[int]) -> AmmoVerdictDict | None:
     """Reconcile one 0x49 snapshot against the recorded activity.
@@ -223,10 +275,12 @@ __all__ = [
     "SLOT_RADAR",
     "AmmoActivityContract",
     "AmmoBookDict",
+    "AmmoDeathContract",
     "AmmoShotContract",
     "AmmoSnapshotContract",
     "AmmoVerdictDict",
     "make_ammo_book",
+    "record_ammo_death",
     "record_ammo_enemy_shot",
     "record_ammo_gain",
     "record_ammo_scan",

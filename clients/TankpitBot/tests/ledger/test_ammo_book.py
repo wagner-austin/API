@@ -8,6 +8,7 @@ from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.ledger.ammo_book import (
     AmmoSnapshotContract,
     make_ammo_book,
+    record_ammo_death,
     record_ammo_gain,
     record_ammo_scan,
     record_ammo_shot,
@@ -49,6 +50,68 @@ def test_unexplained_fall_is_a_divergence() -> None:
     assert verdict["balanced"] is False
     assert "dual fell 3 with only 0 uses recorded" in verdict["detail"]
     assert book["divergences"] == 1
+
+
+def test_a_tank_kill_death_halves_the_baseline_rounding_up() -> None:
+    """The wire-verified law: every slot goes to ceil(n/2) on death.
+
+    Without the transform, the desert 2026-08-26 run burned one false
+    ammo divergence per death (three deaths, three divergences): the
+    post-death 0x49 read as an infeasible fall. The odd counts pin the
+    round-half-UP direction (45->23, 9->5, 37->19).
+    """
+    book = make_ammo_book()
+    record_ammo_snapshot(book=book, counts=[45, 9, 44, 37, 24])
+
+    record_ammo_death(book=book, mine_kill=False)
+
+    assert book["last_counts"] == [23, 5, 22, 19, 12]
+    verdict = record_ammo_snapshot(book=book, counts=[23, 5, 22, 19, 12])
+    if verdict is None:
+        raise AssertionError("expected a snapshot verdict")
+    assert verdict["balanced"] is True
+
+
+def test_shots_before_the_death_stay_feasible() -> None:
+    """Halving the pre-shot baseline never under-allows the real fall.
+
+    Fire one dual from 9, die: the server halves 8 to 4; the book
+    halves 9 to 5 and still holds one recorded shot, so the snapshot
+    at 4 balances.
+    """
+    book = make_ammo_book()
+    record_ammo_snapshot(book=book, counts=[25, 9, 25, 25, 20])
+    record_ammo_shot(book=book, weapon=1)
+
+    record_ammo_death(book=book, mine_kill=False)
+
+    verdict = record_ammo_snapshot(book=book, counts=[13, 4, 13, 13, 10])
+    if verdict is None:
+        raise AssertionError("expected a snapshot verdict")
+    assert verdict["balanced"] is True
+
+
+def test_a_mine_death_zeroes_the_baseline() -> None:
+    """The one observed mine death wiped every slot outright."""
+    book = make_ammo_book()
+    record_ammo_snapshot(book=book, counts=[35, 35, 35, 35, 29])
+
+    record_ammo_death(book=book, mine_kill=True)
+
+    assert book["last_counts"] == [0, 0, 0, 0, 0]
+    verdict = record_ammo_snapshot(book=book, counts=[0, 0, 0, 0, 0])
+    if verdict is None:
+        raise AssertionError("expected a snapshot verdict")
+    assert verdict["balanced"] is True
+
+
+def test_a_death_before_any_snapshot_is_a_no_op() -> None:
+    """With no anchoring 0x49 there is no baseline to penalize."""
+    book = make_ammo_book()
+
+    record_ammo_death(book=book, mine_kill=False)
+
+    assert book["last_counts"] is None
 
 
 def test_rise_requires_an_equipment_gain() -> None:
@@ -102,11 +165,16 @@ def test_malformed_snapshots_are_rejected() -> None:
 
 def test_contract_names_identify_the_invariants() -> None:
     """Contract names appear in enforcement errors; pin them."""
-    from tankpit_bot.ledger.ammo_book import AmmoActivityContract, AmmoShotContract
+    from tankpit_bot.ledger.ammo_book import (
+        AmmoActivityContract,
+        AmmoDeathContract,
+        AmmoShotContract,
+    )
 
     assert AmmoSnapshotContract().name == "ammo_book_snapshot"
     assert AmmoShotContract().name == "ammo_book_shot"
     assert AmmoActivityContract().name == "ammo_book_activity"
+    assert AmmoDeathContract().name == "ammo_book_death"
 
 
 def test_negative_weapon_byte_is_rejected() -> None:

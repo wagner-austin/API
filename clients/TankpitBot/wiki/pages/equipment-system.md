@@ -129,12 +129,13 @@ re-sync race. One sample cannot yet separate "mine kills wipe
 everything" from "a third death in one session wipes everything";
 the next mine death on a first-death session decides it.
 
-Consequences: the ammo/radar books do not model death loss, so a run
-with deaths shows a matching negative `radar_drift` in the corpus
-audit (expected, not a tracking bug); dying costs rank AND half the
-restock — and possibly ALL of it to a mine; and a victim we kill
-respawns half-stocked, so immediate re-pressure after a kill is
-disproportionately favorable.
+Consequences: the ammo book and the corpus audit's radar expectation
+now MODEL the death penalty (`record_ammo_death`: ceil-halve on a
+tank kill, zero on the mine sentinel, applied at the self 0x41 —
+2026-08-28), so death-runs no longer burn false ammo divergences or
+drift flags; dying costs rank AND half the restock — and possibly ALL
+of it to a mine; and a victim we kill respawns half-stocked, so
+immediate re-pressure after a kill is disproportionately favorable.
 
 [^13]: Frame-exact decode 2026-08-28: `decode_session_frames` + `decode_message` over `runs/bot/desert/bot-20260826-182204`, `runs/bot/artax/bot-20260826-084859`, `runs/bot/bot-20260826-003928`, `runs/bot/bot-20260803-180918` capture sessions — for each 0x41 naming the session's own tank (ids 716/601/601/1301), the nearest 0x49 on each side, counts read per `decode_inventory` (`byte & 127`). Mine attribution via the 0x41 killer sentinel (`killer_id_raw >= 65530`, residual = mine team; see [[deactivation-format]]). Corpus context: `tankpit-corpus-audit` over 436 runs put drift flags ONLY on death-runs (-5, -5, -3, -60) plus two minor unexplained +2/+7 on 08-13.
 [^14]: user (Austin), 2026-08-28 -- "a death causes you to lose half inventory or so", confirming the corpus-audit inference the same day; the frame decode then fixed "or so" to ceil(n/2) for tank kills.
