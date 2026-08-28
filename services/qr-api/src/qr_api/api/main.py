@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
-from platform_core.fastapi import install_exception_handlers_fastapi
-from platform_core.json_utils import (
-    InvalidJsonError,
+from platform_core.fastapi import (
+    install_exception_handlers_fastapi,
     register_json_error_handler,
 )
+from platform_core.json_utils import InvalidJsonError
 from platform_core.logging import setup_logging
 from platform_workers.redis import RedisStrProto, redis_for_kv
 

@@ -22,7 +22,8 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 from platform_core.errors import AppError, ErrorCode
-from platform_core.json_utils import JSONTypeError, register_json_error_handler
+from platform_core.fastapi import register_json_error_handler
+from platform_core.json_utils import JSONTypeError
 
 _HandlerType = Callable[[Request, Exception], Response | Awaitable[Response]]
 

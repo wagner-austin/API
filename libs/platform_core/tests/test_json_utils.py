@@ -11,7 +11,7 @@ from starlette.responses import Response
 
 from platform_core._asgi_protocols import _JSONResponseProto, _RequestProto
 from platform_core.errors import AppError, ErrorCode
-from platform_core.fastapi import install_exception_handlers
+from platform_core.fastapi import install_exception_handlers, register_json_error_handler
 from platform_core.json_utils import (
     InvalidJsonError,
     JSONObject,
@@ -29,7 +29,6 @@ from platform_core.json_utils import (
     optional_float,
     optional_int,
     optional_str,
-    register_json_error_handler,
     require_bool,
     require_dict,
     require_float,

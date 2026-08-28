@@ -11,7 +11,7 @@ import tarfile
 from pathlib import Path
 
 import httpx
-from platform_core import DataBankClient
+from platform_core.data_bank_client import DataBankClient
 
 from platform_ml import _test_hooks
 from platform_ml._test_hooks import _CreateTarballProtocol

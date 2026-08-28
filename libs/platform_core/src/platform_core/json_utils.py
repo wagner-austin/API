@@ -1,13 +1,9 @@
 from __future__ import annotations
 
 import json as _json_module
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from json import JSONDecodeError
 from typing import Protocol
-
-from fastapi import FastAPI
-from fastapi.responses import Response
-from starlette.requests import Request
 
 JSONValue = dict[str, "JSONValue"] | list["JSONValue"] | str | int | float | bool | None
 
@@ -291,25 +287,9 @@ def optional_float(obj: JSONObject, key: str) -> float | None:
     raise JSONTypeError(f"Field '{key}' must be a number, got {type(value).__name__}")
 
 
-def register_json_error_handler(
-    app: FastAPI, *, detail: str = "Invalid JSON body"
-) -> Callable[[Request, Exception], Response | Awaitable[Response]]:
-    handler_type = Callable[[Request, Exception], Response | Awaitable[Response]]
-    from platform_core.errors import AppError, ErrorCode
-
-    def _handler(_: Request, exc: Exception) -> Response:
-        if isinstance(exc, (InvalidJsonError, JSONDecodeError)):
-            raise AppError(code=ErrorCode.INVALID_INPUT, message=detail, http_status=400) from exc
-        raise exc
-
-    handler: handler_type = _handler
-    app.add_exception_handler(InvalidJsonError, handler)
-    app.add_exception_handler(JSONDecodeError, handler)
-    return handler
-
-
 __all__ = [
     "InvalidJsonError",
+    "JSONDecodeError",
     "JSONObject",
     "JSONTypeError",
     "JSONValue",
@@ -327,7 +307,6 @@ __all__ = [
     "optional_float",
     "optional_int",
     "optional_str",
-    "register_json_error_handler",
     "require_bool",
     "require_dict",
     "require_float",

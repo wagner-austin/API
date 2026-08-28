@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from typing import Protocol, runtime_checkable
 
+from fastapi import FastAPI as _FastAPI
 from fastapi.responses import JSONResponse as _FastAPIJSONResponse
 from starlette.requests import Request
 from starlette.responses import Response
@@ -20,6 +22,7 @@ from platform_core.errors import (
     ErrorCodeBase,
     _code_value,
 )
+from platform_core.json_utils import InvalidJsonError, JSONDecodeError
 from platform_core.logging import get_logger
 from platform_core.request_context import request_id_var as _global_request_id_var
 
@@ -290,10 +293,49 @@ def install_exception_handlers_fastapi(
     )
 
 
+def register_json_error_handler(
+    app: _FastAPI, *, detail: str = "Invalid JSON body"
+) -> Callable[[Request, Exception], Response | Awaitable[Response]]:
+    """Translate a malformed request body into a 400 rather than a 500.
+
+    Lived in :mod:`platform_core.json_utils` until 2026-08-28. It was the
+    only thing in that module that needed a web framework, and because every
+    JSON decode in this repository goes through that module, the import
+    reached everything: the hpc3 CLI -- a command-line tool that talks to
+    Slurm over SSH -- had FastAPI, Starlette and httpx installed because it
+    validates JSON documents.
+
+    Moving one function to the module named after the framework it needs
+    leaves ``json_utils`` on the standard library alone, which is what lets
+    the comparability stack it underpins be consumed by research code that
+    has no business installing a web server.
+
+    Args:
+        app: The application to install the handlers on.
+        detail: Message the 400 carries.
+
+    Returns:
+        The installed handler, so a caller can assert on identity rather
+        than on the fact that registration was attempted.
+    """
+    handler_type = Callable[[Request, Exception], Response | Awaitable[Response]]
+
+    def _handler(_: Request, exc: Exception) -> Response:
+        if isinstance(exc, (InvalidJsonError, JSONDecodeError)):
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=detail, http_status=400) from exc
+        raise exc
+
+    handler: handler_type = _handler
+    app.add_exception_handler(InvalidJsonError, handler)
+    app.add_exception_handler(JSONDecodeError, handler)
+    return handler
+
+
 __all__ = [
     "FastAPIAppAdapter",
     "StarletteRequestProto",
     "StarletteResponseProto",
     "install_exception_handlers",
     "install_exception_handlers_fastapi",
+    "register_json_error_handler",
 ]

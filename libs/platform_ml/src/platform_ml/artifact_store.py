@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Final
 
-from platform_core import DataBankClient
+from platform_core.data_bank_client import DataBankClient
 from platform_core.data_bank_protocol import FileUploadResponse
 
 from . import _test_hooks

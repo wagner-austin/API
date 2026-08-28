@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 from platform_core.errors import AppError, ErrorCode
-from platform_core.json_utils import InvalidJsonError, load_json_str, register_json_error_handler
+from platform_core.fastapi import register_json_error_handler
+from platform_core.json_utils import InvalidJsonError, load_json_str
 from starlette.requests import Request
 
 from qr_api.api.main import create_app
