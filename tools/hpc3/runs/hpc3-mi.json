@@ -17,8 +17,8 @@
       "requeue": true,
       "checkpoint_steps": 500,
       "image": {
-        "path": "/pub/wagnera3/images/v4/abl.sif",
-        "sha256": "df841c661b9ed41a2213aec1470e2c347723be05785b15cef05d6f301cb791be",
+        "path": "/pub/wagnera3/images/v22/abl.sif",
+        "sha256": "ebb61ed05fe818de05ea171e17536e4d8c96a00409adc07ec38772e0a765e943",
         "binds": [
           "/pub/wagnera3"
         ]
