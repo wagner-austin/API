@@ -140,32 +140,35 @@ immediate re-pressure after a kill is disproportionately favorable.
 [^13]: Frame-exact decode 2026-08-28: `decode_session_frames` + `decode_message` over `runs/bot/desert/bot-20260826-182204`, `runs/bot/artax/bot-20260826-084859`, `runs/bot/bot-20260826-003928`, `runs/bot/bot-20260803-180918` capture sessions — for each 0x41 naming the session's own tank (ids 716/601/601/1301), the nearest 0x49 on each side, counts read per `decode_inventory` (`byte & 127`). Mine attribution via the 0x41 killer sentinel (`killer_id_raw >= 65530`, residual = mine team; see [[deactivation-format]]). Corpus context: `tankpit-corpus-audit` over 436 runs put drift flags ONLY on death-runs (-5, -5, -3, -60) plus two minor unexplained +2/+7 on 08-13.
 [^14]: user (Austin), 2026-08-28 -- "a death causes you to lose half inventory or so", confirming the corpus-audit inference the same day; the frame decode then fixed "or so" to ceil(n/2) for tank kills.
 
-## Equipment spawn stability: practice tiles persist, main-map tiles do not (MINED 2026-08-28)
+## Equipment spawns cluster at persistent HOTSPOTS (FULL-CORPUS MINED 2026-08-28)
 
-Belief-snapshot mining across the farm corpus (equipment containers =
-`is_fuel: false` entries in `entity_alignment_sample` beliefs):[^15]
+The operator's hypothesis ("its probably hotspot based") holds on
+both maps. Full-corpus mining of own-viewport equipment sightings
+(`entity_alignment_sample` beliefs, `is_fuel: false`, 273 field01
+runs + 12 field05 runs):[^15]
 
-- **Practice (field01): tile-stable across days.** One 5-hour session
-  mapped 382 distinct equipment tiles; a run 21 hours later saw 33
-  equipment tiles of which **30 (90%) were already in that atlas**.
-  Equipment locations on practice are fixed (or respawn-in-place)
-  spawn points -- a cross-session atlas solves foraging there
-  outright.
-- **Main map (field05): region-stable at best.** Two sessions 14 h
-  apart saw 243 and 238 tiles with only **12 (5%) exact-tile
-  overlap**, but 5 of the top-12 32x32 density blocks recurred --
-  equipment concentrates in persistent regions while exact tiles
-  churn.
+- **field01 (practice)**: 5,193 distinct tiles ever seen, but
+  persistence is wildly concentrated: (123,123) appears in **101 of
+  273 runs**, (128,126) in 99 — and seven of the ten most persistent
+  tiles sit in ONE ~12x12 patch around (123-134, 123-134), the map
+  center. Secondary hotspots: (180,47), (114,152)/(112,154),
+  (101,203), (112,190), (139,133).
+- **field05 (main)**: even at 12 runs, tiles recur in 7-8 of them,
+  in crisp clusters: (59-65, 13-16), (50-58, 166-170), (176,212).
 
-Consequence: blind paid sweeps re-derive per session what the corpus
-already knows. The 2026-08-28 validation run spent 9 extras on two
-back-to-back quad sweeps that discovered ZERO equipment, on the very
-field where 382 tile locations were already sitting in the previous
-day's artifacts. Confidence: medium (2 runs per field, 1-in-25
-snapshot sampling); a third day's runs would firm the practice
-stability number.
+CORRECTION (same day): the first two-run comparison read "field05
+5% tile stability" — that was COVERAGE BIAS (the two runs roamed
+different areas), not spawn churn. Run-count persistence is the
+honest measure, and by it both fields carry stable hotspots; the
+long once-seen tail is spawn scatter plus roaming bias. Atlas data:
+`runs/analysis/equipment-atlas-20260828.json` (per-field tile
+persistence counts). Design consequence unchanged and strengthened:
+foraging = teleport the hotspot circuit; blind paid sweeps are
+strictly worse than the lookup (the 2026-08-28 validation run spent
+9 extras on sweeps that found zero while the atlas held 5k mapped
+tiles).
 
-[^15]: Mining script over `entity_alignment_sample.belief_containers_json` in runs bot-20260827-171409 (field01, 5 h), bot-20260828-142819 (field01, validation), bot-20260827-085730 + bot-20260826-190811 (field05). Persistence counts inside single runs run 100+ consecutive samples per tile -- equipment sits unclaimed until collected, so within-session beliefs are long-lived; the cross-run overlap is the atlas-worthiness measure.
+[^15]: Full-corpus miner 2026-08-28 over every `runs/bot` events artifact (1-in-20 belief-snapshot sampling, own-viewport sources only — `source != "world_state"` excludes fleet imports). Per-field distinct tiles / seen-in-2+-runs / top persistence lists archived in `runs/analysis/equipment-atlas-20260828.json`. The earlier 4-run pilot (382-tile field01 day-over-day set, 90% recurrence) stands as the freshness measure; the run-count table is the stability measure.
 
 ## "Inventory full" wire signal
 
