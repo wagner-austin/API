@@ -134,6 +134,7 @@ class TestPrintResultNotNewBest:
             best_val_auc=0.90,
             best_trial_number=25,
             duration_seconds=60.0,
+            fingerprint=None,
         )
 
         print_result("xgboost", result, 10.5, all_time_best=all_time_best)
@@ -155,6 +156,7 @@ class TestCreateHistoryComparisonTable:
             best_val_auc=0.82,
             best_trial_number=25,
             duration_seconds=60.0,
+            fingerprint=None,
         )
         table = create_history_comparison_table(
             current_auc=0.85,

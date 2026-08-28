@@ -14,9 +14,15 @@ from pathlib import Path
 from typing import TypedDict
 
 from covenant_ml.types import BackendName
+from platform_core.comparability import (
+    RunFingerprint,
+    decode_run_fingerprint,
+    encode_run_fingerprint,
+)
 from platform_core.config import _test_hooks as config_env
 from platform_core.json_utils import (
     JSONObject,
+    JSONTypeError,
     dump_json_str,
     load_json_str,
     narrow_json_to_dict,
@@ -58,6 +64,7 @@ class UnifiedHistoryEntry(TypedDict, total=True):
     best_val_auc: float
     best_trial_number: int
     duration_seconds: float
+    fingerprint: RunFingerprint | None
 
 
 # =============================================================================
@@ -115,7 +122,75 @@ def _decode_history_entry(obj: JSONObject) -> UnifiedHistoryEntry:
         best_val_auc=require_float(obj, "best_val_auc"),
         best_trial_number=require_int(obj, "best_trial_number"),
         duration_seconds=require_float(obj, "duration_seconds"),
+        fingerprint=_require_fingerprint_or_null(obj),
     )
+
+
+def _require_fingerprint_or_null(obj: JSONObject) -> RunFingerprint | None:
+    """Read the configuration a row's numbers were produced under.
+
+    Three states, and collapsing any two would make the row assert something
+    it does not know:
+
+    * a fingerprint -- this run's configuration was captured;
+    * an explicit ``null`` -- this row predates the field. 3,068 rows written
+      before 2026-08-28 are in this state, and they are not claiming the
+      configuration was unremarkable; they are saying nobody recorded it;
+    * a MISSING key, which is neither and raises. A row that simply omits it
+      cannot be told from one where the writer forgot, and the whole point of
+      the field is that the reader can tell.
+
+    Args:
+        obj: The decoded JSON object for one row.
+
+    Returns:
+        The fingerprint, or None when the row states it has none.
+
+    Raises:
+        JSONTypeError: If the key is absent.
+    """
+    if "fingerprint" not in obj:
+        raise JSONTypeError(
+            "Field 'fingerprint' is required. Write null to state that the row predates "
+            "it -- an absent key cannot be told from a writer that forgot."
+        )
+    value = obj["fingerprint"]
+    if value is None:
+        return None
+    return decode_run_fingerprint(value)
+
+
+def _encode_history_entry(entry: UnifiedHistoryEntry) -> JSONObject:
+    """Encode one row for the JSONL file.
+
+    Exists because the row used to be dumped as the TypedDict itself, which
+    worked only while every field was a JSON scalar. A ``RunFingerprint``
+    carries tuples -- the determinism settings are sorted pairs and the
+    package versions are a tuple of records -- and ``json`` would render
+    those as bare arrays that ``decode_run_fingerprint`` does not accept.
+    Encoding through the contract's own encoder keeps write and read
+    symmetrical.
+
+    Args:
+        entry: The row to encode.
+
+    Returns:
+        A JSON object the decoder above accepts.
+    """
+    fingerprint = entry["fingerprint"]
+    return {
+        "timestamp": entry["timestamp"],
+        "backend": entry["backend"],
+        "dataset": entry["dataset"],
+        "feature_preset": entry["feature_preset"],
+        "n_trials": entry["n_trials"],
+        "n_samples": entry["n_samples"],
+        "n_features": entry["n_features"],
+        "best_val_auc": entry["best_val_auc"],
+        "best_trial_number": entry["best_trial_number"],
+        "duration_seconds": entry["duration_seconds"],
+        "fingerprint": None if fingerprint is None else encode_run_fingerprint(fingerprint),
+    }
 
 
 # =============================================================================
@@ -126,12 +201,18 @@ def _decode_history_entry(obj: JSONObject) -> UnifiedHistoryEntry:
 def result_to_entry(
     result: UnifiedOptimizationResult,
     elapsed: float,
+    fingerprint: RunFingerprint | None,
 ) -> UnifiedHistoryEntry:
     """Convert optimization result to history entry.
 
     Args:
         result: Unified optimization result.
         elapsed: Elapsed time in seconds.
+        fingerprint: The configuration these numbers were produced under, or
+            None only where a caller genuinely has none. Required as a
+            parameter rather than captured here, so this stays a pure
+            conversion and the capture happens once per run at the entry
+            point that knows what it pinned.
 
     Returns:
         History entry with current UTC timestamp.
@@ -147,6 +228,7 @@ def result_to_entry(
         best_val_auc=result["best_value"],
         best_trial_number=result["best_trial_number"],
         duration_seconds=elapsed,
+        fingerprint=fingerprint,
     )
 
 
@@ -239,7 +321,7 @@ class OptimizationHistory:
         self._entries.append(entry)
 
         # Append to file
-        line = dump_json_str(entry, compact=True)
+        line = dump_json_str(_encode_history_entry(entry), compact=True)
         with self._path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
 

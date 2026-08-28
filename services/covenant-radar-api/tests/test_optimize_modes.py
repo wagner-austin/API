@@ -71,6 +71,7 @@ def _make_history_entry(
         best_val_auc=best_val_auc,
         best_trial_number=25,
         duration_seconds=60.0,
+        fingerprint=None,
     )
 
 

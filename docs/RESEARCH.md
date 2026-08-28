@@ -44,12 +44,22 @@ untracked — it is state, not configuration).
 - **Runs:** `scripts.optimize -b cleargbm`, `scripts.benchmark_cleargbm_*`
 - **Produces:** `libs/cleargbm/docs/BENCHMARK_MANIFEST_*.json` (41 of them) and
   `services/covenant-radar-api/models/optimization_history.jsonl`
-- **Provenance:** partial. Every benchmark entry point pins BLAS threads and
-  builds a `RunFingerprint` as of 2026-08-27, but the record shape is
-  `BenchmarkManifest`, not `RunRecord`. `optimization_history.jsonl` carries
-  `best_val_auc` and `duration_seconds` with **no fingerprint at all** — it is
-  a longitudinal comparison with nothing recording whether its rows are
-  comparable.
+- **Provenance:** partial, in two different ways.
+  - The six `benchmark_cleargbm_*` entry points pin BLAS threads and build a
+    `RunFingerprint` as of 2026-08-27, but the record shape is
+    `BenchmarkManifest`, not `RunRecord`.
+  - `optimization_history.jsonl` carries a `RunFingerprint` as of 2026-08-28
+    — host, packages and image digest — where before it recorded
+    `best_val_auc` and `duration_seconds` and nothing about what produced
+    them. The 3,068 rows written before that state `"fingerprint": null`
+    explicitly, which reads as "nobody recorded one" rather than "there was
+    nothing to record"; a missing key is refused outright.
+  - **`scripts/optimize` still pins nothing.** It was not among the six entry
+    points that got a pin, so its fingerprint honestly reports the
+    determinism stack as `none`. The record is now true; the runs are still
+    not reproducible against themselves. Fixing that means pinning before
+    numpy loads, which `scripts/optimize/__init__.py` currently prevents by
+    importing the world at package import time.
 - **Scale:** 108 ledger rows.
 
 ### `floor` — cloze floor scoring

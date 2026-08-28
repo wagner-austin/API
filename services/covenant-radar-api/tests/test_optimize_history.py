@@ -54,6 +54,7 @@ def _make_history_entry(
         best_val_auc=best_val_auc,
         best_trial_number=25,
         duration_seconds=60.0,
+        fingerprint=None,
     )
 
 
@@ -101,6 +102,7 @@ class TestDecodeHistoryEntry:
             "best_val_auc": 0.85,
             "best_trial_number": 25,
             "duration_seconds": 60.0,
+            "fingerprint": None,
         }
 
         entry: UnifiedHistoryEntry = _decode_history_entry(obj)
@@ -127,6 +129,7 @@ class TestDecodeHistoryEntry:
             "best_val_auc": 0.85,
             "best_trial_number": 25,
             "duration_seconds": 60.0,
+            "fingerprint": None,
         }
 
         entry: UnifiedHistoryEntry = _decode_history_entry(obj)
@@ -147,6 +150,7 @@ class TestDecodeHistoryEntry:
             "best_val_auc": 0.85,
             "best_trial_number": 25,
             "duration_seconds": 60.0,
+            "fingerprint": None,
             "best_num_leaves": 31,
             "best_learning_rate": 0.1,
         }
@@ -186,7 +190,7 @@ class TestResultToEntry:
             duration_seconds=120.0,
         )
 
-        entry: UnifiedHistoryEntry = result_to_entry(result, 120.0)
+        entry: UnifiedHistoryEntry = result_to_entry(result, 120.0, None)
 
         assert entry["backend"] == "xgboost"
         assert entry["dataset"] == "us"
@@ -217,7 +221,7 @@ class TestResultToEntry:
             duration_seconds=60.0,
         )
 
-        entry: UnifiedHistoryEntry = result_to_entry(result, 60.0)
+        entry: UnifiedHistoryEntry = result_to_entry(result, 60.0, None)
 
         assert entry["backend"] == "mlp"
         assert entry["dataset"] == "taiwan"

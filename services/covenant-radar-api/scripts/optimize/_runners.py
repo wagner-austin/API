@@ -11,7 +11,10 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from covenant_ml.benchmarking.provenance import benchmark_fingerprint
 from covenant_ml.types import BackendName
+from platform_core.config import _test_hooks as config_env
+from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 from platform_core.rich_logging import RichProgressProtocol, create_rich_progress, get_rich_console
 
 from scripts._test_hooks import (
@@ -138,7 +141,17 @@ def _run_backend_with_progress(
     )
     elapsed = time.perf_counter() - start
 
-    entry = result_to_entry(result, elapsed)
+    # Captured here rather than threaded down from the CLI: this is the one
+    # place that knows a run finished, and a fingerprint built anywhere else
+    # would describe a different moment. The determinism posture is stated as
+    # UNPINNED because this entry point pins nothing -- `scripts/optimize`
+    # was not among the six entry points 19aa6fee gave a pin, and recording
+    # what IS true is the point of the record. See docs/RESEARCH.md.
+    entry = result_to_entry(
+        result,
+        elapsed,
+        benchmark_fingerprint(determinism_record(UNPINNED_STACK, {}), config_env.get_env),
+    )
     history.append(entry)
     return result, elapsed, entry
 
