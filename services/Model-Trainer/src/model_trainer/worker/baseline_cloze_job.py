@@ -52,9 +52,10 @@ def process_baseline_cloze_job(payload: BaselineClozeJobPayload) -> None:
     # no effect. This floor is the number every arm accuracy is reported as
     # lift over, and it was measured unpinned.
     #
-    # remove_split_k=True: a floor every arm is reported as lift over is the
-    # one number that must not depend on which card answered the queue.
-    determinism = _test_hooks.apply_determinism_hook(remove_split_k=True)
+    # Both controls on: a floor every arm is reported as lift over is the one
+    # number that must not depend on which card answered the queue, and the
+    # two controls cover the two halves of the model that otherwise would.
+    determinism = _test_hooks.apply_determinism_hook(remove_split_k=True, math_attention=True)
 
     log = get_logger(__name__)
     r = redis_client(settings)

@@ -122,24 +122,33 @@ def probe_determinism(device: str) -> DeterminismRecord:
     ``configuration_differs`` against every one of them -- for a setting now
     shown not to change the number.
 
-    WHY THIS DOES NOT REMOVE SPLIT-K WHEN EVERY TRAINING RUN NOW DOES. Every
-    command that measures cross-card agreement pins through this function,
-    and ``CUBLASLT_WORKSPACE_SIZE`` is the variable those measurements
-    MANIPULATE. A pin that removed split-K here would leave `gemm_benchmark`
-    unable to time the default condition and `probe_trace` unable to trace
-    it -- the instrument would impose the treatment and then report that the
-    treated arm is all there is. So this passes ``remove_split_k=False``,
-    which writes nothing at all: whatever the launcher exported still
+    WHY THIS APPLIES NEITHER CONTROL WHEN EVERY TRAINING RUN NOW APPLIES
+    BOTH. Every command that measures cross-card agreement pins through this
+    function, and both controls are variables those measurements MANIPULATE.
+
+    ``remove_split_k=False``: ``CUBLASLT_WORKSPACE_SIZE`` is what
+    `gemm_benchmark` times and `probe_trace` traces both arms of. Removing
+    split-K here would leave neither able to reach the default condition. The
+    False arm writes nothing at all, so whatever the launcher exported still
     governs, and
     :func:`~model_trainer.cli.probe_trace.workspace_observation` reads the
     real environment to say which arm actually ran.
 
+    ``math_attention=False``: this one is sharper, because it would not fail
+    loudly. `sdpa_probe` forces each backend in turn and also digests the
+    UNFORCED call, to record what the dispatcher picks when left alone.
+    Restricting the process to the math kernel would make that unforced call
+    forced -- and it would still run, still produce a digest, and still be
+    recorded as "the default". The experiment would report that every card
+    selects math and agrees, which is true only because this function made it
+    so. `sdpa_benchmark` would likewise price the math kernel against itself.
+
     The consequence worth stating plainly: a probe record and a training
     record now pin differently, deliberately. The gate probe's fingerprint is
-    unchanged by this -- ``remove_split_k=False`` adds no setting -- so the
-    entries in ``known-answers.json`` keep gating. A training run's record
-    carries the extra setting and is correctly incomparable with them, which
-    it always was.
+    unchanged by either -- both False arms add no setting -- so the entries in
+    ``known-answers.json`` keep gating. A training run's record carries both
+    extra settings and is correctly incomparable with them, which it always
+    was.
 
     Args:
         device: Device the measurement runs on.
@@ -147,7 +156,7 @@ def probe_determinism(device: str) -> DeterminismRecord:
     Returns:
         What was pinned, ready to place in the fingerprint.
     """
-    applied = _test_hooks.apply_determinism_hook(remove_split_k=False)
+    applied = _test_hooks.apply_determinism_hook(remove_split_k=False, math_attention=False)
     if device == CUDA_DEVICE:
         return applied
     return with_torch_thread_count(applied, _test_hooks.pin_torch_threads(PROBE_CPU_THREADS))

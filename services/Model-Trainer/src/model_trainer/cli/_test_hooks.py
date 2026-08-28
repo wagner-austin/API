@@ -340,7 +340,7 @@ def _default_score_cloze(
     )
 
 
-def _default_apply_determinism(*, remove_split_k: bool) -> DeterminismRecord:
+def _default_apply_determinism(*, remove_split_k: bool, math_attention: bool) -> DeterminismRecord:
     """Production determinism pin - used as default hook.
 
     Delegates to the same hook the workers use, so a run scored from the
@@ -352,13 +352,16 @@ def _default_apply_determinism(*, remove_split_k: bool) -> DeterminismRecord:
             populations actually differ -- a scoring command pins like a
             worker, a measurement command deliberately does not -- so this
             passes the caller's choice on rather than making one.
+        math_attention: Forwarded unchanged, same reasoning.
 
     Returns:
         What was actually applied.
     """
     from model_trainer.core import _test_hooks as core_hooks
 
-    return core_hooks.apply_determinism_hook(remove_split_k=remove_split_k)
+    return core_hooks.apply_determinism_hook(
+        remove_split_k=remove_split_k, math_attention=math_attention
+    )
 
 
 def _default_pin_torch_threads(threads: int) -> int:

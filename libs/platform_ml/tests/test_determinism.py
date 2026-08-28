@@ -22,6 +22,8 @@ from platform_core.determinism_record import (
 )
 
 from platform_ml.determinism import (
+    ATTENTION_MATH_ONLY,
+    ATTENTION_SETTING,
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
     CUBLASLT_NO_SPLIT_K,
@@ -32,6 +34,7 @@ from platform_ml.determinism import (
     TORCH_THREAD_SETTING,
     apply_determinism,
     remove_cublaslt_split_k,
+    restrict_attention_to_math,
     set_cublas_workspace,
     with_torch_thread_count,
 )
@@ -109,8 +112,36 @@ class RecordingCudnn:
         self._log.append(f"cudnn.benchmark={value}")
 
 
+class RecordingSdp:
+    """``torch.backends.cuda`` double, for the four attention switches.
+
+    Records into the shared log like the others, so the attention pin's
+    position in the sequence is assertable rather than only its effect.
+    """
+
+    def __init__(self, log: list[str]) -> None:
+        self._log = log
+        self.enabled: dict[str, bool] = {}
+
+    def enable_flash_sdp(self, enabled: bool, /) -> None:
+        self.enabled["flash"] = enabled
+        self._log.append(f"sdp.flash={enabled}")
+
+    def enable_mem_efficient_sdp(self, enabled: bool, /) -> None:
+        self.enabled["mem_efficient"] = enabled
+        self._log.append(f"sdp.mem_efficient={enabled}")
+
+    def enable_math_sdp(self, enabled: bool, /) -> None:
+        self.enabled["math"] = enabled
+        self._log.append(f"sdp.math={enabled}")
+
+    def enable_cudnn_sdp(self, enabled: bool, /) -> None:
+        self.enabled["cudnn"] = enabled
+        self._log.append(f"sdp.cudnn={enabled}")
+
+
 class RecordingTorch:
-    """The three leaf objects apply_determinism writes, bundled for tests.
+    """The leaf objects apply_determinism writes, bundled for tests.
 
     Not a ``torch`` module double: the function takes the leaves directly, so
     this only exists to build them from one shared log and to expose what was
@@ -120,6 +151,7 @@ class RecordingTorch:
     def __init__(self, log: list[str]) -> None:
         self.cudnn = RecordingCudnn(log)
         self.matmul = RecordingMatmul(log)
+        self.sdp = RecordingSdp(log)
         self._log = log
         self.deterministic_calls: list[bool] = []
 
@@ -127,14 +159,25 @@ class RecordingTorch:
         self.deterministic_calls.append(mode)
         self._log.append(f"use_deterministic_algorithms={mode}")
 
-    def apply(self, env: RecordingEnv, *, remove_split_k: bool) -> DeterminismRecord:
-        """Call the function under test with this bundle's leaves."""
+    def apply(
+        self, env: RecordingEnv, *, remove_split_k: bool, math_attention: bool = False
+    ) -> DeterminismRecord:
+        """Call the function under test with this bundle's leaves.
+
+        ``math_attention`` is the one argument defaulted here, and only here.
+        The production signature requires it; this default keeps the dozen
+        tests that predate the attention pin reading as they did, so a
+        diff of this file shows what the pin changed rather than a rename
+        across every call. Both values are exercised explicitly below.
+        """
         return apply_determinism(
             self.cudnn,
             self.matmul,
             self.use_deterministic_algorithms,
             env,
+            self.sdp,
             remove_split_k=remove_split_k,
+            math_attention=math_attention,
         )
 
 
@@ -259,6 +302,92 @@ def test_both_env_writes_precede_every_cuda_touching_call() -> None:
         "cudnn.deterministic=True",
         "cudnn.benchmark=False",
         "use_deterministic_algorithms=True",
+    ]
+
+
+def test_leaving_attention_alone_adds_no_setting_and_touches_no_switch() -> None:
+    # Same registry property as the split-K control, and the same reason
+    # absence rather than an explicit "not pinned".
+    log: list[str] = []
+    torch = RecordingTorch(log)
+
+    record = torch.apply(RecordingEnv(log), remove_split_k=False, math_attention=False)
+
+    assert ATTENTION_SETTING not in dict(record["settings"])
+    assert torch.sdp.enabled == {}
+
+
+def test_pinning_attention_disables_the_three_fused_kernels_and_enables_math() -> None:
+    # All four, not just the one being turned on. These are independent
+    # booleans, not a selector: enabling math while flash and mem-efficient
+    # stay enabled changes nothing, because the dispatcher still prefers a
+    # fused kernel. A pin that set only `math=True` would record that
+    # attention was pinned and leave the run using the same kernel as before.
+    log: list[str] = []
+    torch = RecordingTorch(log)
+
+    record = torch.apply(RecordingEnv(log), remove_split_k=False, math_attention=True)
+
+    assert torch.sdp.enabled == {
+        "flash": False,
+        "mem_efficient": False,
+        "cudnn": False,
+        "math": True,
+    }
+    assert dict(record["settings"])[ATTENTION_SETTING] == ATTENTION_MATH_ONLY
+
+
+def test_the_two_attention_postures_produce_different_records() -> None:
+    left = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=False, math_attention=True)
+    right = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=False, math_attention=False)
+
+    assert left != right
+
+
+def test_the_two_controls_are_independent_in_the_record() -> None:
+    # Neither implies the other: split-K governs cuBLASLt matmuls, and
+    # attention does not go through cuBLASLt at all. Four distinct records,
+    # so a run can state exactly which halves of the model it controlled.
+    records = [
+        RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=a, math_attention=b)
+        for a in (False, True)
+        for b in (False, True)
+    ]
+    controls = {SPLIT_K_SETTING, ATTENTION_SETTING}
+    keys = [[k for k, _ in r["settings"] if k in controls] for r in records]
+
+    # Read in the record's OWN order, not re-sorted here. `determinism_record`
+    # sorts its settings, so a record is compared as a whole and nothing
+    # downstream can see which control the function applied first -- which is
+    # what makes the two orderings in this file independent facts.
+    assert keys == [
+        [],
+        [ATTENTION_SETTING],
+        [SPLIT_K_SETTING],
+        [SPLIT_K_SETTING, ATTENTION_SETTING],
+    ]
+
+
+def test_restrict_attention_to_math_is_exactly_the_sdpa_kernel_math_call() -> None:
+    """The four calls torch's own ``sdpa_kernel([MATH])`` makes.
+
+    Read from ``torch/nn/attention/__init__.py`` in 2.6.0, where
+    ``_sdpa_kernel`` loops the four backend names and calls
+    ``enable_{name}_sdp(name in backends)``. This is the persistent form of
+    that context manager, so it has to make the same four calls with the same
+    four values -- a pin that diverged would be pinning something the
+    correctness result was never measured under.
+    """
+    log: list[str] = []
+    sdp = RecordingSdp(log)
+
+    restrict_attention_to_math(sdp)
+
+    assert log == [
+        "sdp.flash=False",
+        "sdp.mem_efficient=False",
+        "sdp.cudnn=False",
+        "sdp.math=True",
     ]
 
 

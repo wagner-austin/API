@@ -298,12 +298,20 @@ def setup_env(settings: Settings) -> tuple[int, DeterminismRecord]:
         )
         return threads, declined
 
-    # remove_split_k=True: a training run is a run whose numbers should be
-    # comparable to the same run on another card, and split-K is what stops
-    # them being. It costs nothing at a training step's row count -- measured
-    # free above 128 rows, and rows are batch times sequence length.
+    # Both controls on: a training run is a run whose numbers should be
+    # comparable to the same run on another card, and these are the two
+    # halves of that. Split-K is what stops the matmuls agreeing and costs
+    # nothing at a training step's row count; the math kernel is what stops
+    # attention agreeing and costs 1.3-1.6x peak memory on the probed shapes,
+    # growing with the SQUARE of sequence length.
+    #
+    # That second cost lands here and nowhere else in this file's blast
+    # radius: a long-sequence job that fitted before may now not. The way out
+    # is TRAIN_DETERMINISTIC=0, which declines the whole pin and RECORDS that
+    # it declined -- the branch above. Trading a determinism posture for
+    # memory is a decision a run states, not one this function makes for it.
     report = with_torch_thread_count(
-        _test_hooks.apply_determinism_hook(remove_split_k=True), threads
+        _test_hooks.apply_determinism_hook(remove_split_k=True, math_attention=True), threads
     )
     _log.info("determinism pinned", extra={"determinism": encode_determinism_record(report)})
     return threads, report

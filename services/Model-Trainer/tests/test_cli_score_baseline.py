@@ -49,11 +49,11 @@ class _Recorder:
     def __init__(self) -> None:
         self.order: list[str] = []
         self.scored_with: dict[str, str] = {}
-        self.postures: list[bool] = []
+        self.postures: list[tuple[bool, bool]] = []
 
-    def apply_determinism(self, *, remove_split_k: bool) -> DeterminismRecord:
+    def apply_determinism(self, *, remove_split_k: bool, math_attention: bool) -> DeterminismRecord:
         self.order.append("pin")
-        self.postures.append(remove_split_k)
+        self.postures.append((remove_split_k, math_attention))
         return PINNED
 
     def load_hub_model(self, hub_model_id: str, /) -> PreparedLMModel:
@@ -205,7 +205,7 @@ def test_determinism_is_pinned_before_the_model_loads(tmp_path: pathlib.Path) ->
     # floor by two routes -- one from the queue, one from the command line --
     # and a posture that differed between them would make the two disagree in
     # the last bits, which is exactly where a cloze tie is decided.
-    assert recorder.postures == [True]
+    assert recorder.postures == [(True, True)]
 
 
 @pytest.mark.usefixtures("restore_hooks")
@@ -491,17 +491,19 @@ class TestTheProductionHooks:
         # A second spelling here would be a second posture nobody noticed
         # diverging, so this must reach the core hook rather than pin again.
         calls: list[str] = []
-        postures: list[bool] = []
+        postures: list[tuple[bool, bool]] = []
 
-        def _core_pin(*, remove_split_k: bool) -> DeterminismRecord:
+        def _core_pin(*, remove_split_k: bool, math_attention: bool) -> DeterminismRecord:
             calls.append("core")
-            postures.append(remove_split_k)
+            postures.append((remove_split_k, math_attention))
             return PINNED
 
         core_hooks.apply_determinism_hook = _core_pin
         try:
-            record = cli_hooks._default_apply_determinism(remove_split_k=True)
-            declined = cli_hooks._default_apply_determinism(remove_split_k=False)
+            record = cli_hooks._default_apply_determinism(remove_split_k=True, math_attention=True)
+            declined = cli_hooks._default_apply_determinism(
+                remove_split_k=False, math_attention=False
+            )
         finally:
             core_hooks.apply_determinism_hook = core_hooks._default_apply_determinism
 
@@ -511,7 +513,7 @@ class TestTheProductionHooks:
         # single-value assertion, and the whole point of the CLI tier is that
         # a scoring command and a measurement command pass different postures
         # through the same hook.
-        assert postures == [True, False]
+        assert postures == [(True, True), (False, False)]
         assert record == PINNED
         assert declined == PINNED
 

@@ -34,15 +34,22 @@ What this module deliberately does NOT do:
   assumed to be zero.
 
   That used to read "not achievable", flatly. It is narrower than that, and
-  the correction is measured. Removing cuBLASLt's split-K -- the
-  ``remove_split_k`` argument below -- makes three cards produce bit-identical
-  tensors on every probed GEMM shape, and an A100 and an A30 agree on 1,017 of
-  a 1.5-billion-parameter model's 1,018 traced tensors. So the matmuls CAN be
-  made to agree across cards, cheaply. The model still does not: attention
-  does not go through cuBLASLt and not one of 72 measured SDPA digests moves,
-  and a V100 diverges from the Ampere pair regardless. Cross-card agreement
-  is therefore a property to establish per operation, not a promise this
-  module can make or refuse wholesale.
+  the correction is measured. Two controls here each buy a piece of it:
+
+  * ``remove_split_k`` makes three cards produce bit-identical tensors on
+    every probed GEMM shape, and an A100 and an A30 agree on 1,017 of a
+    1.5-billion-parameter model's 1,018 traced tensors. It is free at a
+    training step's row count.
+  * ``math_attention`` makes attention bit-identical across a V100, an A30
+    and an A100. It costs 1.3-1.6x peak memory on the probed shapes and
+    grows with the square of sequence length.
+
+  They are disjoint -- split-K removal moves not one of 72 measured attention
+  digests -- so neither substitutes for the other, and having both does not
+  make the promise whole either. What remains uncontrolled is everything that
+  is neither a cuBLASLt matmul nor an SDPA call. Cross-card agreement is a
+  property to establish per operation and per configuration, not one this
+  module can promise or refuse wholesale.
 * It does not offer a warn-only mode. PyTorch can be asked to warn instead of
   raising when an operation has no deterministic implementation; that
   silently returns a nondeterministic result while reporting success, which
@@ -101,6 +108,29 @@ class SetDeterministicAlgorithmsProtocol(Protocol):
     """``torch.use_deterministic_algorithms``."""
 
     def __call__(self, mode: bool) -> None: ...
+
+
+class SdpBackendsProtocol(Protocol):
+    """The four attention-backend switches on ``torch.backends.cuda``.
+
+    All four rather than only the one being turned on, because these are
+    independent booleans and not a selector: enabling math while leaving the
+    fused kernels enabled changes nothing at all, since the dispatcher still
+    prefers a fused one. Restricting attention means disabling the other
+    three.
+
+    The names are torch's own, including ``mem_efficient`` where the backend
+    enum spells it ``EFFICIENT_ATTENTION``. Renaming them for tidiness would
+    make the Protocol unsatisfiable by the one module that has to satisfy it.
+    """
+
+    def enable_flash_sdp(self, enabled: bool, /) -> None: ...
+
+    def enable_mem_efficient_sdp(self, enabled: bool, /) -> None: ...
+
+    def enable_math_sdp(self, enabled: bool, /) -> None: ...
+
+    def enable_cudnn_sdp(self, enabled: bool, /) -> None: ...
 
 
 def set_cublas_workspace(set_env: SetEnvProtocol) -> str:
@@ -164,6 +194,58 @@ def remove_cublaslt_split_k(set_env: SetEnvProtocol) -> None:
     set_env(CUBLASLT_WORKSPACE_ENV_VAR, CUBLASLT_NO_SPLIT_K)
 
 
+#: Setting name recorded when a run restricted attention to the math kernel.
+#:
+#: Recorded only when it was done, for the same reason as
+#: :data:`SPLIT_K_SETTING`: absence is readable, and a key on every record
+#: would cost the known-answer registry for a posture most records do not
+#: have.
+ATTENTION_SETTING = "sdpa_backends"
+
+#: The value :data:`ATTENTION_SETTING` carries. Names the surviving backend
+#: rather than saying "restricted", because the useful question a reader has
+#: is which kernel ran, and a future posture permitting two would be spelled
+#: here rather than needing a second key.
+ATTENTION_MATH_ONLY = "math"
+
+
+def restrict_attention_to_math(sdp: SdpBackendsProtocol) -> None:
+    """Leave the attention dispatcher no kernel but the math one.
+
+    WHAT THIS BUYS, MEASURED. Pinning ``SDPBackend.MATH`` makes attention
+    bit-identical across a V100, an A30 and an A100 -- which nothing else
+    here does. Removing cuBLASLt's split-K moves not one of 72 measured
+    attention digests, because scaled-dot-product attention is not a cuBLASLt
+    call, so the two controls address disjoint halves of a model and neither
+    substitutes for the other.
+
+    WHAT IT COSTS, AND WHY THE COST IS NOT A CONSTANT. The math path
+    materialises the full ``[batch, heads, seq, seq]`` score matrix; a fused
+    kernel never does. So the penalty grows with the SQUARE of sequence
+    length -- measured at 1.3-1.6x peak allocation on the probed shapes, and
+    worse than that as sequences lengthen. Time is close to free at 1.0-1.2x.
+    A table of seconds would report this as "slightly slower" right up to the
+    point where it stops fitting on the card at all: on a 16 GB V100 it takes
+    gpt2-medium from trains to does not fit. That is a real operational
+    consequence of turning it on, not a caveat.
+
+    WHY ALL FOUR SWITCHES. This is the persistent form of
+    ``sdpa_kernel([SDPBackend.MATH])``, which is implemented as exactly these
+    four calls -- read from torch 2.6.0's
+    ``torch/nn/attention/__init__.py``, not inferred. Using the context
+    manager instead would mean wrapping every forward pass in the codebase
+    and silently losing the pin at whichever site someone forgot; these
+    switches are process-global and take for every subsequent call.
+
+    Args:
+        sdp: The ``torch.backends.cuda`` module, or a double.
+    """
+    sdp.enable_flash_sdp(False)
+    sdp.enable_mem_efficient_sdp(False)
+    sdp.enable_cudnn_sdp(False)
+    sdp.enable_math_sdp(True)
+
+
 #: Setting name for the thread count a torch run resolved to.
 #:
 #: Distinct from the ``OMP_NUM_THREADS`` family that
@@ -209,8 +291,10 @@ def apply_determinism(
     matmul: MatmulBackendProtocol,
     set_deterministic_algorithms: SetDeterministicAlgorithmsProtocol,
     set_env: SetEnvProtocol,
+    sdp: SdpBackendsProtocol,
     *,
     remove_split_k: bool,
+    math_attention: bool,
 ) -> DeterminismRecord:
     """Put the process into deterministic mode and report what was applied.
 
@@ -224,15 +308,23 @@ def apply_determinism(
     Order matters: both environment variables are written first, because
     every later step may touch CUDA and each is only read once.
 
-    WHY ``remove_split_k`` IS A REQUIRED ARGUMENT WITH NO DEFAULT. The two
-    postures are not "on" and "off" of one feature; they are the treatment
-    and the control of a live experiment. A training run wants split-K gone,
-    because that is what makes its matmuls agree across cards. The commands
-    that MEASURE what split-K does must be able to run without it removed, or
+    WHY THE TWO CONTROLS ARE REQUIRED ARGUMENTS WITH NO DEFAULT. Neither is
+    "on" and "off" of one feature; each is the treatment and the control of a
+    live experiment. A training run wants split-K gone and attention pinned,
+    because together that is what makes its numbers agree across cards. The
+    commands that MEASURE what either does must be able to run without it, or
     they can only ever observe the treated arm -- an instrument that imposes
-    the intervention cannot measure it. Defaulting the argument either way
-    would silently pick one of those for a caller who had not thought about
-    it, and the failure would be a number that looks fine.
+    the intervention cannot measure it. Defaulting either argument would
+    silently pick a posture for a caller who had not thought about it, and
+    the failure would be a number that looks fine.
+
+    THE TWO ARE INDEPENDENT AND NEITHER IMPLIES THE OTHER. Split-K governs
+    cuBLASLt matmuls; attention does not go through cuBLASLt and not one of
+    72 measured attention digests moves when split-K is removed. Conversely
+    the math kernel says nothing about a linear layer. They are separate
+    arguments because they are separate halves of a model, with separate
+    costs -- split-K removal is free at a training step's row count, and the
+    attention pin is not free at all.
 
     Args:
         cudnn: The ``torch.backends.cudnn`` module, or a double.
@@ -240,12 +332,23 @@ def apply_determinism(
         set_deterministic_algorithms: ``torch.use_deterministic_algorithms``.
         set_env: Writer for a process environment variable, e.g.
             ``os.putenv``.
+        sdp: The ``torch.backends.cuda`` module, or a double, carrying the
+            four attention-backend switches.
         remove_split_k: Whether to take split-K out of cuBLASLt's options.
             True for a run whose numbers should be comparable across cards;
             False for a run measuring what that costs or what it changes.
             False writes nothing at all -- it does not write a "keep split-K"
             value -- so a launcher that exported the variable itself still
             governs, and the record says only that this call did not do it.
+        math_attention: Whether to leave the attention dispatcher no kernel
+            but the math one. True makes attention bit-identical across a
+            V100, an A30 and an A100; it also costs 1.3-1.6x peak memory on
+            the probed shapes and worse as sequences lengthen, because the
+            math path materialises the whole score matrix. See
+            :func:`restrict_attention_to_math` -- this is the one control
+            here that can turn a run that fits into a run that does not.
+            False touches none of the four switches, leaving whatever the
+            process already had.
 
     Returns:
         A :class:`DeterminismReport` describing the state now in force.
@@ -260,6 +363,16 @@ def apply_determinism(
     if remove_split_k:
         remove_cublaslt_split_k(set_env)
         split_k = {SPLIT_K_SETTING: SPLIT_K_REMOVED}
+
+    # Same one-branch discipline: applied and recorded together, so a record
+    # claiming the math kernel can only come from a process that pinned it.
+    # Unlike the environment variables this needs no particular ordering
+    # against CUDA -- the switches are read per dispatch, not once at handle
+    # creation -- but it sits with them so one function is one posture.
+    attention: dict[str, str] = {}
+    if math_attention:
+        restrict_attention_to_math(sdp)
+        attention = {ATTENTION_SETTING: ATTENTION_MATH_ONLY}
 
     matmul.allow_tf32 = False
     cudnn.allow_tf32 = False
@@ -277,11 +390,14 @@ def apply_determinism(
             "cudnn_deterministic": TRUE,
             "cudnn_benchmark": FALSE,
             **split_k,
+            **attention,
         },
     )
 
 
 __all__ = [
+    "ATTENTION_MATH_ONLY",
+    "ATTENTION_SETTING",
     "CUBLASLT_NO_SPLIT_K",
     "CUBLASLT_WORKSPACE_ENV_VAR",
     "CUBLAS_DETERMINISTIC_WORKSPACE",
@@ -292,10 +408,12 @@ __all__ = [
     "TORCH_THREAD_SETTING",
     "CudnnBackendProtocol",
     "MatmulBackendProtocol",
+    "SdpBackendsProtocol",
     "SetDeterministicAlgorithmsProtocol",
     "SetEnvProtocol",
     "apply_determinism",
     "remove_cublaslt_split_k",
+    "restrict_attention_to_math",
     "set_cublas_workspace",
     "with_torch_thread_count",
 ]

@@ -119,11 +119,13 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
     # previously left unpinned entirely, which made a cloze accuracy
     # irreproducible in its last bits and its ties order-dependent.
     #
-    # remove_split_k=True for the same reason, one step further out: a tie in
-    # a cloze score is decided by the last bits, and those are exactly what a
-    # split reduction moves. Two cards scoring the same items should decide
-    # the same items.
-    determinism = _test_hooks.apply_determinism_hook(remove_split_k=True)
+    # Both controls on for the same reason, one step further out: a tie in a
+    # cloze score is decided by the last bits, and those are exactly what a
+    # split reduction and a fused attention kernel move. Two cards scoring
+    # the same items should decide the same items. The math kernel's memory
+    # cost is affordable here in a way it is not in training -- scoring runs
+    # one short sequence at a time, and the penalty is quadratic in that.
+    determinism = _test_hooks.apply_determinism_hook(remove_split_k=True, math_attention=True)
 
     log = get_logger(__name__)
     r = redis_client(settings)

@@ -144,7 +144,7 @@ def _default_pkg_version(name: str) -> str:
         return "unknown"
 
 
-def _default_apply_determinism(*, remove_split_k: bool) -> DeterminismRecord:
+def _default_apply_determinism(*, remove_split_k: bool, math_attention: bool) -> DeterminismRecord:
     """Production determinism pin - used as default hook.
 
     Imported inside the function so that merely importing this module does
@@ -154,8 +154,9 @@ def _default_apply_determinism(*, remove_split_k: bool) -> DeterminismRecord:
         remove_split_k: Passed straight through to
             :func:`platform_ml.determinism.apply_determinism`. Not defaulted
             here either: this module is the boundary where a caller's posture
-            becomes a process's arithmetic, and swallowing the argument would
-            put the choice back where nobody states it.
+            becomes a process's arithmetic, and swallowing either argument
+            would put the choice back where nobody states it.
+        math_attention: Passed straight through, same reasoning.
 
     Returns:
         What was actually applied.
@@ -169,12 +170,21 @@ def _default_apply_determinism(*, remove_split_k: bool) -> DeterminismRecord:
     # os.putenv rather than os.environ: it reaches the real process
     # environment that cuBLAS's getenv reads, and it is a write rather than
     # the config read the monorepo's env guard exists to stop.
+    #
+    # `torch.backends.cuda` is passed whole for the attention switches and
+    # its `.matmul` leaf separately, because they are different surfaces: the
+    # switches are functions ON the module, tf32 is an attribute of a
+    # submodule. One argument covering both would have to be the module, and
+    # a Protocol whose member is a submodule cannot be satisfied by a module
+    # under this repo's type checker.
     return apply_determinism(
         torch.backends.cudnn,
         torch.backends.cuda.matmul,
         torch.use_deterministic_algorithms,
         os.putenv,
+        torch.backends.cuda,
         remove_split_k=remove_split_k,
+        math_attention=math_attention,
     )
 
 

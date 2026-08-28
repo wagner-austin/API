@@ -141,7 +141,9 @@ class TestTheRecordItWrites:
 
     def test_the_fingerprint_reports_the_determinism_that_was_applied(self) -> None:
         record = probe_cli.probe_run_record("cpu")
-        applied: DeterminismRecord = cli_hooks.apply_determinism_hook(remove_split_k=False)
+        applied: DeterminismRecord = cli_hooks.apply_determinism_hook(
+            remove_split_k=False, math_attention=False
+        )
 
         assert record["fingerprint"]["determinism"] == with_torch_thread_count(
             applied, probe_cli.PROBE_CPU_THREADS
@@ -186,7 +188,7 @@ class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
         assert TORCH_THREAD_SETTING not in dict(probe_cli.probe_determinism("cuda")["settings"])
 
     def test_the_cuda_record_is_exactly_what_the_stack_pinned(self) -> None:
-        applied = cli_hooks.apply_determinism_hook(remove_split_k=False)
+        applied = cli_hooks.apply_determinism_hook(remove_split_k=False, math_attention=False)
 
         assert probe_cli.probe_determinism("cuda") == applied
 

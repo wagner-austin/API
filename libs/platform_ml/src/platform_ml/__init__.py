@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .artifact_store import ArtifactStore, ArtifactStoreError
 from .determinism import (
+    ATTENTION_MATH_ONLY,
+    ATTENTION_SETTING,
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
     CUBLASLT_NO_SPLIT_K,
@@ -11,10 +13,12 @@ from .determinism import (
     TORCH_STACK,
     CudnnBackendProtocol,
     MatmulBackendProtocol,
+    SdpBackendsProtocol,
     SetDeterministicAlgorithmsProtocol,
     SetEnvProtocol,
     apply_determinism,
     remove_cublaslt_split_k,
+    restrict_attention_to_math,
     set_cublas_workspace,
 )
 from .device_selector import (
@@ -84,6 +88,8 @@ from .wandb_types import (
 )
 
 __all__ = [
+    "ATTENTION_MATH_ONLY",
+    "ATTENTION_SETTING",
     "CUBLASLT_NO_SPLIT_K",
     "CUBLASLT_WORKSPACE_ENV_VAR",
     "CUBLAS_DETERMINISTIC_WORKSPACE",
@@ -122,6 +128,7 @@ __all__ = [
     "RequestedPrecision",
     "ResolvedDevice",
     "ResolvedPrecision",
+    "SdpBackendsProtocol",
     "SetDeterministicAlgorithmsProtocol",
     "SetEnvProtocol",
     "ShapTreeWrapper",
@@ -156,6 +163,7 @@ __all__ = [
     "remove_cublaslt_split_k",
     "resolve_device",
     "resolve_precision",
+    "restrict_attention_to_math",
     "set_cublas_workspace",
     "set_manual_seed",
 ]

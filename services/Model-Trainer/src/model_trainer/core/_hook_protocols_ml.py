@@ -33,19 +33,26 @@ class ApplyDeterminismProto(Protocol):
     stack and without leaking settings into the rest of the suite.
     """
 
-    def __call__(self, *, remove_split_k: bool) -> DeterminismRecord:
+    def __call__(self, *, remove_split_k: bool, math_attention: bool) -> DeterminismRecord:
         """Pin kernel determinism and report what was actually applied.
+
+        Both arguments are required with no default, and keyword-only,
+        because each is the treatment and the control of a live experiment
+        rather than an on/off switch -- see
+        :func:`platform_ml.determinism.apply_determinism`. Training runs pass
+        True for both; the commands that measure what either control does
+        pass False, because an instrument that imposes the intervention
+        cannot observe it.
 
         Args:
             remove_split_k: Whether to take split-K out of cuBLASLt's
-                options, making matmuls agree across cards. Required with no
-                default, and keyword-only, because the two postures are the
-                treatment and the control of a live experiment rather than an
-                on/off switch -- see
-                :func:`platform_ml.determinism.apply_determinism`. Training
-                runs pass True; the commands that measure what split-K does
-                pass False, because an instrument that imposes the
-                intervention cannot observe it.
+                options, making matmuls agree across cards. Free at a
+                training step's row count.
+            math_attention: Whether to leave the attention dispatcher no
+                kernel but the math one, making attention agree across cards.
+                NOT free: 1.3-1.6x peak memory on the probed shapes, growing
+                with the square of sequence length, because the math path
+                materialises the whole score matrix.
 
         Returns:
             What was actually applied, for the run record.

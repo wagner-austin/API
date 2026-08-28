@@ -148,11 +148,11 @@ def score_with_outcomes(
         When the answer is no, the next question is which items moved, and
         only the outcomes can answer that.
     """
-    # remove_split_k=True, matching the queue path exactly: this command and
+    # Both controls on, matching the queue path exactly: this command and
     # `baseline_cloze_job` produce the same floor by two routes, and a posture
     # that differed between them would make the two disagree in the last bits
     # for a reason nobody would look for.
-    determinism = _test_hooks.apply_determinism_hook(remove_split_k=True)
+    determinism = _test_hooks.apply_determinism_hook(remove_split_k=True, math_attention=True)
     fingerprint: RunFingerprint = capture_run_fingerprint(device, determinism)
 
     items = parse_items(items_path.read_text(encoding="utf-8"))
