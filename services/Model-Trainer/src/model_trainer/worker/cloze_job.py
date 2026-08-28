@@ -118,7 +118,12 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
     # so a later call is accepted in silence and has no effect. Scoring was
     # previously left unpinned entirely, which made a cloze accuracy
     # irreproducible in its last bits and its ties order-dependent.
-    determinism = _test_hooks.apply_determinism_hook()
+    #
+    # remove_split_k=True for the same reason, one step further out: a tie in
+    # a cloze score is decided by the last bits, and those are exactly what a
+    # split reduction moves. Two cards scoring the same items should decide
+    # the same items.
+    determinism = _test_hooks.apply_determinism_hook(remove_split_k=True)
 
     log = get_logger(__name__)
     r = redis_client(settings)

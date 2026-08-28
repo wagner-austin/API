@@ -28,6 +28,10 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.comparability import RunFingerprint
+from platform_core.determinism_env import (
+    CUBLASLT_NO_SPLIT_K,
+    CUBLASLT_WORKSPACE_ENV_VAR,
+)
 from platform_core.json_utils import dump_json_str, load_json_str
 from platform_core.logging import get_logger, setup_logging
 from platform_core.run_record import (
@@ -60,10 +64,15 @@ BENCHMARK_EXPERIMENT = "gemm-splitk-cost"
 BENCHMARK_LABEL = "gemm-splitk-cost-v1"
 
 #: The environment variable that removes split-K from cuBLASLt's options, and
-#: the value that does it. Zero workspace leaves the heuristic no scratch to
-#: recombine partial sums in, so it cannot choose a split.
-WORKSPACE_VAR = "CUBLASLT_WORKSPACE_SIZE"
-NO_SPLIT_K = "0"
+#: the value that does it.
+#:
+#: Re-exported rather than spelled, since
+#: :func:`platform_ml.determinism.apply_determinism` now writes the same pair
+#: for training runs. Two spellings of the variable this whole experiment
+#: manipulates would let the measured condition and the applied one drift
+#: apart in silence, which is the one failure no result here could survive.
+WORKSPACE_VAR = CUBLASLT_WORKSPACE_ENV_VAR
+NO_SPLIT_K = CUBLASLT_NO_SPLIT_K
 
 #: The two conditions, and the suffix each one's timings are recorded under.
 DEFAULT_CONDITION = "default"

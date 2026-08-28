@@ -122,13 +122,32 @@ def probe_determinism(device: str) -> DeterminismRecord:
     ``configuration_differs`` against every one of them -- for a setting now
     shown not to change the number.
 
+    WHY THIS DOES NOT REMOVE SPLIT-K WHEN EVERY TRAINING RUN NOW DOES. Every
+    command that measures cross-card agreement pins through this function,
+    and ``CUBLASLT_WORKSPACE_SIZE`` is the variable those measurements
+    MANIPULATE. A pin that removed split-K here would leave `gemm_benchmark`
+    unable to time the default condition and `probe_trace` unable to trace
+    it -- the instrument would impose the treatment and then report that the
+    treated arm is all there is. So this passes ``remove_split_k=False``,
+    which writes nothing at all: whatever the launcher exported still
+    governs, and
+    :func:`~model_trainer.cli.probe_trace.workspace_observation` reads the
+    real environment to say which arm actually ran.
+
+    The consequence worth stating plainly: a probe record and a training
+    record now pin differently, deliberately. The gate probe's fingerprint is
+    unchanged by this -- ``remove_split_k=False`` adds no setting -- so the
+    entries in ``known-answers.json`` keep gating. A training run's record
+    carries the extra setting and is correctly incomparable with them, which
+    it always was.
+
     Args:
         device: Device the measurement runs on.
 
     Returns:
         What was pinned, ready to place in the fingerprint.
     """
-    applied = _test_hooks.apply_determinism_hook()
+    applied = _test_hooks.apply_determinism_hook(remove_split_k=False)
     if device == CUDA_DEVICE:
         return applied
     return with_torch_thread_count(applied, _test_hooks.pin_torch_threads(PROBE_CPU_THREADS))

@@ -53,19 +53,25 @@ _REPORT = determinism_record(
 class _CountingPin:
     """Records whether the determinism pin was actually invoked."""
 
-    __slots__ = ("calls",)
+    __slots__ = ("calls", "postures")
 
     def __init__(self) -> None:
         """Start with no calls recorded."""
         self.calls = 0
+        self.postures: list[bool] = []
 
-    def __call__(self) -> DeterminismRecord:
+    def __call__(self, *, remove_split_k: bool) -> DeterminismRecord:
         """Record an invocation and return a fixed report.
+
+        Args:
+            remove_split_k: The posture the caller asked for, kept so a test
+                can assert which one a training job chose.
 
         Returns:
             A report standing in for what torch would have applied.
         """
         self.calls += 1
+        self.postures.append(remove_split_k)
         return _REPORT
 
 
@@ -141,6 +147,25 @@ class TestPosture:
         pin = _stated({DETERMINISM_ENV_VAR: DETERMINISM_ON})
         setup_env(settings)
         assert pin.calls == 1
+
+    def test_a_training_job_asks_for_split_k_to_be_removed(
+        self, settings_factory: SettingsFactory
+    ) -> None:
+        """The posture is the point of the argument, so it is asserted rather
+        than left to whatever the call site happens to pass.
+
+        A training run's numbers should be comparable to the same run on
+        another card, and split-K is what stops them being. It is free at a
+        training step's row count. If this ever reads False, every job on the
+        queue silently went back to card-dependent matmuls.
+
+        Args:
+            settings_factory: Builds settings with a fixed thread count.
+        """
+        settings = _settings(settings_factory)
+        pin = _stated({DETERMINISM_ENV_VAR: DETERMINISM_ON})
+        setup_env(settings)
+        assert pin.postures == [True]
 
     def test_an_explicit_off_does_not_pin_determinism(
         self, settings_factory: SettingsFactory

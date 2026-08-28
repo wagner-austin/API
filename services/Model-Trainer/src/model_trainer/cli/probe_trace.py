@@ -32,6 +32,7 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.comparability import RunFingerprint
+from platform_core.determinism_env import CUBLASLT_WORKSPACE_ENV_VAR
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger, setup_logging
 from platform_core.run_record import (
@@ -123,7 +124,7 @@ def workspace_observation() -> Observation:
         return Observation(name=WORKSPACE_NAME, value=WORKSPACE_UNSET)
     if not raw.lstrip("-").isdigit():
         raise ValueError(
-            f"CUBLASLT_WORKSPACE_SIZE is {raw!r}, which is not an integer; "
+            f"{CUBLASLT_WORKSPACE_ENV_VAR} is {raw!r}, which is not an integer; "
             "this trace could not say which condition it ran under"
         )
     return Observation(name=WORKSPACE_NAME, value=float(int(raw)))

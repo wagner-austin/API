@@ -298,7 +298,13 @@ def setup_env(settings: Settings) -> tuple[int, DeterminismRecord]:
         )
         return threads, declined
 
-    report = with_torch_thread_count(_test_hooks.apply_determinism_hook(), threads)
+    # remove_split_k=True: a training run is a run whose numbers should be
+    # comparable to the same run on another card, and split-K is what stops
+    # them being. It costs nothing at a training step's row count -- measured
+    # free above 128 rows, and rows are batch times sequence length.
+    report = with_torch_thread_count(
+        _test_hooks.apply_determinism_hook(remove_split_k=True), threads
+    )
     _log.info("determinism pinned", extra={"determinism": encode_determinism_record(report)})
     return threads, report
 

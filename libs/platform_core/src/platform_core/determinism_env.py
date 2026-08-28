@@ -37,6 +37,49 @@ enforcement is the reason this pairing is safe to rely on.
 """
 
 
+CUBLASLT_WORKSPACE_ENV_VAR = "CUBLASLT_WORKSPACE_SIZE"
+"""Name of the variable cuBLASLt reads when IT creates its handle.
+
+A different library and a different handle from the one
+:data:`CUBLAS_WORKSPACE_ENV_VAR` governs, which is why both exist and why
+neither substitutes for the other. cuBLASLt is the path a fused-epilogue
+matmul takes -- ``addmm``, and so every ``nn.Linear`` that has a bias.
+
+Here for the same reason as its cuBLAS neighbour: a batch script exports it
+before the payload starts, and a submitter runs on a laptop that must not
+import torch to know the string.
+"""
+
+CUBLASLT_NO_SPLIT_K = "0"
+"""The workspace size that takes split-K out of cuBLASLt's options.
+
+Split-K partitions the summed dimension across thread blocks and recombines
+the partial sums through a scratch workspace. It is what makes a long
+reduction fast, and it is also what makes the reduction ORDER depend on how
+many partitions the heuristic chose -- which depends on the card. Zero
+workspace leaves nowhere to recombine partials, so the heuristic cannot
+choose a split, and the reduction runs in one deterministic order on every
+card that offers the non-split kernel.
+
+MEASURED, not assumed (2026-08-27, driver 580.82.07, torch 2.6.0+cu124):
+with this set, three cards produce bit-identical tensors on all eight probed
+GEMM shapes, and an A100 and an A30 agree on 1,017 of ``xl``'s 1,018 traced
+tensors. The cost is nothing above 128 rows and up to +85% at 64 -- so a real
+training step, whose row count is batch times sequence length, pays nothing.
+
+What it does NOT buy: attention. Not one of 72 measured SDPA digests moves,
+because the memory-efficient kernel is not a cuBLASLt call. A run with this
+set is comparable across cards for its matmuls and still is not for its
+model. That limit is the reason this is one control among several rather
+than a fix.
+
+The timing constraint is cuBLAS's, and just as unforgiving: read once when
+the handle is created, on first use. Setting it afterwards is accepted in
+silence and does nothing -- measured, two ``addmm`` calls with the variable
+set between them both still used split-K, 2 of 2.
+"""
+
+
 DETERMINISM_ENV_VAR = "TRAIN_DETERMINISTIC"
 """Name of the variable a launcher sets to state a run's determinism posture.
 
@@ -163,6 +206,8 @@ class SetEnvProtocol(Protocol):
 
 __all__ = [
     "BLAS_THREAD_ENV_VARS",
+    "CUBLASLT_NO_SPLIT_K",
+    "CUBLASLT_WORKSPACE_ENV_VAR",
     "CUBLAS_DETERMINISTIC_WORKSPACE",
     "CUBLAS_WORKSPACE_ENV_VAR",
     "DETERMINISM_ENV_VAR",

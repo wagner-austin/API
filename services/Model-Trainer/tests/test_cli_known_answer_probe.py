@@ -17,7 +17,11 @@ from platform_core.json_utils import load_json_str
 from platform_core.known_answer import KnownAnswer, check_known_answer
 from platform_core.run_record import decode_run_record
 from platform_core.testing import sample_run_fingerprint
-from platform_ml.determinism import TORCH_THREAD_SETTING, with_torch_thread_count
+from platform_ml.determinism import (
+    SPLIT_K_SETTING,
+    TORCH_THREAD_SETTING,
+    with_torch_thread_count,
+)
 
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import known_answer_probe as probe_cli
@@ -137,7 +141,7 @@ class TestTheRecordItWrites:
 
     def test_the_fingerprint_reports_the_determinism_that_was_applied(self) -> None:
         record = probe_cli.probe_run_record("cpu")
-        applied: DeterminismRecord = cli_hooks.apply_determinism_hook()
+        applied: DeterminismRecord = cli_hooks.apply_determinism_hook(remove_split_k=False)
 
         assert record["fingerprint"]["determinism"] == with_torch_thread_count(
             applied, probe_cli.PROBE_CPU_THREADS
@@ -182,7 +186,26 @@ class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
         assert TORCH_THREAD_SETTING not in dict(probe_cli.probe_determinism("cuda")["settings"])
 
     def test_the_cuda_record_is_exactly_what_the_stack_pinned(self) -> None:
-        assert probe_cli.probe_determinism("cuda") == cli_hooks.apply_determinism_hook()
+        applied = cli_hooks.apply_determinism_hook(remove_split_k=False)
+
+        assert probe_cli.probe_determinism("cuda") == applied
+
+    def test_the_probe_leaves_split_k_alone_where_a_training_run_removes_it(self) -> None:
+        """The instrument must not impose the treatment it measures.
+
+        `gemm_benchmark` times the default condition against the no-split-K
+        one and `probe_trace` traces both; every one of them pins through
+        `probe_determinism`. If this pinned split-K away, both commands would
+        have only the treated arm to report and would say so without failing.
+
+        The second half is the registry. All the entries in
+        `known-answers.json` were registered from records with no split-K
+        setting, so the control posture adding none is what keeps them
+        gating -- see `SPLIT_K_SETTING` for why absence rather than an
+        explicit "not removed".
+        """
+        assert SPLIT_K_SETTING not in dict(probe_cli.probe_determinism("cuda")["settings"])
+        assert SPLIT_K_SETTING not in dict(probe_cli.probe_determinism("cpu")["settings"])
 
     def test_the_two_devices_do_not_produce_the_same_posture(self) -> None:
         """They ran different arithmetic; their records have to differ."""

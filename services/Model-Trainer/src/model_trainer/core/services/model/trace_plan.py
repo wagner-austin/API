@@ -109,6 +109,20 @@ LOSS_NAME = "loss"
 #: to pay for a thread count. An observation is free, is compared by
 #: :func:`~platform_core.run_record.agree_across_runs` like any other number,
 #: and makes a record say what it ran under.
+#:
+#: AND WHY IT STAYS ONE, NOW THAT THE DETERMINISM RECORD CARRIES THE VARIABLE
+#: TOO. As of the split-K wiring, a run that REMOVED split-K says so in its
+#: determinism record -- see
+#: :data:`platform_ml.determinism.SPLIT_K_SETTING`. That did not make this
+#: observation redundant, because the two report different facts. The record
+#: says what the process ASKED FOR; this says what the environment ACTUALLY
+#: HELD, read back. They come apart in the two cases that matter: a launcher
+#: that exported the variable itself (which is how every arm of this
+#: experiment is run, and which the record correctly does not claim credit
+#: for), and a pin that arrived too late because something had already
+#: created the cuBLASLt handle -- accepted in silence, and invisible to any
+#: record built from intent. Request and actual are a pair, and dropping
+#: either half is how a run comes to be described by what it meant to do.
 WORKSPACE_NAME = "cublaslt_workspace_size"
 
 #: The value :data:`WORKSPACE_NAME` carries when the variable is not set.

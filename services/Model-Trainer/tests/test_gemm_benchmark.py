@@ -129,7 +129,9 @@ def _child_record(condition: str, path: pathlib.Path) -> None:
     record = run_record(
         experiment=bench.BENCHMARK_EXPERIMENT,
         label=bench.BENCHMARK_LABEL,
-        fingerprint=capture_run_fingerprint("cpu", cli_hooks.apply_determinism_hook()),
+        fingerprint=capture_run_fingerprint(
+            "cpu", cli_hooks.apply_determinism_hook(remove_split_k=False)
+        ),
         observations=(Observation(name=f"gemm-x-M8-K16-N4|seconds|{condition}", value=1.0),),
         payload_digest=NO_PAYLOAD,
     )

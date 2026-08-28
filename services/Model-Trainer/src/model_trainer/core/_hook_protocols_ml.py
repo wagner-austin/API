@@ -33,8 +33,23 @@ class ApplyDeterminismProto(Protocol):
     stack and without leaking settings into the rest of the suite.
     """
 
-    def __call__(self) -> DeterminismRecord:
-        """Pin kernel determinism and report what was actually applied."""
+    def __call__(self, *, remove_split_k: bool) -> DeterminismRecord:
+        """Pin kernel determinism and report what was actually applied.
+
+        Args:
+            remove_split_k: Whether to take split-K out of cuBLASLt's
+                options, making matmuls agree across cards. Required with no
+                default, and keyword-only, because the two postures are the
+                treatment and the control of a live experiment rather than an
+                on/off switch -- see
+                :func:`platform_ml.determinism.apply_determinism`. Training
+                runs pass True; the commands that measure what split-K does
+                pass False, because an instrument that imposes the
+                intervention cannot observe it.
+
+        Returns:
+            What was actually applied, for the run record.
+        """
         ...
 
 

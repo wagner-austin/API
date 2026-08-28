@@ -144,11 +144,21 @@ def _default_pkg_version(name: str) -> str:
         return "unknown"
 
 
-def _default_apply_determinism() -> DeterminismRecord:
+def _default_apply_determinism(*, remove_split_k: bool) -> DeterminismRecord:
     """Production determinism pin - used as default hook.
 
     Imported inside the function so that merely importing this module does
     not pull torch into a process that only wanted a Redis handle.
+
+    Args:
+        remove_split_k: Passed straight through to
+            :func:`platform_ml.determinism.apply_determinism`. Not defaulted
+            here either: this module is the boundary where a caller's posture
+            becomes a process's arithmetic, and swallowing the argument would
+            put the choice back where nobody states it.
+
+    Returns:
+        What was actually applied.
     """
     import os
 
@@ -164,6 +174,7 @@ def _default_apply_determinism() -> DeterminismRecord:
         torch.backends.cuda.matmul,
         torch.use_deterministic_algorithms,
         os.putenv,
+        remove_split_k=remove_split_k,
     )
 
 

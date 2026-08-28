@@ -51,7 +51,10 @@ def process_baseline_cloze_job(payload: BaselineClozeJobPayload) -> None:
     # cuBLAS handle is created, so a later call is accepted in silence and has
     # no effect. This floor is the number every arm accuracy is reported as
     # lift over, and it was measured unpinned.
-    determinism = _test_hooks.apply_determinism_hook()
+    #
+    # remove_split_k=True: a floor every arm is reported as lift over is the
+    # one number that must not depend on which card answered the queue.
+    determinism = _test_hooks.apply_determinism_hook(remove_split_k=True)
 
     log = get_logger(__name__)
     r = redis_client(settings)

@@ -24,9 +24,14 @@ from platform_core.determinism_record import (
 from platform_ml.determinism import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
+    CUBLASLT_NO_SPLIT_K,
+    CUBLASLT_WORKSPACE_ENV_VAR,
+    SPLIT_K_REMOVED,
+    SPLIT_K_SETTING,
     TORCH_STACK,
     TORCH_THREAD_SETTING,
     apply_determinism,
+    remove_cublaslt_split_k,
     set_cublas_workspace,
     with_torch_thread_count,
 )
@@ -122,9 +127,15 @@ class RecordingTorch:
         self.deterministic_calls.append(mode)
         self._log.append(f"use_deterministic_algorithms={mode}")
 
-    def apply(self, env: RecordingEnv) -> DeterminismRecord:
+    def apply(self, env: RecordingEnv, *, remove_split_k: bool) -> DeterminismRecord:
         """Call the function under test with this bundle's leaves."""
-        return apply_determinism(self.cudnn, self.matmul, self.use_deterministic_algorithms, env)
+        return apply_determinism(
+            self.cudnn,
+            self.matmul,
+            self.use_deterministic_algorithms,
+            env,
+            remove_split_k=remove_split_k,
+        )
 
 
 def test_apply_determinism_returns_every_field_it_set() -> None:
@@ -132,7 +143,7 @@ def test_apply_determinism_returns_every_field_it_set() -> None:
     torch = RecordingTorch(log)
     env = RecordingEnv(log)
 
-    record = torch.apply(env)
+    record = torch.apply(env, remove_split_k=False)
 
     assert record == {
         "stack": TORCH_STACK,
@@ -147,6 +158,42 @@ def test_apply_determinism_returns_every_field_it_set() -> None:
     }
 
 
+def test_leaving_split_k_alone_adds_no_setting_and_writes_no_variable() -> None:
+    # The property the deployed known-answer registry depends on. Every entry
+    # in it was registered from a record with no split-K setting, so if the
+    # control arm gained a key -- even one saying "not removed" -- every
+    # future probe would report configuration_differs against all of them.
+    # Absence is what keeps that registry gating, and it is load-bearing.
+    log: list[str] = []
+    env = RecordingEnv(log)
+
+    record = RecordingTorch(log).apply(env, remove_split_k=False)
+
+    assert SPLIT_K_SETTING not in dict(record["settings"])
+    assert CUBLASLT_WORKSPACE_ENV_VAR not in env.values
+
+
+def test_removing_split_k_writes_the_variable_and_records_that_it_did() -> None:
+    log: list[str] = []
+    env = RecordingEnv(log)
+
+    record = RecordingTorch(log).apply(env, remove_split_k=True)
+
+    assert dict(record["settings"])[SPLIT_K_SETTING] == SPLIT_K_REMOVED
+    assert env.values[CUBLASLT_WORKSPACE_ENV_VAR] == CUBLASLT_NO_SPLIT_K
+
+
+def test_the_two_split_k_postures_produce_different_records() -> None:
+    # The point of recording it at all: two runs that compute different
+    # numbers must not compare as identically configured. Before this
+    # setting existed they did, and which arm produced which artifact was
+    # recoverable only from the filename.
+    left = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=True)
+    right = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=False)
+
+    assert left != right
+
+
 def test_apply_determinism_writes_the_env_var_before_touching_cuda() -> None:
     # The whole point: CUBLAS_WORKSPACE_CONFIG is read when the cuBLAS handle
     # is created. If any CUDA-touching call precedes it, the setting is a
@@ -155,7 +202,7 @@ def test_apply_determinism_writes_the_env_var_before_touching_cuda() -> None:
     torch = RecordingTorch(log)
     env = RecordingEnv(log)
 
-    torch.apply(env)
+    torch.apply(env, remove_split_k=False)
 
     assert log[0] == f"env:{CUBLAS_WORKSPACE_ENV_VAR}={CUBLAS_DETERMINISTIC_WORKSPACE}"
 
@@ -167,7 +214,7 @@ def test_apply_determinism_pins_every_flag_the_report_claims() -> None:
     torch = RecordingTorch(log)
     env = RecordingEnv(log)
 
-    torch.apply(env)
+    torch.apply(env, remove_split_k=False)
 
     assert torch.matmul.allow_tf32 is False
     assert torch.cudnn.allow_tf32 is False
@@ -182,7 +229,7 @@ def test_apply_determinism_touches_exactly_these_settings() -> None:
     # adding it to the returned record, the run record stops describing
     # the run, which is the failure this module exists to prevent.
     log: list[str] = []
-    RecordingTorch(log).apply(RecordingEnv(log))
+    RecordingTorch(log).apply(RecordingEnv(log), remove_split_k=False)
 
     assert log == [
         f"env:{CUBLAS_WORKSPACE_ENV_VAR}={CUBLAS_DETERMINISTIC_WORKSPACE}",
@@ -192,6 +239,35 @@ def test_apply_determinism_touches_exactly_these_settings() -> None:
         "cudnn.benchmark=False",
         "use_deterministic_algorithms=True",
     ]
+
+
+def test_both_env_writes_precede_every_cuda_touching_call() -> None:
+    # Ordering is the entire correctness condition for both variables: each is
+    # read once, when its library creates its handle, and a write that lands
+    # after is accepted in silence. So this asserts the full sequence rather
+    # than only the first element -- a split-K write that slipped below
+    # `matmul.allow_tf32` would still write the right value, still record the
+    # right setting, and still do nothing.
+    log: list[str] = []
+    RecordingTorch(log).apply(RecordingEnv(log), remove_split_k=True)
+
+    assert log == [
+        f"env:{CUBLAS_WORKSPACE_ENV_VAR}={CUBLAS_DETERMINISTIC_WORKSPACE}",
+        f"env:{CUBLASLT_WORKSPACE_ENV_VAR}={CUBLASLT_NO_SPLIT_K}",
+        "matmul.allow_tf32=False",
+        "cudnn.allow_tf32=False",
+        "cudnn.deterministic=True",
+        "cudnn.benchmark=False",
+        "use_deterministic_algorithms=True",
+    ]
+
+
+def test_remove_cublaslt_split_k_writes_zero_workspace() -> None:
+    env = RecordingEnv([])
+
+    remove_cublaslt_split_k(env)
+
+    assert env.values == {CUBLASLT_WORKSPACE_ENV_VAR: CUBLASLT_NO_SPLIT_K}
 
 
 def test_set_cublas_workspace_returns_what_it_wrote() -> None:
@@ -206,7 +282,8 @@ def test_set_cublas_workspace_returns_what_it_wrote() -> None:
 def test_encode_nests_the_settings_under_their_stack() -> None:
     # Nested rather than flattened so a setting can never collide with the
     # "stack" key, whatever a future stack decides to name one.
-    encoded = encode_determinism_record(RecordingTorch([]).apply(RecordingEnv([])))
+    applied = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=False)
+    encoded = encode_determinism_record(applied)
 
     assert encoded == {
         "stack": TORCH_STACK,
@@ -222,7 +299,7 @@ def test_encode_nests_the_settings_under_their_stack() -> None:
 
 
 def test_a_torch_record_round_trips() -> None:
-    record = RecordingTorch([]).apply(RecordingEnv([]))
+    record = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=False)
 
     assert decode_determinism_record(encode_determinism_record(record)) == record
 
@@ -241,7 +318,7 @@ class TestTheThreadCountIsPartOfThePosture:
     """
 
     def test_the_count_joins_a_pinned_record(self) -> None:
-        pinned = RecordingTorch([]).apply(RecordingEnv([]))
+        pinned = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=False)
 
         recorded = with_torch_thread_count(pinned, 8)
 
@@ -257,19 +334,20 @@ class TestTheThreadCountIsPartOfThePosture:
 
     def test_two_thread_counts_do_not_compare_equal(self) -> None:
         """The whole point: these two runs produce different numbers."""
-        pinned = RecordingTorch([]).apply(RecordingEnv([]))
+        pinned = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=False)
 
         assert with_torch_thread_count(pinned, 1) != with_torch_thread_count(pinned, 8)
 
     def test_it_keeps_every_setting_the_stack_pinned(self) -> None:
-        pinned = RecordingTorch([]).apply(RecordingEnv([]))
+        pinned = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=False)
 
         recorded = with_torch_thread_count(pinned, 4)
 
         assert dict(pinned["settings"]).items() <= dict(recorded["settings"]).items()
 
     def test_the_result_still_round_trips(self) -> None:
-        recorded = with_torch_thread_count(RecordingTorch([]).apply(RecordingEnv([])), 4)
+        applied = RecordingTorch([]).apply(RecordingEnv([]), remove_split_k=False)
+        recorded = with_torch_thread_count(applied, 4)
 
         assert decode_determinism_record(encode_determinism_record(recorded)) == recorded
 

@@ -16,7 +16,16 @@ from typing import Protocol
 
 from platform_core.determinism_record import DeterminismRecord
 
-from model_trainer.core._hook_protocols_ml import PinTorchThreadsProto
+# Imported rather than restated. This module carried its own copy of
+# `ApplyDeterminismProto`, identical to the core one and with no reason to be
+# separate -- `PinTorchThreadsProto` was already coming from here, so the
+# usual excuse (keeping torch out of a laptop-side import) did not apply.
+# The fork was invisible until the core protocol gained an argument and only
+# one of the two copies changed.
+from model_trainer.core._hook_protocols_ml import (
+    ApplyDeterminismProto,
+    PinTorchThreadsProto,
+)
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem
 from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.services.model.forward_cost import FORWARD_SHAPES, ForwardCostShape
@@ -55,19 +64,6 @@ class ScoreClozeProto(Protocol):
         max_seq_len: int,
     ) -> ClozeEvalResult:
         """Score every item and report accuracy against the guessing baseline."""
-        ...
-
-
-class ApplyDeterminismProto(Protocol):
-    """Protocol for the determinism pin.
-
-    Behind a hook because it writes process-global torch state and the
-    environment, which a test must be able to observe without a real CUDA
-    stack.
-    """
-
-    def __call__(self) -> DeterminismRecord:
-        """Pin kernel determinism and report what was actually applied."""
         ...
 
 
@@ -198,8 +194,9 @@ def _default_env_cublaslt_workspace() -> str | None:
         one saying it does not know.
     """
     from platform_core.config import config_test_hooks
+    from platform_core.determinism_env import CUBLASLT_WORKSPACE_ENV_VAR
 
-    value = config_test_hooks.get_env("CUBLASLT_WORKSPACE_SIZE")
+    value = config_test_hooks.get_env(CUBLASLT_WORKSPACE_ENV_VAR)
     return value if value else None
 
 
@@ -343,19 +340,25 @@ def _default_score_cloze(
     )
 
 
-def _default_apply_determinism() -> DeterminismRecord:
+def _default_apply_determinism(*, remove_split_k: bool) -> DeterminismRecord:
     """Production determinism pin - used as default hook.
 
     Delegates to the same hook the workers use, so a run scored from the
     command line and one scored through the queue pin identically. A second
     spelling here would be a second posture nobody noticed diverging.
 
+    Args:
+        remove_split_k: Forwarded unchanged. The CLI tier is where the two
+            populations actually differ -- a scoring command pins like a
+            worker, a measurement command deliberately does not -- so this
+            passes the caller's choice on rather than making one.
+
     Returns:
         What was actually applied.
     """
     from model_trainer.core import _test_hooks as core_hooks
 
-    return core_hooks.apply_determinism_hook()
+    return core_hooks.apply_determinism_hook(remove_split_k=remove_split_k)
 
 
 def _default_pin_torch_threads(threads: int) -> int:

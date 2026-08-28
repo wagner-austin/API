@@ -28,11 +28,21 @@ What this module deliberately does NOT do:
   a seeded nondeterministic run and an unseeded deterministic one are both
   irreproducible, for different reasons.
 * It does not promise reproducibility ACROSS different GPU architectures.
-  That is not achievable: different cards select different kernels with
-  different reduction trees. What it buys is reproducibility WITHIN one
-  configuration, which is what lets a rerun be compared to its own earlier
-  self, and what lets a cross-configuration difference be MEASURED against a
-  known run rather than assumed to be zero.
+  What it buys is reproducibility WITHIN one configuration, which is what
+  lets a rerun be compared to its own earlier self, and what lets a
+  cross-configuration difference be MEASURED against a known run rather than
+  assumed to be zero.
+
+  That used to read "not achievable", flatly. It is narrower than that, and
+  the correction is measured. Removing cuBLASLt's split-K -- the
+  ``remove_split_k`` argument below -- makes three cards produce bit-identical
+  tensors on every probed GEMM shape, and an A100 and an A30 agree on 1,017 of
+  a 1.5-billion-parameter model's 1,018 traced tensors. So the matmuls CAN be
+  made to agree across cards, cheaply. The model still does not: attention
+  does not go through cuBLASLt and not one of 72 measured SDPA digests moves,
+  and a V100 diverges from the Ampere pair regardless. Cross-card agreement
+  is therefore a property to establish per operation, not a promise this
+  module can make or refuse wholesale.
 * It does not offer a warn-only mode. PyTorch can be asked to warn instead of
   raising when an operation has no deterministic implementation; that
   silently returns a nondeterministic result while reporting success, which
@@ -56,6 +66,8 @@ from typing import Protocol
 from platform_core.determinism_env import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
+    CUBLASLT_NO_SPLIT_K,
+    CUBLASLT_WORKSPACE_ENV_VAR,
     SetEnvProtocol,
 )
 from platform_core.determinism_record import (
@@ -110,6 +122,48 @@ def set_cublas_workspace(set_env: SetEnvProtocol) -> str:
     return CUBLAS_DETERMINISTIC_WORKSPACE
 
 
+#: Setting name recorded when a run took split-K out of cuBLASLt's options.
+#:
+#: RECORDED ONLY WHEN IT WAS DONE, and absent otherwise. Absence is readable
+#: as "whatever the library chose", exactly as an absent
+#: :data:`TORCH_THREAD_SETTING` is readable as "whatever the machine chose",
+#: and for the same practical reason: adding a key that every run carries
+#: would change every fingerprint ever written, and the deployed
+#: known-answer registry would report ``configuration_differs`` against every
+#: future probe. A key present only on runs that did the thing costs the
+#: registry nothing and still distinguishes the two postures, because a run
+#: that removed split-K genuinely is a different configuration from one that
+#: did not -- it computes different numbers.
+SPLIT_K_SETTING = "cublaslt_split_k"
+
+#: The value :data:`SPLIT_K_SETTING` carries. A single value rather than a
+#: pair, because the setting is absent when it was not applied; a record
+#: never has to be read as "present and false".
+SPLIT_K_REMOVED = "removed"
+
+
+def remove_cublaslt_split_k(set_env: SetEnvProtocol) -> None:
+    """Take split-K out of cuBLASLt's algorithm choices for this process.
+
+    Must be called before any CUDA work, and before
+    :func:`set_cublas_workspace` has no bearing on it -- the two variables
+    are read by two different libraries when each creates its own handle, and
+    both handles are created on first use. Ordering between them is
+    irrelevant; ordering against CUDA is everything.
+
+    Unlike :func:`set_cublas_workspace` this returns nothing. That function
+    returns what it wrote because the value is a SETTING with more than one
+    admissible value, and a record has to say which one was in force. Here
+    there is exactly one value that means anything -- see
+    :data:`~platform_core.determinism_env.CUBLASLT_NO_SPLIT_K` -- so a
+    returned string would be a constant handed back to its own caller.
+
+    Args:
+        set_env: Writer for a process environment variable.
+    """
+    set_env(CUBLASLT_WORKSPACE_ENV_VAR, CUBLASLT_NO_SPLIT_K)
+
+
 #: Setting name for the thread count a torch run resolved to.
 #:
 #: Distinct from the ``OMP_NUM_THREADS`` family that
@@ -155,6 +209,8 @@ def apply_determinism(
     matmul: MatmulBackendProtocol,
     set_deterministic_algorithms: SetDeterministicAlgorithmsProtocol,
     set_env: SetEnvProtocol,
+    *,
+    remove_split_k: bool,
 ) -> DeterminismRecord:
     """Put the process into deterministic mode and report what was applied.
 
@@ -165,8 +221,18 @@ def apply_determinism(
     which would otherwise have forced a cast at the one call site that
     matters -- the production one.
 
-    Order matters: the cuBLAS workspace variable is written first, because
-    every later step may touch CUDA and the variable is only read once.
+    Order matters: both environment variables are written first, because
+    every later step may touch CUDA and each is only read once.
+
+    WHY ``remove_split_k`` IS A REQUIRED ARGUMENT WITH NO DEFAULT. The two
+    postures are not "on" and "off" of one feature; they are the treatment
+    and the control of a live experiment. A training run wants split-K gone,
+    because that is what makes its matmuls agree across cards. The commands
+    that MEASURE what split-K does must be able to run without it removed, or
+    they can only ever observe the treated arm -- an instrument that imposes
+    the intervention cannot measure it. Defaulting the argument either way
+    would silently pick one of those for a caller who had not thought about
+    it, and the failure would be a number that looks fine.
 
     Args:
         cudnn: The ``torch.backends.cudnn`` module, or a double.
@@ -174,6 +240,12 @@ def apply_determinism(
         set_deterministic_algorithms: ``torch.use_deterministic_algorithms``.
         set_env: Writer for a process environment variable, e.g.
             ``os.putenv``.
+        remove_split_k: Whether to take split-K out of cuBLASLt's options.
+            True for a run whose numbers should be comparable across cards;
+            False for a run measuring what that costs or what it changes.
+            False writes nothing at all -- it does not write a "keep split-K"
+            value -- so a launcher that exported the variable itself still
+            governs, and the record says only that this call did not do it.
 
     Returns:
         A :class:`DeterminismReport` describing the state now in force.
@@ -181,6 +253,13 @@ def apply_determinism(
         cannot be compared to one whose are.
     """
     workspace = set_cublas_workspace(set_env)
+    # Written and recorded in one branch so the two can never disagree: a
+    # record claiming split-K was removed by a process that did not write the
+    # variable would be the exact failure this record exists to prevent.
+    split_k: dict[str, str] = {}
+    if remove_split_k:
+        remove_cublaslt_split_k(set_env)
+        split_k = {SPLIT_K_SETTING: SPLIT_K_REMOVED}
 
     matmul.allow_tf32 = False
     cudnn.allow_tf32 = False
@@ -197,13 +276,18 @@ def apply_determinism(
             "cudnn_tf32": FALSE,
             "cudnn_deterministic": TRUE,
             "cudnn_benchmark": FALSE,
+            **split_k,
         },
     )
 
 
 __all__ = [
+    "CUBLASLT_NO_SPLIT_K",
+    "CUBLASLT_WORKSPACE_ENV_VAR",
     "CUBLAS_DETERMINISTIC_WORKSPACE",
     "CUBLAS_WORKSPACE_ENV_VAR",
+    "SPLIT_K_REMOVED",
+    "SPLIT_K_SETTING",
     "TORCH_STACK",
     "TORCH_THREAD_SETTING",
     "CudnnBackendProtocol",
@@ -211,6 +295,7 @@ __all__ = [
     "SetDeterministicAlgorithmsProtocol",
     "SetEnvProtocol",
     "apply_determinism",
+    "remove_cublaslt_split_k",
     "set_cublas_workspace",
     "with_torch_thread_count",
 ]

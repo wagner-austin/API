@@ -4,12 +4,17 @@ from .artifact_store import ArtifactStore, ArtifactStoreError
 from .determinism import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
     CUBLAS_WORKSPACE_ENV_VAR,
+    CUBLASLT_NO_SPLIT_K,
+    CUBLASLT_WORKSPACE_ENV_VAR,
+    SPLIT_K_REMOVED,
+    SPLIT_K_SETTING,
     TORCH_STACK,
     CudnnBackendProtocol,
     MatmulBackendProtocol,
     SetDeterministicAlgorithmsProtocol,
     SetEnvProtocol,
     apply_determinism,
+    remove_cublaslt_split_k,
     set_cublas_workspace,
 )
 from .device_selector import (
@@ -79,12 +84,16 @@ from .wandb_types import (
 )
 
 __all__ = [
+    "CUBLASLT_NO_SPLIT_K",
+    "CUBLASLT_WORKSPACE_ENV_VAR",
     "CUBLAS_DETERMINISTIC_WORKSPACE",
     "CUBLAS_WORKSPACE_ENV_VAR",
     "GRADIENT_CAPABILITIES",
     "INTEGRATED_GRADIENTS_CAPABILITIES",
     "MANIFEST_SCHEMA_VERSION",
     "PERMUTATION_CAPABILITIES",
+    "SPLIT_K_REMOVED",
+    "SPLIT_K_SETTING",
     "TORCH_STACK",
     "ArtifactStore",
     "ArtifactStoreError",
@@ -144,6 +153,7 @@ __all__ = [
     "from_path_manifest_v2",
     "get_num_threads",
     "recommended_batch_size",
+    "remove_cublaslt_split_k",
     "resolve_device",
     "resolve_precision",
     "set_cublas_workspace",
