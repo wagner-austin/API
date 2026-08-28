@@ -10,10 +10,26 @@ That is not hypothetical here. The unexposed-gpt2 floor of 52.3030% is
 load-bearing -- ``tools/extraction-eval/README.md`` instructs readers to
 report lift above it and never absolute accuracy -- and the record behind it
 carried no device, no driver, no torch version and no timestamp. Meanwhile
-the training manifests beside it DID record ``versions.torch``, which is how
-a 2026-08-25 audit found that the published arms span two torch major
-versions with four contrasts crossing the boundary. The scoring path simply
-never got the treatment the training path had.
+the training manifests beside it DID record ``versions.torch``. The scoring
+path simply never got the treatment the training path had.
+
+A CORRECTION TO WHAT THAT FIELD WAS TAKEN TO SHOW. This docstring previously
+said a 2026-08-25 audit found the published arms spanning two torch major
+versions with four contrasts crossing the boundary. **That reading does not
+survive checking the field itself.** Fifteen of the thirty-nine archived
+manifests record ``versions.torch == "2.13.0"``; PyTorch has never released a
+2.13.0, this repository's lock has pinned ``2.6.0+cu124`` continuously since
+2025-12-19, no commit on any branch ever pinned 2.13, and no Dockerfile or
+requirement names it. The value also changes at a clean time boundary
+(2026-08-16 20:38 to 2026-08-17 00:57) while ``transformers``, ``tokenizers``
+and ``datasets`` stay identical across it.
+
+So the field recorded something other than torch's version for those runs, and
+what it recorded is not recoverable from the archive. The accurate statement is
+weaker and less alarming than the one it replaces: **fifteen of thirty-nine
+runs carry an unusable version record**, which is a provenance gap rather than
+a demonstrated split. It is still a reason this module exists -- a field nobody
+can interpret is exactly as useless as a field nobody wrote.
 
 This module builds the fingerprint that closes that gap, from the same hooks
 the training manifest already reads, so there is one way to answer "what did
