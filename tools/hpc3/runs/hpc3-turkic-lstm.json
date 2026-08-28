@@ -17,8 +17,8 @@
       "requeue": true,
       "checkpoint_steps": 27344,
       "image": {
-        "path": "/pub/wagnera3/images/turkic-lstm-v1/turkic-lstm.sif",
-        "sha256": "8e1f2c41f7f426012d735d5b5e853d8dd2632815de1fe2f5d1d2f93bbed9e702",
+        "path": "/pub/wagnera3/images/turkic-lstm-v2/turkic-lstm.sif",
+        "sha256": "6aa33e027893b2a09352d901d2d0dd2bb108cd1c1670446402a1c08c293552fc",
         "binds": [
           "/pub/wagnera3"
         ]
