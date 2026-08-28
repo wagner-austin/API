@@ -130,6 +130,26 @@ class ProjectConfig(TypedDict):
             Deliberately NOT in :data:`PROJECT_FIELDS`: a run may override
             every resource above, and may override none of this. A cap a run
             can raise is not a cap.
+        repo: Where this project's code lives on the workstation, resolved
+            against the workspace document's own directory exactly as
+            ``ledger`` is, so the declaration stays portable.
+
+            THIS IS THE FIELD THAT MAKES THE TABLE AN INDEX RATHER THAN A
+            RESOURCE FILE. Everything above says how a project runs on the
+            cluster; nothing said what it IS. That was survivable only while
+            every declared project happened to be the same repository -- and
+            all three were, so the mapping was implicit and nobody noticed
+            it was missing.
+
+            It stopped being survivable the moment the question became
+            "what research exists here". A session that opens this workspace
+            can now answer it; before, an audit of this very machine found
+            four research surfaces and missed two, because ninety directories
+            under ``~/PROJECTS`` and no list is not a question anyone can
+            answer by reading.
+
+            Also NOT in :data:`PROJECT_FIELDS`. A run may vary what it asks
+            of the cluster; it may not relocate the project.
     """
 
     partition: str
@@ -144,6 +164,7 @@ class ProjectConfig(TypedDict):
     pinned_packages: dict[str, str]
     deterministic: bool
     budget: Budget
+    repo: str
 
 
 class Workspace(TypedDict):
@@ -234,7 +255,9 @@ def _require_positive(obj: dict[str, JSONValue], key: str) -> int:
     return value
 
 
-def decode_project_config(value: JSONValue, cluster: ClusterFacts) -> ProjectConfig:
+def decode_project_config(
+    value: JSONValue, cluster: ClusterFacts, *, config_dir: pathlib.Path
+) -> ProjectConfig:
     """Decode and validate one project's resource defaults.
 
     The cross-field submission rules -- billing consent, preemption
@@ -246,6 +269,9 @@ def decode_project_config(value: JSONValue, cluster: ClusterFacts) -> ProjectCon
     Args:
         value: Value produced by the JSON loader.
         cluster: The cluster whose partitions and GPUs the defaults must name.
+        config_dir: Directory the workspace document was read from. ``repo``
+            resolves against it, so a relative declaration means the same
+            thing from any working directory.
 
     Returns:
         Validated defaults.
@@ -278,6 +304,7 @@ def decode_project_config(value: JSONValue, cluster: ClusterFacts) -> ProjectCon
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
         deterministic=require_bool(value, "deterministic"),
         budget=decode_budget(value.get("budget")),
+        repo=str(config_dir / _require_nonempty_str(value, "repo")),
     )
 
 
@@ -303,17 +330,20 @@ def encode_project_config(config: ProjectConfig) -> dict[str, JSONValue]:
         "pinned_packages": encode_pinned_packages(config["pinned_packages"]),
         "deterministic": config["deterministic"],
         "budget": encode_budget(config["budget"]),
+        "repo": config["repo"],
     }
 
 
 def _decode_projects(
-    value: dict[str, JSONValue], cluster: ClusterFacts
+    value: dict[str, JSONValue], cluster: ClusterFacts, config_dir: pathlib.Path
 ) -> dict[str, ProjectConfig]:
     """Decode the project table, validating every key as a project name.
 
     Args:
         value: The workspace object being decoded.
         cluster: The cluster the projects' defaults are checked against.
+        config_dir: Directory the document was read from, which each
+            project's ``repo`` resolves against.
 
     Returns:
         Defaults keyed by validated project name.
@@ -335,7 +365,7 @@ def _decode_projects(
         # that reaches `squeue` from here is a name that would be accepted
         # there -- a workspace cannot smuggle in one the layout rejects.
         checked = require_project({"project": name}, "project")
-        decoded[checked] = decode_project_config(config, cluster)
+        decoded[checked] = decode_project_config(config, cluster, config_dir=config_dir)
     return decoded
 
 
@@ -384,7 +414,7 @@ def decode_workspace(value: JSONValue, *, config_dir: pathlib.Path) -> Workspace
         root=require_root(_require_nonempty_str(value, "root")),
         ledger=str(config_dir / _require_nonempty_str(value, "ledger")),
         quiet_seconds=quiet_seconds,
-        projects=_decode_projects(value, cluster),
+        projects=_decode_projects(value, cluster, config_dir),
     )
 
 

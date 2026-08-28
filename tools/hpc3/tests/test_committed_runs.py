@@ -49,6 +49,14 @@ from hpc3.contracts.workspace import Workspace, decode_workspace
 
 _RUNS = pathlib.Path(__file__).parent.parent / "runs"
 
+_INDEX = pathlib.Path(__file__).parents[3] / "docs" / "RESEARCH.md"
+"""The research index, at the monorepo root rather than in this package.
+
+It names work in other repositories -- LSTM lives outside this one entirely --
+so it cannot live under the tool that happens to submit some of it. This
+package holds the check because this package holds the registry.
+"""
+
 
 def _documents() -> list[tuple[str, dict[str, JSONValue]]]:
     """Read every JSON object in ``runs/``.
@@ -163,6 +171,44 @@ class TestTheCommittedWorkspaces:
         what makes one pool's worth of work land in one record."""
         ledgers = {pathlib.Path(w["ledger"]) for w in _workspaces().values()}
         assert ledgers == {_RUNS / "ledger.jsonl"}
+
+
+class TestTheResearchIndexNamesEveryProject:
+    """``docs/RESEARCH.md`` is the list a new session reads first.
+
+    A list that is only prose rots the way the required-symbol assertion in
+    ``test_contracts_image`` rotted -- nine commits past the point it stopped
+    being true. So the registered half of it is checked: every project a
+    committed workspace declares must appear in the index, and every repo
+    path a project declares must exist.
+
+    The reverse direction is deliberately NOT asserted. The index carries
+    surfaces that are not registered anywhere -- LSTM, RustedWarfareBot --
+    and that is the whole reason it is worth reading; a test demanding the
+    two match exactly would be satisfied by deleting the entries that matter.
+    """
+
+    def test_every_declared_project_appears_in_the_index(self) -> None:
+        text = _INDEX.read_text(encoding="utf-8")
+        missing = sorted(name for name in _by_project() if f"`{name}`" not in text)
+        assert missing == []
+
+    def test_every_declared_repo_exists(self) -> None:
+        """A path nobody checks is a path that is eventually wrong."""
+        absent = sorted(
+            name
+            for name, workspace in _workspaces().items()
+            for config in workspace["projects"].values()
+            if not pathlib.Path(config["repo"]).is_dir()
+        )
+        assert absent == []
+
+    def test_the_index_states_which_surfaces_are_unregistered(self) -> None:
+        """The entries no tool can see are the ones a reader most needs."""
+        text = _INDEX.read_text(encoding="utf-8")
+        assert "## Not registered anywhere" in text
+        for surface in ("LSTM", "RustedWarfareBot"):
+            assert surface in text
 
 
 class TestEveryCommittedSubmissionResolves:

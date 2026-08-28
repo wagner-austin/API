@@ -33,7 +33,8 @@
         "self_imposed_gpu_hours": 12.0,
         "max_service_units": 0.0,
         "charge_account": ""
-      }
+      },
+      "repo": "../../.."
     }
   }
 }

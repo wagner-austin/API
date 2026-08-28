@@ -1,0 +1,144 @@
+# Research index
+
+**Every body of work on this machine that produces numbers someone compares.**
+Read this before auditing, extending, or reproducing any experiment.
+
+This file exists because nothing like it did, and the cost was measured: on
+2026-08-28 an audit of provenance across this machine examined four research
+surfaces and missed two entirely — LSTM and RustedWarfareBot — because there
+are roughly ninety directories under `~/PROJECTS` and no list. Two of the
+surfaces below are still not registered anywhere a tool can see.
+
+The machine-readable half of this is the `projects` table in the hpc3
+workspace documents (`tools/hpc3/runs/hpc3*.json`). Each entry declares how a
+project runs on the cluster, its own caps and charge account, and — since
+2026-08-28 — `repo`, where its code lives. Anything registered there is
+enforced against this file by
+`tools/hpc3/tests/test_committed_runs.py`; anything not registered appears
+below with that stated, and nothing checks it.
+
+---
+
+## Registered with the hpc3 CLI
+
+These submit through `hpc3-submit` / `hpc3-sweep` / `hpc3-chain`, and every
+submission lands in `tools/hpc3/runs/ledger.jsonl` (machine-local, deliberately
+untracked — it is state, not configuration).
+
+### `mi` — Model-Trainer probes and benchmarks
+
+- **Repo:** this one, `services/Model-Trainer`
+- **Runs:** `model_trainer.cli.{gemm_benchmark, probe_ladder, train_benchmark,
+  sdpa_benchmark, known_answer_probe, forward_benchmark, probe_trace, ...}`
+- **Produces:** one `RunRecord` JSON per run under `/pub/wagnera3/{bench,gemm,
+  sdpa,ladder,trace,...}`
+- **Provenance:** `RunRecord` + `RunFingerprint` — image digest, GPU model,
+  driver, determinism posture, host, package versions. The only surface here
+  that carries all six axes.
+- **Scale:** 131 ledger rows, the largest body of cluster work.
+
+### `cleargbm` — ClearGBM benchmarks and covenant-radar optimisation
+
+- **Repo:** this one — `libs/cleargbm`, `libs/cleargbm_rs`, `libs/covenant_ml`,
+  `services/covenant-radar-api`
+- **Runs:** `scripts.optimize -b cleargbm`, `scripts.benchmark_cleargbm_*`
+- **Produces:** `libs/cleargbm/docs/BENCHMARK_MANIFEST_*.json` (41 of them) and
+  `services/covenant-radar-api/models/optimization_history.jsonl`
+- **Provenance:** partial. Every benchmark entry point pins BLAS threads and
+  builds a `RunFingerprint` as of 2026-08-27, but the record shape is
+  `BenchmarkManifest`, not `RunRecord`. `optimization_history.jsonl` carries
+  `best_val_auc` and `duration_seconds` with **no fingerprint at all** — it is
+  a longitudinal comparison with nothing recording whether its rows are
+  comparable.
+- **Scale:** 108 ledger rows.
+
+### `floor` — cloze floor scoring
+
+- **Repo:** this one, `services/Model-Trainer`
+- **Runs:** `modeltrainer-score-baseline --experiment extraction-eval`
+- **Produces:** `/pub/wagnera3/floor/results/*.json`
+- **Provenance:** `RunRecord`, and its known answers are registered so a
+  re-run is checked against an established value rather than merely recorded.
+- **Scale:** 7 ledger rows.
+
+---
+
+## Not registered anywhere
+
+Real research, producing numbers that get compared, reachable by no tool.
+
+### LSTM — character-level LSTM for Turkic languages
+
+- **Repo:** `~/PROJECTS/LSTM` (separate Poetry project, no `platform_core`)
+- **Produces:** `results/*.csv`, `checkpoints_*/`, `analysis/`
+- **Compares:** `zero_shot_excess_ce_*.csv` carries `excess_cross_entropy` —
+  one model's cross-entropy minus another's — with confidence intervals,
+  across seven languages and six arms (`pilot_a/b/c`, `variant_b`, `v3`,
+  `2026-02`, `rebuild_2026-08`). Files named `_forMoldir` and a commit
+  crediting a Finnish native reviewer indicate this is bound for publication.
+- **Provenance:** **the filename.** `_2026-08-13`, `_fixedfi`, `_forMoldir`.
+  Checkpoints are `<lang>_best.pt` plus `<lang>_vocab.json`; the vocab is a
+  model contract, not provenance.
+- **Two axes vary by construction and are unrecorded.**
+  `slurm/train_base.sub` is an array job on the **preemptible** `free-gpu`
+  partition with `--requeue`, and its own comment says the scheduler places
+  tasks "across whatever is free" — so arms train on different cards and a
+  preempted run can resume on a different card than it started on. And
+  `torch = "^2.5"` is a caret range, so arms trained months apart can differ
+  in torch minor. Those are exactly `RunFingerprint`'s `gpu_model` and
+  `packages` axes.
+- **Reaches the cluster** via a hand-written `slurm/train_base.sub`, so none
+  of it appears in the ledger. The hpc3 README's own "Adding a project"
+  example is named `turkic-lstm` — this was anticipated and never done.
+
+### RustedWarfareBot — system identification against an obfuscated binary
+
+- **Repo:** this one, `clients/RustedWarfareBot`
+- **Produces:** `runs/*.log` (seeded: `aa-s12345`, `aa-s1337`),
+  `sweeps/*.txt` (`aggression`, `army-mix`, `antiair`, `aa-cover`, ...),
+  `models/fleetdoom.ndjson`
+- **Compares:** seeded runs across parameter sweeps against a stated goal —
+  "100% win rate against the built-in AI at Impossible and every rung below,
+  measured".
+- **Provenance:** its own notion — the README says it "pins every claim to the
+  build it was measured on", which is the right instinct and a different
+  vocabulary from `RunFingerprint`.
+- **Runs locally**, not on the cluster.
+
+### `sirius` — declared as an example, never run
+
+- **Repo:** unconfirmed. `examples/chain-sirius-zodiac.json` runs the SIRIUS
+  `formula` and `zodiac` subcommands, which are metabolomics tools;
+  `~/PROJECTS/metabolomics-dashboard` contains `cho_formulas_assigned.csv`,
+  which is consistent with being the destination, but nothing states the link
+  and it should be confirmed before being relied on.
+- **Status:** appears only in `tools/hpc3/examples/`, with zero ledger rows.
+  A second PI's work (accounts are per-PI; see the account comment in LSTM's
+  `slurm/train_base.sub`) that was scoped and never onboarded.
+
+---
+
+## The shared record, and who uses it
+
+`platform_core.run_record.RunRecord` is the one shape a research run is meant
+to emit: an experiment name, a label, named observations, a payload digest,
+and a `RunFingerprint` saying what produced them. `platform_core.comparability`
+then decides whether two of them may be subtracted.
+
+Its consumers today are Model-Trainer's CLIs and nothing else. `covenant_ml`
+benchmarking has a fingerprint but its own record shape; `covenant-radar-api`'s
+optimisation history has neither; LSTM and RustedWarfareBot cannot adopt it at
+all, because `platform_core` is not installable outside this monorepo.
+
+That is the gap this index exists to make visible rather than to hide.
+
+## Adding a research project
+
+1. Add an entry to `projects` in a workspace document under
+   `tools/hpc3/runs/` — resources, `budget`, and `repo`.
+2. Add a section here. `test_committed_runs.py` fails if a registered project
+   is missing from this file.
+3. Emit `RunRecord`s from whatever produces the numbers.
+4. Submit through the hpc3 CLI rather than a hand-written `sbatch` script, so
+   the run lands in the ledger and `hpc3-trace` can answer "which job produced
+   this artifact".

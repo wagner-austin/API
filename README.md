@@ -4,6 +4,12 @@ Typed Python monorepo for ML training, NLP, media services, and quant-ML risk mo
 
 ## Start here
 
+**Doing research, auditing an experiment, or reproducing a number?** Read
+**[`docs/RESEARCH.md`](docs/RESEARCH.md)** first. It is the index of every body
+of work on this machine that produces numbers someone compares — including the
+two that live outside this repository — and says for each one what provenance
+it carries and what it does not.
+
 The three parts of this repo worth reading first:
 
 1. **[`libs/cleargbm/`](libs/cleargbm)** + **[`libs/cleargbm_rs/`](libs/cleargbm_rs)** — From-scratch interpretable gradient boosting: numpy Python orchestration with a Rust core (histogram building, tree construction, prediction pipeline) exposed via PyO3 bindings.

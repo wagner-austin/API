@@ -138,8 +138,9 @@ class TestDecodeProjectConfig:
         what a RUN may replace, and a cap a run can replace is not a cap.
         """
         config = decode_project_config(project_config())
-        assert sorted(config.keys()) == sorted([*PROJECT_FIELDS, "budget"])
+        assert sorted(config.keys()) == sorted([*PROJECT_FIELDS, "budget", "repo"])
         assert "budget" not in PROJECT_FIELDS
+        assert "repo" not in PROJECT_FIELDS
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a JSON object"):
@@ -194,8 +195,16 @@ class TestDecodeProjectConfig:
 
 class TestRoundTrip:
     def test_a_project_config_round_trips(self) -> None:
-        payload = project_config()
-        assert encode_project_config(decode_project_config(payload)) == payload
+        """Equivalence, not identity, for the same reason the workspace's is:
+        ``repo`` encodes resolved, so a second decode is a fixed point rather
+        than the document that was read."""
+        decoded = decode_project_config(project_config())
+        assert decode_project_config(encode_project_config(decoded)) == decoded
+
+    def test_the_encoded_repo_is_the_resolved_one(self) -> None:
+        decoded = decode_project_config(project_config())
+        assert encode_project_config(decoded)["repo"] == decoded["repo"]
+        assert pathlib.Path(decoded["repo"]).name == "abl"
 
     def test_a_workspace_round_trips_with_the_ledger_resolved(self) -> None:
         """Encoding emits the resolved ledger, so this is equivalence not identity."""

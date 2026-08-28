@@ -60,7 +60,8 @@ written down.
       "env_path": "/pub/wagnera3/envs/abl-pinned",
       "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" },
       "deterministic": true,
-      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" }
+      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
+      "repo": "../../.."
     },
     "sirius": {
       "partition": "free",
@@ -73,7 +74,8 @@ written down.
       "env_path": "/pub/wagnera3/envs/sirius",
       "pinned_packages": {},
       "deterministic": false,
-      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" }
+      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
+      "repo": "../../../../metabolomics-dashboard"
     }
   }
 }
@@ -88,6 +90,7 @@ written down.
 | `quiet_seconds` | how long a running job may write nothing before triage calls it silent (default 1800) |
 | `projects` | resource defaults, caps and charge account per body of work |
 | `projects.<name>.budget` | that project's self-imposed caps, checked before submission and again while running |
+| `projects.<name>.repo` | where that project's code lives; relative paths resolve against this file's directory |
 
 **There are no `--host` / `--root` / `--budget` / `--ledger` flags.** The
 budget is not a flag either; it is read from the project the run names, so
@@ -113,7 +116,8 @@ environment path:
   "env_path": "/pub/wagnera3/envs/turkic",
   "pinned_packages": {},
   "deterministic": false,
-  "budget": { "self_imposed_gpu_hours": 12.0, "max_service_units": 0.0, "charge_account": "" }
+  "budget": { "self_imposed_gpu_hours": 12.0, "max_service_units": 0.0, "charge_account": "" },
+  "repo": "../../../../LSTM"
 }
 ```
 
@@ -184,11 +188,18 @@ default.
   "project": "abl", "name": "rung-large",
   "minutes": 900, "checkpoint_steps": 250,
   "members": [
-    { "suffix": "armB-s0", "command": "python -u train.py --arm B --seed 0" },
-    { "suffix": "armB-s1", "command": "python -u train.py --arm B --seed 1" }
+    { "suffix": "armB-s0", "command": "python -u train.py --arm B --seed 0 --out /pub/wagnera3/abl/s0.json",
+      "artifact": "/pub/wagnera3/abl/s0.json" },
+    { "suffix": "armB-s1", "command": "python -u train.py --arm B --seed 1 --out /pub/wagnera3/abl/s1.json",
+      "artifact": "/pub/wagnera3/abl/s1.json" }
   ]
 }
 ```
+
+Each member states its own `artifact`, or `null` if it writes no file of its
+own — six arms writing to one path are five results nobody can read. It is
+checked against that member's own command, so a suffix changed in one and not
+the other fails here rather than after the run.
 
 `hpc3-sweep --config … --run …` submits each member and records each one as it
 goes. There is no rollback: a member that fails leaves the earlier ones running

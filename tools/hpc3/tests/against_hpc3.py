@@ -49,6 +49,9 @@ from hpc3.core.preflight import parse_test_only as _parse_test_only
 from hpc3.core.status import parse_sacct_output as _parse_sacct_output
 from hpc3.core.status import parse_sacct_row as _parse_sacct_row
 
+PROJECT_CONFIG_DIR = pathlib.Path("/w")
+"""Stand-in directory a test project's relative ``repo`` resolves against."""
+
 
 def decode_job_spec(value: JSONValue) -> JobSpec:
     """Decode a job spec against HPC3, with no service-unit budget declared.
@@ -116,16 +119,22 @@ def decode_sweep_spec(value: JSONValue) -> SweepSpec:
     return _decode_sweep_spec(value, HPC3, max_service_units=0.0)
 
 
-def decode_project_config(value: JSONValue) -> ProjectConfig:
+def decode_project_config(
+    value: JSONValue, *, config_dir: pathlib.Path = PROJECT_CONFIG_DIR
+) -> ProjectConfig:
     """Decode one project's defaults against HPC3.
 
     Args:
         value: The value to decode.
+        config_dir: Directory a relative ``repo`` resolves against. Bound to
+            a fixed stand-in by default, because nearly every test is about
+            a resource rule rather than about where the code lives; the
+            tests that ARE about the path pass their own.
 
     Returns:
         The validated defaults.
     """
-    return _decode_project_config(value, HPC3)
+    return _decode_project_config(value, HPC3, config_dir=config_dir)
 
 
 def parse_sacct_row(line: str) -> JobStatus:

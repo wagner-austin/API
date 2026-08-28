@@ -323,6 +323,7 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
         "pinned_packages": {},
         "deterministic": False,
         "budget": budget_document(),
+        "repo": "repos/abl",
     }
     config.update(overrides)
     return config
