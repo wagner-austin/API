@@ -33,8 +33,14 @@
 #    worker into an immediate, loud failure instead of a silent 124-clone spiral.
 #
 # Everything else is preserved exactly: the coverage argument construction, the
-# per-run COVERAGE_FILE GUID under runs/, the cleanup of runs/.coverage-*, and the
-# pytest exit code.
+# per-run COVERAGE_FILE GUID under runs/, and the pytest exit code.
+#
+# 4. SCOPED COVERAGE CLEANUP. The inherited recipe deleted runs/.coverage-* --
+#    every run's files, not its own. That was correct when a package could only
+#    have one run at a time, and wrong the moment two overlap: the first to
+#    finish deletes the second's data mid-write, and the second reports a
+#    coverage number built from fragments while every test still passes. See the
+#    finally block for the measurement that found it.
 
 [CmdletBinding()]
 param(
@@ -156,7 +162,13 @@ foreach ($c in @('src', 'scripts')) {
 }
 
 if (-not (Test-Path 'runs')) { New-Item -ItemType Directory -Path 'runs' | Out-Null }
-$env:COVERAGE_FILE = (Resolve-Path -LiteralPath '.').Path + '\runs\.coverage-' + [System.Guid]::NewGuid().ToString('N').Substring(0, 8)
+
+# The token is kept so the cleanup below can name THIS run's files. It used to
+# be inlined into the assignment, and the cleanup then had nothing to match on
+# but the shared '.coverage-*' prefix -- see the finally block for what that
+# cost once two runs could overlap.
+$covToken = '.coverage-' + [System.Guid]::NewGuid().ToString('N').Substring(0, 8)
+$env:COVERAGE_FILE = (Resolve-Path -LiteralPath '.').Path + '\runs\' + $covToken
 
 $code = 0
 try {
@@ -164,7 +176,28 @@ try {
     $code = $LASTEXITCODE
     if ($null -eq $code) { $code = 1 }
 } finally {
-    Get-ChildItem -Path 'runs' -Filter '.coverage-*' -Force -ErrorAction SilentlyContinue |
+    # SCOPED TO THIS RUN'S TOKEN, not '.coverage-*'.
+    #
+    # The GUID exists so two concurrent runs cannot collide, and deleting the
+    # whole glob threw that away: whichever run finished first removed the
+    # OTHER run's data files while pytest-cov was still writing them, and the
+    # survivor reported whatever fragments happened to remain. Tests were
+    # unaffected -- they had already executed -- so the symptom was a green
+    # suite with a nonsense coverage number, which reads as untested code.
+    #
+    # Measured 2026-08-27 in services/Model-Trainer: 1937 passed, 0 failed,
+    # coverage 53.03% with 4065 of 9549 statements reported uncovered, on a
+    # package that had read 100% earlier the same day and whose new modules
+    # all ship test files. The unscoped delete was inherited verbatim from the
+    # inline Makefile recipe, where it was correct because one package could
+    # only ever have one run.
+    #
+    # pytest-cov writes $COVERAGE_FILE plus one shard per xdist worker,
+    # suffixed with host/pid/random, so a prefix match takes all of this run's
+    # files and none of anyone else's. Another run's orphans are left behind:
+    # they are inert (each run reads only its own COVERAGE_FILE) and the
+    # pre-run sweep is the thing that cleans wreckage.
+    Get-ChildItem -Path 'runs' -Filter "$covToken*" -Force -ErrorAction SilentlyContinue |
         Remove-Item -Force -ErrorAction SilentlyContinue
     Remove-Item Env:\COVERAGE_FILE -ErrorAction SilentlyContinue
 
