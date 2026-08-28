@@ -168,6 +168,41 @@ class TestCapture:
             for call in fake_run.calls
         )
 
+    def test_an_imaged_projects_environment_is_probed_inside_the_image(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """Because that is the only filesystem it is on.
+
+        Once a project adopts an image its ``env_path`` is a container path:
+        ``/opt/env`` exists inside the ``.sif`` and nowhere on the cluster. A
+        host probe therefore fails on every project past its first build, so
+        this command worked exactly once per project and every version bump
+        since hand-edited ``git_commit`` in the spec it was meant to generate.
+        """
+        _ = _capture(tmp_path, fake_run)
+        probes = [c.remote_command for c in fake_run.calls if "bin/python" in c.remote_command]
+        assert len(probes) == 1
+        assert "apptainer exec" in probes[0]
+
+    def test_a_project_with_no_image_is_probed_on_the_host(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The onboarding case, which is what this command was written for and
+        must keep working: a CPU project's environment is a real directory."""
+        config: JSONValue = project_config(
+            env_path="/pub/wagnera3/envs/abl-pinned",
+            pinned_packages={"torch": "2.6.0+cu124", "transformers": "4.46.3"},
+            gpu=None,
+            image=None,
+        )
+        _ = write_workspace(tmp_path / "hpc3.json", workspace_document(projects={"abl": config}))
+        fake_run.add("bin/python", stdout=_FREEZE)
+        assert capture_cli.main(_args(tmp_path)) == 0
+
+        probes = [c.remote_command for c in fake_run.calls if "bin/python" in c.remote_command]
+        assert len(probes) == 1
+        assert "apptainer" not in probes[0]
+
     def test_it_creates_the_output_directory(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:

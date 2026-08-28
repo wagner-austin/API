@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "85304d1027a321ad76459bac89b22c29d9be4ec4",
+  "git_commit": "c903b3d07213716b2070d3083b310ec607472ed5",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -101,15 +101,21 @@
     {
       "module": "platform_core.run_record",
       "attribute": "run_record"
+    },
+    {
+      "module": "char_lstm.train",
+      "attribute": "WANDB_MODES"
     }
   ],
   "smoke_commands": [
     "/opt/env/bin/python -c \"import torch; assert torch.__version__ == '2.6.0+cu124', torch.__version__\"",
     "/opt/env/bin/python -c \"from char_lstm.provenance import scoring_fingerprint; f = scoring_fingerprint(); assert [p['name'] for p in f['packages']] == ['numpy', 'torch'], f\"",
-    "/opt/env/bin/python -c \"from char_lstm.model import CharLSTM; CharLSTM(vocab_size=8, embed_dim=4, hidden_dim=4, num_layers=1, dropout=0.0)\""
+    "/opt/env/bin/python -c \"from char_lstm.model import CharLSTM; CharLSTM(vocab_size=8, embed_dim=4, hidden_dim=4, num_layers=1, dropout=0.0)\"",
+    "/opt/env/bin/python -c \"from char_lstm.train import parse_args; m = parse_args(['--lang', 'tr']).wandb; assert m == 'offline', m\"",
+    "/opt/env/bin/python -c \"import os; os.environ['WANDB_DIR'] = '/tmp'; import wandb; r = wandb.init(project='smoke', mode='offline'); wandb.finish(); assert r is not None\""
   ],
   "labels": {
     "org.corvis.project": "turkic-lstm",
-    "org.corvis.env-source": "/pub/wagnera3/envs/lstm"
+    "org.corvis.env-source": "/opt/env"
   }
 }

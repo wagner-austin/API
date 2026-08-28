@@ -66,6 +66,32 @@ class PendingJob(TypedDict):
     reason: str
 
 
+def reason_code(reason: str) -> str:
+    """Take Slurm's reason code, without the detail it appends to some.
+
+    Slurm decorates several reasons with a comma and a human explanation --
+    measured on HPC3 2026-08-28, six of our pending jobs read
+    ``ReqNodeNotAvail, May be reserved for other job``, and the same code
+    also appears as ``ReqNodeNotAvail, UnavailableNodes:...``. The code
+    before the comma is the classification; what follows is which nodes and
+    why, which changes between two jobs waiting on the same thing.
+
+    THIS IS WHY ``ReqNodeNotAvail`` SAT IN :data:`TRANSIENT_REASONS` DOING
+    NOTHING. It was declared transient, matched exactly, and could not match:
+    the decorated form is the only form Slurm emits. So the entry read as a
+    considered decision while every job waiting on a reservation was reported
+    ``blocked`` -- a guard outliving its subject, and the shape of always-red
+    board this module exists to avoid.
+
+    Args:
+        reason: The scheduler's reason, verbatim.
+
+    Returns:
+        The text before the first comma, stripped.
+    """
+    return reason.split(",")[0].strip()
+
+
 def is_blocked(reason: str) -> bool:
     """Report whether a pending reason will resolve without intervention.
 
@@ -73,12 +99,18 @@ def is_blocked(reason: str) -> bool:
         reason: The scheduler's reason, verbatim.
 
     Returns:
-        True when nothing will clear this on its own. Unrecognised reasons
-        return True deliberately: a reason we have never seen is precisely
-        where assuming patience would be rewarded is how a job sits for a
-        week. A false alarm costs a glance; a missed block costs the run.
+        True when nothing will clear this on its own. Classified on the
+        reason CODE (see :func:`reason_code`) rather than the whole string,
+        so a decorated reason is recognised as the reason it is.
+
+        Unrecognised reasons still return True deliberately: a reason we have
+        never seen is precisely where assuming patience would be rewarded is
+        how a job sits for a week. A false alarm costs a glance; a missed
+        block costs the run. ``DependencyNeverSatisfied`` -- the 261-job
+        killer -- carries no comma, so it is untouched by the split and stays
+        blocked.
     """
-    return reason.strip() not in TRANSIENT_REASONS
+    return reason_code(reason) not in TRANSIENT_REASONS
 
 
 def _require_nonempty_str(obj: dict[str, JSONValue], key: str) -> str:
@@ -142,4 +174,5 @@ __all__ = [
     "decode_pending_job",
     "encode_pending_job",
     "is_blocked",
+    "reason_code",
 ]

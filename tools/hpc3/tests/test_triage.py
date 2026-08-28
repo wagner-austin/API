@@ -13,7 +13,13 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.contracts.account import AccountJob, decode_account_job
 from hpc3.contracts.ledger import LedgerEntry
-from hpc3.contracts.pending import PendingJob, decode_pending_job, encode_pending_job, is_blocked
+from hpc3.contracts.pending import (
+    PendingJob,
+    decode_pending_job,
+    encode_pending_job,
+    is_blocked,
+    reason_code,
+)
 from hpc3.contracts.status import JobStatus
 from hpc3.core.squeue import parse_squeue_output, parse_squeue_row, squeue_command
 from hpc3.core.triage import (
@@ -122,6 +128,33 @@ class TestIsBlocked:
 
     def test_surrounding_whitespace_does_not_change_the_verdict(self) -> None:
         assert is_blocked("  Resources  ") is False
+
+    def test_the_decorated_reservation_reason_is_transient(self) -> None:
+        """The exact string HPC3 returned for six pending jobs on 2026-08-28.
+
+        `ReqNodeNotAvail` was in the allowlist and could never match it, so
+        every job waiting on a reservation was reported blocked -- an entry
+        that read as a decision while doing nothing.
+        """
+        assert is_blocked("ReqNodeNotAvail, May be reserved for other job") is False
+
+    def test_the_other_decorated_form_is_transient_too(self) -> None:
+        assert is_blocked("ReqNodeNotAvail, UnavailableNodes:hpc3-gpu-l54-05") is False
+
+    def test_the_killer_reason_carries_no_comma_and_is_untouched(self) -> None:
+        """The split must not reach DependencyNeverSatisfied, which is the
+        261-job failure this check was built for."""
+        assert reason_code("DependencyNeverSatisfied") == "DependencyNeverSatisfied"
+        assert is_blocked("DependencyNeverSatisfied") is True
+
+    def test_a_decorated_unknown_reason_is_still_blocked(self) -> None:
+        """Splitting recognises decoration; it does not admit new reasons."""
+        assert is_blocked("SomeReasonInventedNextYear, with detail") is True
+
+    def test_the_code_is_the_text_before_the_first_comma(self) -> None:
+        assert reason_code("ReqNodeNotAvail, May be reserved for other job") == "ReqNodeNotAvail"
+        assert reason_code("  Resources  ") == "Resources"
+        assert reason_code("") == ""
 
 
 class TestBlockedJobs:

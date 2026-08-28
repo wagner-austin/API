@@ -50,6 +50,7 @@ from hpc3.contracts.workspace import require_project_config
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.env_probe import parse_installed, probe_command
 from hpc3.core.image_capture import capture_layers
+from hpc3.core.image_exec import run_inside_image
 from hpc3.core.remote import run_remote
 
 _PROJECT_FLAG = "--project"
@@ -141,8 +142,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     symbols = parse_symbols(cli_args.require_flag(parsed, _SYMBOLS_FLAG))
 
-    output = run_remote(workspace["host"], probe_command(config["env_path"]))
-    installed = parse_installed(output)
+    # THE PROBE FOLLOWS THE ENVIRONMENT, exactly as
+    # :func:`~hpc3.core.preflight.check_env_path` does, and for the same
+    # reason: once a project is imaged its ``env_path`` is a CONTAINER path.
+    # ``/opt/env`` exists only inside the ``.sif`` and nowhere on the cluster
+    # filesystem, so probing the host would fail on every project that has
+    # already adopted an image -- which is every project after its first
+    # build. This command was written for the onboarding case and worked
+    # exactly once per project; every version bump since has hand-edited
+    # ``git_commit`` in the generated spec instead, which is the editing this
+    # command exists to replace.
+    probe = probe_command(config["env_path"])
+    image = config["image"]
+    if image is not None:
+        probe = run_inside_image(image, probe)
+    installed = parse_installed(run_remote(workspace["host"], probe))
     requirements, wheels = capture_layers(installed, first_party)
     _test_hooks.emit(
         f"probed {config['env_path']}: {len(installed)} distribution(s), "
