@@ -103,22 +103,33 @@ Real research, producing numbers that get compared, reachable by no tool.
   **The CSVs already in `results/` have no sidecar** and cannot get an
   honest one retroactively — nobody recorded what produced them. Re-running
   the evaluation is what fills the gap for anything going into the paper.
-- **Two axes vary by construction and are unrecorded.**
-  `slurm/train_base.sub` is an array job on the **preemptible** `free-gpu`
-  partition with `--requeue`, and its own comment says the scheduler places
-  tasks "across whatever is free" — so arms train on different cards and a
-  preempted run can resume on a different card than it started on. And
-  `torch = "^2.5"` is a caret range, so arms trained months apart can differ
-  in torch minor. Those are exactly `RunFingerprint`'s `gpu_model` and
-  `packages` axes.
-- **Reaches the cluster** via a hand-written `slurm/train_base.sub`, so none
-  of it appears in the ledger. The hpc3 README's own "Adding a project"
-  example is named `turkic-lstm` — this was anticipated and never done, and
-  it is the remaining step. It is deliberately NOT declared in a workspace
-  document yet: an entry saying how `turkic-lstm` runs on the cluster, while
-  the runs actually go out through `train_base.sub`, would be a registry
-  claiming something that is not happening. Registration and converting the
-  submission belong in the same change.
+- **Where it actually runs: this workstation, on one local CUDA device.**
+  The training logs carry Windows-style paths (backslash-separated, e.g.
+  `checkpoints_v3` then `tr_best.pt`) and no
+  SLURM markers, and `/pub/wagnera3` holds no `LSTM` directory.
+
+  **Correcting an earlier version of this page**, which said it "reaches the
+  cluster via a hand-written `slurm/train_base.sub`". It does not.
+  `train_base.sub` is real, careful and **unused**: it points at
+  `/pub/wagnera3/LSTM` and `/pub/wagnera3/envs/lstm`, and neither exists —
+  the cluster's `envs/` holds only `abl-pinned` and `cleargbm`. Its own
+  header still reads "BEFORE FIRST USE, fill in the three TODOs below". It
+  describes an intended migration, not a practice, and reading a script as a
+  practice is exactly how this page came to assert one.
+- **The axis that genuinely varies today is `packages`.** `torch = "^2.5"`
+  is a caret range, so arms trained months apart on this one machine can
+  differ in torch minor version — the same class as the incident
+  `platform_core.run_record` was written after. `gpu_model` does **not**
+  vary yet, because every arm trains on the same card. It would begin to the
+  moment this moves to `free-gpu`, whose scheduler places work "across
+  whatever is free" and whose jobs are preemptible.
+- **Not on the cluster, so nothing appears in the ledger.** The hpc3
+  README's own "Adding a project" example is named `turkic-lstm`, which is
+  where this is headed. It is deliberately NOT declared in a workspace
+  document yet, and now for a stronger reason than before: the cluster has
+  no environment and no checkout for it, so an entry naming an `env_path`
+  would be a registry pointing at a directory that does not exist. Standing
+  it up is real provisioning on a shared machine, not a config edit.
 
 ### RustedWarfareBot — system identification against an obfuscated binary
 
