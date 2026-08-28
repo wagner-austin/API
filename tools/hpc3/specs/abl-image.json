@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "ebbe54a0ae9da570e3db1b2d0978b33f4d3f908a",
+  "git_commit": "fab1d991f4d6f39e72c3b21ca5757a072c01f277",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],

@@ -199,9 +199,12 @@ hpc3-image-capture --config runs/hpc3.json --project turkic-lstm \
     --out specs/turkic-lstm-image.json
 
 # 2. Render the build. Pure, runs anywhere, builds nothing.
-hpc3-image --spec specs/turkic-lstm-image.json \
+#    --project and --name COMPOSE the job name; there is no --job-name, so a
+#    name whose project half no workspace declares cannot be rendered.
+hpc3-image --config runs/hpc3.json --spec specs/turkic-lstm-image.json \
     --out-dir runs/turkic-lstm-build-v1 --image-name turkic-lstm.sif \
-    --job-name turkic-lstm-image-v1 --image-dir /pub/wagnera3/images/turkic-lstm-v1
+    --project turkic-lstm --name image-v1 \
+    --image-dir /pub/wagnera3/images/turkic-lstm-v1
 
 # 3. Stage the rendered files AND the first-party wheels into the IMAGE
 #    directory -- build.sbatch does `cd <image-dir>` and runs build.sh there.
@@ -223,6 +226,19 @@ which job built an image, `hpc3-watch` was never given the id, and
 correctly, because from this machine's records it is a stranger holding eight
 cores. The reverse-direction check found the twenty-second, and this command
 is the answer to it.
+
+**And a twenty-third ran the old way on the same day the command landed.** The
+build of image `ebb61ed0…` was submitted by raw `sbatch` hours after
+`hpc3-image-build` existed, so it holds no ledger row either. The cause was
+step 2, not step 4: it had been rendered with `--job-name img.abl-sif-v22`,
+a name whose project half is `img`, which no workspace declares — and
+`hpc3-image-build` **refuses** exactly that, so the malformed name pushed its
+author onto the path that records nothing. A refusal at submit time is one
+step too late when the thing it refuses is what the previous step invited you
+to write. That is why `--job-name` is gone: the renderer now composes the name
+from a declared `--project`, the submitter derives it by the same rule, and
+the two cannot disagree. A build that would break the ledger cannot be
+rendered.
 
 `--project` and `--name` are not read out of the script, because the ledger's
 name is the qualified `<project>.<name>` and **the project half is the part a

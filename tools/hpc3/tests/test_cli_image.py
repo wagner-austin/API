@@ -11,6 +11,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
 from hpc3.cli import image as image_cli
@@ -20,6 +21,7 @@ from hpc3.core.image_layout import (
     SBATCH_NAME,
     SELFCHECK_NAME,
 )
+from tests.conftest import workspace_document, write_workspace
 
 _COMMIT = "d11efacd231ef92426eaf92483c33a8504bd770f"
 
@@ -66,14 +68,23 @@ def _write_spec(tmp_path: pathlib.Path, payload: JSONValue) -> pathlib.Path:
     return path
 
 
-JOB_NAME = "img.abl-sif-test"
+#: The project the default workspace declares. The job name is DERIVED
+#: from it -- this file used to carry `JOB_NAME = "img.abl-sif-test"`,
+#: whose project half names nothing, and rendering that was what pushed a
+#: real build onto the unrecorded `sbatch` path.
+PROJECT = "abl"
+BUILD_NAME = "image-test"
+QUALIFIED_JOB_NAME = "abl.image-test"
 IMAGE_DIR = "/pub/wagnera3/images/test"
 
 
-def _argv(spec_path: pathlib.Path, out_dir: pathlib.Path) -> list[str]:
+def _argv(tmp_path: pathlib.Path, spec_path: pathlib.Path, out_dir: pathlib.Path) -> list[str]:
     """Build a complete command line for the renderer.
 
     Args:
+        tmp_path: Working directory; the workspace is written here, because
+            the renderer now needs one to validate the project it composes
+            the job name from.
         spec_path: The spec document to render from.
         out_dir: Directory the rendered files are written to.
 
@@ -82,14 +93,18 @@ def _argv(spec_path: pathlib.Path, out_dir: pathlib.Path) -> list[str]:
         than in each of the call sites that previously spelled the list out.
     """
     return [
+        "--config",
+        write_workspace(tmp_path / "hpc3.json", workspace_document()),
+        "--project",
+        PROJECT,
+        "--name",
+        BUILD_NAME,
         "--spec",
         str(spec_path),
         "--out-dir",
         str(out_dir),
         "--image-name",
         "abl.sif",
-        "--job-name",
-        JOB_NAME,
         "--image-dir",
         IMAGE_DIR,
     ]
@@ -107,7 +122,7 @@ def _render(tmp_path: pathlib.Path, payload: JSONValue) -> pathlib.Path:
     """
     spec_path = _write_spec(tmp_path, payload)
     out_dir = tmp_path / "build"
-    assert image_cli.main(_argv(spec_path, out_dir)) == 0
+    assert image_cli.main(_argv(tmp_path, spec_path, out_dir)) == 0
     return out_dir
 
 
@@ -187,14 +202,76 @@ class TestItRefusesRatherThanRenders:
         spec_path = _write_spec(tmp_path, _payload(requirements=["torch"]))
         out_dir = tmp_path / "build"
         with pytest.raises(JSONTypeError, match="must pin an exact version"):
-            _ = image_cli.main(_argv(spec_path, out_dir))
+            _ = image_cli.main(_argv(tmp_path, spec_path, out_dir))
         assert not out_dir.exists()
 
     def test_a_bind_mounted_env_prefix_writes_nothing(self, tmp_path: pathlib.Path) -> None:
         spec_path = _write_spec(tmp_path, _payload(env_prefix="/pub/wagnera3/envs/abl"))
         out_dir = tmp_path / "build"
         with pytest.raises(JSONTypeError, match="bind-mounts over"):
-            _ = image_cli.main(_argv(spec_path, out_dir))
+            _ = image_cli.main(_argv(tmp_path, spec_path, out_dir))
+        assert not out_dir.exists()
+
+    def test_the_job_name_is_the_qualified_one_and_reaches_the_script(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Composed here from a declared project, not taken from the caller.
+
+        This is what makes the renderer and `hpc3-image-build` agree: the
+        submitter reads `#SBATCH -J` back out and requires it to equal
+        `<project>.<name>`, so deriving it from the same rule means the two
+        cannot disagree rather than disagreeing and being refused.
+
+        Args:
+            tmp_path: Working directory.
+        """
+        out_dir = _render(tmp_path, _payload())
+
+        assert f"#SBATCH -J {QUALIFIED_JOB_NAME}" in (out_dir / SBATCH_NAME).read_text(
+            encoding="utf-8"
+        )
+
+    def test_a_project_the_workspace_does_not_declare_writes_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        # The defect this closes. `img.abl-sif-v22` was rendered because the
+        # job name was free text; `img` names no project, `hpc3-image-build`
+        # refuses it, and the raw sbatch that name invited records nothing.
+        # Refused at render time now, before any file exists.
+        spec_path = _write_spec(tmp_path, _payload())
+        out_dir = tmp_path / "build"
+        argv = _argv(tmp_path, spec_path, out_dir)
+        argv[argv.index("--project") + 1] = "img"
+
+        with pytest.raises(AppError) as refusal:
+            _ = image_cli.main(argv)
+
+        assert refusal.value.code is Hpc3ErrorCode.WORKSPACE_PROJECT_UNKNOWN
+        assert not out_dir.exists()
+
+    def test_a_name_containing_a_dot_writes_nothing(self, tmp_path: pathlib.Path) -> None:
+        # The dot is the separator `project_of` splits on, so a name carrying
+        # one makes the renderer and the reader disagree about where the
+        # project ends.
+        spec_path = _write_spec(tmp_path, _payload())
+        out_dir = tmp_path / "build"
+        argv = _argv(tmp_path, spec_path, out_dir)
+        argv[argv.index("--name") + 1] = "img.abl-sif-v22"
+
+        with pytest.raises(ValueError, match="must not contain a dot"):
+            _ = image_cli.main(argv)
+
+        assert not out_dir.exists()
+
+    def test_an_empty_name_writes_nothing(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_spec(tmp_path, _payload())
+        out_dir = tmp_path / "build"
+        argv = _argv(tmp_path, spec_path, out_dir)
+        argv[argv.index("--name") + 1] = ""
+
+        with pytest.raises(ValueError, match="must not be empty"):
+            _ = image_cli.main(argv)
+
         assert not out_dir.exists()
 
     def test_a_missing_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
@@ -230,7 +307,7 @@ class TestEntrypoint:
     ) -> None:
         spec_path = _write_spec(tmp_path, _payload())
         out_dir = tmp_path / "build"
-        argv[:] = ["prog", *_argv(spec_path, out_dir)]
+        argv[:] = ["prog", *_argv(tmp_path, spec_path, out_dir)]
 
         with pytest.raises(SystemExit) as excinfo:
             image_cli.entrypoint()
@@ -243,7 +320,7 @@ class TestEntrypoint:
         """A contract refusal is a refusal, not a crash: status 2, no files."""
         spec_path = _write_spec(tmp_path, _payload(requirements=["torch"]))
         out_dir = tmp_path / "build"
-        argv[:] = ["prog", *_argv(spec_path, out_dir)]
+        argv[:] = ["prog", *_argv(tmp_path, spec_path, out_dir)]
 
         with pytest.raises(SystemExit) as excinfo:
             image_cli.entrypoint()

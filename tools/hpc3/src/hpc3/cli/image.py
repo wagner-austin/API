@@ -1,8 +1,19 @@
 """CLI: render an image spec into the files a build consumes.
 
 Usage:
-    hpc3-image --spec runs/abl-image.json --out-dir runs/abl-build \\
-        --image-name abl.sif
+    hpc3-image --config runs/hpc3.json --spec specs/abl-image.json \\
+        --out-dir runs/abl-build-v23 --image-name abl.sif \\
+        --project mi --name image-v23 --image-dir /pub/wagnera3/images/v23
+
+THE JOB NAME IS DERIVED, NOT ACCEPTED. It used to be a free-text
+``--job-name``, and a build rendered on 2026-08-28 carried
+``img.abl-sif-v22`` -- a name whose project half is ``img``, which no
+workspace declares. ``hpc3-image-build`` refuses exactly that, so the
+malformed name pushed its author onto the raw ``sbatch`` path instead, which
+records nothing. Taking ``--project`` and ``--name`` and composing them here
+means the renderer and the submitter derive the same string from the same
+rule, and a project the workspace does not declare is refused at render time
+rather than after the files are written.
 
 Writes four files: the Apptainer definition, the pinned requirements, the
 in-image self-check, and the build script. All four are rendered from the one
@@ -28,8 +39,10 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
-from hpc3.cli import _fatal, _test_hooks
+from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.image_spec import decode_image_spec
+from hpc3.contracts.layout import qualified_name
+from hpc3.contracts.workspace import require_project_config
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.image_build import render_build_script
 from hpc3.core.image_definition import render_definition, render_requirements
@@ -47,15 +60,44 @@ BUILD_SCRIPT_NAME = "build.sh"
 _SPEC_FLAG = "--spec"
 _OUT_DIR_FLAG = "--out-dir"
 _IMAGE_NAME_FLAG = "--image-name"
-_JOB_NAME_FLAG = "--job-name"
+_PROJECT_FLAG = "--project"
+_NAME_FLAG = "--name"
 _IMAGE_DIR_FLAG = "--image-dir"
 _FLAGS = (
+    _config.CONFIG_FLAG,
     _SPEC_FLAG,
     _OUT_DIR_FLAG,
     _IMAGE_NAME_FLAG,
-    _JOB_NAME_FLAG,
+    _PROJECT_FLAG,
+    _NAME_FLAG,
     _IMAGE_DIR_FLAG,
 )
+
+
+def require_build_name(raw: str) -> str:
+    """Validate the job's own name within its project.
+
+    Args:
+        raw: The ``--name`` value.
+
+    Returns:
+        The name, unchanged.
+
+    Raises:
+        ValueError: If it is empty or contains a dot. The dot is the
+            separator :func:`~hpc3.contracts.layout.qualified_name` relies on
+            and :func:`~hpc3.contracts.layout.project_of` splits on, so a
+            name carrying one makes the two disagree about where the project
+            ends.
+    """
+    if raw == "":
+        raise ValueError(f"{_NAME_FLAG} must not be empty")
+    if "." in raw:
+        raise ValueError(
+            f"{_NAME_FLAG} must not contain a dot; it is the separator in "
+            f"'<project>.<name>', and {raw!r} would be read as a project"
+        )
+    return raw
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -85,8 +127,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     spec_path = pathlib.Path(cli_args.require_flag(parsed, _SPEC_FLAG))
     out_dir = pathlib.Path(cli_args.require_flag(parsed, _OUT_DIR_FLAG))
     image_name = cli_args.require_flag(parsed, _IMAGE_NAME_FLAG)
-    job_name = cli_args.require_flag(parsed, _JOB_NAME_FLAG)
     image_dir = cli_args.require_flag(parsed, _IMAGE_DIR_FLAG)
+
+    # DERIVED, never accepted. This used to take a free-text --job-name, and
+    # on 2026-08-28 a build was rendered as `img.abl-sif-v22` -- a name whose
+    # project half is `img`, which no workspace declares. `submit_build`
+    # refuses exactly that, but only when the build reaches the cluster
+    # through it; the raw `sbatch` that name invited leaves no ledger row, and
+    # twenty-two builds went that way. Deriving the name from a project the
+    # workspace must declare makes the malformed one unconstructible and makes
+    # the renderer and the submitter agree by construction rather than by a
+    # refusal one step later.
+    workspace = _config.load_workspace(parsed)
+    project = cli_args.require_flag(parsed, _PROJECT_FLAG)
+    require_project_config(workspace, project)
+    build_name = require_build_name(cli_args.require_flag(parsed, _NAME_FLAG))
+    job_name = qualified_name(project, build_name)
 
     raw = core_hooks.read_bytes(spec_path).decode("utf-8")
     spec = decode_image_spec(load_json_str(raw))
@@ -129,7 +185,7 @@ def entrypoint() -> None:
     raise SystemExit(_fatal.run(main))
 
 
-__all__ = ["BUILD_SCRIPT_NAME", "entrypoint", "main"]
+__all__ = ["BUILD_SCRIPT_NAME", "entrypoint", "main", "require_build_name"]
 
 
 if __name__ == "__main__":
