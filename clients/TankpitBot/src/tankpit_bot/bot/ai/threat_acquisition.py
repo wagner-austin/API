@@ -293,7 +293,7 @@ def stale_human_exists(
     return False
 
 
-def find_relay_travel_target(
+def find_relay_travel_targets(
     ws: WorldService,
     world: WorldStateDict,
     self_state: SelfStateDict,
@@ -307,15 +307,23 @@ def find_relay_travel_target(
     priority_target_name: str = "",
     human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
     human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
-) -> EnemyThreatDict | None:
-    """Pick the nearest map-fresh enemy that fails ONLY the affordability gate.
+) -> list[EnemyThreatDict]:
+    """Rank every map-fresh enemy that fails ONLY the affordability gate.
 
     The same human-first tiering as acquisition applies, so the relay
     chain hops toward a distant human even when a cheaper practice bot
     is also unaffordable.
 
-    The dot-relay travel planner needs a destination worth travelling
-    toward: an enemy that would be a perfectly viable acquisition if
+    The FULL ranked list matters, not just the winner: the nearest
+    unaffordable enemy can be dot-starved while a farther one has a
+    rich relay corridor. Run bot-20260827-162050 exited
+    ``no_viable_targets`` at full fuel with 27 live enemies because
+    the relay consulted only its nearest pick (red-5: zero qualifying
+    dots behind water) while red-2's corridor held 24 — the operator's
+    "there are always 27 enemies" report was the tell.
+
+    The dot-relay travel planner needs destinations worth travelling
+    toward: enemies that would be perfectly viable acquisitions if
     the bot had the fuel for the end-to-end fight. Every other gate
     (alive, synced, not blocked/killed, map-fresh, stand-off landable)
     must pass -- travelling toward a corpse or a blocked target wastes
@@ -333,8 +341,8 @@ def find_relay_travel_target(
             approach teleport (kill budget + fuel-low reserve).
 
     Returns:
-        Nearest unaffordable-but-otherwise-viable enemy, or ``None``
-        when no enemy is worth relaying toward.
+        Unaffordable-but-otherwise-viable enemies, best travel target
+        first; empty when no enemy is worth relaying toward.
     """
     self_x = self_state["x"]
     self_y = self_state["y"]
@@ -367,11 +375,11 @@ def find_relay_travel_target(
         )
 
     candidates.sort(key=_threat_sort_key_for(priority_target_name, fleet_assist_ids(ws)))
-    return candidates[0] if candidates else None
+    return candidates
 
 
 __all__ = [
     "find_acquisition_target",
-    "find_relay_travel_target",
+    "find_relay_travel_targets",
     "stale_human_exists",
 ]

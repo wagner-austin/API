@@ -14,7 +14,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
 from tankpit_bot.bot.ai.threat_acquisition import (
-    find_relay_travel_target,
+    find_relay_travel_targets,
     stale_human_exists,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -125,7 +125,7 @@ def relay_toward_unaffordable_enemy(
         Relay teleport decision, refuel-hop decision, or ``None`` when
         there is no enemy worth relaying toward or no dot helps.
     """
-    travel = find_relay_travel_target(
+    targets = find_relay_travel_targets(
         ctx.ws,
         ctx.filtered,
         ctx.self_state,
@@ -141,9 +141,19 @@ def relay_toward_unaffordable_enemy(
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],
     )
-    if travel is None:
-        return None
-    return relay_toward(ctx, ai_state, travel)
+    # EVERY candidate gets a dot search before any refuel fallback:
+    # the nearest enemy can be dot-starved while a farther one has a
+    # rich corridor (run bot-20260827-162050: red-5 at dist 139 had
+    # ZERO qualifying dots behind the practice lake while red-2's
+    # corridor held 24 — the single-candidate relay exited the
+    # session at full fuel with 27 live enemies on the map).
+    for travel in targets:
+        dot = _pick_relay_dot(ctx, travel)
+        if dot is not None:
+            return _relay_leg_decision(ctx, ai_state, travel, dot)
+    if targets:
+        return _refuel_toward_engagement(ctx, ai_state, targets[0])
+    return None
 
 
 def relay_toward(
@@ -173,6 +183,26 @@ def relay_toward(
     dot = _pick_relay_dot(ctx, travel)
     if dot is None:
         return _refuel_toward_engagement(ctx, ai_state, travel)
+    return _relay_leg_decision(ctx, ai_state, travel, dot)
+
+
+def _relay_leg_decision(
+    ctx: DecideCtx,
+    ai_state: AIStateDict,
+    travel: EnemyThreatDict,
+    dot: tuple[int, int],
+) -> TickDecisionDict:
+    """Build the one-leg dot-hop decision toward ``travel``.
+
+    Args:
+        ctx: Decision context.
+        ai_state: Base AI state for the produced command.
+        travel: Enemy the relay is travelling toward.
+        dot: The chosen relay dot.
+
+    Returns:
+        The relay teleport decision.
+    """
     dot_x, dot_y = dot
     emit_ai(
         "dot-relay toward %s (id=%d) at (%d,%d): hop to dot (%d,%d) (fuel=%d)",
@@ -242,7 +272,7 @@ def human_pursuit_travel_target(ctx: DecideCtx) -> EnemyThreatDict | None:
     the kill then the human player will be the next target"); this
     helper only fires during fresh acquisition.
 
-    :func:`find_relay_travel_target` already sorts human-tier first,
+    :func:`find_relay_travel_targets` already sorts human-tier first,
     so its winner being a bot proves no pursuit-worthy human exists.
     Born from the Yuppler encounter (run bot-20260729-204708 window:
     dist 95 rejected ``unaffordable`` while the bot farmed red-3 at
@@ -256,7 +286,7 @@ def human_pursuit_travel_target(ctx: DecideCtx) -> EnemyThreatDict | None:
         The unaffordable rank-window human worth relaying toward, or
         ``None`` when no such human is on the fresh map.
     """
-    travel = find_relay_travel_target(
+    targets = find_relay_travel_targets(
         ctx.ws,
         ctx.filtered,
         ctx.self_state,
@@ -272,8 +302,8 @@ def human_pursuit_travel_target(ctx: DecideCtx) -> EnemyThreatDict | None:
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],
     )
-    if travel is not None and is_human_name(travel["name"]):
-        return travel
+    if targets and is_human_name(targets[0]["name"]):
+        return targets[0]
     return None
 
 

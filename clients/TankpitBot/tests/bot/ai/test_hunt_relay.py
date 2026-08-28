@@ -168,6 +168,57 @@ def test_hunt_acquire_relays_via_dot_toward_unaffordable_enemy() -> None:
     assert decision["updated_ai_state"]["combat_target_id"] == -1
 
 
+def test_relay_tries_the_next_enemy_when_the_nearest_is_dot_starved() -> None:
+    """A dot-starved nearest enemy must not end the session.
+
+    Run bot-20260827-162050: artax exited ``no_viable_targets`` at
+    FULL fuel with 27 live enemies on the map, because the relay
+    consulted only its nearest pick (red-5 — zero qualifying dots
+    behind the practice lake) while a farther enemy's corridor held
+    24. The operator's ground truth ("there are always 27 enemies")
+    exposed it. The relay must walk the ranked candidate list until
+    an enemy with a qualifying dot is found.
+    """
+    ws = WorldService()
+    ws.map_data_ingested_ms = 99500
+    tanks: dict[str, TankStateDict] = {
+        # Nearest (dist 130): unaffordable, and NO dot makes progress
+        # toward it — the session-4 red-5 shape.
+        "60": make_map_known_enemy(tank_id=60, x=100, y=230, name="red-5"),
+        # Farther (dist 140): also unaffordable, but the (150,100)
+        # dot is an affordable strict-progress leg toward it.
+        "70": make_map_known_enemy(tank_id=70, x=240, y=100, name="red-2"),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        None,
+        "",
+        ((150, 100),),
+        ws=ws,
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 150
+    assert decision["command"]["target_y"] == 100
+    assert decision["behavior"]["reason_kind"] == "dot_relay"
+
+
 def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
     """Among affordable progress dots, the one closest to the enemy wins.
 
