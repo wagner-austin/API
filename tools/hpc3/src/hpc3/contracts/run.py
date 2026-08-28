@@ -127,7 +127,42 @@ def _merged(
         if field in document:
             merged[field] = document[field]
     merged["project"] = project
+    _check_run_keeps_the_image(defaults, merged, project)
     return merged
+
+
+def _check_run_keeps_the_image(
+    defaults: ProjectConfig, merged: dict[str, JSONValue], project: str
+) -> None:
+    """Refuse a run that drops the image its project declared.
+
+    Overriding ``image`` is legitimate and normal: pinning a NEWER image is
+    how an image version gets rolled out one experiment at a time. Setting it
+    to null is different in kind. It moves the payload back onto the host
+    interpreter, which is the shape
+    :func:`~hpc3.contracts.workspace._check_gpu_project_is_imaged` refuses at
+    onboarding -- and without this, that rule would be one line of JSON away
+    from being switched off per run, which is not a rule.
+
+    Args:
+        defaults: The project's declared settings.
+        merged: The document's overrides already overlaid on them.
+        project: The validated project name, for the message.
+
+    Raises:
+        AppError: With ``RUN_REMOVES_IMAGE`` when the project declares an
+            image and the run nulls it.
+    """
+    if defaults["image"] is None or merged.get("image") is not None:
+        return
+    raise AppError(
+        Hpc3ErrorCode.RUN_REMOVES_IMAGE,
+        f"This run sets 'image' to null, but project {project!r} declares one. "
+        "A run may override the image -- pinning a newer one is how a version "
+        "is rolled out -- but it may not remove it, which would put the payload "
+        "back on the host interpreter and undo the guarantee the project was "
+        "onboarded with. Omit the field to inherit the project's image.",
+    )
 
 
 def _require_document(value: JSONValue, kind: str) -> dict[str, JSONValue]:

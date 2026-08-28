@@ -237,3 +237,42 @@ class TestRequireProjectConfig:
         with pytest.raises(AppError) as excinfo:
             require_project_config(workspace, "zodaic")
         assert "'abl', 'zodiac'" in excinfo.value.message
+
+
+class TestAGpuProjectMustBeImaged:
+    """Onboarding a standing body of GPU work without an image is refused.
+
+    The rule exists because it was broken on 2026-08-28: ``turkic-lstm`` was
+    registered with a bare ``env_path`` because the CPU project ``cleargbm``
+    has that shape legitimately and it was copied without asking whether the
+    reason carried over. Within the hour that environment was mutated in
+    place with ``pip install``, and every check still passed because
+    ``pinned_packages`` was edited to match.
+    """
+
+    def test_a_gpu_project_without_an_image_is_refused(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            decode_project_config(project_config(image=None))
+        assert excinfo.value.code is Hpc3ErrorCode.GPU_RUN_UNIMAGED
+
+    def test_the_refusal_names_the_commands_that_fix_it(self) -> None:
+        """A refusal that does not say what to do next gets worked around."""
+        with pytest.raises(AppError) as excinfo:
+            decode_project_config(project_config(image=None))
+        assert "hpc3-image-capture" in str(excinfo.value)
+        assert "hpc3-image" in str(excinfo.value)
+
+    def test_a_cpu_project_without_an_image_is_admitted(self) -> None:
+        """`cleargbm` is real and correct: no card, no driver stack to pin."""
+        config = decode_project_config(
+            project_config(gpu=None, partition="free", image=None, env_path="/pub/envs/cleargbm")
+        )
+        assert config["gpu"] is None
+        assert config["image"] is None
+
+    def test_an_imaged_gpu_project_is_admitted(self) -> None:
+        config = decode_project_config(project_config())
+        image = config["image"]
+        if image is None:
+            raise AssertionError("the imaged baseline decoded without its image")
+        assert image["path"] == "/pub/images/v1/abl.sif"

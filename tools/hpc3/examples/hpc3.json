@@ -16,7 +16,7 @@
       "minutes": 720,
       "requeue": true,
       "checkpoint_steps": 500,
-      "env_path": "/pub/wagnera3/envs/abl-pinned",
+      "env_path": "/opt/env",
       "pinned_packages": {
         "torch": "2.6.0+cu124",
         "transformers": "4.46.3"
@@ -27,7 +27,14 @@
         "max_service_units": 0.0,
         "charge_account": ""
       },
-      "repo": "../../.."
+      "repo": "../../..",
+      "image": {
+        "path": "/pub/wagnera3/images/v21/abl.sif",
+        "sha256": "2b89283fccf289e3060b7b66f61315a5ea0922dbad1b63352540d5f9bdd2d1a5",
+        "binds": [
+          "/pub/wagnera3"
+        ]
+      }
     },
     "sirius": {
       "partition": "free",

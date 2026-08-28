@@ -125,7 +125,7 @@ class TestResolveChain:
 
     def test_stages_inherit_the_projects_defaults(self) -> None:
         stages = resolve_chain(_workspace(), _document())["stages"]
-        assert {stage["env_path"] for stage in stages} == {"/pub/envs/abl-pinned"}
+        assert {stage["env_path"] for stage in stages} == {"/opt/env"}
 
     def test_a_stage_may_differ_in_resources_from_its_neighbour(self) -> None:
         """The reason a chain is not a sweep: a training stage holds a GPU and

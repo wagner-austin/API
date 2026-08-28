@@ -301,6 +301,26 @@ def gpus(model: str, count: int = 1) -> dict[str, JSONValue]:
     return {"model": model, "count": count}
 
 
+def image_reference(
+    *, path: str = "/pub/images/v1/abl.sif", digest: str = "a" * 64
+) -> dict[str, JSONValue]:
+    """Build a reference to an image a job runs inside.
+
+    The default baseline carries one because the baseline requests a GPU, and
+    GPU work without an image is refused -- see
+    :func:`~hpc3.contracts.job._check_gpu_run_is_imaged`. A test about
+    CPU-only work passes ``gpu=None`` and may then pass ``image=None`` too.
+
+    Args:
+        path: Where the image file sits on the cluster.
+        digest: Its content digest.
+
+    Returns:
+        The reference, ready to place in a project config or job spec.
+    """
+    return {"path": path, "sha256": digest, "binds": ["/pub"]}
+
+
 def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
     """Build one project's resource defaults.
 
@@ -318,8 +338,8 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
         "minutes": 30,
         "requeue": False,
         "checkpoint_steps": 0,
-        "image": None,
-        "env_path": "/pub/envs/abl-pinned",
+        "image": image_reference(),
+        "env_path": "/opt/env",
         "pinned_packages": {},
         "deterministic": False,
         "budget": budget_document(),

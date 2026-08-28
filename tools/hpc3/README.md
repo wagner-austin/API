@@ -57,7 +57,12 @@ written down.
       "minutes": 720,
       "requeue": true,
       "checkpoint_steps": 500,
-      "env_path": "/pub/wagnera3/envs/abl-pinned",
+      "image": {
+        "path": "/pub/wagnera3/images/v20/abl.sif",
+        "sha256": "2b89283fccf289e3060b7b66f61315a5ea0922dbad1b63352540d5f9bdd2d1a5",
+        "binds": ["/pub/wagnera3"]
+      },
+      "env_path": "/opt/env",
       "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" },
       "deterministic": true,
       "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
@@ -113,8 +118,13 @@ environment path:
   "partition": "free-gpu", "gpu": { "model": "V100", "count": 1 },
   "cpus": 4, "mem_gb": 32, "minutes": 240,
   "requeue": true, "checkpoint_steps": 200,
-  "env_path": "/pub/wagnera3/envs/turkic",
-  "pinned_packages": {},
+  "image": {
+    "path": "/pub/wagnera3/images/turkic-lstm-v1/turkic-lstm.sif",
+    "sha256": "8e1f2c41f7f426012d735d5b5e853d8dd2632815de1fe2f5d1d2f93bbed9e702",
+    "binds": ["/pub/wagnera3"]
+  },
+  "env_path": "/opt/env",
+  "pinned_packages": { "torch": "2.6.0+cu124", "numpy": "2.3.5" },
   "deterministic": false,
   "budget": { "self_imposed_gpu_hours": 12.0, "max_service_units": 0.0, "charge_account": "" },
   "repo": "../../../../LSTM"
@@ -129,6 +139,55 @@ and 1.0 GPU-hours over the same ledger. `hpc3-watch` then enforced whichever
 one you happened to pass against whatever job you named. `charge_account`
 moved with the caps for a sharper reason: accounts are per-PI, and a job
 charged to the wrong one spends another lab's allocation.
+
+### Adopting an image
+
+**A project that requests a GPU must declare an `image`.** This is enforced
+when the workspace is decoded, so a GPU project cannot be registered without
+one, and a run may override the image but may not set it to `null`.
+
+The reason is not tidiness. A GPU run's numbers are decided by the whole stack
+above the card — CUDA runtime, cuDNN, the torch build, every library that
+touches a tensor. An image pins all of it and gives the run a **content
+digest**, which is the `image_digest` axis of the run fingerprint. A directory
+environment pins nothing and has no digest, and it can be edited in place
+while `pinned_packages` is edited to match — which is exactly what happened on
+2026-08-28, in under an hour, with every check still passing.
+
+CPU-only projects may omit it. `cleargbm` has no card and no driver stack; its
+arithmetic is pinned by BLAS thread count instead.
+
+Four commands, in order:
+
+```bash
+# 1. Capture the project's live environment as a spec. Do NOT hand-write this:
+#    pip freeze, delete the first-party lines, paste into JSON is unrepeatable
+#    and silently incomplete, which is how the first spec got made.
+hpc3-image-capture --config runs/hpc3.json --project turkic-lstm \
+    --commit <repo sha> --base-image python:3.11.16-slim-bookworm \
+    --env-prefix /opt/env --first-party char_lstm,platform_core \
+    --symbols char_lstm.provenance:scoring_fingerprint \
+    --extra-index-url https://download.pytorch.org/whl/cu124 \
+    --out specs/turkic-lstm-image.json
+
+# 2. Render the build. Pure, runs anywhere, builds nothing.
+hpc3-image --spec specs/turkic-lstm-image.json \
+    --out-dir runs/turkic-lstm-build-v1 --image-name turkic-lstm.sif \
+    --job-name turkic-lstm-image-v1 --image-dir /pub/wagnera3/images/turkic-lstm-v1
+
+# 3. Stage the rendered files AND the first-party wheels into the IMAGE
+#    directory -- build.sbatch does `cd <image-dir>` and runs build.sh there.
+#    Putting them anywhere else fails with "build.sh: No such file or directory".
+scp runs/turkic-lstm-build-v1/* hpc3:/pub/wagnera3/images/turkic-lstm-v1/
+
+# 4. Build on the cluster (~25 min, free partition, requeue-protected).
+ssh hpc3 'cd /pub/wagnera3/images/turkic-lstm-v1 && sbatch build.sbatch'
+```
+
+Then put the built image's path and `sha256` in the project's `image`, set
+`env_path` to the in-image prefix (`/opt/env`), and preflight: the pinned
+packages are then checked **inside the image** rather than against a directory
+someone can edit.
 
 `"gpu": null` is how a **CPU-only** job is stated, and it is the only way —
 there is no zero-count request, because two spellings of one state is how they

@@ -16,10 +16,17 @@
       "minutes": 720,
       "requeue": true,
       "checkpoint_steps": 27344,
-      "env_path": "/pub/wagnera3/envs/lstm",
+      "image": {
+        "path": "/pub/wagnera3/images/turkic-lstm-v1/turkic-lstm.sif",
+        "sha256": "8e1f2c41f7f426012d735d5b5e853d8dd2632815de1fe2f5d1d2f93bbed9e702",
+        "binds": [
+          "/pub/wagnera3"
+        ]
+      },
+      "env_path": "/opt/env",
       "pinned_packages": {
-        "torch": "2.5.1+cu124",
-        "numpy": "2.4.6"
+        "torch": "2.6.0+cu124",
+        "numpy": "2.3.5"
       },
       "deterministic": false,
       "budget": {

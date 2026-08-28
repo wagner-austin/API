@@ -255,6 +255,62 @@ def _require_positive(obj: dict[str, JSONValue], key: str) -> int:
     return value
 
 
+def _check_gpu_project_is_imaged(gpu: GpuRequest | None, image: ImageReference | None) -> None:
+    """Refuse to ONBOARD GPU work whose software stack no image pins.
+
+    A GPU run's numbers are decided by the whole stack above the card -- the
+    CUDA runtime, cuDNN, the torch build, every library that touches a tensor.
+    An image pins all of it and gives the run a CONTENT DIGEST, which is the
+    ``image_digest`` axis of
+    :class:`~platform_core.comparability.RunFingerprint`. A directory
+    environment on a shared filesystem pins nothing and has no digest.
+
+    WHAT HAPPENED WITHOUT THIS, on 2026-08-28. ``turkic-lstm`` was onboarded
+    with ``env_path: /pub/wagnera3/envs/lstm`` and no image, because nothing
+    refused it: the CPU project ``cleargbm`` has that shape legitimately and
+    it was copied without asking whether the reason carried over. Within the
+    hour that environment was mutated in place with ``pip install`` to change
+    its torch version, and every check still passed, because
+    ``pinned_packages`` was simply edited to match. A declaration the caller
+    can bring into agreement with reality is not a check. Both GPU projects
+    that had ever actually run -- ``mi`` and ``floor`` -- already declared
+    images; this is their practice, written where it cannot be skipped.
+
+    WHY HERE AND NOT ON THE JOB SPEC, which was tried first and reverted. A
+    job may legitimately run on the host with a GPU: that is how a one-off
+    probe works, ``core.sbatch`` has a whole host branch for it, and 47 tests
+    in ``test_sbatch`` exercise it. Forbidding it there outlawed a capability
+    the tool supports on purpose. What must not happen is ONBOARDING a
+    standing body of work that way -- a project is durable, produces numbers
+    someone will subtract, and is the thing this registry exists to describe.
+
+    A run may still override ``image`` per submission, which is deliberate
+    (an experiment pinning a NEWER image is the normal way an image version
+    is rolled). It may not remove one; see
+    :func:`~hpc3.contracts.run.resolve_run`.
+
+    Args:
+        gpu: GPUs the project requests, or None for CPU-only work.
+        image: Image its payloads run inside, or None to run on the host.
+
+    Raises:
+        AppError: With ``GPU_RUN_UNIMAGED`` when a project requests a GPU and
+            declares no image.
+    """
+    if gpu is None or image is not None:
+        return
+    raise AppError(
+        Hpc3ErrorCode.GPU_RUN_UNIMAGED,
+        "A project requesting a GPU must declare an 'image'. A directory "
+        "environment pins no CUDA runtime, no cuDNN and no torch build, and "
+        "carries no digest, so two runs of it can differ in every layer that "
+        "decides their numbers and still fingerprint the same -- and an "
+        "environment can be edited in place while 'pinned_packages' is edited "
+        "to match. Adopt one with hpc3-image-capture then hpc3-image; see the "
+        "README's 'Adopting an image'. CPU-only projects may omit it.",
+    )
+
+
 def decode_project_config(
     value: JSONValue, cluster: ClusterFacts, *, config_dir: pathlib.Path
 ) -> ProjectConfig:
@@ -284,6 +340,11 @@ def decode_project_config(
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"project config must be a JSON object, got {type(value).__name__}")
+
+    _check_gpu_project_is_imaged(
+        decode_gpu_request(cluster, value.get("gpu"), "gpu"),
+        decode_image_reference(value.get("image"), "image"),
+    )
 
     checkpoint_steps = require_int(value, "checkpoint_steps")
     if checkpoint_steps < 0:

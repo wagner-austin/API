@@ -95,8 +95,12 @@ class TestResolveRun:
             "minutes": 30,
             "requeue": False,
             "checkpoint_steps": 0,
-            "image": None,
-            "env_path": "/pub/envs/abl-pinned",
+            "image": {
+                "path": "/pub/images/v1/abl.sif",
+                "sha256": "a" * 64,
+                "binds": ["/pub"],
+            },
+            "env_path": "/opt/env",
             "pinned_packages": {},
             "deterministic": False,
             "depends_on": None,
@@ -107,8 +111,8 @@ class TestResolveRun:
 
     def test_changing_a_project_default_changes_every_run(self) -> None:
         """One edit, not one per document -- the reason this layer exists."""
-        moved = resolve_run(_workspace(env_path="/pub/envs/abl-next"), _run())
-        assert moved["env_path"] == "/pub/envs/abl-next"
+        moved = resolve_run(_workspace(env_path="/opt/env-next"), _run())
+        assert moved["env_path"] == "/opt/env-next"
 
     def test_an_override_wins_over_the_default(self) -> None:
         assert resolve_run(_workspace(), _run(cpus=16))["cpus"] == 16
@@ -290,3 +294,48 @@ class TestResolveSweep:
         with pytest.raises(AppError) as excinfo:
             resolve_sweep(_workspace(), _sweep(project="zodiac"))
         assert excinfo.value.code is Hpc3ErrorCode.WORKSPACE_PROJECT_UNKNOWN
+
+
+class TestARunMayNotRemoveTheProjectsImage:
+    """Overriding the image is normal; deleting it would switch off the rule.
+
+    ``_check_gpu_project_is_imaged`` refuses to onboard GPU work with no
+    image. Without this, that refusal would be one line of JSON away from
+    being bypassed per submission, which is not a rule.
+    """
+
+    def test_a_run_nulling_the_image_is_refused(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            resolve_run(_workspace(), _run(image=None))
+        assert excinfo.value.code is Hpc3ErrorCode.RUN_REMOVES_IMAGE
+
+    def test_the_refusal_says_to_omit_the_field_instead(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            resolve_run(_workspace(), _run(image=None))
+        assert "Omit the field" in str(excinfo.value)
+
+    def test_a_run_pinning_a_different_image_is_admitted(self) -> None:
+        """Rolling an image version forward one experiment at a time is the
+        reason overriding stays legal."""
+        newer: JSONValue = {
+            "path": "/pub/images/v2/abl.sif",
+            "sha256": "b" * 64,
+            "binds": ["/pub"],
+        }
+        spec = resolve_run(_workspace(), _run(image=newer))
+        assert spec["image"] == newer
+
+    def test_a_run_omitting_the_field_inherits_the_projects_image(self) -> None:
+        spec = resolve_run(_workspace(), _run())
+        image = spec["image"]
+        if image is None:
+            raise AssertionError("the run did not inherit the project's image")
+        assert image["path"] == "/pub/images/v1/abl.sif"
+
+    def test_a_cpu_project_with_no_image_is_unaffected(self) -> None:
+        """Nothing to remove, so nothing to refuse."""
+        spec = resolve_run(
+            _workspace(partition="free", gpu=None, image=None, env_path="/pub/envs/cleargbm"),
+            _run(image=None),
+        )
+        assert spec["image"] is None
