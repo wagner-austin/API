@@ -121,11 +121,35 @@ untracked — it is state, not configuration).
   `--gres=gpu:1`, so the array job's "whatever is free" placement is gone.
   That trades queue time for arms whose numbers can be subtracted from each
   other, which is the whole point of the exercise.
-- **Corpus caveat.** The sweep trains from `corpora_clean`, the base corpora
-  `train_base.sub` named. Recent local training (`train_v3.log`) used
-  `rebuild_2026-08/corpora_clean_v3` instead, which is staged separately to
+- **Corpus caveat, and it is the sharper of the two open questions.** The
+  sweep trains from `corpora_clean`, the base corpora `train_base.sub` named.
+  Recent local training (`train_v3.log`) used
+  `rebuild_2026-08/corpora_clean_v3` instead, which stages separately to
   `/pub/wagnera3/mi/corpora`. Pointing the sweep at v3 is a one-line change
-  per member and a research decision, not a mechanical one.
+  per member — but it is a research decision, and the two sets differ in
+  provenance as well as content:
+
+  | | `corpora_clean` (base) | `corpora_clean_v3` |
+  |---|---|---|
+  | equalized char budget | 12,642,807 | 11,658,775 |
+  | records cleaning params | yes | yes |
+  | records **which rules built it** | **no** | yes (8 digests) |
+
+  Neither repository stores corpora — `~/PROJECTS/turkic-transliteration` is
+  the *engine* (`src/turkic_translit/rules/*.rules` plus the cleaner); its
+  `data/` is empty. The corpora are the engine's output, and live in LSTM.
+
+  Checked 2026-08-28 against the engine as it stands: v3's seven `.rules`
+  digests still match exactly, and its `symbol_map` digest matches **neither**
+  version in that repo's history, in any line-ending form. So **v3 is not
+  byte-reproducible from what is in version control**, and the base set
+  records nothing to reproduce from at all.
+
+  The known-risky map change — merging the `U+02A6` ligature for Kyrgyz,
+  committed 2026-08-12 with the note that "corpora published before then
+  carry it" — is *not* the discrepancy. Both Kyrgyz files were checked
+  directly: zero `U+02A6` in either, 19,374 merged forms in the base set and
+  19,421 in v3.
 - **Nothing in the ledger yet.** Preflight admits; no job has been submitted.
 
 ---
