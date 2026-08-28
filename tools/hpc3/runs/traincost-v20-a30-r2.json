@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "traincost-v20-a30-r2",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 48,
+  "minutes": 60,
+  "requeue": true,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v20/abl.sif",
+    "sha256": "2b89283fccf289e3060b7b66f61315a5ea0922dbad1b63352540d5f9bdd2d1a5",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.train_benchmark --device cuda --out /pub/wagnera3/traincost/v20/a30-r2.json",
+  "artifact": "/pub/wagnera3/traincost/v20/a30-r2.json",
+  "experiment": {
+    "kind": "training-step-cost",
+    "card": "A30",
+    "image": "v20",
+    "repeat": "2"
+  }
+}
