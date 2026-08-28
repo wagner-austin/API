@@ -156,13 +156,14 @@ class TestTheCommittedWorkspaces:
     """Three documents, one per project, sharing one ledger file."""
 
     def test_they_declare_every_project_exactly_once(self) -> None:
-        assert sorted(_by_project()) == ["cleargbm", "floor", "mi"]
+        assert sorted(_by_project()) == ["cleargbm", "floor", "mi", "turkic-lstm"]
 
     def test_each_workspace_declares_the_project_its_filename_implies(self) -> None:
         declared = {name: sorted(w["projects"]) for name, w in _workspaces().items()}
         assert declared == {
             "hpc3-floor.json": ["floor"],
             "hpc3-mi.json": ["mi"],
+            "hpc3-turkic-lstm.json": ["turkic-lstm"],
             "hpc3.json": ["cleargbm"],
         }
 
@@ -204,11 +205,17 @@ class TestTheResearchIndexNamesEveryProject:
         assert absent == []
 
     def test_the_index_states_which_surfaces_are_unregistered(self) -> None:
-        """The entries no tool can see are the ones a reader most needs."""
+        """The entries no tool can see are the ones a reader most needs.
+
+        ``LSTM`` was named here until it was onboarded as ``turkic-lstm`` on
+        2026-08-28, at which point asserting its presence in this section
+        would have kept a true sentence in a section that had stopped
+        applying to it. The section itself is what must not disappear.
+        """
         text = _INDEX.read_text(encoding="utf-8")
-        assert "## Not registered anywhere" in text
-        for surface in ("LSTM", "RustedWarfareBot"):
-            assert surface in text
+        unregistered = text.split("## Not registered anywhere")[1]
+        assert "RustedWarfareBot" in unregistered
+        assert "sirius" in unregistered
 
 
 class TestEveryCommittedSubmissionResolves:
@@ -236,13 +243,25 @@ class TestEveryCommittedSubmissionResolves:
             "sweep-cleargbm-p6-rung4.json",
             "sweep-cleargbm-p6-rung4b.json",
             "sweep-cleargbm-p6-rung5.json",
+            "sweep-turkic-bases.json",
         ]
-        assert sum(expanded) == 108
+        assert sum(expanded) == 115
 
     def test_no_sweep_member_leaves_its_artifact_unstated(self) -> None:
-        """``artifact`` became required after these were written, so the P6
-        record stopped decoding. ``null`` is the honest value: every member
-        runs ``--no-save-model`` and writes no file of its own."""
+        """Stated, which is not the same as null.
+
+        This asserted ``== {None}`` while the only sweeps were cleargbm's,
+        where null is the honest value because every member runs
+        ``--no-save-model`` and writes no file of its own. That made an
+        accident of the corpus look like a rule, and the first sweep that
+        DOES produce a file -- ``sweep-turkic-bases``, whose members each
+        write a checkpoint -- would have failed a test that was never about
+        them. What the contract requires is that the key is present and
+        deliberate; what its value should be is the member's business.
+        """
         artifacts = _sweep_member_artifacts()
-        assert len(artifacts) == 108
-        assert set(artifacts) == {None}
+        stated = sorted(str(a) for a in artifacts if a is not None)
+        assert len(artifacts) == 115
+        assert sum(1 for a in artifacts if a is None) == 108
+        assert stated[0] == "/pub/wagnera3/LSTM/checkpoints/az_best.pt"
+        assert len(stated) == 7

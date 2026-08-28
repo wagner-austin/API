@@ -1,0 +1,47 @@
+{
+  "project": "turkic-lstm",
+  "name": "bases",
+  "experiment": {
+    "kind": "char-lstm-base-training",
+    "corpus": "corpora_clean",
+    "langs": "tr,az,kk,ky,uz,ug,fi",
+    "replaces": "slurm/train_base.sub"
+  },
+  "members": [
+    {
+      "suffix": "tr",
+      "command": "cd /pub/wagnera3/LSTM && SCRATCH=/tmp/wagnera3/$SLURM_JOB_ID && trap 'rm -rf $SCRATCH' EXIT && mkdir -p $SCRATCH && cp -r /pub/wagnera3/LSTM/corpora_clean $SCRATCH/ && mkdir -p /pub/wagnera3/LSTM/checkpoints && python -m char_lstm.train --lang tr --corpus-dir $SCRATCH/corpora_clean --checkpoint-dir /pub/wagnera3/LSTM/checkpoints && test -f /pub/wagnera3/LSTM/checkpoints/tr_best.pt",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints/tr_best.pt"
+    },
+    {
+      "suffix": "az",
+      "command": "cd /pub/wagnera3/LSTM && SCRATCH=/tmp/wagnera3/$SLURM_JOB_ID && trap 'rm -rf $SCRATCH' EXIT && mkdir -p $SCRATCH && cp -r /pub/wagnera3/LSTM/corpora_clean $SCRATCH/ && mkdir -p /pub/wagnera3/LSTM/checkpoints && python -m char_lstm.train --lang az --corpus-dir $SCRATCH/corpora_clean --checkpoint-dir /pub/wagnera3/LSTM/checkpoints && test -f /pub/wagnera3/LSTM/checkpoints/az_best.pt",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints/az_best.pt"
+    },
+    {
+      "suffix": "kk",
+      "command": "cd /pub/wagnera3/LSTM && SCRATCH=/tmp/wagnera3/$SLURM_JOB_ID && trap 'rm -rf $SCRATCH' EXIT && mkdir -p $SCRATCH && cp -r /pub/wagnera3/LSTM/corpora_clean $SCRATCH/ && mkdir -p /pub/wagnera3/LSTM/checkpoints && python -m char_lstm.train --lang kk --corpus-dir $SCRATCH/corpora_clean --checkpoint-dir /pub/wagnera3/LSTM/checkpoints && test -f /pub/wagnera3/LSTM/checkpoints/kk_best.pt",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints/kk_best.pt"
+    },
+    {
+      "suffix": "ky",
+      "command": "cd /pub/wagnera3/LSTM && SCRATCH=/tmp/wagnera3/$SLURM_JOB_ID && trap 'rm -rf $SCRATCH' EXIT && mkdir -p $SCRATCH && cp -r /pub/wagnera3/LSTM/corpora_clean $SCRATCH/ && mkdir -p /pub/wagnera3/LSTM/checkpoints && python -m char_lstm.train --lang ky --corpus-dir $SCRATCH/corpora_clean --checkpoint-dir /pub/wagnera3/LSTM/checkpoints && test -f /pub/wagnera3/LSTM/checkpoints/ky_best.pt",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints/ky_best.pt"
+    },
+    {
+      "suffix": "uz",
+      "command": "cd /pub/wagnera3/LSTM && SCRATCH=/tmp/wagnera3/$SLURM_JOB_ID && trap 'rm -rf $SCRATCH' EXIT && mkdir -p $SCRATCH && cp -r /pub/wagnera3/LSTM/corpora_clean $SCRATCH/ && mkdir -p /pub/wagnera3/LSTM/checkpoints && python -m char_lstm.train --lang uz --corpus-dir $SCRATCH/corpora_clean --checkpoint-dir /pub/wagnera3/LSTM/checkpoints && test -f /pub/wagnera3/LSTM/checkpoints/uz_best.pt",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints/uz_best.pt"
+    },
+    {
+      "suffix": "ug",
+      "command": "cd /pub/wagnera3/LSTM && SCRATCH=/tmp/wagnera3/$SLURM_JOB_ID && trap 'rm -rf $SCRATCH' EXIT && mkdir -p $SCRATCH && cp -r /pub/wagnera3/LSTM/corpora_clean $SCRATCH/ && mkdir -p /pub/wagnera3/LSTM/checkpoints && python -m char_lstm.train --lang ug --corpus-dir $SCRATCH/corpora_clean --checkpoint-dir /pub/wagnera3/LSTM/checkpoints && test -f /pub/wagnera3/LSTM/checkpoints/ug_best.pt",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints/ug_best.pt"
+    },
+    {
+      "suffix": "fi",
+      "command": "cd /pub/wagnera3/LSTM && SCRATCH=/tmp/wagnera3/$SLURM_JOB_ID && trap 'rm -rf $SCRATCH' EXIT && mkdir -p $SCRATCH && cp -r /pub/wagnera3/LSTM/corpora_clean $SCRATCH/ && mkdir -p /pub/wagnera3/LSTM/checkpoints && python -m char_lstm.train --lang fi --corpus-dir $SCRATCH/corpora_clean --checkpoint-dir /pub/wagnera3/LSTM/checkpoints && test -f /pub/wagnera3/LSTM/checkpoints/fi_best.pt",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints/fi_best.pt"
+    }
+  ]
+}

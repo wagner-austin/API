@@ -6,8 +6,9 @@ Read this before auditing, extending, or reproducing any experiment.
 This file exists because nothing like it did, and the cost was measured: on
 2026-08-28 an audit of provenance across this machine examined four research
 surfaces and missed two entirely — LSTM and RustedWarfareBot — because there
-are roughly ninety directories under `~/PROJECTS` and no list. Two of the
-surfaces below are still not registered anywhere a tool can see.
+are roughly ninety directories under `~/PROJECTS` and no list. One of the
+surfaces below is still not registered anywhere a tool can see, and one more
+was scoped as an example and never onboarded.
 
 The machine-readable half of this is the `projects` table in the hpc3
 workspace documents (`tools/hpc3/runs/hpc3*.json`). Each entry declares how a
@@ -73,14 +74,13 @@ untracked — it is state, not configuration).
 
 ---
 
-## Not registered anywhere
+### `turkic-lstm` — character-level LSTM for Turkic languages
 
-Real research, producing numbers that get compared, reachable by no tool.
-
-### LSTM — character-level LSTM for Turkic languages
-
-- **Repo:** `~/PROJECTS/LSTM` (separate Poetry project, no `platform_core`)
-- **Produces:** `results/*.csv`, `checkpoints_*/`, `analysis/`
+- **Repo:** `~/PROJECTS/LSTM` (separate Poetry project; depends on
+  `platform-core` by git rev, NOT by relative path — see below)
+- **Runs:** `runs/sweep-turkic-bases.json`, seven members, one per language
+- **Produces:** `/pub/wagnera3/LSTM/checkpoints/<lang>_best.pt`; locally
+  `results/*.csv` plus a `RunRecord` sidecar per evaluation
 - **Compares:** `zero_shot_excess_ce_*.csv` carries `excess_cross_entropy` —
   one model's cross-entropy minus another's — with confidence intervals,
   across seven languages and six arms (`pilot_a/b/c`, `variant_b`, `v3`,
@@ -93,43 +93,46 @@ Real research, producing numbers that get compared, reachable by no tool.
   payload digest, and a `RunFingerprint` carrying the host and the resolved
   `torch`/`numpy` versions. It states the card and driver as absent because
   the scoring path genuinely uses neither, and the determinism stack as
-  `none` because it pins nothing — both true, and a true record of an
-  unpinned run beats no record.
+  `none` because it pins nothing — both true.
 
-  Before that the provenance was **the filename**: `_2026-08-13`,
-  `_fixedfi`, `_forMoldir`. Checkpoints are `<lang>_best.pt` plus
-  `<lang>_vocab.json`; the vocab is a model contract, not provenance.
+  **The CSVs already in `results/` have no sidecar** and cannot get an honest
+  one retroactively — nobody recorded what produced them. Re-running the
+  evaluation is what fills the gap for anything going into the paper.
+- **Onboarded 2026-08-28**, and the blocker was worth recording. Training had
+  never run on the cluster: `slurm/train_base.sub` was a careful, unused
+  array job pointing at `/pub/wagnera3/LSTM` and `/pub/wagnera3/envs/lstm`,
+  neither of which existed. An earlier version of this page read that script
+  as a description of practice and said so — which is the exact failure this
+  index exists to prevent, made on its own first day.
 
-  **The CSVs already in `results/` have no sidecar** and cannot get an
-  honest one retroactively — nobody recorded what produced them. Re-running
-  the evaluation is what fills the gap for anything going into the paper.
-- **Where it actually runs: this workstation, on one local CUDA device.**
-  The training logs carry Windows-style paths (backslash-separated, e.g.
-  `checkpoints_v3` then `tr_best.pt`) and no
-  SLURM markers, and `/pub/wagnera3` holds no `LSTM` directory.
+  What actually blocked it was one line: `platform-core` was added as
+  `{ path = "../API/libs/platform_core" }`, which resolves beside
+  `~/PROJECTS/API` and cannot resolve on HPC3, where the monorepo is at
+  `/pub/wagnera3/api` — lowercase, case-sensitive filesystem. It is now a git
+  dependency pinned by the lock file, which carries no layout assumption and
+  records exactly which `platform_core` computed a run's fingerprint.
 
-  **Correcting an earlier version of this page**, which said it "reaches the
-  cluster via a hand-written `slurm/train_base.sub`". It does not.
-  `train_base.sub` is real, careful and **unused**: it points at
-  `/pub/wagnera3/LSTM` and `/pub/wagnera3/envs/lstm`, and neither exists —
-  the cluster's `envs/` holds only `abl-pinned` and `cleargbm`. Its own
-  header still reads "BEFORE FIRST USE, fill in the three TODOs below". It
-  describes an intended migration, not a practice, and reading a script as a
-  practice is exactly how this page came to assert one.
-- **The axis that genuinely varies today is `packages`.** `torch = "^2.5"`
-  is a caret range, so arms trained months apart on this one machine can
-  differ in torch minor version — the same class as the incident
-  `platform_core.run_record` was written after. `gpu_model` does **not**
-  vary yet, because every arm trains on the same card. It would begin to the
-  moment this moves to `free-gpu`, whose scheduler places work "across
-  whatever is free" and whose jobs are preemptible.
-- **Not on the cluster, so nothing appears in the ledger.** The hpc3
-  README's own "Adding a project" example is named `turkic-lstm`, which is
-  where this is headed. It is deliberately NOT declared in a workspace
-  document yet, and now for a stronger reason than before: the cluster has
-  no environment and no checkout for it, so an entry naming an `env_path`
-  would be a registry pointing at a directory that does not exist. Standing
-  it up is real provisioning on a shared machine, not a config edit.
+  Now provisioned and verified: checkout, environment (`torch 2.5.1+cu124`,
+  `numpy 2.4.6`), and corpora staged with cluster-side digest verification
+  against `runs/turkic-base-corpus-digests.txt`. All seven sweep members
+  preflight clean, 84 GPU-hours projected against a declared 84-hour cap.
+  `slurm/train_base.sub` is deleted rather than kept beside the new path.
+- **The sweep pins the card to an A100.** The hpc3 contract refuses a generic
+  `--gres=gpu:1`, so the array job's "whatever is free" placement is gone.
+  That trades queue time for arms whose numbers can be subtracted from each
+  other, which is the whole point of the exercise.
+- **Corpus caveat.** The sweep trains from `corpora_clean`, the base corpora
+  `train_base.sub` named. Recent local training (`train_v3.log`) used
+  `rebuild_2026-08/corpora_clean_v3` instead, which is staged separately to
+  `/pub/wagnera3/mi/corpora`. Pointing the sweep at v3 is a one-line change
+  per member and a research decision, not a mechanical one.
+- **Nothing in the ledger yet.** Preflight admits; no job has been submitted.
+
+---
+
+## Not registered anywhere
+
+Real research, producing numbers that get compared, reachable by no tool.
 
 ### RustedWarfareBot — system identification against an obfuscated binary
 

@@ -1,0 +1,33 @@
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "projects": {
+    "turkic-lstm": {
+      "partition": "free-gpu",
+      "gpu": {
+        "model": "A100",
+        "count": 1
+      },
+      "cpus": 4,
+      "mem_gb": 16,
+      "minutes": 720,
+      "requeue": true,
+      "checkpoint_steps": 27344,
+      "env_path": "/pub/wagnera3/envs/lstm",
+      "pinned_packages": {
+        "torch": "2.5.1+cu124",
+        "numpy": "2.4.6"
+      },
+      "deterministic": false,
+      "budget": {
+        "self_imposed_gpu_hours": 84.0,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      },
+      "repo": "../../../../LSTM"
+    }
+  }
+}
