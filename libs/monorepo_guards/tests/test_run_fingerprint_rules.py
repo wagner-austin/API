@@ -142,3 +142,73 @@ def test_a_dict_with_computed_keys_is_not_mistaken_for_one(tmp_path: Path) -> No
 
 def test_the_rule_names_itself_for_the_report(tmp_path: Path) -> None:
     assert RunFingerprintLiteralRule().name == "run-fingerprint-literal"
+
+
+def test_an_exhaustive_equality_assertion_is_not_a_violation(tmp_path: Path) -> None:
+    # The rule's first run against real code flagged exactly this, in
+    # `test_run_fingerprint`'s assertion that capture returns six named axes.
+    # It is the opposite of the defect: add an axis and the captured value
+    # gains a key the literal lacks, so `==` fails and names the site. The
+    # predicate was wrong, not the test, so the predicate moved.
+    target = tmp_path / "tests" / "test_capture.py"
+    _write(
+        target,
+        "def test_capture():\n"
+        "    assert capture() == {\n"
+        '        "image_digest": "sha256:abc",\n'
+        '        "gpu_model": "A100",\n'
+        '        "driver_version": "580",\n'
+        '        "determinism": PINNED,\n'
+        '        "host": HOST,\n'
+        '        "packages": PACKAGES,\n'
+        "    }\n",
+    )
+
+    violations = RunFingerprintLiteralRule().run([target])
+
+    assert violations == []
+
+
+def test_a_literal_on_the_left_of_a_comparison_is_also_allowed(tmp_path: Path) -> None:
+    target = tmp_path / "tests" / "test_capture.py"
+    _write(
+        target,
+        "def test_capture():\n"
+        "    assert {\n"
+        '        "image_digest": "",\n'
+        '        "gpu_model": "",\n'
+        '        "driver_version": "",\n'
+        '        "determinism": {},\n'
+        "    } == capture()\n",
+    )
+
+    violations = RunFingerprintLiteralRule().run([target])
+
+    assert violations == []
+
+
+def test_a_fixture_literal_is_still_flagged_in_the_same_file(tmp_path: Path) -> None:
+    # The two must be distinguished WITHIN one file, or the refinement would
+    # amount to exempting any file that happens to contain an assertion.
+    target = tmp_path / "tests" / "test_both.py"
+    _write(
+        target,
+        "FIXTURE = {\n"
+        '    "image_digest": "sha256:abc",\n'
+        '    "gpu_model": "A100",\n'
+        '    "driver_version": "580",\n'
+        '    "determinism": {},\n'
+        "}\n"
+        "\n"
+        "def test_capture():\n"
+        "    assert capture() == {\n"
+        '        "image_digest": "sha256:abc",\n'
+        '        "gpu_model": "A100",\n'
+        '        "driver_version": "580",\n'
+        '        "determinism": {},\n'
+        "    }\n",
+    )
+
+    violations = RunFingerprintLiteralRule().run([target])
+
+    assert [v.line_no for v in violations] == [1]

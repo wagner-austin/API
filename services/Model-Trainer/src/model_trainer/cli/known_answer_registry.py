@@ -50,7 +50,7 @@ from platform_core.known_answer_registry import (
     write_registry,
 )
 from platform_core.logging import get_logger, setup_logging
-from platform_core.run_record import RunRecord, decode_run_record
+from platform_core.run_record import RunRecord, decode_run_record, run_record
 
 _log = get_logger(__name__)
 
@@ -58,12 +58,13 @@ REGISTRY_FLAG = "--registry"
 RECORD_FLAG = "--record"
 MODE_FLAG = "--mode"
 TOLERANCE_FLAG = "--tolerance"
+OBSERVATION_FLAG = "--observation"
 
 GATE_MODE = "gate"
 REGISTER_MODE = "register"
 MODES = (GATE_MODE, REGISTER_MODE)
 
-_FLAGS = (REGISTRY_FLAG, RECORD_FLAG, MODE_FLAG, TOLERANCE_FLAG)
+_FLAGS = (REGISTRY_FLAG, RECORD_FLAG, MODE_FLAG, TOLERANCE_FLAG, OBSERVATION_FLAG)
 
 # The card name used to prove an entry still reports a configuration move.
 # Any value no real entry carries works; this one is obviously synthetic so a
@@ -206,6 +207,47 @@ def run_gate(registry_path: pathlib.Path, record: RunRecord) -> int:
     return 0 if matched else 1
 
 
+def one_observation(record: RunRecord, name: str) -> RunRecord:
+    """Narrow a record to the single observation that IS the known answer.
+
+    WHY THE SELECTION LIVES HERE AND NOT IN THE LIBRARY.
+    :func:`~platform_core.known_answer_registry.entry_from_record` refuses a
+    record carrying several observations, and says why: "choosing among
+    several here would be a guess about which one the caller meant." That rule
+    is right and stays. What was missing is a way for the caller to STOP it
+    being a guess.
+
+    The case that needed it: a cloze scoring run emits four numbers --
+    ``cloze_accuracy``, ``cloze_chance``, ``cloze_correct``, ``cloze_total`` --
+    and exactly one of them is the floor a later run is gated against. The
+    other three are context. Before this, such a record could not be
+    registered at all.
+
+    Args:
+        record: The measured run, carrying one or more observations.
+        name: Which observation is the answer.
+
+    Returns:
+        The same record with only that observation.
+
+    Raises:
+        ValueError: When the record carries no observation of that name. The
+            message lists what it does carry, because the caller's next act is
+            to pick one of them.
+    """
+    chosen = tuple(o for o in record["observations"] if o["name"] == name)
+    if not chosen:
+        available = ", ".join(sorted(o["name"] for o in record["observations"]))
+        raise ValueError(f"record has no observation named {name!r}; it carries: {available}")
+    return run_record(
+        experiment=record["experiment"],
+        label=record["label"],
+        fingerprint=record["fingerprint"],
+        observations=chosen,
+        payload_digest=record["payload_digest"],
+    )
+
+
 def run_register(registry_path: pathlib.Path, record: RunRecord, tolerance: float) -> int:
     """Establish a new entry from a record, refusing one that cannot gate.
 
@@ -284,11 +326,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     registry_path = pathlib.Path(cli_args.require_flag(parsed, REGISTRY_FLAG))
     record = load_record(pathlib.Path(cli_args.require_flag(parsed, RECORD_FLAG)))
 
+    # Applied to BOTH modes, and symmetry is the point. `gate_record` refuses
+    # a multi-observation record exactly as `entry_from_record` does, so a
+    # flag that only narrowed for registration would register a floor and
+    # then be unable to gate against it -- the check would exist and never be
+    # runnable. Optional, and the absence is not a default: without it the
+    # record must already carry exactly one observation, which both those
+    # functions check and refuse.
+    observation = parsed.get(OBSERVATION_FLAG)
+    chosen = record if observation is None else one_observation(record, observation)
+
     if mode == GATE_MODE:
-        return run_gate(registry_path, record)
+        return run_gate(registry_path, chosen)
 
     tolerance = parse_tolerance(cli_args.require_flag(parsed, TOLERANCE_FLAG))
-    return run_register(registry_path, record, tolerance)
+    return run_register(registry_path, chosen, tolerance)
 
 
 def entrypoint() -> None:
@@ -321,6 +373,7 @@ __all__ = [
     "entrypoint",
     "load_record",
     "main",
+    "one_observation",
     "parse_tolerance",
     "run_gate",
     "run_register",

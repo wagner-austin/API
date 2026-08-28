@@ -345,3 +345,128 @@ class TestTheCommandLine:
                 sys.modules[module_name] = saved_module
 
         assert excinfo.value.code == 0
+
+
+def _many_observation_record(fingerprint: RunFingerprint) -> RunRecord:
+    """Build a record shaped like a cloze scoring run.
+
+    Four numbers, exactly one of which is the answer a later run is gated
+    against. The other three are context, and before ``--observation`` a
+    record like this could not be registered OR gated at all.
+
+    Args:
+        fingerprint: The configuration to record.
+
+    Returns:
+        The record.
+    """
+    return run_record(
+        experiment="extraction-eval",
+        label=_LABEL,
+        fingerprint=fingerprint,
+        observations=(
+            Observation(name="cloze_accuracy", value=_VALUE),
+            Observation(name="cloze_chance", value=0.25),
+            Observation(name="cloze_correct", value=1374.0),
+            Observation(name="cloze_total", value=2627.0),
+        ),
+        payload_digest="",
+    )
+
+
+class TestChoosingWhichNumberIsTheAnswer:
+    """A record with several numbers has to say which one gates."""
+
+    def test_it_keeps_only_the_named_observation(self) -> None:
+        narrowed = registry_cli.one_observation(_many_observation_record(_A100), "cloze_accuracy")
+
+        assert [(o["name"], o["value"]) for o in narrowed["observations"]] == [
+            ("cloze_accuracy", _VALUE)
+        ]
+
+    def test_it_carries_every_other_field_through_unchanged(self) -> None:
+        record = _many_observation_record(_A100)
+
+        narrowed = registry_cli.one_observation(record, "cloze_accuracy")
+
+        assert narrowed["experiment"] == record["experiment"]
+        assert narrowed["label"] == record["label"]
+        assert narrowed["fingerprint"] == record["fingerprint"]
+        assert narrowed["payload_digest"] == record["payload_digest"]
+
+    def test_an_absent_observation_names_what_is_available(self) -> None:
+        # The caller's next act is to pick one of them, so the message has to
+        # say what there is to pick.
+        with pytest.raises(ValueError, match="cloze_accuracy, cloze_chance"):
+            registry_cli.one_observation(_many_observation_record(_A100), "accuracy")
+
+    def test_registering_a_four_number_record_needs_the_flag(self, tmp_path: pathlib.Path) -> None:
+        registry = _write_registry(tmp_path / "k.json")
+        record = _write_record(tmp_path / "r.json", _many_observation_record(_A100))
+        argv = [
+            "--registry",
+            str(registry),
+            "--record",
+            str(record),
+            "--mode",
+            "register",
+            "--tolerance",
+            "0",
+        ]
+
+        with pytest.raises(ValueError, match="exactly one observation"):
+            registry_cli.main(argv)
+
+    def test_the_flag_makes_it_registerable(self, tmp_path: pathlib.Path) -> None:
+        registry = _write_registry(tmp_path / "k.json")
+        record = _write_record(tmp_path / "r.json", _many_observation_record(_A100))
+
+        code = registry_cli.main(
+            [
+                "--registry",
+                str(registry),
+                "--record",
+                str(record),
+                "--mode",
+                "register",
+                "--tolerance",
+                "0",
+                "--observation",
+                "cloze_accuracy",
+            ]
+        )
+
+        assert code == 0
+        assert read_registry(registry) == (_entry(_A100),)
+
+    def test_the_flag_applies_to_gating_too(self, tmp_path: pathlib.Path) -> None:
+        # The asymmetry this prevents: a flag that only narrowed for
+        # registration would register a floor and then be unable to gate
+        # against it, so the check would exist and never be runnable.
+        registry = _write_registry(tmp_path / "k.json", _entry(_A100))
+        record = _write_record(tmp_path / "r.json", _many_observation_record(_A100))
+
+        code = registry_cli.main(
+            [
+                "--registry",
+                str(registry),
+                "--record",
+                str(record),
+                "--mode",
+                "gate",
+                "--observation",
+                "cloze_accuracy",
+            ]
+        )
+
+        assert code == 0
+
+    def test_gating_a_four_number_record_without_the_flag_is_refused(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        registry = _write_registry(tmp_path / "k.json", _entry(_A100))
+        record = _write_record(tmp_path / "r.json", _many_observation_record(_A100))
+        argv = ["--registry", str(registry), "--record", str(record), "--mode", "gate"]
+
+        with pytest.raises(ValueError, match="exactly one observation"):
+            registry_cli.main(argv)

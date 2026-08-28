@@ -51,16 +51,51 @@ _FINGERPRINT_KEYS: Final[frozenset[str]] = frozenset(
 _DEFINING_MODULE: Final[str] = "platform_core/src/platform_core/comparability.py"
 
 
+def _comparison_operands(tree: ast.Module) -> frozenset[int]:
+    """Identify dict literals that are operands of a comparison.
+
+    THE DISTINCTION THIS DRAWS IS THE WHOLE RULE. A literal a fixture is BUILT
+    from rots silently when the type grows an axis -- it keeps producing a
+    value, just an incomplete one. A literal a test COMPARES against does the
+    opposite: add an axis, and the captured value has a key the literal lacks,
+    so ``==`` fails and names the site. An exhaustive equality assertion is
+    therefore the one place a full literal is not merely safe but load-bearing,
+    because it is what proves capture fills every axis.
+
+    Caught by this rule's first run against real code, on
+    ``test_run_fingerprint``'s assertion that `capture_run_fingerprint` returns
+    exactly six named axes. Exempting that file would have been the wrong fix:
+    the predicate was wrong, not the test.
+
+    Args:
+        tree: The parsed module.
+
+    Returns:
+        The ``id()`` of every dict literal used as a comparison operand.
+    """
+    operands: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare):
+            continue
+        for side in (node.left, *node.comparators):
+            if isinstance(side, ast.Dict):
+                operands.add(id(side))
+    return frozenset(operands)
+
+
 class _FingerprintLiteralVisitor(ast.NodeVisitor):
     """Finds dict literals shaped like an encoded run fingerprint."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, compared: frozenset[int]) -> None:
         """Start a scan of one file.
 
         Args:
             path: The file being scanned, for violation reporting.
+            compared: ``id()`` of dict literals used as comparison operands,
+                which are assertion targets rather than fixtures.
         """
         self.path = path
+        self.compared = compared
         self.violations: list[Violation] = []
 
     def visit_Dict(self, node: ast.Dict) -> None:
@@ -70,7 +105,7 @@ class _FingerprintLiteralVisitor(ast.NodeVisitor):
             node: The dict literal to inspect.
         """
         literal_keys = {k.value for k in node.keys if isinstance(k, ast.Constant)}
-        if literal_keys >= _FINGERPRINT_KEYS:
+        if literal_keys >= _FINGERPRINT_KEYS and id(node) not in self.compared:
             self.violations.append(
                 Violation(
                     file=self.path,
@@ -106,7 +141,7 @@ class RunFingerprintLiteralRule:
             if path.as_posix().endswith(_DEFINING_MODULE):
                 continue
             tree = parse_source(path)
-            visitor = _FingerprintLiteralVisitor(path)
+            visitor = _FingerprintLiteralVisitor(path, _comparison_operands(tree))
             visitor.visit(tree)
             found.extend(visitor.violations)
         return found

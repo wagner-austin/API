@@ -248,3 +248,12 @@ __all__ = [
     "outcomes_digest",
     "score_with_outcomes",
 ]
+
+
+# Without this, `python -m model_trainer.cli.score_baseline` imports the
+# module, runs nothing and exits 0. That is worse than a crash: the cluster
+# invokes this through the `modeltrainer-score-baseline` console script and
+# works, so the two forms disagree, and the one that silently does nothing
+# looks like a scoring run that produced no file.
+if __name__ == "__main__":
+    entrypoint()

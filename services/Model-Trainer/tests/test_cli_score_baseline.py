@@ -10,6 +10,7 @@ and recorded a posture the run did not have.
 from __future__ import annotations
 
 import pathlib
+import runpy
 import sys
 from collections.abc import Callable, Generator
 
@@ -512,6 +513,38 @@ class TestTheProductionHooks:
             cli_hooks.score_cloze = cli_hooks._default_score_cloze
 
         assert excinfo.value.code == 0
+
+    def test_running_it_as_a_module_actually_scores(self, tmp_path: pathlib.Path) -> None:
+        """The guard that was missing until 2026-08-27.
+
+        Without ``if __name__ == "__main__"`` this module imported, ran
+        nothing and exited 0 -- while the console script above worked, so the
+        two invocation forms disagreed and the broken one looked exactly like
+        a scoring run that legitimately produced no file. It cost real time
+        during the known-answer re-registration.
+
+        Args:
+            tmp_path: The test's temporary directory.
+        """
+        recorder = _Recorder()
+        _install(recorder)
+        module_name = "model_trainer.cli.score_baseline"
+        saved_argv = sys.argv
+        saved_module = sys.modules.pop(module_name, None)
+        sys.argv = ["x", *_cpu_argv(tmp_path)]
+        try:
+            with pytest.raises(SystemExit) as raised:
+                runpy.run_module(module_name, run_name="__main__", alter_sys=False)
+        finally:
+            sys.argv = saved_argv
+            if saved_module is not None:
+                sys.modules[module_name] = saved_module
+            cli_hooks.apply_determinism_hook = cli_hooks._default_apply_determinism
+            cli_hooks.load_hub_model = cli_hooks._default_load_hub_model
+            cli_hooks.score_cloze = cli_hooks._default_score_cloze
+
+        assert raised.value.code == 0
+        assert _record_path(tmp_path).is_file()
 
 
 @pytest.mark.parametrize(
