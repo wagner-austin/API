@@ -96,8 +96,7 @@ test:
 	@Write-Host "==> test" -ForegroundColor Cyan
 	poetry lock
 	poetry install --with dev
-	New-Item -ItemType Directory -Force "runs" | Out-Null
-	$$covToken = ".coverage-" + [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$env:COVERAGE_FILE = (Resolve-Path -LiteralPath ".").Path + "\runs\" + $$covToken; $$code = 0; try { poetry run python -m pytest --cov=src --cov=scripts --cov-branch --cov-report=term-missing; $$code = $$LASTEXITCODE } finally { Get-ChildItem -Path "runs" -Filter "$$covToken*" -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue; Remove-Item Env:\COVERAGE_FILE -ErrorAction SilentlyContinue }; if ($$code -ne 0) { exit $$code }
+	& "..\\..\\scripts\\run-tests.ps1"; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
 	@Write-Host ""
 	@Write-Host "[test] passed" -ForegroundColor Green
 
