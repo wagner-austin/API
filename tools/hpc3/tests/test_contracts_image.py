@@ -415,8 +415,21 @@ class TestTheCommittedSpec:
         committed anyway, so ``make check`` in this package was red on
         ``main`` across nine changes and the signal this test exists to give
         was being stepped over rather than read. The list below is the whole
-        of ``specs/abl-image.json`` as of v21; the ritual only works if the
-        failure is answered in the commit that causes it.
+        of ``specs/abl-image.json``; the ritual only works if the failure is
+        answered in the commit that causes it.
+
+        IT WENT STALE AGAIN ON THE VERY NEXT SPEC COMMIT. ``b7da5cda`` -- v22,
+        the determinism controls -- added three symbols
+        (``CUBLASLT_WORKSPACE_ENV_VAR``, ``remove_cublaslt_split_k``,
+        ``restrict_attention_to_math``) and did not touch this list, one
+        commit after the paragraph above was written to stop exactly that.
+        So the confession is not the fix, and neither is the tenth repetition
+        of it: what this failure keeps proving is that a list transcribed by
+        hand into a test drifts from the artifact it transcribes whenever
+        those are edited by different people at different times. The
+        assertion is worth keeping because the LOOK is worth forcing, but
+        anyone tempted to explain the next recurrence should reach for the
+        generator instead.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
         symbols = sorted(
@@ -452,8 +465,11 @@ class TestTheCommittedSpec:
                 "model_trainer.core.services.training.base_trainer_checkpoints",
                 "_TrainerCheckpoints",
             ),
+            ("platform_core.determinism_env", "CUBLASLT_WORKSPACE_ENV_VAR"),
             ("platform_core.environment_record", "capture_host_record"),
             ("platform_core.environment_record", "capture_package_versions"),
+            ("platform_ml.determinism", "remove_cublaslt_split_k"),
+            ("platform_ml.determinism", "restrict_attention_to_math"),
         ]
 
     def test_its_environment_survives_the_cluster_bind_mounts(self) -> None:
