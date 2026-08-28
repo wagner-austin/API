@@ -418,6 +418,60 @@ $ hpc3-trace --config hpc3.json --match 07ab4976…
 Exits 1 when nothing matches — a question with no answer is not an error, but
 it must not read as "nothing was ever run".
 
+### The image still computes what it used to
+
+An image that still *builds* is not an image that still *computes* the same
+thing. Nothing in the reproducibility standards checks the second: CWL
+validates the description, MLflow describes entry points, and neither runs the
+tool and compares the answer. On this project a rebuilt image silently changed
+its torch major version, and it was found only after a training run whose
+result could not be interpreted.
+
+The registry lives at **`known-answers.json`, in this directory, in git.**
+That is deliberate — it is the record of what this environment computed and
+when, so a copy on cluster scratch is one cleanup away from losing every
+baseline that makes a future run interpretable. `write_registry` deliberately
+overrides the compact JSON default and writes indented, for the sole reason
+that a new entry should be a readable one-line diff, which only pays off under
+version control.
+
+```bash
+# Before trusting an environment: does it still give the known answer?
+python -m model_trainer.cli.known_answer_registry \
+    --registry tools/hpc3/known-answers.json \
+    --record artifacts/ka-probe-v20/v20-a100.json --mode gate
+
+# Establish a new answer, e.g. on a new image or a new card.
+python -m model_trainer.cli.known_answer_registry \
+    --registry tools/hpc3/known-answers.json \
+    --record <record.json> --mode register --tolerance 0.0
+
+# A scoring run emits four numbers; --observation says which one IS the answer.
+    ... --mode register --tolerance 0.0 --observation cloze_correct
+```
+
+**Three outcomes, not two.** A value can match, deviate, or *not apply*. An
+expected loss is not a property of an experiment; it is a property of an
+experiment on a particular image, on a particular card, under particular
+determinism settings. Without the third outcome, moving to a new GPU reports a
+working image as broken — and everyone learns to ignore the check.
+
+**Two invariants refuse an entry, and both have fired for real:**
+
+- *No empty fingerprint axis.* An unknown axis differs from every real value,
+  so such an entry could never match anything again. This is why the two
+  RTX 3090 Ti cloze floors are **not** registered: measured on the
+  workstation outside any image, their `image_digest` is `""`.
+- *The entry must discriminate.* Registration also checks that a drifted value
+  deviates and that the same value on another card does not apply. Verifying
+  an answer against the measurement it was built from proves only that the
+  checker can subtract. An entry that cannot fail is not a gate, and it fails
+  silently — everything passes forever.
+
+Tolerance is `0.0`: bit-exact is the right band *within* one configuration
+once determinism is pinned, which is exactly why moving configuration is a
+separate outcome rather than a wider band.
+
 ---
 
 ## What the cluster sees
