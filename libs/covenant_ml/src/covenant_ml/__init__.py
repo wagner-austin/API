@@ -67,29 +67,15 @@ from .features import (
     engineer_features,
     get_feature_config_for_preset,
 )
-from .manifest import (
-    ClassifierManifest,
-    ManifestDataset,
-    ManifestMetrics,
-    ManifestSystem,
-    ManifestTraining,
-    ManifestVersions,
-)
 from .predictor import load_model, predict_probabilities
 
 __all__ = [
-    "ClassifierManifest",
     "DataSplits",
     "EngineeredFeatures",
     "EvalMetrics",
     "FeatureEngineeringConfig",
     "FeatureImportance",
     "FeaturePreset",
-    "ManifestDataset",
-    "ManifestMetrics",
-    "ManifestSystem",
-    "ManifestTraining",
-    "ManifestVersions",
     "Proba2DProtocol",
     "ProgressCallback",
     "RegressionDataSplits",

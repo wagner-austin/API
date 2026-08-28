@@ -796,19 +796,6 @@ RegressorTrainConfig = TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig
 | `encode_calibrator_state` | Encode CalibratorState to JSON-compatible dict |
 | `decode_calibrator_state` | Decode JSON-compatible dict to CalibratorState |
 
-## Manifest Types
-
-TypedDicts for model manifest serialization:
-
-| Type | Description |
-|------|-------------|
-| `ClassifierManifest` | Complete model manifest with all metadata |
-| `ManifestVersions` | Library versions |
-| `ManifestSystem` | System info (platform, device, CUDA) |
-| `ManifestDataset` | Dataset info (samples, features, distribution) |
-| `ManifestTraining` | Training info (backend, config, rounds, duration) |
-| `ManifestMetrics` | Train/val/test metrics and best_val_auc |
-
 ## Testing Utilities
 
 ### Classification Config Factories

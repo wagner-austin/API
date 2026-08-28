@@ -1,6 +1,6 @@
 # TankpitBot Wiki
 
-**Read this first.** 6 topic hubs, 74 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
+**Read this first.** 6 topic hubs, 75 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
 
 ## Hubs
 
