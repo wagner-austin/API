@@ -171,6 +171,7 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         self.pending_radar_uses_extra: bool = True
         self.failed_move_targets: dict[str, int] = {}
         self.landing_refusals: dict[str, int] = {}
+        self.displacement_tombstones: dict[str, int] = {}
         self.movement_rejections: list[int] = []
         # The canonical account-identity model ([[tank-registry]] rank
         # number; state/types/self_account.py) — session-stable "who

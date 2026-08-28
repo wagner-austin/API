@@ -211,6 +211,79 @@ class TestFerryBeliefDisproof:
 class TestDisplacementEvidence:
     """The bounce receipt writes belief, not just a diagnostic."""
 
+    def test_unexplained_one_tile_displacement_tombstones_the_tile(self) -> None:
+        """One mystery displacement is enough: the tile is never re-aimed.
+
+        Operator doctrine 2026-08-27 ("if we get displaced once then
+        that should be enough info... why re-attempt unless we cleared
+        mines"): session five re-aimed (18,123) four times because
+        routine one-tile displacements fed no belief. With no known
+        tank on the aimed tile, the displacement proves an invisible
+        occupant — exactly one tile of evidence, no ring.
+        """
+        ws = WorldService()
+        record_teleport_dispatch(
+            ws.ledger,
+            target_x=100,
+            target_y=100,
+            message_index=0,
+            sent_window="(none)",
+        )
+        _seed_self_at(ws, 100, 101)
+
+        _dispatch_landed_and_capture(ws)
+
+        assert "100,100" in ws.displacement_tombstones
+        keys = ws.hostile_landing_keys(ws.displacement_tombstones["100,100"] + 1)
+        assert "100,100" in keys
+        # Single-tile evidence: the neighbor is NOT blocked.
+        assert "100,99" not in keys
+        # And it ages out with the shared TTL, pruning the store.
+        from tankpit_bot.sniffer.world_service_movement import _LANDING_REFUSAL_TTL_MS
+
+        marked = ws.displacement_tombstones["100,100"]
+        assert ws.hostile_landing_keys(marked + _LANDING_REFUSAL_TTL_MS) == frozenset()
+        assert ws.displacement_tombstones == {}
+
+    def test_one_tile_displacement_onto_a_tank_body_is_exempt(self) -> None:
+        """Aiming at a tank's own tile displaces by one legitimately.
+
+        Combat closes aim at the enemy's body and land adjacent every
+        time — a known tank on the requested tile fully explains the
+        displacement, so no tombstone may be written or every kill
+        approach would poison its own target tile.
+        """
+        from tankpit_bot.state.types import make_tank_state
+
+        ws = WorldService()
+        ws.world_state["tanks"]["900"] = make_tank_state(
+            tank_id=900,
+            x=100,
+            y=100,
+            team=3,
+            rank=1,
+            name="red-1",
+            is_self=False,
+            is_bot=True,
+            damage_state=3,
+            timestamp_ms=1000,
+            last_wire_seen_ms=1000,
+            last_position_update_ms=1000,
+            last_viewport_observation_ms=1000,
+        )
+        record_teleport_dispatch(
+            ws.ledger,
+            target_x=100,
+            target_y=100,
+            message_index=0,
+            sent_window="(none)",
+        )
+        _seed_self_at(ws, 100, 101)
+
+        _dispatch_landed_and_capture(ws)
+
+        assert ws.displacement_tombstones == {}
+
     def test_displaced_landing_writes_landing_hostility_evidence(self) -> None:
         """A meaningful bounce records the requested zone as hostile.
 

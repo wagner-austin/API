@@ -51,6 +51,7 @@ class WorldServiceMovementMixin:
     failed_scan_viewports: dict[str, int]
     movement_rejections: list[int]
     landing_refusals: dict[str, int]
+    displacement_tombstones: dict[str, int]
 
     def mark_move_target_failed(self, x: int, y: int, timestamp_ms: int) -> None:
         """Record a move destination that stalled and timed out.
@@ -119,20 +120,51 @@ class WorldServiceMovementMixin:
             requested_y,
         )
 
+    def mark_displacement_tombstone(
+        self, requested_x: int, requested_y: int, timestamp_ms: int
+    ) -> None:
+        """Record an UNEXPLAINED routine displacement as tile evidence.
+
+        Operator doctrine (2026-08-27, verbatim): "if we get displaced
+        once then that should be enough info to make a decision. why
+        re-attempt unless we cleared mines at that location." A one-tile
+        displacement at a tile with NO known tank on it means a hidden
+        mine or invisible occupant sits there — session five re-aimed
+        three such tiles (4x at (18,123)) because routine displacements
+        fed nothing. The caller applies the tank-occupancy exemption
+        (aiming at an enemy's own body displaces by one legitimately,
+        every time); this records only the mystery cases, single tile,
+        no ring — one displacement proves exactly one tile.
+
+        Args:
+            requested_x: The teleport's requested X.
+            requested_y: The teleport's requested Y.
+            timestamp_ms: When the displacement was observed.
+        """
+        self.displacement_tombstones[f"{requested_x},{requested_y}"] = timestamp_ms
+        log.info(
+            "TELEPORT: displacement tombstone at (%d,%d) - unexplained occupant",
+            requested_x,
+            requested_y,
+        )
+
     def hostile_landing_keys(self, now_ms: int) -> frozenset[str]:
-        """Expand fresh landing refusals into blocked landing tiles.
+        """Expand fresh landing evidence into blocked landing tiles.
 
         Consumed by the composed decision terrain each tick, exactly
         as the hostile-mine set is: the refused tile and its ring-1
-        (the zone one refusal actually proves) are not attainable
-        landings until the evidence ages out (or the forced repair
-        radar's reveals let the ordinary mine beliefs answer).
+        (the zone one refusal actually proves) plus each displacement
+        tombstone (single tile — the zone one displacement proves)
+        are not attainable landings until the evidence ages out (or
+        the forced repair radar's reveals let the ordinary mine
+        beliefs answer).
 
         Args:
             now_ms: Current wall-clock ms for the TTL check.
 
         Returns:
-            Tile keys of each fresh refusal's requested tile + ring-1.
+            Tile keys of each fresh refusal's requested tile + ring-1,
+            plus each fresh displacement tombstone's tile.
         """
         keys: set[str] = set()
         for tile_key, marked_ms in list(self.landing_refusals.items()):
@@ -144,6 +176,11 @@ class WorldServiceMovementMixin:
             for x in range(max(0, cx - 1), min(255, cx + 1) + 1):
                 for y in range(max(0, cy - 1), min(255, cy + 1) + 1):
                     keys.add(f"{x},{y}")
+        for tile_key, marked_ms in list(self.displacement_tombstones.items()):
+            if now_ms - marked_ms >= _LANDING_REFUSAL_TTL_MS:
+                del self.displacement_tombstones[tile_key]
+                continue
+            keys.add(tile_key)
         return frozenset(keys)
 
     def has_fresh_landing_refusal(self, now_ms: int) -> bool:

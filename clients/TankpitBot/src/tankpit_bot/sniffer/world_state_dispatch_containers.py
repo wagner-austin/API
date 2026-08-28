@@ -218,6 +218,25 @@ def _expire_disproven_ferry_belief(ws: WorldService, requested_x: int, requested
     )
 
 
+def _tank_stands_at(ws: WorldService, x: int, y: int) -> bool:
+    """Return whether any registry tank occupies the tile.
+
+    The displacement-tombstone exemption: a known tank body on the
+    aimed tile fully explains a one-tile displacement (combat closes
+    aim at the enemy's own tile and displace by one every time), so
+    no mystery evidence is recorded for it.
+
+    Args:
+        ws: World service instance.
+        x: Tile X.
+        y: Tile Y.
+
+    Returns:
+        True when a tank in the registry stands on ``(x, y)``.
+    """
+    return any(tank["x"] == x and tank["y"] == y for tank in ws.world_state["tanks"].values())
+
+
 def _emit_teleport_displacement(ws: WorldService) -> None:
     """Emit a receipt when the server landed the tank off the requested tile.
 
@@ -267,12 +286,26 @@ def _emit_teleport_displacement(ws: WorldService) -> None:
     # back at its origin (137/137 archived receipts) — and the
     # landing selector consumes the ring-blocked verdict through the
     # composed decision terrain.
+    chebyshev = max(abs(self_state["x"] - requested_x), abs(self_state["y"] - requested_y))
     ws.mark_landing_refused(
         requested_x,
         requested_y,
-        max(abs(self_state["x"] - requested_x), abs(self_state["y"] - requested_y)),
+        chebyshev,
         browser.get_current_time_ms(),
     )
+    if chebyshev == 1 and not _tank_stands_at(ws, requested_x, requested_y):
+        # Routine one-tile displacement with NO known tank on the
+        # aimed tile: an invisible occupant (hidden mine) displaced
+        # us. Operator doctrine 2026-08-27: one displacement is
+        # enough information — never re-aim the tile until the
+        # evidence ages out or a radar reveal explains it. Aims at a
+        # tank's own body stay exempt: those displace by one
+        # legitimately on every combat close.
+        ws.mark_displacement_tombstone(
+            requested_x,
+            requested_y,
+            browser.get_current_time_ms(),
+        )
     _expire_disproven_ferry_belief(ws, requested_x, requested_y)
 
 
