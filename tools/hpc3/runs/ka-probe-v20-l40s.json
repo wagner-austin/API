@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "ka-probe-v20-l40s",
+  "partition": "free-gpu32",
+  "gpu": {
+    "model": "L40S",
+    "count": 1
+  },
+  "cpus": 4,
+  "mem_gb": 16,
+  "minutes": 20,
+  "requeue": false,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v20/abl.sif",
+    "sha256": "2b89283fccf289e3060b7b66f61315a5ea0922dbad1b63352540d5f9bdd2d1a5",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.known_answer_probe --device cuda --out /pub/wagnera3/probe/v20-l40s.json",
+  "artifact": "/pub/wagnera3/probe/v20-l40s.json",
+  "experiment": {
+    "kind": "known-answer",
+    "label": "gpt2-tiny-L2-d128-h2-v512-len64-seed42",
+    "card": "L40S",
+    "image": "v20"
+  }
+}
