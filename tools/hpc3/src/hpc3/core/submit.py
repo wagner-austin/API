@@ -26,6 +26,8 @@ from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.core import audit, ledger, preflight, remote
+from hpc3.core.inflight import check_artifact_is_free, claimed_artifacts
+from hpc3.core.squeue import account_command, parse_account_output
 
 _SUBMIT_PREFIX = "Submitted batch job "
 
@@ -106,6 +108,20 @@ def submit(
             ``REMOTE_COMMAND_FAILED`` if a command failed or ``sbatch``
             announced no usable job id.
     """
+    # Asked BEFORE preflight, because it is the cheaper question and the one
+    # whose answer means "do not submit this at all" rather than "this job is
+    # malformed". Two jobs writing one artifact both SUCCEED, so this is the
+    # rare check whose absence produces no failure to notice -- see
+    # `hpc3.core.inflight`, and the uz_best.pt race it was written for.
+    check_artifact_is_free(
+        spec["artifact"],
+        claimed_artifacts(
+            ledger.read(ledger_path, cluster),
+            parse_account_output(remote.run_remote(host, account_command())),
+        ),
+        name=qualified_name(spec["project"], spec["name"]),
+    )
+
     # Preflight is not a separate step a caller may skip. It uploads the
     # script and asks the scheduler whether it would be admitted; submission
     # then queues that same uploaded file. Making it a prefix of submit rather

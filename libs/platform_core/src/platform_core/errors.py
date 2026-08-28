@@ -191,6 +191,12 @@ class Hpc3ErrorCode(ErrorCodeBase):
     SWEEP_EXCEEDS_CPU_CEILING = "SWEEP_EXCEEDS_CPU_CEILING"
     SWEEP_EXCEEDS_JOB_CEILING = "SWEEP_EXCEEDS_JOB_CEILING"
 
+    # Concurrency -- two jobs that would write one file.
+    ARTIFACT_ALREADY_IN_FLIGHT = "ARTIFACT_ALREADY_IN_FLIGHT"
+
+    # Campaigns -- a set of runs converging on a declared end state.
+    CAMPAIGN_MEMBER_HAS_NO_ARTIFACT = "CAMPAIGN_MEMBER_HAS_NO_ARTIFACT"
+
     # Image builds -- the one job that is submitted from an already-rendered
     # script rather than from a run document.
     IMAGE_BUILD_SCRIPT_UNREADABLE = "IMAGE_BUILD_SCRIPT_UNREADABLE"

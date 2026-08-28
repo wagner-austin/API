@@ -163,10 +163,47 @@ completed epoch; it does not restart from zero. That is what
 `checkpoint_steps` and the trainer's `save_resume_state` / `load_resume_state`
 are for, and it is why a long run on this partition is viable at all.
 
-Resubmitting is a one-member run document naming the job it resumes, so the
-ledger records the chain — see `runs/turkic-lstm-kk-resume.json`. Expect to do
-this: `free-gpu` is the free partition because other people's allocated work
-outranks yours.
+**Use `hpc3-campaign` for this, not a hand-written resume document.** Run the
+sweep document again and it submits exactly the members that are neither
+finished nor already running:
+
+```bash
+hpc3-campaign --config runs/hpc3-turkic-lstm.json --run runs/sweep-turkic-bases.json
+```
+
+```
+done      turkic-lstm.bases-tr
+done      turkic-lstm.bases-az
+in flight turkic-lstm.bases-kk <- turkic-lstm.bases-r1-kk
+in flight turkic-lstm.bases-uz <- turkic-lstm.bases-uz-r3
+2 done, 5 in flight, 0 submitted, 5 remaining
+```
+
+That is the real first run, and it shows what makes this work: **the artifact
+is the identity, not the job name.** `bases-uz-r3` is recognised as covering
+`bases-uz` because they write the same checkpoint, so a resume under any name
+counts. Run it twice in a row and the second run submits nothing — which is
+also why it is safe on a schedule.
+
+Every member must declare an `artifact`, and that is the one thing a campaign
+refuses. "Done" means the artifact exists, so a member that writes no file of
+its own is never done and would be resubmitted forever. `cleargbm`'s sweeps
+all declare `null` — correctly, every member runs `--no-save-model` — and are
+therefore sweeps, not campaigns. The refusal says so and names `hpc3-sweep`.
+
+**Why this exists.** On 2026-08-28 `free-gpu` preempted five of seven members
+inside an hour, and nothing could say which five. What followed was four
+hand-written resume documents describing one experiment, each a transcription
+of a queue state that had already changed — and at one point two of them were
+live, writing the same `uz_best.pt`. That race is now refused at submit time
+by `hpc3.core.inflight`, for every command, and the campaign avoids provoking
+it in the first place.
+
+The older shape — a one-member run document naming the job it resumes, like
+`runs/turkic-lstm-kk-resume.json` — still works and still records the chain in
+the ledger. It is the right tool for resuming *one* member deliberately. It is
+the wrong tool for a preemption wave. Expect waves: `free-gpu` is the free
+partition because other people's allocated work outranks yours.
 
 ### Adopting an image
 
@@ -870,6 +907,7 @@ window for a job to close cleanly.
 | `hpc3-preflight --config C {--run R \| --sweep S}` | asks the scheduler whether it would start. Nothing is queued. |
 | `hpc3-submit --config C --run R` | preflight → submit → record in the ledger |
 | `hpc3-sweep --config C --run S` | the same, per member, recording each as it goes |
+| `hpc3-campaign --config C --run S` | the same sweep document, run repeatedly: submits only the members that are neither finished nor already running |
 | `hpc3-watch --config C --job ID[,ID…]` | state, elapsed, real cost, GPU-hours, state tally; one `sacct` call so a sweep's rows share one moment |
 | `hpc3-triage --config C` | the three conditions above; exit 1 if any |
 | `hpc3-trace --config C {--match V \| --job ID}` | which run produced a result, or what a job was; exit 1 if nothing matches |

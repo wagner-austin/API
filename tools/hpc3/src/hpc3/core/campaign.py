@@ -1,0 +1,205 @@
+"""Converging a set of runs on a declared end state, however many tries it takes.
+
+WHAT WAS MISSING, and what it cost on 2026-08-28. The package had two shapes
+for many jobs and neither is a session. A sweep is one template run several
+ways CONCURRENTLY, submitted once. A chain is several jobs run one after
+another. Neither models "this experiment is seven checkpoints and is finished
+when seven checkpoints exist" -- so when ``free-gpu`` preempted five of seven
+members inside an hour, nothing could say which five, and the answer lived in
+an operator's head.
+
+What followed is the evidence: a hand-written four-member resume sweep, then a
+separate one-member document for ``uz``, then another when that was preempted
+too, then another after an image rebuild. Four documents describing one
+experiment, each a transcription of a queue state that had already changed,
+and at one point two of them were live at once writing the same checkpoint.
+
+A CAMPAIGN IS THE SAME DOCUMENT, RUN AGAIN. It takes the sweep document that
+already exists -- no new shape to learn, and every committed sweep is already
+one -- and instead of submitting all members, it computes what is missing:
+
+* **done** -- the member's artifact exists on the cluster. Nothing to do.
+* **in flight** -- a live job is already writing it. Nothing to do, and
+  submitting would be the ``uz_best.pt`` race (:mod:`hpc3.core.inflight`).
+* **missing** -- neither. Submit it.
+
+So re-running after a preemption wave IS the resume, and it is idempotent: run
+it twice in a row and the second run submits nothing. There is no state to
+keep between runs because the cluster holds it -- the artifacts that exist and
+the jobs that are live are both facts you can ask for, and neither can go
+stale the way a transcription does.
+
+EVERY MEMBER MUST DECLARE AN ARTIFACT, and this is the one thing a campaign
+refuses. "Done" is defined as the artifact existing; a member that writes no
+file of its own has no done, so every run would resubmit it forever. That is
+not a hypothetical -- every ``cleargbm`` sweep member runs ``--no-save-model``
+and declares ``null``, correctly. Those sweeps are perfectly good sweeps and
+cannot be campaigns, and being told so once beats an infinite loop that looks
+like enthusiasm.
+"""
+
+from __future__ import annotations
+
+import shlex
+from collections.abc import Sequence
+
+from platform_core.errors import AppError, Hpc3ErrorCode
+from typing_extensions import TypedDict
+
+from hpc3.contracts.job import JobSpec
+from hpc3.contracts.layout import qualified_name
+
+_PRESENT = "PRESENT|"
+_ABSENT = "ABSENT|"
+
+
+class CampaignPlan(TypedDict):
+    """What a campaign run would do, before it does any of it.
+
+    Attributes:
+        done: Qualified names whose artifact already exists, in declaration
+            order.
+        in_flight: Qualified name to the live job already writing that
+            member's artifact.
+        missing: Specs to submit -- the gap, and nothing else.
+    """
+
+    done: list[str]
+    in_flight: dict[str, str]
+    missing: list[JobSpec]
+
+
+def require_every_member_declares_an_artifact(specs: Sequence[JobSpec]) -> list[str]:
+    """Refuse a campaign whose progress cannot be measured.
+
+    Args:
+        specs: The expanded members.
+
+    Returns:
+        Each member's artifact, in declaration order.
+
+    Raises:
+        AppError: With ``CAMPAIGN_MEMBER_HAS_NO_ARTIFACT`` if any member
+            declares none. Refused rather than skipped: a member with no
+            artifact is never done, so a campaign carrying one would resubmit
+            it on every run forever, and an infinite loop that reports
+            progress every time is worse than a refusal that happens once.
+    """
+    artifacts: list[str] = []
+    for spec in specs:
+        artifact = spec["artifact"]
+        if artifact is None:
+            label = qualified_name(spec["project"], spec["name"])
+            raise AppError(
+                Hpc3ErrorCode.CAMPAIGN_MEMBER_HAS_NO_ARTIFACT,
+                f"{label} declares no artifact, so nothing can say whether it has "
+                "finished and every run of this campaign would submit it again. A "
+                "sweep whose members write no file of their own is a sweep, not a "
+                "campaign; submit it with hpc3-sweep.",
+            )
+        artifacts.append(artifact)
+    return artifacts
+
+
+def existence_command(artifacts: Sequence[str]) -> str:
+    """Build one command that reports which artifacts exist.
+
+    One command rather than one per member: a campaign of thirty members over
+    SSH is thirty round trips, each with its own chance to fail halfway and
+    leave the plan built from a mixture of two moments.
+
+    Args:
+        artifacts: Absolute cluster paths. Never empty -- an empty campaign
+            is refused before this is reached.
+
+    Returns:
+        A shell command printing one ``PRESENT|<path>`` or ``ABSENT|<path>``
+        line per artifact, in the order given. Each path is shell-quoted, so
+        a filename holding a space or a quote is tested rather than
+        interpreted.
+
+    Raises:
+        ValueError: If no artifact is given.
+    """
+    if len(artifacts) == 0:
+        raise ValueError("existence_command requires at least one artifact")
+    quoted = " ".join(shlex.quote(artifact) for artifact in artifacts)
+    return (
+        f"for p in {quoted}; do "
+        f'if [ -e "$p" ]; then echo "{_PRESENT}$p"; else echo "{_ABSENT}$p"; fi; done'
+    )
+
+
+def parse_existence(output: str) -> set[str]:
+    """Read which artifacts the cluster reported as present.
+
+    Args:
+        output: The command's standard output.
+
+    Returns:
+        The paths that exist.
+
+    Raises:
+        AppError: With ``SACCT_FIELD_UNPARSABLE`` if a line carries neither
+            marker. A line this cannot read is a member whose state is
+            unknown, and treating unknown as absent would resubmit a job that
+            is already finished -- straight into the artifact it wrote.
+    """
+    present: set[str] = set()
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped == "":
+            continue
+        if stripped.startswith(_PRESENT):
+            present.add(stripped[len(_PRESENT) :])
+            continue
+        if stripped.startswith(_ABSENT):
+            continue
+        raise AppError(
+            Hpc3ErrorCode.SACCT_FIELD_UNPARSABLE,
+            f"existence probe returned a line carrying neither {_PRESENT!r} nor "
+            f"{_ABSENT!r}: {line!r}",
+        )
+    return present
+
+
+def plan_campaign(
+    specs: Sequence[JobSpec], *, present: set[str], claimed: dict[str, str]
+) -> CampaignPlan:
+    """Split the members into finished, running, and still to do.
+
+    Args:
+        specs: The expanded members, every one declaring an artifact.
+        present: Artifacts that exist on the cluster.
+        claimed: Artifact to the live job writing it, from
+            :func:`~hpc3.core.inflight.claimed_artifacts`.
+
+    Returns:
+        The three groups. A member that is BOTH present and in flight counts
+        as in flight, because that is the state that forbids submitting: the
+        file existing while a job writes it is a partially-written file, not a
+        finished one.
+    """
+    done: list[str] = []
+    in_flight: dict[str, str] = {}
+    missing: list[JobSpec] = []
+    for spec in specs:
+        artifact = spec["artifact"]
+        label = qualified_name(spec["project"], spec["name"])
+        holder = claimed.get(artifact) if artifact is not None else None
+        if holder is not None:
+            in_flight[label] = holder
+        elif artifact in present:
+            done.append(label)
+        else:
+            missing.append(spec)
+    return CampaignPlan(done=done, in_flight=in_flight, missing=missing)
+
+
+__all__ = [
+    "CampaignPlan",
+    "existence_command",
+    "parse_existence",
+    "plan_campaign",
+    "require_every_member_declares_an_artifact",
+]
