@@ -8,14 +8,19 @@ from the workspace, so this command necessarily reads the same record
 ``hpc3-submit`` wrote. A ``--ledger`` flag here would be the single easiest
 way to get a clean board while jobs run unwatched.
 
-Reconciles the local ledger against the cluster and reports three conditions
-that a normal status check cannot distinguish from health:
+Reconciles the local ledger against the cluster -- in both directions -- and
+reports four conditions that a normal status check cannot distinguish from
+health:
 
 * **blocked** -- pending on a reason that will never resolve. On HPC3, 261 of
   621 pending GPU jobs were sitting on ``DependencyNeverSatisfied``.
 * **unaccounted** -- we recorded submitting it and accounting has never heard
   of it. No cluster-side query can find these, because the evidence is the
   absence of a cluster-side record.
+* **unclaimed** -- the cluster is holding it and our ledger has never heard of
+  it. No ledger-side query can find these either, for the mirror reason: the
+  evidence is the absence of a LOCAL record, so the enumeration has to start
+  from the account.
 * **silent** -- ``RUNNING``, holding GPUs, and its log has stopped growing.
 
 Exits non-zero when anything is found. A triage command that reports problems
@@ -35,7 +40,12 @@ from hpc3.contracts.pending import PendingJob
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import ledger, logs
 from hpc3.core.remote import run_remote
-from hpc3.core.squeue import parse_squeue_output, squeue_command
+from hpc3.core.squeue import (
+    account_command,
+    parse_account_output,
+    parse_squeue_output,
+    squeue_command,
+)
 from hpc3.core.status import parse_sacct_output, sacct_command
 from hpc3.core.triage import (
     Finding,
@@ -45,9 +55,31 @@ from hpc3.core.triage import (
     open_entries,
     silent_jobs,
     unaccounted_jobs,
+    unclaimed_jobs,
 )
 
 _FLAGS = (_config.CONFIG_FLAG,)
+
+
+def _report(findings: Sequence[Finding]) -> int:
+    """Emit every finding and decide the exit status.
+
+    Exists because there are now three places the command can finish -- an
+    empty ledger, a fully closed one, and the full reconciliation -- and the
+    first two used to return 0 without reporting anything. A separate exit
+    path is exactly where a finding gets dropped silently.
+
+    Args:
+        findings: Everything found, in the order it was found.
+
+    Returns:
+        1 when anything was found, 0 otherwise.
+    """
+    for finding in findings:
+        _test_hooks.emit(
+            f"{finding.kind.upper()} {finding.job_id} {finding.name}: {finding.detail}"
+        )
+    return 1 if findings != [] else 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -80,9 +112,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     closures_path = ledger.closure_path(ledger_path)
 
     recorded = ledger.read(ledger_path, cluster)
+
+    # Asked FIRST, and asked whatever the ledger holds. Both of the early
+    # returns below used to exit 0 before any cluster query ran, so a machine
+    # with an empty ledger and seven jobs on the cluster reported "nothing has
+    # been submitted from this machine" and exited clean -- which is the
+    # strongest form of the condition this query exists to find, reported as
+    # health. The enumeration does not depend on the ledger holding anything,
+    # so it does not wait for it to.
+    account = parse_account_output(run_remote(host, account_command()))
+    findings: list[Finding] = unclaimed_jobs(recorded, account)
+
     if recorded == []:
         _test_hooks.emit("ledger is empty; nothing has been submitted from this machine")
-        return 0
+        return _report(findings)
 
     # Jobs already observed to have ended are not asked about again. Without
     # this, every job older than the cluster's sacct retention window becomes
@@ -92,7 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     entries = open_entries(recorded, closed)
     if entries == []:
         _test_hooks.emit(f"{len(recorded)} recorded, all closed; nothing left to reconcile")
-        return 0
+        return _report(findings)
 
     job_ids = [entry["job_id"] for entry in entries]
     statuses = parse_sacct_output(run_remote(host, sacct_command(job_ids)), cluster)
@@ -111,16 +154,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     still_live = live_entries(entries, statuses)
     ages = logs.log_ages(host, still_live)
 
-    findings: list[Finding] = [
-        *unaccounted_jobs(entries, statuses),
-        *blocked_jobs(pending),
-        *silent_jobs(statuses, ages, quiet_seconds=quiet_seconds),
-    ]
-
-    for finding in findings:
-        _test_hooks.emit(
-            f"{finding.kind.upper()} {finding.job_id} {finding.name}: {finding.detail}"
-        )
+    findings.extend(
+        [
+            *unaccounted_jobs(entries, statuses),
+            *blocked_jobs(pending),
+            *silent_jobs(statuses, ages, quiet_seconds=quiet_seconds),
+        ]
+    )
+    exit_code = _report(findings)
 
     # Written AFTER the findings are built, so this run still reports on a job
     # it is closing, and only then stops asking. Recorded whatever the verdict
@@ -130,10 +171,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         ledger.append_closure(closures_path, closure)
 
     _test_hooks.emit(
-        f"{len(recorded)} recorded, {len(entries)} open, {len(still_live)} not finished, "
-        f"{len(findings)} finding(s), {len(newly_closed)} newly closed"
+        f"{len(recorded)} recorded, {len(account)} on the cluster, {len(entries)} open, "
+        f"{len(still_live)} not finished, {len(findings)} finding(s), "
+        f"{len(newly_closed)} newly closed"
     )
-    return 1 if findings != [] else 0
+    return exit_code
 
 
 def entrypoint() -> None:

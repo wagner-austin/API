@@ -212,6 +212,15 @@ scp runs/turkic-lstm-build-v1/* hpc3:/pub/wagnera3/images/turkic-lstm-v1/
 ssh hpc3 'cd /pub/wagnera3/images/turkic-lstm-v1 && sbatch build.sbatch'
 ```
 
+**Step 4 is the one path here that leaves no ledger row**, and `hpc3-triage`
+now reports it as `unclaimed` for as long as the build runs. That finding is
+correct and is not noise: an image build is a real job holding real cores, and
+if it wedges, nothing in this package knows it exists — `hpc3-trace` cannot
+find it and `hpc3-watch` was never given its id. The finding is left visible
+rather than filtered because filtering it would mean filtering the shape of
+every other bypass too. Recording the build through the tool is the fix, and
+it is not built yet.
+
 Then put the built image's path and `sha256` in the project's `image`, set
 `env_path` to the in-image prefix (`/opt/env`), and preflight: the pinned
 packages are then checked **inside the image** rather than against a directory
@@ -608,10 +617,10 @@ same rendered file is then submitted, so preflight and submission cannot drift.
 
 ---
 
-## Triage: the three conditions that look like health
+## Triage: the four conditions that look like health
 
-`hpc3-triage` reconciles the ledger against the cluster and exits non-zero if
-anything is found.
+`hpc3-triage` reconciles the ledger against the cluster **in both directions**
+and exits non-zero if anything is found.
 
 - **blocked** — pending on a reason that will never resolve. On HPC3, 261 of
   621 pending GPU jobs were sitting on `DependencyNeverSatisfied`; in `squeue`'s
@@ -621,9 +630,36 @@ anything is found.
 - **unaccounted** — we recorded submitting it and accounting has never heard of
   it. No cluster-side query can find these: the evidence is the *absence* of a
   cluster-side record, which is what the local ledger exists to supply.
+- **unclaimed** — the cluster is holding it and the ledger has never heard of
+  *it*. No ledger-side query can find these either, for the mirror reason: the
+  evidence is the absence of a **local** record, so the check has to ask the
+  account to enumerate itself (`squeue --me`) rather than ask about ids it
+  already has.
 - **silent** — `RUNNING`, holding GPUs, and its log has stopped growing. Log
   age is measured against the cluster's own clock; a few minutes of skew would
   either invent staleness or hide it.
+
+**Only three of these existed until 2026-08-28**, and the missing one was the
+mirror of the one everybody thought was the clever check. `unaccounted` proves
+every ledger row is a real job; nothing proved every real job has a ledger row.
+That is not a hypothetical gap — the image-build recipe below tells you to run
+`ssh hpc3 'cd … && sbatch build.sbatch'`, and twenty-one builds ran that way
+without leaving a record. The check found the twenty-second on its first run.
+
+Two consequences worth knowing before the first red board:
+
+- **An interactive session is a true positive.** It is a job on the account
+  that this machine did not submit and cannot trace. If those become common
+  enough to be noise, the fix is to record them, not to teach the check to
+  look away — a name filter that skipped them would skip the bypasses too,
+  since a job submitted around this tool is under no obligation to be named
+  the way this tool names things.
+- **It cannot see a bypassed job that already finished.** `squeue` forgets a
+  job minutes after it ends, so this catches an unrecorded job while it is
+  running — when it is costing something and cancelling is still possible —
+  and never afterwards. Catching the finished ones would mean an `sacct` sweep
+  over a window, which reports every interactive shell the account has ever
+  opened and drowns the signal.
 
 ## Chains: a pipeline that stops when a stage fails
 
@@ -749,6 +785,16 @@ window for a job to close cleanly.
 | `hpc3-trace --config C {--match V \| --job ID}` | which run produced a result, or what a job was; exit 1 if nothing matches |
 | `hpc3-cancel --config C --job ID[,ID…]` | stops jobs and reports which were actually running — `scancel` is silent about one that had already finished |
 | `hpc3-stage --config C --manifest M --source-dir D --expect-from R` | places files, verifies sha256 on both sides, and holds every digest against the published record |
+| `hpc3-chain --config C --chain H` | runs stages in order and stops at the first failure, so a broken stage does not feed the next |
+| `hpc3-image-capture --out S …` | reads a live environment and writes the image spec. **Use this rather than writing a spec by hand** |
+| `hpc3-image --spec S --out-dir D --image-name N` | renders the spec into definition, requirements, self-check and build script. Pure; builds nothing |
+
+**Three of these were missing from this table until 2026-08-28**, and the
+omission cost real work: `hpc3-image-capture` appeared exactly once in this
+file, inside a code comment eight hundred lines down, and a session that
+needed it did not find it and hand-wrote the spec instead — the precise
+failure its own docstring warns about. A command that is not in the command
+table does not exist to anyone who has not already read the whole document.
 
 Start estimates are a snapshot of the queue, not a reservation. A measured
 3.4-hour estimate on this cluster started in 5 seconds.

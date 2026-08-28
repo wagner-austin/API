@@ -241,21 +241,27 @@ class TestTriageCli:
         submit_cli.main(["--config", config, "--run", str(tmp_path / "run.json")])
 
         fake_run.add("sacct", stdout="55519937|abl.arm-b-42|free-gpu|RUNNING|60|billing=8|n1\n")
+        fake_run.add("squeue --me", stdout="55519937|abl.arm-b-42|RUNNING\n")
         fake_run.add("squeue", stdout="")
         fake_run.add("date +%s", stdout="now 1000\n55519937 990\n")
 
         assert triage_cli.main(["--config", config]) == 0
-        assert emitted[-1] == "1 recorded, 1 open, 1 not finished, 0 finding(s), 0 newly closed"
+        assert emitted[-1] == (
+            "1 recorded, 1 on the cluster, 1 open, 1 not finished, 0 finding(s), 0 newly closed"
+        )
 
     def test_a_healthy_finished_job_reports_nothing_wrong(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
         self._ledger(tmp_path)
         fake_run.add("sacct", stdout="101|abl.arm|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n")
+        fake_run.add("squeue --me", stdout="101|abl.arm|COMPLETING\n")
         fake_run.add("squeue", stdout="")
 
         assert triage_cli.main(self._config(tmp_path)) == 0
-        assert emitted[-1] == "1 recorded, 1 open, 0 not finished, 0 finding(s), 1 newly closed"
+        assert emitted[-1] == (
+            "1 recorded, 1 on the cluster, 1 open, 0 not finished, 0 finding(s), 1 newly closed"
+        )
 
     def test_a_finished_job_is_closed_and_then_never_re_reported(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -279,7 +285,12 @@ class TestTriageCli:
 
         assert triage_cli.main(self._config(tmp_path)) == 0
         assert emitted[-1] == "1 recorded, all closed; nothing left to reconcile"
-        assert second.calls == []
+        # The LEDGER-side question is never asked again -- no sacct, no
+        # id-restricted squeue. The account enumeration still is, and must be:
+        # a fully closed ledger says nothing about what the cluster is holding
+        # now, and this early return used to exit 0 before asking.
+        assert [c.split(" ", 1)[0] for c in second.commands()] == ["squeue"]
+        assert "--me" in second.commands()[0]
 
     def test_the_queue_is_not_asked_about_a_job_that_has_finished(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -297,7 +308,10 @@ class TestTriageCli:
         fake_run.add("sacct", stdout="101|abl.arm|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n")
 
         assert triage_cli.main(self._config(tmp_path)) == 0
-        assert not any("squeue" in command for command in fake_run.commands())
+        # The id-restricted query is the one that must not run. The account
+        # enumeration is also a squeue and always runs, so asserting on the
+        # bare word would now pass for the wrong reason.
+        assert not any(command.startswith("squeue -h -j") for command in fake_run.commands())
 
     def test_the_queue_is_asked_only_about_the_ids_that_are_pending(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -317,11 +331,12 @@ class TestTriageCli:
                 "102|abl.arm-102|free-gpu|PENDING|0||\n"
             ),
         )
+        fake_run.add("squeue --me", stdout="102|abl.arm-102|PENDING\n")
         fake_run.add("squeue", stdout="102|abl.arm-102|Resources\n")
         fake_run.add("date +%s", stdout="now 1000\n")
 
         triage_cli.main(self._config(tmp_path))
-        queue_calls = [c for c in fake_run.commands() if "squeue" in c]
+        queue_calls = [c for c in fake_run.commands() if c.startswith("squeue -h -j")]
         assert len(queue_calls) == 1
         assert "-j 102" in queue_calls[0]
         assert "101" not in queue_calls[0]
@@ -350,6 +365,69 @@ class TestTriageCli:
 
         assert triage_cli.main(self._config(tmp_path)) == 1
         assert emitted[0].startswith("UNACCOUNTED 101 abl.arm:")
+
+    def test_an_unclaimed_job_is_found(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The mirror: the cluster is holding it and the ledger never heard of it.
+
+        The row is the one HPC3 really returned on 2026-08-28 -- an image
+        build started by the raw ``ssh <host> sbatch`` this package's own
+        README prescribes, which is how twenty-one of them ran unrecorded.
+        """
+        self._ledger(tmp_path)
+        fake_run.add(
+            "squeue --me", stdout="101|abl.arm|RUNNING\n55645549|img.abl-sif-v22|RUNNING\n"
+        )
+        fake_run.add("sacct", stdout="101|abl.arm|free-gpu|RUNNING|60|billing=8,gres/gpu=1|n1\n")
+        fake_run.add("squeue", stdout="")
+        fake_run.add("date +%s", stdout="now 1000\n101 990\n")
+
+        assert triage_cli.main(self._config(tmp_path)) == 1
+        assert emitted[0].startswith("UNCLAIMED 55645549 img.abl-sif-v22:")
+
+    def test_an_empty_ledger_does_not_excuse_the_cluster_from_answering(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The bug this check was added around.
+
+        With no ledger the command used to emit "nothing has been submitted
+        from this machine" and return 0 without asking the cluster anything --
+        so a machine whose ledger was empty while seven jobs ran reported the
+        strongest form of the condition as health.
+        """
+        fake_run.add("squeue --me", stdout="55645549|img.abl-sif-v22|RUNNING\n")
+
+        assert triage_cli.main(self._config(tmp_path)) == 1
+        assert "ledger is empty" in emitted[0]
+        assert emitted[1].startswith("UNCLAIMED 55645549 img.abl-sif-v22:")
+
+    def test_a_fully_closed_ledger_does_not_excuse_it_either(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The second early return, which had the same hole as the first."""
+        self._ledger(tmp_path)
+        fake_run.add("sacct", stdout="101|abl.arm|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n")
+        assert triage_cli.main(self._config(tmp_path)) == 0
+
+        second = FakeRun()
+        core_hooks.run = second
+        second.add("squeue --me", stdout="55645549|img.abl-sif-v22|RUNNING\n")
+
+        assert triage_cli.main(self._config(tmp_path)) == 1
+        assert "nothing left to reconcile" in emitted[-2]
+        assert emitted[-1].startswith("UNCLAIMED 55645549 img.abl-sif-v22:")
+
+    def test_a_cluster_holding_only_recorded_jobs_is_clean(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        self._ledger(tmp_path)
+        fake_run.add("squeue --me", stdout="101|abl.arm|RUNNING\n")
+        fake_run.add("sacct", stdout="101|abl.arm|free-gpu|RUNNING|60|billing=8,gres/gpu=1|n1\n")
+        fake_run.add("squeue", stdout="")
+        fake_run.add("date +%s", stdout="now 1000\n101 990\n")
+
+        assert triage_cli.main(self._config(tmp_path)) == 0
 
     def test_a_silent_running_job_is_found(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]

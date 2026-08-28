@@ -11,11 +11,18 @@ import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 
+from hpc3.contracts.account import AccountJob, decode_account_job
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.pending import PendingJob, decode_pending_job, encode_pending_job, is_blocked
 from hpc3.contracts.status import JobStatus
 from hpc3.core.squeue import parse_squeue_output, parse_squeue_row, squeue_command
-from hpc3.core.triage import blocked_jobs, live_entries, silent_jobs, unaccounted_jobs
+from hpc3.core.triage import (
+    blocked_jobs,
+    live_entries,
+    silent_jobs,
+    unaccounted_jobs,
+    unclaimed_jobs,
+)
 from tests.against_hpc3 import decode_job_status, decode_ledger_entry
 from tests.conftest import ledger_row
 
@@ -57,6 +64,20 @@ def _status(job_id: str, state: str, **overrides: JSONValue) -> JobStatus:
     }
     base.update(overrides)
     return decode_job_status(base)
+
+
+def _account(job_id: str, name: str = "arm", state: str = "RUNNING") -> AccountJob:
+    """Build a row from the account enumeration.
+
+    Args:
+        job_id: Job id.
+        name: Job name, verbatim from the cluster.
+        state: Slurm state.
+
+    Returns:
+        A validated account job.
+    """
+    return decode_account_job({"job_id": job_id, "name": name, "state": state})
 
 
 def _pending(job_id: str, reason: str) -> PendingJob:
@@ -132,6 +153,61 @@ class TestUnaccountedJobs:
     def test_the_detail_names_where_it_went(self) -> None:
         findings = unaccounted_jobs([_entry("101")], [])
         assert "hpc3" in findings[0].detail
+
+
+class TestUnclaimedJobs:
+    """The mirror of unaccounted, and the direction that went unbuilt.
+
+    Caught a real one the first time it was run against HPC3:
+    ``55645549 img.abl-sif-v22``, an image build started from a login node by
+    the raw ``ssh <host> sbatch`` this package's own README prescribes.
+    """
+
+    def test_a_job_on_the_cluster_with_no_ledger_row_is_found(self) -> None:
+        findings = unclaimed_jobs([_entry("101")], [_account("101"), _account("999")])
+        assert [f.job_id for f in findings] == ["999"]
+        assert findings[0].kind == "unclaimed"
+
+    def test_the_measured_build_job_is_found(self) -> None:
+        """The exact row the cluster returned on 2026-08-28."""
+        build = _account("55645549", name="img.abl-sif-v22")
+        findings = unclaimed_jobs([_entry("55645374")], [build])
+        assert [(f.job_id, f.name) for f in findings] == [("55645549", "img.abl-sif-v22")]
+
+    def test_an_unprefixed_name_is_still_found(self) -> None:
+        """Matching only `<project>.<name>` would be the natural narrowing and
+        would defeat the check: a job that bypassed this package is under no
+        obligation to be named the way this package names things."""
+        findings = unclaimed_jobs([], [_account("999", name="build.sbatch")])
+        assert [f.job_id for f in findings] == ["999"]
+
+    def test_an_empty_ledger_reports_every_job_on_the_cluster(self) -> None:
+        """The strongest form of the condition, not a reason to skip it."""
+        findings = unclaimed_jobs([], [_account("101"), _account("102")])
+        assert [f.job_id for f in findings] == ["101", "102"]
+
+    def test_an_empty_cluster_yields_nothing(self) -> None:
+        assert unclaimed_jobs([_entry("101")], []) == []
+
+    def test_a_fully_claimed_cluster_yields_nothing(self) -> None:
+        assert unclaimed_jobs([_entry("101"), _entry("102")], [_account("101")]) == []
+
+    def test_a_closed_job_still_claims_its_row(self) -> None:
+        """This takes the WHOLE ledger, not the open subset. squeue holds a
+        job for minutes after it ends, so filtering by closure would report
+        every just-finished job as though nobody had submitted it."""
+        assert unclaimed_jobs([_entry("101")], [_account("101", state="COMPLETING")]) == []
+
+    def test_the_detail_carries_the_state_and_says_what_happened(self) -> None:
+        """The difference between something to stop and something to cancel
+        before it starts."""
+        findings = unclaimed_jobs([], [_account("999", state="PENDING")])
+        assert "PENDING" in findings[0].detail
+        assert "no ledger row claims it" in findings[0].detail
+
+    def test_findings_keep_the_order_the_cluster_reported(self) -> None:
+        account = [_account("103"), _account("101"), _account("102")]
+        assert [f.job_id for f in unclaimed_jobs([], account)] == ["103", "101", "102"]
 
 
 class TestSilentJobs:

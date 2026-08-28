@@ -1,6 +1,6 @@
 """Reconciling what we submitted against what the cluster is actually doing.
 
-This is the module that answers "is anything wrong that looks fine?". Three
+This is the module that answers "is anything wrong that looks fine?". Four
 conditions, all of which present as a healthy-looking queue:
 
 * **Blocked.** ``PENDING`` on a reason that will never resolve. Measured on
@@ -9,19 +9,37 @@ conditions, all of which present as a healthy-looking queue:
 * **Unaccounted.** In our ledger, and accounting has never heard of it. The
   submission returned an id and the job does not exist -- so nothing will
   ever report on it, and no query that starts from the cluster will find it.
+* **Unclaimed.** Running under the account, and our ledger has never heard of
+  *it*. The mirror of unaccounted, and the direction that went unbuilt.
 * **Silent.** ``RUNNING``, holding GPUs, and its log has not grown. A job
   wedged on a download it will never finish reports ``RUNNING`` forever and
   bills GPU-hours the whole time.
 
-The reconciliation starts from the LEDGER, not from the cluster. Starting
-from ``squeue`` can only ever find jobs the cluster already knows about,
-which by construction excludes the ones that went missing.
+THE RECONCILIATION RUNS IN BOTH DIRECTIONS, and for a long time only ran in
+one. This module used to justify that in so many words -- "the reconciliation
+starts from the LEDGER, not from the cluster; starting from ``squeue`` can
+only ever find jobs the cluster already knows about, which by construction
+excludes the ones that went missing." Every clause of that is true and it is
+an argument for the ledger-first query, not against the cluster-first one.
+What it obscured is that the two queries answer different questions. Asking
+the cluster about ids we recorded finds a job that vanished. Asking the
+cluster to enumerate itself finds a job we never recorded -- and no
+ledger-first query can, because it starts from the record whose completeness
+is the thing in doubt.
+
+That gap had a real occupant. The image builds documented in this package's
+own README are started with a raw ``ssh <host> sbatch``, and twenty-one of
+them ran without leaving a ledger row, invisible to a triage command whose
+whole purpose was to find jobs nobody was watching. A guard that only checks
+the direction its author was thinking about is the shape this workspace's
+PM-112 is about: the paired check is not optional, it is the other half.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from hpc3.contracts.account import AccountJob
 from hpc3.contracts.closure import Closure
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.pending import PendingJob, is_blocked
@@ -34,8 +52,8 @@ class Finding:
     Attributes:
         job_id: The job in question.
         name: Its name, as submitted.
-        kind: Which condition it hit -- ``blocked``, ``unaccounted`` or
-            ``silent``.
+        kind: Which condition it hit -- ``blocked``, ``unaccounted``,
+            ``unclaimed`` or ``silent``.
         detail: Human-readable specifics, such as the scheduler's own reason.
     """
 
@@ -143,6 +161,45 @@ def unaccounted_jobs(
     ]
 
 
+def unclaimed_jobs(entries: Sequence[LedgerEntry], account: Sequence[AccountJob]) -> list[Finding]:
+    """Find jobs the cluster is holding that no ledger row claims.
+
+    Args:
+        entries: The WHOLE ledger, not the open subset. A closure records
+            that a job ended, never that it stopped having been ours, so
+            filtering by it here would report every finished job the cluster
+            still happens to be holding -- which it does for minutes after
+            the end -- as though nobody had submitted it.
+        account: Every job the cluster reports for this account.
+
+    Returns:
+        One finding per job with no ledger row, in the order the cluster
+        reported them. No filter on the name: matching only jobs called
+        ``<project>.<something>`` would be the natural narrowing and would
+        defeat the check outright, because a job submitted around this
+        package is under no obligation to be named the way this package
+        names things -- the image builds are called ``<project>-image-v<n>``
+        and would pass such a filter untouched.
+
+        An interactive session is a true positive here, not a false one: it
+        is a job on the account that this machine did not submit and cannot
+        trace. If those become common enough to be noise, the fix is to
+        record them, not to teach this function to look away.
+    """
+    recorded = {entry["job_id"] for entry in entries}
+    return [
+        Finding(
+            job["job_id"],
+            job["name"],
+            "unclaimed",
+            f"{job['state']} on the cluster and no ledger row claims it; "
+            "it was not submitted from this machine through hpc3",
+        )
+        for job in account
+        if job["job_id"] not in recorded
+    ]
+
+
 def _allocation_phrase(status: JobStatus) -> str:
     """Describe what a running job is holding, in its own terms.
 
@@ -227,4 +284,5 @@ __all__ = [
     "open_entries",
     "silent_jobs",
     "unaccounted_jobs",
+    "unclaimed_jobs",
 ]
