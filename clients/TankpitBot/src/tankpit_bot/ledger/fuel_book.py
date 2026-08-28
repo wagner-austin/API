@@ -31,6 +31,7 @@ FuelEntryKind = Literal[
     "pickup",
     "enemy_hit",
     "detonation",
+    "boundary_strand",
 ]
 
 FUEL_ENTRY_KINDS: tuple[FuelEntryKind, ...] = (
@@ -46,8 +47,17 @@ FUEL_ENTRY_KINDS: tuple[FuelEntryKind, ...] = (
     "pickup",
     "enemy_hit",
     "detonation",
+    "boundary_strand",
 )
 """Every entry kind, for validation and iteration."""
+
+MAX_SERVE_CHARGE = 10
+"""The largest single serve charge (a dual/missile/homing shot or a
+radar press). A cap-forced block boundary can strand exactly one such
+charge on either side of the cut — the 2026-08-28 corpus mine found
+156 divergences whose gap was exactly one weapon charge (-10 duals in
+ENGAGE, -6 clearance singles in COLLECT, -5 homing halves), each
+mirrored by a +charge under-spend in the following block."""
 
 
 class FuelEntryDict(TypedDict):
@@ -229,9 +239,20 @@ def record_fuel_reading(*, book: FuelBookDict, fuel_total: int) -> FuelWindowVer
         and book["readings_in_block"] > 1
     )
     book["entries_at_last_reading"] = len(book["entries"])
-    if not quiet and book["readings_in_block"] < BLOCK_READING_CAP:
+    forced = not quiet
+    if forced and book["readings_in_block"] < BLOCK_READING_CAP:
         return None
     entries = book["entries"]
+    if forced:
+        # A cap-forced cut can land mid charge/echo pair: the last
+        # serve's charge in this block with its echo in the next (or
+        # the echo here with its charge still in flight). Quiet
+        # boundaries cannot strand — the ~100 ms charge/echo lag never
+        # spans a zero-delta 2 s reading gap — so the tolerance exists
+        # ONLY here, bounded to one serve charge each way (the
+        # 2026-08-28 corpus mine: every strand gap was exactly one
+        # weapon charge).
+        entries = [*entries, FuelEntryDict(kind="boundary_strand", lo=-MAX_SERVE_CHARGE, hi=0)]
     block_start = book["block_start_fuel"]
     residual = fuel_total - (block_start if block_start is not None else fuel_total)
     lo = sum(entry["lo"] for entry in entries)
@@ -245,6 +266,14 @@ def record_fuel_reading(*, book: FuelBookDict, fuel_total: int) -> FuelWindowVer
         for entry in entries
         if entry["kind"] == "shot_homing"
     ]
+    if forced:
+        # The mirror: an entry judged above may have its charge still
+        # in flight, landing as an unexplained debit in the next
+        # block; and a stranded charge judged above surfaces as its
+        # echo's un-fallen entry there.
+        book["entries"].append(
+            FuelEntryDict(kind="boundary_strand", lo=-MAX_SERVE_CHARGE, hi=MAX_SERVE_CHARGE)
+        )
     book["block_start_fuel"] = fuel_total
     book["readings_in_block"] = 0
     book["entries_at_last_reading"] = len(book["entries"])
@@ -257,15 +286,123 @@ def record_fuel_reading(*, book: FuelBookDict, fuel_total: int) -> FuelWindowVer
     )
 
 
+class FuelBookOnlyContract:
+    """Structural invariants on a book-only operation."""
+
+    @property
+    def name(self) -> str:
+        """Name of the contract."""
+        return "fuel_book_only"
+
+    def check(self, *, book: FuelBookDict) -> None:
+        """Validate the book before the operation.
+
+        Args:
+            book: The book being operated on.
+
+        Raises:
+            LedgerInvariantError: If the entry list is malformed.
+        """
+        require(
+            len(book["entries"]) < 10_000,
+            LedgerInvariantError,
+            entries=repr(len(book["entries"])),
+        )
+
+
+class FuelWidenContract:
+    """Structural invariants on a teleport re-pricing."""
+
+    @property
+    def name(self) -> str:
+        """Name of the contract."""
+        return "fuel_book_widen"
+
+    def check(self, *, book: FuelBookDict, widen_by: int) -> None:
+        """Validate a widening before it applies.
+
+        Args:
+            book: The book holding the open teleport entry.
+            widen_by: Non-negative widening, in fuel.
+
+        Raises:
+            LedgerInvariantError: If the widening is negative.
+        """
+        require(widen_by >= 0, LedgerInvariantError, widen_by=repr(widen_by))
+
+
+@enforce_contract(FuelBookOnlyContract())
+def reset_fuel_book_on_death(*, book: FuelBookDict) -> None:
+    """Re-anchor the book across a death: the account does not survive it.
+
+    The killing drain is unbookable (the fatal hits took fuel below
+    zero mid-batch) and the respawn refill arrives as an absolute
+    reading with no announced cause — the three largest corpus
+    divergences (+1351, +1078, +361, all ~20 s after a death,
+    2026-08-28 mine) were respawn refills judged against a dead
+    block. Death wipes the open entries and the anchor; the next wire
+    reading opens a fresh account, exactly like the session's first.
+
+    Args:
+        book: The book being re-anchored.
+    """
+    book["last_fuel"] = None
+    book["block_start_fuel"] = None
+    book["readings_in_block"] = 0
+    book["entries_at_last_reading"] = 0
+    book["entries"] = []
+
+
+@enforce_contract(FuelWidenContract())
+def widen_last_teleport_entry(*, book: FuelBookDict, widen_by: int) -> bool:
+    """Widen the newest open teleport entry for a displaced landing.
+
+    The server charges the distance to the ACTUAL landing tile
+    ([[game-economy]]#teleport-cost); the entry was priced at dispatch
+    from the REQUESTED tile with only the routine +/-6-tile drift
+    allowance. When the landing confirm proves a bigger displacement
+    (refusals land a full field away), the triangle inequality bounds
+    the true charge within ``6 * displacement`` fuel of the dispatch
+    price — the 2026-08-28 corpus mine matched every teleport
+    under-spend gap to a displacement receipt this widening covers.
+
+    Args:
+        book: The book holding the open teleport entry.
+        widen_by: Fuel to widen each bound by (``teleport_cost`` over
+            the requested-to-landed displacement, plus rounding).
+
+    Returns:
+        True when an open teleport entry was widened, False when the
+        block holding it has already been judged.
+    """
+    for entry in reversed(book["entries"]):
+        if entry["kind"] != "teleport":
+            continue
+        new_lo = entry["lo"] - widen_by
+        new_hi = min(entry["hi"] + widen_by, 0)
+        total = book["totals"]["teleport"]
+        total["lo_sum"] += new_lo - entry["lo"]
+        total["hi_sum"] += new_hi - entry["hi"]
+        entry["lo"] = new_lo
+        entry["hi"] = new_hi
+        return True
+    return False
+
+
 __all__ = [
     "BLOCK_READING_CAP",
     "FUEL_ENTRY_KINDS",
+    "MAX_SERVE_CHARGE",
     "FuelBookDict",
+    "FuelBookOnlyContract",
     "FuelEntryDict",
     "FuelEntryKind",
     "FuelKindTotalDict",
+    "FuelWidenContract",
     "FuelWindowVerdictDict",
     "make_fuel_book",
     "record_fuel_entry",
     "record_fuel_reading",
+    "reset_fuel_book_on_death",
+    "widen_last_teleport_entry",
 ]

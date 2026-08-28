@@ -16,6 +16,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
 from tankpit_bot.ledger.ammo_book import record_ammo_death
+from tankpit_bot.ledger.fuel_book import reset_fuel_book_on_death
 from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_NAMES
 from tankpit_bot.protocol.decorations import decoration_names_from_state
 from tankpit_bot.runtime_logging import (
@@ -296,6 +297,7 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
                 record_ammo_death(book=ws.ammo_book, mine_kill=is_mine)
                 if not ws.self_deactivated:
                     ws.self_deactivated = True
+                    reset_fuel_book_on_death(book=ws.fuel_book)
                     emit_diagnostic(
                         diagnostic_kind="self_deactivated",
                         origin="protocol_0x41",

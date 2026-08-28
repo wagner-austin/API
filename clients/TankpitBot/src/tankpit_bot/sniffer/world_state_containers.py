@@ -11,7 +11,11 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks
 from tankpit_bot.facts.source import FactSource
 from tankpit_bot.ledger.damage_book import confirm_incoming_damage
-from tankpit_bot.ledger.fuel_book import record_fuel_entry, record_fuel_reading
+from tankpit_bot.ledger.fuel_book import (
+    record_fuel_entry,
+    record_fuel_reading,
+    reset_fuel_book_on_death,
+)
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
@@ -67,6 +71,7 @@ def update_world_state_from_fuel_total(
         if self_state is None or ws.self_deactivated:
             return
         ws.self_deactivated = True
+        reset_fuel_book_on_death(book=ws.fuel_book)
         emit_world(
             "DEACTIVATED: tank=%d SELF killed (fuel through zero, raw u16 %d, prev %d)",
             self_state["tank_id"],

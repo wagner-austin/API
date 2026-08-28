@@ -284,6 +284,38 @@ class TestDisplacementEvidence:
 
         assert ws.displacement_tombstones == {}
 
+    def test_displaced_landing_reprices_the_open_teleport_entry(self) -> None:
+        """The fuel book consumes the receipt: charge follows the landing.
+
+        2026-08-28 corpus mine: the server charges the LANDED distance
+        ([[game-economy]]#teleport-cost), but the dispatch price only
+        allowed +/-6 tiles of drift, so refused relay legs (landed back
+        at origin, charge ~0) read as impossible under-spends -- 65
+        teleport windows, gaps matching their displacement receipts.
+        """
+        from tankpit_bot.ledger.fuel_book import record_fuel_entry
+        from tankpit_bot.physics.costs import teleport_cost
+
+        ws = WorldService()
+        record_teleport_dispatch(
+            ws.ledger,
+            target_x=235,
+            target_y=5,
+            message_index=0,
+            sent_window="(none)",
+        )
+        record_fuel_entry(book=ws.fuel_book, kind="teleport", lo=-446, hi=-374)
+        _seed_self_at(ws, 230, 10)
+
+        _dispatch_landed_and_capture(ws)
+
+        widen = teleport_cost(235, 5, 230, 10) + 6
+        assert ws.fuel_book["entries"][-1] == {
+            "kind": "teleport",
+            "lo": -446 - widen,
+            "hi": min(-374 + widen, 0),
+        }
+
     def test_displaced_landing_writes_landing_hostility_evidence(self) -> None:
         """A meaningful bounce records the requested zone as hostile.
 

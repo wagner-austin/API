@@ -551,9 +551,36 @@ so the shapes had to live somewhere neither imports.[^guard]
         "teleport",
         "pickup",
         "enemy_hit",
-        "detonation"
+        "detonation",
+        "boundary_strand"
       ],
       "means": "every predicted fuel effect the fuel book can record"
+    },
+    {
+      "id": "fuel-book-max-serve-charge",
+      "code": "tankpit_bot.ledger.fuel_book:MAX_SERVE_CHARGE",
+      "value": 10,
+      "means": "largest single serve charge a cap-forced block cut can strand"
+    },
+    {
+      "id": "fuel-book-fuelbookonlycontract",
+      "code": "tankpit_bot.ledger.fuel_book:FuelBookOnlyContract",
+      "law": "Structural invariants on a book-only operation."
+    },
+    {
+      "id": "fuel-book-fuelwidencontract",
+      "code": "tankpit_bot.ledger.fuel_book:FuelWidenContract",
+      "law": "Structural invariants on a teleport re-pricing."
+    },
+    {
+      "id": "fuel-book-reset-on-death",
+      "code": "tankpit_bot.ledger.fuel_book:reset_fuel_book_on_death",
+      "law": "Re-anchor the book across a death: the account does not survive it."
+    },
+    {
+      "id": "fuel-book-widen-last-teleport",
+      "code": "tankpit_bot.ledger.fuel_book:widen_last_teleport_entry",
+      "law": "Widen the newest open teleport entry for a displaced landing."
     },
     {
       "id": "fuel-book-fuelbookdict",

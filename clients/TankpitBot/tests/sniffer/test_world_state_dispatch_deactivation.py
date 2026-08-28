@@ -70,6 +70,9 @@ class TestDispatchProtocolDeactivation:
         update_world_state_from_fuel_total(ws, 14)
         update_world_state_from_fuel_total(ws, 65460)
         assert ws.self_deactivated is True
+        # The wrap receipt re-anchors the fuel book: the killing drain
+        # is unbookable and the respawn refill arrives unannounced.
+        assert ws.fuel_book["last_fuel"] is None
         self_state = ws.world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
@@ -99,11 +102,15 @@ class TestDispatchProtocolDeactivation:
         mine sentinel, so the 0x41 owns the book transform.
         """
         from tankpit_bot.protocol import DeactivationDict
+        from tankpit_bot.sniffer.world_state_containers import (
+            update_world_state_from_fuel_total,
+        )
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
 
         ws = WorldService()
         ws.update_world_state_from_position(100, 100)
         update_inventory_from_protocol(ws, [45, 9, 45, 37, 24], [True, True, True, True, True])
+        update_world_state_from_fuel_total(ws, 149)
         self_state = ws.world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
@@ -119,6 +126,10 @@ class TestDispatchProtocolDeactivation:
         dispatch_world_state_update(ws, msg)
 
         assert ws.ammo_book["last_counts"] == [23, 5, 23, 19, 12]
+        # The 0x41 producer re-anchors the fuel book too (the wrap
+        # producer covers the Normal-field order; either receipt may
+        # land first).
+        assert ws.fuel_book["last_fuel"] is None
 
     def test_own_mine_0x41_zeroes_the_ammo_book_baseline(self) -> None:
         """The mine sentinel wipes the whole baseline, and the

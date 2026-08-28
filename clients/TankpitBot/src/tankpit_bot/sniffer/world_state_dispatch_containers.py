@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from tankpit_bot import browser, protocol
 from tankpit_bot.container.types import ContainerPickupRecordDict
-from tankpit_bot.ledger.fuel_book import record_fuel_entry
+from tankpit_bot.ledger.fuel_book import record_fuel_entry, widen_last_teleport_entry
 from tankpit_bot.ledger.outcome.teleport import pending_teleport_target
+from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.physics.damage import MINE_DETONATION_COST
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
@@ -286,6 +287,17 @@ def _emit_teleport_displacement(ws: WorldService) -> None:
     # back at its origin (137/137 archived receipts) — and the
     # landing selector consumes the ring-blocked verdict through the
     # composed decision terrain.
+    #
+    # The fuel book consumes the receipt too (2026-08-28 corpus
+    # mine): the server charges the LANDED distance, and the dispatch
+    # price only allowed +/-6 tiles of drift, so every displacement
+    # beyond that read as an impossible under-spend. The triangle
+    # inequality bounds the re-price by the requested-to-landed
+    # distance.
+    widen_last_teleport_entry(
+        book=ws.fuel_book,
+        widen_by=teleport_cost(requested_x, requested_y, self_state["x"], self_state["y"]) + 6,
+    )
     chebyshev = max(abs(self_state["x"] - requested_x), abs(self_state["y"] - requested_y))
     ws.mark_landing_refused(
         requested_x,
