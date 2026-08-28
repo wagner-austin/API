@@ -8,6 +8,7 @@ message naming a cause the job never established.
 
 from __future__ import annotations
 
+import pathlib
 import subprocess
 
 from hpc3.core.image_exec import APPTAINER_MODULE
@@ -18,6 +19,7 @@ from hpc3.core.image_sbatch import (
     TMP_DIR,
     render_build_sbatch,
 )
+from tests.conftest import bash_beside_git, is_wsl_launcher, posix_bash
 
 _SMOKE = "/opt/env/bin/python -m pkg.probe --device cpu --out /tmp/probe.json"
 
@@ -170,7 +172,7 @@ class TestSmokeCommands:
         announce = next(line for line in rendered.splitlines() if line.startswith("    echo '"))
 
         printed = subprocess.run(
-            ["bash", "-c", announce.strip()],
+            [posix_bash(), "-c", announce.strip()],
             capture_output=True,
             check=True,
         ).stdout.decode("utf-8")
@@ -184,7 +186,7 @@ class TestSmokeCommands:
         )
 
         printed = subprocess.run(
-            ["bash", "-c", failure.strip().removesuffix(" >&2")],
+            [posix_bash(), "-c", failure.strip().removesuffix(" >&2")],
             capture_output=True,
             check=True,
         ).stdout.decode("utf-8")
@@ -200,6 +202,54 @@ class TestSmokeCommands:
         assert "apptainer exec abl.sif /opt/env/bin/python -m" not in rendered
 
 
+class TestTheInterpreterIsChosenNotInherited:
+    """The six failures in this file that were being called flaky.
+
+    They resolved ``bash`` through an ambient PATH, so which program answered
+    depended on the shell that launched pytest: MSYS bash from Git Bash, and
+    ``C:\\Windows\\System32\\bash.exe`` -- the WSL launcher, not a shell --
+    from the PowerShell the Makefile uses. When the WSL service was down the
+    launcher exited 1 and six tests failed in a ``make check`` about something
+    else entirely.
+    """
+
+    def test_the_launcher_is_recognised(self) -> None:
+        assert is_wsl_launcher(r"C:\Windows\System32\bash.exe") is True
+
+    def test_a_difference_in_case_does_not_hide_it(self) -> None:
+        """Windows spells this directory both ways and means the same one."""
+        assert is_wsl_launcher(r"C:\WINDOWS\system32\bash.exe") is True
+
+    def test_the_32_bit_spelling_is_recognised_too(self) -> None:
+        """`make` recipes run in 32-bit PowerShell, which sees SysWOW64."""
+        assert is_wsl_launcher(r"C:\Windows\SysWOW64\bash.exe") is True
+
+    def test_a_real_shell_is_not_mistaken_for_it(self) -> None:
+        assert is_wsl_launcher(r"C:\Program Files\Git\usr\bin\bash.exe") is False
+        assert is_wsl_launcher("/usr/bin/bash") is False
+
+    def test_it_finds_the_bash_git_ships_two_directories_up(self, tmp_path: pathlib.Path) -> None:
+        """The step that matters from PowerShell, where excluding the launcher
+        leaves no bash on PATH at all."""
+        (tmp_path / "usr" / "bin").mkdir(parents=True)
+        (tmp_path / "usr" / "bin" / "bash.exe").write_bytes(b"")
+        found = bash_beside_git(str(tmp_path / "cmd" / "git.exe"))
+        assert found == str(tmp_path / "usr" / "bin" / "bash.exe")
+
+    def test_it_reports_none_when_no_bash_ships_beside_git(self, tmp_path: pathlib.Path) -> None:
+        """Which is the normal case off Windows, where the PATH search already
+        succeeded and this is never reached."""
+        assert bash_beside_git(str(tmp_path / "cmd" / "git.exe")) is None
+
+    def test_the_resolved_interpreter_is_not_the_launcher(self) -> None:
+        assert "system32" not in posix_bash().lower()
+
+    def test_the_resolved_interpreter_runs_a_script(self) -> None:
+        """The property every test below depends on, asserted once directly."""
+        result = subprocess.run([posix_bash(), "-c", "echo ok"], capture_output=True, check=True)
+        assert result.stdout.decode("utf-8").strip() == "ok"
+
+
 class TestItIsRunnableShell:
     """Asserting on rendered text cannot see a syntax error in it.
 
@@ -212,13 +262,18 @@ class TestItIsRunnableShell:
     def _parse(self, rendered: str) -> subprocess.CompletedProcess[bytes]:
         """Run the rendered script through bash's syntax checker.
 
-        Two details that both produced a wrong answer before being fixed:
+        Three details that each produced a wrong answer before being fixed:
+
+        The interpreter is RESOLVED, not looked up on PATH -- see
+        :func:`posix_bash`. This paragraph used to assert that "on Windows the
+        bash on PATH is MSYS", which is true of a Git Bash session and false
+        of the PowerShell one the Makefile runs pytest in, where the first
+        match is the WSL launcher.
 
         The script is fed on stdin rather than written to a file and named on
-        the command line. On Windows the bash on PATH is MSYS, which rewrites
-        a native path argument into something it cannot open, so a path-based
-        check returns 127 for every input -- failing everything while looking
-        like a working test.
+        the command line. MSYS bash rewrites a native path argument into
+        something it cannot open, so a path-based check returns 127 for every
+        input -- failing everything while looking like a working test.
 
         The input is BYTES. With ``text=True`` Python translates ``\\n`` to
         ``\\r\\n`` on the way in, bash reads ``then\\r`` instead of ``then``,
@@ -226,7 +281,7 @@ class TestItIsRunnableShell:
         script really is LF-only; the harness was corrupting it.
         """
         return subprocess.run(
-            ["bash", "-n"],
+            [posix_bash(), "-n"],
             input=rendered.encode("utf-8"),
             capture_output=True,
             check=False,
