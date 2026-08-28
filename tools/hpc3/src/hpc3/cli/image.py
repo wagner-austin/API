@@ -130,3 +130,7 @@ def entrypoint() -> None:
 
 
 __all__ = ["BUILD_SCRIPT_NAME", "entrypoint", "main"]
+
+
+if __name__ == "__main__":
+    entrypoint()

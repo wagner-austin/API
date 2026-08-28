@@ -173,3 +173,7 @@ def entrypoint() -> None:
 
 
 __all__ = ["entrypoint", "format_status", "main"]
+
+
+if __name__ == "__main__":
+    entrypoint()

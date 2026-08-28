@@ -195,3 +195,7 @@ def entrypoint() -> None:
 
 
 __all__ = ["LIST_SEPARATOR", "SYMBOL_SEPARATOR", "entrypoint", "main", "parse_symbols"]
+
+
+if __name__ == "__main__":
+    entrypoint()
