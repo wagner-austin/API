@@ -140,6 +140,33 @@ immediate re-pressure after a kill is disproportionately favorable.
 [^13]: Frame-exact decode 2026-08-28: `decode_session_frames` + `decode_message` over `runs/bot/desert/bot-20260826-182204`, `runs/bot/artax/bot-20260826-084859`, `runs/bot/bot-20260826-003928`, `runs/bot/bot-20260803-180918` capture sessions — for each 0x41 naming the session's own tank (ids 716/601/601/1301), the nearest 0x49 on each side, counts read per `decode_inventory` (`byte & 127`). Mine attribution via the 0x41 killer sentinel (`killer_id_raw >= 65530`, residual = mine team; see [[deactivation-format]]). Corpus context: `tankpit-corpus-audit` over 436 runs put drift flags ONLY on death-runs (-5, -5, -3, -60) plus two minor unexplained +2/+7 on 08-13.
 [^14]: user (Austin), 2026-08-28 -- "a death causes you to lose half inventory or so", confirming the corpus-audit inference the same day; the frame decode then fixed "or so" to ceil(n/2) for tank kills.
 
+## Equipment spawn stability: practice tiles persist, main-map tiles do not (MINED 2026-08-28)
+
+Belief-snapshot mining across the farm corpus (equipment containers =
+`is_fuel: false` entries in `entity_alignment_sample` beliefs):[^15]
+
+- **Practice (field01): tile-stable across days.** One 5-hour session
+  mapped 382 distinct equipment tiles; a run 21 hours later saw 33
+  equipment tiles of which **30 (90%) were already in that atlas**.
+  Equipment locations on practice are fixed (or respawn-in-place)
+  spawn points -- a cross-session atlas solves foraging there
+  outright.
+- **Main map (field05): region-stable at best.** Two sessions 14 h
+  apart saw 243 and 238 tiles with only **12 (5%) exact-tile
+  overlap**, but 5 of the top-12 32x32 density blocks recurred --
+  equipment concentrates in persistent regions while exact tiles
+  churn.
+
+Consequence: blind paid sweeps re-derive per session what the corpus
+already knows. The 2026-08-28 validation run spent 9 extras on two
+back-to-back quad sweeps that discovered ZERO equipment, on the very
+field where 382 tile locations were already sitting in the previous
+day's artifacts. Confidence: medium (2 runs per field, 1-in-25
+snapshot sampling); a third day's runs would firm the practice
+stability number.
+
+[^15]: Mining script over `entity_alignment_sample.belief_containers_json` in runs bot-20260827-171409 (field01, 5 h), bot-20260828-142819 (field01, validation), bot-20260827-085730 + bot-20260826-190811 (field05). Persistence counts inside single runs run 100+ consecutive samples per tile -- equipment sits unclaimed until collected, so within-session beliefs are long-lived; the cross-run overlap is the atlas-worthiness measure.
+
 ## "Inventory full" wire signal
 
 Server returns 0x52 CommandResult error code **7 (`SUPERVISOR_ERROR_INVENTORY_FULL`)** when the bot dispatches ``pickup_equipment`` while every inventory slot is at the rank cap (`20 + 5 * rank`; 25 at Private, which is where this was observed). The error code is defined in `protocol/constants.py:147` and is in `_ACTION_BLOCKING_COMMAND_ERRORS` (`bot/tick_loop_actions.py:44`) as of 2026-06-21, so today the bot:[^7]
