@@ -1,0 +1,22 @@
+{
+  "project": "floor",
+  "name": "floor-gpt2-medium-a100-v20",
+  "image": {
+    "path": "/pub/wagnera3/images/v20/abl.sif",
+    "sha256": "2b89283fccf289e3060b7b66f61315a5ea0922dbad1b63352540d5f9bdd2d1a5",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 modeltrainer-score-baseline --model gpt2-medium --items /pub/wagnera3/floor/cloze-items-80f9732a.jsonl --device cuda --max-seq-len 512 --experiment extraction-eval --label gpt2-medium-floor-2627items --out /pub/wagnera3/floor/results/gpt2-medium-floor-a100-v20.json --outcomes /pub/wagnera3/floor/results/gpt2-medium-outcomes-a100-v20.json",
+  "artifact": "/pub/wagnera3/floor/results/gpt2-medium-floor-a100-v20.json",
+  "experiment": {
+    "measurement": "gpt2-medium-cloze-floor",
+    "items": "80f9732af6507fe65d8ece9042b12f3631c8452421ed37bcfc6b72b331ef379a",
+    "item_count": "2627",
+    "max_seq_len": "512",
+    "image": "v20",
+    "established_value": "0.5572896840502475",
+    "why": "re-register_after_fingerprint_axes_added_6e28486e"
+  }
+}
