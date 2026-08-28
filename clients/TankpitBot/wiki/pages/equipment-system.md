@@ -153,8 +153,20 @@ runs + 12 field05 runs):[^15]
   tiles sit in ONE ~12x12 patch around (123-134, 123-134), the map
   center. Secondary hotspots: (180,47), (114,152)/(112,154),
   (101,203), (112,190), (139,133).
-- **field05 (main)**: even at 12 runs, tiles recur in 7-8 of them,
-  in crisp clusters: (59-65, 13-16), (50-58, 166-170), (176,212).
+- **field05 (main)**: even at 12 runs, the strongest tiles recur in
+  7-8 of them — but SAME-DAY CORRECTION after operator skepticism
+  ("im skeptical that we have identified all the hotspots on main in
+  such a short time"): the eyeballed top-of-list clusters
+  ((59-65,13-16), (50-58,166-170), (176,212)) capture only ~4% of
+  the field's equipment sighting-mass. The persistent set is
+  HUNDREDS of tiles field-wide, including a west-edge band (x 1-7
+  across many y) absent from every top-10 list. Observation coverage
+  is nearly complete (100% of 16x16 blocks visited, 75% in 6+ of the
+  runs), so nothing is hidden by roaming bias — but 12 runs only has
+  the power to certify the strongest spots; mid-frequency hotspots
+  are not yet separable from scatter. More main-map sessions
+  genuinely improve the field05 atlas; the atlas must be the full
+  persistence-weighted tile set, not a handful of named clusters.
 
 CORRECTION (same day): the first two-run comparison read "field05
 5% tile stability" — that was COVERAGE BIAS (the two runs roamed
@@ -162,7 +174,7 @@ different areas), not spawn churn. Run-count persistence is the
 honest measure, and by it both fields carry stable hotspots; the
 long once-seen tail is spawn scatter plus roaming bias. Atlas data:
 `runs/analysis/equipment-atlas-20260828.json` (per-field tile
-persistence counts). Design consequence unchanged and strengthened:
+persistence counts). Design consequence:
 foraging = teleport the hotspot circuit; blind paid sweeps are
 strictly worse than the lookup (the 2026-08-28 validation run spent
 9 extras on sweeps that found zero while the atlas held 5k mapped
