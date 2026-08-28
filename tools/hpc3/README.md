@@ -140,6 +140,34 @@ one you happened to pass against whatever job you named. `charge_account`
 moved with the caps for a sharper reason: accounts are per-PI, and a job
 charged to the wrong one spends another lab's allocation.
 
+### Preemption on `free-gpu` cancels; it does not requeue
+
+`#SBATCH --requeue` is rendered for every preemptible run over an hour, and it
+is correct — but it does **not** bring a preempted job back on this cluster:
+
+```
+$ scontrol show partition free-gpu
+GraceTime=0  PreemptMode=CANCEL
+```
+
+Slurm requeues on preemption only under `PreemptMode=REQUEUE`. Under `CANCEL`
+the job is cancelled and `--requeue` covers node failure and administrative
+requeue instead. Observed on 2026-08-28: `turkic-lstm.bases-kk` was preempted
+at 64 seconds and did not return to the queue.
+
+**What actually protects the work is the checkpoint, not the flag.** The
+resume state is written to `/pub` after every completed epoch precisely
+because node-local scratch dies with the job — including when it dies by
+preemption. So a preempted member is resubmitted and continues from its last
+completed epoch; it does not restart from zero. That is what
+`checkpoint_steps` and the trainer's `save_resume_state` / `load_resume_state`
+are for, and it is why a long run on this partition is viable at all.
+
+Resubmitting is a one-member run document naming the job it resumes, so the
+ledger records the chain — see `runs/turkic-lstm-kk-resume.json`. Expect to do
+this: `free-gpu` is the free partition because other people's allocated work
+outranks yours.
+
 ### Adopting an image
 
 **A project that requests a GPU must declare an `image`.** This is enforced

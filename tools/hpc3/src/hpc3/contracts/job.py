@@ -25,6 +25,10 @@ into a run.
    Under ``PreemptMode=CANCEL`` an eviction destroys unsaved work.
 4. The wall clock fits the partition. Slurm rejects the rest at submission.
 5. The partition exists on the cluster the workspace selected.
+6. An imaged payload does not need a shell it will not get. The batch script
+   interpolates the command into an ``apptainer exec`` line, so an unquoted
+   ``&&`` splits that line rather than reaching the container -- see
+   :mod:`hpc3.contracts.payload`, which seven dead jobs paid for.
 
 Every rule is asked of a :class:`~hpc3.contracts.cluster.ClusterFacts` rather
 than of a constant, so the same code enforces a different machine's real
@@ -62,6 +66,7 @@ from hpc3.contracts.image import (
     encode_image_reference,
 )
 from hpc3.contracts.layout import require_project
+from hpc3.contracts.payload import check_imaged_command_can_run
 from hpc3.contracts.pins import encode_pinned_packages, require_pinned_packages
 
 PREEMPTION_PROTECTION_THRESHOLD_MINUTES = 60
@@ -515,6 +520,7 @@ def decode_job_spec(
 
     image = decode_image_reference(value.get("image"), "image")
     command = _require_nonempty_str(value, "command")
+    check_imaged_command_can_run(image, command)
 
     return JobSpec(
         project=require_project(value, "project"),

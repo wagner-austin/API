@@ -229,7 +229,7 @@ class TestEveryCommittedSubmissionResolves:
         owners = _by_project()
         runs = [(p, d) for _, p, d in _submissions() if "command" in d and "members" not in d]
         resolved = [resolve_run(owners[project], doc)["project"] for project, doc in runs]
-        assert sorted(set(resolved)) == ["floor", "mi"]
+        assert sorted(set(resolved)) == ["floor", "mi", "turkic-lstm"]
         assert len(resolved) == len(runs)
 
     def test_every_sweep_document_resolves_and_expands(self) -> None:
