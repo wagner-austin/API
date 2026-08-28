@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "lmhead-v21-v100",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 4,
+  "mem_gb": 24,
+  "minutes": 20,
+  "requeue": false,
+  "checkpoint_steps": 0,
+  "image": {
+    "path": "/pub/wagnera3/images/v21/abl.sif",
+    "sha256": "e0247e113922af92574a9367c29a33914efbfeb6d897ccd0b0db6959a4ab5bf0",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.legacy_gemm_probe --device cuda --out /pub/wagnera3/lmhead/v21-v100.json",
+  "artifact": "/pub/wagnera3/lmhead/v21-v100.json",
+  "experiment": {
+    "kind": "lm-head-entry-point",
+    "card": "V100",
+    "image": "v21",
+    "question": "does_routing_lm_head_to_cublaslt_make_cards_agree"
+  }
+}
