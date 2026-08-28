@@ -164,9 +164,7 @@ class CandidateRunnerProtocol(Protocol):
 class OrchestratorProtocol(Protocol):
     """Protocol for calibration orchestrator."""
 
-    def __init__(
-        self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig
-    ) -> None: ...
+    def __init__(self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfig) -> None: ...
 
     def run_stage_a(
         self,

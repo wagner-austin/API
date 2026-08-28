@@ -4,13 +4,6 @@ from pathlib import Path
 from typing import Final
 
 from platform_core.config._utils import _EnvError
-from platform_core.config.handwriting_ai import AppConfig as AppConfig
-from platform_core.config.handwriting_ai import DigitsConfig as DigitsConfig
-from platform_core.config.handwriting_ai import Limits as Limits
-from platform_core.config.handwriting_ai import SecurityConfig as SecurityConfig
-from platform_core.config.handwriting_ai import Settings as Settings
-from platform_core.config.handwriting_ai import limits_from_settings as limits_from_settings
-from platform_core.config.handwriting_ai import load_settings as _load_platform_settings
 from platform_core.config.handwriting_ai import (
     DEFAULT_ALLOWED_HOSTS,
     DEFAULT_MAX_IMAGE_MB,
@@ -26,6 +19,13 @@ from platform_core.config.handwriting_ai import (
     _apply_security_env,
     _finalize,
 )
+from platform_core.config.handwriting_ai import AppConfig as AppConfig
+from platform_core.config.handwriting_ai import DigitsConfig as DigitsConfig
+from platform_core.config.handwriting_ai import Limits as Limits
+from platform_core.config.handwriting_ai import SecurityConfig as SecurityConfig
+from platform_core.config.handwriting_ai import Settings as Settings
+from platform_core.config.handwriting_ai import limits_from_settings as limits_from_settings
+from platform_core.config.handwriting_ai import load_settings as _load_platform_settings
 from platform_core.logging import get_logger
 
 MNIST_N_CLASSES: Final[int] = 10

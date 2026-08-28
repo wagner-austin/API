@@ -23,7 +23,11 @@ from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import MultiprocessingProcessProtocol
 from handwriting_ai.training.calibration._types import (
     BudgetConfig as BudgetConfig,
+)
+from handwriting_ai.training.calibration._types import (
     CandidateError as CandidateError,
+)
+from handwriting_ai.training.calibration._types import (
     CandidateOutcome as CandidateOutcome,
 )
 from handwriting_ai.training.calibration.candidates import Candidate

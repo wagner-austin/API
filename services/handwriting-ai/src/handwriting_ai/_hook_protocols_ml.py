@@ -201,9 +201,7 @@ class MakeInferencePoolProtocol(Protocol):
 class DownloadRemoteProtocol(Protocol):
     """Protocol for fetching a v2 manifest's remote model artifact."""
 
-    def __call__(
-        self, settings: Settings, model_dir: Path, manifest_path: Path
-    ) -> None:
+    def __call__(self, settings: Settings, model_dir: Path, manifest_path: Path) -> None:
         """Download the artifact the manifest names, if it names one.
 
         Args:

@@ -12,7 +12,6 @@ from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import CalibrationRunnerResultDict
 from handwriting_ai.training.calibration._types import Candidate
-from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
 from handwriting_ai.training.calibration.runner import (
     _child_entry,

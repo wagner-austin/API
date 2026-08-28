@@ -84,9 +84,7 @@ def _default_make_inference_pool(settings: Settings) -> InferencePoolProtocol:
     return _make_pool(settings)
 
 
-def _default_download_remote(
-    settings: Settings, model_dir: Path, manifest_path: Path
-) -> None:
+def _default_download_remote(settings: Settings, model_dir: Path, manifest_path: Path) -> None:
     """Fetch the remote artifact named by a v2 manifest.
 
     Args:
