@@ -6,6 +6,7 @@ Fighting strategy, weapon behavior, enemy AI patterns, and diagnosed combat bugs
 [Enemy Bot Behavior](../pages/enemy-bot-behavior.md) -- bots stand ground, only flee at low HP, never collect resources, never fight each other
 [Weapon Log Markers](../pages/weapon-log-markers.md) -- dual="You hit", homing="You fire", no miss lines in range
 [Weapon Selection](../pages/weapon-selection.md) -- server-side: dual at adjacent, homing when target moves same tick, single at empty ground
+[Serve Cadence](../pages/serve-cadence.md) -- one action per 2 s global beat, moves share the slot, excess dispatches queue
 [Combat Chase Bug](../pages/combat-chase-bug.md) -- teleport-chase loop diagnosed and fixed: teleport directly to target
 [Gameplay Loop](../pages/gameplay-loop.md) -- the full combat→refill→radar conservation cycle as played by a human
 [Equipment Refill Strategy](../pages/equipment-refill-strategy.md) -- low-radar grid walk, extra radar conservation, container randomness

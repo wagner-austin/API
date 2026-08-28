@@ -133,4 +133,30 @@ tier 3 (assume healthy), not "full = 0".[^3]
 }
 ```
 
+## Self-death receipts: the 0x41 arrives everywhere, and the wrap precedes it
+
+Live-corrected 2026-08-26/27 against `runs/bot/desert/bot-20260826-182204`
+(three deaths, each carrying `origin=protocol_0x41`): **the self 0x41
+DOES arrive on Normal fields** — the earlier "no 0x41 for self on
+Normal" claim was an inference from a dead reporting counter, falsified
+by the artifact. What actually happens at a self-death, in wire order
+inside one drain batch:
+
+1. A fuel total drives THROUGH zero and the u16 field wraps (readings
+   65460/65475/65482/65530 observed). The wrap is a valid earlier
+   receipt of the death — and must never be ingested as a +65k pickup
+   (it polluted the fuel book three times in that run).
+2. The self 0x41 lands one message later with the killer id.
+
+Both producers raise the same `ws.self_deactivated` flag and dedup on
+it — one death, one `self_deactivated` diagnostic, whichever receipt
+lands first (the wrap usually wins; it carries no killer id, honestly).
+Every reporting consumer (run digest, engagement ledger) counts that
+single diagnostic; the old free-text regex and the
+tank_deactivated-victim-is-us branch were dead code that read deaths=0
+through three real deaths. Detection lives in
+`src/tankpit_bot/sniffer/world_state_containers.py` (wrap) and
+`world_state_dispatch.py` (0x41); the respawn contract
+(`_handle_own_deactivation`) consumes the flag either way.
+
 [^3]: user (Austin), 2026-07-23 — "tanks dont heal. they only can recover health/fuel from picking up fuel containers... when i mouse over a tank on the map, it shows them lighter more hp or darker lower hp". Corpus fit same day: 19,658 tier+fuel pairs, boundaries exactly 275/550/825 = capacity quartiles at rank 1, zero exceptions. The consequence — fuel IS health, so the only recovery path is a fuel pickup — is why the pickup predicate refuses nothing on volume grounds: `minimum_volume=1` at `src/tankpit_bot/bot/ai/collect_pickups.py:253`. Deactivation itself is read off the wire, not inferred from health: `src/tankpit_bot/combat.py:114` and `:119`.

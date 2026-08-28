@@ -41,7 +41,7 @@ which let the identical hop re-certify against mine-blind beliefs
 forever (the 08-05 session in the attainability docstring ran **534
 refusals at one tile in 43 minutes**; the 2026-08-21 marooning ran
 the same loop in escape and harvest form). Now a chebyshev->=2
-refusal (ring-1 one-tile displacement stays routine and unrecorded)
+refusal
 writes ``ws.landing_refusals`` — requested tile + timestamp — and the
 composed decision terrain refuses LANDINGS in the requested tile's
 ring-1 (exactly the zone one refusal proves; walking unaffected) for
@@ -58,6 +58,23 @@ sealed hops with 0x52 CANT_GO, corrected 2026-08-21 to the measured
 confirm-at-origin and pinned by the ring-refusal seam scenario
 (``tests/sim/test_landing_refusal_seam.py``: one hop on the wire,
 refusal ingested, zero repeats).
+
+**Displacement tombstones (operator ruling 2026-08-27, "if we get
+displaced once then that should be enough info... why re-attempt
+unless we cleared mines").** Ring-1 one-tile displacements were
+routine-and-unrecorded until session bot-20260827-170800 re-aimed
+the same tile four times (its issue report's displacement orbits).
+The refined law: a one-tile displacement whose requested tile holds
+**no known tank** proves an invisible occupant (hidden mine) on
+exactly that tile — ``ws.mark_displacement_tombstone`` records it
+(single tile, no ring: one displacement proves one tile) and
+``hostile_landing_keys`` serves it to the composed decision terrain
+with the same 30 s TTL as refusals. Aims at a tank's own body stay
+exempt and unrecorded: combat closes displace by one legitimately on
+every approach, and tombstoning the enemy's tile would poison the
+kill approach itself. Pinned by
+``tests/sniffer/test_world_state_dispatch_teleport.py`` (tombstone +
+exemption).
 
 **Do NOT compute adjacent tiles client-side.** The server is authoritative for placement. Teleporting to an enemy's exact coordinates is correct — the server places you adjacent. This is how human players play.[^8]
 
