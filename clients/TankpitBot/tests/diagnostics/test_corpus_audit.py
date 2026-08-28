@@ -311,6 +311,29 @@ class TestAuditEventsArtifact:
 
         assert audit_events_artifact(source)["radar_drift"] == 0
 
+    def test_an_era_shape_the_analyzers_reject_raises(self, tmp_path: Path) -> None:
+        """A record missing a strictly-required field raises, not lies.
+
+        The first real-corpus sweep hit an archive
+        ``teleport_displacement`` with no requested tile; the digest
+        rejects that shape too, so the single-artifact audit raises and
+        the SWEEP books a named skip (covered in the sweep tests).
+        """
+        source = _write_run(
+            tmp_path / "old-displacement.events.jsonl",
+            [
+                _event(
+                    "2026-08-05T00:00:00",
+                    "DIAGNOSTIC",
+                    "diagnostic_kind=teleport_displacement",
+                    diagnostic_kind="teleport_displacement",
+                ),
+            ],
+        )
+
+        with pytest.raises(KeyError, match="requested_x"):
+            audit_events_artifact(source)
+
     def test_physics_divergences_are_tallied(self, tmp_path: Path) -> None:
         """The fuel book's residual detector count rides along unflagged."""
         source = _write_run(
@@ -388,13 +411,29 @@ class TestCorpusSweep:
         )
         (tmp_path / "a" / "empty.events.jsonl").write_text("", encoding="utf-8")
         _write_run(tmp_path / "a" / "latest.events.jsonl", _clean_run_lines())
+        # An archive era missing a field a strict reader requires is a
+        # NAMED skip, not a crash (the first real-corpus sweep died on
+        # this before the KeyError arm existed).
+        _write_run(
+            tmp_path / "a" / "old-era.events.jsonl",
+            [
+                _event(
+                    "2026-08-05T00:00:00",
+                    "DIAGNOSTIC",
+                    "diagnostic_kind=inventory_sample",
+                    diagnostic_kind="inventory_sample",
+                    radar=5,
+                ),
+            ],
+        )
 
         corpus = audit_corpus(tmp_path)
 
         assert corpus["runs_audited"] == 2
         assert corpus["runs_flagged"] == 1
-        assert corpus["runs_skipped"] == 1
+        assert corpus["runs_skipped"] == 2
         assert "empty.events.jsonl" in corpus["skipped"][0]
+        assert "old-era.events.jsonl" in corpus["skipped"][1]
         assert corpus["kind_counts"]["tank_identity"] == 2
         assert len(corpus["audits"]) == 1
 

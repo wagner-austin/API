@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 from platform_core.logging import get_logger
+from platform_core.rich_logging import setup_rich_logging
 from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks
@@ -339,7 +340,9 @@ def audit_corpus(root: Path) -> CorpusAuditDict:
             continue
         try:
             audit = audit_events_artifact(source_path)
-        except ValueError as error:
+        except (KeyError, ValueError) as error:
+            # KeyError: an archive era missing a field a strict reader
+            # (this recount or the scorecard accumulator) requires.
             skipped.append(f"{source_path}: {error}")
             continue
         runs_audited += 1
@@ -390,6 +393,7 @@ def main() -> int:
     Returns:
         0 when every audited run is clean, 1 when any run is flagged.
     """
+    setup_rich_logging(level="INFO")
     argv = _test_hooks.get_argv()
     root = Path(argv[1]) if len(argv) > 1 else Path("runs") / "bot"
     corpus = audit_corpus(root)
