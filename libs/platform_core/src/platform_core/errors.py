@@ -191,6 +191,11 @@ class Hpc3ErrorCode(ErrorCodeBase):
     SWEEP_EXCEEDS_CPU_CEILING = "SWEEP_EXCEEDS_CPU_CEILING"
     SWEEP_EXCEEDS_JOB_CEILING = "SWEEP_EXCEEDS_JOB_CEILING"
 
+    # Image builds -- the one job that is submitted from an already-rendered
+    # script rather than from a run document.
+    IMAGE_BUILD_SCRIPT_UNREADABLE = "IMAGE_BUILD_SCRIPT_UNREADABLE"
+    IMAGE_BUILD_NAME_MISMATCH = "IMAGE_BUILD_NAME_MISMATCH"
+
     # Staging -- the bytes a run is entitled to read.
     DIGEST_MISMATCH = "DIGEST_MISMATCH"
     MANIFEST_FILE_MISSING = "MANIFEST_FILE_MISSING"

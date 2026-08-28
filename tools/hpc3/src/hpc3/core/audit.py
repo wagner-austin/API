@@ -66,6 +66,53 @@ def job_submitted(spec: JobSpec, *, host: str, job_id: str, cluster: ClusterFact
     )
 
 
+def image_build_submitted(
+    *,
+    host: str,
+    job_id: str,
+    project: str,
+    label: str,
+    partition: str,
+    artifact: str,
+    cluster: ClusterFacts,
+) -> None:
+    """Record a submitted image build.
+
+    Separate from :func:`job_submitted` rather than routed through it: that
+    one reads a :class:`~hpc3.contracts.job.JobSpec`, and a build has none --
+    its resources live in a script this package rendered earlier, from a spec
+    that describes the image's contents rather than the job's shape. Squeezing
+    one into a JobSpec would mean inventing a GPU, a checkpoint interval and a
+    time limit the build does not have.
+
+    Args:
+        host: SSH destination it went to.
+        job_id: Id Slurm assigned.
+        project: Body of work the image belongs to.
+        label: Qualified job name, matching the script's own directive.
+        partition: Partition it went to, read from that script.
+        artifact: Absolute path of the ``.sif`` the build produces, which is
+            the field that makes this event answer "which job built this
+            image" -- a question that had no answer at all before builds were
+            recorded.
+        cluster: The cluster it went to.
+    """
+    _test_hooks.log_event(
+        JOB_SUBMITTED,
+        {
+            "job_id": job_id,
+            "job_name": label,
+            "project": project,
+            "host": host,
+            "cluster": cluster["slug"],
+            "partition": partition,
+            "usage_factor": partition_facts(cluster, partition)["usage_factor"],
+            "kind": "image-build",
+            "artifact": artifact,
+        },
+    )
+
+
 def sweep_submitted(*, host: str, project: str, base_name: str, job_ids: list[str]) -> None:
     """Record a completed sweep.
 
@@ -134,6 +181,7 @@ __all__ = [
     "SWEEP_SUBMITTED",
     "chain_submitted",
     "files_staged",
+    "image_build_submitted",
     "job_submitted",
     "sweep_submitted",
 ]

@@ -209,17 +209,35 @@ hpc3-image --spec specs/turkic-lstm-image.json \
 scp runs/turkic-lstm-build-v1/* hpc3:/pub/wagnera3/images/turkic-lstm-v1/
 
 # 4. Build on the cluster (~25 min, free partition, requeue-protected).
-ssh hpc3 'cd /pub/wagnera3/images/turkic-lstm-v1 && sbatch build.sbatch'
+#    Preflights, submits, and writes the ledger row — like every other job.
+hpc3-image-build --config runs/hpc3.json \
+    --project turkic-lstm --name image-v1 \
+    --image-dir /pub/wagnera3/images/turkic-lstm-v1 \
+    --image-name turkic-lstm.sif
 ```
 
-**Step 4 is the one path here that leaves no ledger row**, and `hpc3-triage`
-now reports it as `unclaimed` for as long as the build runs. That finding is
-correct and is not noise: an image build is a real job holding real cores, and
-if it wedges, nothing in this package knows it exists — `hpc3-trace` cannot
-find it and `hpc3-watch` was never given its id. The finding is left visible
-rather than filtered because filtering it would mean filtering the shape of
-every other bypass too. Recording the build through the tool is the fix, and
-it is not built yet.
+**Step 4 was a raw `ssh hpc3 'cd … && sbatch build.sbatch'` until 2026-08-28**,
+and that is why twenty-one builds hold no ledger row: `hpc3-trace` cannot say
+which job built an image, `hpc3-watch` was never given the id, and
+`hpc3-triage` reports the build as `unclaimed` for the two hours it runs —
+correctly, because from this machine's records it is a stranger holding eight
+cores. The reverse-direction check found the twenty-second, and this command
+is the answer to it.
+
+`--project` and `--name` are not read out of the script, because the ledger's
+name is the qualified `<project>.<name>` and **the project half is the part a
+script cannot tell you**: v22 was rendered `img.abl-sif-v22`, which reads as a
+project called `img` that no workspace declares. The script's own `#SBATCH -J`
+is then required to match what will be recorded — so the ledger row and
+`squeue` cannot disagree — and the refusal prints the `hpc3-image --job-name`
+that would fix it. The partition is read from the script rather than assumed
+from `BUILD_PARTITION`: that constant says what this package renders *today*,
+and the file on the cluster is what actually runs.
+
+The row records `deterministic: false` and an empty `image_digest` — a build
+is not a numerical run, and it *produces* the image rather than running inside
+one — and carries the `.sif` as its `artifact`, which is what lets
+`hpc3-trace --match` answer "which job built this image".
 
 Then put the built image's path and `sha256` in the project's `image`, set
 `env_path` to the in-image prefix (`/opt/env`), and preflight: the pinned
@@ -696,9 +714,11 @@ and exits non-zero if anything is found.
 **Only three of these existed until 2026-08-28**, and the missing one was the
 mirror of the one everybody thought was the clever check. `unaccounted` proves
 every ledger row is a real job; nothing proved every real job has a ledger row.
-That is not a hypothetical gap — the image-build recipe below tells you to run
+That is not a hypothetical gap — the image-build recipe below *told you* to run
 `ssh hpc3 'cd … && sbatch build.sbatch'`, and twenty-one builds ran that way
-without leaving a record. The check found the twenty-second on its first run.
+without leaving a record. The check found the twenty-second on its first run,
+and `hpc3-image-build` is why there will not be a twenty-third: the finding was
+answered by closing the path that produced it, not by excusing it.
 
 Two consequences worth knowing before the first red board:
 
@@ -842,6 +862,7 @@ window for a job to close cleanly.
 | `hpc3-chain --config C --chain H` | runs stages in order and stops at the first failure, so a broken stage does not feed the next |
 | `hpc3-image-capture --out S …` | reads a live environment and writes the image spec. **Use this rather than writing a spec by hand** |
 | `hpc3-image --spec S --out-dir D --image-name N` | renders the spec into definition, requirements, self-check and build script. Pure; builds nothing |
+| `hpc3-image-build --config C --project P --name N --image-dir D --image-name I` | preflight → submit the rendered build → record it in the ledger |
 
 **Three of these were missing from this table until 2026-08-28**, and the
 omission cost real work: `hpc3-image-capture` appeared exactly once in this
