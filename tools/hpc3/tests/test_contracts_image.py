@@ -396,28 +396,58 @@ class TestTheCommittedSpec:
         symbol only detects a stale wheel if it names something the new code
         introduced.
 
-        The last two are the environment known-answer probe, added by
-        another session on 2026-08-25. They arrived here as a FAILURE of
-        this test rather than as a silent widening, which is the exactness
-        earning its keep: the spec grew, and someone had to look.
+        The environment known-answer probe was added by another session on
+        2026-08-25. It arrived here as a FAILURE of this test rather than as
+        a silent widening, which is the exactness earning its keep: the spec
+        grew, and someone had to look.
+
+        THE LOOK WAS SKIPPED AFTER THAT, AND THIS LIST WENT STALE. Images
+        v17 through v21 added nineteen more symbols -- the trace, SDPA,
+        forward-cost, training-step and legacy-GEMM probes, and the two
+        ``environment_record`` captures that commit ``c0ce20b7`` baked in so
+        a fingerprint could carry its host and packages. Each spec edit left
+        this assertion failing and each was committed anyway, so the suite
+        was red on ``main`` and the signal it exists to give was being
+        stepped over rather than read. The list below is the whole of
+        ``specs/abl-image.json`` as of v21; the ritual only works if the
+        failure is answered in the same commit that causes it.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
         symbols = sorted(
             (check["module"], check["attribute"]) for check in spec["required_symbols"]
         )
         assert symbols == [
+            ("model_trainer.cli.forward_benchmark", "measure_row"),
             ("model_trainer.cli.known_answer_probe", "probe_run_record"),
+            ("model_trainer.cli.legacy_gemm_probe", "legacy_run_record"),
+            ("model_trainer.cli.probe_trace", "trace_run_record"),
+            ("model_trainer.cli.probe_trace", "workspace_observation"),
+            ("model_trainer.cli.probe_trace_report", "report_lines"),
             ("model_trainer.cli.score_baseline", "main"),
             ("model_trainer.cli.score_baseline", "score_with_outcomes"),
+            ("model_trainer.cli.sdpa_benchmark", "benchmark_run_record"),
+            ("model_trainer.cli.sdpa_probe", "selected_backend"),
+            ("model_trainer.cli.train_benchmark", "train_run_record"),
+            ("model_trainer.cli.train_benchmark_report", "report_lines"),
             ("model_trainer.cluster.preflight", "check_corpus_certified"),
+            ("model_trainer.core.services.model.forward_cost", "release_row"),
+            ("model_trainer.core.services.model.forward_trace", "traced_forward"),
             (
                 "model_trainer.core.services.model.known_answer_probe",
                 "probe_forward_loss",
             ),
+            ("model_trainer.core.services.model.legacy_gemm_probe", "arm_outputs"),
+            ("model_trainer.core.services.model.sdpa_probe", "probe_sdpa"),
+            ("model_trainer.core.services.model.sdpa_timing", "backend_context"),
+            ("model_trainer.core.services.model.sdpa_timing", "time_sdpa"),
+            ("model_trainer.core.services.model.train_cost", "run_train_step"),
+            ("model_trainer.core.services.model.train_cost", "train_step_setup"),
             (
                 "model_trainer.core.services.training.base_trainer_checkpoints",
                 "_TrainerCheckpoints",
             ),
+            ("platform_core.environment_record", "capture_host_record"),
+            ("platform_core.environment_record", "capture_package_versions"),
         ]
 
     def test_its_environment_survives_the_cluster_bind_mounts(self) -> None:
