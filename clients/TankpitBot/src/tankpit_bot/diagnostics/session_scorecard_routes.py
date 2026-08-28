@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from tankpit_bot.diagnostics.issue_report_types import (
     InventoryCountsDict,
-    TargetedTeleportRecordDict,
 )
 from tankpit_bot.diagnostics.session_scorecard_types import (
     FuelSampleRecordDict,
@@ -25,25 +24,6 @@ from tankpit_bot.runtime_records import (
     require_int_field,
     require_str_field,
 )
-
-
-def _classify_targeted_teleport(record: RuntimeEventRecordDict) -> TargetedTeleportRecordDict:
-    """Build a typed targeted-teleport row from a DIAGNOSTIC event.
-
-    Args:
-        record: Decoded event record whose ``diagnostic_kind`` is
-            ``equipment_approach``.
-
-    Returns:
-        Strict-typed targeted-teleport row.
-    """
-    fields = record["fields"]
-    return TargetedTeleportRecordDict(
-        target_x=require_int_field(fields, "target_x"),
-        target_y=require_int_field(fields, "target_y"),
-        fuel=require_int_field(fields, "fuel"),
-        timestamp=record["timestamp"],
-    )
 
 
 def _classify_inventory_counts(record: RuntimeEventRecordDict) -> InventoryCountsDict:
@@ -103,9 +83,7 @@ def route_scorecard_diagnostic(
         return
     if _route_fuel_diagnostic(kind, record, accumulator):
         return
-    if kind == "equipment_approach":
-        accumulator["equipment_approaches"].append(_classify_targeted_teleport(record))
-    elif kind == "inventory_sample":
+    if kind == "inventory_sample":
         accumulator["inventory_samples"].append(_classify_inventory_counts(record))
     elif kind == "equipment_gain":
         accumulator["equipment_gain_events"] += 1
@@ -280,12 +258,6 @@ def _route_combat_diagnostic(
         return True
     if kind == "combat_miss":
         accumulator["combat_misses"] += 1
-        return True
-    if kind == "combat_ghost_detected":
-        accumulator["combat_ghosts_blocked"] += 1
-        return True
-    if kind == "combat_stale_position":
-        accumulator["combat_stale_positions_blocked"] += 1
         return True
     if kind == "tank_damage_changed":
         accumulator["tank_damage_changes"] += 1

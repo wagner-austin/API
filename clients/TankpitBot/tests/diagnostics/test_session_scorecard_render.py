@@ -31,7 +31,6 @@ class TestRenderAndIssues:
         fuel_min: int = 405,
         fuel_sample_count: int = 5,
         state_budget: list[StateBudgetRecordDict] | None = None,
-        equipment_approach_max_repeats: int = 1,
         inventory_sample_count: int = 3,
         radar_last: int = 11,
     ) -> SessionScorecardDict:
@@ -48,8 +47,6 @@ class TestRenderAndIssues:
             kills=kills,
             shots=shots,
             combat_misses=0,
-            combat_ghosts_blocked=0,
-            combat_stale_positions_blocked=0,
             tank_damage_changes=0,
             fuel_min=fuel_min,
             fuel_last=866,
@@ -64,9 +61,6 @@ class TestRenderAndIssues:
             scans_extra=3,
             scans_builtin=2,
             physics_divergences=0,
-            equipment_approaches=[],
-            equipment_approach_distinct_targets=0,
-            equipment_approach_max_repeats=equipment_approach_max_repeats,
             action_outcome_counts={},
             fuel_low_water_threshold=354,
             fuel_low_water_episodes=[],
@@ -120,15 +114,6 @@ class TestRenderAndIssues:
         issues = collect_scorecard_issues(self._scorecard(kills=0, shots=43))
 
         assert issues == ["combat futility: 43 shots produced 0 observed kills"]
-
-    def test_equipment_orbit_issue(self) -> None:
-        """Three teleport approaches at one container is the orbit signature."""
-        issues = collect_scorecard_issues(self._scorecard(equipment_approach_max_repeats=7))
-
-        assert issues == [
-            "equipment-approach orbit: one container teleport-approached 7 times "
-            "without completing a pickup"
-        ]
 
     def test_radars_exhausted_issue(self) -> None:
         """Ending the run with zero extra radars is surfaced."""

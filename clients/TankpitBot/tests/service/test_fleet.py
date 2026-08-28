@@ -300,8 +300,12 @@ def test_stats_summarizes_the_instance_events(spawner: _FakeSpawner) -> None:
         [
             '{"timestamp":"2026-08-06T10:00:00","level":"INFO","logger":"l",'
             '"mode":"bot","channel":"STATE","message":"INITIALIZING"}',
+            '{"timestamp":"2026-08-06T10:00:01","level":"INFO","logger":"l",'
+            '"mode":"bot","channel":"DIAGNOSTIC","message":"diagnostic_kind=tank_identity",'
+            '"diagnostic_kind":"tank_identity","tank_id":601}',
             '{"timestamp":"2026-08-06T10:05:00","level":"INFO","logger":"l",'
-            '"mode":"bot","channel":"COMBAT","message":"kill registered"}',
+            '"mode":"bot","channel":"DIAGNOSTIC","message":"diagnostic_kind=tank_deactivated",'
+            '"diagnostic_kind":"tank_deactivated","victim_id":529,"killer_id":601}',
         ]
     )
     reads: list[Path] = []

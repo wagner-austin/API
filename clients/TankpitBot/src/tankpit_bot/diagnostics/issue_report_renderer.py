@@ -178,8 +178,6 @@ def _render_scorecard_section(report: IssueReportDict) -> list[str]:
         f"  duration={scorecard['duration_seconds']}s "
         f"kills={scorecard['kills']} shots={scorecard['shots']}",
         f"  combat gates: misses={scorecard['combat_misses']} "
-        f"ghosts_blocked={scorecard['combat_ghosts_blocked']} "
-        f"stale_pos_blocked={scorecard['combat_stale_positions_blocked']} "
         f"damage_changes={scorecard['tank_damage_changes']}",
         "  outcomes: "
         + (

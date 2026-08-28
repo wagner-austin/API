@@ -27,9 +27,7 @@ from tankpit_bot.diagnostics.issue_report_codecs_records import (
 )
 from tankpit_bot.diagnostics.issue_report_codecs_scorecard import (
     decode_state_budget_record,
-    decode_targeted_teleport_record,
     encode_state_budget_record,
-    encode_targeted_teleport_record,
 )
 from tankpit_bot.diagnostics.issue_report_types import (
     ActionOutcomeRowDict,
@@ -37,7 +35,6 @@ from tankpit_bot.diagnostics.issue_report_types import (
     MapOpenSkippedRecordDict,
     SessionRoomRecordDict,
     StateBudgetRecordDict,
-    TargetedTeleportRecordDict,
     TeleportAttemptRecordDict,
 )
 
@@ -233,8 +230,6 @@ def test_session_scorecard_decodes_pre_upgrade_artifacts() -> None:
         kills=0,
         shots=0,
         combat_misses=0,
-        combat_ghosts_blocked=0,
-        combat_stale_positions_blocked=0,
         tank_damage_changes=0,
         fuel_min=-1,
         fuel_last=-1,
@@ -247,9 +242,6 @@ def test_session_scorecard_decodes_pre_upgrade_artifacts() -> None:
         scans_extra=0,
         scans_builtin=0,
         physics_divergences=0,
-        equipment_approaches=[],
-        equipment_approach_distinct_targets=0,
-        equipment_approach_max_repeats=0,
         action_outcome_counts={},
         fuel_low_water_threshold=100,
         fuel_low_water_episodes=[],
@@ -292,20 +284,6 @@ def test_session_scorecard_decodes_pre_upgrade_artifacts() -> None:
     assert decoded["ledger_shot_singles"] == -1
     assert decoded["ledger_shot_duals"] == -1
     assert decoded["ledger_shot_homings"] == -1
-
-
-def test_targeted_teleport_record_round_trip() -> None:
-    """``TargetedTeleportRecordDict`` round-trips through JSON encoding."""
-    record = TargetedTeleportRecordDict(
-        target_x=151,
-        target_y=109,
-        fuel=280,
-        timestamp="2026-06-07T22:12:35",
-    )
-
-    decoded = decode_targeted_teleport_record(_round_trip(encode_targeted_teleport_record(record)))
-
-    assert decoded == record
 
 
 def test_require_object_rejects_non_dict() -> None:

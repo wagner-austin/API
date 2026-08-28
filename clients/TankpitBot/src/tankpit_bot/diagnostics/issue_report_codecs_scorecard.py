@@ -27,7 +27,6 @@ from tankpit_bot.diagnostics.issue_report_types import (
     InventoryCountsDict,
     SessionScorecardDict,
     StateBudgetRecordDict,
-    TargetedTeleportRecordDict,
     TeleportSpendRecordDict,
 )
 
@@ -145,40 +144,6 @@ def decode_teleport_spend_record(data: JSONObject) -> TeleportSpendRecordDict:
     )
 
 
-def encode_targeted_teleport_record(record: TargetedTeleportRecordDict) -> JSONObject:
-    """Encode a targeted teleport record to JSON.
-
-    Args:
-        record: Record to encode.
-
-    Returns:
-        JSON-compatible representation.
-    """
-    return {
-        "target_x": record["target_x"],
-        "target_y": record["target_y"],
-        "fuel": record["fuel"],
-        "timestamp": record["timestamp"],
-    }
-
-
-def decode_targeted_teleport_record(data: JSONObject) -> TargetedTeleportRecordDict:
-    """Decode a targeted teleport record from JSON.
-
-    Args:
-        data: JSON object to decode.
-
-    Returns:
-        Validated record.
-    """
-    return TargetedTeleportRecordDict(
-        target_x=require_int(data, "target_x"),
-        target_y=require_int(data, "target_y"),
-        fuel=require_int(data, "fuel"),
-        timestamp=require_str(data, "timestamp"),
-    )
-
-
 def encode_inventory_counts(counts: InventoryCountsDict) -> JSONObject:
     """Encode inventory counts to JSON.
 
@@ -230,8 +195,6 @@ def encode_session_scorecard(scorecard: SessionScorecardDict) -> JSONObject:
         "kills": scorecard["kills"],
         "shots": scorecard["shots"],
         "combat_misses": scorecard["combat_misses"],
-        "combat_ghosts_blocked": scorecard["combat_ghosts_blocked"],
-        "combat_stale_positions_blocked": scorecard["combat_stale_positions_blocked"],
         "tank_damage_changes": scorecard["tank_damage_changes"],
         "fuel_min": scorecard["fuel_min"],
         "fuel_last": scorecard["fuel_last"],
@@ -244,11 +207,6 @@ def encode_session_scorecard(scorecard: SessionScorecardDict) -> JSONObject:
         "scans_extra": scorecard["scans_extra"],
         "scans_builtin": scorecard["scans_builtin"],
         "physics_divergences": scorecard["physics_divergences"],
-        "equipment_approaches": [
-            encode_targeted_teleport_record(r) for r in scorecard["equipment_approaches"]
-        ],
-        "equipment_approach_distinct_targets": scorecard["equipment_approach_distinct_targets"],
-        "equipment_approach_max_repeats": scorecard["equipment_approach_max_repeats"],
         "action_outcome_counts": dict(scorecard["action_outcome_counts"]),
         "fuel_low_water_threshold": scorecard["fuel_low_water_threshold"],
         "fuel_low_water_episodes": [
@@ -287,8 +245,6 @@ def decode_session_scorecard(data: JSONObject) -> SessionScorecardDict:
         kills=require_int(data, "kills"),
         shots=require_int(data, "shots"),
         combat_misses=require_int(data, "combat_misses"),
-        combat_ghosts_blocked=require_int(data, "combat_ghosts_blocked"),
-        combat_stale_positions_blocked=require_int(data, "combat_stale_positions_blocked"),
         tank_damage_changes=require_int(data, "tank_damage_changes"),
         fuel_min=require_int(data, "fuel_min"),
         fuel_last=require_int(data, "fuel_last"),
@@ -301,15 +257,6 @@ def decode_session_scorecard(data: JSONObject) -> SessionScorecardDict:
         scans_extra=require_int(data, "scans_extra"),
         scans_builtin=require_int(data, "scans_builtin"),
         physics_divergences=require_int(data, "physics_divergences"),
-        equipment_approaches=[
-            decode_targeted_teleport_record(item)
-            for item in _require_object_list(data, "equipment_approaches")
-        ],
-        equipment_approach_distinct_targets=require_int(
-            data,
-            "equipment_approach_distinct_targets",
-        ),
-        equipment_approach_max_repeats=require_int(data, "equipment_approach_max_repeats"),
         action_outcome_counts=_require_str_int_map(data, "action_outcome_counts"),
         fuel_low_water_threshold=(
             require_int(data, "fuel_low_water_threshold")
@@ -386,12 +333,10 @@ __all__ = [
     "decode_inventory_counts",
     "decode_session_scorecard",
     "decode_state_budget_record",
-    "decode_targeted_teleport_record",
     "decode_teleport_spend_record",
     "encode_fuel_low_water_episode",
     "encode_inventory_counts",
     "encode_session_scorecard",
     "encode_state_budget_record",
-    "encode_targeted_teleport_record",
     "encode_teleport_spend_record",
 ]

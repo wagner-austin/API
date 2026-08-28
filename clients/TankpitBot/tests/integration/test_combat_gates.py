@@ -8,7 +8,7 @@ behave correctly:
     within their TTLs, ``engage_target`` produces a ``shoot`` command.
   - When ``last_wire_seen_ms`` is stale (older than
     ``WIRE_PRESENCE_TTL_MS``), engagement blocks the target without
-    firing and emits the ``combat_ghost_detected`` diagnostic.
+    firing.
   - When ``last_position_update_ms`` is stale (status-only broadcasts
     kept wire fresh but no position arrived), engagement blocks the
     target without firing.

@@ -261,26 +261,6 @@ class TeleportSpendRecordDict(TypedDict):
     fuel_spent: int
 
 
-class TargetedTeleportRecordDict(TypedDict):
-    """One targeted-teleport DIAGNOSTIC event.
-
-    Row shape for the ``equipment_approach`` diagnostic -- records a
-    deliberate teleport at a known coordinate with the fuel level at
-    dispatch.
-
-    Attributes:
-        target_x: Target X coordinate.
-        target_y: Target Y coordinate.
-        fuel: Fuel level when the teleport was planned.
-        timestamp: ISO timestamp from the event record.
-    """
-
-    target_x: int
-    target_y: int
-    fuel: int
-    timestamp: str
-
-
 class InventoryCountsDict(TypedDict):
     """Absolute counts for the five inventory item types.
 
@@ -324,9 +304,7 @@ class SessionScorecardDict(TypedDict):
 
     This is the audit every live run gets compared on: where the time
     went, what combat produced, how low fuel dipped, how the inventory
-    moved, what each radar press actually consumed, and whether the
-    equipment approaches show pathological repetition (the orbit class
-    of bug from live runs 20260612-062453 and 20260612-071918).
+    moved, and what each radar press actually consumed.
 
     Attributes:
         duration_seconds: Whole seconds between the first and last
@@ -338,14 +316,6 @@ class SessionScorecardDict(TypedDict):
             ``shoot(``.
         combat_misses: Count of ``combat_miss`` DIAGNOSTIC events
             (shot resolved with no tank at the target tile).
-        combat_ghosts_blocked: Count of ``combat_ghost_detected``
-            DIAGNOSTIC events (combat shot refused because the
-            target's last wire-presence stamp went stale).
-        combat_stale_positions_blocked: Count of
-            ``combat_stale_position`` DIAGNOSTIC events (combat shot
-            refused because the target's last wire-confirmed position
-            went stale -- the kill-shot gate added by the 2026-06-19
-            freshness refactor).
         tank_damage_changes: Count of ``tank_damage_changed``
             DIAGNOSTIC events.
         fuel_min: Lowest ``belief_fuel`` across
@@ -367,12 +337,6 @@ class SessionScorecardDict(TypedDict):
         physics_divergences: Count of ``physics_divergence``
             DIAGNOSTIC events -- fuel windows outside the physics
             book's feasibility interval.
-        equipment_approaches: Every ``equipment_approach`` event in
-            order.
-        equipment_approach_distinct_targets: Number of distinct
-            equipment coordinates teleport-approached.
-        equipment_approach_max_repeats: Highest event count for any
-            single equipment coordinate, ``0`` with no approaches.
         action_outcome_counts: Per ``"kind:outcome"`` tallies from the
             unified ``action_outcome`` fabric, sorted by key.
         fuel_low_water_threshold: The danger line used for episode
@@ -409,8 +373,6 @@ class SessionScorecardDict(TypedDict):
     kills: int
     shots: int
     combat_misses: int
-    combat_ghosts_blocked: int
-    combat_stale_positions_blocked: int
     tank_damage_changes: int
     fuel_min: int
     fuel_last: int
@@ -423,9 +385,6 @@ class SessionScorecardDict(TypedDict):
     scans_extra: int
     scans_builtin: int
     physics_divergences: int
-    equipment_approaches: list[TargetedTeleportRecordDict]
-    equipment_approach_distinct_targets: int
-    equipment_approach_max_repeats: int
     action_outcome_counts: dict[str, int]
     fuel_low_water_threshold: int
     fuel_low_water_episodes: list[FuelLowWaterEpisodeDict]
@@ -535,7 +494,6 @@ __all__ = [
     "SessionScorecardDict",
     "StateBudgetRecordDict",
     "SuppressedDispatchRecordDict",
-    "TargetedTeleportRecordDict",
     "TeleportAttemptRecordDict",
     "TeleportSpendRecordDict",
     "make_unsampled_inventory_counts",

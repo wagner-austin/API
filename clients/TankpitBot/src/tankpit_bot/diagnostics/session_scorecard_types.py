@@ -13,7 +13,6 @@ from typing_extensions import TypedDict
 
 from tankpit_bot.diagnostics.issue_report_types import (
     InventoryCountsDict,
-    TargetedTeleportRecordDict,
     make_zero_inventory_counts,
 )
 
@@ -115,14 +114,6 @@ class ScorecardAccumulatorDict(TypedDict):
             ``shoot(``.
         combat_misses: Count of ``combat_miss`` DIAGNOSTIC events
             (shot resolved with no tank at the target tile).
-        combat_ghosts_blocked: Count of ``combat_ghost_detected``
-            DIAGNOSTIC events (combat shot refused because
-            ``last_wire_seen_ms`` was stale).
-        combat_stale_positions_blocked: Count of
-            ``combat_stale_position`` DIAGNOSTIC events (combat shot
-            refused because ``last_position_update_ms`` was stale --
-            the kill-shot gate added with the 2026-06-19 freshness
-            refactor).
         tank_damage_changes: Count of ``tank_damage_changed``
             DIAGNOSTIC events (any tank's ``damage_state`` transitioned
             via wire), useful for sanity-checking shots against damage
@@ -156,8 +147,6 @@ class ScorecardAccumulatorDict(TypedDict):
         scans_extra: ``radar_dispatch`` events with ``uses_extra``.
         scans_builtin: ``radar_dispatch`` events without
             ``uses_extra``.
-        equipment_approaches: Every ``equipment_approach`` event, in
-            stream order.
         action_outcome_counts: Per ``"kind:outcome"`` tallies from the
             unified ``action_outcome`` fabric -- the ledger-grade view
             of every attempt resolution (hits, stalls, rejections,
@@ -173,8 +162,6 @@ class ScorecardAccumulatorDict(TypedDict):
     kills: int
     shots: int
     combat_misses: int
-    combat_ghosts_blocked: int
-    combat_stale_positions_blocked: int
     tank_damage_changes: int
     fuel_samples: list[FuelSampleRecordDict]
     max_escape_floor: int
@@ -191,7 +178,6 @@ class ScorecardAccumulatorDict(TypedDict):
     scans_extra: int
     scans_builtin: int
     physics_divergences: int
-    equipment_approaches: list[TargetedTeleportRecordDict]
     action_outcome_counts: dict[str, int]
     first_timestamp: str
     last_timestamp: str
@@ -226,8 +212,6 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
         kills=0,
         shots=0,
         combat_misses=0,
-        combat_ghosts_blocked=0,
-        combat_stale_positions_blocked=0,
         tank_damage_changes=0,
         fuel_samples=[],
         max_escape_floor=0,
@@ -244,7 +228,6 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
         scans_extra=0,
         physics_divergences=0,
         scans_builtin=0,
-        equipment_approaches=[],
         action_outcome_counts={},
         first_timestamp="",
         last_timestamp="",

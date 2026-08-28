@@ -109,8 +109,6 @@ class TestBuildScorecard:
             kills=0,
             shots=0,
             combat_misses=0,
-            combat_ghosts_blocked=0,
-            combat_stale_positions_blocked=0,
             tank_damage_changes=0,
             fuel_min=-1,
             fuel_last=-1,
@@ -123,9 +121,6 @@ class TestBuildScorecard:
             scans_extra=0,
             scans_builtin=0,
             physics_divergences=0,
-            equipment_approaches=[],
-            equipment_approach_distinct_targets=0,
-            equipment_approach_max_repeats=0,
             action_outcome_counts={},
             fuel_low_water_threshold=100,
             fuel_low_water_episodes=[],
@@ -315,17 +310,13 @@ class TestBuildScorecard:
         assert scorecard["fuel_last"] == 908
         assert scorecard["fuel_sample_count"] == 3
 
-    def test_inventory_and_approach_aggregates(self) -> None:
-        """Inventory first/last and approach repeat counts come from the buckets."""
+    def test_inventory_aggregates(self) -> None:
+        """Inventory first/last counts come from the sample bucket."""
         sample_fields: dict[str, str | int | float | bool] = {
             "diagnostic_kind": "inventory_sample",
             "armor": 0,
             "missile": 0,
             "radar_enabled": True,
-        }
-        approach_fields: dict[str, str | int | float | bool] = {
-            "diagnostic_kind": "equipment_approach",
-            "fuel": 838,
         }
         accumulator = _routed(
             [
@@ -336,18 +327,6 @@ class TestBuildScorecard:
                 _record(
                     channel="DIAGNOSTIC",
                     fields={**sample_fields, "dual": 19, "homing": 25, "radar": 3},
-                ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={**approach_fields, "target_x": 128, "target_y": 126},
-                ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={**approach_fields, "target_x": 128, "target_y": 126},
-                ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={**approach_fields, "target_x": 157, "target_y": 169},
                 ),
             ]
         )
@@ -361,8 +340,6 @@ class TestBuildScorecard:
             armor=0, dual=19, missile=0, homing=25, radar=3
         )
         assert scorecard["inventory_sample_count"] == 2
-        assert scorecard["equipment_approach_distinct_targets"] == 2
-        assert scorecard["equipment_approach_max_repeats"] == 2
 
 
 class TestFuelLowWaterEpisodes:

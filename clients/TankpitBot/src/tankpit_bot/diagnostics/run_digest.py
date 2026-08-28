@@ -24,9 +24,15 @@ from pathlib import Path
 
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
-from typing_extensions import TypedDict
 
 from tankpit_bot.diagnostics.event_stream import load_event_records, run_analyzer_cli
+from tankpit_bot.diagnostics.run_digest_render import render_run_digest
+from tankpit_bot.diagnostics.run_digest_types import (
+    ClearanceShotRowDict,
+    DisplacementRowDict,
+    RunDigestDict,
+    TimelineRowDict,
+)
 from tankpit_bot.protocol import RANK_NAMES
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
@@ -34,129 +40,15 @@ log = get_logger(__name__)
 
 _TIMELINE_BUCKET_S = 300
 _CLEARANCE_CONVERT_WINDOW_S = 10
+#: A live tick loop dispatches every ~2 s; a silence this long between
+#: consecutive WIRE dispatches is a stall the five-minute timeline
+#: buckets smooth over (the 2026-08-20 arterial run idled 193 s inside
+#: a 261 s session and the digest showed nothing).
+_WIRE_GAP_STALL_S = 30
 
 _SHOOT_WIRE = re.compile(r"^shoot\(")
 _TELEPORT_WIRE = re.compile(r"^teleport\(")
 _PICKUP_WIRE = re.compile(r"^pickup_(fuel|equipment)")
-
-
-class DisplacementRowDict(TypedDict):
-    """One repeated-displacement histogram row.
-
-    Attributes:
-        requested_x: Aimed landing X.
-        requested_y: Aimed landing Y.
-        count: How many teleports at this tile displaced.
-    """
-
-    requested_x: int
-    requested_y: int
-    count: int
-
-
-class ClearanceShotRowDict(TypedDict):
-    """One mine-clearance shot and whether it converted.
-
-    Attributes:
-        timestamp: Shot decision timestamp.
-        x: Aim tile X.
-        y: Aim tile Y.
-        pickup_followed: A pickup dispatched within the convert window.
-    """
-
-    timestamp: str
-    x: int
-    y: int
-    pickup_followed: bool
-
-
-class TimelineRowDict(TypedDict):
-    """Activity counts for one five-minute bucket.
-
-    Attributes:
-        minute: Bucket start offset from session start, in minutes.
-        kills: Kills registered in the bucket.
-        shots: Shoot dispatches in the bucket.
-        teleports: Teleport dispatches in the bucket.
-        pickups: Pickup dispatches in the bucket.
-    """
-
-    minute: int
-    kills: int
-    shots: int
-    teleports: int
-    pickups: int
-
-
-class RunDigestDict(TypedDict):
-    """The whole-run digest table.
-
-    Attributes:
-        source: Events artifact the digest was computed from.
-        started_at: First event timestamp.
-        ended_at: Last event timestamp.
-        duration_s: Wall seconds between first and last event.
-        clean_exit: A session scorecard event was present (teardown ran).
-        exit_reason: Scorecard exit reason, empty when the run crashed.
-        room_id: Last joined room.
-        self_tank_id: Wire id of our own tank (-1 when never identified).
-        kills: Kill-registered count.
-        deaths: Own deactivations observed.
-        rank_changes: Wire-observed own rank changes, in order (e.g.
-            ``"promoted to captain (rank 5)"``) — the 2026-08-27
-            Captain promotion went unnoticed for a session because
-            nothing surfaced it.
-        shots: Shoot dispatches.
-        hits: Server-confirmed shot hits (``action_outcome`` hit).
-        misses: Server-confirmed shot misses.
-        zero_yield_radars: Radar dispatches followed by no container
-            pickup before the next radar (or session end) — scans
-            that bought nothing collectible.
-        damage_dealt: Fuel-confirmed damage dealt (``damage_ledger``).
-        damage_taken: Fuel-confirmed damage taken.
-        teleports: Teleport dispatches.
-        pickups: Pickup dispatches.
-        displacements: Total displaced teleports.
-        displacement_top: Most-displaced request tiles, descending.
-        clearance_shots: Every mine-clearance shot with conversion.
-        releases_by_reason: ``plan_released`` reason counts.
-        rank_name: Account rank label at startup, empty when unscraped.
-        rank_number: Countdown rank number at startup (-1 unscraped).
-        promotion_points: Account promotion points (-1 unscraped).
-        inventory_first: First sampled (armor,dual,missile,homing,radar).
-        inventory_last: Last sampled (armor,dual,missile,homing,radar).
-        timeline: Five-minute activity buckets.
-    """
-
-    source: str
-    started_at: str
-    ended_at: str
-    duration_s: int
-    clean_exit: bool
-    exit_reason: str
-    room_id: str
-    self_tank_id: int
-    kills: int
-    deaths: int
-    rank_changes: list[str]
-    shots: int
-    hits: int
-    misses: int
-    zero_yield_radars: int
-    damage_dealt: int
-    damage_taken: int
-    teleports: int
-    pickups: int
-    displacements: int
-    displacement_top: list[DisplacementRowDict]
-    clearance_shots: list[ClearanceShotRowDict]
-    releases_by_reason: dict[str, int]
-    rank_name: str
-    rank_number: int
-    promotion_points: int
-    inventory_first: list[int]
-    inventory_last: list[int]
-    timeline: list[TimelineRowDict]
 
 
 def _ts_seconds(timestamp: str) -> float:
@@ -275,6 +167,15 @@ def _apply_combat_diagnostic(
             digest["hits"] += 1
         elif outcome == "miss":
             digest["misses"] += 1
+        elif outcome == "superseded":
+            # The wasted-tick split the live livelock detector streaks
+            # on: an undispatched supersede is planner churn (the
+            # decision never reached the wire); a dispatched one is a
+            # re-aim on top of real output.
+            if record["fields"].get("dispatched") is True:
+                digest["superseded_dispatched"] += 1
+            else:
+                digest["superseded_undispatched"] += 1
         return
     # Teardown damage-ledger emission with fuel-confirmed totals
     # (2026-08-06); pre-extension archives lack the numeric fields
@@ -357,6 +258,8 @@ def _apply_diagnostic(
         # logged that line with the self id, so deaths read 0 through
         # arterial's three 2026-08-26 main-map deaths.
         digest["deaths"] += 1
+    elif kind == "liveness_stall":
+        digest["liveness_stalls"] += 1
     elif kind in ("action_outcome", "damage_ledger"):
         _apply_combat_diagnostic(record, digest, kind)
     else:
@@ -392,6 +295,54 @@ def _apply_wire(
             if t_s - shot_s <= _CLEARANCE_CONVERT_WINDOW_S:
                 row["pickup_followed"] = True
         pending_clearance.clear()
+
+
+def _apply_kill_receipt(
+    record: RuntimeEventRecordDict,
+    digest: RunDigestDict,
+    start_s: float,
+    t_s: float,
+) -> None:
+    """Count one ``tank_deactivated`` receipt when the killer is us.
+
+    OUR kill only when the 0x41 names this session's tank as the
+    killer -- the scorecard's attribution rule. The old free-text
+    "kill registered" count missed coordinate-aimed kills (44 wire
+    kills vs 43 lines, arterial 2026-08-26). The ``-1`` unidentified
+    sentinel never matches a ``-1`` killer_id from a pre-fleet
+    artifact that lacked the field.
+
+    Args:
+        record: The ``tank_deactivated`` event record.
+        digest: Digest under construction.
+        start_s: Session start epoch seconds.
+        t_s: Event epoch seconds.
+    """
+    killer = record["fields"].get("killer_id")
+    if (
+        digest["self_tank_id"] != -1
+        and isinstance(killer, int)
+        and killer == digest["self_tank_id"]
+    ):
+        digest["kills"] += 1
+        _bucket(digest["timeline"], start_s, t_s)["kills"] += 1
+
+
+def _note_wire_gap(digest: RunDigestDict, last_wire_s: float | None, t_s: float) -> None:
+    """Fold one inter-dispatch silence into the wire-gap census.
+
+    Args:
+        digest: Digest under construction.
+        last_wire_s: Previous WIRE dispatch epoch seconds, or None
+            before the first dispatch.
+        t_s: This dispatch's epoch seconds.
+    """
+    if last_wire_s is None:
+        return
+    gap = int(t_s - last_wire_s)
+    digest["max_wire_gap_s"] = max(digest["max_wire_gap_s"], gap)
+    if gap > _WIRE_GAP_STALL_S:
+        digest["wire_gaps_over_30s"] += 1
 
 
 def build_run_digest(source_path: Path) -> RunDigestDict:
@@ -435,6 +386,11 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
         displacement_top=[],
         clearance_shots=[],
         releases_by_reason={},
+        liveness_stalls=0,
+        superseded_undispatched=0,
+        superseded_dispatched=0,
+        max_wire_gap_s=0,
+        wire_gaps_over_30s=0,
         rank_name="",
         rank_number=-1,
         promotion_points=-1,
@@ -450,13 +406,16 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
     # productive. A window still open when the next radar fires (or
     # the session ends) was a scan that bought nothing collectible.
     radar_pending = False
+    last_wire_s: float | None = None
 
     for record in records:
         t_s = _ts_seconds(record["timestamp"])
         message = record["message"]
         kind_field = record["fields"].get("diagnostic_kind")
         radar_pending = _track_radar_yield(str(kind_field), digest, radar_pending)
-        if kind_field is not None:
+        if kind_field == "tank_deactivated":
+            _apply_kill_receipt(record, digest, start_s, t_s)
+        elif kind_field is not None:
             _apply_diagnostic(record, digest, displacement_counts, release_counts)
         elif record["fields"].get("behavior_reason") == "mine_clearance_shot":
             shot_row = ClearanceShotRowDict(
@@ -468,10 +427,9 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
             digest["clearance_shots"].append(shot_row)
             pending_clearance.append((t_s, shot_row))
         elif record["channel"] == "WIRE":
+            _note_wire_gap(digest, last_wire_s, t_s)
+            last_wire_s = t_s
             _apply_wire(digest, message, start_s, t_s, pending_clearance)
-        elif "kill registered" in message:
-            digest["kills"] += 1
-            _bucket(digest["timeline"], start_s, t_s)["kills"] += 1
 
     if radar_pending:
         digest["zero_yield_radars"] += 1
@@ -481,58 +439,6 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
     ]
     digest["releases_by_reason"] = dict(release_counts)
     return digest
-
-
-def render_run_digest(digest: RunDigestDict) -> str:
-    """Render the digest as the aligned human table.
-
-    Args:
-        digest: Computed digest.
-
-    Returns:
-        Multi-line table text.
-    """
-    exit_line = (
-        f"CLEAN {digest['exit_reason']}"
-        if digest["clean_exit"]
-        else "CRASHED (no teardown scorecard)"
-    )
-    lines = [
-        "=== RUN DIGEST ===",
-        f"source     {digest['source']}",
-        f"window     {digest['started_at']} .. {digest['ended_at']}"
-        f"  ({digest['duration_s'] // 60}m{digest['duration_s'] % 60:02d}s)",
-        f"exit       {exit_line}",
-        f"room       {digest['room_id']}   self tank id {digest['self_tank_id']}",
-        f"combat     kills={digest['kills']} deaths={digest['deaths']} shots={digest['shots']}",
-        *([f"rank       {'; '.join(digest['rank_changes'])}"] if digest["rank_changes"] else []),
-        f"movement   teleports={digest['teleports']} displaced={digest['displacements']}"
-        f" pickups={digest['pickups']}",
-    ]
-    if digest["rank_number"] != -1:
-        lines.append(
-            f"account    rank={digest['rank_name']} ({digest['rank_number']})"
-            f" promo={digest['promotion_points']}"
-        )
-    if digest["inventory_first"]:
-        lines.append(
-            f"inventory  first={digest['inventory_first']} last={digest['inventory_last']}"
-            " (armor,dual,missile,homing,radar)"
-        )
-    for row in digest["displacement_top"]:
-        lines.append(f"displaced  ({row['requested_x']},{row['requested_y']}) x{row['count']}")
-    for shot in digest["clearance_shots"]:
-        outcome = "converted" if shot["pickup_followed"] else "no pickup followed"
-        lines.append(f"clearance  {shot['timestamp']} ({shot['x']},{shot['y']}) {outcome}")
-    for reason, count in sorted(digest["releases_by_reason"].items()):
-        lines.append(f"release    {reason} x{count}")
-    lines.append("timeline   min: kills/shots/teleports/pickups")
-    for bucket in digest["timeline"]:
-        lines.append(
-            f"           {bucket['minute']:>4}: {bucket['kills']}/{bucket['shots']}"
-            f"/{bucket['teleports']}/{bucket['pickups']}"
-        )
-    return "\n".join(lines)
 
 
 def build_and_persist_run_digest(source_path: Path) -> RunDigestDict:
@@ -566,12 +472,7 @@ def main() -> int:
 
 
 __all__ = [
-    "ClearanceShotRowDict",
-    "DisplacementRowDict",
-    "RunDigestDict",
-    "TimelineRowDict",
     "build_and_persist_run_digest",
     "build_run_digest",
     "main",
-    "render_run_digest",
 ]

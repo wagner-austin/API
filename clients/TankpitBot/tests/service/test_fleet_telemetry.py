@@ -20,11 +20,18 @@ _EVENT_LINES = "\n".join(
     [
         '{"timestamp":"2026-08-06T20:00:00","level":"INFO","logger":"l",'
         '"mode":"bot","channel":"STATE","message":"INITIALIZING"}',
+        '{"timestamp":"2026-08-06T20:00:01","level":"INFO","logger":"l",'
+        '"mode":"bot","channel":"DIAGNOSTIC","message":"diagnostic_kind=tank_identity",'
+        '"diagnostic_kind":"tank_identity","tank_id":601}',
         '{"timestamp":"2026-08-06T20:00:10","level":"INFO","logger":"l",'
         '"mode":"bot","channel":"WORLD","message":"Fuel: 1100 -> 1055 (-45)",'
         '"tick_n":133,"bot_state":"TELEPORT/CLOSE"}',
+        '{"timestamp":"2026-08-06T20:00:11","level":"INFO","logger":"l",'
+        '"mode":"bot","channel":"COMBAT","message":"engaging orange-5",'
+        '"tick_n":134,"bot_state":"HUNT/ENGAGE"}',
         '{"timestamp":"2026-08-06T20:00:12","level":"INFO","logger":"l",'
-        '"mode":"bot","channel":"COMBAT","message":"kill registered",'
+        '"mode":"bot","channel":"DIAGNOSTIC","message":"diagnostic_kind=tank_deactivated",'
+        '"diagnostic_kind":"tank_deactivated","victim_id":529,"killer_id":601,'
         '"tick_n":134,"bot_state":"HUNT/ENGAGE"}',
         '{"timestamp":"2026-08-06T20:00:12","level":"INFO","logger":"l",'
         '"mode":"bot","channel":"AI","message":"shoot orange-5 at (231,29)",'

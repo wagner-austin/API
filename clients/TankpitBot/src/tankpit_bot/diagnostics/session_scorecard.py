@@ -280,8 +280,6 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         accumulator["teleport_spend_drops"],
     )
     inventory_samples = accumulator["inventory_samples"]
-    approaches = accumulator["equipment_approaches"]
-    approach_counts = Counter((row["target_x"], row["target_y"]) for row in approaches)
     return SessionScorecardDict(
         duration_seconds=duration_seconds,
         state_budget=_build_state_budget(
@@ -292,8 +290,6 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         kills=accumulator["kills"],
         shots=accumulator["shots"],
         combat_misses=accumulator["combat_misses"],
-        combat_ghosts_blocked=accumulator["combat_ghosts_blocked"],
-        combat_stale_positions_blocked=accumulator["combat_stale_positions_blocked"],
         tank_damage_changes=accumulator["tank_damage_changes"],
         fuel_min=min(fuel_values) if fuel_values else -1,
         fuel_last=fuel_values[-1] if fuel_values else -1,
@@ -310,9 +306,6 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         scans_extra=accumulator["scans_extra"],
         scans_builtin=accumulator["scans_builtin"],
         physics_divergences=accumulator["physics_divergences"],
-        equipment_approaches=approaches,
-        equipment_approach_distinct_targets=len(approach_counts),
-        equipment_approach_max_repeats=(max(approach_counts.values()) if approach_counts else 0),
         action_outcome_counts=dict(sorted(accumulator["action_outcome_counts"].items())),
         fuel_low_water_threshold=low_water_threshold,
         fuel_low_water_episodes=_build_low_water_episodes(fuel_samples, low_water_threshold),

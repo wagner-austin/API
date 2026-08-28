@@ -11,8 +11,8 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.diagnostics.run_digest import (
     build_run_digest,
     main,
-    render_run_digest,
 )
+from tankpit_bot.diagnostics.run_digest_render import render_run_digest
 
 
 def _event(timestamp: str, channel: str, message: str, **fields: str | int | bool) -> str:
@@ -134,7 +134,19 @@ def _full_session_lines() -> list[str]:
         ),
         _event("2026-08-05T00:00:24", "WIRE", "pickup_equipment"),
         _event("2026-08-05T00:00:30", "WIRE", "shoot(100,100,id=501)"),
-        _event("2026-08-05T00:00:31", "AI", "kill registered (tank_id=501)"),
+        # A kill is the 0x41 wire receipt naming us as the killer --
+        # the scorecard's attribution rule. The old free-text "kill
+        # registered" count missed coordinate-aimed kills (arterial
+        # 2026-08-26: 44 wire kills, 43 registered lines).
+        _event(
+            "2026-08-05T00:00:31",
+            "DIAGNOSTIC",
+            "diagnostic_kind=tank_deactivated",
+            diagnostic_kind="tank_deactivated",
+            origin="protocol_0x41",
+            victim_id=501,
+            killer_id=1301,
+        ),
         # Our own death arrives ONLY as the self_deactivated
         # diagnostic (0x41 origin here; the Normal-field fuel-wrap
         # emits the same kind). The old free-text DEACTIVATED regex
@@ -214,6 +226,13 @@ def test_full_session_digest(tmp_path: Path) -> None:
     assert digest["inventory_first"] == [25, 20, 25, 23, 22]
     assert digest["inventory_last"] == [25, 25, 25, 25, 20]
     assert [s["pickup_followed"] for s in digest["clearance_shots"]] == [True, False]
+    # WIRE dispatches land at 00:00:05, :24, :30, 06:30, 06:31 -- the
+    # 360 s silence between :30 and 06:30 is the one census gap.
+    assert digest["max_wire_gap_s"] == 360
+    assert digest["wire_gaps_over_30s"] == 1
+    assert digest["liveness_stalls"] == 0
+    assert digest["superseded_undispatched"] == 0
+    assert digest["superseded_dispatched"] == 0
     assert [b["minute"] for b in digest["timeline"]] == [0, 5]
     assert digest["timeline"][0]["kills"] == 1
     assert digest["timeline"][0]["shots"] == 1
@@ -227,8 +246,23 @@ def test_crashed_session_has_no_clean_exit(tmp_path: Path) -> None:
     source = _write_session(
         tmp_path / "crashed.events.jsonl",
         [
-            _event("2026-08-05T00:00:00", "WIRE", "shoot(1,1,id=5)"),
-            _event("2026-08-05T00:00:01", "AI", "kill registered (tank_id=5)"),
+            _event(
+                "2026-08-05T00:00:00",
+                "DIAGNOSTIC",
+                "diagnostic_kind=tank_identity",
+                diagnostic_kind="tank_identity",
+                tank_id=1301,
+            ),
+            _event("2026-08-05T00:00:01", "WIRE", "shoot(1,1,id=5)"),
+            _event(
+                "2026-08-05T00:00:02",
+                "DIAGNOSTIC",
+                "diagnostic_kind=tank_deactivated",
+                diagnostic_kind="tank_deactivated",
+                origin="protocol_0x41",
+                victim_id=5,
+                killer_id=1301,
+            ),
         ],
     )
 

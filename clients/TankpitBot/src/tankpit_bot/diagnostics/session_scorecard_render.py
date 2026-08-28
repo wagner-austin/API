@@ -16,7 +16,6 @@ from tankpit_bot.diagnostics.session_scorecard import _FUEL_FLOOR_THRESHOLD
 # An equipment container teleport-approached this many times never
 # became collectable -- the unreachable-pocket orbit from live run
 # 20260612-071918 ((128,126)/(129,127) re-approached 7x each).
-_EQUIPMENT_ORBIT_REPEAT_THRESHOLD = 3
 
 # Sessions that shoot this much without a single observed deactivation
 # are chasing unkillable or repairing targets.
@@ -162,9 +161,6 @@ def render_scorecard_section(scorecard: SessionScorecardDict) -> list[str]:
         f"homing={gained['homing']} radar={gained['radar']}",
         f"  scans: extra={scorecard['scans_extra']} builtin={scorecard['scans_builtin']}",
         f"  physics divergences: {scorecard['physics_divergences']}",
-        f"  equipment approaches: events={len(scorecard['equipment_approaches'])} "
-        f"distinct={scorecard['equipment_approach_distinct_targets']} "
-        f"max_repeats={scorecard['equipment_approach_max_repeats']}",
     ]
     lines.extend(render_shot_billing_lines(scorecard))
     lines.extend(render_fuel_low_water_lines(scorecard))
@@ -190,11 +186,6 @@ def collect_scorecard_issues(scorecard: SessionScorecardDict) -> list[str]:
             "outside the physics-predicted feasibility interval -- each is a candidate "
             "wiki claim (new mechanic or drifted constant); query "
             "diagnostic_kind=physics_divergence in the events log"
-        )
-    if scorecard["equipment_approach_max_repeats"] >= _EQUIPMENT_ORBIT_REPEAT_THRESHOLD:
-        issues.append(
-            "equipment-approach orbit: one container teleport-approached "
-            f"{scorecard['equipment_approach_max_repeats']} times without completing a pickup"
         )
     if 0 <= scorecard["fuel_min"] < _FUEL_FLOOR_THRESHOLD:
         issues.append(

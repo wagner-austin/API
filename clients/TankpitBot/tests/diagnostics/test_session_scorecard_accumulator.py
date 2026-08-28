@@ -13,7 +13,6 @@ from tests.diagnostics._scorecard_fixtures import (
 
 from tankpit_bot.diagnostics.issue_report_types import (
     InventoryCountsDict,
-    TargetedTeleportRecordDict,
 )
 from tankpit_bot.diagnostics.session_scorecard import build_session_scorecard
 from tankpit_bot.diagnostics.session_scorecard_accumulator import route_scorecard_record
@@ -210,15 +209,6 @@ class TestRouting:
                     channel="DIAGNOSTIC",
                     fields={"diagnostic_kind": "radar_dispatch", "uses_extra": False},
                 ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "equipment_approach",
-                        "target_x": 128,
-                        "target_y": 126,
-                        "fuel": 838,
-                    },
-                ),
             ]
         )
 
@@ -231,23 +221,17 @@ class TestRouting:
         )
         assert accumulator["scans_extra"] == 1
         assert accumulator["scans_builtin"] == 2
-        assert accumulator["equipment_approaches"] == [
-            TargetedTeleportRecordDict(
-                target_x=128,
-                target_y=126,
-                fuel=838,
-                timestamp="2026-06-12T06:25:00",
-            )
-        ]
 
     def test_routes_combat_gate_diagnostics(self) -> None:
         """Combat-gate diagnostics each increment their dedicated counter.
 
         Locks the wiring added 2026-06-19 alongside the freshness
-        refactor. Without these counters the combat gates (ghost,
-        stale-position) and the miss path emit DIAGNOSTIC events that
-        the scorecard ignores -- regression of this test would
-        re-blind the scorecard to those events.
+        refactor. Without these counters the miss path and damage
+        transitions emit DIAGNOSTIC events the scorecard ignores --
+        regression of this test would re-blind the scorecard. (The
+        ghost / stale-position counters were removed 2026-08-28: their
+        emitters died in the 0x29-departure and three-timestamp
+        freshness reworks, so the counters read zero forever.)
         """
         accumulator = _routed(
             [
@@ -265,24 +249,6 @@ class TestRouting:
                         "diagnostic_kind": "combat_miss",
                         "target_name": "red-3",
                         "target_id": 211,
-                    },
-                ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "combat_ghost_detected",
-                        "target_name": "purple-9",
-                        "target_id": 517,
-                        "wire_age_ms": 60000,
-                    },
-                ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "combat_stale_position",
-                        "target_name": "orange-8",
-                        "target_id": 534,
-                        "position_age_ms": 5000,
                     },
                 ),
                 _record(
@@ -309,8 +275,6 @@ class TestRouting:
         )
 
         assert accumulator["combat_misses"] == 2
-        assert accumulator["combat_ghosts_blocked"] == 1
-        assert accumulator["combat_stale_positions_blocked"] == 1
         assert accumulator["tank_damage_changes"] == 2
 
 
