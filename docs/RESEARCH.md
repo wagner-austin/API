@@ -86,9 +86,23 @@ Real research, producing numbers that get compared, reachable by no tool.
   across seven languages and six arms (`pilot_a/b/c`, `variant_b`, `v3`,
   `2026-02`, `rebuild_2026-08`). Files named `_forMoldir` and a commit
   crediting a Finnish native reviewer indicate this is bound for publication.
-- **Provenance:** **the filename.** `_2026-08-13`, `_fixedfi`, `_forMoldir`.
-  Checkpoints are `<lang>_best.pt` plus `<lang>_vocab.json`; the vocab is a
-  model contract, not provenance.
+- **Provenance:** a `RunRecord` sidecar as of 2026-08-28. Every
+  `zero_shot_eval` run writes `<results>.csv.runrecord.json` beside its CSV:
+  experiment `turkic-zero-shot-excess-ce`, the OOV regime as the label, one
+  named observation per ordered language pair, a SHA-256 of the CSV as the
+  payload digest, and a `RunFingerprint` carrying the host and the resolved
+  `torch`/`numpy` versions. It states the card and driver as absent because
+  the scoring path genuinely uses neither, and the determinism stack as
+  `none` because it pins nothing — both true, and a true record of an
+  unpinned run beats no record.
+
+  Before that the provenance was **the filename**: `_2026-08-13`,
+  `_fixedfi`, `_forMoldir`. Checkpoints are `<lang>_best.pt` plus
+  `<lang>_vocab.json`; the vocab is a model contract, not provenance.
+
+  **The CSVs already in `results/` have no sidecar** and cannot get an
+  honest one retroactively — nobody recorded what produced them. Re-running
+  the evaluation is what fills the gap for anything going into the paper.
 - **Two axes vary by construction and are unrecorded.**
   `slurm/train_base.sub` is an array job on the **preemptible** `free-gpu`
   partition with `--requeue`, and its own comment says the scheduler places
@@ -99,7 +113,12 @@ Real research, producing numbers that get compared, reachable by no tool.
   `packages` axes.
 - **Reaches the cluster** via a hand-written `slurm/train_base.sub`, so none
   of it appears in the ledger. The hpc3 README's own "Adding a project"
-  example is named `turkic-lstm` — this was anticipated and never done.
+  example is named `turkic-lstm` — this was anticipated and never done, and
+  it is the remaining step. It is deliberately NOT declared in a workspace
+  document yet: an entry saying how `turkic-lstm` runs on the cluster, while
+  the runs actually go out through `train_base.sub`, would be a registry
+  claiming something that is not happening. Registration and converting the
+  submission belong in the same change.
 
 ### RustedWarfareBot — system identification against an obfuscated binary
 
