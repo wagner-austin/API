@@ -151,7 +151,7 @@ class TestRouting:
             [
                 _record(
                     channel="DIAGNOSTIC",
-                    fields={"diagnostic_kind": "map_positions_parsed", "tank_count": 37},
+                    fields={"diagnostic_kind": "fake_unrouted_kind", "tank_count": 37},
                 )
             ]
         )

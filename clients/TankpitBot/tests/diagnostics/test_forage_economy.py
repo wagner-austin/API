@@ -169,7 +169,7 @@ def _economy_rows() -> list[dict[str, str | int | float | bool]]:
         _record(
             "2026-07-26T10:02:10",
             bot_state="UNSET",
-            diagnostic_kind="noise",
+            diagnostic_kind="fake_noise",
         ),
         _record(
             "2026-07-26T10:02:20",
@@ -179,7 +179,7 @@ def _economy_rows() -> list[dict[str, str | int | float | bool]]:
         ),
         _record(
             "2026-07-26T10:02:30",
-            diagnostic_kind="noise",
+            diagnostic_kind="fake_noise",
         ),
         _record(
             "2026-07-26T10:02:40",
@@ -264,7 +264,7 @@ def test_control_an_int_radar_field_is_tallied(fake_fs: FakeFileSystem) -> None:
 
 def test_build_forage_economy_empty_artifact_is_all_zero(fake_fs: FakeFileSystem) -> None:
     """A single-record artifact yields zero spans and None kills."""
-    _write_jsonl(fake_fs, _SOURCE, [_record("2026-07-26T10:00:00", diagnostic_kind="noise")])
+    _write_jsonl(fake_fs, _SOURCE, [_record("2026-07-26T10:00:00", diagnostic_kind="fake_noise")])
     report = build_forage_economy(_SOURCE)
     assert report["span_seconds"] == 0.0
     assert report["kills"] is None
@@ -296,7 +296,7 @@ def test_render_forage_economy_handles_missing_scorecard(fake_fs: FakeFileSystem
 
 def test_render_forage_economy_zero_denominators_render_dash(fake_fs: FakeFileSystem) -> None:
     """Zero forage scans and zero pickups render '-' ratios."""
-    _write_jsonl(fake_fs, _SOURCE, [_record("2026-07-26T10:00:00", diagnostic_kind="noise")])
+    _write_jsonl(fake_fs, _SOURCE, [_record("2026-07-26T10:00:00", diagnostic_kind="fake_noise")])
     text = render_forage_economy(build_forage_economy(_SOURCE))
     assert "pickups: 0 (0 consumed + 0 clamped, -/viewport)" in text
     assert "equipment pickups: 0 -> weapons 0 (-/pickup), radars 0" in text

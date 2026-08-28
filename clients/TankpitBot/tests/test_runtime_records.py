@@ -294,7 +294,7 @@ class TestRuntimeContext:
 
         artifacts = configure_bot_runtime_logging("20260620-150138")
         set_runtime_context(tick_n=12)
-        emit_diagnostic(diagnostic_kind="explicit_override", tick_n=999)
+        emit_diagnostic(diagnostic_kind="fake_override", tick_n=999)
 
         event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
         decoded = narrow_json_to_dict(load_json_str(event_line))

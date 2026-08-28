@@ -314,7 +314,7 @@ def test_emit_rejects_reserved_field_names_at_the_call() -> None:
     import pytest
 
     with pytest.raises(ValueError, match="'level' collides with reserved record key"):
-        emit_diagnostic(diagnostic_kind="test_kind", level=3)
+        emit_diagnostic(diagnostic_kind="fake_kind", level=3)
 
 
 def test_decode_runtime_event_record_rejects_non_primitive_field_value() -> None:

@@ -19,6 +19,7 @@ help:
 	@Write-Host "  make lint                        guard + ruff + mypy"
 	@Write-Host "  make test                        pytest + coverage"
 	@Write-Host "  make audit                       re-derive wiki physics claims from the runs archive"
+	@Write-Host "  make corpus-audit                diff every archived run's analyzers against its wire receipts"
 	@Write-Host "  make wiki-anchors                report wiki pages owed an audit (never gates)"
 	@Write-Host "  make sim-run                     production bot vs the simulator on real terrain (free soak)"
 	@Write-Host "  make sim-run-practice            production bot vs the CERTIFIED practice-bot roster"
@@ -322,6 +323,14 @@ digest:
 	@Write-Host ""
 	@Write-Host "==> digest (latest run)" -ForegroundColor Cyan
 	poetry run tankpit-run-digest runs/bot/latest.events.jsonl
+
+# Diff every archived run's analyzers against its own wire receipts
+# (kill/death recounts, beat discipline, radar book, tombstone
+# re-aims). Exit 1 when any run is flagged.
+corpus-audit:
+	@Write-Host ""
+	@Write-Host "==> corpus-audit (every archived bot run vs its wire receipts)" -ForegroundColor Cyan
+	poetry run tankpit-corpus-audit runs/bot
 
 analyze:
 	@Write-Host ""
