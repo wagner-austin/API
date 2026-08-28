@@ -101,12 +101,14 @@ re-confirmed the same day (run -225643 attempt 1). This unlocks the
 [[larder-plan]] harvest atom: teleport ON the container, one pickup
 command, done.[^10]
 
-## Death costs about half the carried inventory (corpus-audit find, 2026-08-28)
+## Death costs about half the carried inventory (OPERATOR-CONFIRMED 2026-08-28)
 
-Found by the first `make corpus-audit` sweep: every radar-book
-negative drift in the corpus lands on a run with deaths, and the
-inventory samples bracketing arterial's three 2026-08-26 deaths
-(`runs/bot/desert/bot-20260826-182204`) show the loss directly:[^13]
+Found by the first `make corpus-audit` sweep and confirmed by the
+user the same day ("a death causes you to lose half inventory or
+so").[^14] Every radar-book negative drift in the corpus lands on a
+run with deaths, and the inventory samples bracketing arterial's
+three 2026-08-26 deaths (`runs/bot/desert/bot-20260826-182204`) show
+the loss directly:[^13]
 
 | death | last pre-death sample (armor,dual,missile,homing,radar) | first post-death | pattern |
 |---|---|---|---|
@@ -114,18 +116,19 @@ inventory samples bracketing arterial's three 2026-08-26 deaths
 | 18:42:01 | 40, 33, 40, 39, 38 | 20, 15, 20, 18, 19 | ~half each |
 | 18:45:58 | 35, 35, 35, 35, 29 | 0, 0, 0, 0, 0 | zeroed |
 
-Two deaths halve every slot (exact rounding unresolved -- shots fired
-between the last sample and the death blur the halving base by a few
-units); the third sampled to ZERO before later recovery. Whether the
-third is a real total wipe (compounding? mine-kill difference?) or a
-respawn re-sync race is UNKNOWN -- needs a controlled capture with a
-tight sample cadence. Consequences: the ammo/radar books do not model
-death loss, so a run with deaths shows a matching negative
-`radar_drift` in the corpus audit (expected, not a tracking bug), and
-dying is even more expensive than the rank loss alone -- half the
-restock walks with you.
+The law: **each slot loses ~half on death** ("or so" -- the exact
+rounding stays unresolved; shots fired between the last sample and
+the death blur the halving base by a few units). The third death's
+ZERO samples are best read as a respawn re-sync race, not a total
+wipe, given the operator's ruling; a controlled capture with a tight
+sample cadence would settle both loose ends. Consequences: the
+ammo/radar books do not model death loss, so a run with deaths shows
+a matching negative `radar_drift` in the corpus audit (expected, not
+a tracking bug), and dying is even more expensive than the rank loss
+alone -- half the restock walks with you.
 
 [^13]: `tankpit-corpus-audit` over `runs/bot` 2026-08-28: 436 runs audited, drift flags only on death-runs (artax 08-26 08:48 drift -5 / 1 death; 08-03 18:09 -5 / 1; 08-26 00:39 -3 / 1; desert 08-26 18:22 -60 / 3 deaths) plus two small positive drifts (+2, +7) on 08-13 death-free runs, unexplained and minor. Inventory rows above are verbatim `inventory_sample` diagnostics bracketing each `self_deactivated` receipt.
+[^14]: user (Austin), 2026-08-28 -- "a death causes you to lose half inventory or so", confirming the corpus-audit inference the same day it was recorded.
 
 ## "Inventory full" wire signal
 
