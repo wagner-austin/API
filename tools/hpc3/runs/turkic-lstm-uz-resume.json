@@ -1,0 +1,18 @@
+{
+  "project": "turkic-lstm",
+  "name": "bases-uz-resume",
+  "command": "bash -c \"WANDB_MODE=offline WANDB_DIR=/pub/wagnera3/turkic-lstm python -m char_lstm.train --lang uz --corpus-dir /pub/wagnera3/LSTM/rebuild_2026-08/corpora_clean_v3 --checkpoint-dir /pub/wagnera3/LSTM/checkpoints && test -f /pub/wagnera3/LSTM/checkpoints/uz_best.pt\"",
+  "artifact": "/pub/wagnera3/LSTM/checkpoints/uz_best.pt",
+  "experiment": {
+    "kind": "char-lstm-base-training",
+    "corpus": "rebuild_2026-08/corpora_clean_v3",
+    "equalized_char_budget": "11658775",
+    "langs": "tr,az,kk,ky,uz,ug,fi",
+    "matches_paper": "overleaf-tu-paper/LM_MI_LSA_template.tex",
+    "wandb": "offline",
+    "wandb_dir": "/pub/wagnera3/turkic-lstm",
+    "member": "uz",
+    "resumes": "55645409",
+    "why": "preempted_at_414s;free-gpu_is_PreemptMode=CANCEL_so_requeue_does_not_return_it"
+  }
+}

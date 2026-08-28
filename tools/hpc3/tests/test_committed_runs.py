@@ -243,9 +243,10 @@ class TestEveryCommittedSubmissionResolves:
             "sweep-cleargbm-p6-rung4.json",
             "sweep-cleargbm-p6-rung4b.json",
             "sweep-cleargbm-p6-rung5.json",
+            "sweep-turkic-bases-resume-1.json",
             "sweep-turkic-bases.json",
         ]
-        assert sum(expanded) == 115
+        assert sum(expanded) == 119
 
     def test_no_sweep_member_leaves_its_artifact_unstated(self) -> None:
         """Stated, which is not the same as null.
@@ -261,7 +262,13 @@ class TestEveryCommittedSubmissionResolves:
         """
         artifacts = _sweep_member_artifacts()
         stated = sorted(str(a) for a in artifacts if a is not None)
-        assert len(artifacts) == 115
+        assert len(artifacts) == 119
         assert sum(1 for a in artifacts if a is None) == 108
         assert stated[0] == "/pub/wagnera3/LSTM/checkpoints/az_best.pt"
-        assert len(stated) == 7
+        # 7 from the original sweep, 4 more from the resume round that
+        # followed the 2026-08-28 preemption wave. `free-gpu` is
+        # PreemptMode=CANCEL, so a preempted member does not come back on its
+        # own and is resubmitted as a new record naming the jobs it resumes --
+        # which is why a resume round is a committed document rather than a
+        # command someone re-ran.
+        assert len(stated) == 11
