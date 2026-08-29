@@ -57,11 +57,20 @@ def test_marooned_tank_pans_and_walks_to_fuel_beyond_the_window() -> None:
                 deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
                 clock.advance(1000)
         except SessionExitError as error:
-            # After the refuel the world holds no more containers and no
-            # enemies, so the session ends the production way. Any exit
-            # BEFORE the refuel — out_of_fuel above all — is the marooning
-            # this test exists to prevent, and propagates.
-            if error.reason not in ("no_productive_collect", "no_viable_targets"):
+            # After the refuel the world holds no more containers, no
+            # dots, and no enemies, so the session ends the production
+            # way -- including ``out_of_fuel`` at the floor: the
+            # staleness frontier (2026-08-28) legitimately spends the
+            # post-refuel surplus foraging this deliberately empty
+            # world back down to ``fuel_low_threshold``. Marooning
+            # (an exit BEFORE the refuel) is what this test exists to
+            # prevent, and the assertions below catch it either way:
+            # a marooned run never draws its pans or its pickup.
+            if error.reason not in (
+                "no_productive_collect",
+                "no_viable_targets",
+                "out_of_fuel",
+            ):
                 raise
     finally:
         _test_hooks.get_current_time_ms = original_clock

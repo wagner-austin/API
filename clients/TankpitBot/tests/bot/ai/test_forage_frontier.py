@@ -1,0 +1,260 @@
+"""Tests for the staleness-seeking forage frontier."""
+
+from __future__ import annotations
+
+from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.forage_frontier import (
+    BLOCK_TILES,
+    FRONTIER_VISIT_TTL_MS,
+    plan_forage_frontier_hop,
+)
+from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.inventory import InventoryState
+from tankpit_bot.sniffer.world_service import WorldService
+from tests.bot.ai._support import (
+    make_inventory,
+    make_scanned_ai_state,
+    make_world,
+)
+from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+_NOW = 100000
+
+
+def _deficient_inventory() -> InventoryState:
+    """Inventory below the dual cap so the restock gate is open."""
+    inventory = make_inventory()
+    inventory["dual_shots"]["count"] = 10
+    return inventory
+
+
+def _frontier_ctx(
+    *,
+    fuel: int = 800,
+    inventory: InventoryState | None = None,
+    terrain: InMemoryTerrainMap | None = None,
+    ai_state: AIStateDict | None = None,
+    stale_blocks: tuple[tuple[int, int], ...] = ((8, 6),),
+    ws: WorldService | None = None,
+) -> DecideCtx:
+    """Build a ctx where EVERY block is covered except ``stale_blocks``.
+
+    Self sits at (100,100) in block (6,6). Block (8,6)'s center is
+    (136,104) — chebyshev 36, beyond any walking, a plain teleport
+    goal. Block (6,5)'s center is (104,88) — chebyshev 12.
+    """
+    ws = ws if ws is not None else WorldService()
+    # scanned=False: the frontier judges coverage itself, so the
+    # helper stamps exactly one live tile per non-stale block.
+    world, self_state = make_world(fuel=fuel, scanned=False)
+    for bx in range(16):
+        for by in range(16):
+            if (bx, by) in stale_blocks:
+                continue
+            world["scanned_tiles"][f"{bx * BLOCK_TILES + 1},{by * BLOCK_TILES + 1}"] = _NOW
+    return DecideCtx(
+        world,
+        self_state,
+        ai_state if ai_state is not None else make_scanned_ai_state(),
+        inventory if inventory is not None else _deficient_inventory(),
+        _NOW,
+        terrain if terrain is not None else InMemoryTerrainMap(),
+        "",
+        ws=ws,
+    )
+
+
+def _target(decision_x: int, decision_y: int) -> tuple[int, int]:
+    """Readability helper for asserted goal coordinates."""
+    return (decision_x, decision_y)
+
+
+def test_stocked_inventory_declines() -> None:
+    """Full restock bars: the frontier has no reason to move."""
+    ctx = _frontier_ctx(inventory=make_inventory())
+
+    assert plan_forage_frontier_hop(ctx, ctx.base) is None
+
+
+def test_missing_terrain_declines() -> None:
+    """No terrain map yet: no passability judgement, no hop."""
+    world, self_state = make_world(fuel=800, scanned=False)
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        _deficient_inventory(),
+        _NOW,
+        None,
+        "",
+        ws=WorldService(),
+    )
+
+    assert plan_forage_frontier_hop(ctx, ctx.base) is None
+
+
+def test_fully_covered_field_declines() -> None:
+    """Nothing stale anywhere: the frontier yields to the sweep."""
+    ctx = _frontier_ctx(stale_blocks=())
+
+    assert plan_forage_frontier_hop(ctx, ctx.base) is None
+
+
+def test_targets_the_nearest_stale_block() -> None:
+    """The nearest block with no live coverage wins."""
+    ctx = _frontier_ctx(stale_blocks=((8, 6), (4, 6)))
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert decision["behavior"]["reason_kind"] == "forage_frontier_hop"
+    # (72,104) at chebyshev 28 beats (136,104) at 36.
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (72, 104)
+    assert decision["updated_ai_state"]["forage_goal_x"] == 72
+    assert decision["updated_ai_state"]["forage_goal_y"] == 104
+
+
+def test_expired_coverage_reopens_a_block() -> None:
+    """A stamp older than the forage TTL no longer counts as looked-at."""
+    ctx = _frontier_ctx(stale_blocks=((8, 6), (6, 5)))
+    # Block (6,5): expired stamp only -- it must re-qualify and win
+    # over the farther (8,6).
+    ctx.world["scanned_tiles"][f"{6 * BLOCK_TILES + 1},{5 * BLOCK_TILES + 1}"] = _NOW - 200_000
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (104, 88)
+
+
+def test_visited_tombstone_is_skipped_until_ttl() -> None:
+    """An arrived-at block stays off the circuit for the visit TTL."""
+    ws = WorldService()
+    ws.forage_visited["136,104"] = _NOW - 1000
+    ctx = _frontier_ctx(ws=ws)
+
+    assert plan_forage_frontier_hop(ctx, ctx.base) is None
+
+
+def test_expired_tombstone_is_pruned() -> None:
+    """A tombstone past the TTL is dropped and the block re-qualifies."""
+    ws = WorldService()
+    ws.forage_visited["136,104"] = _NOW - FRONTIER_VISIT_TTL_MS - 1
+    ctx = _frontier_ctx(ws=ws)
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (136, 104)
+    assert "136,104" not in ws.forage_visited
+
+
+def test_impassable_center_is_skipped() -> None:
+    """A water block center never becomes a goal."""
+    terrain = InMemoryTerrainMap(terrain_data={(136, 104): "W"})
+    ctx = _frontier_ctx(terrain=terrain)
+
+    assert plan_forage_frontier_hop(ctx, ctx.base) is None
+
+
+def test_unaffordable_beyond_window_is_skipped() -> None:
+    """Out-of-window blocks must be teleport-affordable above the floor."""
+    # Fuel 210 leaves a 10-fuel budget: the chebyshev-36 hop to
+    # (136,104) costs far more, and the center is outside the window.
+    ctx = _frontier_ctx(fuel=210)
+
+    assert plan_forage_frontier_hop(ctx, ctx.base) is None
+
+
+def test_in_window_stale_block_is_walked() -> None:
+    """A stale center inside the current window is a free walk."""
+    # Block (6,6)'s own center (104,104) sits inside the window; a
+    # covered home block normally removes it, so only stamp coverage
+    # OUTSIDE block (6,6).
+    ctx = _frontier_ctx(fuel=210, stale_blocks=((6, 6),))
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert decision["command"]["cmd_type"] == "move"
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (
+        104,
+        104,
+    )
+
+
+def test_far_goal_travels_by_teleport() -> None:
+    """A goal beyond the window dispatches a teleport."""
+    ctx = _frontier_ctx()
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (136, 104)
+
+
+def test_standing_goal_outranks_a_nearer_fresh_block() -> None:
+    """The latched goal is served first: no target swap mid-travel."""
+    ai_state = AIStateDict(
+        **{**make_scanned_ai_state(), "forage_goal_x": 136, "forage_goal_y": 104}
+    )
+    ctx = _frontier_ctx(ai_state=ai_state, stale_blocks=((8, 6), (6, 5)))
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    # (104,88) is nearer and stale, but the standing goal wins.
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (136, 104)
+
+
+def test_own_tile_center_is_never_a_goal() -> None:
+    """Standing exactly on the only stale center: nothing to travel to."""
+    world, self_state = make_world(self_x=104, self_y=104, fuel=800, scanned=False)
+    for bx in range(16):
+        for by in range(16):
+            if (bx, by) != (6, 6):
+                world["scanned_tiles"][f"{bx * BLOCK_TILES + 1},{by * BLOCK_TILES + 1}"] = _NOW
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        _deficient_inventory(),
+        _NOW,
+        InMemoryTerrainMap(),
+        "",
+        ws=WorldService(),
+    )
+
+    assert plan_forage_frontier_hop(ctx, ctx.base) is None
+
+
+def test_unwalkable_in_window_center_is_passed_over() -> None:
+    """A failed-move in-window center falls through to no decision."""
+    ws = WorldService()
+    ws.failed_move_targets["104,104"] = _NOW
+    ctx = _frontier_ctx(fuel=210, stale_blocks=((6, 6),), ws=ws)
+
+    assert plan_forage_frontier_hop(ctx, ctx.base) is None
+
+
+def test_arrival_tombstones_the_goal_and_picks_fresh() -> None:
+    """Standing within two tiles of the goal releases and tombstones it."""
+    ai_state = AIStateDict(
+        **{**make_scanned_ai_state(), "forage_goal_x": 101, "forage_goal_y": 101}
+    )
+    ws = WorldService()
+    ctx = _frontier_ctx(ai_state=ai_state, ws=ws)
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    assert ws.forage_visited["101,101"] == _NOW
+    if decision is None:
+        raise AssertionError("expected a fresh frontier decision")
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (136, 104)

@@ -87,15 +87,15 @@ def test_ringed_hop_is_refused_once_and_never_re_certified() -> None:
     finally:
         _test_hooks.get_current_time_ms = original_clock
 
-    sent_teleports = link.sent_commands.count("teleport")
-    assert sent_teleports == 1, (
-        f"expected exactly one teleport on the wire, got {sent_teleports} "
-        f"across {rounds} rounds — the refusal did not stop re-certification"
-    )
-    # The decision layer legitimately shows two hop decisions: the
-    # original plan, then its re-derivation against the opened map
-    # (the teleport/map-open precondition, [[teleport-mechanics]]).
-    # Anything beyond that pair is the loop.
+    # The frontier legitimately travels to stale blocks (2026-08-28
+    # staleness forage), so the wire carries its hops too; the law
+    # under test binds only the RINGED hop, pinned on the decision
+    # ledger and the tank's final position below. The decision layer
+    # legitimately shows two ring decisions: the original plan, then
+    # its re-derivation against the opened map (the teleport/map-open
+    # precondition, [[teleport-mechanics]]). Anything beyond that
+    # pair is the loop.
+    del rounds
     ring_teleport_decisions = [
         decision
         for decision in ws.ledger.decisions.values()

@@ -406,6 +406,8 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "sweep_anchor_y": state["sweep_anchor_y"],
         "maroon_pan_x": state["maroon_pan_x"],
         "maroon_pan_y": state["maroon_pan_y"],
+        "forage_goal_x": state["forage_goal_x"],
+        "forage_goal_y": state["forage_goal_y"],
     }
 
 
@@ -537,6 +539,8 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         sweep_anchor_y=require_int(data, "sweep_anchor_y"),
         maroon_pan_x=require_int(data, "maroon_pan_x"),
         maroon_pan_y=require_int(data, "maroon_pan_y"),
+        forage_goal_x=require_int(data, "forage_goal_x"),
+        forage_goal_y=require_int(data, "forage_goal_y"),
         visited_tank_ids=_require_str_int_mapping(data, "visited_tank_ids"),
     )
 

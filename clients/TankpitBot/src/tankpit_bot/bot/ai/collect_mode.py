@@ -29,9 +29,9 @@ from tankpit_bot.bot.ai.combat_opportunity import collect_return_fire
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
 )
-from tankpit_bot.bot.ai.equipment_atlas import plan_atlas_equipment_hop
 from tankpit_bot.bot.ai.equipment_search import describe_container_search
 from tankpit_bot.bot.ai.forage import plan_forage_search
+from tankpit_bot.bot.ai.forage_frontier import plan_forage_frontier_hop
 from tankpit_bot.bot.ai.quad_sweep import plan_quad_sweep
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
@@ -144,14 +144,15 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     if pursuit_decision is not None:
         return pursuit_decision
 
-    # Equipment atlas hop ([[equipment-system]] hotspot law,
+    # Forage frontier ([[equipment-system]] staleness law,
     # 2026-08-28): when nothing believed collectible remains in
-    # reach, teleport to corpus-proven equipment ground instead of
-    # buying blind reveals -- the landing's own viewport shows
+    # reach, move to the nearest unlooked-at block -- spawn is
+    # ~uniform, so standing stock accumulates wherever nobody has
+    # harvested lately, and the landing's own viewport shows
     # whatever sits there.
-    atlas_decision = plan_atlas_equipment_hop(ctx, base_state)
-    if atlas_decision is not None:
-        return atlas_decision
+    frontier_decision = plan_forage_frontier_hop(ctx, base_state)
+    if frontier_decision is not None:
+        return frontier_decision
 
     # Quad sweep ([[quad-sweep-doctrine]], reordered 2026-08-13, HUD
     # flags 8/9/14): recon runs only when every collection branch
@@ -160,7 +161,7 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     # the sweep's remainder via the anchor latch, making the sweep an
     # incremental scan-until-found. It runs on its extras economics
     # (the 2026-08-28 hoard gate was reverted by operator order the
-    # same day); the atlas hop above simply outranks it for
+    # same day); the frontier hop above simply outranks it for
     # equipment discovery.
     sweep_decision = plan_quad_sweep(ctx, base_state)
     if sweep_decision is not None:

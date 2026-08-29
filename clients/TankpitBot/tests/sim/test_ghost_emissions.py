@@ -97,7 +97,6 @@ def test_ghost_atlas_composition_underlays_the_mined_room(fake_fs: FakeFileSyste
     # The ghost replay drives the production collect cascade, whose
     # atlas hop reads the committed hotspot data; the sim world has
     # no mined atlas, so it reads empty.
-    fake_fs.write_text(Path("data/equipment_atlas.json"), "{}")
     # A BOT-named ghost: the reactive-policy driver constructs over it
     # (the certified roster policy under the recorded timeline).
     fake_fs.write_text(Path("runs/ghost-input.capture_session.json"), _fight_capture("orange-2"))

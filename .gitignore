@@ -86,8 +86,6 @@ Thumbs.db
 !services/covenant-radar-api/data/
 !services/covenant-radar-api/data/external/
 !services/covenant-radar-api/data/external/**
-!clients/TankpitBot/data/
-!clients/TankpitBot/data/**
 # Exclude large Kaggle datasets (>50MB, use kaggle CLI to download)
 # rw_matches is locally generated rather than downloaded -- the RustedWarfare
 # match fleet writes it -- but data.csv is 64MB, over the same threshold, and

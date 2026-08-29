@@ -276,6 +276,15 @@ class AIStateDict(TypedDict):
             bot-20260825-133452 oscillated 331 s between clamp tiles;
             the pan gait must not inherit the loop).
         maroon_pan_y: Y of that latched position (-1 before any).
+        forage_goal_x: X of the latched forage-frontier goal block
+            center (-1 when none). The latch keeps the goal stable
+            across the beats its travel spends (a teleport's map-open
+            defer), so the next tick's replan serves the same goal
+            instead of swapping targets mid-prelude (the atlas hop's
+            open-for-40-throw-227 waste, run bot-20260828-192801
+            19:31:00). Released by arrival (the block is tombstoned)
+            or by the goal failing its own qualification.
+        forage_goal_y: Y of that latched goal (-1 when none).
     """
 
     config: AIConfigDict
@@ -318,6 +327,8 @@ class AIStateDict(TypedDict):
     sweep_anchor_y: int
     maroon_pan_x: int
     maroon_pan_y: int
+    forage_goal_x: int
+    forage_goal_y: int
 
 
 def make_respawn_ai_state(previous: AIStateDict) -> AIStateDict:
@@ -415,6 +426,8 @@ def make_initial_ai_state(
         sweep_anchor_y=-1,
         maroon_pan_x=-1,
         maroon_pan_y=-1,
+        forage_goal_x=-1,
+        forage_goal_y=-1,
     )
 
 
