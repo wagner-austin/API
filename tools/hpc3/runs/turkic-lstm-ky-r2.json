@@ -1,0 +1,18 @@
+{
+  "project": "turkic-lstm",
+  "name": "bases-ky-r2",
+  "command": "bash -c \"WANDB_DIR=/pub/wagnera3/turkic-lstm python -m char_lstm.train --lang ky --corpus-dir /pub/wagnera3/LSTM/rebuild_2026-08/corpora_clean_v3 --checkpoint-dir /pub/wagnera3/LSTM/checkpoints && test -f /pub/wagnera3/LSTM/checkpoints/ky_best.pt\"",
+  "artifact": "/pub/wagnera3/LSTM/checkpoints/ky_best.pt",
+  "experiment": {
+    "kind": "char-lstm-base-training",
+    "corpus": "rebuild_2026-08/corpora_clean_v3",
+    "equalized_char_budget": "11658775",
+    "langs": "tr,az,kk,ky,uz,ug,fi",
+    "matches_paper": "overleaf-tu-paper/LM_MI_LSA_template.tex",
+    "wandb": "offline-by-default",
+    "wandb_dir": "/pub/wagnera3/turkic-lstm",
+    "member": "ky",
+    "resumes": "55645402,55645775",
+    "why": "first_real_resume_on_image_v3;55645775_died_25s_in_on_the_rng_ByteTensor_bug_with_1189s_banked"
+  }
+}

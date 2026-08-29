@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "c903b3d07213716b2070d3083b310ec607472ed5",
+  "git_commit": "68af44fc37a629d7ccc13ef0e9b2058f3ebba88c",
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -112,7 +112,8 @@
     "/opt/env/bin/python -c \"from char_lstm.provenance import scoring_fingerprint; f = scoring_fingerprint(); assert [p['name'] for p in f['packages']] == ['numpy', 'torch'], f\"",
     "/opt/env/bin/python -c \"from char_lstm.model import CharLSTM; CharLSTM(vocab_size=8, embed_dim=4, hidden_dim=4, num_layers=1, dropout=0.0)\"",
     "/opt/env/bin/python -c \"from char_lstm.train import parse_args; m = parse_args(['--lang', 'tr']).wandb; assert m == 'offline', m\"",
-    "/opt/env/bin/python -c \"import os; os.environ['WANDB_DIR'] = '/tmp'; import wandb; r = wandb.init(project='smoke', mode='offline'); wandb.finish(); assert r is not None\""
+    "/opt/env/bin/python -c \"import os; os.environ['WANDB_DIR'] = '/tmp'; import wandb; r = wandb.init(project='smoke', mode='offline'); wandb.finish(); assert r is not None\"",
+    "/opt/env/bin/python -c \"import json, random, tempfile, pathlib, torch; from char_lstm.train import load_resume_state; m = torch.nn.Linear(2, 2); p = {'model_state': m.state_dict(), 'optimizer_state': torch.optim.Adam(m.parameters()).state_dict(), 'epoch': 3, 'global_step': 41, 'best_val_loss': 0.5, 'epochs_no_improve': 1, 'vocab_size': 99, 'rng_torch': torch.get_rng_state(), 'rng_cuda': [], 'rng_python_json': json.dumps(random.getstate())}; f = pathlib.Path(tempfile.mkdtemp()) / 'r.pt'; torch.save(p, str(f)); s = {'global_step': 0, 'best_val_loss': 9e9, 'epochs_no_improve': 0}; e = load_resume_state(path=f, model=torch.nn.Linear(2, 2), optimizer=torch.optim.Adam(torch.nn.Linear(2, 2).parameters()), device=torch.device('cpu'), state=s, vocab_size=99); assert e == 4, e\""
   ],
   "labels": {
     "org.corvis.project": "turkic-lstm",
