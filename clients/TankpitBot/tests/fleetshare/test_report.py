@@ -81,7 +81,15 @@ class TestBuildFleetReport:
 
         assert (
             build_fleet_report(
-                ws, instance="artax", role="fighter", engaged_target_id=-1, now_ms=_NOW
+                ws,
+                instance="artax",
+                role="fighter",
+                engaged_target_id=-1,
+                forage_goal_x=-1,
+                forage_goal_y=-1,
+                collect_claim_x=-1,
+                collect_claim_y=-1,
+                now_ms=_NOW,
             )
             is None
         )
@@ -91,7 +99,15 @@ class TestBuildFleetReport:
         ws = _world_service(tanks={"506": _enemy(506)})
 
         report = build_fleet_report(
-            ws, instance="arterial", role="fighter", engaged_target_id=506, now_ms=_NOW
+            ws,
+            instance="arterial",
+            role="fighter",
+            engaged_target_id=506,
+            forage_goal_x=-1,
+            forage_goal_y=-1,
+            collect_claim_x=-1,
+            collect_claim_y=-1,
+            now_ms=_NOW,
         )
 
         if report is None:
@@ -140,7 +156,15 @@ class TestBuildFleetReport:
         ws = _world_service(tanks={"600": ally, "601": corpse, "602": unplaced, "603": stale})
 
         report = build_fleet_report(
-            ws, instance="arterial", role="fighter", engaged_target_id=-1, now_ms=_NOW
+            ws,
+            instance="arterial",
+            role="fighter",
+            engaged_target_id=-1,
+            forage_goal_x=-1,
+            forage_goal_y=-1,
+            collect_claim_x=-1,
+            collect_claim_y=-1,
+            now_ms=_NOW,
         )
 
         if report is None:
@@ -158,7 +182,15 @@ class TestBuildFleetReport:
         ws = _world_service(containers={"50,60": good, "51,61": failed})
 
         report = build_fleet_report(
-            ws, instance="arterial", role="gatherer", engaged_target_id=-1, now_ms=_NOW
+            ws,
+            instance="arterial",
+            role="gatherer",
+            engaged_target_id=-1,
+            forage_goal_x=-1,
+            forage_goal_y=-1,
+            collect_claim_x=-1,
+            collect_claim_y=-1,
+            now_ms=_NOW,
         )
 
         if report is None:
@@ -174,7 +206,15 @@ class TestWriteFleetReport:
     def test_write_places_the_encoded_report(self, fake_fs: FakeFileSystem) -> None:
         ws = _world_service()
         report = build_fleet_report(
-            ws, instance="arterial", role="fighter", engaged_target_id=-1, now_ms=_NOW
+            ws,
+            instance="arterial",
+            role="fighter",
+            engaged_target_id=-1,
+            forage_goal_x=-1,
+            forage_goal_y=-1,
+            collect_claim_x=-1,
+            collect_claim_y=-1,
+            now_ms=_NOW,
         )
         if report is None:
             raise AssertionError("expected a report")
@@ -206,7 +246,15 @@ class TestReportFreshnessBounds:
         )
 
         report = build_fleet_report(
-            ws, instance="arterial", role="fighter", engaged_target_id=-1, now_ms=_NOW
+            ws,
+            instance="arterial",
+            role="fighter",
+            engaged_target_id=-1,
+            forage_goal_x=-1,
+            forage_goal_y=-1,
+            collect_claim_x=-1,
+            collect_claim_y=-1,
+            now_ms=_NOW,
         )
 
         if report is None:
@@ -235,7 +283,15 @@ class TestReportFreshnessBounds:
         ws = _world_service(containers={"50,60": fresh, "51,61": aged})
 
         report = build_fleet_report(
-            ws, instance="arterial", role="fighter", engaged_target_id=-1, now_ms=_NOW
+            ws,
+            instance="arterial",
+            role="fighter",
+            engaged_target_id=-1,
+            forage_goal_x=-1,
+            forage_goal_y=-1,
+            collect_claim_x=-1,
+            collect_claim_y=-1,
+            now_ms=_NOW,
         )
 
         if report is None:
@@ -252,7 +308,15 @@ class TestReportFreshnessBounds:
         ws.container_disproofs["71,81"] = _NOW - CONTAINER_SIGHTING_TTL_MS - 1
 
         report = build_fleet_report(
-            ws, instance="arterial", role="fighter", engaged_target_id=-1, now_ms=_NOW
+            ws,
+            instance="arterial",
+            role="fighter",
+            engaged_target_id=-1,
+            forage_goal_x=-1,
+            forage_goal_y=-1,
+            collect_claim_x=-1,
+            collect_claim_y=-1,
+            now_ms=_NOW,
         )
 
         if report is None:
@@ -272,6 +336,16 @@ def test_no_selected_room_offers_nothing() -> None:
     ws = _world_service()
     ws.selected_room = None
 
-    report = build_fleet_report(ws, instance="a", role="fighter", engaged_target_id=-1, now_ms=1)
+    report = build_fleet_report(
+        ws,
+        instance="a",
+        role="fighter",
+        engaged_target_id=-1,
+        forage_goal_x=-1,
+        forage_goal_y=-1,
+        collect_claim_x=-1,
+        collect_claim_y=-1,
+        now_ms=1,
+    )
 
     assert report is None

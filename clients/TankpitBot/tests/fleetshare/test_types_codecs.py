@@ -32,6 +32,10 @@ def _report() -> FleetReportDict:
         x=100,
         y=120,
         engaged_target_id=506,
+        forage_goal_x=120,
+        forage_goal_y=104,
+        collect_claim_x=44,
+        collect_claim_y=24,
         combat_consent_ids=[],
         written_ms=100000,
         enemies=[

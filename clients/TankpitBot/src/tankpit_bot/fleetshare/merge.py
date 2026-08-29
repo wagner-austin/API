@@ -24,6 +24,7 @@ from tankpit_bot.fleetshare.codecs import decode_fleet_report
 from tankpit_bot.fleetshare.report import FLEET_REPORT_FILENAME
 from tankpit_bot.fleetshare.types import FleetReportDict
 from tankpit_bot.runtime_artifacts import bot_run_dir
+from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import merge_container_sighting, remove_container
 from tankpit_bot.state.scan_coverage import merge_scanned_coverage
@@ -65,23 +66,27 @@ two-fighter session at full tick rate hit it (arterial tick 264,
 2026-08-26 03:01:06, ``[Errno 13]`` on artax's knowledge.json; POSIX
 rename never refuses the open, which is why 2,500+ single-bot and
 short pair sessions never saw it). The writer's swap completes within
-the failed open itself, so an immediate retry lands. A persistent
-denial across the whole budget is no longer the race — it is a real
-permission fault, and it still raises."""
+the failed open itself, so an immediate retry usually lands. But
+"denied across the whole budget = real permission fault" was
+FALSIFIED live (arterial tick 316, 2026-08-28 21:10, first two-bot
+World fleet under heavy machine load): three immediate retries all
+landed inside one swap and the raise KILLED the session over one
+beat of advisory data that rewrites every ~2 s. A denied sibling is
+now skipped for this exchange -- the diagnostic keeps a genuinely
+wedged permission fault visible as a repeating beacon instead of a
+dead bot."""
 
 
-def _read_report_text(path: Path) -> str:
+def _read_report_text(path: Path) -> str | None:
     """Read a sibling report, absorbing the Windows replace window.
 
     Args:
         path: The report file.
 
     Returns:
-        The file text.
-
-    Raises:
-        PermissionError: When every attempt in the budget is denied —
-            a real permission fault, never the transient swap race.
+        The file text, or ``None`` when every attempt in the budget
+        was denied -- the caller skips this sibling for the exchange
+        and the next tick reads its fresh rewrite.
     """
     attempt = 0
     while True:
@@ -90,7 +95,13 @@ def _read_report_text(path: Path) -> str:
         except PermissionError:
             attempt += 1
             if attempt >= _REPORT_READ_ATTEMPTS:
-                raise
+                emit_diagnostic(
+                    diagnostic_kind="fleet_report_read_denied",
+                    origin="fleetshare.merge.read_team_reports",
+                    report_path=str(path),
+                    attempts=attempt,
+                )
+                return None
 
 
 def read_team_reports(
@@ -129,7 +140,10 @@ def read_team_reports(
     for path in paths:
         if path == own_path:
             continue
-        parsed = load_json_str(_read_report_text(path))
+        text = _read_report_text(path)
+        if text is None:
+            continue
+        parsed = load_json_str(text)
         if not isinstance(parsed, dict):
             raise JSONTypeError(f"fleet report must be an object, got {type(parsed).__name__}")
         # Freshness gates BEFORE full decode, two-sided: every fleet
@@ -287,8 +301,17 @@ def merge_fleet_reports(
     scanned_merged = 0
     engaged: dict[int, int] = {}
     consented: set[int] = set()
+    forage_goals: dict[str, tuple[int, int]] = {}
+    claimed: set[str] = set()
     for report in reports:
         consented.update(report["combat_consent_ids"])
+        if report["forage_goal_x"] >= 0 and report["forage_goal_y"] >= 0:
+            forage_goals[report["instance"]] = (
+                report["forage_goal_x"],
+                report["forage_goal_y"],
+            )
+        if report["collect_claim_x"] >= 0 and report["collect_claim_y"] >= 0:
+            claimed.add(f"{report['collect_claim_x']},{report['collect_claim_y']}")
         target_id = report["engaged_target_id"]
         if target_id not in (-1, own_tank_id):
             recorded = engaged.get(target_id, 0)
@@ -309,6 +332,12 @@ def merge_fleet_reports(
     # the human has long since granted the survivor organic consent
     # (or the fight is over).
     ws.fleet_consented_tank_ids = consented
+    # Same wholesale-replacement contract: a sibling that arrives,
+    # finishes, or goes silent stops steering the division of ground
+    # within one exchange (operator observation 2026-08-28: "no
+    # awareness of who's collecting what").
+    ws.fleet_forage_goals = forage_goals
+    ws.fleet_claimed_containers = claimed
     return FleetMergeSummaryDict(
         reports=len(reports),
         enemies=enemies_merged,

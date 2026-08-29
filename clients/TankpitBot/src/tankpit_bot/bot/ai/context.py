@@ -124,7 +124,9 @@ class DecideCtx:
             timestamp_ms,
             self.config["kill_cooldown_ms"],
         )
-        self.filtered: WorldStateDict = filter_killed_tanks(world, self.killed)
+        self.filtered: WorldStateDict = filter_fleet_claimed_containers(
+            filter_killed_tanks(world, self.killed), ws.fleet_claimed_containers
+        )
         self.base: AIStateDict = AIStateDict(
             **{
                 **ai_state,
@@ -283,6 +285,43 @@ def expire_kills(killed: dict[str, int], now: int, cooldown_ms: int) -> dict[str
         Filtered mapping with only unexpired kills.
     """
     return {k: v for k, v in killed.items() if now - v < cooldown_ms}
+
+
+def filter_fleet_claimed_containers(world: WorldStateDict, claimed: set[str]) -> WorldStateDict:
+    """Remove containers a fleet sibling's collect plan holds.
+
+    One choke point makes every collect selector claim-aware: the
+    planner works over ``ctx.filtered``, so a sibling-claimed
+    container simply does not exist for pickups, hops, larders, or
+    clearance (operator observation 2026-08-28: two bots racing the
+    same container resolves only when the winner's removal row lands,
+    after the loser paid the travel). Own claims are never in the
+    set -- the merge reads SIBLING reports only.
+
+    Args:
+        world: Current (already tank-filtered) world state.
+        claimed: Sibling-claimed container keys (``"x,y"``).
+
+    Returns:
+        World state without the claimed containers.
+    """
+    if not claimed:
+        return world
+    remaining = {
+        key: container for key, container in world["containers"].items() if key not in claimed
+    }
+    if len(remaining) == len(world["containers"]):
+        return world
+    return WorldStateDict(
+        self_state=world["self_state"],
+        tanks=world["tanks"],
+        containers=remaining,
+        mines=world["mines"],
+        terrain=world["terrain"],
+        viewport=world["viewport"],
+        scanned_tiles=world["scanned_tiles"],
+        timestamp_ms=world["timestamp_ms"],
+    )
 
 
 def filter_killed_tanks(world: WorldStateDict, killed: dict[str, int]) -> WorldStateDict:

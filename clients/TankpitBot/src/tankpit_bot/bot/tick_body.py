@@ -263,11 +263,16 @@ def _exchange_fleet_knowledge(bot: Bot) -> None:
     """
     now_ms = get_current_time_ms()
     instance = resolve_bot_instance()
+    claimed = bot._ai_state["resource_target_kind"] != ""
     report = build_fleet_report(
         bot.world,
         instance=instance,
         role=bot._ai_state["config"]["role"],
         engaged_target_id=bot._ai_state["combat_target_id"],
+        forage_goal_x=bot._ai_state["forage_goal_x"],
+        forage_goal_y=bot._ai_state["forage_goal_y"],
+        collect_claim_x=bot._ai_state["resource_target_x"] if claimed else -1,
+        collect_claim_y=bot._ai_state["resource_target_y"] if claimed else -1,
         now_ms=now_ms,
     )
     if report is None:

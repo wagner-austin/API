@@ -191,6 +191,10 @@ def build_fleet_report(
     instance: str,
     role: FleetRole,
     engaged_target_id: int,
+    forage_goal_x: int,
+    forage_goal_y: int,
+    collect_claim_x: int,
+    collect_claim_y: int,
     now_ms: int,
 ) -> FleetReportDict | None:
     """Assemble this bot's knowledge offer from its current beliefs.
@@ -201,6 +205,10 @@ def build_fleet_report(
             namespace).
         role: This bot's fleet role.
         engaged_target_id: The held combat lock (-1 for none).
+        forage_goal_x: The latched forage-frontier goal X (-1 none).
+        forage_goal_y: The latched forage-frontier goal Y (-1 none).
+        collect_claim_x: The held collect-plan container X (-1 none).
+        collect_claim_y: The held collect-plan container Y (-1 none).
         now_ms: Current wall-clock ms (stamped as ``written_ms`` and
             used for the sighting freshness bound).
 
@@ -226,6 +234,10 @@ def build_fleet_report(
         x=self_state["x"],
         y=self_state["y"],
         engaged_target_id=engaged_target_id,
+        forage_goal_x=forage_goal_x,
+        forage_goal_y=forage_goal_y,
+        collect_claim_x=collect_claim_x,
+        collect_claim_y=collect_claim_y,
         combat_consent_ids=_combat_consent_rows(ws),
         written_ms=now_ms,
         enemies=_enemy_rows(ws, own_team, now_ms),

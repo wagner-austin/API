@@ -138,6 +138,18 @@ class FleetReportDict(TypedDict):
         role: The reporter's :data:`FleetRole`.
         x: The reporter's X at write time.
         y: The reporter's Y at write time.
+        forage_goal_x: X of the reporter's latched forage-frontier
+            goal block center (-1 for none). Siblings skip claimed
+            blocks so a fleet divides the map instead of dogpiling
+            one stale block (operator observation 2026-08-28: "no
+            awareness of who's collecting what").
+        forage_goal_y: Y of that goal (-1 for none).
+        collect_claim_x: X of the reporter's held collect-plan
+            container (-1 for none). Siblings treat claimed
+            containers as taken -- the race otherwise resolves only
+            when the winner's removal row lands, after the loser has
+            already paid the travel.
+        collect_claim_y: Y of that claim (-1 for none).
         combat_consent_ids: Tank ids whose combat-consent evidence
             this reporter holds (they chatted to it, or struck it).
             Operator ruling 2026-08-26: "if one has consent the other
@@ -170,6 +182,10 @@ class FleetReportDict(TypedDict):
     x: int
     y: int
     engaged_target_id: int
+    forage_goal_x: int
+    forage_goal_y: int
+    collect_claim_x: int
+    collect_claim_y: int
     combat_consent_ids: list[int]
     written_ms: int
     enemies: list[FleetEnemySightingDict]

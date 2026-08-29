@@ -244,6 +244,12 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # acquisition within one exchange. Threat ranking prefers
         # these ids inside a priority tier (focus fire).
         self.fleet_engaged_target_ids: dict[int, int] = {}
+        # Siblings' shared collect intents ([[fleet-coordination]],
+        # 2026-08-28): latched forage-frontier goals by instance, and
+        # container tiles a sibling's collect plan holds. Replaced
+        # wholesale each merge pass, like the engaged ids above.
+        self.fleet_forage_goals: dict[str, tuple[int, int]] = {}
+        self.fleet_claimed_containers: set[str] = set()
         # Consent evidence inherited from same-color siblings
         # ([[fleet-coordination]], operator ruling 2026-08-26): ids the
         # FLEET has proof consented to combat. Replaced wholesale per

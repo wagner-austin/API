@@ -14,10 +14,11 @@ in six seconds.
 Under uniform spawn the optimal restock policy is staleness-seeking:
 standing stock accumulates wherever nobody has harvested lately, so
 the best ground is the NEAREST block with no live radar coverage.
-The frontier hop picks it, travels by the walk-first rule (a leg in
-window walks; beyond it teleports), and latches the chosen goal in
-the AI state so the teleport's map-open beat cannot be re-planned
-away (the atlas hop stamped its own target visited at PLAN time and
+The frontier hop picks it, teleports (in-window blocks are stamped
+looked-at by sight -- 0x5A enumerates a window's containers
+radar-free, so every goal is genuinely unseen ground), and latches
+the chosen goal in the AI state so the teleport's map-open beat
+cannot be re-planned away (the atlas hop stamped its own target visited at PLAN time and
 swapped targets across the open beat -- run bot-20260828-192801
 19:31:00 opened for a cost-40 hop and threw a cost-227 one).
 """
@@ -27,7 +28,6 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
-from tankpit_bot.bot.ai.movement import plan_viewport_walk
 from tankpit_bot.bot.ai.tactics import combat_radar_min
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -130,9 +130,9 @@ def _stale_block_centers(ctx: DecideCtx, terrain: TerrainMapProtocol) -> list[tu
 
     A block qualifies when it holds no live coverage stamp, its
     center is passable, un-tombstoned, and not hostile ground, and
-    its center is either inside the current window (walkable — the
-    walk dispatcher only walks in-window legs) or teleport-affordable
-    above the fuel floor.
+    its teleport is affordable above the fuel floor. In-window
+    centers never qualify: the caller stamps them looked-at by
+    sight before ranking.
 
     Args:
         ctx: Decision context.
@@ -145,12 +145,14 @@ def _stale_block_centers(ctx: DecideCtx, terrain: TerrainMapProtocol) -> list[tu
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     budget = ctx.fuel - ctx.config["fuel_low_threshold"]
     hostile = ctx.ws.hostile_landing_keys(ctx.timestamp_ms)
-    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    claimed_blocks = {
+        (gx // BLOCK_TILES, gy // BLOCK_TILES) for gx, gy in ctx.ws.fleet_forage_goals.values()
+    }
     half = BLOCK_TILES // 2
     ranked: list[tuple[int, int, int]] = []
     for by in range(_BLOCK_GRID):
         for bx in range(_BLOCK_GRID):
-            if (bx, by) in covered:
+            if (bx, by) in covered or (bx, by) in claimed_blocks:
                 continue
             x = bx * BLOCK_TILES + half
             y = by * BLOCK_TILES + half
@@ -159,15 +161,64 @@ def _stale_block_centers(ctx: DecideCtx, terrain: TerrainMapProtocol) -> list[tu
                 continue
             if not terrain.is_passable(x, y):
                 continue
+            # distance is never 0: the tank's own block center is
+            # in-window and therefore sight-stamped before ranking.
             distance = max(abs(x - sx), abs(y - sy))
-            if distance == 0:
-                continue
-            in_window = left <= x <= right and top <= y <= bottom
-            if not in_window and teleport_cost(sx, sy, x, y) > budget:
+            if teleport_cost(sx, sy, x, y) > budget:
                 continue
             ranked.append((distance, x, y))
     ranked.sort()
     return [(x, y) for _, x, y in ranked]
+
+
+def _stamp_window_blocks_by_sight(ctx: DecideCtx) -> None:
+    """Mark every block whose center the current window shows as looked-at.
+
+    A window in view IS looked at: 0x5A enumerates its containers
+    radar-free, so traveling to an in-window block center reveals
+    nothing (operator flag, 2026-08-28 World watch: "walking to a
+    spot, then walking back to another spot, not doing anything").
+    Stamping by sight keeps every frontier goal genuinely unseen
+    ground, and frontier travel is therefore teleport-only.
+
+    Args:
+        ctx: Decision context.
+    """
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    half = BLOCK_TILES // 2
+    for by in range(top // BLOCK_TILES, bottom // BLOCK_TILES + 1):
+        for bx in range(left // BLOCK_TILES, right // BLOCK_TILES + 1):
+            center_x = bx * BLOCK_TILES + half
+            center_y = by * BLOCK_TILES + half
+            if left <= center_x <= right and top <= center_y <= bottom:
+                ctx.ws.forage_visited[f"{center_x},{center_y}"] = ctx.timestamp_ms
+
+
+def _resolve_standing_goal(ctx: DecideCtx, base_state: AIStateDict) -> tuple[int, int, bool]:
+    """Release the latched goal on arrival or at the attempt cap.
+
+    Args:
+        ctx: Decision context.
+        base_state: AI state carrying the goal latch.
+
+    Returns:
+        ``(goal_x, goal_y, live)`` -- the latched coordinates and
+        whether the latch still holds after arrival and attempt-cap
+        release (both releases tombstone the block).
+    """
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    goal_x = base_state["forage_goal_x"]
+    goal_y = base_state["forage_goal_y"]
+    goal_live = goal_x >= 0 and goal_y >= 0
+    if goal_live and max(abs(sx - goal_x), abs(sy - goal_y)) <= _ARRIVE_TILES:
+        ctx.ws.forage_visited[f"{goal_x},{goal_y}"] = ctx.timestamp_ms
+        goal_live = False
+    if goal_live and base_state["forage_goal_attempts"] >= _GOAL_ATTEMPT_CAP:
+        # Every landing bounced away from the center: the block is
+        # unlandable, and re-throwing burns ~20 fuel per attempt.
+        ctx.ws.forage_visited[f"{goal_x},{goal_y}"] = ctx.timestamp_ms
+        goal_live = False
+    return goal_x, goal_y, goal_live
 
 
 def plan_forage_frontier_hop(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict | None:
@@ -208,65 +259,47 @@ def plan_forage_frontier_hop(ctx: DecideCtx, base_state: AIStateDict) -> TickDec
     if terrain is None:
         return None
     _prune_visits(ctx.ws, ctx.timestamp_ms)
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    goal_x = base_state["forage_goal_x"]
-    goal_y = base_state["forage_goal_y"]
-    goal_live = goal_x >= 0 and goal_y >= 0
-    if goal_live and max(abs(sx - goal_x), abs(sy - goal_y)) <= _ARRIVE_TILES:
-        ctx.ws.forage_visited[f"{goal_x},{goal_y}"] = ctx.timestamp_ms
-        goal_live = False
-    if goal_live and base_state["forage_goal_attempts"] >= _GOAL_ATTEMPT_CAP:
-        # Every landing bounced away from the center: the block is
-        # unlandable, and re-throwing burns ~20 fuel per attempt.
-        ctx.ws.forage_visited[f"{goal_x},{goal_y}"] = ctx.timestamp_ms
-        goal_live = False
+    _stamp_window_blocks_by_sight(ctx)
+    goal_x, goal_y, goal_live = _resolve_standing_goal(ctx, base_state)
     candidates = _stale_block_centers(ctx, terrain)
     if goal_live:
         candidates = [(goal_x, goal_y)] + [c for c in candidates if c != (goal_x, goal_y)]
-    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-    for target_x, target_y in candidates:
-        # In-window ground is walked for free ([[walk-mechanics]]);
-        # the window itself never moves in COLLECT (autoscroll OFF),
-        # so anything beyond it travels by teleport.
-        if left <= target_x <= right and top <= target_y <= bottom:
-            command = plan_viewport_walk(ctx, target_x, target_y)
-        else:
-            command = make_teleport_command(target_x, target_y)
-        if command is None:
-            continue
-        emit_ai(
-            "forage frontier: %s to unlooked block (%d,%d)",
-            command["cmd_type"],
-            target_x,
-            target_y,
-        )
-        return make_decision(
-            command,
-            "COLLECT",
-            COLLECT_SCORE,
-            target_x,
-            target_y,
-            "forage_frontier_hop",
-            # The held resource plan is NOT cleared: a plan whose
-            # teleport is merely unaffordable this tick survives a
-            # frontier leg (pinned by the locked-target cascade law);
-            # the lock machinery re-validates it itself.
-            AIStateDict(
-                **{
-                    **base_state,
-                    "forage_goal_x": target_x,
-                    "forage_goal_y": target_y,
-                    "forage_goal_attempts": (
-                        base_state["forage_goal_attempts"] + 1
-                        if goal_live and (target_x, target_y) == (goal_x, goal_y)
-                        else 1
-                    ),
-                }
-            ),
-            ctx.equip,
-            reason_context={"stale_blocks": len(candidates)},
-        )
-    return None
+    if not candidates:
+        return None
+    target_x, target_y = candidates[0]
+    command = make_teleport_command(target_x, target_y)
+    emit_ai(
+        "forage frontier: %s to unlooked block (%d,%d)",
+        command["cmd_type"],
+        target_x,
+        target_y,
+    )
+    return make_decision(
+        command,
+        "COLLECT",
+        COLLECT_SCORE,
+        target_x,
+        target_y,
+        "forage_frontier_hop",
+        # The held resource plan is NOT cleared: a plan whose
+        # teleport is merely unaffordable this tick survives a
+        # frontier leg (pinned by the locked-target cascade law);
+        # the lock machinery re-validates it itself.
+        AIStateDict(
+            **{
+                **base_state,
+                "forage_goal_x": target_x,
+                "forage_goal_y": target_y,
+                "forage_goal_attempts": (
+                    base_state["forage_goal_attempts"] + 1
+                    if goal_live and (target_x, target_y) == (goal_x, goal_y)
+                    else 1
+                ),
+            }
+        ),
+        ctx.equip,
+        reason_context={"stale_blocks": len(candidates)},
+    )
 
 
 __all__ = [

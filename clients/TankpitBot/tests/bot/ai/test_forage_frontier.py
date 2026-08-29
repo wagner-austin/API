@@ -169,22 +169,41 @@ def test_unaffordable_beyond_window_is_skipped() -> None:
     assert plan_forage_frontier_hop(ctx, ctx.base) is None
 
 
-def test_in_window_stale_block_is_walked() -> None:
-    """A stale center inside the current window is a free walk."""
-    # Block (6,6)'s own center (104,104) sits inside the window; a
-    # covered home block normally removes it, so only stamp coverage
-    # OUTSIDE block (6,6).
-    ctx = _frontier_ctx(fuel=210, stale_blocks=((6, 6),))
+def test_in_window_blocks_are_looked_at_by_sight() -> None:
+    """A window in view IS looked at: no walk to its own center.
+
+    Operator flag (2026-08-28 World watch): "walking to a spot, then
+    walking back to another spot, not doing anything" -- 0x5A
+    enumerates a window's containers radar-free, so traveling to an
+    in-window center reveals nothing. The center is stamped by sight
+    and the frontier declines.
+    """
+    ws = WorldService()
+    ctx = _frontier_ctx(fuel=210, stale_blocks=((6, 6),), ws=ws)
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    assert decision is None
+    assert "104,104" in ws.forage_visited
+
+
+def test_sibling_goal_blocks_are_skipped() -> None:
+    """A block a fleet sibling is already traveling to is not chosen.
+
+    Operator observation (2026-08-28): "no awareness of who's
+    collecting what" -- two bots latched the same stale block
+    mid-flight; coverage sharing only helps after a scan lands.
+    """
+    ws = WorldService()
+    ws.fleet_forage_goals = {"arterial": (136, 104)}
+    ctx = _frontier_ctx(ws=ws, stale_blocks=((8, 6), (4, 6)))
 
     decision = plan_forage_frontier_hop(ctx, ctx.base)
 
     if decision is None:
         raise AssertionError("expected a frontier decision")
-    assert decision["command"]["cmd_type"] == "move"
-    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (
-        104,
-        104,
-    )
+    # (136,104) is nearer... it belongs to arterial; (72,104) wins.
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (72, 104)
 
 
 def test_far_goal_travels_by_teleport() -> None:
@@ -304,3 +323,63 @@ def test_arrival_tombstones_the_goal_and_picks_fresh() -> None:
     if decision is None:
         raise AssertionError("expected a fresh frontier decision")
     assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (136, 104)
+
+
+def test_claimed_container_filter_prunes_and_passes_through() -> None:
+    """Sibling-claimed containers vanish from ctx.filtered; others stay."""
+    from tankpit_bot.state.types import make_container_state
+
+    ws = WorldService()
+    ws.fleet_claimed_containers = {"120,100", "999,999"}
+    world, self_state = make_world(fuel=800, scanned=False)
+    world["containers"]["120,100"] = make_container_state(
+        x=120, y=100, is_fuel=False, volume=0, timestamp_ms=_NOW
+    )
+    world["containers"]["121,101"] = make_container_state(
+        x=121, y=101, is_fuel=False, volume=0, timestamp_ms=_NOW
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        _deficient_inventory(),
+        _NOW,
+        InMemoryTerrainMap(),
+        "",
+        ws=ws,
+    )
+
+    assert "120,100" not in ctx.filtered["containers"]
+    assert "121,101" in ctx.filtered["containers"]
+
+    # A claim set that touches nothing believed returns the world as-is.
+    ws_untouched = WorldService()
+    ws_untouched.fleet_claimed_containers = {"999,999"}
+    world2, self2 = make_world(fuel=800, scanned=False)
+    world2["containers"]["121,101"] = make_container_state(
+        x=121, y=101, is_fuel=False, volume=0, timestamp_ms=_NOW
+    )
+    ctx2 = DecideCtx(
+        world2,
+        self2,
+        make_scanned_ai_state(),
+        _deficient_inventory(),
+        _NOW,
+        InMemoryTerrainMap(),
+        "",
+        ws=ws_untouched,
+    )
+    assert "121,101" in ctx2.filtered["containers"]
+
+
+def test_partially_affordable_frontier_picks_the_reachable_block() -> None:
+    """An unaffordable far block is skipped for an affordable nearer one."""
+    # Fuel 320 gives a 120 budget: (104,88) at chebyshev 12 is
+    # affordable; (8,136) at chebyshev ~92 is not and must be skipped.
+    ctx = _frontier_ctx(fuel=320, stale_blocks=((6, 5), (0, 8)))
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (104, 88)

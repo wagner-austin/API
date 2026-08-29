@@ -70,6 +70,10 @@ def test_exchange_publishes_and_merges_a_sibling(
         x=90,
         y=90,
         engaged_target_id=506,
+        forage_goal_x=-1,
+        forage_goal_y=-1,
+        collect_claim_x=-1,
+        collect_claim_y=-1,
         combat_consent_ids=[709],
         written_ms=sibling_ms,
         enemies=[

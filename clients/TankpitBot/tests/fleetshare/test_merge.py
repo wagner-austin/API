@@ -43,6 +43,10 @@ def _report(
     tank_id: int = 1301,
     written_ms: int = _NOW - 1000,
     engaged_target_id: int = -1,
+    forage_goal_x: int = -1,
+    forage_goal_y: int = -1,
+    collect_claim_x: int = -1,
+    collect_claim_y: int = -1,
     enemies: list[FleetEnemySightingDict] | None = None,
     containers: list[FleetContainerSightingDict] | None = None,
     removed: list[FleetContainerRemovalDict] | None = None,
@@ -58,6 +62,10 @@ def _report(
         x=90,
         y=90,
         engaged_target_id=engaged_target_id,
+        forage_goal_x=forage_goal_x,
+        forage_goal_y=forage_goal_y,
+        collect_claim_x=collect_claim_x,
+        collect_claim_y=collect_claim_y,
         combat_consent_ids=[],
         written_ms=written_ms,
         enemies=list(enemies) if enemies else [],
@@ -148,8 +156,15 @@ class TestReadTeamReports:
         assert len(reports) == 1
         assert calls["n"] == 2
 
-    def test_read_raises_on_persistent_permission_denial(self, fake_fs: FakeFileSystem) -> None:
-        """Every attempt denied: a real permission fault still crashes."""
+    def test_read_skips_a_sibling_denied_through_the_budget(self, fake_fs: FakeFileSystem) -> None:
+        """Every attempt denied: the sibling is skipped, never a crash.
+
+        Falsified premise (arterial tick 316, 2026-08-28 21:10, first
+        two-bot World fleet under heavy machine load): three immediate
+        retries all landed inside one Windows replace swap and the
+        raise killed the session over one beat of advisory data that
+        rewrites every ~2 s. The next tick reads the fresh rewrite.
+        """
         _write(fake_fs, _report("artax"))
         real_read = _test_hooks.read_text
 
@@ -158,8 +173,7 @@ class TestReadTeamReports:
 
         _test_hooks.read_text = denied_read
         try:
-            with pytest.raises(PermissionError):
-                read_team_reports("arterial", 2, "6", _NOW)
+            assert read_team_reports("arterial", 2, "6", _NOW) == []
         finally:
             _test_hooks.read_text = real_read
 
@@ -393,7 +407,6 @@ class TestStaleSchemaArtifacts:
 
     def test_fresh_invalid_report_still_raises(self, fake_fs: FakeFileSystem) -> None:
         """A live mixed-schema fleet is a genuine bug and says so."""
-        import pytest
         from platform_core.json_utils import JSONTypeError
 
         fake_fs.write_text(
@@ -406,7 +419,6 @@ class TestStaleSchemaArtifacts:
 
     def test_non_object_file_raises(self, fake_fs: FakeFileSystem) -> None:
         """A non-object payload names the shape in the error."""
-        import pytest
         from platform_core.json_utils import JSONTypeError
 
         fake_fs.write_text(bot_run_dir("weird") / FLEET_REPORT_FILENAME, "[1, 2]")
@@ -472,3 +484,25 @@ class TestSharedRemovals:
         merge_fleet_reports(ws, [report], own_tank_id=2731, own_team=2)
 
         assert ws.container_disproofs["70,80"] == _NOW - 100
+
+    def test_sibling_goal_and_claim_land_in_world_service(self, fake_fs: FakeFileSystem) -> None:
+        """Shared collect intents replace wholesale each merge pass."""
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        report = _report(
+            "artax",
+            forage_goal_x=120,
+            forage_goal_y=104,
+            collect_claim_x=44,
+            collect_claim_y=24,
+        )
+
+        merge_fleet_reports(ws, [report], own_tank_id=1400, own_team=2)
+
+        assert ws.fleet_forage_goals == {"artax": (120, 104)}
+        assert ws.fleet_claimed_containers == {"44,24"}
+
+        merge_fleet_reports(ws, [], own_tank_id=1400, own_team=2)
+
+        assert ws.fleet_forage_goals == {}
+        assert ws.fleet_claimed_containers == set()
