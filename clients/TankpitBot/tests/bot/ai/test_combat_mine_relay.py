@@ -23,18 +23,22 @@ from tests.bot.ai._support import (
 class TestCombatCorridorMineGuard:
     """Tests for the walk-close corridor mine clearance."""
 
-    def test_mined_walk_corridor_draws_the_free_clearance_first(self) -> None:
-        """A short close through a known mine shoots it before stepping.
+    @staticmethod
+    def _corridor_ctx(
+        *,
+        corked: bool,
+        ai_state: AIStateDict | None = None,
+    ) -> DecideCtx:
+        """Enemy 3 east, hostile mine at (101,100), composed terrain.
 
-        Flags s6-8/9: six 45-fuel walk-ins against mines that were in
-        the mine layer the whole time. The clearance single is free
-        ([[mine-mechanics]]), so the corridor is drained before the
-        first step and the walk proceeds next tick.
+        ``corked=True`` walls column x=101 with rock at every other
+        row, so the mined tile is the ONLY passage. ``corked=False``
+        leaves the field open -- the mine has a free detour.
         """
+        from tankpit_bot.bot.ai.ferry import compose_decision_terrain
         from tankpit_bot.state.types import make_mine_state
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-        ws = WorldService()
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -52,17 +56,55 @@ class TestCombatCorridorMineGuard:
         world, self_state = make_world(fuel=800, tanks=tanks)
         # make_world's self is team 1, so a team-2 mine is hostile.
         world["mines"]["101,100"] = make_mine_state(x=101, y=100, mine_type=0, tank_id=-1, team=2)
-        terrain = InMemoryTerrainMap({(102, 100): InMemoryTerrainMap.ROCK})
-        ctx = DecideCtx(
+        # The rock at (102,100) blocks the dual line to the enemy so
+        # the tick reaches the CLOSE branch instead of shooting them.
+        rocks: dict[tuple[int, int], str] = {(102, 100): InMemoryTerrainMap.ROCK}
+        if corked:
+            # Wall the whole window's worth of column x=101 except
+            # the mined tile: the mine is the ONLY passage east.
+            for y in range(85, 115):
+                if y != 100:
+                    rocks[(101, y)] = InMemoryTerrainMap.ROCK
+        # Production passes the COMPOSED terrain (mines are blockers)
+        # into the ctx; the detour judgement only exists on that view.
+        terrain = compose_decision_terrain(world, InMemoryTerrainMap(rocks), 100000, frozenset())
+        return DecideCtx(
             world,
             self_state,
-            make_scanned_ai_state(),
+            ai_state if ai_state is not None else make_scanned_ai_state(),
             make_inventory(),
             100000,
             terrain,
             "",
-            ws=ws,
+            ws=WorldService(),
         )
+
+    def test_open_detour_walks_without_clearing(self) -> None:
+        """A single mine with a free in-window detour is never shot.
+
+        Operator law 2026-08-28: "the server autopaths you around
+        mines if there's a clear path in that viewport that the bot
+        has" -- flag 5's mine at (120,224) had an open column beside
+        it and three shots were spent where zero were owed.
+        """
+        ctx = self._corridor_ctx(corked=False)
+
+        result = teleport_to_target(ctx, _enemy_threat(x=103, y=100, name="NearEnemy"))
+
+        if result is None:
+            raise AssertionError("expected a close decision")
+        assert result["command"]["cmd_type"] == "move"
+        assert result["behavior"]["reason_kind"] == "walk_to_target"
+
+    def test_corked_corridor_draws_the_free_clearance_first(self) -> None:
+        """A close whose ONLY passage is mined shoots it before stepping.
+
+        Flags s6-8/9: six 45-fuel walk-ins against mines that were in
+        the mine layer the whole time. The clearance single is free
+        ([[mine-mechanics]]), so the corked passage is drained before
+        the first step and the walk proceeds next tick.
+        """
+        ctx = self._corridor_ctx(corked=True)
 
         result = teleport_to_target(ctx, _enemy_threat(x=103, y=100, name="NearEnemy"))
 
@@ -71,6 +113,33 @@ class TestCombatCorridorMineGuard:
         assert result["command"]["cmd_type"] == "shoot"
         assert result["behavior"]["reason_kind"] == "mine_clearance_shot"
         assert result["updated_ai_state"]["combat_target_id"] == 50
+        assert result["updated_ai_state"]["mine_clearance_aim_key"] == "101,100"
+        assert result["updated_ai_state"]["mine_clearance_shot_ms"] == 100000
+
+    def test_pending_clearance_single_is_never_superseded(self) -> None:
+        """While the single serves, the tick must not re-aim the tile.
+
+        The flag-5 churn (2026-08-28 live watch): three dispatches at
+        one mine, ledger outcomes superseded/superseded/fired -- each
+        re-dispatch cancelled the unserved shot and reset the serve,
+        six seconds for one free single. With the latch held the tick
+        falls through to the teleport close instead.
+        """
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "mine_clearance_aim_key": "101,100",
+                "mine_clearance_shot_ms": 99000,
+            }
+        )
+        ctx = self._corridor_ctx(corked=True, ai_state=ai_state)
+
+        result = teleport_to_target(ctx, _enemy_threat(x=103, y=100, name="NearEnemy"))
+
+        if result is None:
+            raise AssertionError("expected a fall-through close decision")
+        assert result["behavior"]["reason_kind"] != "mine_clearance_shot"
+        assert result["command"]["cmd_type"] != "shoot"
 
     def test_short_close_with_no_usable_landing_falls_through_to_teleport(self) -> None:
         """All-occupied adjacency at short range leaves the teleport close.

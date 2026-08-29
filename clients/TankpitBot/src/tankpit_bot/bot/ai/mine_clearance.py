@@ -34,10 +34,50 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
+from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.state.line_of_sight import is_shot_line_clear, shot_line_tiles
 from tankpit_bot.state.types import ContainerStateDict, MineStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+
+MINE_CLEARANCE_EFFECT_MS = 5_000
+"""How long a dispatched clearance shot owns its aim tile.
+
+A clearance single serves on the shot beat and its 0x45 detonation
+follows the echo by up to a wire tick; until then the mine is still
+in the beliefs and a replanning tick would aim at it again. The
+re-dispatch does not merely waste a decision -- it SUPERSEDES the
+in-flight shot and resets the serve (flag 5 of the 2026-08-28 live
+watch: three dispatches at (120,224), ledger outcomes
+superseded/superseded/fired, ONE mine, six seconds to clear what one
+uninterrupted single serves in two).
+"""
+
+
+def clearance_shot_pending(
+    base_state: AIStateDict,
+    aim_x: int,
+    aim_y: int,
+    now_ms: int,
+) -> bool:
+    """Return True while a prior clearance shot at this tile is in flight.
+
+    Args:
+        base_state: AI state carrying the clearance latch fields.
+        aim_x: Candidate aim X.
+        aim_y: Candidate aim Y.
+        now_ms: Current timestamp.
+
+    Returns:
+        True when the latched aim matches and the effect window has
+        not lapsed -- the caller must not re-dispatch (superseding
+        resets the serve) and must not walk the still-mined corridor.
+    """
+    return (
+        f"{aim_x},{aim_y}" == base_state["mine_clearance_aim_key"]
+        and now_ms - base_state["mine_clearance_shot_ms"] < MINE_CLEARANCE_EFFECT_MS
+    )
+
 
 # Blast reach of one shot at a mine tile, by shooter rank
 # ([[mine-mechanics]] [^8]): recruit (rank 0) destroys only the

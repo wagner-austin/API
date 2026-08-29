@@ -162,7 +162,15 @@ class TestRadarSpendEconomics:
         assert ws.container_desync_pending() is False
 
     def test_spend_floor_only_binds_with_extras_stocked(self) -> None:
-        """A radar-broke tank scans any uncovered sliver for free."""
+        """A radar-broke tank fires free only into its OWN footprint.
+
+        The free built-in radar reveals ``2 + rank // 3`` tiles
+        around SELF, not the viewport (operator law, re-observed in
+        the 2026-08-28 live watch: the whole-viewport gate
+        press-looped at zero extras). An uncovered tile beside the
+        tank fires; the same sliver at a far corner declines -- the
+        scan-walk-scan doctrine walks there first.
+        """
         from tankpit_bot.bot.ai.context import radar_spend_worthwhile
 
         ws = WorldService()
@@ -173,7 +181,7 @@ class TestRadarSpendEconomics:
         ai_state = make_scanned_ai_state()
 
         stocked = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
-        broke = DecideCtx(
+        broke_far = DecideCtx(
             world,
             self_state,
             ai_state,
@@ -183,9 +191,24 @@ class TestRadarSpendEconomics:
             "",
             ws=ws,
         )
+        near_world, near_self = make_world(scanned=True)
+        # Uncover a tile adjacent to the tank: inside the rank-1
+        # radius-2 footprint, so the free press reveals it.
+        del near_world["scanned_tiles"][f"{near_self['x'] + 1},{near_self['y']}"]
+        broke_near = DecideCtx(
+            near_world,
+            near_self,
+            ai_state,
+            make_inventory(default_count=0),
+            100000,
+            None,
+            "",
+            ws=ws,
+        )
 
         assert radar_spend_worthwhile(stocked) is False
-        assert radar_spend_worthwhile(broke) is True
+        assert radar_spend_worthwhile(broke_far) is False
+        assert radar_spend_worthwhile(broke_near) is True
 
     def test_last_extra_is_not_dribbled_on_a_partial_reveal(self) -> None:
         """Radar reserve (user ruling 2026-07-31): the final extra holds.

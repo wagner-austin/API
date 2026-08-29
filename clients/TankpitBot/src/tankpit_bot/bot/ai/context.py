@@ -26,7 +26,10 @@ from tankpit_bot.bot.types import BotCommand
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.state.scan_coverage import viewport_uncovered_count
+from tankpit_bot.state.scan_coverage import (
+    free_radar_new_coverage,
+    viewport_uncovered_count,
+)
 from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -414,10 +417,32 @@ def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
         has at least :data:`RADAR_SPEND_REVEAL_FLOOR_TILES` uncovered
         tiles. At the reserve (the last extra): True only from
         :data:`RADAR_RESERVE_REVEAL_FLOOR_TILES` uncovered tiles.
-        Without extras: True when any tile is uncovered (the built-in
-        radar is free).
+        Without extras: True only when the built-in radar's own
+        rank-scaled footprint around the tank holds an uncovered tile
+        -- the press is free, but it reveals ``2 + rank // 3`` tiles
+        around SELF, not the viewport. The old whole-viewport gate
+        press-looped at zero extras: far uncovered corners kept
+        answering "scan", the 5x5 revealed nothing new, and the
+        scan-walk-scan doctrine (user ruling 2026-08-14) never got
+        the tick (operator observation, live watch 2026-08-28).
     """
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    extras = ctx.inventory["extra_radars"]["count"]
+    if extras == 0:
+        return (
+            free_radar_new_coverage(
+                ctx.world["scanned_tiles"],
+                ctx.self_state["x"],
+                ctx.self_state["y"],
+                left,
+                top,
+                right,
+                bottom,
+                ctx.timestamp_ms,
+                ctx.self_state["rank"],
+            )
+            > 0
+        )
     uncovered = viewport_uncovered_count(
         ctx.world["scanned_tiles"],
         left,
@@ -426,12 +451,9 @@ def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
         bottom,
         ctx.timestamp_ms,
     )
-    extras = ctx.inventory["extra_radars"]["count"]
     if extras > RADAR_RESERVE_EXTRAS:
         return uncovered >= RADAR_SPEND_REVEAL_FLOOR_TILES
-    if extras > 0:
-        return uncovered >= RADAR_RESERVE_REVEAL_FLOOR_TILES
-    return uncovered > 0
+    return uncovered >= RADAR_RESERVE_REVEAL_FLOOR_TILES
 
 
 def teleport_fuel_cost_to(ctx: DecideCtx, target_x: int, target_y: int) -> int:

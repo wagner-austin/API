@@ -305,6 +305,19 @@ service: install
 # multi-bot fleet without owning any bot's terminal. Runs in a
 # user-owned terminal for the same reason as `make service` — harness
 # background tasks are killed after ~46 minutes.
+# Build a frozen, runnable release snapshot of the bot plus its two
+# path-dep libs at the CURRENT COMMIT (uncommitted work is excluded
+# by construction -- git archive reads HEAD). The fleet manager and
+# live sessions run from the snapshot so hot-tree surgery can never
+# crash them (2026-08-28: deleting a runtime-read file killed a live
+# session). Versioning is the folder name:
+# C:\Users\Test\PROJECTS\tankpit-releases\v<version>-<short-sha>.
+# Activate by restarting the fleet manager from the new folder.
+release:
+	@Write-Host ""
+	@Write-Host "==> release (frozen runnable snapshot for the fleet)" -ForegroundColor Cyan
+	$$sha = (git rev-parse --short HEAD).Trim(); $$ver = (Select-String -Path pyproject.toml -Pattern 'version = .(\d+\.\d+\.\d+).').Matches[0].Groups[1].Value; $$dest = "C:\Users\Test\PROJECTS\tankpit-releases\v$$ver-$$sha"; if (Test-Path $$dest) { Write-Host "[release] $$dest already exists; nothing to do" -ForegroundColor Yellow } else { New-Item -ItemType Directory -Force $$dest | Out-Null; git -C ..\.. archive --format=zip HEAD clients/TankpitBot libs/platform_core libs/monorepo_guards -o "$$dest\snapshot.zip"; Expand-Archive "$$dest\snapshot.zip" -DestinationPath $$dest; Remove-Item "$$dest\snapshot.zip";Copy-Item accounts.json "$$dest\clients\TankpitBot\"; Copy-Item .env "$$dest\clients\TankpitBot\"; New-Item -ItemType Directory -Force "$$dest\clients\TankpitBot\runs" | Out-Null; Push-Location "$$dest\clients\TankpitBot"; poetry install --only main; Pop-Location; Write-Host "[release] built $$dest" -ForegroundColor Green; Write-Host "[release] activate: restart the fleet manager from that folder (kill the 27300 listener, then run 'poetry run tankpit-fleet' there, detached)" -ForegroundColor DarkGray }
+
 fleet: install
 	@Write-Host ""
 	@Write-Host "==> fleet (AI-operated fleet manager)" -ForegroundColor Cyan

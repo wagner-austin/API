@@ -16,6 +16,7 @@ from tankpit_bot.bot.ai.equipment_search import (
 )
 from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.mine_clearance import (
+    clearance_shot_pending,
     find_mine_clearance_shot,
     find_walk_clearance_shot,
 )
@@ -101,9 +102,6 @@ def select_and_pickup_equipment(
 # detonation follows the shot echo within a wire tick, so two server
 # windows comfortably covers apply-lag without stalling a genuine
 # re-clear (a recruit's 1-mine blast leaving covered neighbors).
-_MINE_CLEARANCE_EFFECT_MS = 5_000
-
-
 def mine_clearance_decision(
     ctx: DecideCtx,
     base_state: AIStateDict,
@@ -158,15 +156,13 @@ def mine_clearance_decision(
         return None
     aim_x, aim_y = aim
     aim_key = f"{aim_x},{aim_y}"
-    if (
-        aim_key == base_state["mine_clearance_aim_key"]
-        and ctx.timestamp_ms - base_state["mine_clearance_shot_ms"] < _MINE_CLEARANCE_EFFECT_MS
-    ):
+    if clearance_shot_pending(base_state, aim_x, aim_y, ctx.timestamp_ms):
         # The previous clearance shot at this exact tile has not had
         # its detonation applied yet (the 0x45 follows the shot echo
         # by up to a wire tick); re-aiming inside the window is the
-        # live double-shot at (162,94), 01:59:57/:59 -- one shot
-        # wasted on mines that were already dead on the server.
+        # live double-shot at (162,94), 01:59:57/:59 -- and worse, a
+        # re-dispatch SUPERSEDES the in-flight single and resets its
+        # serve (see clearance_shot_pending).
         return None
     emit_ai(
         "mine clearance: shooting covered container at (%d,%d) to expose the pickups",

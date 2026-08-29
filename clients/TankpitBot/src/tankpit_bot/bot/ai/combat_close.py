@@ -30,7 +30,12 @@ from tankpit_bot.bot.ai.context import (
     teleport_fuel_cost_to,
 )
 from tankpit_bot.bot.ai.hunt_relay import relay_toward
-from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
+from tankpit_bot.bot.ai.mine_clearance import (
+    clearance_shot_pending,
+    find_corridor_clearance_shot,
+)
+from tankpit_bot.bot.ai.reachability import is_move_reachable_in_viewport
+from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
@@ -57,6 +62,106 @@ the walk wins on fuel everywhere and on time out to ~9 tiles. The
 bound stays inside the corridor-clearance guard's reach (known
 mines are shot before the first step); hidden-mine arrest risk is
 what keeps it at 8 rather than the full time-breakeven."""
+
+
+def _walk_close_or_clear_corridor(
+    ctx: DecideCtx,
+    target: EnemyThreatDict,
+    walk_x: int,
+    walk_y: int,
+    close_distance: int,
+) -> TickDecisionDict | None:
+    """Walk the short close, or fire ONE clearance single when corked.
+
+    Detour first (operator law 2026-08-28: "the server autopaths you
+    around mines if there's a clear path in that viewport that the
+    bot has"): the composed decision terrain already blocks hostile
+    mines, so an existing in-window path means the walk needs no
+    clearing at all -- flag 5's single mine at (120,224) had an open
+    x=121 column and three shots were spent where zero were owed.
+
+    Only a genuinely corked corridor (no mine-free in-window path)
+    earns a clearance single, and only when no prior single at that
+    tile is still in flight: a replanning re-dispatch SUPERSEDES the
+    unserved shot and resets its serve (the flag-5 churn:
+    superseded/superseded/fired, six seconds for one mine).
+
+    Args:
+        ctx: Decision context.
+        target: The locked combat target.
+        walk_x: Chosen walk-close landing X.
+        walk_y: Chosen walk-close landing Y.
+        close_distance: Manhattan distance to the target.
+
+    Returns:
+        The walk or clearance decision, or ``None`` to fall through
+        to the teleport close: the corridor is corked and the single
+        is already serving (the teleport needs no walk path), or
+        nothing on the corridor is shootable.
+    """
+    terrain = ctx.terrain
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    if terrain is None or is_move_reachable_in_viewport(
+        ctx.filtered, terrain, sx, sy, walk_x, walk_y
+    ):
+        emit_ai(
+            "walking %d tiles to close on %s at (%d,%d)",
+            close_distance,
+            target["name"],
+            target["x"],
+            target["y"],
+        )
+        return make_decision(
+            make_move_command(walk_x, walk_y),
+            "HUNT",
+            800,
+            walk_x,
+            walk_y,
+            "walk_to_target",
+            _set_combat_target(ctx.base, target),
+            ctx.equip,
+            reason_context={"target_name": target["name"]},
+        )
+    corridor_mine = find_corridor_clearance_shot(
+        ctx.filtered,
+        ctx.self_state,
+        terrain,
+        walk_x,
+        walk_y,
+    )
+    if corridor_mine is None:
+        return None
+    mine_x, mine_y = corridor_mine
+    if clearance_shot_pending(ctx.base, mine_x, mine_y, ctx.timestamp_ms):
+        return None
+    # Flags s6-8/9: six 45-fuel walk-ins against KNOWN mines because
+    # no walk ever consulted the mine layer. Mine shots are free
+    # singles ([[mine-mechanics]]), so the corked corridor is drained
+    # before the first step.
+    emit_ai(
+        "walk corridor to (%d,%d) is corked - clearing (%d,%d) first",
+        walk_x,
+        walk_y,
+        mine_x,
+        mine_y,
+    )
+    return make_decision(
+        make_shoot_command(mine_x, mine_y),
+        "HUNT",
+        800,
+        mine_x,
+        mine_y,
+        "mine_clearance_shot",
+        AIStateDict(
+            **{
+                **_set_combat_target(ctx.base, target),
+                "mine_clearance_aim_key": f"{mine_x},{mine_y}",
+                "mine_clearance_shot_ms": ctx.timestamp_ms,
+            }
+        ),
+        ctx.equip,
+        reason_context={"target_name": target["name"]},
+    )
 
 
 def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
@@ -115,55 +220,11 @@ def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionD
         walk_candidates = _combat_landing_candidates(ctx, target)
         if walk_candidates:
             walk_x, walk_y = walk_candidates[0]
-            corridor_mine = find_corridor_clearance_shot(
-                ctx.filtered,
-                ctx.self_state,
-                ctx.terrain,
-                walk_x,
-                walk_y,
+            close_decision = _walk_close_or_clear_corridor(
+                ctx, target, walk_x, walk_y, close_distance
             )
-            if corridor_mine is not None:
-                # Flags s6-8/9: six 45-fuel walk-ins against KNOWN
-                # mines because no walk ever consulted the mine layer.
-                # Mine shots are free singles ([[mine-mechanics]]), so
-                # the corridor is drained before the first step.
-                mine_x, mine_y = corridor_mine
-                emit_ai(
-                    "walk corridor to (%d,%d) is mined - clearing (%d,%d) first",
-                    walk_x,
-                    walk_y,
-                    mine_x,
-                    mine_y,
-                )
-                return make_decision(
-                    make_shoot_command(mine_x, mine_y),
-                    "HUNT",
-                    800,
-                    mine_x,
-                    mine_y,
-                    "mine_clearance_shot",
-                    _set_combat_target(ctx.base, target),
-                    ctx.equip,
-                    reason_context={"target_name": target["name"]},
-                )
-            emit_ai(
-                "walking %d tiles to close on %s at (%d,%d)",
-                close_distance,
-                target["name"],
-                target["x"],
-                target["y"],
-            )
-            return make_decision(
-                make_move_command(walk_x, walk_y),
-                "HUNT",
-                800,
-                walk_x,
-                walk_y,
-                "walk_to_target",
-                _set_combat_target(ctx.base, target),
-                ctx.equip,
-                reason_context={"target_name": target["name"]},
-            )
+            if close_decision is not None:
+                return close_decision
     landing_x, landing_y = combat_landing_tile(ctx, target)
     if ctx.ws.is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
         # The target is off-view here (in-view targets shot above), so
