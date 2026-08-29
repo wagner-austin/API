@@ -113,7 +113,9 @@ def legacy_run_record(device: str) -> RunRecord:
         The record: five observations per shape -- a digest and a sum for
         each arm, plus the within-card control.
     """
-    fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
+    fingerprint: RunFingerprint = capture_run_fingerprint(
+        device, probe_determinism(device, remove_split_k=False, math_attention=False)
+    )
 
     observations: list[Observation] = []
     for shape in LM_HEAD_SHAPES:

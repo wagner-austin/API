@@ -121,7 +121,9 @@ def benchmark_run_record(device: str) -> RunRecord:
         RuntimeError: Propagated when a call failed for a reason that is
             neither an out-of-memory nor a no-kernel refusal.
     """
-    fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
+    fingerprint: RunFingerprint = capture_run_fingerprint(
+        device, probe_determinism(device, remove_split_k=False, math_attention=False)
+    )
 
     observations: list[Observation] = []
     for shape in _test_hooks.cost_shapes_hook():

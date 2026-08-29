@@ -156,7 +156,9 @@ def sdpa_run_record(device: str) -> RunRecord:
             split-K condition cannot be read as an integer.
     """
     workspace = workspace_observation()
-    fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
+    fingerprint: RunFingerprint = capture_run_fingerprint(
+        device, probe_determinism(device, remove_split_k=False, math_attention=False)
+    )
 
     observations: list[Observation] = [workspace]
     for shape in sdpa_shapes():

@@ -88,7 +88,9 @@ thread costs nothing here and makes the number reproducible by construction.
 """
 
 
-def probe_determinism(device: str) -> DeterminismRecord:
+def probe_determinism(
+    device: str, *, remove_split_k: bool, math_attention: bool
+) -> DeterminismRecord:
     """Pin whatever governs this device's arithmetic, and report it.
 
     Device-conditional for the same reason
@@ -150,13 +152,34 @@ def probe_determinism(device: str) -> DeterminismRecord:
     extra settings and is correctly incomparable with them, which it always
     was.
 
+    WHY THE POSTURE IS AN ARGUMENT RATHER THAN FIXED AT FALSE. It was fixed,
+    and that made this function unable to express the arm it exists to
+    compare against. Split-K has an environment escape -- a launcher can
+    export ``CUBLASLT_WORKSPACE_SIZE=0`` and the process picks it up -- so
+    the treated arm was reachable for that control by accident of it being
+    an environment variable. The attention pin has no such escape: it is
+    four ``torch.backends.cuda`` calls, so a command pinning through here
+    could only ever observe attention UNTREATED. An instrument that cannot
+    reach a condition cannot measure it, which is the same defect as one
+    that imposes it.
+
+    So every caller states its posture. Nine of them pass False for both,
+    because they measure what the controls do and must keep the control arm
+    reachable; :mod:`~model_trainer.cli.probe_trace` takes it from a flag,
+    because tracing a model under both controls is the question of whether
+    cross-card agreement is achievable at all.
+
     Args:
         device: Device the measurement runs on.
+        remove_split_k: Whether to take split-K out of cuBLASLt's options.
+        math_attention: Whether to restrict attention to the math kernel.
 
     Returns:
         What was pinned, ready to place in the fingerprint.
     """
-    applied = _test_hooks.apply_determinism_hook(remove_split_k=False, math_attention=False)
+    applied = _test_hooks.apply_determinism_hook(
+        remove_split_k=remove_split_k, math_attention=math_attention
+    )
     if device == CUDA_DEVICE:
         return applied
     return with_torch_thread_count(applied, _test_hooks.pin_torch_threads(PROBE_CPU_THREADS))
@@ -179,7 +202,9 @@ def probe_run_record(device: str) -> RunRecord:
         observation, so a digest over it would restate the number rather than
         add the independent check a digest is for.
     """
-    fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
+    fingerprint: RunFingerprint = capture_run_fingerprint(
+        device, probe_determinism(device, remove_split_k=False, math_attention=False)
+    )
 
     loss = probe_forward_loss(device, require_probe_shape(GATE_RUNG))
 

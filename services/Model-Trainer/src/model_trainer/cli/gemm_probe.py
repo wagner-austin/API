@@ -76,7 +76,9 @@ def gemm_run_record(device: str) -> RunRecord:
         The record: two observations per shape and the fingerprint of the
         configuration they ran under.
     """
-    fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
+    fingerprint: RunFingerprint = capture_run_fingerprint(
+        device, probe_determinism(device, remove_split_k=False, math_attention=False)
+    )
 
     observations: list[Observation] = []
     for name, shape in probed_shapes():

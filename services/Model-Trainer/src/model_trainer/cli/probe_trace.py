@@ -29,6 +29,7 @@ from __future__ import annotations
 import pathlib
 import sys
 from collections.abc import Sequence
+from typing import Final
 
 from platform_core import cli_args
 from platform_core.comparability import RunFingerprint
@@ -68,8 +69,52 @@ _log = get_logger(__name__)
 
 DEVICE_FLAG = "--device"
 OUT_FLAG = "--out"
+CONTROLS_FLAG = "--controls"
 
-_FLAGS = (DEVICE_FLAG, OUT_FLAG)
+_FLAGS = (DEVICE_FLAG, OUT_FLAG, CONTROLS_FLAG)
+
+#: Which cross-card controls a trace applies, by the name the flag takes.
+#:
+#: WHY FOUR ARMS AND NOT TWO. The two controls address disjoint halves of a
+#: model -- split-K governs cuBLASLt matmuls, the math pin governs attention,
+#: and neither moves the other's tensors. So "both" answers whether agreement
+#: is achievable, and the two single-control arms answer which control bought
+#: which tensor. A two-arm flag would force a later attribution question to be
+#: a code change rather than a run.
+#:
+#: ``none`` is first and is the arm every other measurement command is fixed
+#: at: it applies nothing, so whatever the launcher exported still governs and
+#: :func:`workspace_observation` still reports the real environment.
+CONTROL_ARMS: Final[dict[str, tuple[bool, bool]]] = {
+    "none": (False, False),
+    "split-k": (True, False),
+    "attention": (False, True),
+    "both": (True, True),
+}
+
+
+def require_control_arm(raw: str) -> tuple[bool, bool]:
+    """Resolve the ``--controls`` value to a posture.
+
+    Args:
+        raw: The flag's value.
+
+    Returns:
+        ``(remove_split_k, math_attention)``.
+
+    Raises:
+        ValueError: When the name is not one of :data:`CONTROL_ARMS`. Refused
+            rather than defaulted: a trace whose arm was guessed is a trace
+            whose record names a condition it may not have run, which is the
+            defect this command's ``workspace_observation`` already exists to
+            prevent one control at a time.
+    """
+    arm = CONTROL_ARMS.get(raw)
+    if arm is None:
+        raise ValueError(
+            f"{CONTROLS_FLAG} must be one of {', '.join(sorted(CONTROL_ARMS))}; got {raw!r}"
+        )
+    return arm
 
 
 def tensor_observations(rung: str, traced: tuple[TracedTensor, ...]) -> tuple[Observation, ...]:
@@ -130,15 +175,23 @@ def workspace_observation() -> Observation:
     return Observation(name=WORKSPACE_NAME, value=float(int(raw)))
 
 
-def trace_run_record(device: str, rungs: tuple[str, ...]) -> RunRecord:
+def trace_run_record(
+    device: str, rungs: tuple[str, ...], *, remove_split_k: bool, math_attention: bool
+) -> RunRecord:
     """Pin determinism, trace every rung, and record what they ran on.
 
     Determinism is pinned FIRST, before any rung builds a model, because
     ``CUBLAS_WORKSPACE_CONFIG`` is read when the cuBLAS handle is created and
-    constructing a model on cuda is enough to create it.
+    constructing a model on cuda is enough to create it. The controls are part
+    of that pin, so they are applied there too -- and the record says which
+    were, because :func:`~platform_ml.determinism.apply_determinism` writes
+    ``cublaslt_split_k`` and ``sdpa_backends`` into the determinism block only
+    when it applied them.
 
     Args:
         device: Device to trace every rung on.
+        remove_split_k: Whether to take split-K out of cuBLASLt's options.
+        math_attention: Whether to restrict attention to the math kernel.
         rungs: The rungs to walk, in order. Taken as an argument rather than
             read from the module so the suite can exercise this on one cheap
             rung: the declared set ends in a 1.5-billion-parameter model,
@@ -163,7 +216,10 @@ def trace_run_record(device: str, rungs: tuple[str, ...]) -> RunRecord:
     # worth nothing, so finding that out must not cost a GPU-hour first.
     workspace = workspace_observation()
 
-    fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
+    fingerprint: RunFingerprint = capture_run_fingerprint(
+        device,
+        probe_determinism(device, remove_split_k=remove_split_k, math_attention=math_attention),
+    )
 
     observations: list[Observation] = [workspace]
     for rung, shape in shapes:
@@ -202,7 +258,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
 
-    record = trace_run_record(cli_args.require_flag(parsed, DEVICE_FLAG), _test_hooks.trace_rungs())
+    remove_split_k, math_attention = require_control_arm(
+        cli_args.require_flag(parsed, CONTROLS_FLAG)
+    )
+    record = trace_run_record(
+        cli_args.require_flag(parsed, DEVICE_FLAG),
+        _test_hooks.trace_rungs(),
+        remove_split_k=remove_split_k,
+        math_attention=math_attention,
+    )
 
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -240,8 +304,10 @@ def entrypoint() -> None:
 
 
 __all__ = [
+    "CONTROL_ARMS",
     "entrypoint",
     "main",
+    "require_control_arm",
     "tensor_observations",
     "trace_run_record",
     "workspace_observation",

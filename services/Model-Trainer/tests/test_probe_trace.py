@@ -23,6 +23,12 @@ import pytest
 from platform_core.json_utils import load_json_str
 from platform_core.known_answer_registry import entry_from_record
 from platform_core.run_record import NO_PAYLOAD, decode_run_record
+from platform_ml.determinism import (
+    ATTENTION_MATH_ONLY,
+    ATTENTION_SETTING,
+    SPLIT_K_REMOVED,
+    SPLIT_K_SETTING,
+)
 
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import probe_trace
@@ -92,12 +98,14 @@ def _out_path(tmp_path: pathlib.Path) -> pathlib.Path:
 
 def _argv(tmp_path: pathlib.Path) -> list[str]:
     """Return a complete CPU command line for the trace."""
-    return ["--device", "cpu", "--out", str(_out_path(tmp_path))]
+    return ["--device", "cpu", "--out", str(_out_path(tmp_path)), "--controls", "none"]
 
 
 class TestWhatOneRecordCarries:
     def test_it_reports_two_observations_for_every_traced_tensor(self) -> None:
-        record = probe_trace.trace_run_record("cpu", CHEAP)
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False
+        )
         parsed = [parse_trace_name(o["name"]) for o in record["observations"]]
         tensors = [p for p in parsed if p is not None]
         suffixes = {p["suffix"] for p in tensors}
@@ -106,7 +114,9 @@ class TestWhatOneRecordCarries:
         assert len(tensors) % 2 == 0
 
     def test_the_loss_it_records_is_what_the_production_forward_pass_returns(self) -> None:
-        record = probe_trace.trace_run_record("cpu", CHEAP)
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False
+        )
         values = {o["name"]: o["value"] for o in record["observations"]}
 
         assert values[trace_loss_name("tiny")] == probe_forward_loss("cpu", PROBE_SHAPES["tiny"])
@@ -114,13 +124,17 @@ class TestWhatOneRecordCarries:
     def test_every_measurement_names_the_rung_it_came_from(self, no_workspace: None) -> None:
         # Everything except the one RECORD-level observation, which describes
         # the process rather than any rung and so carries no rung prefix.
-        record = probe_trace.trace_run_record("cpu", CHEAP)
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False
+        )
         names = [o["name"] for o in record["observations"]]
 
         assert [name for name in names if not name.startswith("tiny|")] == [WORKSPACE_NAME]
 
     def test_the_observations_come_back_in_execution_order(self) -> None:
-        record = probe_trace.trace_run_record("cpu", CHEAP)
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False
+        )
         digests = [
             parsed
             for parsed in (parse_trace_name(o["name"]) for o in record["observations"])
@@ -131,7 +145,9 @@ class TestWhatOneRecordCarries:
         assert steps == sorted(steps)
 
     def test_the_first_traced_tensor_is_the_token_embedding_input(self) -> None:
-        record = probe_trace.trace_run_record("cpu", CHEAP)
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False
+        )
         digests = [
             parsed
             for parsed in (parse_trace_name(o["name"]) for o in record["observations"])
@@ -141,7 +157,9 @@ class TestWhatOneRecordCarries:
         assert (digests[0]["path"], digests[0]["kind"]) == ("transformer.wte", "in")
 
     def test_it_declares_its_own_experiment_and_a_derived_label(self) -> None:
-        record = probe_trace.trace_run_record("cpu", CHEAP)
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False
+        )
 
         assert record["experiment"] == TRACE_EXPERIMENT
         assert record["label"] == trace_label(CHEAP)
@@ -149,10 +167,17 @@ class TestWhatOneRecordCarries:
     def test_it_carries_no_payload_digest(self) -> None:
         # The digests ARE the output; a payload digest over them would restate
         # the numbers rather than add the independent check a digest is for.
-        assert probe_trace.trace_run_record("cpu", CHEAP)["payload_digest"] == NO_PAYLOAD
+        assert (
+            probe_trace.trace_run_record("cpu", CHEAP, remove_split_k=False, math_attention=False)[
+                "payload_digest"
+            ]
+            == NO_PAYLOAD
+        )
 
     def test_a_cpu_trace_records_no_card_and_no_driver(self) -> None:
-        fingerprint = probe_trace.trace_run_record("cpu", CHEAP)["fingerprint"]
+        fingerprint = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False
+        )["fingerprint"]
 
         assert (fingerprint["gpu_model"], fingerprint["driver_version"]) == ("", "")
 
@@ -161,7 +186,12 @@ class TestWhatOneRecordCarries:
         # exactly one. It must be refused by count rather than quietly
         # registering whichever observation happened to sort first.
         with pytest.raises(ValueError, match="exactly one observation"):
-            entry_from_record(probe_trace.trace_run_record("cpu", CHEAP), 0.0)
+            entry_from_record(
+                probe_trace.trace_run_record(
+                    "cpu", CHEAP, remove_split_k=False, math_attention=False
+                ),
+                0.0,
+            )
 
 
 class TestRecordingTheSplitKCondition:
@@ -224,12 +254,16 @@ class TestRecordingTheSplitKCondition:
         cli_hooks.env_cublaslt_workspace = lambda: "lots"
         try:
             with pytest.raises(ValueError, match="which is not an integer"):
-                probe_trace.trace_run_record("cpu", CHEAP)
+                probe_trace.trace_run_record(
+                    "cpu", CHEAP, remove_split_k=False, math_attention=False
+                )
         finally:
             cli_hooks.env_cublaslt_workspace = cli_hooks._default_env_cublaslt_workspace
 
     def test_the_record_carries_the_condition_beside_the_tensors(self, no_workspace: None) -> None:
-        record = probe_trace.trace_run_record("cpu", CHEAP)
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False
+        )
         named = {o["name"]: o["value"] for o in record["observations"]}
 
         assert named[WORKSPACE_NAME] == WORKSPACE_UNSET
@@ -268,11 +302,15 @@ class TestNamingTracedTensors:
 class TestRefusals:
     def test_an_unknown_rung_is_refused_and_nothing_is_traced(self) -> None:
         with pytest.raises(KeyError, match="unknown probe rung 'enormous'"):
-            probe_trace.trace_run_record("cpu", ("enormous",))
+            probe_trace.trace_run_record(
+                "cpu", ("enormous",), remove_split_k=False, math_attention=False
+            )
 
     def test_a_repeated_rung_is_refused_before_any_work(self) -> None:
         with pytest.raises(ValueError, match="cannot walk one rung twice"):
-            probe_trace.trace_run_record("cpu", ("tiny", "tiny"))
+            probe_trace.trace_run_record(
+                "cpu", ("tiny", "tiny"), remove_split_k=False, math_attention=False
+            )
 
 
 class TestTheCommandLine:
@@ -301,13 +339,13 @@ class TestTheCommandLine:
         self, tmp_path: pathlib.Path
     ) -> None:
         with pytest.raises(ValueError, match="--device"):
-            probe_trace.main(["--out", str(_out_path(tmp_path))])
+            probe_trace.main(["--out", str(_out_path(tmp_path)), "--controls", "none"])
 
         assert not _out_path(tmp_path).exists()
 
     def test_an_absent_out_is_refused(self) -> None:
         with pytest.raises(ValueError, match="--out"):
-            probe_trace.main(["--device", "cpu"])
+            probe_trace.main(["--device", "cpu", "--controls", "none"])
 
     def test_an_unknown_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--rung"):
@@ -351,3 +389,62 @@ class TestTheCommandLine:
 
         written = decode_run_record(load_json_str(_out_path(tmp_path).read_text(encoding="utf-8")))
         assert written["label"] == trace_label(CHEAP)
+
+
+class TestTheControlArms:
+    """The flag exists so the instrument can reach the treated condition.
+
+    Split-K had an environment escape and the attention pin has none -- it is
+    four `torch.backends.cuda` calls -- so before this flag a trace could only
+    ever observe attention untreated. An instrument that cannot reach a
+    condition cannot measure it.
+    """
+
+    def test_every_arm_names_a_distinct_posture(self) -> None:
+        # Four arms because the two controls are disjoint: split-K governs
+        # cuBLASLt matmuls, the math pin governs attention. The single-control
+        # arms are what make attribution a run rather than a code change.
+        assert probe_trace.CONTROL_ARMS == {
+            "none": (False, False),
+            "split-k": (True, False),
+            "attention": (False, True),
+            "both": (True, True),
+        }
+
+    def test_it_resolves_each_arm(self) -> None:
+        assert probe_trace.require_control_arm("none") == (False, False)
+        assert probe_trace.require_control_arm("both") == (True, True)
+
+    def test_an_unknown_arm_is_refused_by_name(self) -> None:
+        # Refused rather than defaulted: a trace whose arm was guessed is a
+        # trace whose record names a condition it may not have run.
+        with pytest.raises(ValueError, match="must be one of attention, both, none, split-k"):
+            probe_trace.require_control_arm("splitk")
+
+    def test_the_applied_arm_reaches_the_determinism_record(self, tmp_path: pathlib.Path) -> None:
+        # The record is how a reader knows which arm produced a trace, and
+        # `apply_determinism` writes these keys ONLY when it applied them --
+        # so their presence is evidence, not a restatement of the flag.
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=True, math_attention=True
+        )
+        settings = dict(record["fingerprint"]["determinism"]["settings"])
+
+        assert settings[SPLIT_K_SETTING] == SPLIT_K_REMOVED
+        assert settings[ATTENTION_SETTING] == ATTENTION_MATH_ONLY
+
+    def test_the_none_arm_leaves_the_record_as_it_was(self, tmp_path: pathlib.Path) -> None:
+        # The arm every other measurement command is fixed at. It must add no
+        # setting, so a trace taken under it stays comparable with every trace
+        # taken before the flag existed.
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False
+        )
+        settings = dict(record["fingerprint"]["determinism"]["settings"])
+
+        assert SPLIT_K_SETTING not in settings
+        assert ATTENTION_SETTING not in settings
+
+    def test_the_flag_is_required(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match="--controls"):
+            probe_trace.main(["--device", "cpu", "--out", str(_out_path(tmp_path))])

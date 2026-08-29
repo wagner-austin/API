@@ -42,6 +42,18 @@ from model_trainer.core.services.model.probe_shapes import (
 GATE_SHAPE = require_probe_shape(GATE_RUNG)
 
 
+def _pinned(device: str) -> DeterminismRecord:
+    """Pin the untreated arm, which is the one every measurement uses.
+
+    Args:
+        device: Device the probe would run on.
+
+    Returns:
+        What `probe_determinism` applied.
+    """
+    return probe_cli.probe_determinism(device, remove_split_k=False, math_attention=False)
+
+
 def _out_path(tmp_path: pathlib.Path) -> pathlib.Path:
     """Return the record path used by the CLI tests."""
     return tmp_path / "records" / "probe.json"
@@ -164,7 +176,7 @@ class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
     """
 
     def test_a_cpu_probe_records_the_thread_count_it_pinned(self) -> None:
-        settings = dict(probe_cli.probe_determinism("cpu")["settings"])
+        settings = dict(_pinned("cpu")["settings"])
 
         assert settings[TORCH_THREAD_SETTING] == str(probe_cli.PROBE_CPU_THREADS)
 
@@ -185,12 +197,12 @@ class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
         `configuration_differs` against all eight entries in
         known-answers.json, which were registered without it.
         """
-        assert TORCH_THREAD_SETTING not in dict(probe_cli.probe_determinism("cuda")["settings"])
+        assert TORCH_THREAD_SETTING not in dict(_pinned("cuda")["settings"])
 
     def test_the_cuda_record_is_exactly_what_the_stack_pinned(self) -> None:
         applied = cli_hooks.apply_determinism_hook(remove_split_k=False, math_attention=False)
 
-        assert probe_cli.probe_determinism("cuda") == applied
+        assert _pinned("cuda") == applied
 
     def test_the_probe_leaves_split_k_alone_where_a_training_run_removes_it(self) -> None:
         """The instrument must not impose the treatment it measures.
@@ -206,12 +218,12 @@ class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
         gating -- see `SPLIT_K_SETTING` for why absence rather than an
         explicit "not removed".
         """
-        assert SPLIT_K_SETTING not in dict(probe_cli.probe_determinism("cuda")["settings"])
-        assert SPLIT_K_SETTING not in dict(probe_cli.probe_determinism("cpu")["settings"])
+        assert SPLIT_K_SETTING not in dict(_pinned("cuda")["settings"])
+        assert SPLIT_K_SETTING not in dict(_pinned("cpu")["settings"])
 
     def test_the_two_devices_do_not_produce_the_same_posture(self) -> None:
         """They ran different arithmetic; their records have to differ."""
-        assert probe_cli.probe_determinism("cpu") != probe_cli.probe_determinism("cuda")
+        assert _pinned("cpu") != _pinned("cuda")
 
     def test_the_count_recorded_is_the_one_torch_resolved_to(self) -> None:
         """A request and a resolved value are different facts. torch may clamp
@@ -224,7 +236,7 @@ class TestTheProbePinsWhatGovernsTheDeviceItRanOn:
 
         cli_hooks.pin_torch_threads = _pin
         try:
-            settings = dict(probe_cli.probe_determinism("cpu")["settings"])
+            settings = dict(_pinned("cpu")["settings"])
         finally:
             cli_hooks.pin_torch_threads = cli_hooks._default_pin_torch_threads
 

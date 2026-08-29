@@ -175,7 +175,9 @@ def benchmark_run_record(device: str, out: pathlib.Path) -> RunRecord:
         The record: both conditions' timings under one fingerprint, because
         both ran on one card in one allocation.
     """
-    fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
+    fingerprint: RunFingerprint = capture_run_fingerprint(
+        device, probe_determinism(device, remove_split_k=False, math_attention=False)
+    )
 
     default = timing_observations(device, DEFAULT_CONDITION, _test_hooks.benchmark_shapes())
     child = run_child(device, out.with_name(f"{out.stem}-child{out.suffix}"))
@@ -219,7 +221,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         record = run_record(
             experiment=BENCHMARK_EXPERIMENT,
             label=BENCHMARK_LABEL,
-            fingerprint=capture_run_fingerprint(device, probe_determinism(device)),
+            fingerprint=capture_run_fingerprint(
+                device, probe_determinism(device, remove_split_k=False, math_attention=False)
+            ),
             observations=timing_observations(device, condition, _test_hooks.benchmark_shapes()),
             payload_digest=NO_PAYLOAD,
         )

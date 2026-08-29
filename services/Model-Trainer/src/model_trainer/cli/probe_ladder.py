@@ -140,7 +140,9 @@ def ladder_run_record(device: str, shapes: Mapping[str, ProbeShape]) -> RunRecor
         a digest over them would restate the numbers rather than add the
         independent check a digest is for.
     """
-    fingerprint: RunFingerprint = capture_run_fingerprint(device, probe_determinism(device))
+    fingerprint: RunFingerprint = capture_run_fingerprint(
+        device, probe_determinism(device, remove_split_k=False, math_attention=False)
+    )
 
     observations: list[Observation] = []
     for rung, shape in shapes.items():
