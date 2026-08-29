@@ -45,11 +45,29 @@ class Closure(TypedDict):
         closed_at: ISO-8601 timestamp of the observation, supplied by the
             caller. Not when the job ended -- when this tool noticed, which is
             the only thing it can honestly claim.
+        elapsed_seconds: How long the job actually ran, as accounting
+            reported it. Kept here because this is the only durable record of
+            it: ``sacct`` forgets, and the answer to "how long does this
+            project's work really take" is otherwise unavailable the moment
+            retention expires.
+
+            It exists because nothing compared a request to a runtime.
+            ``turkic-lstm`` declared 720 minutes and its members finished in
+            27, a 26x over-request that left five of them unschedulable for
+            hours -- and every check in the package passed, because the
+            budget cap had been derived FROM the request (7 x 12h = 84.0
+            exactly) and so could never contradict it.
+
+            THREE STATES, because there are three: a duration; ``None`` for a
+            closure written before this field existed, which is a real thing
+            to have been and not a zero; and a missing key, which is a
+            malformed record and refused.
     """
 
     job_id: str
     state: JobState
     closed_at: str
+    elapsed_seconds: int | None
 
 
 def encode_closure(closure: Closure) -> dict[str, JSONValue]:
@@ -65,7 +83,40 @@ def encode_closure(closure: Closure) -> dict[str, JSONValue]:
         "job_id": closure["job_id"],
         "state": closure["state"],
         "closed_at": closure["closed_at"],
+        "elapsed_seconds": closure["elapsed_seconds"],
     }
+
+
+def _require_elapsed_or_null(obj: dict[str, JSONValue]) -> int | None:
+    """Read the runtime, which may be a stated absence but not a missing key.
+
+    Args:
+        obj: Object being decoded.
+
+    Returns:
+        The duration, or None when the closure was written before this field
+        existed -- a real thing to have been.
+
+    Raises:
+        JSONTypeError: If the key is absent, the value is not an integer or
+            null, or the duration is negative. Absent is refused rather than
+            defaulted: a closure that never carried a runtime and one whose
+            runtime was dropped by a bad write are different records, and
+            treating the second as the first is how the count this feeds
+            starts quietly lying.
+    """
+    if "elapsed_seconds" not in obj:
+        raise JSONTypeError("Field 'elapsed_seconds' is required; write null if unknown")
+    value = obj["elapsed_seconds"]
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise JSONTypeError(
+            f"Field 'elapsed_seconds' must be an integer or null, got {type(value).__name__}"
+        )
+    if value < 0:
+        raise JSONTypeError(f"Field 'elapsed_seconds' must not be negative, got {value}")
+    return value
 
 
 def decode_closure(value: JSONValue) -> Closure:
@@ -93,7 +144,12 @@ def decode_closure(value: JSONValue) -> Closure:
     if closed_at == "":
         raise JSONTypeError("Field 'closed_at' must not be empty")
 
-    return Closure(job_id=job_id, state=require_state(value, "state"), closed_at=closed_at)
+    return Closure(
+        job_id=job_id,
+        state=require_state(value, "state"),
+        closed_at=closed_at,
+        elapsed_seconds=_require_elapsed_or_null(value),
+    )
 
 
 __all__ = ["Closure", "decode_closure", "encode_closure"]

@@ -429,6 +429,74 @@ class TestTriageCli:
 
         assert triage_cli.main(self._config(tmp_path)) == 0
 
+    def _closed_history(self, tmp_path: pathlib.Path, *, elapsed: int) -> None:
+        """Record two finished jobs on the project's own partition.
+
+        Args:
+            tmp_path: Directory holding the ledger.
+            elapsed: Seconds the LONGER of them ran; job 101 gets this and
+                job 102 gets half, so the evidence a finding names is
+                unambiguous rather than a tie broken by job id.
+        """
+        write_file(
+            tmp_path / "ledger.jsonl",
+            b"".join(
+                dump_json_str(ledger_row(job_id=job_id, name=f"abl.arm-{job_id}")).encode("utf-8")
+                + b"\n"
+                for job_id in ("101", "102")
+            ),
+        )
+        write_file(
+            tmp_path / "ledger.jsonl.closed",
+            b"".join(
+                dump_json_str(
+                    {
+                        "job_id": job_id,
+                        "state": "COMPLETED",
+                        "closed_at": "2026-08-28T21:00:00+00:00",
+                        "elapsed_seconds": elapsed if job_id == "101" else elapsed // 2,
+                    }
+                ).encode("utf-8")
+                + b"\n"
+                for job_id in ("101", "102")
+            ),
+        )
+
+    def test_a_project_asking_for_far_more_than_it_uses_is_found(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """turkic-lstm asked for 720 minutes and finished in 27, and every
+        check passed because the budget cap had been derived from the
+        request."""
+        self._closed_history(tmp_path, elapsed=60)
+
+        assert triage_cli.main(self._config(tmp_path, projects={"abl": project_config()})) == 1
+        reported = [line for line in emitted if line.startswith("OVERSIZED")]
+        assert len(reported) == 1
+        assert reported[0].startswith("OVERSIZED 101 abl:")
+        assert "min or less would not be remarked on" in reported[0]
+
+    def test_it_is_reported_even_when_every_job_is_closed(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """A fully closed ledger is a project whose work has all FINISHED,
+        which is when its runtimes are most worth comparing against its
+        request. This check sat after that early return for one revision and
+        was silent in exactly the steady state it describes."""
+        self._closed_history(tmp_path, elapsed=60)
+
+        assert triage_cli.main(self._config(tmp_path, projects={"abl": project_config()})) == 1
+        assert any("nothing left to reconcile" in line for line in emitted)
+        assert any(line.startswith("OVERSIZED") for line in emitted)
+
+    def test_a_right_sized_project_is_not_remarked_on(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        self._closed_history(tmp_path, elapsed=60 * 60)
+
+        assert triage_cli.main(self._config(tmp_path, projects={"abl": project_config()})) == 0
+        assert not any(line.startswith("OVERSIZED") for line in emitted)
+
     def test_a_silent_running_job_is_found(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:

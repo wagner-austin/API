@@ -26,6 +26,24 @@ from tests.conftest import ledger_row, write_file
 _AT = "2026-08-22T16:00:00+00:00"
 
 
+def _closed(job_id: str, state: str = "COMPLETED", closed_at: str = _AT) -> Closure:
+    """Build a closure for a bookkeeping test.
+
+    Args:
+        job_id: Job id.
+        state: Terminal state accounting reported.
+        closed_at: When this tool noticed.
+
+    Returns:
+        A validated closure. ``elapsed_seconds`` is null throughout this file:
+        these tests are about closure bookkeeping, not about runtimes, and a
+        fabricated duration here would read as evidence somewhere it is not.
+    """
+    return decode_closure(
+        {"job_id": job_id, "state": state, "closed_at": closed_at, "elapsed_seconds": None}
+    )
+
+
 def _entry(job_id: str) -> LedgerEntry:
     """Build a ledger entry.
 
@@ -73,11 +91,11 @@ class TestTheRetentionFalsePositive:
 
     def test_a_closed_job_is_never_asked_about_again(self) -> None:
         """The fix: it is not in the set the question is asked of."""
-        closed = {"101": Closure(job_id="101", state="COMPLETED", closed_at=_AT)}
+        closed = {"101": _closed("101", "COMPLETED", _AT)}
         assert open_entries([_entry("101")], closed) == []
 
     def test_the_two_together_stop_the_permanent_finding(self) -> None:
-        closed = {"101": Closure(job_id="101", state="COMPLETED", closed_at=_AT)}
+        closed = {"101": _closed("101", "COMPLETED", _AT)}
         still_open = open_entries([_entry("101"), _entry("102")], closed)
         assert [f.job_id for f in unaccounted_jobs(still_open, [])] == ["102"]
 
@@ -121,10 +139,9 @@ class TestClosureStore:
 
     def test_a_written_closure_reads_back(self, tmp_path: pathlib.Path) -> None:
         path = tmp_path / "l.jsonl.closed"
-        ledger.append_closure(path, Closure(job_id="101", state="COMPLETED", closed_at=_AT))
-        assert ledger.read_closures(path) == {
-            "101": {"job_id": "101", "state": "COMPLETED", "closed_at": _AT}
-        }
+        written = Closure(job_id="101", state="COMPLETED", closed_at=_AT, elapsed_seconds=1618)
+        ledger.append_closure(path, written)
+        assert ledger.read_closures(path) == {"101": written}
 
     def test_an_absent_file_reads_as_nothing_closed(self, tmp_path: pathlib.Path) -> None:
         assert ledger.read_closures(tmp_path / "never.closed") == {}
@@ -132,26 +149,26 @@ class TestClosureStore:
     def test_closures_accumulate(self, tmp_path: pathlib.Path) -> None:
         path = tmp_path / "l.closed"
         for job_id in ("101", "102", "103"):
-            ledger.append_closure(path, Closure(job_id=job_id, state="COMPLETED", closed_at=_AT))
+            ledger.append_closure(path, _closed(job_id, "COMPLETED", _AT))
         assert sorted(ledger.read_closures(path)) == ["101", "102", "103"]
 
     def test_a_repeated_job_resolves_to_the_later_record(self, tmp_path: pathlib.Path) -> None:
         """Unlike the ledger a duplicate is harmless: both say it ended."""
         path = tmp_path / "l.closed"
-        ledger.append_closure(path, Closure(job_id="101", state="FAILED", closed_at=_AT))
-        ledger.append_closure(path, Closure(job_id="101", state="COMPLETED", closed_at="later"))
+        ledger.append_closure(path, _closed("101", "FAILED", _AT))
+        ledger.append_closure(path, _closed("101", "COMPLETED", "later"))
         assert ledger.read_closures(path)["101"]["state"] == "COMPLETED"
 
     def test_blank_lines_are_skipped(self, tmp_path: pathlib.Path) -> None:
         path = tmp_path / "l.closed"
-        ledger.append_closure(path, Closure(job_id="101", state="COMPLETED", closed_at=_AT))
+        ledger.append_closure(path, _closed("101", "COMPLETED", _AT))
         write_file(path, path.read_bytes() + b"\n\n")
         assert len(ledger.read_closures(path)) == 1
 
     def test_a_malformed_line_fails_the_read(self, tmp_path: pathlib.Path) -> None:
         """Skipping it would resurrect a finished job as an unaccounted finding."""
         path = tmp_path / "l.closed"
-        ledger.append_closure(path, Closure(job_id="101", state="COMPLETED", closed_at=_AT))
+        ledger.append_closure(path, _closed("101", "COMPLETED", _AT))
         write_file(path, path.read_bytes() + b'{"job_id": "102"}\n')
         with pytest.raises(JSONTypeError):
             ledger.read_closures(path)
@@ -163,6 +180,7 @@ class TestClosureContract:
             "job_id": "101",
             "state": "COMPLETED",
             "closed_at": _AT,
+            "elapsed_seconds": 1618,
         }
         assert encode_closure(decode_closure(payload)) == payload
 
@@ -172,12 +190,18 @@ class TestClosureContract:
 
     def test_an_unrecognised_state_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
-            decode_closure({"job_id": "1", "state": "VANISHED", "closed_at": _AT})
+            decode_closure(
+                {"job_id": "1", "state": "VANISHED", "closed_at": _AT, "elapsed_seconds": None}
+            )
 
     def test_an_empty_job_id_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
-            decode_closure({"job_id": "", "state": "COMPLETED", "closed_at": _AT})
+            decode_closure(
+                {"job_id": "", "state": "COMPLETED", "closed_at": _AT, "elapsed_seconds": None}
+            )
 
     def test_an_empty_timestamp_is_refused(self) -> None:
         with pytest.raises(JSONTypeError):
-            decode_closure({"job_id": "1", "state": "COMPLETED", "closed_at": ""})
+            decode_closure(
+                {"job_id": "1", "state": "COMPLETED", "closed_at": "", "elapsed_seconds": None}
+            )

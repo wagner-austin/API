@@ -53,7 +53,7 @@ class Finding:
         job_id: The job in question.
         name: Its name, as submitted.
         kind: Which condition it hit -- ``blocked``, ``unaccounted``,
-            ``unclaimed`` or ``silent``.
+            ``unclaimed``, ``silent`` or ``oversized``.
         detail: Human-readable specifics, such as the scheduler's own reason.
     """
 
@@ -125,7 +125,16 @@ def closures_for(statuses: Sequence[JobStatus], *, closed_at: str) -> list[Closu
         which is protection working rather than the run ending.
     """
     return [
-        Closure(job_id=status["job_id"], state=status["state"], closed_at=closed_at)
+        Closure(
+            job_id=status["job_id"],
+            state=status["state"],
+            closed_at=closed_at,
+            # Captured here because this is the last moment it is available:
+            # sacct's retention is finite, and this is the only place the
+            # package will ever be able to answer "how long does this
+            # project's work actually take".
+            elapsed_seconds=status["elapsed_seconds"],
+        )
         for status in statuses
         if is_terminal(status["state"])
     ]

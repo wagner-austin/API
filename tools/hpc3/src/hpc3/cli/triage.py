@@ -9,7 +9,7 @@ from the workspace, so this command necessarily reads the same record
 way to get a clean board while jobs run unwatched.
 
 Reconciles the local ledger against the cluster -- in both directions -- and
-reports four conditions that a normal status check cannot distinguish from
+reports five conditions that a normal status check cannot distinguish from
 health:
 
 * **blocked** -- pending on a reason that will never resolve. On HPC3, 261 of
@@ -22,6 +22,10 @@ health:
   evidence is the absence of a LOCAL record, so the enumeration has to start
   from the account.
 * **silent** -- ``RUNNING``, holding GPUs, and its log has stopped growing.
+* **oversized** -- the project asks Slurm for far more wall clock than its
+  work has ever taken, so its jobs wait for a hole they never needed. The one
+  finding drawn from history rather than from the queue, and the only one
+  needing no cluster query.
 
 Exits non-zero when anything is found. A triage command that reports problems
 and exits 0 is a triage command whose output gets skimmed.
@@ -40,6 +44,7 @@ from hpc3.contracts.pending import PendingJob
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import ledger, logs
 from hpc3.core.remote import run_remote
+from hpc3.core.rightsize import describe, oversized_projects
 from hpc3.core.squeue import (
     account_command,
     parse_account_output,
@@ -123,6 +128,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     account = parse_account_output(run_remote(host, account_command()))
     findings: list[Finding] = unclaimed_jobs(recorded, account)
 
+    # Read here, and the right-sizing done here, because BOTH early returns
+    # below are reachable with a project that is over-requesting -- a fully
+    # closed ledger is precisely a project whose work has all finished, which
+    # is when its runtimes are most worth comparing against its request. This
+    # check sat after those returns for one revision and was silent in the
+    # steady state, which is the state it exists to describe.
+    #
+    # It therefore reports from closures written by EARLIER runs, so a project
+    # becomes right-sizeable on the run after the one that finishes its second
+    # member. That delay is real and preferable to a check that is skipped.
+    closed = ledger.read_closures(closures_path)
+    findings.extend(
+        Finding(item["evidence"], item["project"], "oversized", describe(item))
+        for item in oversized_projects(workspace["projects"], recorded, closed)
+    )
+
     if recorded == []:
         _test_hooks.emit("ledger is empty; nothing has been submitted from this machine")
         return _report(findings)
@@ -131,7 +152,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     # this, every job older than the cluster's sacct retention window becomes
     # a permanent 'unaccounted' finding, and a board that is always red is the
     # same as no board.
-    closed = ledger.read_closures(closures_path)
     entries = open_entries(recorded, closed)
     if entries == []:
         _test_hooks.emit(f"{len(recorded)} recorded, all closed; nothing left to reconcile")
@@ -161,14 +181,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             *silent_jobs(statuses, ages, quiet_seconds=quiet_seconds),
         ]
     )
-    exit_code = _report(findings)
 
-    # Written AFTER the findings are built, so this run still reports on a job
-    # it is closing, and only then stops asking. Recorded whatever the verdict
-    # was: a job that ended is a job accounting will eventually forget.
+    # Written AFTER the job findings are built, so this run still reports on a
+    # job it is closing, and only then stops asking. Recorded whatever the
+    # verdict was: a job that ended is a job accounting will eventually forget.
     newly_closed = closures_for(statuses, closed_at=_test_hooks.now_iso())
     for closure in newly_closed:
         ledger.append_closure(closures_path, closure)
+
+    exit_code = _report(findings)
 
     _test_hooks.emit(
         f"{len(recorded)} recorded, {len(account)} on the cluster, {len(entries)} open, "

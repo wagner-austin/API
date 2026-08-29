@@ -742,7 +742,7 @@ same rendered file is then submitted, so preflight and submission cannot drift.
 
 ---
 
-## Triage: the four conditions that look like health
+## Triage: the five conditions that look like health
 
 `hpc3-triage` reconciles the ledger against the cluster **in both directions**
 and exits non-zero if anything is found.
@@ -763,6 +763,27 @@ and exits non-zero if anything is found.
 - **silent** — `RUNNING`, holding GPUs, and its log has stopped growing. Log
   age is measured against the cluster's own clock; a few minutes of skew would
   either invent staleness or hide it.
+- **oversized** — the project asks Slurm for far more wall clock than its work
+  has ever taken. Slurm backfills a job into a hole its own size, so an
+  oversized request waits for a hole it never needed. The only finding drawn
+  from history rather than the queue, and the only one needing no cluster
+  query — the runtimes live in the closure records.
+
+**What `oversized` caught the day it was written.** `turkic-lstm` declared
+`minutes: 720`; its members finished in 27 minutes, and five more sat
+unschedulable for hours. That got past everything because it was never
+measured — the project was created before LSTM had ever run on the cluster —
+then inherited from the `abl` example above, and finally *ratified* by a
+budget derived from it: the cap was 84.0 GPU-hours and 7 members × 12 hours is
+84.0 exactly, so the one number positioned to contradict the request had been
+computed from it. `floor` was over-requested too, by 10×, and nobody had
+noticed either.
+
+Only `COMPLETED` runs on the project's **own partition** count as evidence.
+Both exclusions were learned from this check's first live run, which reported
+a true finding for two wrong reasons: it counted a cancelled job's zero
+seconds, and it took its evidence from an image build that ran on `free` under
+`build.sbatch`'s own limit and had never used `minutes` at all.
 
 **Only three of these existed until 2026-08-28**, and the missing one was the
 mirror of the one everybody thought was the clever check. `unaccounted` proves
