@@ -39,25 +39,25 @@ class TestRecoveryHelpers:
 
     def test_compute_equipment_collect_fuel(self) -> None:
         """Stocked combat equipment enables the standard equipment list."""
-        assert compute_equipment("COLLECT", 800, make_inventory(), 1) == [2, 4, 5]
+        assert compute_equipment(800, make_inventory()) == [2, 4, 5]
 
     def test_compute_equipment_hunt(self) -> None:
         """Combat mode uses the same stocked equipment selection."""
-        assert compute_equipment("HUNT", 800, make_inventory(), 1) == [2, 4, 5]
+        assert compute_equipment(800, make_inventory()) == [2, 4, 5]
 
     def test_compute_equipment_no_shields(self) -> None:
         """Shields are never part of the active combat equipment selection."""
-        assert 1 not in compute_equipment("HUNT", 800, make_inventory(), 1)
+        assert 1 not in compute_equipment(800, make_inventory())
 
     def test_compute_equipment_dual_depleted(self) -> None:
         """Dual depletion removes dual from the active equipment list."""
-        assert compute_equipment("HUNT", 800, make_inventory(dual_count=0), 1) == [4, 5]
+        assert compute_equipment(800, make_inventory(dual_count=0)) == [4, 5]
 
     def test_compute_equipment_homing_depleted(self) -> None:
         """Homing depletion removes homing from the active equipment list."""
         inventory = make_inventory()
         inventory["homing_shots"]["count"] = 0
-        assert compute_equipment("HUNT", 800, inventory, 1) == [2, 5]
+        assert compute_equipment(800, inventory) == [2, 5]
 
     def test_expire_kills_removes_expired(self) -> None:
         """Expired kill cooldown entries are removed."""

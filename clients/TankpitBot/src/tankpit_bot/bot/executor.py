@@ -48,19 +48,16 @@ from tankpit_bot.sniffer.world_state_combat import (
 )
 from tankpit_bot.state.types.coord import coord_key
 
-# Equipment slots that get toggled based on the decision's desired set.
+# Combat equipment slots that get toggled based on behavior mode.
+# Slot 5 (radar) is handled separately — always enabled when desired + stocked.
 # Slot 3 (missiles) joined 2026-08-13: it was never MANAGED, so the
 # server's per-account default persisted — a fresh account (arterial)
 # spawned with missiles ENABLED while artax's older account state had
 # them off, and an enabled missile slot is consumed on occluded shots
-# (missiles fire over obstacles, [[game-rules]]). Slot 5 (radar)
-# joined 2026-08-28: it was enable-only, so once lit it stayed
-# server-side enabled forever and every press consumed an extra
-# regardless of what decisions desired — the income-burn deadlock
-# (16 radars gained, 16 spent, hunt bar never reached). The radar
-# hoard rule (tactics.compute_desired_equipment) now drives the slot
-# both ways.
-_MANAGED_SLOTS: list[int] = [1, 2, 3, 4, 5]
+# (missiles fire over obstacles, [[game-rules]]). The doctrine never
+# desires slot 3, so managing it means always-disabled — uniform
+# across accounts.
+_COMBAT_SLOTS: list[int] = [1, 2, 3, 4]
 
 # Wire command type -> ledger action kind. ``hold`` dispatches nothing
 # and is deliberately absent -- it produces no attempt to correlate.
@@ -101,16 +98,22 @@ def apply_equipment(bot: BotProtocol, desired: list[int]) -> None:
     """Enable desired equipment slots and disable undesired ones.
 
     Checks inventory stock before enabling — does not enable a slot
-    if the bot has zero remaining of that item. Every managed slot is
-    driven BOTH ways: an undesired slot is actively disabled, because
-    toggle state is server-held and persists across ticks (and
-    logins) — an unmanaged direction becomes a permanent stuck state.
+    if the bot has zero remaining of that item.  Slot 5 (extra radar)
+    is enabled first if desired and never disabled — the free
+    built-in 5x5 needs the slot ON at zero stock, and radar spending
+    is governed by the reveal-floor economics, not the toggle
+    (2026-08-28 operator revert of the radar-hoard band).
 
     Args:
         bot: Bot instance for equipment commands.
         desired: Sorted list of equipment slot numbers (1-5) to enable.
     """
-    for slot in _MANAGED_SLOTS:
+    # Extra radar: always enable if desired and stocked
+    if 5 in desired and bot._has_equipment_stock(5):
+        bot.enable_equipment(5)
+
+    # Combat slots (1=armor, 2=dual, 4=homing): enable if desired + stocked, else disable
+    for slot in _COMBAT_SLOTS:
         if slot in desired and bot._has_equipment_stock(slot):
             bot.enable_equipment(slot)
         else:

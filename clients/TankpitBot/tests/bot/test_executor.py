@@ -70,20 +70,6 @@ class TestApplyEquipment:
         # Should disable slots 1, 2, 3, 4 (4 CDP calls)
         assert fake_cdp._sent_methods.count("Runtime.evaluate") == 4
 
-    def test_disables_the_radar_slot_when_undesired(self, fake_env: FakeEnv) -> None:
-        """The radar slot is driven BOTH ways (2026-08-28 hoard rule).
-
-        Slot 5 used to be enable-only: once lit it stayed server-side
-        enabled forever and every press consumed an extra regardless
-        of what decisions desired -- the income-burn deadlock (16
-        radars gained, 16 spent, hunt bar never reached).
-        """
-        bot, fake_cdp = _make_bot(fake_env)
-        update_inventory_from_toggle(bot.world, [False, True, False, True, True])
-        apply_equipment(bot, [2, 4])
-        # Only slot 5 flips: 2 and 4 stay enabled, 1 and 3 stay off.
-        assert fake_cdp._sent_methods.count("Runtime.evaluate") == 1
-
     def test_skips_already_correct_state(self, fake_env: FakeEnv) -> None:
         """No toggles when equipment already matches desired state."""
         bot, fake_cdp = _make_bot(fake_env)

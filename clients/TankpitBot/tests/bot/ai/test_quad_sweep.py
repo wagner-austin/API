@@ -149,31 +149,23 @@ def test_anchored_sweep_continues_below_the_start_floor() -> None:
     assert decision["command"]["direction"] == SCOPE_SOUTHEAST
 
 
-def test_quadrant_spend_is_a_pure_reveal_floor() -> None:
-    """With the hoard gate holding the bar, only the reveal floor gates.
+def test_last_extra_needs_the_reserve_floor() -> None:
+    """At the reserve, a quadrant must clear the bigger reveal floor."""
+    inventory = make_inventory()
+    inventory["extra_radars"]["count"] = 1
+    ctx = make_sweep_ctx(now_ms=_NOW, scanned=True, block_scanned=False, inventory=inventory)
+    # Leave under 128 uncovered tiles per quadrant: cover all but a
+    # 7-row strip of the block.
+    for y in range(85, 116):
+        for x in range(85, 116):
+            if y >= 92:
+                ctx.world["scanned_tiles"][f"{x},{y}"] = _NOW
 
-    The old zero-extras and last-extras-reserve branches died with the
-    2026-08-28 hoard gate: a sweep tick always holds at least the hunt
-    bar of extras.
-    """
-    from tankpit_bot.bot.ai.context import RADAR_SPEND_REVEAL_FLOOR_TILES
+    assert plan_quad_sweep(ctx, _anchored_ai_state(100, 100)) is None
+
+
+def test_zero_extras_never_qualify_a_quadrant() -> None:
+    """The sweep is an extras strategy: zero extras refuse any spend."""
     from tankpit_bot.bot.ai.quad_sweep import _quadrant_spend_worthwhile
 
-    assert _quadrant_spend_worthwhile(RADAR_SPEND_REVEAL_FLOOR_TILES) is True
-    assert _quadrant_spend_worthwhile(RADAR_SPEND_REVEAL_FLOOR_TILES - 1) is False
-
-
-def test_sweep_declines_below_the_radar_hunt_bar() -> None:
-    """The hoard rule gates the sweep: below the bar, no 4-extra buys.
-
-    The 2026-08-28 validation run ran two back-to-back paid sweeps
-    (9 extras, zero equipment found) while stock sat far below the
-    hunt bar -- the income-burn deadlock. Below the bar the atlas hop
-    is the discovery strategy and the sweep declines outright.
-    """
-    stocked_below_bar = make_inventory()
-    stocked_below_bar["extra_radars"]["count"] = 9
-
-    ctx = make_sweep_ctx(now_ms=_NOW, inventory=stocked_below_bar)
-
-    assert plan_quad_sweep(ctx, make_scanned_ai_state()) is None
+    assert _quadrant_spend_worthwhile(961, 0) is False

@@ -237,7 +237,7 @@ def test_make_hold_decision_preserves_started_ms_when_already_unset() -> None:
     )
 
     decision = make_hold_decision(
-        state, timestamp_ms=15000, fuel=900, inventory=_make_hold_inventory(), rank=1
+        state, timestamp_ms=15000, fuel=900, inventory=_make_hold_inventory()
     )
 
     assert decision["updated_ai_state"]["mode_started_ms"] == 8000

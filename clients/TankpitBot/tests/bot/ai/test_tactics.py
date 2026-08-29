@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.tactics import (
-    combat_radar_min,
     compute_desired_equipment,
     should_proactive_radar,
 )
@@ -199,44 +198,3 @@ class TestComputeDesiredEquipment:
         """Shields are never included in desired equipment."""
         result = compute_desired_equipment("HUNT", 800)
         assert 1 not in result
-
-
-class TestRadarHoardRule:
-    """The extra-radar slot follows the hoard rule (2026-08-28)."""
-
-    def test_below_the_bar_outside_hunt_disables_radar(self) -> None:
-        """Restock-phase presses must serve the free built-in 5x5.
-
-        The 2026-08-28 validation run burned all 16 gained radars
-        mid-restock and never reached the hunt bar (income-burn
-        deadlock); below the bar the slot stays off outside HUNT.
-        """
-        result = compute_desired_equipment("COLLECT", 800, extra_radars_count=19, rank=1)
-        assert 5 not in result
-
-    def test_at_the_bar_outside_hunt_enables_radar(self) -> None:
-        """Reaching the bar re-arms paid scanning."""
-        result = compute_desired_equipment("COLLECT", 800, extra_radars_count=20, rank=1)
-        assert 5 in result
-
-    def test_hunt_keeps_radar_enabled_below_the_bar(self) -> None:
-        """Combat scanning is what the bar was saved FOR."""
-        result = compute_desired_equipment("HUNT", 800, extra_radars_count=3, rank=1)
-        assert 5 in result
-
-    def test_the_bar_is_rank_derived(self) -> None:
-        """combat_radar_min follows the inventory-capacity ladder."""
-        assert combat_radar_min(0) == 15
-        assert combat_radar_min(1) == 20
-        assert combat_radar_min(8) == 55
-
-    def test_zero_extras_enables_the_free_builtin_scan(self) -> None:
-        """At zero stock the slot is on: the free 5x5 only serves enabled.
-
-        The 2026-08-28 trial proved a press with the slot disabled is
-        a total no-op (no extras, no fuel, no scan) -- 369 dead
-        presses; the free grid-walk half of the doctrine lives at
-        exactly zero stock.
-        """
-        result = compute_desired_equipment("COLLECT", 800, extra_radars_count=0, rank=1)
-        assert 5 in result

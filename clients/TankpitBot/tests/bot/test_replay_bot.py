@@ -111,19 +111,17 @@ def test_fuel_probe_replay_first_dispatched_command_is_radar(
 def test_fuel_probe_replay_dispatches_sweep_radars_beyond_the_landing_scan(
     fuel_probe_session: ReplaySession,
 ) -> None:
-    """Band stock scans exactly once: the pre-inventory landing scan.
+    """The bot spends multiple radars: the landing scan plus sweep scans.
 
-    Re-pinned 2026-08-28 with the radar hoard rule: the recorded
-    session's stock sits in the hoard band (between one extra and the
-    hunt bar), where the slot is disabled and every scan decider
-    declines -- so the only radar the replay dispatches is the first
-    landing scan, fired before the 0x49 inventory snapshot reveals
-    the band. (The 2026-08-06 pin of >= 3 sweep radars encoded the
-    pre-hoard flow that burned band stock on sweeps -- the exact
-    income-burn deadlock the rule kills.)
+    Re-pinned 2026-08-06 with the quad-sweep routing (see the sweep
+    test above for why the pickup phase is unreachable in replay).
+    The recorded session repositions several times; each fresh block
+    draws a sweep radar on its still-fresh window, so the dispatched
+    radar count must exceed the single scan-on-landing the
+    pre-doctrine flow produced per landing.
     """
     radar_count = sum(1 for _tick, cmd in fuel_probe_session.all_dispatched if cmd == "radar")
-    assert radar_count == 1
+    assert radar_count >= 3
 
 
 def test_fuel_probe_replay_observes_visible_containers(

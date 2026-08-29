@@ -38,28 +38,22 @@ Stay in equipment recovery until radars reach ~20. Don't exit early just because
 
 [^1]: user (Austin), 2026-06-16 — "when I run out of radars I scan, walk a little, scan — making sure to do adjacent 5x5 blocks. when I collect extra radar I use them on a clean viewport. radars are the least frequent item from containers." The scan-walk-scan pattern is the free-radar footprint at `free_radar_revealed_tiles` (`src/tankpit_bot/state/scan_coverage.py:120-145`), which reveals only a small envelope around the tank clipped to viewport bounds; the "use extras on a clean viewport" half is the reveal-floor economics at `src/tankpit_bot/bot/ai/context.py:382` (`RADAR_SPEND_REVEAL_FLOOR_TILES = 32`) escalating to `:408` (`RADAR_RESERVE_REVEAL_FLOOR_TILES = 128`) on the last extra.
 
-## The atlas + hoard implementation (2026-08-28)
+## The atlas implementation — and the reverted hoard (2026-08-28)
 
-The 2026-08-28 income-burn deadlock (16 radars gained, 16 spent
-mid-restock, hunt bar never reached, zero kills in 17 minutes) turned
-this page's two clauses against each other and forced the precedence
-ruling, shipped as:
+The equipment ATLAS shipped and stays ([[equipment-system]] hotspot
+law): `data/equipment_atlas.json` (rebuilt by `make equipment-atlas`)
+drives a COLLECT teleport circuit (`bot/ai/equipment_atlas.py`) that
+hops to corpus-proven equipment ground when nothing believed
+collectible remains — an ADDITION to the cascade, above the quad
+sweep.
 
-- **Radar hoard rule** (`tactics.compute_desired_equipment`): outside
-  HUNT the extra-radar slot is toggled OFF below the hunt bar
-  (`combat_radar_min`), so every restock press serves the free
-  built-in 5x5 (this page's grid-walk half) and stock provably climbs.
-  The slot was previously enable-only in `apply_equipment` — once lit
-  it stayed server-side enabled forever, which is WHY collected extras
-  kept burning. In HUNT the slot stays on: combat scanning is what
-  the bar was saved for.
-- **Equipment atlas** ([[equipment-system]] hotspot law): the corpus's
-  per-field persistence-weighted hotspot tiles
-  (`data/equipment_atlas.json`, `make equipment-atlas`,
-  `bot/ai/equipment_atlas.py`) drive a COLLECT teleport circuit — hop
-  to the best unvisited hotspot, let the viewport reveal what sits
-  there (equipment needs NO radar to see), collect, hop on. Empty
-  hotspots tombstone for 3 minutes.
-- **Quad sweep demoted, not deleted**: it declines outright below the
-  hunt bar and survives only as rich-stock recon for ground the atlas
-  does not know. The last-extras reserve branch died with the gate.
+The same-day radar-HOARD band (slot toggled off between one extra and
+the hunt bar) was **REVERTED by operator order** ("i never said to do
+the conservative radar shit"). Radar policy is unchanged from before:
+the slot stays enabled while stocked, and spending is governed by the
+reveal-floor economics. Two facts from the trials survive the revert
+as recorded knowledge: a press with the radar slot DISABLED is a
+total no-op (no extras, no fuel, NO scan — the free built-in 5x5
+requires the slot ON at zero stock), and equipment income during
+20-minute low-radar foraging measured ~0.45 radars/min vs ~2.6/min
+during full-tempo farming.

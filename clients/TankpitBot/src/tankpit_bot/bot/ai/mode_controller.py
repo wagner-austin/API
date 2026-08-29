@@ -245,7 +245,6 @@ def make_hold_decision(
     timestamp_ms: int,
     fuel: int,
     inventory: InventoryState,
-    rank: int,
 ) -> TickDecisionDict:
     """Return a no-op decision for a manually-pinned idle tick.
 
@@ -275,8 +274,7 @@ def make_hold_decision(
         timestamp_ms: Current tick timestamp in milliseconds.
         fuel: Current fuel level (equipment-policy input).
         inventory: Current inventory state (stock counts gate the
-            dual/homing toggles and the radar hoard rule).
-        rank: Wire rank (sets the radar hunt bar).
+            dual/homing toggles).
 
     Returns:
         Tick decision that dispatches nothing, keeps the tank armed,
@@ -288,8 +286,6 @@ def make_hold_decision(
         fuel,
         dual_shots_count=inventory["dual_shots"]["count"],
         homing_shots_count=inventory["homing_shots"]["count"],
-        extra_radars_count=inventory["extra_radars"]["count"],
-        rank=rank,
     )
     return make_tick_decision(
         command=make_hold_command(),

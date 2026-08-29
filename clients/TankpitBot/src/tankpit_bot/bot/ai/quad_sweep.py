@@ -29,12 +29,13 @@ from typing import Literal
 from tankpit_bot.bot.ai.block_harvest import MAP_LAST_ORIGIN, WINDOW_LAST
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.context import (
+    RADAR_RESERVE_EXTRAS,
+    RADAR_RESERVE_REVEAL_FLOOR_TILES,
     RADAR_SPEND_REVEAL_FLOOR_TILES,
     DecideCtx,
     clear_resource_target,
     make_decision,
 )
-from tankpit_bot.bot.ai.tactics import combat_radar_min
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
@@ -107,21 +108,27 @@ def quadrant_bounds(sx: int, sy: int, offset_x: int, offset_y: int) -> tuple[int
     return (left, top, left + WINDOW_LAST, top + WINDOW_LAST)
 
 
-def _quadrant_spend_worthwhile(uncovered: int) -> bool:
+def _quadrant_spend_worthwhile(uncovered: int, extras: int) -> bool:
     """Return True when one quadrant scan is worth an extra radar.
 
-    The hoard gate guarantees every sweep tick holds at least the
-    hunt bar of extras (2026-08-28) -- far above the last-extras
-    reserve -- so the only economics left is the reveal floor: the
-    quadrant must buy enough fresh tiles to justify a paid scan.
+    Mirrors the shared radar-spend economics
+    (:func:`~tankpit_bot.bot.ai.context.radar_spend_worthwhile`)
+    evaluated against the QUADRANT window instead of the current one.
+    The sweep is an extras strategy by definition -- the free radar's
+    5x5 cannot tile a block -- so zero extras never qualifies.
 
     Args:
         uncovered: Uncovered tile count inside the quadrant window.
+        extras: Extra radars currently stocked.
 
     Returns:
-        True when the spend clears the reveal floor.
+        True when the spend clears the applicable reveal floor.
     """
-    return uncovered >= RADAR_SPEND_REVEAL_FLOOR_TILES
+    if extras > RADAR_RESERVE_EXTRAS:
+        return uncovered >= RADAR_SPEND_REVEAL_FLOOR_TILES
+    if extras > 0:
+        return uncovered >= RADAR_RESERVE_REVEAL_FLOOR_TILES
+    return False
 
 
 def _anchored_state(base_state: AIStateDict, sx: int, sy: int) -> AIStateDict:
@@ -168,16 +175,6 @@ def plan_quad_sweep(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict
         extras exhausted).
     """
     extras = ctx.inventory["extra_radars"]["count"]
-    if extras < combat_radar_min(ctx.self_state["rank"]):
-        # The RADAR HOARD rule (2026-08-28 income-burn deadlock): a
-        # sweep is a 4-extra purchase, and below the hunt bar every
-        # extra belongs to reaching the bar. Below the bar the radar
-        # slot is toggled OFF anyway (tactics.compute_desired_equipment)
-        # so a paid sweep could not consume -- this gate makes the
-        # sweep decline instead of pressing free 5x5s that cannot
-        # tile a block. The equipment ATLAS hop is the below-bar
-        # discovery strategy.
-        return None
     if ctx.fuel <= ctx.config["fuel_low_threshold"]:
         # Recon is an economy move, never a survival move: at or below
         # the fuel-low break every tick belongs to fuel acquisition
@@ -201,7 +198,7 @@ def plan_quad_sweep(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict
         if block_uncovered < SWEEP_START_FLOOR_TILES:
             return None
     window = viewport_visible_bounds(ctx.world["viewport"])
-    pending = _pending_quadrants(ctx, sx, sy)
+    pending = _pending_quadrants(ctx, sx, sy, extras)
     if not pending:
         return None
     for direction, bounds, uncovered in pending:
@@ -238,6 +235,7 @@ def _pending_quadrants(
     ctx: DecideCtx,
     sx: int,
     sy: int,
+    extras: int,
 ) -> list[tuple[int, tuple[int, int, int, int], int]]:
     """Return the quadrants still worth an extra, in sweep order.
 
@@ -245,6 +243,7 @@ def _pending_quadrants(
         ctx: Decision context.
         sx: Anchor X (the tank's current tile).
         sy: Anchor Y (the tank's current tile).
+        extras: Extra radars currently stocked.
 
     Returns:
         ``(direction, bounds, uncovered)`` per qualifying quadrant.
@@ -260,7 +259,7 @@ def _pending_quadrants(
             bounds[3],
             ctx.timestamp_ms,
         )
-        if _quadrant_spend_worthwhile(uncovered):
+        if _quadrant_spend_worthwhile(uncovered, extras):
             pending.append((direction, bounds, uncovered))
     return pending
 

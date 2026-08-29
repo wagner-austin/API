@@ -79,7 +79,6 @@ def decide(
             timestamp_ms,
             self_state["fuel"],
             inventory,
-            self_state["rank"],
         )
     ctx = DecideCtx(
         world,
