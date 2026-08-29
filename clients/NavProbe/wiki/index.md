@@ -1,6 +1,6 @@
 # NavProbe Wiki
 
-**Read this first.** 5 topic hubs, 30 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
+**Read this first.** 5 topic hubs, 33 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
 
 NavProbe is a reproducibility instrument for simulated navigation. This wiki records two things kept deliberately apart: **what the instrument was built to be** (design decisions and their reasoning) and **what it has measured** (results, with the conditions they were taken under).
 
@@ -22,6 +22,17 @@ that costs is [[deterministic-mode-cost-falls-with-scale]]: a few-fold slowdown 
 figures were measured on a solve the contact buffer had silently truncated, and its
 wall clocks move by up to 4x with host load.
 
+**The patch is safe; the mode it unlocks is not safe everywhere.** The patch itself
+changes nothing — measured on the vendor's own tactile fixture with twelve live taxels,
+patched and unpatched agree bit for bit on both devices
+([[tactile-alias-is-inert-with-live-taxels]]). But on that same mesh/multiccd model the
+deterministic mode **drops every contact** and the body falls through the geom it should
+rest on, silently and exit 0
+([[deterministic-mode-drops-contacts-on-mesh-collision]]). The sphere family above is
+unaffected and its ten-scene table was re-checked with contact counts and survives —
+which is worth knowing precisely because this instrument scores a zero-contact run as
+`deterministic: true` ([[a-determinism-verdict-needs-a-correctness-oracle]]).
+
 **The headline results so far**, all in the default mode. Three separate reproducibility failures, none of which a simple benchmark would surface. Read the figures as instances rather than constants — every precise number below moved when re-measured on a different scene, while every shape held ([[the-numbers-are-scene-dependent-the-shapes-replicate]]):
 
 1. **GPU run-to-run, once bodies touch each other.** Twelve runs of one rollout in one process give twelve different answers once six bodies are in mutual contact — while thirty-two bodies resting only on the floor, with *four times* the contacts, reproduce exactly. The CPU reproduces in every case. Contact count is not the variable; what the contacts connect is. And it is not last-bit trivia: at thirty-two touching bodies the disagreement amplifies chaotically from 10⁻⁸ m to the scale of the container within two simulated seconds, while the CPU stays at exactly zero. Every other measurement on this wiki is on a scene with no body-to-body contact, so all of them sit below the threshold by construction.
@@ -30,9 +41,9 @@ wall clocks move by up to 4x with host load.
 
 ## Hubs
 
-[Determinism Measurement](hubs/determinism-measurement.md) -- what reproducible means here, and every physics trial this instrument has run (13 pages)
+[Determinism Measurement](hubs/determinism-measurement.md) -- what reproducible means here, and every physics trial this instrument has run (16 pages)
 [Rendered Observations](hubs/rendered-observations.md) -- the batch renderer, and whether the pixel stream a policy consumes reproduces (3 pages)
-[Instrument Design](hubs/instrument-design.md) -- canonical encoding, digest folding, record formats, and the injectivity obligations behind them (7 pages)
+[Instrument Design](hubs/instrument-design.md) -- canonical encoding, digest folding, record formats, and the injectivity obligations behind them (8 pages)
 [Simulator Adapters](hubs/simulator-adapters.md) -- the vendor boundary: typing untyped APIs, keeping the declarations honest, and what each backend requires (3 pages)
 [Platform Constraints](hubs/platform-constraints.md) -- which measurements are reachable from which machine, and why (4 pages)
 

@@ -12,7 +12,7 @@ provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"
   - "google-deepmind/mujoco_warp PR #1591 (withdrawn)"
-fact_checked: 2026-08-18
+fact_checked: 2026-08-29
 confidence: high
 measured_with:
   package: mujoco-warp 3.11.0
@@ -102,4 +102,11 @@ Three separate `RUN_TO_RUN` processes — the original sweep under heavy co-resi
 
 ## What this does not establish
 
-The digests are RUN_TO_RUN-mode digests, comparable neither to default-mode GPU digests nor to the CPU reference — the deterministic lowering fixes a *different* summation order rather than reproducing either of the old ones. Cross-boot and cross-machine repetition of the RUN_TO_RUN digests is unmeasured, as is `GPU_TO_GPU` on a second architecture. The scene family declares `nsensor = 0`, so the aliased tactile writes were compiled but never executed with live taxel data; a model that uses tactile sensing should be checked for output equivalence against the unpatched build before the patch is trusted beyond compilation. One scene family, one pipeline configuration (sparse solver path, nworld 2), `deterministic_max_records` validated only up to 32 bodies.
+The digests are RUN_TO_RUN-mode digests, comparable neither to default-mode GPU digests nor to the CPU reference — the deterministic lowering fixes a *different* summation order rather than reproducing either of the old ones. Cross-boot and cross-machine repetition of the RUN_TO_RUN digests is unmeasured, as is `GPU_TO_GPU` on a second architecture. One scene family, one pipeline configuration (sparse solver path, nworld 2).
+
+**The `nsensor = 0` gap named here is now closed, and closing it found something worse than the gap.** This section used to end by asking for an output-equivalence check on a model that actually uses tactile sensing, before trusting the patch beyond compilation. Measured 2026-08-29 on the vendor's own tactile fixture: the patch is semantically inert — patched and unpatched produce bit-identical output on both devices with twelve live taxels ([[tactile-alias-is-inert-with-live-taxels]]). The patch is safe.
+
+The mode it unlocks is not, on that model. Under `RUN_TO_RUN` the same fixture generates **zero contacts** and the body falls through the geom it should rest on — erratically at `deterministic_max_records = 64`, and identically on all eight repetitions at 4096 ([[deterministic-mode-drops-contacts-on-mesh-collision]]). So two qualifications land on this page's headline:
+
+- **`deterministic_max_records = 64` is model-dependent and fails quietly.** It was validated here on the sphere family up to 32 bodies with no sensors. On the tactile fixture it is too small, and Warp's overflow guard is skipped while a CUDA stream is capturing, which MuJoCo-Warp does — so a truncated buffer corrupts results with no exception and exit 0.
+- **"10/10 bit-reproducible" was a verdict with no correctness oracle.** The ten rows below were re-run with contact counts attached and they survive intact — the contacts are there, totals matching the default mode on nine of ten scenes ([[a-determinism-verdict-needs-a-correctness-oracle]]). The table stands. But it stands because it was checked, not because the original sweep could have told the difference.

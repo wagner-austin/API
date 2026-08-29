@@ -27,6 +27,24 @@ Warp's deterministic modes would make most of this wiki's findings a *setting* r
 
 **Also unmeasured:** the throughput cost of deterministic atomics, because nothing compiled and so nothing was timed. Warp 1.15's own documentation publishes a cost table (RTX 4090: deterministic sort-and-reduce is up to 7.6x *faster* than atomics at high contention, ~13x slower at low contention), which bounds the expectation but does not measure MJWarp.
 
+**The equivalence check this question deferred is now done, and it opened question 1b.** The patch was trusted for *compilation* only; whether the aliased writes changed any numbers was untested because the scene family has `nsensor = 0`. Measured 2026-08-29 on the vendor's own tactile fixture: they do not — patched and unpatched are bit-identical on both devices with 12 live taxels ([[tactile-alias-is-inert-with-live-taxels]]). The patch is safe to file. What the check found instead is below.
+
+## 1b. Which kernel drops the contacts on a mesh/multiccd model under deterministic mode?
+
+Under `RUN_TO_RUN` the vendor tactile fixture generates **zero contacts** and the body falls through the box it should rest on — reproducibly, at adequate buffer capacity, with no exception and exit 0 ([[deterministic-mode-drops-contacts-on-mesh-collision]]). The sphere family is unaffected, so this is specific to the mesh-vs-box collision path, not to deterministic mode in general.
+
+This is the highest-value open item on this page, because it is a **correctness** failure rather than a reproducibility one, and because it decides how an upstream bug report is scoped.
+
+**`multiccd` is ruled out, 2026-08-29.** It was the obvious suspect and the cheapest test, so it went first: rebuilding the identical fixture without `<flag multiccd="enable"/>` changes nothing in either mode — default keeps its 60 contacts and final z 1.149779, `RUN_TO_RUN` still drops to zero contacts and 0.981754, one distinct digest from six repetitions in all four cells. The flag does not affect this scene at all and removing it does not rescue the contacts.
+
+**What would answer the rest, cheapest first:**
+
+1. **Bisect the deterministic lowering by kernel.** Warp intercepts atomics per kernel; a build that leaves `collision_driver`'s kernels on ordinary atomics while the rest stays deterministic would locate the failure to a module. This is now the next experiment.
+2. **Vary the geometry pair.** The sphere family (primitive-vs-plane, primitive-vs-primitive) is clean and this fixture (mesh-vs-box) is not. A mesh-vs-plane and a primitive-vs-box arm would say whether "mesh" or "box" is the operative half, which is one more axis the bug report can name.
+3. **`_preprocess_tactile_contacts` is a bystander, not a suspect.** It consumes an `atomic_add` *return value* as a slot index — the two-pass counter-replay lowering, the most fragile construct in the pipeline. But it runs downstream of `d.nacon`, which is already zero, so it never had contacts to deduplicate. Noted here so the next reader does not re-open it.
+
+**Also unresolved and worth stating:** whether `deterministic_max_records = 64` — the value question 1 adopted and this wiki still publishes — silently truncated anything in the runs that produced the ten-scene table. Those runs pass a contact check ([[a-determinism-verdict-needs-a-correctness-oracle]]), so nothing is known to be wrong; but the guard that would have said so is skipped under CUDA graph capture, so "no error was raised" is not evidence.
+
 ## 2. Do the findings hold on another GPU architecture?
 
 Everything GPU-side was measured on two Ampere sm_86 devices: the RTX 3090 Ti (84 SMs) and, since 2026-08-16, sedona's RTX 3070 Ti Laptop (46 SMs), where the coupled-body threshold did not move ([[coupled-body-threshold-does-not-move-with-sm-count]]). That falsifies the occupancy explanation *within* an architecture but says nothing about cross-architecture codegen: both devices compile to the same sm_86 target. A threshold that is a codegen or warp-scheduling artefact could still move on a different architecture; one that is algorithmic should not.
