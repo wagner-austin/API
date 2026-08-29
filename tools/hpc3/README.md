@@ -498,23 +498,35 @@ tool and compares the answer. On this project a rebuilt image silently changed
 its torch major version, and it was found only after a training run whose
 result could not be interpreted.
 
-The registry lives at **`known-answers.json`, in this directory, in git.**
-That is deliberate — it is the record of what this environment computed and
-when, so a copy on cluster scratch is one cleanup away from losing every
-baseline that makes a future run interpretable. `write_registry` deliberately
-overrides the compact JSON default and writes indented, for the sole reason
-that a new entry should be a readable one-line diff, which only pays off under
-version control.
+The registry lives at **`wiki/tools/extraction-eval/runs/known-answers.json`,
+in git** — in the wiki repo, not this one, beside the ablation audit chain
+(`PROVENANCE.md`, `baselines.txt`, `runs*.txt`) whose floors it also carries.
+Version control is the point: it is the record of what this environment
+computed and when, so a copy on cluster scratch is one cleanup away from
+losing every baseline that makes a future run interpretable. `write_registry`
+deliberately overrides the compact JSON default and writes indented, for the
+sole reason that a new entry should be a readable one-line diff, which only
+pays off under version control.
+
+**It briefly lived here too, and that was a mistake worth recording.** On
+2026-08-29 a session searched this repo, `/pub/wagnera3`, the cluster home
+directory and `artifacts/`, found no registry, and built a second one in this
+directory — having written the first into the wiki repo hours earlier in the
+same session. The duplicate reconstructed the original's six entries
+byte-for-byte from the same artifacts through the same command, which is
+exactly the signal that should have prompted a wider search. Four exhaustive
+searches of the wrong namespace are not an absence proof, and this workspace
+spans three repositories plus a cluster filesystem.
 
 ```bash
 # Before trusting an environment: does it still give the known answer?
 python -m model_trainer.cli.known_answer_registry \
-    --registry tools/hpc3/known-answers.json \
+    --registry ../../../wiki/tools/extraction-eval/runs/known-answers.json \
     --record artifacts/ka-probe-v20/v20-a100.json --mode gate
 
 # Establish a new answer, e.g. on a new image or a new card.
 python -m model_trainer.cli.known_answer_registry \
-    --registry tools/hpc3/known-answers.json \
+    --registry ../../../wiki/tools/extraction-eval/runs/known-answers.json \
     --record <record.json> --mode register --tolerance 0.0
 
 # A scoring run emits four numbers; --observation says which one IS the answer.
